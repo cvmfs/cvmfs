@@ -27,6 +27,8 @@
 #include <stdint.h>
 #include <sys/dir.h>
 #include <sys/stat.h>
+#include <sys/xattr.h>
+
 #ifndef __APPLE__
 #include <sys/statfs.h>
 #endif
@@ -35,6 +37,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
@@ -506,6 +509,8 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
   // the absolute sequence number with the first bit set in two's complement.
   // So -1 can be a marker that will never appear in the database.
   int64_t max_acseq = -1;
+  std::vector<EvictCandidate> lru_ordered_open;
+
   do {
     sqlite3_reset(stmt_lru_);
     sqlite3_bind_int64(stmt_lru_, 1,
@@ -533,19 +538,32 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
     }
 
     const unsigned N = candidates.size();
+
+    open_files_.clear();
+    open_files_ = (cleanup_unused_first_) ? CollectAllOpenHashes()
+                                          : std::vector<shash::Any>();
+
     for (i = 0; i < N; ++i) {
       // That's a critical condition.  We must not delete a not yet inserted
       // pinned file as it is already reserved (but will be inserted later).
       // Instead, set the pin bit in the db to not run into an endless loop
-      if (pinned_chunks_.find(candidates[i].hash) != pinned_chunks_.end()) {
-        hash_str = candidates[i].hash.ToString();
-        LogCvmfs(kLogQuota, kLogDebug, "skip %s for eviction",
-                 hash_str.c_str());
-        sqlite3_bind_text(stmt_block_, 1, &hash_str[0], hash_str.length(),
-                          SQLITE_STATIC);
-        result = (sqlite3_step(stmt_block_) == SQLITE_DONE);
-        sqlite3_reset(stmt_block_);
-        assert(result);
+      const bool is_pinned = pinned_chunks_.find(candidates[i].hash)
+                             != pinned_chunks_.end();
+
+      // Avoid evicting open files hopping there are enough more recently used
+      // files to satisfy the cleanup request
+      const bool is_open = std::find(open_files_.begin(), open_files_.end(),
+                                     candidates[i].hash)
+                           != open_files_.end();
+
+      if (is_pinned) {
+        SkipEviction(candidates[i]);
+        continue;
+      }
+
+      if (cleanup_unused_first_ and is_open) {
+        SkipEviction(candidates[i]);
+        lru_ordered_open.push_back(candidates[i]);
         continue;
       }
 
@@ -570,6 +588,17 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
     result = (sqlite3_step(stmt_unblock_) == SQLITE_DONE);
     sqlite3_reset(stmt_unblock_);
     assert(result);
+  }
+
+  while (!lru_ordered_open.empty() and gauge_ > leave_size) {
+    // cleanup files in use
+    auto &candidate = lru_ordered_open[0];
+    trash.push_back(cache_dir_ + "/" + candidate.hash.MakePathWithoutSuffix());
+    gauge_ -= candidate.size;
+    max_acseq = candidate.acseq;
+    LogCvmfs(kLogQuota, kLogDebug, "lru cleanup %s, new gauge %" PRIu64,
+             candidate.hash.ToString().c_str(), gauge_);
+    lru_ordered_open.erase(lru_ordered_open.begin());
   }
 
   if (!EmptyTrash(trash))
@@ -752,6 +781,53 @@ uint32_t PosixQuotaManager::GetProtocolRevision() {
   return revision;
 }
 
+void PosixQuotaManager::SetCleanupPolicy(bool cleanup_unused_first) {
+  LruCommand cmd;
+  cmd.command_type = kSetCleanupPolicy;
+  WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
+
+  WritePipe(pipe_lru_[1], &cleanup_unused_first, sizeof(bool));
+}
+
+void PosixQuotaManager::RegisterMountpoint(const std::string &mountpoint) {
+  LruCommand cmd;
+  cmd.command_type = kRegisterMountpoint;
+  WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
+
+  size_t mp_size = mountpoint.size();
+  WritePipe(pipe_lru_[1], &mp_size, sizeof(size_t));
+  WritePipe(pipe_lru_[1], mountpoint.data(), mp_size);
+}
+
+std::string PosixQuotaManager::GetMountpoints() {
+  int pipe_mp[2];
+  MakeReturnPipe(pipe_mp);
+
+  LruCommand cmd;
+  cmd.command_type = kGetMountpoints;
+  cmd.return_pipe = pipe_mp[1];
+  WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
+  size_t mp_str_size = 0;
+  ManagedReadHalfPipe(pipe_mp[0], &mp_str_size, sizeof(size_t));
+  char *buf = (char *)malloc(mp_str_size * sizeof(char));
+  ManagedReadHalfPipe(pipe_mp[0], buf, mp_str_size);
+  return std::string(buf);
+}
+
+std::string PosixQuotaManager::GetGroupHashes() {
+  int pipe_gh[2];
+  MakeReturnPipe(pipe_gh);
+
+  LruCommand cmd;
+  cmd.command_type = kGetGroupHashes;
+  cmd.return_pipe = pipe_gh[1];
+  WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
+  size_t mp_str_size = 0;
+  ManagedReadHalfPipe(pipe_gh[0], &mp_str_size, sizeof(size_t));
+  char *buf = (char *)malloc(mp_str_size * sizeof(char));
+  ManagedReadHalfPipe(pipe_gh[0], buf, mp_str_size);
+  return std::string(buf);
+}
 
 /**
  * Queries the shared local hard disk quota manager.
@@ -1259,6 +1335,64 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
       continue;
     }
 
+    // Register a new mountpoint
+    if (command_type == kRegisterMountpoint) {
+      size_t mp_size = 0;
+      ReadPipe(quota_mgr->pipe_lru_[0], &mp_size, sizeof(size_t));
+      std::string mountpoint(mp_size, '\0');
+      ReadPipe(quota_mgr->pipe_lru_[0], (void *)mountpoint.data(), mp_size);
+      quota_mgr->mountpoints_.push_back(mountpoint);
+      LogCvmfs(kLogQuota, kLogDebug | kLogSyslog,
+               "Mountpoint %s registered in the group", mountpoint.c_str());
+      continue;
+    }
+
+    // Set Cleanup Policy
+    if (command_type == kSetCleanupPolicy) {
+      bool policy = false;
+      ReadPipe(quota_mgr->pipe_lru_[0], &policy, sizeof(bool));
+      quota_mgr->cleanup_unused_first_ = policy;
+      continue;
+    }
+    // Mountpoints are returned immediately
+    if (command_type == kGetMountpoints) {
+      const int return_pipe = quota_mgr->BindReturnPipe(
+          command_buffer[num_commands].return_pipe);
+      if (return_pipe < 0)
+        continue;
+
+      std::string mps;
+      for (auto it = quota_mgr->mountpoints_.begin();
+           it != quota_mgr->mountpoints_.end();
+           ++it) {
+        mps += *it + "\n";
+      }
+      size_t mp_size = mps.size();
+      WritePipe(return_pipe, &mp_size, sizeof(size_t));
+      WritePipe(return_pipe, mps.c_str(), mp_size);
+      quota_mgr->UnbindReturnPipe(return_pipe);
+      continue;
+    }
+
+    // Group hashes are returned immediately
+    if (command_type == kGetGroupHashes) {
+      const int return_pipe = quota_mgr->BindReturnPipe(
+          command_buffer[num_commands].return_pipe);
+      if (return_pipe < 0)
+        continue;
+
+      std::vector<shash::Any> gh = quota_mgr->CollectAllOpenHashes();
+      std::string result;
+      for (auto it = gh.begin(); it != gh.end(); ++it) {
+        result += (*it).ToString() + "\n";
+      }
+      size_t result_size = result.size();
+      WritePipe(return_pipe, &result_size, sizeof(size_t));
+      WritePipe(return_pipe, result.c_str(), result_size);
+      quota_mgr->UnbindReturnPipe(return_pipe);
+      continue;
+    }
+
     // The cleanup rate is returned immediately
     if (command_type == kCleanupRate) {
       const int return_pipe = quota_mgr->BindReturnPipe(
@@ -1606,6 +1740,16 @@ void PosixQuotaManager::ParseDirectories(const std::string cache_workspace,
   }
 }
 
+void PosixQuotaManager::SkipEviction(const EvictCandidate &candidate) {
+  bool res = true;
+  std::string hash_str = candidate.hash.ToString();
+  LogCvmfs(kLogQuota, kLogDebug, "Exclude %s from eviction", hash_str.c_str());
+  sqlite3_bind_text(stmt_block_, 1, &hash_str[0], hash_str.length(),
+                    SQLITE_STATIC);
+  res = (sqlite3_step(stmt_block_) == SQLITE_DONE);
+  sqlite3_reset(stmt_block_);
+  assert(res);
+}
 
 /**
  * Immediately inserts a new pinned catalog. Does cache cleanup if necessary.
@@ -1709,7 +1853,8 @@ PosixQuotaManager::PosixQuotaManager(const uint64_t limit,
     , stmt_list_pinned_(NULL)
     , stmt_list_catalogs_(NULL)
     , stmt_list_volatile_(NULL)
-    , initialized_(false) {
+    , initialized_(false)
+    , cleanup_unused_first_(false) {
   ParseDirectories(cache_workspace, &cache_dir_, &workspace_dir_);
   pipe_lru_[0] = pipe_lru_[1] = -1;
   cleanup_recorder_.AddRecorder(1, 90);  // last 1.5 min with second resolution
@@ -1719,10 +1864,15 @@ PosixQuotaManager::PosixQuotaManager(const uint64_t limit,
   cleanup_recorder_.AddRecorder(20 * 60, 60 * 60 * 18);
   // last 4 days with hour resolution
   cleanup_recorder_.AddRecorder(60 * 60, 60 * 60 * 24 * 4);
+
+  lock_open_files_ = reinterpret_cast<pthread_mutex_t *>(
+      smalloc(sizeof(pthread_mutex_t)));
 }
 
 
 PosixQuotaManager::~PosixQuotaManager() {
+  free(lock_open_files_);
+
   if (!initialized_)
     return;
 
@@ -2106,3 +2256,92 @@ void PosixQuotaManager::ManagedReadHalfPipe(int fd, void *buf, size_t nbyte) {
           "Error: quota manager could not read from cachemanager pipe");
   }
 }
+
+void *PosixQuotaManager::CollectMountpointsHashes(void *data) {
+#ifndef __APPLE__
+  pthread_setname_np(pthread_self(), "hash_collector");
+  auto *handler = static_cast<CollectorHandler *>(data);
+
+  const std::string mountpoint = handler->mp[handler->i];
+  ssize_t n = getxattr(mountpoint.c_str(), "user.list_open_hashes", nullptr, 0);
+  if (n < 0) {
+    pthread_exit(nullptr);
+  }
+  std::vector<char> buf((size_t)n);
+  n = getxattr(mountpoint.c_str(), "user.list_open_hashes", buf.data(),
+               buf.size());
+  if (n < 0) {
+    pthread_exit(nullptr);
+  }
+
+  std::vector<std::string> hash_strs;
+  std::string hash_str;
+  for (const char c : buf) {
+    if (c == '\n') {
+      hash_strs.push_back(hash_str);
+      hash_str.clear();
+    } else {
+      hash_str += c;
+    }
+  }
+  const MutexLockGuard lock_guard(handler->l);
+  for (auto hash_str : hash_strs) {
+    handler->of.push_back(shash::MkFromHexPtr(shash::HexPtr(hash_str)));
+  }
+#endif
+  pthread_exit(nullptr);
+}
+
+std::vector<shash::Any> PosixQuotaManager::CollectAllOpenHashes() {
+  std::vector<CollectorHandler *> handlers;
+  std::vector<pthread_t *> threads;
+  open_files_.clear();
+#ifndef __APPLE__
+  auto &&a_after_b = [](const struct timespec a, const struct timespec b) {
+    return (a.tv_sec > b.tv_sec) ? true : false;
+  };
+
+  for (size_t i = 0; i < mountpoints_.size(); ++i) {
+    handlers.push_back(
+        new CollectorHandler{open_files_, mountpoints_, lock_open_files_, i});
+    threads.push_back(new pthread_t);
+  }
+
+  const int retval = pthread_mutex_init(lock_open_files_, NULL);
+  assert(retval == 0);
+
+  for (size_t i = 0; i < mountpoints_.size(); ++i) {
+    pthread_create(threads[i], nullptr, CollectMountpointsHashes, handlers[i]);
+  }
+
+  std::vector<bool> joined(handlers.size(), false);
+  struct timespec reference, current;
+  clock_gettime(CLOCK_REALTIME, &reference);
+  clock_gettime(CLOCK_REALTIME, &current);
+  reference.tv_sec += 10;  // Give 10sec for hash collection
+  size_t i = 0;
+  while (
+      (not std::all_of(joined.begin(), joined.end(), [](bool b) { return b; }))
+      and a_after_b(reference, current)) {
+    // as long as there are still threads that haven't joined yet
+    // and for 10 seconds
+    if (not joined[i]) {
+      const int s = pthread_tryjoin_np(*threads[i], NULL);
+      if (s == 0) {
+        joined[i] = true;
+      }
+    }
+    ++i;
+    i = i % handlers.size();
+    clock_gettime(CLOCK_REALTIME, &current);
+  }
+
+  for (size_t i = 0; i < handlers.size(); ++i) {
+    delete handlers[i];
+  }
+
+  pthread_mutex_destroy(lock_open_files_);
+#endif
+  return open_files_;
+}
+

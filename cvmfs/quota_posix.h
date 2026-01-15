@@ -35,6 +35,7 @@ class Recorder;
 class PosixQuotaManager : public QuotaManager {
   FRIEND_TEST(T_QuotaManager, BindReturnPipe);
   FRIEND_TEST(T_QuotaManager, Cleanup);
+  FRIEND_TEST(T_QuotaManager, CleanupLru);
   FRIEND_TEST(T_QuotaManager, Contains);
   FRIEND_TEST(T_QuotaManager, InitDatabase);
   FRIEND_TEST(T_QuotaManager, MakeReturnPipe);
@@ -84,6 +85,10 @@ class PosixQuotaManager : public QuotaManager {
   virtual void Spawn();
   virtual pid_t GetPid();
   virtual uint32_t GetProtocolRevision();
+  virtual void RegisterMountpoint(const std::string &mountpoint);
+  virtual void SetCleanupPolicy(bool cleanup_unused_first);
+  virtual std::string GetMountpoints();
+  virtual std::string GetGroupHashes();
 
   void ManagedReadHalfPipe(int fd, void *buf, size_t nbyte);
   void SetCacheMgrPid(pid_t pid_) { cachemgr_pid_ = pid_; };
@@ -124,6 +129,11 @@ class PosixQuotaManager : public QuotaManager {
     kListVolatile,
     kCleanupRate,
     kSetLimit,
+    // After non open aware LRU cleanup
+    kRegisterMountpoint,
+    kGetMountpoints,
+    kGetGroupHashes,
+    kSetCleanupPolicy,
   };
 
   /**
@@ -263,6 +273,7 @@ class PosixQuotaManager : public QuotaManager {
                                std::string *workspace_dir);
   PosixQuotaManager(const uint64_t limit, const uint64_t cleanup_threshold,
                     const std::string &cache_workspace);
+  void SkipEviction(const EvictCandidate &candidate);
 
   /**
    * Indicates if the cache manager is a shared process or a thread within the
@@ -372,6 +383,29 @@ class PosixQuotaManager : public QuotaManager {
    * Used in the destructor to steer closing of the database and so on.
    */
   bool initialized_;
+
+  /**
+   * Used in DoCleanup to exclude currently used files from eviction
+   */
+  // TODO(gchr): it would be faster if it was a std::set. Needs a comparison
+  // operator for shash::Any
+  pthread_mutex_t *lock_open_files_;
+  std::vector<shash::Any> open_files_;
+
+  bool cleanup_unused_first_;
+  std::vector<std::string> mountpoints_;
+
+  std::vector<shash::Any> CollectAllOpenHashes();
+
+  struct CollectorHandler {
+    std::vector<shash::Any> &of;
+    const std::vector<std::string> &mp;
+    pthread_mutex_t *l;
+    size_t i;
+  };
+
+  static void *CollectMountpointsHashes(void *data);
 };  // class PosixQuotaManager
 
 #endif  // CVMFS_QUOTA_POSIX_H_
+

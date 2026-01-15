@@ -1179,9 +1179,12 @@ _update_geodb() {
     CVMFS_GEO_DB_FILE=/usr/share/GeoIP/$CVMFS_UPDATEGEO_DB
   fi
   if [ -n "$CVMFS_GEO_DB_FILE" ]; then
+    if [ "$CVMFS_GEO_DB_FILE" = "NONE" ] || [ "$CVMFS_GEO_DB_FILE" = "none" ]; then
+      return 0
+    fi
     # This overrides the update/install; link to the given file instead.
     if [ ! -L "$dbfile" ] || [ "`readlink $dbfile`" != "$CVMFS_GEO_DB_FILE" ]; then
-      if [ "$CVMFS_GEO_DB_FILE" != "NONE" ] && [ ! -r "$CVMFS_GEO_DB_FILE" ]; then
+      if [ ! -r "$CVMFS_GEO_DB_FILE" ]; then
         echo "$CVMFS_GEO_DB_FILE doesn't exist or is not readable" >&2
         return 1
       fi

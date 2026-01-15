@@ -229,6 +229,7 @@ TEST_F(T_QuotaManager, CleanupLru) {
     quota_mgr_->Touch(hashes_[i]);
   }
 
+  quota_mgr_->cleanup_unused_first_ = false;
   EXPECT_TRUE(quota_mgr_->Cleanup(N / 2));
   vector<string> remaining = quota_mgr_->List();
   EXPECT_EQ(N / 2, remaining.size());
@@ -574,3 +575,4 @@ TEST_F(T_QuotaManager, SetLimit) {
   const uint64_t limit = quota_mgr_->GetCapacity();
   EXPECT_EQ(100ul, limit);
 }
+

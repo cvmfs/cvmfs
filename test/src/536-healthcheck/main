@@ -102,6 +102,9 @@ cvmfs_run_test() {
   echo "*** check repository integrity"
   check_repository $CVMFS_TEST_REPO -i || return 18
 
+  echo "*** check repository integrity with custom scratch dir"
+  check_repository $CVMFS_TEST_REPO -i -x $(mktemp -d) || return 19
+
   return 0
 }
 

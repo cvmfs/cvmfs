@@ -129,6 +129,7 @@ jobs:
             src/103-reloadcachemgr                            \
             src/104-concurrent_mounts                         \
             src/105-streaming-cache                           \
+            src/108-global-config                             \
             src/406-ducc-webhook-notifications                \
             --                                                \
             src/0*                                            \

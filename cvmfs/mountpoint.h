@@ -101,8 +101,6 @@ class FileSystem : SingleCopy, public BootFactory {
   FRIEND_TEST(T_MountPoint, CheckInstanceName);
   FRIEND_TEST(T_MountPoint, CheckPosixCacheSettings);
   FRIEND_TEST(T_Cvmfs, Basics);
-  FRIEND_TEST(T_VersionEnv, SetupGlobalEnvironmentParams);
-  FRIEND_TEST(T_VersionEnv, VersionNumericFormat);
 
  public:
   enum Type {
@@ -276,7 +274,8 @@ class FileSystem : SingleCopy, public BootFactory {
         , cache_base_defined(false)
         , cache_dir_defined(false)
         , quota_limit(0)
-        , do_refcount(true) { }
+        , do_refcount(true)
+        , cleanup_unused_first(false) { }
     bool is_shared;
     bool is_alien;
     bool is_managed;
@@ -289,6 +288,7 @@ class FileSystem : SingleCopy, public BootFactory {
      */
     int64_t quota_limit;
     bool do_refcount;
+    bool cleanup_unused_first;
     std::string cache_path;
     /**
      * Different from cache_path only if CVMFS_WORKSPACE or
@@ -303,7 +303,6 @@ class FileSystem : SingleCopy, public BootFactory {
 
   explicit FileSystem(const FileSystemInfo &fs_info);
 
-  static void SetupGlobalEnvironmentParams();
   void SetupLogging();
   void CreateStatistics();
   void SetupSqlite();
@@ -689,3 +688,4 @@ class MountPoint : SingleCopy, public BootFactory {
 };  // class MointPoint
 
 #endif  // CVMFS_MOUNTPOINT_H_
+

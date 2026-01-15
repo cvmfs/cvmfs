@@ -37,8 +37,26 @@ COPY --from=builder /home/sftnight/buildpackage_config/RPMS/noarch/ /tmp/.
 RUN dnf -y install /tmp/*.rpm
 
 # cloudtest dependencies
-RUN dnf install -y sudo gcc autofs bind-utils fuse fuse3 httpd iproute lsof \
-    python python3-pip attr nc sqlite python3-mod_wsgi jq usbutils
+RUN dnf install -y \
+    attr \
+    autofs \
+    bind-utils \
+    e2fsprogs \
+    fuse \
+    fuse3 \
+    gcc \
+    httpd \
+    iproute \
+    jq \
+    lsof \
+    nc \
+    python \
+    python3-mod_wsgi \
+    python3-pip \
+    sqlite \
+    sudo \
+    usbutils \
+    ;
 
 RUN pip3 install flask
 # Create the sftnight user

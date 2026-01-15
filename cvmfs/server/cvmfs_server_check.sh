@@ -79,6 +79,11 @@ __do_check() {
   local with_reflog=
   has_reflog_checksum $name && with_reflog="-R $(get_reflog_checksum $name)"
 
+  default_scratch_dir="${CVMFS_SPOOL_DIR}/tmp"
+  if [ -z "$scratch_dir" ]; then
+    scratch_dir=$default_scratch_dir
+  fi
+
   local user_shell="$(get_user_shell $name)"
   local check_cmd
   check_cmd="$(__swissknife_cmd dbg) check $tag        \
@@ -86,7 +91,7 @@ __do_check() {
                      $log_level_param                  \
                      $subtree_param                    \
                      -r $url                           \
-                     -t ${CVMFS_SPOOL_DIR}/tmp         \
+                     -t ${scratch_dir}                 \
                      -k ${CVMFS_PUBLIC_KEY}            \
                      -N ${CVMFS_REPOSITORY_NAME}       \
                      $(get_swissknife_proxy)           \
@@ -152,12 +157,17 @@ __check_repair_reflog() {
     to_syslog_for_repo $name "reference log reconstruction started"
     local repository_url
 
+    default_scratch_dir="${CVMFS_SPOOL_DIR}/tmp"
+    if [ -z "$scratch_dir" ]; then
+      scratch_dir=$default_scratch_dir
+    fi
+
     local reflog_reconstruct_command="$(__swissknife_cmd dbg) reconstruct_reflog \
                                                   -r $repository_url             \
                                                   $(get_swissknife_proxy)        \
                                                   -u $CVMFS_UPSTREAM_STORAGE     \
                                                   -n $CVMFS_REPOSITORY_NAME      \
-                                                  -t ${CVMFS_SPOOL_DIR}/tmp/     \
+                                                  -t ${scratch_dir}              \
                                                   -k $CVMFS_PUBLIC_KEY           \
                                                   -R $(get_reflog_checksum $name)"
     if ! $user_shell "$reflog_reconstruct_command"; then
@@ -276,10 +286,11 @@ cvmfs_server_check() {
   local subtree_path=""
   local tag=
   local repair_reflog=0
+  local scratch_dir=""
 
   # optional parameter handling
   OPTIND=1
-  while getopts "acit:s:r" option
+  while getopts "acit:s:rx:" option
   do
     case $option in
       a)
@@ -299,6 +310,9 @@ cvmfs_server_check() {
       ;;
       r)
         repair_reflog=1
+      ;;
+      x)
+        scratch_dir="$OPTARG"
       ;;
       ?)
         shift $(($OPTIND-2))

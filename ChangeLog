@@ -1,3 +1,13 @@
+2.13.3:
+  * [client] Fix a race with concurrent auto-mount/umounts (#3993)
+  * [server] cvmfs_server check: add -x option for custom scratch dir (#4011)
+  * [client] Fix CVMFS_VERSION and CVMFS_ARCH availability in config files (#3999)
+  * [client] Add extended info with cvmfs_config status <repo> (#3973)
+  * [server] Avoid accessing held mutexes after forking (#3995)
+  * [client] Fix spurious "failed to umount" messages (#3970)
+  * [server] Fix updating of last_gc when no gc is run under gc -a without dry run (#3947)
+  * [geoip] Change geoip database to openhtc source by default (#3967)
+  * [client] Add CVMFS_PREMOUNT_FUSE option to allow fallback to fusermount (#4017)
 
 2.13.2:
   * [client] Fix loader return value when automounter unmounts (#3929)

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-cvmfs_test_name="Auto unmount of stalled mountpoint after crash"
+cvmfs_test_name="Auto unmount after crash and soft kill"
 cvmfs_test_suites="quick"
 
 cvmfs_run_test() {
@@ -37,6 +37,23 @@ cvmfs_run_test() {
 
   echo "try to list /cvmfs/atlas.cern.ch again"
   ls /cvmfs/atlas.cern.ch || return 6
+
+  echo -n "looking for PID of cvmfs2 process again... "
+  local pid=$(sudo cvmfs_talk -i atlas pid)
+  echo "$pid"
+
+  echo "testing softer shutdown of cvmfs2 with SIGTERM ($pid)"
+  # this uses a different code path for cleanup than a crash
+  sudo kill $pid || return 13
+
+  echo "wait for things to settle"
+  sleep 5
+
+  echo "make sure repository is not mounted"
+  mount | grep atlas.cern.ch && return 14
+
+  echo "try to list /cvmfs/atlas.cern.ch again"
+  ls /cvmfs/atlas.cern.ch || return 16
 
   return 0
 }

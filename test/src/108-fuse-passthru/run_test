@@ -1,0 +1,125 @@
+#!/bin/bash
+set -euo pipefail
+set -x
+
+this_script_dir=$(dirname "$(readlink -f "$0")")
+if ! [[ -v TEST_ROOT ]]; then
+    TEST_ROOT=$(readlink -f "$this_script_dir/../..")
+fi
+build_dir=$(dirname "$TEST_ROOT")
+
+mkdir -p /var/{spool,run}/cvmfs/
+[[ -d /etc/cvmfs/default.d ]]
+cat > /etc/cvmfs/default.d/99-test.conf <<EOF
+CVMFS_USER=$(whoami)
+CVMFS_HTTP_PROXY=DIRECT
+CVMFS_AUTO_UPDATE=yes
+CVMFS_USE_FILE_CHUNKING=false
+CVMFS_QUOTA_LIMIT=-1
+EOF
+export CVMFS_TEST_USER=$(whoami)
+
+rsyslogd &
+systemctl enable --now httpd
+
+rm -rf /var/spool/cvmfs/* # just in case
+cp -a /etc/fstab{,.orig}
+> /etc/fstab
+
+create_repo() {
+	MOUNT_OPTS=$1
+	EXTRA_CONFIG=$2
+	export CVMFS_USE_FILE_CHUNKING=false
+	mv /etc/fstab{,.bkp}
+	cvmfs_server mkfs -o "$CVMFS_TEST_USER" "$CVMFS_TEST_REPO"
+	export CVMFS_TEST_MOUNTPOINT=/cvmfs/$CVMFS_TEST_REPO
+	cat "$CVMFS_TEST_MOUNTPOINT"/new_repository
+
+	pgrep cvmfs2
+	umount /cvmfs/"$CVMFS_TEST_REPO"
+	umount /var/spool/cvmfs/"$CVMFS_TEST_REPO"/rdonly
+	sed -i /etc/fstab -e "s/,noauto /,simple_options_parsing,disable_watchdog,noauto,debug,$MOUNT_OPTS /"
+	mv /etc/fstab{,.new}
+	cat /etc/fstab.new /etc/fstab.bkp > /etc/fstab
+	systemctl daemon-reload
+	cat >> /etc/cvmfs/repositories.d/"$CVMFS_TEST_REPO"/client.conf <<-EOF
+	CVMFS_HTTP_PROXY=DIRECT
+	CVMFS_KCACHE_TIMEOUT=0
+	CVMFS_MAX_TTL_SECS=1
+	CVMFS_AUTO_UPDATE=yes
+	CVMFS_DEBUGLOG=/var/log/$CVMFS_TEST_REPO.cvmfs-debug.log
+	CVMFS_USYSLOG=/var/log/$CVMFS_TEST_REPO.cvmfs-usyslog.log
+	$EXTRA_CONFIG
+	EOF
+	cat >> /etc/cvmfs/repositories.d/"$CVMFS_TEST_REPO"/server.conf <<-EOF
+	CVMFS_USE_FILE_CHUNKING=false
+	EOF
+
+	mount  /var/spool/cvmfs/"$CVMFS_TEST_REPO"/rdonly
+	mount  /cvmfs/"$CVMFS_TEST_REPO"
+
+	cvmfs_server transaction "$CVMFS_TEST_REPO"
+	echo HELLO > "$CVMFS_TEST_MOUNTPOINT"/hello.txt
+	time dd status=progress bs=1M count=10 if=/dev/urandom of="$CVMFS_TEST_MOUNTPOINT"/big.bin
+	pushd "$CVMFS_TEST_MOUNTPOINT"
+	sha1sum * > CHECKSUMS
+	popd
+
+	time cvmfs_server publish "$CVMFS_TEST_REPO"
+	mount | grep "$CVMFS_TEST_REPO"
+	cat "$CVMFS_TEST_MOUNTPOINT"/hello.txt
+	grep HELLO "$CVMFS_TEST_MOUNTPOINT"/hello.txt
+
+	if ! ; then
+		umount /cvmfs/"$CVMFS_TEST_REPO"
+		umount /var/spool/cvmfs/"$CVMFS_TEST_REPO"/rdonly
+		nohup valgrind \
+			--tool=memcheck \
+			--log-file=/var/log/"$CVMFS_TEST_REPO".valgrind.log \
+			--enable-debuginfod=yes \
+			--leak-check=full \
+			--show-leak-kinds=all \
+			--track-origins=yes \
+			--trace-children=yes \
+			--track-fds=yes \
+			--show-error-list=all \
+			--read-var-info=yes \
+			--gen-suppressions=all \
+			--suppressions=<(grep -v '^[=-]' "$build_dir"/valgrind.supp) \
+			\
+			/usr/bin/cvmfs2 -f -o \
+			allow_other,fsname="$CVMFS_TEST_REPO",config=/etc/cvmfs/repositories.d/"$CVMFS_TEST_REPO"/client.conf:/var/spool/cvmfs/"$CVMFS_TEST_REPO"/client.local,disable_watchdog,simple_options_parsing,grab_mountpoint,uid=0,gid=0"$MOUNT_OPTS" \
+			"$CVMFS_TEST_REPO" /var/spool/cvmfs/"$CVMFS_TEST_REPO"/rdonly \
+			&
+		while ! grep /var/spool/cvmfs/"$CVMFS_TEST_REPO"/rdonly /proc/mounts; do
+			sleep 1
+		done
+		mount /cvmfs/"$CVMFS_TEST_REPO"
+	fi
+
+	touch /tmp/"$CVMFS_TEST_REPO".big.bin.read.begin
+	time dd status=progress bs=512 if="$CVMFS_TEST_MOUNTPOINT"/big.bin of=/dev/null
+	touch /tmp/"$CVMFS_TEST_REPO".big.bin.read.end
+	DURATION=$(echo -e "scale=10\n $(date +%s.%N --reference=/tmp/"$CVMFS_TEST_REPO".big.bin.read.end) - $(date +%s.%N --reference=/tmp/"$CVMFS_TEST_REPO".big.bin.read.begin)\n" | bc -q )
+	echo "$DURATION" > /tmp/"$CVMFS_TEST_REPO".big.bin.read.duration
+
+	pushd "$CVMFS_TEST_MOUNTPOINT"
+	time parallel -N0 "sha1sum --check --status CHECKSUMS" ::: {1..100}
+	popd
+	umount /cvmfs/"$CVMFS_TEST_REPO"
+	umount /var/spool/cvmfs/"$CVMFS_TEST_REPO"/rdonly
+}
+
+export CVMFS_TEST_REPO=test.repo.dumbdumb
+create_repo '' ''
+grep -F 'FUSE: Passthrough enabled in build, available at runtime, but not enabled by the config option.' /var/log/test.repo.dumbdumb.cvmfs-debug.log
+
+export CVMFS_TEST_REPO=test.repo.passthru
+create_repo ,fuse_passthrough ''
+grep -F 'FUSE: Passthrough enabled.' /var/log/test.repo.passthru.cvmfs-debug.log
+
+export CVMFS_TEST_REPO=test.repo.with-var
+create_repo '' 'CVMFS_FUSE_PASSTHROUGH=on'
+grep -F 'FUSE: Passthrough enabled.' /var/log/test.repo.with-var.cvmfs-debug.log
+
+head /tmp/test.repo.{passthru,dumbdumb}.big.bin.read.duration

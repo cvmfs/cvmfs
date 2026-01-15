@@ -6,6 +6,7 @@
 
 #ifndef CVMFS_UTIL_PLATFORM_OSX_H_
 #define CVMFS_UTIL_PLATFORM_OSX_H_
+#ifdef __APPLE__
 
 #include <alloca.h>
 #include <dirent.h>
@@ -17,6 +18,7 @@
 #include <libkern/OSAtomic.h>
 #endif  //  defined(__MAC_OS_X_VERSION_MIN_REQUIRED) &&
         //  __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200
+#include <libkern/OSByteOrder.h>
 #include <mach-o/dyld.h>
 #include <mach/mach.h>  // NOLINT
 #include <mach/mach_time.h>
@@ -309,6 +311,14 @@ inline uint64_t platform_memsize() {
   return ramsize;
 }
 
+inline uint16_t platform_htole16(uint16_t host_16bits) {
+  return OSSwapHostToLittleInt16(host_16bits);
+}
+
+inline uint16_t platform_le16toh(uint16_t little_endian_16bits) {
+  return OSSwapLittleToHostInt16(little_endian_16bits);
+}
+
 #ifdef CVMFS_NAMESPACE_GUARD
 }  // namespace CVMFS_NAMESPACE_GUARD
 #endif
@@ -316,4 +326,5 @@ inline uint64_t platform_memsize() {
 inline int prctl(int, uint64_t, uint64_t, uint64_t, uint64_t) { return 0; }
 #define PR_SET_DUMPABLE 0
 
+#endif // __APPLE__
 #endif  // CVMFS_UTIL_PLATFORM_OSX_H_

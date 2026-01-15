@@ -1,7 +1,7 @@
 Summary: CernVM File System Default Configuration and Public Keys
 Name: cvmfs-config-default
 Version: 2.2
-Release: 1
+Release: 2
 Source0: cern-it1.cern.ch.pub
 Source1: cern-it4.cern.ch.pub
 Source2: cern-it5.cern.ch.pub
@@ -61,6 +61,11 @@ done
 install -D -m 444 "%{SOURCE9}" $RPM_BUILD_ROOT%{_sysconfdir}/cvmfs/config.d/README
 
 %files
+%dir %{_sysconfdir}/cvmfs
+%dir %{_sysconfdir}/cvmfs/keys
+%dir %{_sysconfdir}/cvmfs/default.d
+%dir %{_sysconfdir}/cvmfs/config.d
+%dir %{_sysconfdir}/cvmfs/domain.d
 %dir %{_sysconfdir}/cvmfs/keys/cern.ch
 %dir %{_sysconfdir}/cvmfs/keys/egi.eu
 %dir %{_sysconfdir}/cvmfs/keys/opensciencegrid.org
@@ -75,6 +80,9 @@ install -D -m 444 "%{SOURCE9}" $RPM_BUILD_ROOT%{_sysconfdir}/cvmfs/config.d/READ
 %config %{_sysconfdir}/cvmfs/config.d/*
 
 %changelog
+* Fri Dec 19 2025 Steve Traylen <steve.traylen@cern.ch> - 2.2-2
+- Package now owns /etc/cvmfs, /etc/cvmfs/keys, ... directories
+
 * Tue Sep 24 2024 Dave Dykstra <dwd@fnal.gov> - 2.2-1
 - Remove the ASGC Taiwan stratum 1 from the egi and opensciencegrid domains.
   Note that the list of stratum 1s is normally overriden by the configuration

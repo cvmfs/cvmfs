@@ -2442,13 +2442,14 @@ get_cache_directory() {
 
 __do_local_mount() {
   local as_root="$1"
-  local mountpoint="$2"
-  local repo_name="$3"
-  local repo_url="$4"
-  local config_file="$5"   # config file containing CVMFS client options,
+  local debug_option="$2"
+  local mountpoint="$3"
+  local repo_name="$4"
+  local repo_url="$5"
+  local config_file="$6"   # config file containing CVMFS client options,
                            # if used the options listed below are not added
-  local extra_option="$6"  # CVMFS client options as str
-  local mount_options="$7" # comma separated mount options
+  local extra_option="$7"  # CVMFS client options as str
+  local mount_options="$8" # comma separated mount options
 
   local cache="$(get_cache_directory $mountpoint)"
   local config="$(mktemp ${mountpoint}.conf.XXXXX)"
@@ -2479,18 +2480,22 @@ EOF
   fi
 
   if [ x"$as_root" != x"" ]; then
-    sudo cvmfs2 -d -o allow_other,${mount_options}config=$config $repo_name $mountpoint >> $output 2>&1
+    sudo cvmfs2 $debug_option -o allow_other,${mount_options}config=$config $repo_name $mountpoint >> $output 2>&1
   else
-    cvmfs2 -d -o ${mount_options}config=$config $repo_name $mountpoint >> $output 2>&1
+    cvmfs2 $debug_option -o ${mount_options}config=$config $repo_name $mountpoint >> $output 2>&1
   fi
 }
 
 do_local_mount() {
-  __do_local_mount "" "$@"
+  __do_local_mount "" "-d" "$@"
 }
 
 do_local_mount_as_root() {
-  __do_local_mount "sudo" "$@"
+  __do_local_mount "sudo" "-d" "$@"
+}
+
+do_non_debug_local_mount() {
+  __do_local_mount "" "" "$@"
 }
 
 remove_local_mount() {

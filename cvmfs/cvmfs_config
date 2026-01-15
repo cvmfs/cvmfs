@@ -270,7 +270,7 @@ cvmfs_config_usage() {
   echo ""
   echo "  stat [-v | <repository>]"
   echo ""
-  echo "  status"
+  echo "  status [<repository list>]"
   echo ""
   echo "  probe [<repository list>]"
   echo ""
@@ -1150,14 +1150,30 @@ cvmfs_stat() {
 
 cvmfs_status() {
   local list
+  local repos="$@"
   list=""
 
   RETVAL=0
 
   local mounted_repos
+  local mountpoints
   local processed
-  mounted_repos=`list_mounts | awk '{print $3}'`
-  for mountpoint in $mounted_repos
+  mounted_repos="$(echo $(list_mounts | awk '{print $3}'))"
+  if [ -n "$repos" ]; then
+    cvmfs_readconfig || die "Failed to read CernVM-FS configuration"
+    for repo in $repos; do
+      mountpoint="$CVMFS_MOUNT_DIR/$repo"
+      if [[ " $mounted_repos " != *" $mountpoint "* ]]; then
+        echo $mountpoint is not mounted
+        RETVAL=1
+      else
+        mountpoints="$mountpoints $mountpoint"
+      fi
+    done
+  else
+    mountpoints="$mounted_repos"
+  fi
+  for mountpoint in $mountpoints
   do
     local fqrn=
     local pid=
@@ -1176,6 +1192,59 @@ cvmfs_status() {
     else
       echo
     fi
+    if [ -z "$repos" ]; then
+      continue
+    fi
+    if [ "$sys_arch" = "Darwin" ]; then
+      # no more detail is available on macOS
+      continue
+    fi
+    # provide more detail if specific repo(s) requested
+    local s1="$(attr -qg host $mountpoint)"
+    if [ -z "$s1" ]; then
+      echo "- could not read host from $mountpoint"
+      RETVAL=1
+      continue
+    fi
+    local last_snapshot="$(curl -s -m 5 "$s1/.cvmfs_status.json" | sed -n 's/"//g;s/,$//;s/.*last_snapshot[^ ]* //p')"
+    if [ -z "$last_snapshot" ]; then
+      echo "- could not read last_snapshot from $s1/.cvmfs_status.json"
+      RETVAL=1
+      continue
+    fi
+    local age="$(($(date +%s) - $(date --date "$last_snapshot" +%s)))"
+    echo "- mounted for $(attr -qg uptime $mountpoint) minutes"
+    echo "- host ${s1%/*/*}"
+    local external_host="$(attr -qg external_host $mountpoint)"
+    if [ -n "$external_host" ]; then
+      echo "- external host $external_host"
+    fi
+    echo "- proxy $(attr -qg proxy $mountpoint)"
+    echo "- host updated $(($age / 60)) minutes and $(($age % 60)) seconds ago"
+    local host_list="$(attr -qg host_list $mountpoint)"
+    local max_revision=0
+    local max_rev_host=""
+    for host in ${host_list//;/ }; do
+      local rev="$(curl -s -m 3 "$host/.cvmfspublished" | cat -v | sed -n 's/^S//p')"
+      # Note that later hosts are queried later so they get more time to
+      # catch up. That might give them a little advantage.
+      if [ -n "$rev" ] && [ "$rev" -gt $max_revision ]; then
+        max_revision=$rev
+        max_rev_host=$host
+      fi
+    done
+    local revision=$(attr -qg revision $mountpoint)
+    if [ "$revision" = "$max_revision" ]; then
+      echo "- revision $revision matches most current host"
+    else
+      echo "- current revision is $(attr -qg revision $mountpoint) and most current host is revision $max_revision"
+      echo "- most current host ${max_rev_host%/*/*}"
+    fi
+    echo "- i/o errors since mount: $(attr -qg nioerr $mountpoint)"
+    echo "- cache hitrate since mount: $(attr -qg hitrate $mountpoint)"
+    echo "- cache cleanups in last 24 hours: $(attr -qg ncleanup24 $mountpoint)"
+    echo "- end of log (for all do attr -g logbuffer $mountpoint):"
+    attr -qg logbuffer $mountpoint|tail -10
   done
 
   return $RETVAL
