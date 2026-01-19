@@ -34,4 +34,11 @@ FetchContent_Declare(
   DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
 
+# Configuration
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
+set(ENABLE_TEST OFF CACHE BOOL "" FORCE)
+set(ENABLE_CPIO OFF CACHE BOOL "" FORCE)
+set(ENABLE_TAR OFF  CACHE BOOL "" FORCE)
+set(ENABLE_CAT OFF  CACHE BOOL "" FORCE)
+
 FetchContent_MakeAvailable(LibArchive)
