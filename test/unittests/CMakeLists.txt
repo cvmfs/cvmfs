@@ -270,7 +270,7 @@ if (BUILD_SERVER)
         ${ZLIB_LIBRARIES}
         ${VJSON_LIBRARIES}
         ${CAP_LIBRARIES}
-        ${LibArchive_LIBRARY}
+        archive_static
         ${RT_LIBRARY}
         pthread
         dl
@@ -599,7 +599,7 @@ list (APPEND CVMFS_UNITTESTS_LINK_LIBRARIES
       ${PACPARSER_LIBRARIES}
       ${VJSON_LIBRARIES}
       ${PROTOBUF_LITE_LIBRARY}
-      ${LibArchive_LIBRARY}
+      archive_static
       ${RT_LIBRARY}
       pthread
       dl
