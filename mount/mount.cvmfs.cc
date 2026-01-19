@@ -59,9 +59,7 @@ static string MkFqrn(const string &repository) {
     const bool retval = options_manager_.GetValue("CVMFS_DEFAULT_DOMAIN",
                                                   &domain);
     if (!retval) {
-      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
-               "CVMFS_DEFAULT_DOMAIN missing");
-      abort();
+      return ""; // empty repo name indicates error
     }
     return repository + "." + domain;
   }
@@ -427,6 +425,12 @@ int main(int argc, char **argv) {
 
   options_manager_.ParseDefault("");
   const string fqrn = MkFqrn(device);
+  // Bail in case we could not form a Fqrn
+  if (fqrn.empty()) {
+    LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+             "CVMFS_DEFAULT_DOMAIN missing - cannot mount incompletely named repo %s", device.c_str());
+    return 1;
+  }
   options_manager_.SwitchTemplateManager(
       new DefaultOptionsTemplateManager(fqrn));
   options_manager_.ParseDefault(fqrn);

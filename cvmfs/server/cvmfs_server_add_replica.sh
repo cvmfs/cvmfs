@@ -149,7 +149,7 @@ cvmfs_server_add_replica() {
         echo "       user ID and run update-geodb monthly as that user"
         echo "    4. Use another update tool such as Maxmind's geoipupdate and"
         echo "       set CVMFS_GEO_DB_FILE to point to the downloaded file"
-        echo "    5. Disable the geo api with CVMFS_GEO_DB_FILE=none"
+        echo "    5. Disable the geo api with CVMFS_GEO_DB_FILE=NONE"
         echo "  See 'Geo API Setup' in the cvmfs documentation for more info."
       fi
     else
