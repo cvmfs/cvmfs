@@ -708,7 +708,7 @@ if (BUILD_SERVER)
         ${RT_LIBRARY}
         ${VJSON_LIBRARIES}
         ${CAP_LIBRARIES}
-        ${LibArchive_LIBRARY}
+        archive_static
         pthread
         dl
   )
@@ -822,7 +822,7 @@ if (BUILD_SERVER)
         ${ZLIB_LIBRARIES}
         ${VJSON_LIBRARIES}
         ${CAP_LIBRARIES}
-        ${LibArchive_LIBRARY}
+        archive_static
         ${RT_LIBRARY}
         pthread
         dl
@@ -1110,7 +1110,7 @@ if(BUILD_RECEIVER)
         ${OPENSSL_LIBRARIES}
         ${ZLIB_LIBRARIES}
         ${RT_LIBRARY}
-        ${LibArchive_LIBRARY}
+        archive_static
         pthread
         dl
   )
