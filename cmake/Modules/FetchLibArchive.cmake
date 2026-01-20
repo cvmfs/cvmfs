@@ -1,7 +1,7 @@
 # CMake module for vendored dependencies
 include(FetchContent)
 
-# Required to maintain backwords compatibility with vendored dependencies
+# Required to maintain backwards compatibility with vendored dependencies
 set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 
 set(LIBARCHIVE_VERSION "3.3.2")
@@ -23,7 +23,7 @@ endfunction()
 
 # -> libarchive <-
 # NOTE: This specific version of libarchive exports `archive` and `archive_static` as build targets.
-# NOTE: If upgrading to newer verion verify target names and make sure they match with usage in cvmfs/CMakeLists.txt
+# NOTE: If upgrading to newer version verify target names and make sure they match with usage in cvmfs/CMakeLists.txt
 
 get_source_url("libarchive" "${LIBARCHIVE_LOCAL_PATH}" "${LIBARCHIVE_URL}" LIBARCHIVE_SRC)
 FetchContent_Declare(

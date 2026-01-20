@@ -304,8 +304,8 @@ endif(BUILTIN_EXTERNALS)
 # Migrate bootstrap.sh to cmake
 #
 if(BUILTIN_EXTERNALS)
-  message(STATUS "Enterning external dependencies setup")
-  include(cmake/Modules/ExternalDependencies.cmake)
+  message(STATUS "Entering external dependencies setup")
+  include(cmake/Modules/FetchLibArchive.cmake)
 endif()
 
 #
