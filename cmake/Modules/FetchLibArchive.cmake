@@ -26,6 +26,24 @@ endfunction()
 # NOTE: If upgrading to newer version verify target names and make sure they match with usage in cvmfs/CMakeLists.txt
 
 get_source_url("libarchive" "${LIBARCHIVE_LOCAL_PATH}" "${LIBARCHIVE_URL}" LIBARCHIVE_SRC)
+# Configuration
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
+set(ENABLE_ACL OFF)
+set(ENABLE_BZip2 OFF)
+set(ENABLE_CAT OFF)
+set(ENABLE_CNG OFF)
+set(ENABLE_CPIO OFF)
+set(ENABLE_EXPAT OFF)
+set(ENABLE_ICONV OFF)
+set(ENABLE_LIBXML2 OFF)
+set(ENABLE_LZMA OFF)
+set(ENABLE_NETTLE OFF)
+set(ENABLE_OPENSSL OFF)
+set(ENABLE_TAR OFF)
+set(ENABLE_TEST OFF)
+set(ENABLE_XATTR OFF)
+set(ENABLE_ZLIB OFF)
+
 FetchContent_Declare(
   LibArchive
   URL "${LIBARCHIVE_SRC}"
@@ -33,12 +51,5 @@ FetchContent_Declare(
                 patch -p0 < "${CMAKE_SOURCE_DIR}/externals/libarchive/src/libarchive_cmake.patch"
   DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
-
-# Configuration
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
-set(ENABLE_TEST OFF CACHE BOOL "" FORCE)
-set(ENABLE_CPIO OFF CACHE BOOL "" FORCE)
-set(ENABLE_TAR OFF  CACHE BOOL "" FORCE)
-set(ENABLE_CAT OFF  CACHE BOOL "" FORCE)
 
 FetchContent_MakeAvailable(LibArchive)
