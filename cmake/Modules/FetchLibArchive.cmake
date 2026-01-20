@@ -1,12 +1,10 @@
 # CMake module for vendored dependencies
 include(FetchContent)
 
-# Required to maintain backwards compatibility with vendored dependencies
-set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
-
 set(LIBARCHIVE_VERSION "3.3.2")
 set(LIBARCHIVE_LOCAL_PATH "${CMAKE_SOURCE_DIR}/externals/libarchive/libarchive-${LIBARCHIVE_VERSION}.tar.gz")
-set(LIBARCHIVE_URL "")
+set(LIBARCHIVE_URL "https://libarchive.org/downloads/libarchive-3.8.0.tar.gz")
+set(LIBARCHIVE_HASH "MD5=d3ed99350b47a53d60ae629160726134")
 
 # -> libarchive <-
 # NOTE: This specific version of libarchive exports `archive` and `archive_static` as build targets.
@@ -32,9 +30,8 @@ set(ENABLE_ZLIB OFF)
 
 FetchContent_Declare(
   LibArchive
-  URL "${LIBARCHIVE_SRC}"
-  PATCH_COMMAND patch -p0 < "${CMAKE_SOURCE_DIR}/externals/libarchive/src/fix-new-glibc.patch" &&
-                patch -p0 < "${CMAKE_SOURCE_DIR}/externals/libarchive/src/libarchive_cmake.patch"
+  URL "${LIBARCHIVE_URL}"
+  URL_HASH "${LIBARCHIVE_HASH}"
   DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
 
