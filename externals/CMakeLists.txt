@@ -6,4 +6,5 @@ add_custom_target(install_externals
      --component external_deps 
      --prefix ${EXTERNALS_INSTALL_LOCATION}
   COMMENT "Installing external dependencies to ${EXTERNALS_INSTALL_LOCATION}"
+  DEPENDS archive_static #TODO replace with a list that gets populated for each external
 )

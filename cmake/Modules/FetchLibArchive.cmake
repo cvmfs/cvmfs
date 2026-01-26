@@ -12,6 +12,7 @@ set(LIBARCHIVE_HASH "MD5=2226a84d3720b1a3d00deb0d11530a60")
 # NOTE: This specific version of libarchive exports `archive` and `archive_static` as build targets.
 # NOTE: If upgrading to newer version verify target names and make sure they match with usage in cvmfs/CMakeLists.txt
 
+
 # Configure libarchive
 set(CMAKE_INSTALL_DEFAULT_COMPONENT_NAME external_deps)
 set(ENABLE_INSTALL  OFF)
@@ -46,10 +47,12 @@ FetchContent_Declare(
   DOWNLOAD_EXTRACT_TIMESTAMP TRUE
   DOWNLOAD_DIR ${EXTERNALS_LIB_LOCATION}/download
   INSTALL_DIR ${EXTERNALS_INSTALL_LOCATION}
+  EXCLUDE_FROM_ALL
   FIND_PACKAGE_ARGS
 )
 
 FetchContent_MakeAvailable(LibArchive)
+
 
 if(LibArchive_FOUND)
   message(STATUS "Found LibArchive at: ${LibArchive_LIBRARY}")
@@ -57,6 +60,7 @@ if(LibArchive_FOUND)
 else()
   message(STATUS "Building LibArchive from vendored sources.")
   add_library(LibArchive::LibArchive ALIAS archive_static)
-  install(TARGETS archive_static DESTINATION ${EXTERNALS_INSTALL_LOCATION})
-  install(FILES  ${libarchive_SOURCE_DIR}/libarchive/archive.h ${libarchive_SOURCE_DIR}/libarchive/archive_entry.h   DESTINATION ${EXTERNALS_INSTALL_LOCATION}/include)
+  install(TARGETS archive_static DESTINATION ${EXTERNALS_INSTALL_LOCATION} COMPONENT external_deps EXCLUDE_FROM_ALL)
+  install(FILES  ${libarchive_SOURCE_DIR}/libarchive/archive.h ${libarchive_SOURCE_DIR}/libarchive/archive_entry.h   DESTINATION ${EXTERNALS_INSTALL_LOCATION}/include COMPONENT external_deps EXCLUDE_FROM_ALL)
 endif()
+
