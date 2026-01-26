@@ -14,8 +14,7 @@ set(LIBARCHIVE_HASH "MD5=2226a84d3720b1a3d00deb0d11530a60")
 
 # Configure libarchive
 set(CMAKE_INSTALL_DEFAULT_COMPONENT_NAME external_deps)
-set(CMAKE_INSTALL_PREFIX ${EXTERNALS_INSTALL_LOCATION})
-set(ENABLE_INSTALL  ON)
+set(ENABLE_INSTALL  OFF)
 set(BUILD_SHARED_LIBS OFF)
 set(BUILD_TESTING   OFF)
 
@@ -37,18 +36,19 @@ set(ENABLE_TEST     OFF)
 set(ENABLE_XATTR    OFF)
 set(ENABLE_ZLIB     OFF)
 
-set(FETCHCONTENT_TRY_FIND_PACKAGE_MODE NEVER)
-# Declare libarchive
+#TODO: configure this on a per-package basis
+#set(FETCHCONTENT_TRY_FIND_PACKAGE_MODE ALWAYS)
+
 FetchContent_Declare(
   LibArchive
   URL "${LIBARCHIVE_URL}" "${LIBARCHIVE_URL_MIRROR}"
   URL_HASH "${LIBARCHIVE_HASH}"
   DOWNLOAD_EXTRACT_TIMESTAMP TRUE
   DOWNLOAD_DIR ${EXTERNALS_LIB_LOCATION}/download
+  INSTALL_DIR ${EXTERNALS_INSTALL_LOCATION}
   FIND_PACKAGE_ARGS
 )
 
-# Make libarchive available
 FetchContent_MakeAvailable(LibArchive)
 
 if(LibArchive_FOUND)
@@ -57,4 +57,6 @@ if(LibArchive_FOUND)
 else()
   message(STATUS "Building LibArchive from vendored sources.")
   add_library(LibArchive::LibArchive ALIAS archive_static)
+  install(TARGETS archive_static DESTINATION ${EXTERNALS_INSTALL_LOCATION})
+  install(FILES  ${libarchive_SOURCE_DIR}/libarchive/archive.h ${libarchive_SOURCE_DIR}/libarchive/archive_entry.h   DESTINATION ${EXTERNALS_INSTALL_LOCATION}/include)
 endif()
