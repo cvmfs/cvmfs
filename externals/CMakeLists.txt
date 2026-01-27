@@ -16,7 +16,7 @@ function(setup_external_build_mode PACKAGE_NAME)
   endif()
 endfunction()
 
-include(${CMAKE_SOURCE_DIR}/cmake/Modules/FetchLibArchive.cmake)
+add_subdirectory(libarchive)
 
 add_custom_target(install_externals
   COMMAND ${CMAKE_COMMAND} --install ${CMAKE_BINARY_DIR}

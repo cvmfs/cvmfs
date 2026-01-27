@@ -1,5 +1,4 @@
 # CMake module for vendoring libarchive
-
 include(FetchContent)
 
 set(LIBARCHIVE_VERSION "3.8.5")
@@ -7,10 +6,9 @@ set(LIBARCHIVE_URL "https://libarchive.org/downloads/libarchive-${LIBARCHIVE_VER
 set(LIBARCHIVE_URL_MIRROR "https://ecsft.cern.ch/dist/cvmfs/build_externals/libarchive-${LIBARCHIVE_VERSION}.tar.gz")
 set(LIBARCHIVE_HASH "MD5=2226a84d3720b1a3d00deb0d11530a60")
 
-
 # -> libarchive <-
 # NOTE: This specific version of libarchive exports `archive` and `archive_static` as build targets.
-# NOTE: If upgrading to newer version verify target names and make sure they match with usage in cvmfs/CMakeLists.txt
+# NOTE: If upgrading to newer version verify target names and make sure they match with usage.
 
 # Configure libarchive
 set(CMAKE_INSTALL_DEFAULT_COMPONENT_NAME external_deps)
