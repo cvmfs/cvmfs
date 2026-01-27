@@ -12,7 +12,6 @@ set(LIBARCHIVE_HASH "MD5=2226a84d3720b1a3d00deb0d11530a60")
 # NOTE: This specific version of libarchive exports `archive` and `archive_static` as build targets.
 # NOTE: If upgrading to newer version verify target names and make sure they match with usage in cvmfs/CMakeLists.txt
 
-
 # Configure libarchive
 set(CMAKE_INSTALL_DEFAULT_COMPONENT_NAME external_deps)
 set(ENABLE_INSTALL  OFF)
@@ -37,8 +36,7 @@ set(ENABLE_TEST     OFF)
 set(ENABLE_XATTR    OFF)
 set(ENABLE_ZLIB     OFF)
 
-#TODO: configure this on a per-package basis
-#set(FETCHCONTENT_TRY_FIND_PACKAGE_MODE ALWAYS)
+setup_external_build_mode(LibArchive)
 
 FetchContent_Declare(
   LibArchive
@@ -52,7 +50,7 @@ FetchContent_Declare(
 )
 
 FetchContent_MakeAvailable(LibArchive)
-
+unset(FETCHCONTENT_TRY_FIND_PACKAGE_MODE)
 
 if(LibArchive_FOUND)
   message(STATUS "Found LibArchive at: ${LibArchive_LIBRARY}")
