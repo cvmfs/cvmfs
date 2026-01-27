@@ -285,7 +285,7 @@ build_lib() {
 
 # Build a list of libs that need to be built
 # Check if BUILTIN_EXTERNALS_LIST is set and override missing_libs
-if [ x"$BUILTIN_EXTERNALS_LIST" != x"" ]; then
+if [ x"$BUILTIN_EXTERNALS_LIST" != x"" ] && ! echo ";${BUILTIN_EXTERNALS_LIST};" | grep -qE ";(libarchive);"; then
     # Convert semicolon-separated list to space-separated
     missing_libs=$(echo "$BUILTIN_EXTERNALS_LIST" | tr ';' ' ')
     echo "Bootstrap - Using custom externals list: $missing_libs"
@@ -316,7 +316,7 @@ else
 fi
 
 # Apply exclusions if BUILTIN_EXTERNALS_EXCLUDE is set
-if [ x"$BUILTIN_EXTERNALS_EXCLUDE" != x"" ]; then
+if [ x"$BUILTIN_EXTERNALS_EXCLUDE" != x"" ] && ! echo ";${BUILTIN_EXTERNALS_EXCLUDE};" | grep -qE ";(libarchive);"; then
     # Convert semicolon-separated list to space-separated
     exclude_libs=$(echo "$BUILTIN_EXTERNALS_EXCLUDE" | tr ';' ' ')
     echo "Bootstrap - Excluding libraries: $exclude_libs"
