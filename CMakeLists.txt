@@ -5,7 +5,7 @@
 # See externals/CMake-Register_External_Lib.txt for details on external inclusion
 #
 
-cmake_minimum_required (VERSION 3.12..3.30)
+cmake_minimum_required (VERSION 3.24..3.30)
 set (PROJECT_NAME "CernVM-FS")
 project (${PROJECT_NAME})
 
