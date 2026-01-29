@@ -2692,15 +2692,9 @@ EOF'
     echo "  Starting repository gateway"
     sudo $gateway_script start
 
-    # Wait for gateway to be ready with timeout
-    local timeout=30
-    while ! $gateway_script status > /dev/null 2>&1 && [ $timeout -gt 0 ]; do
-        sleep 1
-        timeout=$((timeout - 1))
-    done
-
-    if [ $timeout -eq 0 ]; then
-        echo "Gateway failed to start within 30 seconds"
+    # Wait for gateway to be ready with timeout (use timeout + until as suggested)
+    if ! timeout 30 bash -c "until $gateway_script status &>/dev/null; do sleep 1; done"; then
+        echo "Gateway failed to start within 30 seconds" >&2
         return 1
     fi
 }
