@@ -24,7 +24,7 @@ else()
             --output=${MAN_OUTPUT_DIR}/cvmfs2.1
             --name "cvmfs2: fuse client for the CernVM-Filesystem" 
             "$<TARGET_FILE:cvmfs2>"
-        DEPENDS cvmfs2
+        DEPENDS cvmfs2 cvmfs_fuse3 cvmfs_fuse3_stub
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/cvmfs/
         COMMENT "Generating man page for cvmfs2"
         VERBATIM

@@ -5,7 +5,7 @@
 # See externals/CMake-Register_External_Lib.txt for details on external inclusion
 #
 
-cmake_minimum_required (VERSION 3.12..3.30)
+cmake_minimum_required (VERSION 3.24..3.30)
 set (PROJECT_NAME "CernVM-FS")
 project (${PROJECT_NAME})
 
@@ -300,6 +300,16 @@ if (BUILTIN_EXTERNALS)
   message("System prefix path: ${CMAKE_SYSTEM_PREFIX_PATH}")
 endif(BUILTIN_EXTERNALS)
 
+
+# Migrate bootstrap.sh to cmake
+if(BUILTIN_EXTERNALS)
+  message(STATUS "Entering external dependencies setup")
+  add_subdirectory(externals)
+endif()
+
+# reset cache variables the externals may have changed
+set(CMAKE_BUILD_TYPE "" CACHE STRING "Build Type" FORCE)
+
 #
 # include some common functionality
 #
@@ -411,9 +421,6 @@ message("Using libcrypto for libcvmfs_crypto from ${Libcrypto_INCLUDE_DIRS}")
 
 find_package (VJSON REQUIRED)
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${VJSON_INCLUDE_DIRS})
-
-find_package (LibArchive REQUIRED)
-set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${LibArchive_INCLUDE_DIRS})
 
 # Almost all build targets require zlib and sha3
 if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_SERVER OR BUILD_SERVER_DEBUG OR
