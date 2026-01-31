@@ -59,6 +59,9 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
   if (args.find('j') != args.end()) {
     params.enable_mtime_ns = true;
   }
+  if (args.find('f') != args.end()) {
+    params.fast_delete = true;
+  }
   shash::Algorithms hash_algorithm = shash::kSha1;
   if (args.find('e') != args.end()) {
     hash_algorithm = shash::ParseHashAlgorithm(*args.find('e')->second);

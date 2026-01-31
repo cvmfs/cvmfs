@@ -229,11 +229,11 @@ void SyncMediator::Touch(SharedPtr<SyncItem> entry) {
 /**
  * Remove an entry from the repository. Directories will be recursively removed.
  */
-void SyncMediator::Remove(SharedPtr<SyncItem> entry) {
+void SyncMediator::Remove(SharedPtr<SyncItem> entry, bool fast_delete) {
   EnsureAllowed(entry);
 
   if (entry->WasDirectory()) {
-    RemoveDirectoryRecursively(entry);
+    RemoveDirectoryRecursively(entry, fast_delete);
     return;
   }
 
@@ -623,7 +623,8 @@ void SyncMediator::LeaveAddedDirectoryCallback(const std::string &parent_dir,
 }
 
 
-void SyncMediator::RemoveDirectoryRecursively(SharedPtr<SyncItem> entry) {
+void SyncMediator::RemoveDirectoryRecursively(SharedPtr<SyncItem> entry,
+                                              bool fast_delete) {
   // Delete a directory AFTER it was emptied here,
   // because it would start up another recursion
 
@@ -640,7 +641,7 @@ void SyncMediator::RemoveDirectoryRecursively(SharedPtr<SyncItem> entry) {
   traversal.Recurse(entry->GetRdOnlyPath());
 
   // The given directory was emptied recursively and can now itself be deleted
-  RemoveDirectory(entry);
+  RemoveDirectory(entry, fast_delete);
 }
 
 

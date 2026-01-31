@@ -24,6 +24,7 @@ cvmfs_server_ingest() {
   local gid=""
   local keep_ownership=false
   local create_catalog=false
+  local fast_delete=false
 
   local force_native=0
   local force_external=0
@@ -65,6 +66,9 @@ cvmfs_server_ingest() {
       ;;
       -k | --keep-ownership )
         keep_ownership=true
+      ;;
+      -f | --fast-delete )
+        fast_delete=true
       ;;
     esac
     shift
@@ -327,6 +331,10 @@ cvmfs_server_ingest() {
 
   if [ "x$CVMFS_ENABLE_MTIME_NS" = "xtrue" ]; then
     ingest_command="$ingest_command -j"
+  fi
+
+  if [ "$fast_delete" = true ]; then
+    ingest_command="$ingest_command -f"
   fi
 
   if [ "x$CVMFS_PRINT_STATISTICS" = "xtrue" ]; then
