@@ -106,6 +106,7 @@ void BundleMgr::SpawnFetchers() {
     pthread_t thread;
     const int res = pthread_create(&thread, nullptr, EstablishConnection, this);
     if (res != 0) {
+      LogCvmfs(kLogBungleMgr, kLogDebug, "Thread creation failed!");
       continue;
     }
     int fd;
