@@ -1071,6 +1071,8 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     return;
   }
 
+  perf::Inc(file_system_->n_fs_open());  // Count actual open / fetch operations
+
   if (dirent.IsBundleTrigger()) {
     // fetch dependences if not there already
     BundleMgr bundle_mgr(mount_point_,  ino);
@@ -1081,8 +1083,6 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
                "Couldn't fetch bundle associated to file %s", path.c_str());
     }
   }
-
-  perf::Inc(file_system_->n_fs_open());  // Count actual open / fetch operations
 
   glue::PageCacheTracker::OpenDirectives open_directives;
   if (!dirent.IsChunkedFile()) {
