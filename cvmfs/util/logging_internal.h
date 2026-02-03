@@ -109,7 +109,7 @@ enum LogSource {
   kLogKvStore,
   kLogTelemetry,
   kLogCurl,
-  kLogBungleMgr
+  kLogBundleMgr
 };
 
 const int kLogWarning = kLogStdout | kLogShowSource | kLogNormal;

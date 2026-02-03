@@ -36,7 +36,7 @@ void BundleMgr::Fetch() {
 
   auto it = fetcher_pool_.begin();
   if (it == fetcher_pool_.end()) {
-    LogCvmfs(kLogBungleMgr,
+    LogCvmfs(kLogBundleMgr,
              kLogDebug,
              "The pool of fetchers is empty. Can't fetch dependencies. "
              "Aborting Op.");
@@ -75,7 +75,7 @@ void BundleMgr::JoinFetchers() {
 
     struct timespec ts;
     if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
-      LogCvmfs(kLogBungleMgr,
+      LogCvmfs(kLogBundleMgr,
                kLogDebug,
                "Failed to read CLOCK_REALTIME. Detaching fetchers.");
       detach_mode = true;
@@ -88,7 +88,7 @@ void BundleMgr::JoinFetchers() {
       Command cmd = Command::kTerminate;
       WritePipe(fd, &cmd, sizeof(Command));
       if (pthread_timedjoin_np(thread, nullptr, &ts) != 0) {
-        LogCvmfs(kLogBungleMgr,
+        LogCvmfs(kLogBundleMgr,
                  kLogDebug,
                  "Fetcher is busy for too long. Detaching.");
         pthread_detach(thread);
@@ -106,7 +106,7 @@ void BundleMgr::SpawnFetchers() {
     pthread_t thread;
     const int res = pthread_create(&thread, nullptr, EstablishConnection, this);
     if (res != 0) {
-      LogCvmfs(kLogBungleMgr, kLogDebug, "Thread creation failed!");
+      LogCvmfs(kLogBundleMgr, kLogDebug, "Thread creation failed!");
       continue;
     }
     int fd;
@@ -141,7 +141,7 @@ void *BundleMgr::EstablishConnection(void *data) {
       case Command::kFetch: {
         auto obj = mgr->ReceiveLabeledObject(rfd);
         if (not obj.IsValid()) {
-          LogCvmfs(kLogBungleMgr, kLogDebug, "Received a null object");
+          LogCvmfs(kLogBundleMgr, kLogDebug, "Received a null object");
           break;
         }
         mgr->fetcher_->Fetch(*obj);
@@ -191,7 +191,7 @@ bool BundleMgr::TrySendData(int fd,
   Command cmd = Command::kFetch;
   if ((write(fd, &cmd, sizeof(Command))) != sizeof(Command)) {
     if (not(errno == EAGAIN || errno == EWOULDBLOCK)) {
-      LogCvmfs(kLogBungleMgr,
+      LogCvmfs(kLogBundleMgr,
                kLogDebug,
                "write() on back channel failed unexpectedly");
     }
