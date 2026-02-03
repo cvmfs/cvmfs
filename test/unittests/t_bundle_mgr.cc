@@ -102,8 +102,6 @@ class T_BundleMgr : public ::testing::Test {
     repo_path_ = "repo";
     uuid_dummy_ = cvmfs::Uuid::Create("");
     used_fds_ = GetNoUsedFds();
-    fd_cwd_ = open(".", O_RDONLY);
-    ASSERT_GE(fd_cwd_, 0);
     tmp_path_ = CreateTempDir("./cvmfs_ut_cache");
     options_mgr_.SetValue("CVMFS_CACHE_BASE", tmp_path_);
     options_mgr_.SetValue("CVMFS_SHARED_CACHE", "no");
@@ -188,9 +186,6 @@ class T_BundleMgr : public ::testing::Test {
 
   virtual void TearDown() {
     delete uuid_dummy_;
-    int retval = fchdir(fd_cwd_);
-    ASSERT_EQ(0, retval);
-    close(fd_cwd_);
     if (tmp_path_ != "")
       RemoveTree(tmp_path_);
     if (repo_path_ != "")
@@ -224,7 +219,6 @@ class T_BundleMgr : public ::testing::Test {
   SimpleOptionsParser options_mgr_;
   string tmp_path_;
   string repo_path_;
-  int fd_cwd_;
   unsigned used_fds_;
   /**
    * Initialize libuuid / open file descriptor on /dev/urandom
