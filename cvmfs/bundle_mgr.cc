@@ -104,7 +104,7 @@ void BundleMgr::SpawnFetchers() {
   const size_t size = 1 + (bfm_->Size() / 30);  // Spawn at least one fetcher
   for (size_t i = 0; i < size; ++i) {
     pthread_t thread;
-    const int res = pthread_create(&thread, nullptr, EstablishConnection, this);
+    const int res = pthread_create(&thread, nullptr, MainBundleMgrFetcher, this);
     if (res != 0) {
       LogCvmfs(kLogBundleMgr, kLogDebug, "Thread creation failed!");
       continue;
@@ -123,7 +123,7 @@ void BundleMgr::SpawnFetchers() {
   }
 }
 
-void *BundleMgr::EstablishConnection(void *data) {
+void *BundleMgr::MainBundleMgrFetcher(void *data) {
   pthread_setname_np(pthread_self(), "bm_fetcher");
   BundleMgr *mgr = static_cast<BundleMgr *>(data);
   const int& wfd = mgr->pipe_bm_[1];

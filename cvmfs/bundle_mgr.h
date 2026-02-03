@@ -30,7 +30,7 @@ class BundleMgr : SingleCopy {
   explicit operator bool() const { return is_valid_; }
 
  private:
-  static void *EstablishConnection(void *data);
+  static void *MainBundleMgrFetcher(void *data);
   void SpawnFetchers();
   void JoinFetchers();
   UniquePtr<CacheManager::LabeledObject> ReceiveLabeledObject(int fd) const;
