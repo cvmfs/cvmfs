@@ -339,6 +339,7 @@ set(CVMFS_UNITTEST_SOURCES
   t_bigqueue.cc
   t_bigvector.cc
   t_blocking_counter.cc
+  t_bundle_mgr.cc
   t_cache.cc
   t_cache_extern.cc
   t_cache_ram.cc
@@ -447,7 +448,6 @@ set(CVMFS_UNITTEST_SOURCES
   t_whitelist.cc
   t_wpad.cc
   t_xattr.cc
-  t_bundle_mgr.cc
 
   ${CVMFS_SOURCE_DIR}/acl.cc
   ${CVMFS_SOURCE_DIR}/authz/authz.cc
@@ -455,6 +455,7 @@ set(CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/authz/authz_fetch.cc
   ${CVMFS_SOURCE_DIR}/authz/authz_session.cc
   ${CVMFS_SOURCE_DIR}/backoff.cc
+  ${CVMFS_SOURCE_DIR}/bundle_mgr.cc
   ${CVMFS_SOURCE_DIR}/cache.cc
   ${CVMFS_SOURCE_DIR}/cache_extern.cc
   ${CVMFS_SOURCE_DIR}/cache_posix.cc
@@ -504,9 +505,7 @@ set(CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/libcvmfs_legacy.cc
   ${CVMFS_SOURCE_DIR}/libcvmfs_options.cc
   ${CVMFS_SOURCE_DIR}/magic_xattr.cc
-  ${CVMFS_SOURCE_DIR}/bundle_mgr.cc
   ${CVMFS_SOURCE_DIR}/fetch.cc
-  ${CVMFS_SOURCE_DIR}/util/inode.cc
   ${CVMFS_SOURCE_DIR}/malloc_arena.cc
   ${CVMFS_SOURCE_DIR}/malloc_heap.cc
   ${CVMFS_SOURCE_DIR}/manifest.cc
@@ -572,6 +571,7 @@ set(CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/upload_s3.cc
   ${CVMFS_SOURCE_DIR}/upload_spooler_definition.cc
   ${CVMFS_SOURCE_DIR}/url.cc
+  ${CVMFS_SOURCE_DIR}/util/inode.cc
   ${CVMFS_SOURCE_DIR}/whitelist.cc
   ${CVMFS_SOURCE_DIR}/wpad.cc
   ${CVMFS_SOURCE_DIR}/xattr.cc
