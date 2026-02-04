@@ -654,7 +654,7 @@ int FuseMain(int argc, char *argv[]) {
       // reload ignores the current state
       //
       // if you mount with debug but do not set CVMFS_DEBUGLOG and reload,
-      // you will reload with
+      // debug will be turned off
       if (std::string(argv[argc - 1]) == std::string("--debug")) {
         debug_mode_ = true;
       } else {
