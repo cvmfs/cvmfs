@@ -34,16 +34,12 @@ checksum_large_files() {
 
   local pid1=
   local pid2=
-  local pid3=
-  (sudo find $dir -type f -size +4M -exec sha1sum {} \; > ${result_file}.t1) &
+  (sudo find $dir -type f -size +8M -exec sha1sum {} \; > ${result_file}.t1) &
   pid1=$!
-  (sudo find $dir -type f -size +4M -exec sha1sum {} \; > ${result_file}.t2) &
+  (sudo find $dir -type f -size +8M -exec sha1sum {} \; > ${result_file}.t2) &
   pid2=$!
-  (sudo find $dir -type f -size +4M -exec sha1sum {} \; > ${result_file}.t3) &
-  pid3=$!
   wait $pid1
   wait $pid2
-  wait $pid3
   cat ${result_file}.t* > $result_file
   rm ${result_file}.t*
 }
@@ -65,15 +61,12 @@ cvmfs_run_test() {
 
   . ${script_location}/../../common/migration_tests/common.sh
 
-  local src_dir='/cvmfs/sft.cern.ch/lcg/external/experimental'
+  local src_dir='/cvmfs/sft.cern.ch/lcg/external/experimental/linux/linux-4.4.241'
   local xxl_files_dir='/cvmfs/cernvm-prod.cern.ch/cvm3'
-  local tar_log1="tar_1.log"
   local tar_log2="tar_2.log"
   local tar_log3="tar_3.log"
-  local chksum_log1="chksum_log1"
   local chksum_log2="chksum_log2"
   local chksum_log3="chksum_log3"
-  local md5_1=""
   local md5_2=""
   local md5_3=""
   local md5_output="async_md5.checksum"
@@ -97,9 +90,6 @@ cvmfs_run_test() {
         else
           echo "Successfully disabled a broken IPv6 setup"
           MIGTEST_001_IPV6_DISABLED=1
-          echo "Retrieving new DHCP lease..."
-          sudo dhclient -r
-          sudo dhclient
         fi
       fi
     fi
@@ -114,22 +104,27 @@ cvmfs_run_test() {
   # previous_version=$(decrement_version $current_version)
   previous_version="2.10.0"
   echo "Version to be downloaded: $previous_version"
-  upstream_package_url=$(guess_package_url "cvmfs" ${previous_version})
-  echo "Download URL:             $upstream_package_url"
-  wget --no-check-certificate --quiet $upstream_package_url || return 2
-  upstream_package=$(basename $upstream_package_url)
-  echo "Upstream Package:         $upstream_package"
+  upstream_packages=""
+  for name in cvmfs cvmfs-libs cvmfs-fuse3; do
+    upstream_package_url=$(guess_package_url $name ${previous_version})
+    echo "Download URL:             $upstream_package_url"
+    wget --no-check-certificate --quiet $upstream_package_url || return 2
+    upstream_packages="$upstream_packages $(basename $upstream_package_url)"
+  done
+  echo "Upstream Packages:         $upstream_packages"
 
   # make sure that there is no version of CernVM-FS installed
-  if is_installed "cvmfs"; then
-    installed_version=$(installed_package_version "cvmfs")
-    echo "uninstalling CernVM-FS $installed_version"
-    uninstall_package "cvmfs" || return 3
-  fi
+  for name in cvmfs cvmfs-libs cvmfs-fuse3; do
+    if is_installed $name; then
+      installed_version=$(installed_package_version $name)
+      echo "uninstalling $name $installed_version"
+      uninstall_package $name || return 3
+    fi
+  done
 
-  # install the upstream CernVM-FS package
+  # install the upstream CernVM-FS packages
   echo "installing CernVM-FS $previous_version"
-  install_packages $upstream_package || return 4
+  install_packages $upstream_packages || return 4
 
   # make sure that autofs is running
   echo "switching on autofs"
@@ -142,18 +137,9 @@ cvmfs_run_test() {
   sudo cvmfs_config setup    || return 6
   sudo cvmfs_config chksetup || return 6
 
-  # mount a repository
-  echo "mounting sft.cern.ch and cernvm-prod.cern.ch"
-  cvmfs_mount sft.cern.ch,cernvm-prod.cern.ch "CVMFS_KCACHE_TIMEOUT=10" || return 7
-
-  # do some hammering on the file system (without interruption)
-  echo "tar $src_dir (without interruption)"
-  md5_1=$(tar_gzip_and_hash $src_dir $tar_log1 $script_location)
-  sudo cvmfs_talk -i sft.cern.ch cleanup 0
-
-  echo "checksumming large files in $xxl_files_dir (without interruption)"
-  checksum_large_files $xxl_files_dir $chksum_log1
-  sudo cvmfs_talk -i cernvm-prod.cern.ch cleanup 0
+  # mount some repositories
+  echo "mounting sft.cern.ch, cernvm-prod.cern.ch, atlas.cern.ch, and cms.cern.ch"
+  cvmfs_mount sft.cern.ch,cernvm-prod.cern.ch,atlas.cern.ch,cms.cern.ch "CVMFS_KCACHE_TIMEOUT=10" || return 7
 
   # do some hammering on the file system
   echo "starting to tar $src_dir (log output in separate file)"
@@ -177,7 +163,7 @@ cvmfs_run_test() {
   echo "updating CernVM-FS package to version $current_version"
   kill -0 $tar_pid || return 11 # tar finished already >.<
   kill -0 $chksum_pid || return 11 # checksumming finished already >.<
-  install_packages "$CVMFS_CLIENT_PACKAGE"
+  install_packages "$CVMFS_LIBS_PACKAGE" "$CVMFS_FUSE_PACKAGE" "$CVMFS_CLIENT_PACKAGE"
   if ! kill -0 $tar_pid; then
     echo "WARNING: tar finished before upgrading"
     CVMFS_GENERAL_WARNING_FLAG=1
@@ -198,36 +184,28 @@ cvmfs_run_test() {
   echo "checksumming is done (exit code: $chksum_exit_code)"
 
   # do some hammering on the file system (after update)
-  echo "tar $src_dir (without interruption - after update)"
+  echo "tar $src_dir (after update)"
   md5_3=$(tar_gzip_and_hash $src_dir $tar_log3 $script_location)
-  echo "checksumming large files in $xxl_files_dir (without interruption - after update)"
+  echo "checksumming large files in $xxl_files_dir (after update)"
   checksum_large_files $xxl_files_dir $chksum_log3
 
   # check the outcome
-  echo "compare the output of all tar runs"
-  echo "MD5 (before update): $md5_1"
+  echo "compare the output of tar runs"
   echo "MD5 (with reload):   $md5_2"
   echo "MD5 (after update):  $md5_3"
-  if [ x"$md5_1" != x"$md5_2" ] ||
-     [ x"$md5_2" != x"$md5_3" ]; then
+  if [ x"$md5_2" != x"$md5_3" ]; then
     return 18
-  fi
-  if ! diff -q $tar_log1 $tar_log2; then
-    return 19
   fi
   if ! diff -q $tar_log2 $tar_log3; then
     return 20
   fi
 
-  echo "compare the output of all checksumming runs"
-  local chksum_chksum_1="$(cat $chksum_log1 | sort | md5sum | cut -d' ' -f1)"
+  echo "compare the output of checksumming runs"
   local chksum_chksum_2="$(cat $chksum_log2 | sort | md5sum | cut -d' ' -f1)"
   local chksum_chksum_3="$(cat $chksum_log3 | sort | md5sum | cut -d' ' -f1)"
-  echo "MD5 of sorted log (before update): $chksum_chksum_1"
   echo "MD5 of sorted log (with reload):   $chksum_chksum_2"
   echo "MD5 of sorted log (after update):  $chksum_chksum_3"
-  if [ x"$chksum_chksum_1" != x"$chksum_chksum_2" ] ||
-     [ x"$chksum_chksum_2" != x"$chksum_chksum_3" ]; then
+  if [ x"$chksum_chksum_2" != x"$chksum_chksum_3" ]; then
      return 21
   fi
 

@@ -108,7 +108,9 @@ version_lower_or_equal() {
 
 has_binary() {
   local binary_name=$1
-  which $binary_name > /dev/null 2>&1
+  # use `type` instead of `which` because as a dependency of cvmfs the latter
+  # can be deleted as an unused dependency when the cvmfs package is deleted
+  type $binary_name > /dev/null 2>&1
 }
 
 
@@ -269,14 +271,23 @@ if [ x"$CVMFS_CLIENT_PACKAGE" = x"" ] || [ ! -f $CVMFS_CLIENT_PACKAGE ]; then
   echo "CernVM-FS client package '$CVMFS_CLIENT_PACKAGE' not found!"
 fi
 
-if [ x"$CVMFS_SERVER_PACKAGE" = x"" ] || [ ! -f $CVMFS_SERVER_PACKAGE ]; then
+if [ x"$CVMFS_SERVER_PACKAGE" = x"" ]; then
+  CVMFS_SERVER_PACKAGE="${CVMFS_CLIENT_PACKAGE/cvmfs/cvmfs-server}"
+fi
+if [ ! -f $CVMFS_SERVER_PACKAGE ]; then
   echo "CernVM-FS server package '$CVMFS_SERVER_PACKAGE' not found!"
 fi
 
-if [ x"$CVMFS_CONFIG_PACKAGE" = x"" ] || [ ! -f $CVMFS_CONFIG_PACKAGE ]; then
-  echo "CernVM-FS config package '$CVMFS_CONFIG_PACKAGE' not found!"
+if [ x"$CVMFS_LIBS_PACKAGE" = x"" ]; then
+  CVMFS_LIBS_PACKAGE="${CVMFS_CLIENT_PACKAGE/cvmfs/cvmfs-libs}"
+fi
+if [ ! -f $CVMFS_LIBS_PACKAGE ]; then
+  echo "CernVM-FS libs package '$CVMFS_LIBS_PACKAGE' not found!"
 fi
 
-if [ x"$CVMFS_LIBS_PACKAGE" = x"" ] || [ ! -f $CVMFS_LIBS_PACKAGE ]; then
-  echo "CernVM-FS libs package '$CVMFS_LIBS_PACKAGE' not found!"
+if [ x"$CVMFS_FUSE_PACKAGE" = x"" ]; then
+  CVMFS_FUSE_PACKAGE="${CVMFS_CLIENT_PACKAGE/cvmfs/cvmfs-fuse3}"
+fi
+if [ ! -f $CVMFS_FUSE_PACKAGE ]; then
+  echo "CernVM-FS fuse package '$CVMFS_FUSE_PACKAGE' not found!"
 fi

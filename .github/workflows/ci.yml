@@ -33,8 +33,10 @@ jobs:
       - name: Archive logs
         if: ${{ always () }}
         run: |
-          docker cp cvmfs-dev:/tmp/cvmfs-client-test.log /tmp/cvmfs-client-test.log
-          docker cp cvmfs-dev:/tmp/cvmfs-server-test.log /tmp/cvmfs-server-test.log
+          for logname in client server migration; do
+            log=/tmp/cvmfs-$logname-test.log
+            docker cp cvmfs-dev:$log $log || true
+          done
 
       - name: Upload logs as artifact
         if: ${{ always () }}
@@ -42,6 +44,4 @@ jobs:
         with: 
           name: CVMFS test logs
           path: |
-              /tmp/cvmfs-client-test.log
-              /tmp/cvmfs-server-test.log
-
+              /tmp/cvmfs-*-test.log
