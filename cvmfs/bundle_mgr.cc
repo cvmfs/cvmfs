@@ -140,10 +140,7 @@ void *BundleMgr::MainBundleMgrFetcher(void *data) {
     switch (cmd) {
       case Command::kFetch: {
         auto obj = mgr->ReceiveLabeledObject(rfd);
-        if (not obj.IsValid()) {
-          LogCvmfs(kLogBundleMgr, kLogDebug, "Received a null object");
-          break;
-        }
+        assert(obj.IsValid() && "Received a null object");
         mgr->fetcher_->Fetch(*obj);
       } break;
       case Command::kTerminate:
