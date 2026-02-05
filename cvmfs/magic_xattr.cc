@@ -10,6 +10,7 @@
 
 #include "cache_posix.h"
 #include "catalog_mgr_client.h"
+#include "crypto/hash.h"
 #include "crypto/signature.h"
 #include "fetch.h"
 #include "mountpoint.h"
@@ -833,7 +834,8 @@ void ListOpenHashesMagicXattr::FinalizeValue() {
         for (size_t i = 0; i < hash_map.capacity(); ++i) {
           const shash::Any &hash = keys[i];
           if (hash != empty) {
-            result += hash.ToString() + "\n";
+            shash::Short short_hash(hash);
+            result += short_hash.ToString() + "\n";
           }
         }
       }
