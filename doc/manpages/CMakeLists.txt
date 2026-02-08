@@ -17,13 +17,13 @@ else()
     # cvmfs2
     add_custom_command(
         OUTPUT "${MAN_OUTPUT_DIR}/cvmfs2.1"
-        COMMAND ${HELP2MAN} 
+        COMMAND ${HELP2MAN}
             -i ${CMAKE_CURRENT_LIST_DIR}/cvmfs_common.h2m
             -i ${CMAKE_CURRENT_LIST_DIR}/cvmfs2.h2m
-            --no-info 
-            --section=1 
+            --no-info
+            --section=1
             --output=${MAN_OUTPUT_DIR}/cvmfs2.1
-            --name "cvmfs2: fuse client for the CernVM-Filesystem" 
+            --name "cvmfs2: fuse client for the CernVM-Filesystem"
             "$<TARGET_FILE:cvmfs2>"
         DEPENDS cvmfs2 cvmfs_fuse3 cvmfs_fuse3_stub
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/cvmfs/
@@ -39,6 +39,7 @@ else()
         DESTINATION ${CMAKE_INSTALL_MANDIR}/man1
         COMPONENT documentation
     )
+    endif()
     # cvmfs_config
     add_custom_command(
         OUTPUT "${MAN_OUTPUT_DIR}/cvmfs_config.1"
