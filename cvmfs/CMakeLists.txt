@@ -1272,6 +1272,7 @@ if (BUILD_PRELOADER)
                         ${RT_LIBRARY}
                         ${UUID_LIBRARIES}
                         ${VJSON_LIBRARIES}
+                        LibArchive::LibArchive
                         pthread
                         dl
   )
