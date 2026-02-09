@@ -52,7 +52,7 @@ jobs:
           key: ${{ runner.os }}-${{ steps.get-externals-hash.outputs.hash }}
       - name: Generate compilation database
         run: |
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+          cmake -S . -B build -DBUILD_ALL=ON -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
           cd ./build
           make cache.pb.generated
           cd ..

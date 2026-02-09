@@ -33,6 +33,11 @@ target_link_libraries (s3benchmark
                        dl
 )
 
+if (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
+  target_link_libraries (s3benchmark GTest::gtest)
+endif()
+
+
 
 add_executable(s3mockserver
                test/stress/s3mockserver.cc

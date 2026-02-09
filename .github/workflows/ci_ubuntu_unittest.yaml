@@ -67,7 +67,7 @@ jobs:
           export CVMFS_EXTERNALS_PREFIX=/home/runner/.cache/cvmfs_externals_install
           export CMAKE_CXX_COMPILER_LAUNCHER=ccache
           mkdir build; cd build
-          cmake .. -DBUILD_UNITTESTS=ON
+          cmake .. -DBUILD_ALL=ON -DBUILD_UNITTESTS=ON
           make -j 8
           cd ..
       - name: Run Unittests - Mockfuse
