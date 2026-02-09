@@ -13,6 +13,7 @@ else()
     set(MAN_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}")
     file(MAKE_DIRECTORY ${MAN_OUTPUT_DIR})
 
+    if (BUILD_CVMFS)
     # cvmfs2
     add_custom_command(
         OUTPUT "${MAN_OUTPUT_DIR}/cvmfs2.1"
@@ -60,9 +61,10 @@ else()
         DESTINATION ${CMAKE_INSTALL_MANDIR}/man1
         COMPONENT documentation
     )
-    if (BUILD_SERVER) 
+    endif (BUILD_CVMFS)
 
     # cvmfs_server
+    if (BUILD_SERVER) 
     add_custom_command(
         OUTPUT "${MAN_OUTPUT_DIR}/cvmfs_server.1"
         COMMAND ${CMAKE_CURRENT_LIST_DIR}/generate_manpage_cvmfs_server.sh
