@@ -29,6 +29,16 @@ import (
 
 var NoPasswordError = 101
 
+// OverlayCacheDir is the path to the cache directory used by cvmfs_server overlay.
+// If empty, no -c flag is passed to cvmfs_server overlay.
+var OverlayCacheDir = "/var/tmp/cvmfs/overlay-cache"
+
+func init() {
+	if ocd := os.Getenv("DUCC_OVERLAY_CACHE_DIR"); ocd != "" {
+		OverlayCacheDir = ocd
+	}
+}
+
 type ConversionResult int
 
 const (
@@ -49,10 +59,7 @@ func ConvertWishFlat(wish WishFriendly) error {
 		nFlat.Elapsed(tFlat).AddField("action", "end_flat_conversion").Send()
 	}()
 
-	// it may happen at the very first round that this two calls return an error, let it be
-	if err := cvmfs.CreateCatalogIntoDir(wish.CvmfsRepo, ".chains"); err != nil {
-		l.LogE(err).Error("Error in creating catalog inside `.chains` directory")
-	}
+	// it may happen at the very first round that this call returns an error, let it be
 	if err := cvmfs.CreateCatalogIntoDir(wish.CvmfsRepo, ".flat"); err != nil {
 		l.LogE(err).Error("Error in creating catalog inside `.flat` directory")
 	}
@@ -128,24 +135,20 @@ func ConvertWishFlat(wish WishFriendly) error {
 
 		i := n.AddField("image", inputImage.GetSimpleName()).AddId()
 		t1 := time.Now()
-		i.Action("start_single_chain_conversion").Send()
-		i = i.Action("end_single_chain_convertion")
+		i.Action("start_flat_overlay_conversion").Send()
+		i = i.Action("end_flat_overlay_conversion")
 
-		err, lastChain := inputImage.CreateSneakyChainStructure(wish.CvmfsRepo)
+		// Use cvmfs_server overlay to merge layers into a flat image
+		_, err = inputImage.CreateFlatOverlay(wish.CvmfsRepo, OverlayCacheDir)
 		if err != nil {
 			if firstError == nil {
 				firstError = err
 			}
-			l.LogE(err).Error("Error in creating the chain structure")
+			l.LogE(err).Error("Error in creating the flat overlay")
 			i.Error(err).Elapsed(t1).Send()
 			continue
 		}
 
-		if _, err := os.Stat(filepath.Dir(completeSingularityPriPath)); err != nil {
-			cvmfs.WithinTransaction(wish.CvmfsRepo, func() error {
-				return os.MkdirAll(filepath.Dir(completeSingularityPriPath), constants.DirPermision)
-			})
-		}
 		ociImage, err := inputImage.GetOCIImage()
 		if err != nil {
 			if firstError == nil {
@@ -155,7 +158,7 @@ func ConvertWishFlat(wish WishFriendly) error {
 			i.Error(err).Elapsed(t1).Send()
 			continue
 		}
-		// we create the image with the correct singularity's dotfiles
+		// we create the singularity dotfiles inside the flat overlay result
 		err = cvmfs.WithinTransaction(wish.CvmfsRepo,
 			func() error {
 				if err := singularity.MakeBaseEnv(completeSingularityPriPath); err != nil {
@@ -171,10 +174,7 @@ func ConvertWishFlat(wish WishFriendly) error {
 					return err
 				}
 				return nil
-			},
-			cvmfs.NewTemplateTransaction(
-				cvmfs.TrimCVMFSRepoPrefix(cvmfs.ChainPath(wish.CvmfsRepo, lastChain)),
-				singularityPrivatePath))
+			})
 
 		if err != nil {
 			if firstError == nil {

@@ -77,6 +77,24 @@ var convertSingleImageCmd = &cobra.Command{
 
 		var conversionErrors []string
 
+		if !skipLayers {
+			for i := 0; i < attempts; i++ {
+				err = lib.ConvertWish(wish, convertAgain, overwriteLayer)
+				log := l.LogE(err).WithFields(fields).
+					WithFields(log.Fields{"attempts number": i})
+				if err != nil {
+					log.Warning("Could not convert wish (layers), trying again")
+				} else {
+					log.Info("Successfully converted the layers")
+					break
+				}
+			}
+			if err != nil {
+				log.Error("Multiple Errors in converting layers, going on")
+				conversionErrors = append(conversionErrors, fmt.Sprintf("layers: %s", err))
+			}
+		}
+
 		if !skipFlat {
 			for i := 0; i < attempts; i++ {
 				err = lib.ConvertWishFlat(wish)
@@ -96,23 +114,6 @@ var convertSingleImageCmd = &cobra.Command{
 			}
 		}
 
-		if !skipLayers {
-			for i := 0; i < attempts; i++ {
-				err = lib.ConvertWish(wish, convertAgain, overwriteLayer)
-				log := l.LogE(err).WithFields(fields).
-					WithFields(log.Fields{"attempts number": i})
-				if err != nil {
-					log.Warning("Could not convert wish (layers), trying again")
-				} else {
-					log.Info("Successfully converted the layers")
-					break
-				}
-			}
-			if err != nil {
-				log.Error("Multiple Errors in converting layers, going on")
-				conversionErrors = append(conversionErrors, fmt.Sprintf("layers: %s", err))
-			}
-		}
 
 		if !skipThinImage {
 			for i := 0; i < attempts; i++ {
