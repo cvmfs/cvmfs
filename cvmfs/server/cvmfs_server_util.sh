@@ -1241,7 +1241,7 @@ is_subcommand() {
     resign list info tag list-tags lstags check transaction enter abort snapshot    \
     skeleton migrate list-catalogs diff checkout update-geodb gc catalog-chown      \
     eliminate-hardlinks eliminate-bulk-hashes fix-stats update-info update-repoinfo \
-    mount fix-permissions masterkeycard ingest overlay merge-stats print-stats"
+    mount fix-permissions masterkeycard ingest ingestsql overlay merge-stats print-stats"
 
   for possible_command in $supported_commands; do
     if [ x"$possible_command" = x"$subcommand" ]; then
@@ -1415,6 +1415,19 @@ Supported Commands:
                   Extract the content of the tarfile inside the base directory,
                   in the same transaction it also delete the required folders.
                   Use '-' as -t argument to read the tarball from STDIN.
+  ingestsql       -D <sqlite database>
+                  [-l <lease path>] [-p <prefix>]
+                  [-q <concurrent jobs>] [-n <create empty db file>]
+                  [-C <config prefix>] [-B <block visibility mount point>]
+                  [-T <reset TTL>] [-r <lease retry interval>]
+                  [-P <priority>]
+                  [-a allow additions] [-d allow deletions]
+                  [-x force cancel lease] [-c enable core]
+                  [-z create nested catalogs] [-Z check completed]
+                  [-v verbose]
+                  <fully qualified name>
+                  Graft the contents of a SQLite database to the repository
+                  via the gateway.
   overlay         -l <layer1,layer2,...> (comma-separated, bottom-to-top order)
                   -d <destination path>
                   <fully qualified name>
