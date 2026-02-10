@@ -102,8 +102,18 @@ bool CommandOverlay::CheckCachedMerge(
     return false;
   }
 
-  // Read entries: each entry is 6 lines:
-  //   relative_path, parent_path, mode, size, checksum_hex, name
+  // Read format version marker
+  if (!GetLineFile(f, &line) || line != "v2") {
+    fclose(f);
+    LogCvmfs(kLogCvmfs, kLogStdout,
+             "Stale cache format for key %s, will recompute",
+             cache_key.c_str());
+    return false;
+  }
+
+  // Read entries: each entry is 10 lines (v2 format):
+  //   relative_path, parent_path, mode, size, checksum_hex, name,
+  //   symlink_target, mtime, uid, gid
   merged->clear();
   while (GetLineFile(f, &line)) {
     OverlayEntry oe;
@@ -118,11 +128,25 @@ bool CommandOverlay::CheckCachedMerge(
     const string checksum_hex = line;
     if (!GetLineFile(f, &line)) break;
     const string entry_name = line;
+    if (!GetLineFile(f, &line)) break;
+    const string symlink_target = line;
+    if (!GetLineFile(f, &line)) break;
+    const int64_t mtime = String2Int64(line);
+    if (!GetLineFile(f, &line)) break;
+    const uint64_t uid = String2Uint64(line);
+    if (!GetLineFile(f, &line)) break;
+    const uint64_t gid = String2Uint64(line);
 
     catalog::DirectoryEntryBase base;
     base.name_.Assign(entry_name.data(), entry_name.length());
     base.mode_ = mode;
     base.size_ = size;
+    base.mtime_ = static_cast<time_t>(mtime);
+    base.uid_ = static_cast<uid_t>(uid);
+    base.gid_ = static_cast<gid_t>(gid);
+    if (!symlink_target.empty()) {
+      base.symlink_.Assign(symlink_target.data(), symlink_target.length());
+    }
     if (!checksum_hex.empty()) {
       base.checksum_ = shash::MkFromHexPtr(
           shash::HexPtr(checksum_hex), shash::kSuffixNone);
@@ -162,7 +186,12 @@ bool CommandOverlay::StoreMergeInCache(
   // Write timestamp
   fprintf(f, "%" PRIu64 "\n", static_cast<uint64_t>(time(NULL)));
 
-  // Write entries
+  // Write format version marker (v2 includes symlink, mtime, uid, gid)
+  fprintf(f, "v2\n");
+
+  // Write entries: each entry is 10 lines:
+  //   relative_path, parent_path, mode, size, checksum_hex, name,
+  //   symlink_target, mtime, uid, gid
   for (map<string, OverlayEntry>::const_iterator it = merged.begin();
        it != merged.end(); ++it) {
     const OverlayEntry &oe = it->second;
@@ -172,6 +201,10 @@ bool CommandOverlay::StoreMergeInCache(
     fprintf(f, "%" PRIu64 "\n", oe.entry.size());
     fprintf(f, "%s\n", oe.entry.checksum().ToString().c_str());
     fprintf(f, "%s\n", oe.entry.name().ToString().c_str());
+    fprintf(f, "%s\n", oe.entry.symlink().ToString().c_str());
+    fprintf(f, "%" PRId64 "\n", static_cast<int64_t>(oe.entry.mtime()));
+    fprintf(f, "%" PRIu64 "\n", static_cast<uint64_t>(oe.entry.uid()));
+    fprintf(f, "%" PRIu64 "\n", static_cast<uint64_t>(oe.entry.gid()));
   }
 
   fclose(f);
@@ -483,6 +516,78 @@ catalog::Catalog *CommandOverlay::LoadCatalogForPath(
 }
 
 
+catalog::Catalog *CommandOverlay::FindCatalogForLayer(
+    const string &repo_base,
+    const string &temp_dir,
+    catalog::Catalog *catalog,
+    const string &layer_path,
+    vector<catalog::Catalog *> *loaded_catalogs) {
+  // First try a direct lookup in the given catalog
+  catalog::DirectoryEntry test_entry;
+  const PathString ps_layer(layer_path.data(), layer_path.length());
+  if (catalog->LookupPath(ps_layer, &test_entry)) {
+    return catalog;
+  }
+
+  // The path was not found directly.  Walk the path components *below*
+  // this catalog's mountpoint to find a nested catalog mountpoint that
+  // is an ancestor of layer_path.
+  const string mountpoint = catalog->mountpoint().ToString();
+
+  // Verify layer_path starts with the mountpoint (or mountpoint is empty
+  // for the root catalog)
+  if (!mountpoint.empty() && layer_path.substr(0, mountpoint.length())
+                                                            != mountpoint) {
+    return NULL;
+  }
+
+  // Get the suffix of layer_path below the mountpoint
+  const string suffix = mountpoint.empty() ? layer_path
+                                           : layer_path.substr(
+                                                 mountpoint.length());
+  const vector<string> components = SplitString(suffix, '/');
+  string prefix = mountpoint;
+  for (size_t i = 0; i < components.size(); ++i) {
+    if (components[i].empty()) continue;
+    prefix += "/" + components[i];
+
+    catalog::DirectoryEntry dir_entry;
+    const PathString ps_prefix(prefix.data(), prefix.length());
+    if (!catalog->LookupPath(ps_prefix, &dir_entry)) {
+      break;
+    }
+
+    if (dir_entry.IsNestedCatalogMountpoint()) {
+      shash::Any nested_hash;
+      uint64_t nested_size;
+      if (!catalog->FindNested(ps_prefix, &nested_hash, &nested_size)) {
+        LogCvmfs(kLogCvmfs, kLogStderr,
+                 "Failed to find nested catalog hash for %s", prefix.c_str());
+        return NULL;
+      }
+
+      catalog::Catalog *nested = LoadCatalogForPath(
+          repo_base, prefix, temp_dir, nested_hash);
+      if (nested == NULL) {
+        LogCvmfs(kLogCvmfs, kLogStderr,
+                 "Failed to load nested catalog at %s", prefix.c_str());
+        return NULL;
+      }
+      loaded_catalogs->push_back(nested);
+
+      // Recurse: the layer path may be directly in this nested catalog
+      // or in an even deeper nested catalog
+      return FindCatalogForLayer(
+          repo_base, temp_dir, nested, layer_path, loaded_catalogs);
+    }
+  }
+
+  LogCvmfs(kLogCvmfs, kLogStderr, "Layer path not found: %s",
+           layer_path.c_str());
+  return NULL;
+}
+
+
 int CommandOverlay::Main(const ArgumentList &args) {
   // Parse publish workflow parameters
   const string spooler_definition_str = *args.find('r')->second;
@@ -622,25 +727,41 @@ int CommandOverlay::Main(const ArgumentList &args) {
 
       map<string, OverlayEntry> layer_entries;
 
-      // Look up the subdirectory in the root catalog
-      catalog::DirectoryEntry subdir_entry;
-      const PathString ps_layer_path(layer_path.data(), layer_path.length());
-      if (!root_catalog->LookupPath(ps_layer_path, &subdir_entry)) {
-        LogCvmfs(kLogCvmfs, kLogStderr, "Layer path not found: %s",
-                 layer_path.c_str());
+      // Find the catalog that contains this layer path (may be nested)
+      vector<catalog::Catalog *> loaded_catalogs;
+      catalog::Catalog *layer_catalog = FindCatalogForLayer(
+          stratum0, temp_dir, root_catalog, layer_path, &loaded_catalogs);
+      if (layer_catalog == NULL) {
+        for (size_t j = 0; j < loaded_catalogs.size(); ++j)
+          delete loaded_catalogs[j];
         delete root_catalog;
         return 1;
       }
 
-      // Check if this is a nested catalog mountpoint
+      catalog::DirectoryEntry subdir_entry;
+      const PathString ps_layer_path(layer_path.data(), layer_path.length());
+      if (!layer_catalog->LookupPath(ps_layer_path, &subdir_entry)) {
+        LogCvmfs(kLogCvmfs, kLogStderr,
+                 "Unexpected: layer path not found after catalog resolution: %s",
+                 layer_path.c_str());
+        for (size_t j = 0; j < loaded_catalogs.size(); ++j)
+          delete loaded_catalogs[j];
+        delete root_catalog;
+        return 1;
+      }
+
+      // Check if the layer path itself is a nested catalog mountpoint;
+      // if so, load that catalog and read its entries.
       if (subdir_entry.IsNestedCatalogMountpoint()) {
         shash::Any nested_hash;
         uint64_t nested_size;
-        if (!root_catalog->FindNested(ps_layer_path, &nested_hash,
-                                      &nested_size)) {
+        if (!layer_catalog->FindNested(ps_layer_path, &nested_hash,
+                                       &nested_size)) {
           LogCvmfs(kLogCvmfs, kLogStderr,
                    "Failed to find nested catalog for %s",
                    layer_path.c_str());
+          for (size_t j = 0; j < loaded_catalogs.size(); ++j)
+            delete loaded_catalogs[j];
           delete root_catalog;
           return 1;
         }
@@ -651,6 +772,8 @@ int CommandOverlay::Main(const ArgumentList &args) {
           LogCvmfs(kLogCvmfs, kLogStderr,
                    "Failed to load nested catalog for %s",
                    layer_path.c_str());
+          for (size_t j = 0; j < loaded_catalogs.size(); ++j)
+            delete loaded_catalogs[j];
           delete root_catalog;
           return 1;
         }
@@ -658,8 +781,12 @@ int CommandOverlay::Main(const ArgumentList &args) {
         ReadCatalogEntries(nested_catalog, layer_path, "", &layer_entries);
         delete nested_catalog;
       } else {
-        ReadCatalogEntries(root_catalog, layer_path, "", &layer_entries);
+        ReadCatalogEntries(layer_catalog, layer_path, "", &layer_entries);
       }
+
+      // Clean up any intermediate catalogs loaded during hierarchy walk
+      for (size_t j = 0; j < loaded_catalogs.size(); ++j)
+        delete loaded_catalogs[j];
 
       LogCvmfs(kLogCvmfs, kLogStdout, "  Read %zu entries from layer %s",
                layer_entries.size(), layer_path.c_str());

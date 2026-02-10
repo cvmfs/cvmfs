@@ -130,6 +130,21 @@ class CommandOverlay : public Command {
       const std::string &subdirectory,
       const std::string &temp_dir,
       const shash::Any &root_hash);
+
+  /**
+   * Find the catalog that contains the given layer path by walking the
+   * nested catalog hierarchy.  The layer path may be deep inside a nested
+   * catalog (e.g. /.layers/ab/abcdef.../layerfs where /.layers is a nested
+   * catalog mountpoint).  Returns the catalog that can look up layer_path,
+   * or NULL on failure.  The caller takes ownership of any additionally
+   * loaded catalogs returned via loaded_catalogs.
+   */
+  catalog::Catalog *FindCatalogForLayer(
+      const std::string &repo_base,
+      const std::string &temp_dir,
+      catalog::Catalog *root_catalog,
+      const std::string &layer_path,
+      std::vector<catalog::Catalog *> *loaded_catalogs);
 };
 
 }  // namespace swissknife
