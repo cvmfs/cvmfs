@@ -162,7 +162,7 @@ list_deps_rpm() {
 install_deps_deb() {
   [ -f "$DEB_CONTROL" ] || die "Debian control file not found at $DEB_CONTROL"
   $SUDO apt-get -y update
-  if ! check_available mk-build-deps; then
+  if ! check_available mk-build-deps || ! dpkg -s equivs >/dev/null 2>&1; then
     $SUDO apt-get -y install devscripts equivs
   fi
   # Use mk-build-deps to create and install the meta-package, then remove it
