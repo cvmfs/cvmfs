@@ -41,6 +41,9 @@ class QuotaManager : SingleCopy {
    *  - backchannel command 'R': release pinned files if possible
    * Revision 2:
    *  - add kCleanupRate command
+   * Revision 3:
+   *  - add kRegisterMountpoint, kGetMountpoints, kGetGroupHashes, and
+   *    kSetCleanupPolicy commands
    */
   static const uint32_t kProtocolRevision;
 

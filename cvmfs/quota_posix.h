@@ -129,7 +129,7 @@ class PosixQuotaManager : public QuotaManager {
     kListVolatile,
     kCleanupRate,
     kSetLimit,
-    // After non open aware LRU cleanup
+    // as of protocol revision 3
     kRegisterMountpoint,
     kGetMountpoints,
     kGetGroupHashes,

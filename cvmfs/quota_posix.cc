@@ -426,7 +426,9 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
     LogCvmfs(kLogQuota, kLogDebug, "failed to start cache manager");
     return NULL;
   }
-  LogCvmfs(kLogQuota, kLogDebug, "new cache manager pid: %d", new_cachemgr_pid);
+  LogCvmfs(kLogQuota, kLogDebug,
+           "new cache manager pid: %d protocol revision %d",
+           new_cachemgr_pid, QuotaManager::kProtocolRevision);
   quota_mgr->SetCacheMgrPid(new_cachemgr_pid);
   const int fd_lockfile_rw = open((workspace_dir + "/lock_cachemgr").c_str(),
                                   O_RDWR | O_TRUNC, 0600);
@@ -792,6 +794,8 @@ uint32_t PosixQuotaManager::GetProtocolRevision() {
 }
 
 void PosixQuotaManager::SetCleanupPolicy(bool cleanup_unused_first) {
+  if (protocol_revision_ < 3) return;
+
   LruCommand cmd;
   cmd.command_type = kSetCleanupPolicy;
   WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
@@ -800,6 +804,8 @@ void PosixQuotaManager::SetCleanupPolicy(bool cleanup_unused_first) {
 }
 
 void PosixQuotaManager::RegisterMountpoint(const std::string &mountpoint) {
+  if (protocol_revision_ < 3) return;
+
   LruCommand cmd;
   cmd.command_type = kRegisterMountpoint;
   WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
@@ -810,6 +816,8 @@ void PosixQuotaManager::RegisterMountpoint(const std::string &mountpoint) {
 }
 
 std::string PosixQuotaManager::GetMountpoints() {
+  if (protocol_revision_ < 3) return "";
+
   int pipe_mp[2];
   MakeReturnPipe(pipe_mp);
 
@@ -825,6 +833,8 @@ std::string PosixQuotaManager::GetMountpoints() {
 }
 
 std::string PosixQuotaManager::GetGroupHashes() {
+  if (protocol_revision_ < 3) return "";
+
   int pipe_gh[2];
   MakeReturnPipe(pipe_gh);
 
