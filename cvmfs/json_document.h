@@ -5,48 +5,32 @@
 #ifndef CVMFS_JSON_DOCUMENT_H_
 #define CVMFS_JSON_DOCUMENT_H_
 
+#include <nlohmann/json.hpp>
 #include <string>
-#include <utility>
-#include <vector>
 
-#include "json.h"
 #include "util/single_copy.h"
 
-typedef struct json_value JSON;
+typedef nlohmann::json JSON;
 
 class JsonDocument : SingleCopy {
  public:
   static JsonDocument *Create(const std::string &text);
-  ~JsonDocument();
+  ~JsonDocument() { }
 
   std::string PrintCanonical();
-  std::string PrintPretty();
 
-  inline const JSON *root() const { return root_; }
-  inline bool IsValid() const { return root_ != NULL; }
+  inline const JSON *root() const { return &root_; }
+  inline bool IsValid() const { return !root_.is_null(); }
 
-  static std::string EscapeString(const std::string &input);
-  static JSON *SearchInObject(const JSON *json_object, const std::string &name,
-                              const json_type type);
+  static const JSON *SearchInObject(const JSON *json_object,
+                                    const std::string &name,
+                                    const nlohmann::json::value_t type);
 
  private:
-  static const unsigned kDefaultBlockSize = 2048;  // 2kB
-
-  struct PrintOptions {
-    PrintOptions() : with_whitespace(false), num_indent(0) { }
-    bool with_whitespace;
-    unsigned num_indent;
-  };
-
   JsonDocument();
   bool Parse(const std::string &text);
-  std::string PrintValue(JSON *value, PrintOptions print_options);
-  std::string PrintArray(JSON *first_child, PrintOptions print_options);
-  std::string PrintObject(JSON *first_child, PrintOptions print_options);
 
-  block_allocator allocator_;
-  JSON *root_;
-  char *raw_text_;
+  JSON root_;
 };
 
 template<typename T>

@@ -4,249 +4,115 @@
 
 #include "json_document.h"
 
-#include <cassert>
-#include <cstdlib>
-#include <cstring>
+#include <nlohmann/json.hpp>
 
-#include "util/exception.h"
 #include "util/logging.h"
 #include "util/pointer.h"
-#include "util/string.h"
+
+// TODO: fix json key ordering, use nlohmann::ordered_json instead
+// fix floating point formatting. update test/force precision
+// strict parsing: update unit tests to stop using {} without key value pair
 
 using namespace std;  // NOLINT
+using json = nlohmann::json;
 
 JsonDocument *JsonDocument::Create(const string &text) {
   UniquePtr<JsonDocument> json(new JsonDocument());
-  const bool retval = json->Parse(text);
-  if (!retval)
+  if (!json->Parse(text))
     return NULL;
   return json.Release();
 }
 
-string JsonDocument::EscapeString(const string &input) {
-  string escaped;
-  escaped.reserve(input.length());
+JsonDocument::JsonDocument() : root_(json::value_t::null) { }
 
-  for (unsigned i = 0, s = input.length(); i < s; ++i) {
-    if (input[i] == '\\') {
-      escaped.push_back('\\');
-      escaped.push_back('\\');
-    } else if (input[i] == '"') {
-      escaped.push_back('\\');
-      escaped.push_back('"');
-    } else {
-      escaped.push_back(input[i]);
-    }
-  }
-  return escaped;
-}
-
-JsonDocument::JsonDocument()
-    : allocator_(kDefaultBlockSize), root_(NULL), raw_text_(NULL) { }
-
-JsonDocument::~JsonDocument() {
-  if (raw_text_)
-    free(raw_text_);
-}
-
-/**
- * Parses a JSON string in text.
- *
- * @return        true if parsing was successful
- */
 bool JsonDocument::Parse(const string &text) {
-  assert(root_ == NULL);
+  root_ = json::parse(text, nullptr, false);
 
-  // The used JSON library 'vjson' is a destructive parser and therefore
-  // alters the content of the provided buffer.  The buffer must persist as
-  // name and string values from JSON nodes just point into it.
-  raw_text_ = strdup(text.c_str());
-
-  char *error_pos = 0;
-  char *error_desc = 0;
-  int error_line = 0;
-  JSON *root = json_parse(raw_text_, &error_pos, &error_desc, &error_line,
-                          &allocator_);
-
-  // check if the json string was parsed successfully
-  if (!root) {
-    LogCvmfs(kLogUtility, kLogDebug,
-             "Failed to parse json string. Error at line %d: %s (%s)",
-             error_line, error_desc, error_pos);
+  if (root_.is_discarded()) {
+    LogCvmfs(kLogUtility, kLogDebug, "Failed to parse JSON string.");
+    root_ = json(json::value_t::null);
     return false;
   }
-
-  root_ = root;
   return true;
 }
 
-string JsonDocument::PrintArray(JSON *first_child, PrintOptions print_options) {
-  string result = "[";
-  if (print_options.with_whitespace) {
-    result += "\n";
-    print_options.num_indent += 2;
-  }
-  JSON *value = first_child;
-  if (value != NULL) {
-    result += PrintValue(value, print_options);
-    value = value->next_sibling;
-  }
-  while (value != NULL) {
-    result += print_options.with_whitespace ? ",\n" : ",";
-    result += PrintValue(value, print_options);
-    value = value->next_sibling;
-  }
-  if (print_options.with_whitespace) {
-    result += "\n";
-    for (unsigned i = 2; i < print_options.num_indent; ++i)
-      result.push_back(' ');
-  }
-  return result + "]";
-}
-
-/**
- * JSON string in a canonical format:
- *   - No whitespaces
- *   - Variable names and strings in quotes
- *
- * Can be used as a canonical representation to sign or encrypt a JSON text.
- */
 string JsonDocument::PrintCanonical() {
-  if (!root_)
+  if (root_.is_null())
     return "";
-  const PrintOptions print_options;
-  return PrintObject(root_->first_child, print_options);
+  return root_.dump();
 }
 
-string JsonDocument::PrintObject(JSON *first_child,
-                                 PrintOptions print_options) {
-  string result = "{";
-  if (print_options.with_whitespace) {
-    result += "\n";
-    print_options.num_indent += 2;
-  }
-  JSON *value = first_child;
-  if (value != NULL) {
-    result += PrintValue(value, print_options);
-    value = value->next_sibling;
-  }
-  while (value != NULL) {
-    result += print_options.with_whitespace ? ",\n" : ",";
-    result += PrintValue(value, print_options);
-    value = value->next_sibling;
-  }
-  if (print_options.with_whitespace) {
-    result += "\n";
-    for (unsigned i = 2; i < print_options.num_indent; ++i)
-      result.push_back(' ');
-  }
-  return result + "}";
-}
-
-/**
- * JSON string for humans.
- */
-string JsonDocument::PrintPretty() {
-  if (!root_)
-    return "";
-  PrintOptions print_options;
-  print_options.with_whitespace = true;
-  return PrintObject(root_->first_child, print_options);
-}
-
-std::string JsonDocument::PrintValue(JSON *value, PrintOptions print_options) {
-  assert(value);
-
-  string result;
-  for (unsigned i = 0; i < print_options.num_indent; ++i)
-    result.push_back(' ');
-  if (value->name) {
-    result += "\"" + EscapeString(value->name) + "\":";
-    if (print_options.with_whitespace)
-      result += " ";
-  }
-  switch (value->type) {
-    case JSON_NULL:
-      result += "null";
-      break;
-    case JSON_OBJECT:
-      result += PrintObject(value->first_child, print_options);
-      break;
-    case JSON_ARRAY:
-      result += PrintArray(value->first_child, print_options);
-      break;
-    case JSON_STRING:
-      result += "\"" + EscapeString(value->string_value) + "\"";
-      break;
-    case JSON_INT:
-      result += StringifyInt(value->int_value);
-      break;
-    case JSON_FLOAT:
-      result += StringifyDouble(value->float_value);
-      break;
-    case JSON_BOOL:
-      result += value->int_value ? "true" : "false";
-      break;
-    default:
-      PANIC(NULL);
-  }
-  return result;
-}
-
-JSON *JsonDocument::SearchInObject(const JSON *json_object, const string &name,
-                                   const json_type type) {
-  if (!json_object || (json_object->type != JSON_OBJECT))
+const JSON *JsonDocument::SearchInObject(const JSON *json_object,
+                                         const string &name,
+                                         const json::value_t type) {
+  if (!json_object || !json_object->is_object())
     return NULL;
 
-  JSON *walker = json_object->first_child;
-  while (walker != NULL) {
-    if (string(walker->name) == name) {
-      return (walker->type == type) ? walker : NULL;
-    }
-    walker = walker->next_sibling;
+  auto it = json_object->find(name);
+  if (it != json_object->end() && it->type() == type) {
+    return &(*it);
   }
   return NULL;
 }
 
 template<>
-bool GetFromJSON<std::string>(const JSON *object, const std::string &name,
-                              std::string *value) {
-  const JSON *o = JsonDocument::SearchInObject(object, name, JSON_STRING);
-
-  if (o == NULL) {
+bool GetFromJSON<string>(const JSON *object,
+                         const string &name,
+                         string *value) {
+  const JSON *o = JsonDocument::SearchInObject(
+      object, name, json::value_t::string);
+  if (!o)
     return false;
-  }
 
   if (value) {
-    *value = o->string_value;
-  }
-
-  return true;
-}
-
-template<>
-bool GetFromJSON<int>(const JSON *object, const std::string &name, int *value) {
-  const JSON *o = JsonDocument::SearchInObject(object, name, JSON_INT);
-
-  if (o == NULL || value == NULL) {
+    const string *s = o->get_ptr<const string *>();
+    if (s) {
+      *value = *s;
+      return true;
+    }
     return false;
   }
-
-  *value = o->int_value;
-
   return true;
 }
 
 template<>
-bool GetFromJSON<float>(const JSON *object, const std::string &name,
+bool GetFromJSON<int>(const JSON *object,
+                      const string &name,
+                      int *value) {
+  const JSON *o = JsonDocument::SearchInObject(
+      object, name, json::value_t::number_integer);
+
+  if (!o) {
+    o = JsonDocument::SearchInObject(
+        object, name, json::value_t::number_unsigned);
+  }
+
+  if (!o || !value)
+    return false;
+
+  if (auto p = o->get_ptr<const json::number_integer_t *>()) {
+    *value = static_cast<int>(*p);
+    return true;
+  } else if (auto p = o->get_ptr<const json::number_unsigned_t *>()) {
+    *value = static_cast<int>(*p);
+    return true;
+  }
+
+  return false;
+}
+
+template<>
+bool GetFromJSON<float>(const JSON *object,
+                        const string &name,
                         float *value) {
-  const JSON *o = JsonDocument::SearchInObject(object, name, JSON_FLOAT);
-
-  if (o == NULL || value == NULL) {
+  const JSON *o = JsonDocument::SearchInObject(
+      object, name, json::value_t::number_float);
+  if (!o || !value)
     return false;
+
+  if (auto p = o->get_ptr<const json::number_float_t *>()) {
+    *value = static_cast<float>(*p);
+    return true;
   }
-
-  *value = o->float_value;
-
-  return true;
+  return false;
 }
