@@ -25,16 +25,16 @@ TEST(T_Json, Complex) {
       " \"float\": 0.1,\n"
       " \"switch\": true,\n"
       " \"void\": null,\n"
-      " \"vector\": [true, false, null, 0.0, 7, \"foo\", {1, 2}, {}, []],\n"
+      " \"vector\": [true, false, null, 0.0, 7, \"foo\", [1, 2], {}, []],\n"
       " \"compound\": {\"a\": 2, \"b\": [1, 2, 3], \"c\": {}}}"));
   EXPECT_TRUE(json.IsValid());
-  EXPECT_EQ("{\"string\":\"a string with spaces\","
+  EXPECT_EQ("{\"compound\":{\"a\":2,\"b\":[1,2,3],\"c\":{}},"
+            "\"float\":0.1,"
             "\"number\":42,"
-            "\"float\":0.100,"
+            "\"string\":\"a string with spaces\","
             "\"switch\":true,"
-            "\"void\":null,"
-            "\"vector\":[true,false,null,0.000,7,\"foo\",{1,2},{},[]],"
-            "\"compound\":{\"a\":2,\"b\":[1,2,3],\"c\":{}}}",
+            "\"vector\":[true,false,null,0.0,7,\"foo\",[1,2],{},[]],"
+            "\"void\":null}", 
             json->PrintCanonical());
 }
 
