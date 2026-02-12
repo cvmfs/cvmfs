@@ -124,13 +124,13 @@ if (BUILD_CVMFS)
                   authz/helper_log.cc
                   authz/helper_util.cc
   )
-  target_link_libraries (cvmfs_allow_helper ${VJSON_LIBRARIES})
+  target_link_libraries (cvmfs_allow_helper nlohmann_json::nlohmann_json)
   add_executable (cvmfs_deny_helper
                   authz/helper_deny.cc
                   authz/helper_log.cc
                   authz/helper_util.cc
   )
-  target_link_libraries (cvmfs_deny_helper ${VJSON_LIBRARIES})
+  target_link_libraries (cvmfs_deny_helper nlohmann_json::nlohmann_json)
 
 
   #
@@ -270,7 +270,7 @@ if (BUILD_CVMFS)
        ${SPARSEHASH_LIBRARIES}
        ${LEVELDB_LIBRARIES}
        ${PROTOBUF_LITE_LIBRARY}
-       ${VJSON_LIBRARIES}
+       nlohmann_json::nlohmann_json
        ${RT_LIBRARY}
        ${UUID_LIBRARIES}
        pthread
@@ -372,8 +372,8 @@ if (BUILD_CVMFS)
     )
   endif ()
   if (NOT MACOSX)
-  # Systemd service unit for reloads after package upgrades
-  install (
+    # Systemd service unit for reloads after package upgrades
+    install (
     FILES pkg/cvmfs-reload.service
     DESTINATION /usr/lib/systemd/system
     PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
@@ -419,7 +419,6 @@ if (BUILD_LIBCVMFS)
   target_include_directories (cvmfs_client PRIVATE ${LEVELDB_INCLUDE_DIR})
   target_include_directories (cvmfs_client PRIVATE ${PACPARSER_INCLUDE_DIR})
   target_include_directories (cvmfs_client PRIVATE ${ZLIB_INCLUDE_DIRS})
-  target_include_directories (cvmfs_client PRIVATE ${VJSON_INCLUDE_DIRS})
   target_include_directories (cvmfs_client PRIVATE ${PROTOBUF_INCLUDE_DIRS})
 
   target_link_libraries (cvmfs_client
@@ -433,7 +432,7 @@ if (BUILD_LIBCVMFS)
                                  ${LEVELDB_LIBRARIES}
                                  ${PACPARSER_LIBRARIES}
                                  ${ZLIB_LIBRARIES}
-                                 ${VJSON_LIBRARIES}
+                                 nlohmann_json::nlohmann_json
                                  ${PROTOBUF_LITE_LIBRARY}
   )
 
@@ -707,7 +706,7 @@ if (BUILD_SERVER)
         ${ZLIB_LIBRARIES}
         ${OPENSSL_LIBRARIES}
         ${RT_LIBRARY}
-        ${VJSON_LIBRARIES}
+        nlohmann_json::nlohmann_json
         LibArchive::LibArchive
         pthread
         dl
@@ -820,7 +819,12 @@ if (BUILD_SERVER)
         ${OPENSSL_LIBRARIES}
         ${SQLITE3_LIBRARY}
         ${ZLIB_LIBRARIES}
+<<<<<<< HEAD
         ${VJSON_LIBRARIES}
+=======
+        nlohmann_json::nlohmann_json
+        ${CAP_LIBRARIES}
+>>>>>>> d8c0db226 (link to nlohmann json)
         LibArchive::LibArchive
         ${RT_LIBRARY}
         pthread
@@ -1105,7 +1109,7 @@ if(BUILD_RECEIVER)
         ${CURL_LIBRARIES}
         ${CARES_LIBRARIES} ${CARES_LDFLAGS}
         ${SQLITE3_LIBRARY}
-        ${VJSON_LIBRARIES}
+        nlohmann_json::nlohmann_json
         ${OPENSSL_LIBRARIES}
         ${ZLIB_LIBRARIES}
         ${RT_LIBRARY}
@@ -1269,7 +1273,7 @@ if (BUILD_PRELOADER)
                         ${OPENSSL_LIBRARIES}
                         ${RT_LIBRARY}
                         ${UUID_LIBRARIES}
-                        ${VJSON_LIBRARIES}
+                        nlohmann_json::nlohmann_json
                         LibArchive::LibArchive
                         pthread
                         dl

@@ -269,7 +269,7 @@ if (BUILD_SERVER)
         ${OPENSSL_LIBRARIES}
         ${SQLITE3_LIBRARY}
         ${ZLIB_LIBRARIES}
-        ${VJSON_LIBRARIES}
+        nlohmann_json::nlohmann_json
         ${CAP_LIBRARIES}
         LibArchive::LibArchive
         ${RT_LIBRARY}
@@ -598,7 +598,7 @@ list (APPEND CVMFS_UNITTESTS_LINK_LIBRARIES
       ${ZLIB_LIBRARIES}
       ${UUID_LIBRARIES}
       ${PACPARSER_LIBRARIES}
-      ${VJSON_LIBRARIES}
+      nlohmann_json::nlohmann_json
       ${PROTOBUF_LITE_LIBRARY}
       ${CAP_LIBRARIES}
       LibArchive::LibArchive
