@@ -6,10 +6,6 @@
 #include "util/logging.h"
 #include "util/pointer.h"
 
-// TODO: fix json key ordering, use nlohmann::ordered_json instead
-// fix floating point formatting. update test/force precision
-// strict parsing: update unit tests to stop using {} without key value pair
-
 using namespace std;  // NOLINT
 
 JsonDocument *JsonDocument::Create(const string &text) {
@@ -45,8 +41,17 @@ const JSON *JsonDocument::SearchInObject(const JSON *json_object,
     return NULL;
 
   auto it = json_object->find(name);
-  if (it != json_object->end() && it->type() == type) {
-    return &(*it);
+  if (it != json_object->end()) {
+    // if we asked for an int, accept signed or unsigned
+    if (type == JSON::value_t::number_integer) {
+      if (it->is_number_integer() || it->is_number_unsigned()) {
+        return &(*it);
+      }
+    }
+    // otherwise, stick to strict matching for strings, objects, etc.
+    else if (it->type() == type) {
+      return &(*it);
+    }
   }
   return NULL;
 }
