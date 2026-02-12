@@ -156,7 +156,7 @@ bool MakeEndRequest(const std::string &method, const std::string &key_id,
   } else {
     UniquePtr<JsonDocument> const reply_json(doc);
     const JSON *reply_status = JsonDocument::SearchInObject(
-        reply_json->root(), "status", nlohmann::json::value_t::string);
+        reply_json->root(), "status", JSON_STRING);
     ok = (reply_status != NULL
           && std::string(reply_status->get<std::string>()) == "ok");
     if (!ok) {
@@ -165,7 +165,7 @@ bool MakeEndRequest(const std::string &method, const std::string &key_id,
     }
     if (expect_final_revision) {
       const JSON *reply_final_rev = JsonDocument::SearchInObject(
-          reply_json->root(), "final_revision", nlohmann::json::value_t::number_integer);
+          reply_json->root(), "final_revision", JSON_INT);
       ok = (reply_final_rev != NULL);
       if (ok) {
         g_final_revision = reply_final_rev->get<int>();

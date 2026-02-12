@@ -396,7 +396,7 @@ bool AuthzExternalFetcher::ParseMsg(const std::string &json_msg,
   }
 
   const JSON *json_authz = JsonDocument::SearchInObject(
-      json_document->root(), "cvmfs_authz_v1", nlohmann::json::value_t::object);
+      json_document->root(), "cvmfs_authz_v1", JSON_OBJECT);
   if (json_authz == NULL) {
     LogCvmfs(kLogAuthz, kLogSyslogErr | kLogDebug,
              "\"cvmfs_authz_v1\" not found in json from authz helper %s: %s",
@@ -427,7 +427,7 @@ bool AuthzExternalFetcher::ParseMsg(const std::string &json_msg,
 bool AuthzExternalFetcher::ParseMsgId(const JSON *json_authz,
                                       AuthzExternalMsg *binary_msg) {
   const JSON *json_msgid = JsonDocument::SearchInObject(json_authz, "msgid",
-                                                  nlohmann::json::value_t::number_integer);
+                                                  JSON_INT);
   if (json_msgid == NULL) {
     LogCvmfs(kLogAuthz, kLogSyslogErr | kLogDebug,
              "\"msgid\" not found in json from authz helper %s",
@@ -457,7 +457,7 @@ bool AuthzExternalFetcher::ParseMsgId(const JSON *json_authz,
 bool AuthzExternalFetcher::ParsePermit(const JSON *json_authz,
                                        AuthzExternalMsg *binary_msg) {
   const JSON *json_status = JsonDocument::SearchInObject(json_authz, "status",
-                                                   nlohmann::json::value_t::number_integer);
+                                                   JSON_INT);
   if (json_status == NULL) {
     LogCvmfs(kLogAuthz, kLogSyslogErr | kLogDebug,
              "\"status\" not found in json from authz helper %s",
@@ -473,7 +473,7 @@ bool AuthzExternalFetcher::ParsePermit(const JSON *json_authz,
         json_status->get<int>());
   }
 
-  const JSON *json_ttl = JsonDocument::SearchInObject(json_authz, "ttl", nlohmann::json::value_t::number_integer);
+  const JSON *json_ttl = JsonDocument::SearchInObject(json_authz, "ttl", JSON_INT);
   if (json_ttl == NULL) {
     LogCvmfs(kLogAuthz, kLogDebug, "no ttl, using default");
     binary_msg->permit.ttl = kDefaultTtl;
@@ -482,7 +482,7 @@ bool AuthzExternalFetcher::ParsePermit(const JSON *json_authz,
   }
 
   const JSON *json_token = JsonDocument::SearchInObject(json_authz, "x509_proxy",
-                                                  nlohmann::json::value_t::string);
+                                                  JSON_STRING);
   if (json_token != NULL) {
     binary_msg->permit.token.type = kTokenX509;
     string token_binary;
@@ -505,7 +505,7 @@ bool AuthzExternalFetcher::ParsePermit(const JSON *json_authz,
   }
 
   json_token = JsonDocument::SearchInObject(json_authz, "bearer_token",
-                                            nlohmann::json::value_t::string);
+                                            JSON_STRING);
   if (json_token != NULL) {
     binary_msg->permit.token.type = kTokenBearer;
     const unsigned size = json_token->get<string>().size();
@@ -543,7 +543,7 @@ bool AuthzExternalFetcher::ParsePermit(const JSON *json_authz,
 bool AuthzExternalFetcher::ParseRevision(const JSON *json_authz,
                                          AuthzExternalMsg *binary_msg) {
   const JSON *json_revision = JsonDocument::SearchInObject(json_authz, "revision",
-                                                     nlohmann::json::value_t::number_integer);
+                                                     JSON_INT);
   if (json_revision == NULL) {
     LogCvmfs(kLogAuthz, kLogSyslogErr | kLogDebug,
              "\"revision\" not found in json from authz helper %s",

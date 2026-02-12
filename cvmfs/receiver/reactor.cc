@@ -125,7 +125,7 @@ bool Reactor::ExtractStatsFromReq(JsonDocument *req, perf::Statistics *stats,
   const upload::UploadCounters counters(stats_tmpl);
 
   const JSON *statistics = JsonDocument::SearchInObject(
-      req->root(), "statistics", nlohmann::json::value_t::object);
+      req->root(), "statistics", JSON_OBJECT);
   if (statistics == NULL) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
              "Could not find 'statistics' field in request");
@@ -133,7 +133,7 @@ bool Reactor::ExtractStatsFromReq(JsonDocument *req, perf::Statistics *stats,
   }
 
   const JSON *publish_ctrs = JsonDocument::SearchInObject(statistics, "publish",
-                                                          nlohmann::json::value_t::object);
+                                                          JSON_OBJECT);
 
   if (publish_ctrs == NULL) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
@@ -142,18 +142,18 @@ bool Reactor::ExtractStatsFromReq(JsonDocument *req, perf::Statistics *stats,
   }
 
   const JSON *n_chunks_added = JsonDocument::SearchInObject(
-      publish_ctrs, "n_chunks_added", nlohmann::json::value_t::number_integer);
+      publish_ctrs, "n_chunks_added", JSON_INT);
   const JSON *n_chunks_duplicated = JsonDocument::SearchInObject(
-      publish_ctrs, "n_chunks_duplicated", nlohmann::json::value_t::number_integer);
+      publish_ctrs, "n_chunks_duplicated", JSON_INT);
   const JSON *n_catalogs_added = JsonDocument::SearchInObject(
-      publish_ctrs, "n_catalogs_added", nlohmann::json::value_t::number_integer);
+      publish_ctrs, "n_catalogs_added", JSON_INT);
   const JSON *sz_uploaded_bytes = JsonDocument::SearchInObject(
-      publish_ctrs, "sz_uploaded_bytes", nlohmann::json::value_t::number_integer);
+      publish_ctrs, "sz_uploaded_bytes", JSON_INT);
   const JSON *sz_uploaded_catalog_bytes = JsonDocument::SearchInObject(
-      publish_ctrs, "sz_uploaded_catalog_bytes", nlohmann::json::value_t::number_integer);
+      publish_ctrs, "sz_uploaded_catalog_bytes", JSON_INT);
 
   const JSON *start_time_json = JsonDocument::SearchInObject(
-      statistics, "start_time", nlohmann::json::value_t::string);
+      statistics, "start_time", JSON_STRING);
 
   if (n_chunks_added == NULL || n_chunks_duplicated == NULL
       || n_catalogs_added == NULL || sz_uploaded_bytes == NULL
@@ -205,11 +205,11 @@ bool Reactor::HandleGenerateToken(const std::string &req, std::string *reply) {
   }
 
   const JSON *key_id = JsonDocument::SearchInObject(req_json->root(), "key_id",
-                                                    nlohmann::json::value_t::string);
+                                                    JSON_STRING);
   const JSON *path = JsonDocument::SearchInObject(req_json->root(), "path",
-                                                  nlohmann::json::value_t::string);
+                                                  JSON_STRING);
   const JSON *max_lease_time = JsonDocument::SearchInObject(
-      req_json->root(), "max_lease_time", nlohmann::json::value_t::number_integer);
+      req_json->root(), "max_lease_time", JSON_INT);
 
   if (key_id == NULL || path == NULL || max_lease_time == NULL) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
@@ -272,9 +272,9 @@ bool Reactor::HandleCheckToken(const std::string &req, std::string *reply) {
   }
 
   const JSON *token = JsonDocument::SearchInObject(req_json->root(), "token",
-                                                   nlohmann::json::value_t::string);
+                                                   JSON_STRING);
   const JSON *secret = JsonDocument::SearchInObject(req_json->root(), "secret",
-                                                    nlohmann::json::value_t::string);
+                                                    JSON_STRING);
 
   if (token == NULL || secret == NULL) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
@@ -332,11 +332,11 @@ bool Reactor::HandleSubmitPayload(int fdin, const std::string &req,
   }
 
   const JSON *path_json = JsonDocument::SearchInObject(req_json->root(), "path",
-                                                       nlohmann::json::value_t::string);
+                                                       JSON_STRING);
   const JSON *digest_json = JsonDocument::SearchInObject(req_json->root(),
-                                                         "digest", nlohmann::json::value_t::string);
+                                                         "digest", JSON_STRING);
   const JSON *header_size_json = JsonDocument::SearchInObject(
-      req_json->root(), "header_size", nlohmann::json::value_t::number_integer);
+      req_json->root(), "header_size", JSON_INT);
 
   if (path_json == NULL || digest_json == NULL || header_size_json == NULL) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
@@ -399,15 +399,15 @@ bool Reactor::HandleCommit(const std::string &req, std::string *reply) {
   }
 
   const JSON *lease_path_json = JsonDocument::SearchInObject(
-      req_json->root(), "lease_path", nlohmann::json::value_t::string);
+      req_json->root(), "lease_path", JSON_STRING);
   const JSON *old_root_hash_json = JsonDocument::SearchInObject(
-      req_json->root(), "old_root_hash", nlohmann::json::value_t::string);
+      req_json->root(), "old_root_hash", JSON_STRING);
   const JSON *new_root_hash_json = JsonDocument::SearchInObject(
-      req_json->root(), "new_root_hash", nlohmann::json::value_t::string);
+      req_json->root(), "new_root_hash", JSON_STRING);
   const JSON *tag_name_json = JsonDocument::SearchInObject(
-      req_json->root(), "tag_name", nlohmann::json::value_t::string);
+      req_json->root(), "tag_name", JSON_STRING);
   const JSON *tag_description_json = JsonDocument::SearchInObject(
-      req_json->root(), "tag_description", nlohmann::json::value_t::string);
+      req_json->root(), "tag_description", JSON_STRING);
 
   if (lease_path_json == NULL || old_root_hash_json == NULL
       || new_root_hash_json == NULL) {

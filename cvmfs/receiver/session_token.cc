@@ -95,9 +95,9 @@ bool GetTokenPublicId(const std::string &token, std::string *public_id) {
   }
 
   const JSON *token_id = JsonDocument::SearchInObject(token_json->root(),
-                                                      "token_id", nlohmann::json::value_t::string);
+                                                      "token_id", JSON_STRING);
   const JSON *blob = JsonDocument::SearchInObject(token_json->root(), "blob",
-                                                  nlohmann::json::value_t::string);
+                                                  JSON_STRING);
 
   if (token_id == NULL || blob == NULL) {
     return false;
@@ -129,9 +129,9 @@ TokenCheckResult CheckToken(const std::string &token, const std::string &secret,
   }
 
   const JSON *token_id = JsonDocument::SearchInObject(token_json->root(),
-                                                      "token_id", nlohmann::json::value_t::string);
+                                                      "token_id", JSON_STRING);
   const JSON *blob = JsonDocument::SearchInObject(token_json->root(), "blob",
-                                                  nlohmann::json::value_t::string);
+                                                  JSON_STRING);
   if (token_id == NULL || blob == NULL) {
     return kInvalid;
   }
@@ -162,9 +162,9 @@ TokenCheckResult CheckToken(const std::string &token, const std::string &secret,
   }
 
   const JSON *path = JsonDocument::SearchInObject(body_json->root(), "path",
-                                                  nlohmann::json::value_t::string);
+                                                  JSON_STRING);
   const JSON *expiry = JsonDocument::SearchInObject(body_json->root(), "expiry",
-                                                    nlohmann::json::value_t::string);
+                                                    JSON_STRING);
   if (path == NULL || expiry == NULL) {
     return kInvalid;
   }

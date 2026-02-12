@@ -12,6 +12,14 @@
 
 typedef nlohmann::json JSON;
 
+static constexpr JSON::value_t JSON_NULL = JSON::value_t::null;
+static constexpr JSON::value_t JSON_OBJECT = JSON::value_t::object;
+static constexpr JSON::value_t JSON_ARRAY = JSON::value_t::array;
+static constexpr JSON::value_t JSON_STRING = JSON::value_t::string;
+static constexpr JSON::value_t JSON_INT = JSON::value_t::number_integer;
+static constexpr JSON::value_t JSON_FLOAT = JSON::value_t::number_float;
+static constexpr JSON::value_t JSON_BOOL = JSON::value_t::boolean;
+
 class JsonDocument : SingleCopy {
  public:
   static JsonDocument *Create(const std::string &text);
@@ -24,7 +32,7 @@ class JsonDocument : SingleCopy {
 
   static const JSON *SearchInObject(const JSON *json_object,
                                     const std::string &name,
-                                    const nlohmann::json::value_t type);
+                                    const JSON::value_t type);
 
  private:
   JsonDocument();
