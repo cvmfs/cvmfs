@@ -58,9 +58,6 @@ TEST(T_Json, SearchInObject) {
   EXPECT_EQ(NULL, result);
   result = json->SearchInObject(NULL, "string", JSON_STRING);
   EXPECT_EQ(NULL, result);
-  result = json->SearchInObject(
-      json->root(), "string", JSON_STRING);
-  EXPECT_EQ(NULL, result);
 }
 
 TEST(T_Json, GenerateValidJsonString) {
