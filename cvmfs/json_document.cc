@@ -3,9 +3,6 @@
  */
 
 #include "json_document.h"
-
-#include <nlohmann/json.hpp>
-
 #include "util/logging.h"
 #include "util/pointer.h"
 
@@ -14,7 +11,6 @@
 // strict parsing: update unit tests to stop using {} without key value pair
 
 using namespace std;  // NOLINT
-using json = nlohmann::json;
 
 JsonDocument *JsonDocument::Create(const string &text) {
   UniquePtr<JsonDocument> json(new JsonDocument());
@@ -23,14 +19,14 @@ JsonDocument *JsonDocument::Create(const string &text) {
   return json.Release();
 }
 
-JsonDocument::JsonDocument() : root_(json::value_t::null) { }
+JsonDocument::JsonDocument() : root_(JSON::value_t::null) { }
 
 bool JsonDocument::Parse(const string &text) {
-  root_ = json::parse(text, nullptr, false);
+  root_ = JSON::parse(text, nullptr, false);
 
   if (root_.is_discarded()) {
     LogCvmfs(kLogUtility, kLogDebug, "Failed to parse JSON string.");
-    root_ = json(json::value_t::null);
+    root_ = JSON(JSON::value_t::null);
     return false;
   }
   return true;
@@ -44,7 +40,7 @@ string JsonDocument::PrintCanonical() {
 
 const JSON *JsonDocument::SearchInObject(const JSON *json_object,
                                          const string &name,
-                                         const json::value_t type) {
+                                         const JSON::value_t type) {
   if (!json_object || !json_object->is_object())
     return NULL;
 
@@ -60,7 +56,7 @@ bool GetFromJSON<string>(const JSON *object,
                          const string &name,
                          string *value) {
   const JSON *o = JsonDocument::SearchInObject(
-      object, name, json::value_t::string);
+      object, name, JSON::value_t::string);
   if (!o)
     return false;
 
@@ -80,20 +76,20 @@ bool GetFromJSON<int>(const JSON *object,
                       const string &name,
                       int *value) {
   const JSON *o = JsonDocument::SearchInObject(
-      object, name, json::value_t::number_integer);
+      object, name, JSON::value_t::number_integer);
 
   if (!o) {
     o = JsonDocument::SearchInObject(
-        object, name, json::value_t::number_unsigned);
+        object, name, JSON::value_t::number_unsigned);
   }
 
   if (!o || !value)
     return false;
 
-  if (auto p = o->get_ptr<const json::number_integer_t *>()) {
+  if (auto p = o->get_ptr<const JSON::number_integer_t *>()) {
     *value = static_cast<int>(*p);
     return true;
-  } else if (auto p = o->get_ptr<const json::number_unsigned_t *>()) {
+  } else if (auto p = o->get_ptr<const JSON::number_unsigned_t *>()) {
     *value = static_cast<int>(*p);
     return true;
   }
@@ -106,11 +102,11 @@ bool GetFromJSON<float>(const JSON *object,
                         const string &name,
                         float *value) {
   const JSON *o = JsonDocument::SearchInObject(
-      object, name, json::value_t::number_float);
+      object, name, JSON::value_t::number_float);
   if (!o || !value)
     return false;
 
-  if (auto p = o->get_ptr<const json::number_float_t *>()) {
+  if (auto p = o->get_ptr<const JSON::number_float_t *>()) {
     *value = static_cast<float>(*p);
     return true;
   }

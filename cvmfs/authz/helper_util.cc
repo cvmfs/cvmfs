@@ -13,10 +13,9 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <nlohmann/json.hpp>
+#include "json_document.h"
 
 #include "authz/helper_log.h"
-typedef struct json_value JSON;
 
 #ifdef __APPLE__
 #define strdupa(s)                    \
@@ -25,7 +24,6 @@ typedef struct json_value JSON;
 #endif
 
 using namespace std;  // NOLINT
-using json = nlohmann::json;
 
 /**
  * Helper binaries are supposed to be called from the cvmfs client, not
@@ -41,10 +39,10 @@ void CheckCallContext() {
 
 
 void ParseHandshakeInit(const string &msg) {
-  json j = json::parse(msg);
+  JSON j = JSON::parse(msg);
 
   if (j.contains("cvmfs_authz_v1")) {
-    const json& config = j["cvmfs_authz_v1"];
+    const JSON& config = j["cvmfs_authz_v1"];
 
     if (config.contains("debug_log")) {
       SetLogAuthzDebug(config["debug_log"].get<string>() + ".authz");
@@ -65,10 +63,10 @@ void ParseHandshakeInit(const string &msg) {
 
 
 void ParseRequest(const string &msg) {
-  json j = json::parse(msg);
+  JSON j = JSON::parse(msg);
 
   if (j.contains("cvmfs_authz_v1")) {
-    const json& req = j["cvmfs_authz_v1"];
+    const JSON& req = j["cvmfs_authz_v1"];
 
     if (req.contains("msgid")) {
       if (req["msgid"].get<int>() == 4) { /* kAuthzMsgQuit */
