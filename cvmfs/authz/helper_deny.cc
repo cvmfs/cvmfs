@@ -7,8 +7,6 @@
 
 #include "helper_log.h"
 #include "helper_util.h"
-#include "json.h"
-typedef struct json_value JSON;
 
 using namespace std;  // NOLINT
 
