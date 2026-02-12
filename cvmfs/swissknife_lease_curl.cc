@@ -156,19 +156,19 @@ bool MakeEndRequest(const std::string &method, const std::string &key_id,
   } else {
     UniquePtr<JsonDocument> const reply_json(doc);
     const JSON *reply_status = JsonDocument::SearchInObject(
-        reply_json->root(), "status", JSON_STRING);
+        reply_json->root(), "status", nlohmann::json::value_t::string);
     ok = (reply_status != NULL
-          && std::string(reply_status->string_value) == "ok");
+          && std::string(reply_status->get<std::string>()) == "ok");
     if (!ok) {
       LogCvmfs(kLogUploadGateway, kLogStderr,
                "Lease end request - error reply: %s", reply->data.c_str());
     }
     if (expect_final_revision) {
       const JSON *reply_final_rev = JsonDocument::SearchInObject(
-          reply_json->root(), "final_revision", JSON_INT);
+          reply_json->root(), "final_revision", nlohmann::json::value_t::number_integer);
       ok = (reply_final_rev != NULL);
       if (ok) {
-        g_final_revision = reply_final_rev->int_value;
+        g_final_revision = reply_final_rev->get<int>();
       } else {
         g_final_revision = -1;
       }

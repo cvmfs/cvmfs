@@ -141,19 +141,19 @@ TEST_F(T_Reactor, FullCycle) {
 
     // Extract the token, public_id and secret from the reply
     const JSON *token_json = JsonDocument::SearchInObject(json_reply->root(),
-                                                          "token", JSON_STRING);
+                                                          "token", nlohmann::json::value_t::string);
     ASSERT_TRUE(token_json);
-    token = token_json->string_value;
+    token = token_json->get<std::string>();
 
     const JSON *public_id_json = JsonDocument::SearchInObject(
-        json_reply->root(), "id", JSON_STRING);
+        json_reply->root(), "id", nlohmann::json::value_t::string);
     ASSERT_TRUE(public_id_json);
-    public_id = public_id_json->string_value;
+    public_id = public_id_json->get<std::string>();
 
     const JSON *secret_json = JsonDocument::SearchInObject(
-        json_reply->root(), "secret", JSON_STRING);
+        json_reply->root(), "secret", nlohmann::json::value_t::string);
     ASSERT_TRUE(secret_json);
-    secret = secret_json->string_value;
+    secret = secret_json->get<std::string>();
   }
 
   // Get the public_id from the token
@@ -168,9 +168,9 @@ TEST_F(T_Reactor, FullCycle) {
 
     // Extract the token, public_id and secret from the reply
     const JSON *id_json = JsonDocument::SearchInObject(json_reply->root(), "id",
-                                                       JSON_STRING);
+                                                       nlohmann::json::value_t::string);
     ASSERT_TRUE(id_json);
-    ASSERT_EQ(public_id, id_json->string_value);
+    ASSERT_EQ(public_id, id_json->get<std::string>());
   }
 
   // Check the token validity
@@ -190,9 +190,9 @@ TEST_F(T_Reactor, FullCycle) {
 
     // Extract the token, public_id and secret from the reply
     const JSON *path_json = JsonDocument::SearchInObject(json_reply->root(),
-                                                         "path", JSON_STRING);
+                                                         "path", nlohmann::json::value_t::string);
     ASSERT_TRUE(path_json);
-    ASSERT_EQ(path, path_json->string_value);
+    ASSERT_EQ(path, path_json->get<std::string>());
   }
 
   // Submit a payload

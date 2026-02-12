@@ -375,9 +375,9 @@ bool SessionContext::DoUpload(const SessionContext::UploadJob *job) {
 
   const UniquePtr<JsonDocument> reply_json(JsonDocument::Create(reply));
   const JSON *reply_status = JsonDocument::SearchInObject(
-      reply_json->root(), "status", JSON_STRING);
+      reply_json->root(), "status", nlohmann::json::value_t::string);
   const bool ok = (reply_status != NULL
-                   && std::string(reply_status->string_value) == "ok");
+                   && std::string(reply_status->get<std::string>()) == "ok");
   if (!ok) {
     LogCvmfs(kLogUploadGateway, kLogStderr,
              "SessionContext::DoUpload - error reply: %s", reply.c_str());

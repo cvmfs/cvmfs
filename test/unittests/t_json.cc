@@ -50,16 +50,16 @@ TEST(T_Json, SearchInObject) {
   UniquePtr<JsonDocument> json(JsonDocument::Create(
       "{\"string\": \"a \\\"string\\\" with special chars\"}"));
   ASSERT_TRUE(json.IsValid());
-  JSON *result = json->SearchInObject(json->root(), "string", JSON_STRING);
+  const JSON *result = json->SearchInObject(json->root(), "string", nlohmann::json::value_t::string);
   EXPECT_TRUE(result != NULL);
-  result = json->SearchInObject(json->root(), "string", JSON_INT);
+  result = json->SearchInObject(json->root(), "string", nlohmann::json::value_t::number_integer);
   EXPECT_EQ(NULL, result);
-  result = json->SearchInObject(json->root(), "xyz", JSON_INT);
+  result = json->SearchInObject(json->root(), "xyz", nlohmann::json::value_t::number_integer);
   EXPECT_EQ(NULL, result);
-  result = json->SearchInObject(NULL, "string", JSON_STRING);
+  result = json->SearchInObject(NULL, "string", nlohmann::json::value_t::string);
   EXPECT_EQ(NULL, result);
   result = json->SearchInObject(
-      json->root()->first_child, "string", JSON_STRING);
+      json->root(), "string", nlohmann::json::value_t::string);
   EXPECT_EQ(NULL, result);
 }
 

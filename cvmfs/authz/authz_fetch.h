@@ -165,9 +165,9 @@ class AuthzExternalFetcher : public AuthzFetcher, SingleCopy {
   bool ParseMsg(const std::string &json_msg,
                 const AuthzExternalMsgIds expected_msgid,
                 AuthzExternalMsg *binary_msg);
-  bool ParseMsgId(JSON *json_authz, AuthzExternalMsg *binary_msg);
-  bool ParseRevision(JSON *json_authz, AuthzExternalMsg *binary_msg);
-  bool ParsePermit(JSON *json_authz, AuthzExternalMsg *binary_msg);
+  bool ParseMsgId(const JSON *json_authz, AuthzExternalMsg *binary_msg);
+  bool ParseRevision(const JSON *json_authz, AuthzExternalMsg *binary_msg);
+  bool ParsePermit(const JSON *json_authz, AuthzExternalMsg *binary_msg);
 
   void ReapHelper();
 

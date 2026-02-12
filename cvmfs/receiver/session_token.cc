@@ -9,7 +9,6 @@
 #include <limits>
 
 #include "crypto/encrypt.h"
-#include "json.h"
 #include "json_document.h"
 #include "util/logging.h"
 #include "util/platform.h"
@@ -96,15 +95,15 @@ bool GetTokenPublicId(const std::string &token, std::string *public_id) {
   }
 
   const JSON *token_id = JsonDocument::SearchInObject(token_json->root(),
-                                                      "token_id", JSON_STRING);
+                                                      "token_id", nlohmann::json::value_t::string);
   const JSON *blob = JsonDocument::SearchInObject(token_json->root(), "blob",
-                                                  JSON_STRING);
+                                                  nlohmann::json::value_t::string);
 
   if (token_id == NULL || blob == NULL) {
     return false;
   }
 
-  *public_id = token_id->string_value;
+  *public_id = token_id->get<std::string>();
 
   return true;
 }
@@ -130,9 +129,9 @@ TokenCheckResult CheckToken(const std::string &token, const std::string &secret,
   }
 
   const JSON *token_id = JsonDocument::SearchInObject(token_json->root(),
-                                                      "token_id", JSON_STRING);
+                                                      "token_id", nlohmann::json::value_t::string);
   const JSON *blob = JsonDocument::SearchInObject(token_json->root(), "blob",
-                                                  JSON_STRING);
+                                                  nlohmann::json::value_t::string);
   if (token_id == NULL || blob == NULL) {
     return kInvalid;
   }
@@ -148,7 +147,7 @@ TokenCheckResult CheckToken(const std::string &token, const std::string &secret,
   }
 
   std::string encrypted_body;
-  if (!Debase64(blob->string_value, &encrypted_body)) {
+  if (!Debase64(blob->get<std::string>(), &encrypted_body)) {
     return kInvalid;
   }
 
@@ -163,21 +162,21 @@ TokenCheckResult CheckToken(const std::string &token, const std::string &secret,
   }
 
   const JSON *path = JsonDocument::SearchInObject(body_json->root(), "path",
-                                                  JSON_STRING);
+                                                  nlohmann::json::value_t::string);
   const JSON *expiry = JsonDocument::SearchInObject(body_json->root(), "expiry",
-                                                    JSON_STRING);
+                                                    nlohmann::json::value_t::string);
   if (path == NULL || expiry == NULL) {
     return kInvalid;
   }
 
   // TODO(radu): can we still use monotonic time if the process restarts?
-  const uint64_t expiry_time = String2Uint64(expiry->string_value);
+  const uint64_t expiry_time = String2Uint64(expiry->get<std::string>());
   const uint64_t current_time = platform_monotonic_time();
   if (current_time > expiry_time) {
     return kExpired;
   }
 
-  *lease_path = path->string_value;
+  *lease_path = path->get<std::string>();
 
   return kValid;
 }
