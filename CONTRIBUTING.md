@@ -42,4 +42,4 @@ If possible, please add tests to any new code.  Preferably add tests as unit tes
 
 # Documentation
 
-The sources of our [technical documentation](https://cvmfs.readthedocs.io) is at [https://github.com/cvmfs/doc-cvmfs](https://github.com/cvmfs/doc-cvmfs).  We are happy to merge contributions to this document, in particular if they describe user-visible changes in the software!
+The sources of our [technical documentation](https://cvmfs.readthedocs.io) are at [https://github.com/cvmfs/doc-cvmfs](https://github.com/cvmfs/doc-cvmfs).  We are happy to merge contributions to this document, in particular if they describe user-visible changes in the software!
