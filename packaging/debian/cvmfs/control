@@ -10,6 +10,7 @@ Build-Depends:
  cmake,
  cpio,
  help2man,
+ libarchive-dev,
  libcap-dev,
  libssl-dev,
  libattr1-dev,
