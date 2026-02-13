@@ -7,6 +7,7 @@ CVMFS_TEST407_RECIPE="$(pwd)/$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8
 CVMFS_TEST407_REPOSITORY="$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1).cern.ch"
 CVMFS_TEST407_SUBDIR="ducc/subdir"
 CVMFS_TEST407_DUCC_ERR="$(pwd)/$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1).err"
+ducc_test_407_max_attempts=3
 
 ducc_test_407_clean_up() {
     echo -n "Cleaning up..."
@@ -39,15 +40,30 @@ EOL
 
     echo "*** Starting test."
     echo "*** Converting recipe..."
-    cvmfs_ducc convert --skip-flat --skip-thin-image --skip-podman $CVMFS_TEST407_RECIPE 2> $CVMFS_TEST407_DUCC_ERR || return 101
-    grep -q "level=error" $CVMFS_TEST407_DUCC_ERR
-    while [ $? -ne 1 ]
+    local attempt=1
+    local conversion_ok=0
+    while [ $attempt -le $ducc_test_407_max_attempts ]
     do
-        echo -n "*** Some error during conversion, let's do it again. Converting recipe..."
-        rm $CVMFS_TEST407_DUCC_ERR
-        cvmfs_ducc convert --skip-flat --skip-thin-image --skip-podman $CVMFS_TEST407_RECIPE 2> $CVMFS_TEST407_DUCC_ERR || return 101
+        rm -f $CVMFS_TEST407_DUCC_ERR
+        cvmfs_ducc convert --skip-flat --skip-thin-image --skip-podman $CVMFS_TEST407_RECIPE 2> $CVMFS_TEST407_DUCC_ERR
+        local retval=$?
         grep -q "level=error" $CVMFS_TEST407_DUCC_ERR
+        local has_level_error=$?
+
+        if [ $retval -eq 0 ] && [ $has_level_error -eq 1 ]; then
+            conversion_ok=1
+            break
+        fi
+
+        echo "*** Conversion attempt ${attempt}/${ducc_test_407_max_attempts} failed (retval=$retval)."
+        attempt=$((attempt+1))
+        sleep 1
     done
+    if [ $conversion_ok -ne 1 ]; then
+        echo "*** Conversion failed after ${ducc_test_407_max_attempts} attempts. Last DUCC stderr follows:"
+        cat $CVMFS_TEST407_DUCC_ERR
+        return 101
+    fi
     echo "*** Convert recipe successfully"
 
     echo "*** Check integrity of the repository..."
