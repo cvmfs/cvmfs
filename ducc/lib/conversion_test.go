@@ -27,3 +27,12 @@ func TestOutputImageForExpandedTagFixedTag(t *testing.T) {
 	}
 }
 
+func TestOutputRepositoryForImport(t *testing.T) {
+	output := Image{Registry: "localhost:5000", Repository: "mock/repo", Tag: "stable"}
+
+	got := outputRepositoryForImport(output)
+
+	if got != "localhost:5000/mock/repo" {
+		t.Fatalf("expected repository-only reference, got %q", got)
+	}
+}

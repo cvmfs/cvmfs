@@ -263,6 +263,12 @@ func outputImageForExpandedTag(inputImage, outputImage *Image, expandedTag strin
 	return outputWithTag
 }
 
+func outputRepositoryForImport(outputImage Image) string {
+	outputRepository := outputImage
+	outputRepository.Tag = ""
+	return outputRepository.GetSimpleName()
+}
+
 func ConvertWishPodman(wish WishFriendly, convertAgain bool) (err error) {
 	var firstError error
 	for _, expandedImgTag := range wish.ExpandedTagImagesLayer {
@@ -509,7 +515,7 @@ func CreateThinImage(manifest da.Manifest, layerLocations map[string]string, inp
 	importResult, err := dockerClient.ImageImport(
 		context.Background(),
 		image,
-		outputImage.GetSimpleName(),
+		outputRepositoryForImport(outputImage),
 		importOptions)
 	if err != nil {
 		l.LogE(err).Error("Error in image import")
