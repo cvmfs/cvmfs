@@ -36,3 +36,64 @@ func TestGetRepoAndSubdir(t *testing.T) {
 		})
 	}
 }
+
+func TestPrefixRepoSubdirOnce(t *testing.T) {
+	tests := []struct {
+		name     string
+		repo     string
+		path     string
+		expected string
+	}{
+		{
+			name:     "root_repo_path_unchanged",
+			repo:     "repo.cern.ch",
+			path:     ".chains/ab/test",
+			expected: ".chains/ab/test",
+		},
+		{
+			name:     "subdir_repo_prefix_added",
+			repo:     "repo.cern.ch/compat",
+			path:     ".chains/ab/test",
+			expected: "compat/.chains/ab/test",
+		},
+		{
+			name:     "subdir_repo_prefix_not_duplicated",
+			repo:     "repo.cern.ch/compat",
+			path:     "compat/.chains/ab/test",
+			expected: "compat/.chains/ab/test",
+		},
+		{
+			name:     "absolute_path_is_normalized",
+			repo:     "repo.cern.ch/compat",
+			path:     "/compat/.chains/ab/test",
+			expected: "compat/.chains/ab/test",
+		},
+		{
+			name:     "similar_prefix_is_not_treated_as_equal",
+			repo:     "repo.cern.ch/compat",
+			path:     "compat2/.chains/ab/test",
+			expected: "compat/compat2/.chains/ab/test",
+		},
+		{
+			name:     "empty_path_points_to_subdir_root",
+			repo:     "repo.cern.ch/compat",
+			path:     "",
+			expected: "compat",
+		},
+		{
+			name:     "mock_repo_colon_separator",
+			repo:     "../../tmp/mockrepo:target_subdir",
+			path:     ".layers/aa",
+			expected: "target_subdir/.layers/aa",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := PrefixRepoSubdirOnce(tt.repo, tt.path)
+			if got != tt.expected {
+				t.Errorf("PrefixRepoSubdirOnce() got = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}

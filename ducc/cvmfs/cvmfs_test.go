@@ -101,3 +101,83 @@ func TestPublishToSubdir(t *testing.T) {
 		t.Fatal("Published file content differs!")
 	}
 }
+
+func TestCreateCatalogIntoDirSubdir(t *testing.T) {
+	mockrepo := filepath.Clean("/" + os.Getenv("CVMFS_TEST_REPO"))
+	subdirName := "catalog_target_subdir"
+	fullRepoPath := ".." + mockrepo + ":" + subdirName
+	dir := filepath.Join("catalog_test", "nested")
+
+	if err := CreateCatalogIntoDir(fullRepoPath, dir); err != nil {
+		t.Fatal(err)
+	}
+
+	expectedPath := filepath.Join(mockrepo, subdirName, dir, ".cvmfscatalog")
+	if _, err := os.Stat(expectedPath); err != nil {
+		t.Fatalf("Expected catalog file missing at %s: %v", expectedPath, err)
+	}
+
+	wrongRootPath := filepath.Join(mockrepo, dir, ".cvmfscatalog")
+	if _, err := os.Stat(wrongRootPath); err == nil {
+		t.Fatalf("Catalog file was unexpectedly created in repository root: %s", wrongRootPath)
+	}
+}
+
+func TestIngestDeleteSubdirPathHandling(t *testing.T) {
+	mockrepo := filepath.Clean("/" + os.Getenv("CVMFS_TEST_REPO"))
+	subdirName := "delete_target_subdir"
+	fullRepoPath := ".." + mockrepo + ":" + subdirName
+
+	tests := []struct {
+		name         string
+		deletePathFn func(repoRelativePath string) string
+	}{
+		{
+			name: "unprefixed_path",
+			deletePathFn: func(repoRelativePath string) string {
+				return repoRelativePath
+			},
+		},
+		{
+			name: "already_prefixed_path",
+			deletePathFn: func(repoRelativePath string) string {
+				return filepath.Join(subdirName, repoRelativePath)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repoRelativePath := filepath.Join("delete_test", tt.name, "file")
+			target, err := os.CreateTemp("", "DeleteSubdirTestFile")
+			if err != nil {
+				t.Fatal(err)
+			}
+			content := []byte("delete_subdir_test_content")
+			if _, err := target.Write(content); err != nil {
+				t.Fatal(err)
+			}
+			if err := target.Close(); err != nil {
+				t.Fatal(err)
+			}
+
+			if err := PublishToCVMFS(fullRepoPath, repoRelativePath, target.Name()); err != nil {
+				t.Fatal(err)
+			}
+
+			expectedPath := filepath.Join(mockrepo, subdirName, repoRelativePath)
+			if _, err := os.Stat(expectedPath); err != nil {
+				t.Fatalf("Expected test file missing at %s: %v", expectedPath, err)
+			}
+
+			deletePath := tt.deletePathFn(repoRelativePath)
+			if err := IngestDelete(fullRepoPath, deletePath); err != nil {
+				t.Fatal(err)
+			}
+
+			if _, err := os.Stat(expectedPath); !os.IsNotExist(err) {
+				t.Fatalf("Expected file to be deleted at %s, stat error: %v", expectedPath, err)
+			}
+		})
+	}
+}
