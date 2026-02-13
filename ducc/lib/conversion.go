@@ -488,7 +488,7 @@ func CreateThinImage(manifest da.Manifest, layerLocations map[string]string, inp
 		return
 	}
 
-	dockerClient, err := client.NewClientWithOpts(client.WithVersion("1.19"))
+	dockerClient, err := NewDockerClient()
 	if err != nil {
 		return
 	}
@@ -537,7 +537,7 @@ func PushImageToRegistry(outputImage Image) (err error) {
 	pushOptions := dockerImage.PushOptions{
 		RegistryAuth: authCredential,
 	}
-	dockerClient, err := client.NewClientWithOpts(client.WithVersion("1.19"))
+	dockerClient, err := NewDockerClient()
 	if err != nil {
 		return err
 	}
@@ -560,6 +560,15 @@ func PushImageToRegistry(outputImage Image) (err error) {
 	}
 	l.Log().Info("Finish pushing the image to the registry")
 	return
+}
+
+// NewDockerClient creates a Docker client that negotiates the API version with
+// the daemon to stay compatible across Docker releases.
+func NewDockerClient() (*client.Client, error) {
+	return client.NewClientWithOpts(
+		client.FromEnv,
+		client.WithAPIVersionNegotiation(),
+	)
 }
 
 func StoreLayerInfo(CVMFSRepo string, layerDigest string, r ReadHashCloseSizer) (err error) {
