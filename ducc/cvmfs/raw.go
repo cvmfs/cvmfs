@@ -38,6 +38,11 @@ func lockRepoKey(CVMFSRepo string) string {
 	return repoName
 }
 
+func transactionRepoName(CVMFSRepo string) string {
+	repoName, _ := GetRepoAndSubdir(CVMFSRepo)
+	return repoName
+}
+
 func getLock(CVMFSRepo string) {
 	key := lockRepoKey(CVMFSRepo)
 	lockMap.Lock()
@@ -82,7 +87,7 @@ func ExecuteAndOpenTransaction(CVMFSRepo string, f func() error, options ...Tran
 	for _, opt := range options {
 		cmd = append(cmd, opt.ToString())
 	}
-	cmd = append(cmd, CVMFSRepo)
+	cmd = append(cmd, transactionRepoName(CVMFSRepo))
 	getLock(CVMFSRepo)
 	if err := f(); err != nil {
 		unlock(CVMFSRepo)
