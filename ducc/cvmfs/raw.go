@@ -97,8 +97,9 @@ func OpenTransaction(CVMFSRepo string, options ...TransactionOption) error {
 }
 
 func Publish(CVMFSRepo string) error {
+	repoName, _ := GetRepoAndSubdir(CVMFSRepo)
 	defer unlock(CVMFSRepo)
-	err := exec.ExecCommand("cvmfs_server", "publish", CVMFSRepo).Start()
+	err := exec.ExecCommand("cvmfs_server", "publish", repoName).Start()
 	if err != nil {
 		l.LogE(err).WithFields(
 			log.Fields{"repo": CVMFSRepo}).
@@ -125,7 +126,8 @@ func Abort(CVMFSRepo string) error {
 }
 
 func abort(CVMFSRepo string) error {
-	return exec.ExecCommand("cvmfs_server", "abort", "-f", CVMFSRepo).Start()
+	repoName, _ := GetRepoAndSubdir(CVMFSRepo)
+	return exec.ExecCommand("cvmfs_server", "abort", "-f", repoName).Start()
 }
 
 func RepositoryExists(CVMFSRepo string) bool {
@@ -139,7 +141,7 @@ func RepositoryExists(CVMFSRepo string) bool {
 	stdoutString := string(stdout.Bytes())
 
 	// remove sub directory in case it was passed
-	repo, _, _ := strings.Cut(CVMFSRepo, "/")
+	repo, _ := GetRepoAndSubdir(CVMFSRepo)
 	if strings.Contains(stdoutString, repo) {
 		return true
 	} else {
@@ -160,18 +162,21 @@ func WithinTransaction(CVMFSRepo string, f func() error, opts ...TransactionOpti
 }
 
 func Ingest(CVMFSRepo string, input io.ReadCloser, options ...string) error {
+	repoName, _ := GetRepoAndSubdir(CVMFSRepo)
 	cmd := []string{"cvmfs_server", "ingest"}
 	for _, opt := range options {
 		cmd = append(cmd, opt)
 	}
-	cmd = append(cmd, CVMFSRepo)
+	cmd = append(cmd, repoName)
 	getLock(CVMFSRepo)
 	defer unlock(CVMFSRepo)
 	return exec.ExecCommand(cmd...).StdIn(input).Start()
 }
 
 func IngestDelete(CVMFSRepo string, path string) error {
+	repoName, _ := GetRepoAndSubdir(CVMFSRepo)
+	path = PrefixRepoSubdirOnce(CVMFSRepo, path)
 	getLock(CVMFSRepo)
 	defer unlock(CVMFSRepo)
-	return exec.ExecCommand("cvmfs_server", "ingest", "--delete", path, CVMFSRepo).Start()
+	return exec.ExecCommand("cvmfs_server", "ingest", "--delete", path, repoName).Start()
 }

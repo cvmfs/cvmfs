@@ -69,3 +69,35 @@ func TestPublishToCVMFS(t *testing.T) {
 		t.Fatal("Published file on CVMFS differs!")
 	}
 }
+
+func TestPublishToSubdir(t *testing.T) {
+	mockrepo := filepath.Clean("/" + os.Getenv("CVMFS_TEST_REPO"))
+	t.Log("Mockrepo:", mockrepo)
+
+	// Create a subdirectory in the mock repo to simulate a pre-existing state or just target it
+	subdirName := "target_subdir"
+	fullRepoPath := ".." + mockrepo + ":" + subdirName
+
+	f, _ := os.CreateTemp("", "PublishSubdirTestFile")
+	t.Log("SubdirTestFile:", f.Name())
+	content := []byte("subdir_test_content")
+	f.Write(content)
+
+	// Publish to a sub-path within the subdirectory
+	// Logic: ducc should extract 'mockrepo' as the scratch base, but put files into 'subdirName/deep/path'
+	err := PublishToCVMFS(fullRepoPath, "deep/path/file", f.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Verification
+	// The file should exist at mockrepo/subdirName/deep/path/file
+	expectedPath := filepath.Join(mockrepo, subdirName, "deep", "path", "file")
+	readback, err := os.ReadFile(expectedPath)
+	if err != nil {
+		t.Fatalf("Failed to read back file from expected path %s: %v", expectedPath, err)
+	}
+	if !bytes.Equal(readback, content) {
+		t.Fatal("Published file content differs!")
+	}
+}
