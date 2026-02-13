@@ -33,18 +33,24 @@ var locksMap = make(map[string]*sync.Mutex)
 var locksFile = make(map[string]fSLock)
 var lockMap = &sync.Mutex{}
 
+func lockRepoKey(CVMFSRepo string) string {
+	repoName, _ := GetRepoAndSubdir(CVMFSRepo)
+	return repoName
+}
+
 func getLock(CVMFSRepo string) {
+	key := lockRepoKey(CVMFSRepo)
 	lockMap.Lock()
-	lc := locksMap[CVMFSRepo]
+	lc := locksMap[key]
 	if lc == nil {
-		locksMap[CVMFSRepo] = &sync.Mutex{}
-		lc = locksMap[CVMFSRepo]
+		locksMap[key] = &sync.Mutex{}
+		lc = locksMap[key]
 	}
-	f := locksFile[CVMFSRepo]
+	f := locksFile[key]
 	if f == nil {
 		f = newFSLock("/tmp/DUCC.lock")
-		locksFile[CVMFSRepo] = f
-		f = locksFile[CVMFSRepo]
+		locksFile[key] = f
+		f = locksFile[key]
 	}
 	lockMap.Unlock()
 
@@ -61,9 +67,10 @@ func getLock(CVMFSRepo string) {
 }
 
 func unlock(CVMFSRepo string) {
+	key := lockRepoKey(CVMFSRepo)
 	lockMap.Lock()
-	l := locksMap[CVMFSRepo]
-	f := locksFile[CVMFSRepo]
+	l := locksMap[key]
+	f := locksFile[key]
 	lockMap.Unlock()
 
 	l.Unlock()
