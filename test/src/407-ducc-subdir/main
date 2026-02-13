@@ -8,21 +8,12 @@ CVMFS_TEST407_REPOSITORY="$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | 
 CVMFS_TEST407_SUBDIR="ducc/subdir"
 CVMFS_TEST407_DUCC_ERR="$(pwd)/$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1).err"
 ducc_test_407_max_attempts=3
-CVMFS_TEST407_INPUT_REGISTRY="$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1)"
-CVMFS_TEST407_INPUT_PORT="$((5100 + RANDOM % 900))"
-CVMFS_TEST407_INPUT_IMAGE_REF="localhost:${CVMFS_TEST407_INPUT_PORT}/ducc-subdir/input:latest"
-CVMFS_TEST407_INPUT_IMAGE_URL="http://${CVMFS_TEST407_INPUT_IMAGE_REF}"
-CVMFS_TEST407_BUILD_DIR="$(mktemp -d $(pwd)/build407.XXXXX)"
 
 ducc_test_407_clean_up() {
     echo -n "Cleaning up..."
 
     rm $CVMFS_TEST407_RECIPE
     rm $CVMFS_TEST407_DUCC_ERR
-    rm -rf $CVMFS_TEST407_BUILD_DIR
-
-    docker stop $CVMFS_TEST407_INPUT_REGISTRY >> /dev/null
-    docker rm $CVMFS_TEST407_INPUT_REGISTRY >> /dev/null
 
     sudo cvmfs_server rmfs -f $CVMFS_TEST407_REPOSITORY
 
@@ -39,22 +30,8 @@ user: mock_user
 cvmfs_repo: '$CVMFS_TEST407_REPOSITORY/$CVMFS_TEST407_SUBDIR'
 output_format: '\$(scheme)://localhost:5000/mock/\$(image)'
 input:
-    - '$CVMFS_TEST407_INPUT_IMAGE_URL'
+    - 'https://registry.hub.docker.com/library/ubuntu:latest'
 EOL
-    echo "done"
-
-    echo -n "*** Starting local registry for test input image..."
-    docker run -d -p ${CVMFS_TEST407_INPUT_PORT}:5000 --name $CVMFS_TEST407_INPUT_REGISTRY registry:2 >> /dev/null || return 3
-    echo "done"
-
-    echo -n "*** Building and publishing local input image..."
-    cat > $CVMFS_TEST407_BUILD_DIR/Dockerfile << EOL
-FROM scratch
-ADD hello.txt /hello.txt
-EOL
-    echo "hello from DUCC subdir test" > $CVMFS_TEST407_BUILD_DIR/hello.txt
-    docker build -t $CVMFS_TEST407_INPUT_IMAGE_REF $CVMFS_TEST407_BUILD_DIR >> /dev/null || return 4
-    docker push $CVMFS_TEST407_INPUT_IMAGE_REF >> /dev/null || return 5
     echo "done"
 
     echo -n "*** Creating CVMFS repo..."
@@ -96,11 +73,11 @@ EOL
     subdir_root="/cvmfs/$CVMFS_TEST407_REPOSITORY/$CVMFS_TEST407_SUBDIR"
     ls "$subdir_root/.layers" || return 111
     ls "$subdir_root/.metadata" || return 112
-    ls "$subdir_root/.metadata/localhost:${CVMFS_TEST407_INPUT_PORT}/ducc-subdir/input:latest" || return 113
+    ls "$subdir_root/.metadata/registry.hub.docker.com/library/ubuntu:latest" || return 113
 
     [ ! -e "/cvmfs/$CVMFS_TEST407_REPOSITORY/.layers" ] || return 114
     [ ! -e "/cvmfs/$CVMFS_TEST407_REPOSITORY/.metadata" ] || return 115
-    [ ! -e "/cvmfs/$CVMFS_TEST407_REPOSITORY/localhost:${CVMFS_TEST407_INPUT_PORT}" ] || return 116
+    [ ! -e "/cvmfs/$CVMFS_TEST407_REPOSITORY/registry.hub.docker.com" ] || return 116
 
     echo "*** Test successful"
     return 0
