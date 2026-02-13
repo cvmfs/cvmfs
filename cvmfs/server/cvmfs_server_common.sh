@@ -793,7 +793,8 @@ release_update_lock() {
 #
 # @param name               the repository to lock
 # @param update_type        update type such as snapshot or gc
-# @param abort_on_conflict  0 to wait for lock, 1 to abort if already acquired.
+# @param abort_on_conflict  0 to wait for lock, 1 to abort if already acquired,
+#                           2 to skip if already acquired.
 #                           Default 0.  Always aborts if initial snapshot is
 #                           in progress.
 # @return                   0 if lock successfully acquired
@@ -809,9 +810,13 @@ acquire_update_lock()
 
   # check for other updates in progress
   if ! acquire_lock $update_lock; then
-    if [ $abort_on_conflict -eq 1 ]; then
-      echo "another update is in progress... aborting"
-      to_syslog_for_repo $name "did not $update_type (another update in progress)"
+    if [ $abort_on_conflict -ge 1 ]; then
+      if [ $abort_on_conflict -ge 2 ]; then
+        echo "another update is in progress... skipping"
+      else
+        echo "another update is in progress... aborting"
+        to_syslog_for_repo $name "did not $update_type (another update in progress)"
+      fi
       return 1
     fi
 
@@ -822,8 +827,12 @@ acquire_update_lock()
     fi
 
     if [ $initial_snapshot -eq 1 ]; then
-      echo "an initial snapshot is in progress... aborting"
-      to_syslog_for_repo $name "did not $update_type (initial snapshot in progress)"
+      if [ $abort_on_conflict -ge 2 ]; then
+        echo "another update is in progress... skipping"
+      else
+        echo "an initial snapshot is in progress... aborting"
+        to_syslog_for_repo $name "did not $update_type (initial snapshot in progress)"
+      fi
       return 1
     fi
 
