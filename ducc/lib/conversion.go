@@ -226,12 +226,7 @@ func ConvertWishDocker(wish WishFriendly) (err error) {
 	var firstError error
 	for _, expandedImgTag := range wish.ExpandedTagImagesLayer {
 		tag := expandedImgTag.Tag
-		outputWithTag := *outputImage
-		if inputImage.TagWildcard {
-			outputWithTag.Tag = tag
-		} else {
-			outputWithTag.Tag = outputImage.Tag
-		}
+		outputWithTag := outputImageForExpandedTag(inputImage, outputImage, tag)
 
 		manifestPath := filepath.Join("/", "cvmfs", wish.CvmfsRepo, ".metadata", expandedImgTag.GetSimpleName(), "manifest.json")
 		if _, err := os.Stat(manifestPath); os.IsNotExist(err) {
@@ -248,16 +243,24 @@ func ConvertWishDocker(wish WishFriendly) (err error) {
 			layerPath := cvmfs.LayerRootfsPath(wish.CvmfsRepo, layerDigest)
 			layerLocations[layer.Digest] = layerPath
 		}
-		err = CreateThinImage(manifest, layerLocations, *expandedImgTag, *outputImage)
+		err = CreateThinImage(manifest, layerLocations, *expandedImgTag, outputWithTag)
 		if err != nil && firstError == nil {
 			firstError = err
 		}
-		err = PushImageToRegistry(*outputImage)
+		err = PushImageToRegistry(outputWithTag)
 		if err != nil && firstError == nil {
 			firstError = err
 		}
 	}
 	return firstError
+}
+
+func outputImageForExpandedTag(inputImage, outputImage *Image, expandedTag string) Image {
+	outputWithTag := *outputImage
+	if inputImage.TagWildcard {
+		outputWithTag.Tag = expandedTag
+	}
+	return outputWithTag
 }
 
 func ConvertWishPodman(wish WishFriendly, convertAgain bool) (err error) {
