@@ -281,7 +281,7 @@ set (REQUIRED_HEADERS sys/xattr.h zlib.h netinet/in.h arpa/inet.h sys/socket.h
                       sys/wait.h sys/select.h pthread.h termios.h utime.h
                       signal.h errno.h dirent.h unistd.h fcntl.h netdb.h
                       syslog.h sys/resource.h execinfo.h poll.h pwd.h grp.h
-                      zstd.h)
+                    )
 set (OPTIONAL_HEADERS )
 if (NOT MACOSX)
   set (REQUIRED_HEADERS ${REQUIRED_HEADERS}
