@@ -39,6 +39,7 @@ Depends:
  uuid-dev,
  uuid,
  adduser,
+ nlohmann-json3-dev,
  cvmfs-libs (= ${binary:Version}),
  ${misc:Depends},
  ${shlibs:Depends}
@@ -72,6 +73,7 @@ Depends:
  usbutils,
  sqlite3,
  tar,
+ nlohmann-json3-dev,
  cvmfs-libs (= ${binary:Version}),
  cvmfs-fuse3 (= ${binary:Version}),
  ${misc:Depends}
