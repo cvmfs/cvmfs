@@ -179,9 +179,10 @@ static LeaseReply ParseAcquireReply(const CurlBuffer &buffer,
     } else if (status == "path_busy") {
       const JSON *time_remaining = JsonDocument::SearchInObject(
           reply->root(), "time_remaining", JSON_STRING);
-      LogCvmfs(
-          kLogCvmfs, llvl | kLogStdout, "Path busy. Time remaining = %s",
-          (time_remaining != NULL) ? time_remaining->get<std::string>().c_str() : "UNKNOWN");
+      LogCvmfs(kLogCvmfs, llvl | kLogStdout, "Path busy. Time remaining = %s",
+               (time_remaining != NULL)
+                   ? time_remaining->get<std::string>().c_str()
+                   : "UNKNOWN");
       return kLeaseReplyBusy;
     } else if (status == "error") {
       const JSON *reason = JsonDocument::SearchInObject(reply->root(), "reason",

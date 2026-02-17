@@ -34,7 +34,7 @@ TEST(T_Json, Complex) {
             "\"string\":\"a string with spaces\","
             "\"switch\":true,"
             "\"vector\":[true,false,null,0.0,7,\"foo\",[1,2],{},[]],"
-            "\"void\":null}", 
+            "\"void\":null}",
             json->PrintCanonical());
 }
 
@@ -50,7 +50,8 @@ TEST(T_Json, SearchInObject) {
   UniquePtr<JsonDocument> json(JsonDocument::Create(
       "{\"string\": \"a \\\"string\\\" with special chars\"}"));
   ASSERT_TRUE(json.IsValid());
-  const JSON *result = json->SearchInObject(json->root(), "string", JSON_STRING);
+  const JSON *result = json->SearchInObject(
+      json->root(), "string", JSON_STRING);
   EXPECT_TRUE(result != NULL);
   result = json->SearchInObject(json->root(), "string", JSON_INT);
   EXPECT_EQ(NULL, result);

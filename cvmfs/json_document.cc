@@ -3,6 +3,7 @@
  */
 
 #include "json_document.h"
+
 #include "util/logging.h"
 #include "util/pointer.h"
 
@@ -77,9 +78,7 @@ bool GetFromJSON<string>(const JSON *object,
 }
 
 template<>
-bool GetFromJSON<int>(const JSON *object,
-                      const string &name,
-                      int *value) {
+bool GetFromJSON<int>(const JSON *object, const string &name, int *value) {
   const JSON *o = JsonDocument::SearchInObject(
       object, name, JSON::value_t::number_integer);
 
@@ -103,9 +102,7 @@ bool GetFromJSON<int>(const JSON *object,
 }
 
 template<>
-bool GetFromJSON<float>(const JSON *object,
-                        const string &name,
-                        float *value) {
+bool GetFromJSON<float>(const JSON *object, const string &name, float *value) {
   const JSON *o = JsonDocument::SearchInObject(
       object, name, JSON::value_t::number_float);
   if (!o || !value)

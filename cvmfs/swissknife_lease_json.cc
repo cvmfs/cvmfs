@@ -59,7 +59,8 @@ LeaseReply ParseAcquireReplyWithRevision(const CurlBuffer &buffer,
       const JSON *reason = JsonDocument::SearchInObject(reply->root(), "reason",
                                                         JSON_STRING);
       if (reason != NULL) {
-        LogCvmfs(kLogCvmfs, kLogStdout, "Error: %s", reason->get<std::string>().c_str());
+        LogCvmfs(kLogCvmfs, kLogStdout, "Error: %s",
+                 reason->get<std::string>().c_str());
       }
     } else {
       LogCvmfs(kLogCvmfs, kLogStdout, "Unknown reply. Status: %s",
@@ -106,7 +107,8 @@ LeaseReply ParseAcquireReply(const CurlBuffer &buffer,
       const JSON *reason = JsonDocument::SearchInObject(reply->root(), "reason",
                                                         JSON_STRING);
       if (reason != NULL) {
-        LogCvmfs(kLogCvmfs, kLogStdout, "Error: %s", reason->get<std::string>().c_str());
+        LogCvmfs(kLogCvmfs, kLogStdout, "Error: %s",
+                 reason->get<std::string>().c_str());
       }
     } else {
       LogCvmfs(kLogCvmfs, kLogStdout, "Unknown reply. Status: %s",
@@ -141,7 +143,8 @@ LeaseReply ParseDropReply(const CurlBuffer &buffer) {
       const JSON *reason = JsonDocument::SearchInObject(reply->root(), "reason",
                                                         JSON_STRING);
       if (reason != NULL) {
-        LogCvmfs(kLogCvmfs, kLogStdout, "Error: %s", reason->get<std::string>().c_str());
+        LogCvmfs(kLogCvmfs, kLogStdout, "Error: %s",
+                 reason->get<std::string>().c_str());
       }
     } else {
       LogCvmfs(kLogCvmfs, kLogStdout, "Unknown reply. Status: %s",

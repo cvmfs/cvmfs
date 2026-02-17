@@ -13,9 +13,9 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include "json_document.h"
 
 #include "authz/helper_log.h"
+#include "json_document.h"
 
 #ifdef __APPLE__
 #define strdupa(s)                    \
@@ -42,13 +42,13 @@ void ParseHandshakeInit(const string &msg) {
   JSON j = JSON::parse(msg);
 
   if (j.contains("cvmfs_authz_v1")) {
-    const JSON& config = j["cvmfs_authz_v1"];
+    const JSON &config = j["cvmfs_authz_v1"];
 
     if (config.contains("debug_log")) {
       SetLogAuthzDebug(config["debug_log"].get<string>() + ".authz");
     }
     if (config.contains("fqrn")) {
-      string fqrn = config["fqrn"].get<string>();
+      const string fqrn = config["fqrn"].get<string>();
       LogAuthz(kLogAuthzDebug, "fqrn is %s", fqrn.c_str());
       SetLogAuthzSyslogPrefix(fqrn);
     }
@@ -66,7 +66,7 @@ void ParseRequest(const string &msg) {
   JSON j = JSON::parse(msg);
 
   if (j.contains("cvmfs_authz_v1")) {
-    const JSON& req = j["cvmfs_authz_v1"];
+    const JSON &req = j["cvmfs_authz_v1"];
 
     if (req.contains("msgid")) {
       if (req["msgid"].get<int>() == 4) { /* kAuthzMsgQuit */

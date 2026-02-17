@@ -221,7 +221,8 @@ bool Reactor::HandleGenerateToken(const std::string &req, std::string *reply) {
   std::string public_token_id;
   std::string token_secret;
 
-  if (!GenerateSessionToken(key_id->get<std::string>(), path->get<std::string>(),
+  if (!GenerateSessionToken(key_id->get<std::string>(),
+                            path->get<std::string>(),
                             max_lease_time->get<int>(), &session_token,
                             &public_token_id, &token_secret)) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
@@ -436,8 +437,8 @@ bool Reactor::HandleCommit(const std::string &req, std::string *reply) {
   const RepositoryTag repo_tag(tag_name_json->get<std::string>(),
                                tag_description_json->get<std::string>());
   const CommitProcessor::Result res = proc->Process(
-      lease_path_json->get<std::string>(), old_root_hash, new_root_hash, repo_tag,
-      &final_revision);
+      lease_path_json->get<std::string>(), old_root_hash, new_root_hash,
+      repo_tag, &final_revision);
 
   JsonStringGenerator reply_input;
   switch (res) {

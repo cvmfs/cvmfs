@@ -427,7 +427,7 @@ bool AuthzExternalFetcher::ParseMsg(const std::string &json_msg,
 bool AuthzExternalFetcher::ParseMsgId(const JSON *json_authz,
                                       AuthzExternalMsg *binary_msg) {
   const JSON *json_msgid = JsonDocument::SearchInObject(json_authz, "msgid",
-                                                  JSON_INT);
+                                                        JSON_INT);
   if (json_msgid == NULL) {
     LogCvmfs(kLogAuthz, kLogSyslogErr | kLogDebug,
              "\"msgid\" not found in json from authz helper %s",
@@ -457,7 +457,7 @@ bool AuthzExternalFetcher::ParseMsgId(const JSON *json_authz,
 bool AuthzExternalFetcher::ParsePermit(const JSON *json_authz,
                                        AuthzExternalMsg *binary_msg) {
   const JSON *json_status = JsonDocument::SearchInObject(json_authz, "status",
-                                                   JSON_INT);
+                                                         JSON_INT);
   if (json_status == NULL) {
     LogCvmfs(kLogAuthz, kLogSyslogErr | kLogDebug,
              "\"status\" not found in json from authz helper %s",
@@ -473,7 +473,8 @@ bool AuthzExternalFetcher::ParsePermit(const JSON *json_authz,
         json_status->get<int>());
   }
 
-  const JSON *json_ttl = JsonDocument::SearchInObject(json_authz, "ttl", JSON_INT);
+  const JSON *json_ttl = JsonDocument::SearchInObject(json_authz, "ttl",
+                                                      JSON_INT);
   if (json_ttl == NULL) {
     LogCvmfs(kLogAuthz, kLogDebug, "no ttl, using default");
     binary_msg->permit.ttl = kDefaultTtl;
@@ -481,12 +482,13 @@ bool AuthzExternalFetcher::ParsePermit(const JSON *json_authz,
     binary_msg->permit.ttl = std::max(kMinTtl, json_ttl->get<int>());
   }
 
-  const JSON *json_token = JsonDocument::SearchInObject(json_authz, "x509_proxy",
-                                                  JSON_STRING);
+  const JSON *json_token = JsonDocument::SearchInObject(
+      json_authz, "x509_proxy", JSON_STRING);
   if (json_token != NULL) {
     binary_msg->permit.token.type = kTokenX509;
     string token_binary;
-    const bool valid_base64 = Debase64(json_token->get<string>(), &token_binary);
+    const bool valid_base64 = Debase64(json_token->get<string>(),
+                                       &token_binary);
     if (!valid_base64) {
       LogCvmfs(kLogAuthz, kLogSyslogErr | kLogDebug,
                "invalid Base64 in 'x509_proxy' from authz helper %s",
@@ -514,7 +516,8 @@ bool AuthzExternalFetcher::ParsePermit(const JSON *json_authz,
       // The token is passed to the AuthzSessionManager, which takes care of
       // freeing the memory
       binary_msg->permit.token.data = smalloc(size);
-      memcpy(binary_msg->permit.token.data, json_token->get<string>().data(), size);
+      memcpy(binary_msg->permit.token.data, json_token->get<string>().data(),
+             size);
 
       LogCvmfs(kLogAuthz, kLogDebug,
                "Got a bearer_token from authz_helper. "
@@ -542,8 +545,8 @@ bool AuthzExternalFetcher::ParsePermit(const JSON *json_authz,
 
 bool AuthzExternalFetcher::ParseRevision(const JSON *json_authz,
                                          AuthzExternalMsg *binary_msg) {
-  const JSON *json_revision = JsonDocument::SearchInObject(json_authz, "revision",
-                                                     JSON_INT);
+  const JSON *json_revision = JsonDocument::SearchInObject(
+      json_authz, "revision", JSON_INT);
   if (json_revision == NULL) {
     LogCvmfs(kLogAuthz, kLogSyslogErr | kLogDebug,
              "\"revision\" not found in json from authz helper %s",
