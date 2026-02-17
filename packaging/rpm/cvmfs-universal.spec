@@ -174,7 +174,7 @@ Requires: util-linux
   %endif
 %endif
 Requires: cvmfs-config
-Requires: nlohmann-json-devel
+Requires: json-devel
 Requires: cvmfs-libs = %{version}-%{release}
 Requires: cvmfs-fuse3 = %{version}-%{release}
 Provides: group(cvmfs)
@@ -269,7 +269,7 @@ Requires: jq
 Requires(post): /usr/sbin/semanage
 Requires(postun): /usr/sbin/semanage
 %endif
-Requires: nlohmann-json-devel
+Requires: json-devel
 Requires: cvmfs-libs = %{version}-%{release}
 
 Recommends: logrotate
