@@ -3,7 +3,6 @@ include(FetchContent)
 
 set(JSON_VERSION "3.12.0")
 set(JSON_URL "https://github.com/nlohmann/json/archive/refs/tags/v${JSON_VERSION}.tar.gz")
-# TODO: add json tarball to cern servers
 set(JSON_URL_MIRROR "https://ecsft.cern.ch/dist/cvmfs/build_externals/json-${JSON_VERSION}.tar.gz")
 set(JSON_HASH "MD5=c2528c3e04faccaaee44f1f8f3d30d99")
 
