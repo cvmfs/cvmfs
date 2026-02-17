@@ -285,7 +285,7 @@ build_lib() {
 
 # Build a list of libs that need to be built
 # Check if BUILTIN_EXTERNALS_LIST is set and override missing_libs
-if [ x"$BUILTIN_EXTERNALS_LIST" != x"" ] && ! echo ";${BUILTIN_EXTERNALS_LIST};" | grep -qE ";(libarchive|json);"; then
+if [ x"$BUILTIN_EXTERNALS_LIST" != x"" ] && ! echo ";${BUILTIN_EXTERNALS_LIST};" | grep -qE ";(libarchive|vjson);"; then
     # Convert semicolon-separated list to space-separated
     missing_libs=$(echo "$BUILTIN_EXTERNALS_LIST" | tr ';' ' ')
     echo "Bootstrap - Using custom externals list: $missing_libs"
