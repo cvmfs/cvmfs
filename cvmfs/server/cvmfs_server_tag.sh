@@ -83,7 +83,6 @@ cvmfs_server_tag() {
   check_repository_existence $name || die "The repository $name does not exist"
   load_repo_config $name
   is_owner_or_root $name           || die "Permission denied: Repository $name is owned by $CVMFS_USER"
-  is_stratum0 $name                || die "This is not a stratum 0 repository"
   ! is_publishing $name            || die "Repository is currently publishing"
   health_check -r $name
 
@@ -97,7 +96,7 @@ cvmfs_server_tag() {
       -w $CVMFS_STRATUM0                                     \
       $(get_swissknife_proxy)                                \
       -t ${CVMFS_SPOOL_DIR}/tmp                              \
-      -p /etc/cvmfs/keys/${name}.pub                         \
+      -p ${CVMFS_PUBLIC_KEY}                                 \
       -f $name"
     if [ $machine_readable -ne 0 ]; then
       tag_list_command="$tag_list_command -x"
@@ -115,7 +114,7 @@ cvmfs_server_tag() {
       -w $CVMFS_STRATUM0                                        \
       $(get_swissknife_proxy)                                   \
       -t ${CVMFS_SPOOL_DIR}/tmp                                 \
-      -p /etc/cvmfs/keys/${name}.pub                            \
+      -p ${CVMFS_PUBLIC_KEY}                                    \
       -f $name                                                  \
       -n $tag_name"
     if [ $machine_readable -ne 0 ]; then
@@ -124,6 +123,8 @@ cvmfs_server_tag() {
     $user_shell "$tag_inspect_command"
     return $?
   fi
+
+  is_stratum0 $name              || die "This is not a stratum 0 repository"
 
   # all following commands need an open repository transaction and are supposed
   # to commit or abort it after performing a tag database manipulation. Hence,
