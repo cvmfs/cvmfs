@@ -102,6 +102,43 @@ func TestPublishToSubdir(t *testing.T) {
 	}
 }
 
+func TestPublishToSubdirAlreadyPrefixedPath(t *testing.T) {
+	mockrepo := filepath.Clean("/" + os.Getenv("CVMFS_TEST_REPO"))
+	subdirName := "prefixed_target_subdir"
+	fullRepoPath := ".." + mockrepo + ":" + subdirName
+
+	f, err := os.CreateTemp("", "PublishSubdirPrefixedPathTestFile")
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := []byte("prefixed_subdir_test_content")
+	if _, err := f.Write(content); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	alreadyPrefixedPath := filepath.Join(subdirName, "deep", "path", "file")
+	if err := PublishToCVMFS(fullRepoPath, alreadyPrefixedPath, f.Name()); err != nil {
+		t.Fatal(err)
+	}
+
+	expectedPath := filepath.Join(mockrepo, subdirName, "deep", "path", "file")
+	readback, err := os.ReadFile(expectedPath)
+	if err != nil {
+		t.Fatalf("Failed to read expected file %s: %v", expectedPath, err)
+	}
+	if !bytes.Equal(readback, content) {
+		t.Fatal("Published file content differs!")
+	}
+
+	duplicatedPath := filepath.Join(mockrepo, subdirName, subdirName, "deep", "path", "file")
+	if _, err := os.Stat(duplicatedPath); err == nil {
+		t.Fatalf("Unexpected duplicated subdir path created: %s", duplicatedPath)
+	}
+}
+
 func TestCreateCatalogIntoDirSubdir(t *testing.T) {
 	mockrepo := filepath.Clean("/" + os.Getenv("CVMFS_TEST_REPO"))
 	subdirName := "catalog_target_subdir"

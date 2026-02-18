@@ -78,6 +78,8 @@ EOL
     [ ! -e "/cvmfs/$CVMFS_TEST407_REPOSITORY/.layers" ] || return 114
     [ ! -e "/cvmfs/$CVMFS_TEST407_REPOSITORY/.metadata" ] || return 115
     [ ! -e "/cvmfs/$CVMFS_TEST407_REPOSITORY/registry.hub.docker.com" ] || return 116
+    [ ! -e "/cvmfs/$CVMFS_TEST407_REPOSITORY/$CVMFS_TEST407_SUBDIR/$CVMFS_TEST407_SUBDIR/.layers" ] || return 117
+    [ ! -e "/cvmfs/$CVMFS_TEST407_REPOSITORY/$CVMFS_TEST407_SUBDIR/$CVMFS_TEST407_SUBDIR/.metadata" ] || return 118
 
     echo "*** Test successful"
     return 0

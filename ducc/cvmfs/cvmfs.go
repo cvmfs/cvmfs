@@ -36,8 +36,9 @@ func PublishToCVMFS(CVMFSRepo string, path string, target string) (err error) {
 	}()
 	l.Log().WithFields(log.Fields{"target": target, "action": "ingesting"}).Info("Start ingesting")
 
-	repoName, subDir := GetRepoAndSubdir(CVMFSRepo)
-	path = filepath.Join("/", "cvmfs", repoName, subDir, path)
+	repoName, _ := GetRepoAndSubdir(CVMFSRepo)
+	path = PrefixRepoSubdirOnce(CVMFSRepo, path)
+	path = filepath.Join("/", "cvmfs", repoName, path)
 
 	l.Log().WithFields(log.Fields{"target": target, "action": "ingesting"}).Info("Start transaction")
 
