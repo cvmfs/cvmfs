@@ -95,7 +95,9 @@ __do_snapshot() {
     fi
 
     if ! acquire_update_lock $alias_name snapshot $abort_on_conflict; then
-      retcode=1
+      if [ $abort_on_conflict -lt 2 ]; then
+        retcode=1
+      fi
       continue
     fi
 
@@ -317,7 +319,7 @@ __do_all_snapshots() {
     # See https://lists.gnu.org/archive/html/bug-bash/2012-12/msg00093.html
     set +e
     (set -e
-    __do_snapshot $repo 1
+    __do_snapshot $repo 2
     )
     if [ $? != 0 ]; then
       echo "ERROR from cvmfs_server snapshot!" >&2
