@@ -20,20 +20,22 @@ func ConstructDeleteCommands(pathsToDelete []string, pathsPerBatchCommand int, C
 	if pathsPerBatchCommand < 1 {
 		return nil, errors.New("Num of paths per batch command must be greater than zero")
 	}
+	repoName, _ := cvmfs.GetRepoAndSubdir(CVMFSRepo)
 
 	// we send pathsPerBatchCommand folders to deletion at a time
 	commandPrefix := []string{"cvmfs_server", "ingest"}
 	commands := make([][]string, 0)
 	command := commandPrefix
 	for i, path := range pathsToDelete {
+		path = cvmfs.PrefixRepoSubdirOnce(CVMFSRepo, path)
 		if i%pathsPerBatchCommand == 0 && i > 0 {
-			command = append(command, CVMFSRepo)
+			command = append(command, repoName)
 			commands = append(commands, command)
 			command = commandPrefix
 		}
 		command = append(command, "--delete", path)
 	}
-	command = append(command, CVMFSRepo)
+	command = append(command, repoName)
 	commands = append(commands, command)
 
 	return commands, nil
