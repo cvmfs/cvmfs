@@ -7,11 +7,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"math"
+	"math/rand"
 	"net/http"
 	"os"
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -60,6 +63,61 @@ type RegistryConfig struct {
 }
 
 var inputRegistries []RegistryConfig
+
+const rateLimitMaxRetries = 5
+
+// handleRateLimitBackoff checks if the response is a 429 (Too Many Requests) and implements
+// exponential backoff with jitter. Returns true if a retry should be attempted.
+func handleRateLimitBackoff(resp *http.Response, attempt int, maxRetries int) bool {
+	if resp.StatusCode != 429 {
+		return false
+	}
+
+	if attempt >= maxRetries {
+		l.Log().WithFields(log.Fields{
+			"attempt":     attempt,
+			"status_code": resp.StatusCode,
+		}).Warning("Max retries reached for 429 response")
+		return false
+	}
+
+	// Check for Retry-After header
+	var waitDuration time.Duration
+	if retryAfter := resp.Header.Get("Retry-After"); retryAfter != "" {
+		// Try to parse as seconds (integer)
+		if seconds, err := strconv.Atoi(retryAfter); err == nil {
+			waitDuration = time.Duration(seconds) * time.Second
+		} else {
+			// Try to parse as HTTP date
+			if retryTime, err := time.Parse(time.RFC1123, retryAfter); err == nil {
+				waitDuration = time.Until(retryTime)
+				if waitDuration < 0 {
+					waitDuration = 0
+				}
+			}
+		}
+	}
+
+	// If no Retry-After header or parsing failed, use exponential backoff
+	if waitDuration == 0 {
+		// Exponential backoff: 2^attempt seconds, with a max of 60 seconds
+		backoffSeconds := math.Min(math.Pow(2, float64(attempt)), 60)
+		waitDuration = time.Duration(backoffSeconds) * time.Second
+	}
+
+	// Add jitter (±25% randomization)
+	jitter := time.Duration(float64(waitDuration) * 0.25 * (2*rand.Float64() - 1))
+	waitDuration += jitter
+
+	l.Log().WithFields(log.Fields{
+		"attempt":       attempt,
+		"wait_duration": waitDuration,
+		"status_code":   resp.StatusCode,
+	}).Info("Rate limited by registry (429), backing off before retry")
+
+	time.Sleep(waitDuration)
+	return true
+}
 
 func SetupRegistries() {
 	regs := os.Getenv("DUCC_AUTH_REGISTRIES")
@@ -479,25 +537,47 @@ func (img *Image) ExpandWildcard() (<-chan *Image, <-chan *Image, error) {
 	}
 
 	client := http.Client{}
-	req, err := http.NewRequest("GET", url, nil)
-	req.Header.Set("Authorization", token)
 
-	resp, err := client.Do(req)
-	if err != nil {
-		errF := fmt.Errorf("error making the request for retrieving the tags: %s", err)
-		l.LogE(err).WithFields(log.Fields{"url": url}).Error(errF)
-		return r1, r2, errF
+	for attempt := 0; attempt <= rateLimitMaxRetries; attempt++ {
+		req, reqErr := http.NewRequest("GET", url, nil)
+		if reqErr != nil {
+			errF := fmt.Errorf("error creating the request for retrieving the tags: %s", reqErr)
+			l.LogE(reqErr).WithFields(log.Fields{"url": url}).Error(errF)
+			return r1, r2, errF
+		}
+		req.Header.Set("Authorization", token)
+
+		resp, respErr := client.Do(req)
+		if respErr != nil {
+			errF := fmt.Errorf("error making the request for retrieving the tags: %s", respErr)
+			l.LogE(respErr).WithFields(log.Fields{"url": url}).Error(errF)
+			return r1, r2, errF
+		}
+
+		// Handle 429 rate limiting
+		if handleRateLimitBackoff(resp, attempt, rateLimitMaxRetries) {
+			resp.Body.Close()
+			continue
+		}
+
+		if resp.StatusCode >= 400 {
+			errF := fmt.Errorf("error status code (%d) trying to retrieve the tags", resp.StatusCode)
+			l.LogE(errF).WithFields(log.Fields{"status code": resp.StatusCode, "url": url}).Error(errF)
+			resp.Body.Close()
+			return r1, r2, errF
+		}
+		if err = json.NewDecoder(resp.Body).Decode(&tagsList); err != nil {
+			errF := fmt.Errorf("error in decoding the tags from the server: %s", err)
+			l.LogE(err).Error(errF)
+			resp.Body.Close()
+			return r1, r2, errF
+		}
+		resp.Body.Close()
+		// Successfully decoded, break out of retry loop
+		break
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode >= 400 {
-		errF := fmt.Errorf("error status code (%d) trying to retrieve the tags", resp.StatusCode)
-		l.LogE(err).WithFields(log.Fields{"status code": resp.StatusCode, "url": url}).Error(errF)
-		return r1, r2, errF
-	}
-	if err = json.NewDecoder(resp.Body).Decode(&tagsList); err != nil {
-		errF := fmt.Errorf("error in decoding the tags from the server: %s", err)
-		l.LogE(err).Error(errF)
-		return r1, r2, errF
+	if tagsList.Tags == nil {
+		return r1, r2, fmt.Errorf("max retries exceeded for rate limiting while retrieving tags")
 	}
 	pattern := img.Tag
 	filteredTags, err := filterUsingGlob(pattern, tagsList.Tags)
@@ -593,45 +673,65 @@ func firstRequestForAuth(url string) (token string, err error) {
 }
 
 func firstRequestForAuth_internal(url, user, pass string) (token string, err error) {
-	resp, err := http.Get(url)
-	if err != nil {
-		l.LogE(err).Error("Error in making the first request for auth")
-		return "", err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode < 300 && resp.StatusCode >= 200 {
-		log.WithFields(log.Fields{
-			"status code": resp.StatusCode,
-		}).Info("Return valid response, token not necessary.")
-		return
-	}
-	if resp.StatusCode != 401 {
-		log.WithFields(log.Fields{
-			"url":         url,
-			"status code": resp.StatusCode,
-		}).Info("Expected status code 401.")
-		return "", err
-	}
-	WwwAuthenticate := resp.Header["Www-Authenticate"][0]
-	// we first try to get the token with the authentication
-	// if we fail, and we might since the docker hub might not have our user
-	// we try again without authentication
-	token, err = requestAuthToken(WwwAuthenticate, user, pass)
-	if err == nil {
-		// happy path
-		return token, nil
-	}
-	fmt.Printf("We failed with authentication and we now go without for %s\n", url)
-	// some error, we should retry without auth
-	if user != "" || pass != "" {
-		token, err = requestAuthToken(WwwAuthenticate, "", "")
+	client := &http.Client{}
+
+	for attempt := 0; attempt <= rateLimitMaxRetries; attempt++ {
+		req, reqErr := http.NewRequest("GET", url, nil)
+		if reqErr != nil {
+			l.LogE(reqErr).Error("Error in creating the first request for auth")
+			return "", reqErr
+		}
+
+		resp, respErr := client.Do(req)
+		if respErr != nil {
+			l.LogE(respErr).Error("Error in making the first request for auth")
+			return "", respErr
+		}
+
+		// Handle 429 rate limiting
+		if handleRateLimitBackoff(resp, attempt, rateLimitMaxRetries) {
+			resp.Body.Close()
+			continue
+		}
+
+		if resp.StatusCode < 300 && resp.StatusCode >= 200 {
+			log.WithFields(log.Fields{
+				"status code": resp.StatusCode,
+			}).Info("Return valid response, token not necessary.")
+			resp.Body.Close()
+			return "", nil
+		}
+		if resp.StatusCode != 401 {
+			log.WithFields(log.Fields{
+				"url":         url,
+				"status code": resp.StatusCode,
+			}).Info("Expected status code 401.")
+			resp.Body.Close()
+			return "", fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		}
+		WwwAuthenticate := resp.Header["Www-Authenticate"][0]
+		resp.Body.Close()
+		// we first try to get the token with the authentication
+		// if we fail, and we might since the docker hub might not have our user
+		// we try again without authentication
+		token, err = requestAuthToken(WwwAuthenticate, user, pass)
 		if err == nil {
-			// happy path without auth
+			// happy path
 			return token, nil
 		}
+		fmt.Printf("We failed with authentication and we now go without for %s\n", url)
+		// some error, we should retry without auth
+		if user != "" || pass != "" {
+			token, err = requestAuthToken(WwwAuthenticate, "", "")
+			if err == nil {
+				// happy path without auth
+				return token, nil
+			}
+		}
+		l.LogE(err).Error("Error in getting the authentication token")
+		return "", err
 	}
-	l.LogE(err).Error("Error in getting the authentication token")
-	return "", err
+	return "", fmt.Errorf("max retries exceeded for rate limiting")
 }
 
 func getLayerUrl(img *Image, layerDigest string) string {
@@ -794,11 +894,11 @@ func (img *Image) downloadLayer(layer da.Layer, token string) (toSend downloaded
 			return
 		}
 	}
-	for i := 0; i <= 5; i++ {
+	for i := 0; i <= rateLimitMaxRetries; i++ {
 		err = nil
 		client := &http.Client{}
 		req, errR := http.NewRequest("GET", layerUrl, nil)
-		if err != nil {
+		if errR != nil {
 			l.LogE(errR).Error("Impossible to create the HTTP request.")
 			err = errR
 			break
@@ -812,11 +912,19 @@ func (img *Image) downloadLayer(layer da.Layer, token string) (toSend downloaded
 			err = errReq
 			break
 		}
+
+		// Handle 429 rate limiting
+		if handleRateLimitBackoff(resp, i, rateLimitMaxRetries) {
+			resp.Body.Close()
+			continue
+		}
+
 		if 200 <= resp.StatusCode && resp.StatusCode < 300 {
 			gread, errG := gzip.NewReader(resp.Body)
 			if errG != nil {
 				err = errG
 				l.LogE(err).Warning("Error in creating the zip to unzip the layer")
+				resp.Body.Close()
 				continue
 			}
 			path := NewReadAndHash(gread)
@@ -825,6 +933,7 @@ func (img *Image) downloadLayer(layer da.Layer, token string) (toSend downloaded
 		} else {
 			err = fmt.Errorf("layer not received, status code: %d", resp.StatusCode)
 			l.LogE(err).Warning("Received status code ", resp.StatusCode)
+			resp.Body.Close()
 			if resp.StatusCode == 401 {
 				// try to get the token again
 				newToken, errToken := firstRequestForAuth(layerUrl)
@@ -865,47 +974,61 @@ func requestAuthToken(token, user, pass string) (authToken string, err error) {
 	if err != nil {
 		return
 	}
-	req, err := http.NewRequest("GET", realm, nil)
-	if err != nil {
-		return
-	}
-
-	query := req.URL.Query()
-	for k, v := range options {
-		query.Add(k, v)
-	}
-	if user != "" && pass != "" {
-		query.Add("offline_token", "true")
-		req.SetBasicAuth(user, pass)
-	}
-	req.URL.RawQuery = query.Encode()
 
 	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		err = fmt.Errorf("error in getting the token, http request failed %s", err)
-		return
-	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode >= 400 {
-		err = fmt.Errorf("authorization error %s", resp.Status)
-		return
-	}
+	for attempt := 0; attempt <= rateLimitMaxRetries; attempt++ {
+		req, reqErr := http.NewRequest("GET", realm, nil)
+		if reqErr != nil {
+			return "", reqErr
+		}
 
-	var jsonResp map[string]interface{}
-	err = json.NewDecoder(resp.Body).Decode(&jsonResp)
-	if err != nil {
+		query := req.URL.Query()
+		for k, v := range options {
+			query.Add(k, v)
+		}
+		if user != "" && pass != "" {
+			query.Add("offline_token", "true")
+			req.SetBasicAuth(user, pass)
+		}
+		req.URL.RawQuery = query.Encode()
+
+		resp, respErr := client.Do(req)
+		if respErr != nil {
+			err = fmt.Errorf("error in getting the token, http request failed %s", respErr)
+			return
+		}
+
+		// Handle 429 rate limiting
+		if handleRateLimitBackoff(resp, attempt, rateLimitMaxRetries) {
+			resp.Body.Close()
+			continue
+		}
+
+		if resp.StatusCode >= 400 {
+			err = fmt.Errorf("authorization error %s", resp.Status)
+			resp.Body.Close()
+			return
+		}
+
+		var jsonResp map[string]interface{}
+		err = json.NewDecoder(resp.Body).Decode(&jsonResp)
+		if err != nil {
+			resp.Body.Close()
+			return
+		}
+		authTokenInterface, ok := jsonResp["token"]
+		if ok {
+			authToken = "Bearer " + authTokenInterface.(string)
+		} else {
+			err = fmt.Errorf("didn't get the token key from the server")
+			resp.Body.Close()
+			return
+		}
+		resp.Body.Close()
 		return
 	}
-	authTokenInterface, ok := jsonResp["token"]
-	if ok {
-		authToken = "Bearer " + authTokenInterface.(string)
-	} else {
-		err = fmt.Errorf("didn't get the token key from the server")
-		return
-	}
-	return
+	return "", fmt.Errorf("max retries exceeded for rate limiting")
 }
 
 type LayerDownloader struct {
@@ -1169,37 +1292,49 @@ func makeGetRequest(url string, headers map[string]string) ([]byte, error) {
 	}
 
 	client := &http.Client{}
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		l.LogE(err).Error("Impossible to create a HTTP request")
-		return nil, err
-	}
 
-	req.Header.Set("Authorization", token)
-	for k, v := range headers {
-		req.Header.Set(k, v)
-	}
-
-	// for debugging: log curl command corresponding to request
-	if log.IsLevelEnabled(log.TraceLevel) {
-		curlcmd, err := curling.NewFromRequest(req)
-		if err != nil {
-			log.Fatal(err)
+	for attempt := 0; attempt <= rateLimitMaxRetries; attempt++ {
+		req, reqErr := http.NewRequest("GET", url, nil)
+		if reqErr != nil {
+			l.LogE(reqErr).Error("Impossible to create a HTTP request")
+			return nil, reqErr
 		}
-		log.Trace(curlcmd)
+
+		req.Header.Set("Authorization", token)
+		for k, v := range headers {
+			req.Header.Set(k, v)
+		}
+
+		// for debugging: log curl command corresponding to request
+		if log.IsLevelEnabled(log.TraceLevel) {
+			curlcmd, curlErr := curling.NewFromRequest(req)
+			if curlErr != nil {
+				log.Fatal(curlErr)
+			}
+			log.Trace(curlcmd)
+		}
+
+		resp, respErr := client.Do(req)
+		if respErr != nil {
+			l.LogE(respErr).Error("Error in making the HTTP request")
+			return nil, respErr
+		}
+
+		// Handle 429 rate limiting
+		if handleRateLimitBackoff(resp, attempt, rateLimitMaxRetries) {
+			resp.Body.Close()
+			continue
+		}
+
+		body, bodyErr := ioutil.ReadAll(resp.Body)
+		resp.Body.Close()
+		if bodyErr != nil {
+			l.LogE(bodyErr).Error("Error in reading the second http response")
+			return nil, bodyErr
+		}
+
+		return body, nil
 	}
 
-	resp, err := client.Do(req)
-	if err != nil {
-		l.LogE(err).Error("Error in making the HTTP request")
-		return nil, err
-	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		l.LogE(err).Error("Error in reading the second http response")
-		return nil, err
-	}
-
-	return body, nil
+	return nil, fmt.Errorf("max retries exceeded for rate limiting")
 }
