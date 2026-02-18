@@ -154,11 +154,16 @@ func RepositoryExists(CVMFSRepo string) bool {
 
 	// remove sub directory in case it was passed
 	repo, _ := GetRepoAndSubdir(CVMFSRepo)
-	if strings.Contains(stdoutString, repo) {
-		return true
-	} else {
-		return false
+	return repositoryExistsInList(stdoutString, repo)
+}
+
+func repositoryExistsInList(stdoutString, repo string) bool {
+	for _, line := range strings.Split(stdoutString, "\n") {
+		if strings.TrimSpace(line) == repo {
+			return true
+		}
 	}
+	return false
 }
 
 func WithinTransaction(CVMFSRepo string, f func() error, opts ...TransactionOption) error {
