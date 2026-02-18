@@ -158,8 +158,19 @@ func RepositoryExists(CVMFSRepo string) bool {
 }
 
 func repositoryExistsInList(stdoutString, repo string) bool {
+	candidates := map[string]struct{}{
+		repo: {},
+	}
+	if strings.HasPrefix(repo, "/") {
+		candidates[strings.TrimPrefix(repo, "/")] = struct{}{}
+		candidates[".."+repo] = struct{}{}
+	}
+	if strings.HasPrefix(repo, "..") {
+		candidates[strings.TrimPrefix(repo, "..")] = struct{}{}
+	}
+
 	for _, line := range strings.Split(stdoutString, "\n") {
-		if strings.TrimSpace(line) == repo {
+		if _, ok := candidates[strings.TrimSpace(line)]; ok {
 			return true
 		}
 	}

@@ -49,7 +49,7 @@ func TestTransactionRepoName(t *testing.T) {
 }
 
 func TestRepositoryExistsInList(t *testing.T) {
-	list := "test.cern.ch\nrepo.cern.ch\nrepo.cern.chx\n"
+	list := "test.cern.ch\nrepo.cern.ch\nrepo.cern.chx\n../../tmp/mockrepo\n"
 	cases := []struct {
 		name     string
 		repo     string
@@ -58,6 +58,7 @@ func TestRepositoryExistsInList(t *testing.T) {
 		{name: "exact_match", repo: "repo.cern.ch", expected: true},
 		{name: "no_false_positive_on_prefix", repo: "repo.cern", expected: false},
 		{name: "no_false_positive_on_suffix", repo: "repo.cern.ch-extra", expected: false},
+		{name: "legacy_mock_list_prefix", repo: "/../../tmp/mockrepo", expected: true},
 		{name: "missing_repo", repo: "absent.cern.ch", expected: false},
 	}
 
