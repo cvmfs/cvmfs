@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"fmt"
 	"io/ioutil"
+	"strings"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -62,6 +64,7 @@ var convertCmd = &cobra.Command{
 			l.LogE(err).Error("The repository does not seem to exists.")
 			return err
 		}
+		var conversionErrors []string
 		for wish := range recipe.Wishes {
 			fields := log.Fields{"input image": wish.InputName,
 				"repository":   wish.CvmfsRepo,
@@ -70,31 +73,36 @@ var convertCmd = &cobra.Command{
 			if !skipLayers {
 				err = lib.ConvertWish(wish, convertAgain, overwriteLayer)
 				if err != nil {
-					l.LogE(err).WithFields(fields).Error("Error in converting wish (layers)")
-					return err
+					l.LogE(err).WithFields(fields).Error("Error in converting wish (layers), going on")
+					conversionErrors = append(conversionErrors, fmt.Sprintf("[%s] layers: %s", wish.InputName, err))
 				}
 			}
 			if !skipThinImage {
 				err = lib.ConvertWishDocker(wish)
 				if err != nil {
-					l.LogE(err).WithFields(fields).Error("Error in converting wish (docker)")
-					return err
+					l.LogE(err).WithFields(fields).Error("Error in converting wish (docker), going on")
+					conversionErrors = append(conversionErrors, fmt.Sprintf("[%s] docker: %s", wish.InputName, err))
 				}
 			}
 			if !skipPodman {
 				err = lib.ConvertWishPodman(wish, convertAgain)
 				if err != nil {
-					l.LogE(err).WithFields(fields).Error("Error in converting wish (podman)")
-					return err
+					l.LogE(err).WithFields(fields).Error("Error in converting wish (podman), going on")
+					conversionErrors = append(conversionErrors, fmt.Sprintf("[%s] podman: %s", wish.InputName, err))
 				}
 			}
 			if !skipFlat {
 				err = lib.ConvertWishFlat(wish)
 				if err != nil {
-					l.LogE(err).WithFields(fields).Error("Error in converting wish (singularity)")
-					return err
+					l.LogE(err).WithFields(fields).Error("Error in converting wish (singularity), going on")
+					conversionErrors = append(conversionErrors, fmt.Sprintf("[%s] singularity: %s", wish.InputName, err))
 				}
 			}
+		}
+		if len(conversionErrors) > 0 {
+			summary := fmt.Sprintf("%d conversion error(s):\n  %s", len(conversionErrors), strings.Join(conversionErrors, "\n  "))
+			l.Log().Error(summary)
+			return fmt.Errorf("%s", summary)
 		}
 		return nil
 	},
