@@ -27,6 +27,13 @@ func GetRepoAndSubdir(cvmfsRepo string) (repoName, subDir string) {
 	if strings.HasPrefix(cvmfsRepo, "..") || strings.HasPrefix(cvmfsRepo, "/..") {
 		return cvmfsRepo, ""
 	}
+	if strings.HasPrefix(cvmfsRepo, "/") {
+		if strings.HasPrefix(cvmfsRepo, "/cvmfs/") {
+			cvmfsRepo = strings.TrimPrefix(cvmfsRepo, "/cvmfs/")
+		} else {
+			return strings.TrimSuffix(cvmfsRepo, "/"), ""
+		}
+	}
 	repoName, subDir, _ = strings.Cut(cvmfsRepo, "/")
 	subDir = strings.TrimSuffix(subDir, "/")
 	return

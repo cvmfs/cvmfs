@@ -18,6 +18,9 @@ func TestGetRepoAndSubdir(t *testing.T) {
 		{"../../tmp/mockrepo", "../../tmp/mockrepo", ""},
 		{"../../tmp/mockrepo:subdir", "../../tmp/mockrepo", "subdir"},
 		{"/../../tmp/mockrepo", "/../../tmp/mockrepo", ""},
+		{"/tmp/mockrepo", "/tmp/mockrepo", ""},
+		{"/tmp/mockrepo/subdir", "/tmp/mockrepo/subdir", ""},
+		{"/cvmfs/repo.cern.ch/subdir", "repo.cern.ch", "subdir"},
 		// Edge cases
 		{"", "", ""},                                       // empty input
 		{"repo.cern.ch/", "repo.cern.ch", ""},              // trailing slash on repo
@@ -34,6 +37,16 @@ func TestGetRepoAndSubdir(t *testing.T) {
 				t.Errorf("GetRepoAndSubdir() gotSubDir = %v, want %v", gotSubDir, tt.wantSubDir)
 			}
 		})
+	}
+}
+
+func TestGetRepoAndSubdirAbsolutePathKeepsRepoName(t *testing.T) {
+	repo, subdir := GetRepoAndSubdir("/tmp/mockrepo")
+	if repo == "" {
+		t.Fatal("GetRepoAndSubdir returned an empty repository name for an absolute path")
+	}
+	if subdir != "" {
+		t.Fatalf("GetRepoAndSubdir returned unexpected subdir %q for an absolute path", subdir)
 	}
 }
 
