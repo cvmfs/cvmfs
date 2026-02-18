@@ -170,8 +170,15 @@ func repositoryExistsInList(stdoutString, repo string) bool {
 	}
 
 	for _, line := range strings.Split(stdoutString, "\n") {
-		if _, ok := candidates[strings.TrimSpace(line)]; ok {
+		line = strings.TrimSpace(line)
+		if _, ok := candidates[line]; ok {
 			return true
+		}
+		fields := strings.Fields(line)
+		if len(fields) > 0 {
+			if _, ok := candidates[fields[0]]; ok {
+				return true
+			}
 		}
 	}
 	return false
