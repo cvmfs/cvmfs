@@ -68,26 +68,31 @@ class CommandOverlay : public Command {
    */
   bool CheckCachedMerge(const std::string &cache_dir,
                         const std::string &cache_key,
-                        std::map<std::string, OverlayEntry> *merged) const;
+                        std::map<std::string, OverlayEntry> *merged);
 
   /**
-   * Store the merged entry map in the cache with the given key.
-   * Creates a SQLite catalog database file containing all merged entries.
+   * Store the merge result in the cache by copying the nested catalog
+   * database that was created at dest_path during PublishMergedEntries.
    */
   bool StoreMergeInCache(
       const std::string &cache_dir,
       const std::string &cache_key,
-      const std::map<std::string, OverlayEntry> &merged) const;
+      catalog::WritableCatalogManager *catalog_mgr,
+      const std::string &dest_path) const;
 
   /**
    * Recursively read all entries from a catalog rooted at the given path.
    * The entries are stored with paths relative to the layer root.
+   * When a nested catalog mountpoint is encountered and repo_base/temp_dir
+   * are non-empty, the nested catalog is loaded and recursed into.
    */
   bool ReadCatalogEntries(
       catalog::Catalog *catalog,
       const std::string &catalog_root_path,
       const std::string &relative_prefix,
-      std::map<std::string, OverlayEntry> *entries) const;
+      const std::string &repo_base,
+      const std::string &temp_dir,
+      std::map<std::string, OverlayEntry> *entries);
 
   /**
    * Check if a filename represents a whiteout file (.wh.<name>).

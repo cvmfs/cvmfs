@@ -60,19 +60,23 @@ url_to_cvmfs_image_path() { echo "${1#*://}"; }
 
 # Produce a deterministic, sorted listing of all entries in a directory.
 # Format: TYPE PERMS SIZE PATH [-> SYMLINK_TARGET]
-# Filters out CVMFS bookkeeping files and files that get special handling
-# by the unpacker's singularity support (see ducc/singularity/dotfiles.go
-# and ducc/singularity/startup_files.go):
-#   - .singularity.d/ tree (created/overwritten by makeBaseEnv)
-#   - /etc/hosts and /etc/resolv.conf (truncated by makeFiles)
-#   - symlinks: singularity .run .exec .test .shell environment
+# Filters out:
+#   - CVMFS bookkeeping files (.cvmfscatalog, .cvmfsdirtab, .cvmfsautocatalog)
+#   - Singularity support files (see ducc/singularity/dotfiles.go and
+#     ducc/singularity/startup_files.go):
+#       .singularity.d/ tree, /etc/hosts, /etc/resolv.conf,
+#       symlinks: singularity .run .exec .test .shell environment
+#   - Docker runtime artifacts not present in image layers:
+#       .dockerenv, dev/console, dev/pts, dev/shm, etc/mtab, etc/hostname
 generate_listing() {
     local dir="$1" output="$2"
     ( cd "$dir"
       find . \( -name '.cvmfscatalog' -o -name '.cvmfsdirtab' \
                 -o -name '.cvmfsautocatalog' \
-                -o -path './.singularity.d' \) -prune -o -print \
-        | grep -v -x \
+                -o -path './.singularity.d' \
+                -o -path './dev/pts' -o -path './dev/shm' \
+                \) -prune -o -print0 \
+        | grep -z -v -x \
             -e '\./\.singularity\.d' \
             -e '\./etc/hosts' \
             -e '\./etc/resolv\.conf' \
@@ -82,7 +86,13 @@ generate_listing() {
             -e '\./\.test' \
             -e '\./\.shell' \
             -e '\./environment' \
-        | sort | while IFS= read -r entry; do
+            -e '\./\.dockerenv' \
+            -e '\./dev/console' \
+            -e '\./dev/pts' \
+            -e '\./dev/shm' \
+            -e '\./etc/mtab' \
+            -e '\./etc/hostname' \
+        | sort -z | while IFS= read -r -d '' entry; do
             if   [ -L "$entry" ]; then
                 printf 'L %s -> %s\n' "$entry" "$(readlink "$entry")"
             elif [ -d "$entry" ]; then
@@ -101,14 +111,21 @@ generate_listing() {
 generate_checksums() {
     local dir="$1" output="$2"
     ( cd "$dir"
-      find . -path './.singularity.d' -prune -o -type f \
+      find . -path './.singularity.d' -prune \
+             -o -path './dev/pts' -prune \
+             -o -path './dev/shm' -prune \
+             -o -type f \
              ! -name '.cvmfscatalog' \
              ! -name '.cvmfsdirtab' \
              ! -name '.cvmfsautocatalog' \
              ! -path './etc/hosts' \
              ! -path './etc/resolv.conf' \
-             -print \
-        | sort | xargs -r sha256sum
+             ! -path './.dockerenv' \
+             ! -path './dev/console' \
+             ! -path './etc/mtab' \
+             ! -path './etc/hostname' \
+             -print0 \
+        | sort -z | xargs -0 -r sha256sum
     ) > "$output"
 }
 
