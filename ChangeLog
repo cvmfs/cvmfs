@@ -1,3 +1,19 @@
+
+2.14.0:
+  * [server] s3fanout: Add 507 s3 error (#3997)
+  * [client] Skip open files on cache cleanup when possible (#4029)
+  * [client] Use short hashes in open-file-aware cleanup (#4059)
+  * [client] Implement FUSE passthrough (#4006)
+  * [client] Add support for xattrs with values up to 64k (#3622)
+  * [rpm] Migrate from bootstrap.sh to cmake: libarchive (#4064)
+  * [client] Per-repo granularity of CVMFS_DEBUGLOG at reload (#4085)
+  * [macos]  compile with cxxstd=11 (#4101)
+  * [server] Make busy snapshot during -a not be an ERROR (#4108)
+  * [server] Allow cvmfs_server tag readonly ops to work on stratum 1 (#4106)
+  * [ducc] proper backoff on 429 responses from registry (#4110)
+  * [ducc] cache auth token for requests to registry (#4112)
+  * [ducc] continue on error, and print a summary at the end (#4113)
+
 2.13.3:
   * [client] Fix a race with concurrent auto-mount/umounts (#3993)
   * [server] cvmfs_server check: add -x option for custom scratch dir (#4011)
