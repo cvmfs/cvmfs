@@ -23,6 +23,8 @@
 
 #include "catalog.h"
 #include "catalog_mgr_rw.h"
+#include "catalog_rw.h"
+#include "catalog_sql.h"
 #include "compression/compression.h"
 #include "crypto/hash.h"
 #include "directory_entry.h"
@@ -89,77 +91,34 @@ bool CommandOverlay::CheckCachedMerge(
     map<string, OverlayEntry> *merged) const {
   if (cache_dir.empty()) return false;
 
-  const string cache_path = cache_dir + "/" + cache_key + ".cache";
+  const string cache_path = cache_dir + "/" + cache_key + ".db";
   if (!FileExists(cache_path)) return false;
 
-  FILE *f = fopen(cache_path.c_str(), "r");
-  if (f == NULL) return false;
-
-  // Read timestamp line
-  string line;
-  if (!GetLineFile(f, &line) || line.empty()) {
-    fclose(f);
+  // Open the cached catalog database
+  catalog::WritableCatalog *cached_catalog =
+      catalog::WritableCatalog::AttachFreely(
+          "", cache_path, shash::Any(shash::kSha1));
+  if (cached_catalog == NULL) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "Failed to open cached catalog: %s", cache_path.c_str());
     return false;
   }
 
-  // Read format version marker
-  if (!GetLineFile(f, &line) || line != "v2") {
-    fclose(f);
-    LogCvmfs(kLogCvmfs, kLogStdout,
-             "Stale cache format for key %s, will recompute",
-             cache_key.c_str());
-    return false;
-  }
-
-  // Read entries: each entry is 10 lines (v2 format):
-  //   relative_path, parent_path, mode, size, checksum_hex, name,
-  //   symlink_target, mtime, uid, gid
+  // Read all entries from the cached catalog
   merged->clear();
-  while (GetLineFile(f, &line)) {
-    OverlayEntry oe;
-    oe.path = line;
-    if (!GetLineFile(f, &line)) break;
-    oe.parent = line;
-    if (!GetLineFile(f, &line)) break;
-    const unsigned int mode = String2Uint64(line);
-    if (!GetLineFile(f, &line)) break;
-    const uint64_t size = String2Uint64(line);
-    if (!GetLineFile(f, &line)) break;
-    const string checksum_hex = line;
-    if (!GetLineFile(f, &line)) break;
-    const string entry_name = line;
-    if (!GetLineFile(f, &line)) break;
-    const string symlink_target = line;
-    if (!GetLineFile(f, &line)) break;
-    const int64_t mtime = String2Int64(line);
-    if (!GetLineFile(f, &line)) break;
-    const uint64_t uid = String2Uint64(line);
-    if (!GetLineFile(f, &line)) break;
-    const uint64_t gid = String2Uint64(line);
 
-    catalog::DirectoryEntryBase base;
-    base.name_.Assign(entry_name.data(), entry_name.length());
-    base.mode_ = mode;
-    base.size_ = size;
-    base.mtime_ = static_cast<time_t>(mtime);
-    base.uid_ = static_cast<uid_t>(uid);
-    base.gid_ = static_cast<gid_t>(gid);
-    if (!symlink_target.empty()) {
-      base.symlink_.Assign(symlink_target.data(), symlink_target.length());
-    }
-    if (!checksum_hex.empty()) {
-      base.checksum_ = shash::MkFromHexPtr(
-          shash::HexPtr(checksum_hex), shash::kSuffixNone);
-    }
-    base.linkcount_ = 1;
-    oe.entry = catalog::DirectoryEntry(base);
-    oe.is_whiteout = false;
-    oe.is_opaque_dir = false;
+  // Helper function to recursively read entries from a catalog path
+  bool success = ReadCatalogEntries(cached_catalog, "", "", merged);
 
-    (*merged)[oe.path] = oe;
+  delete cached_catalog;
+
+  if (!success) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "Failed to read entries from cached catalog: %s",
+             cache_path.c_str());
+    return false;
   }
 
-  fclose(f);
   LogCvmfs(kLogCvmfs, kLogStdout,
            "Cache hit for key %s (%zu entries)",
            cache_key.c_str(), merged->size());
@@ -175,39 +134,64 @@ bool CommandOverlay::StoreMergeInCache(
 
   MkdirDeep(cache_dir, 0755);
 
-  const string cache_path = cache_dir + "/" + cache_key + ".cache";
-  FILE *f = fopen(cache_path.c_str(), "w");
-  if (f == NULL) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to create cache file: %s",
+  const string cache_path = cache_dir + "/" + cache_key + ".db";
+
+  // Create a new catalog database
+  catalog::CatalogDatabase *cache_db =
+      catalog::CatalogDatabase::Create(cache_path);
+  if (cache_db == NULL) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to create cache database: %s",
              cache_path.c_str());
     return false;
   }
 
-  // Write timestamp
-  fprintf(f, "%" PRIu64 "\n", static_cast<uint64_t>(time(NULL)));
+  // Create a root directory entry for the catalog
+  catalog::DirectoryEntry root_entry;
+  root_entry.mode_ = 0755 | S_IFDIR;
+  root_entry.uid_ = 0;
+  root_entry.gid_ = 0;
+  root_entry.mtime_ = time(NULL);
 
-  // Write format version marker (v2 includes symlink, mtime, uid, gid)
-  fprintf(f, "v2\n");
+  // Initialize the catalog with root entry
+  const bool volatile_content = false;
+  if (!cache_db->InsertInitialValues("", volatile_content, "", root_entry)) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "Failed to initialize cache catalog: %s", cache_path.c_str());
+    delete cache_db;
+    unlink(cache_path.c_str());
+    return false;
+  }
 
-  // Write entries: each entry is 10 lines:
-  //   relative_path, parent_path, mode, size, checksum_hex, name,
-  //   symlink_target, mtime, uid, gid
+  delete cache_db;
+  cache_db = NULL;
+
+  // Open the catalog as writable to add entries
+  catalog::WritableCatalog *cache_catalog =
+      catalog::WritableCatalog::AttachFreely(
+          "", cache_path, shash::Any(shash::kSha1));
+  if (cache_catalog == NULL) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "Failed to open cache catalog for writing: %s",
+             cache_path.c_str());
+    unlink(cache_path.c_str());
+    return false;
+  }
+
+  cache_catalog->Transaction();
+
+  // Add all merged entries to the catalog
   for (map<string, OverlayEntry>::const_iterator it = merged.begin();
        it != merged.end(); ++it) {
     const OverlayEntry &oe = it->second;
-    fprintf(f, "%s\n", oe.path.c_str());
-    fprintf(f, "%s\n", oe.parent.c_str());
-    fprintf(f, "%u\n", oe.entry.mode());
-    fprintf(f, "%" PRIu64 "\n", oe.entry.size());
-    fprintf(f, "%s\n", oe.entry.checksum().ToString().c_str());
-    fprintf(f, "%s\n", oe.entry.name().ToString().c_str());
-    fprintf(f, "%s\n", oe.entry.symlink().ToString().c_str());
-    fprintf(f, "%" PRId64 "\n", static_cast<int64_t>(oe.entry.mtime()));
-    fprintf(f, "%" PRIu64 "\n", static_cast<uint64_t>(oe.entry.uid()));
-    fprintf(f, "%" PRIu64 "\n", static_cast<uint64_t>(oe.entry.gid()));
+    const string entry_path = "/" + oe.path;
+    const string parent_path = oe.parent.empty() ? "" : "/" + oe.parent;
+
+    cache_catalog->AddEntry(oe.entry, oe.xattrs, entry_path, parent_path);
   }
 
-  fclose(f);
+  cache_catalog->Commit();
+  delete cache_catalog;
+
   LogCvmfs(kLogCvmfs, kLogStdout, "Stored merge result in cache: %s",
            cache_key.c_str());
   return true;

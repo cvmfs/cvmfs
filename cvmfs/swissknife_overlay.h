@@ -62,8 +62,9 @@ class CommandOverlay : public Command {
 
   /**
    * Check if a valid cached catalog exists for the given cache key.
-   * The cached catalog stores the serialized merged OverlayEntry map so that
-   * re-running the same layer combination can skip the merge computation.
+   * The cached catalog is stored as a SQLite database file containing
+   * the merged overlay entries, so that re-running the same layer
+   * combination can skip the merge computation.
    */
   bool CheckCachedMerge(const std::string &cache_dir,
                         const std::string &cache_key,
@@ -71,6 +72,7 @@ class CommandOverlay : public Command {
 
   /**
    * Store the merged entry map in the cache with the given key.
+   * Creates a SQLite catalog database file containing all merged entries.
    */
   bool StoreMergeInCache(
       const std::string &cache_dir,
