@@ -114,7 +114,6 @@ var convertSingleImageCmd = &cobra.Command{
 			}
 		}
 
-
 		if !skipThinImage {
 			for i := 0; i < attempts; i++ {
 				err = lib.ConvertWishDocker(wish)
