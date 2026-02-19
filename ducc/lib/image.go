@@ -64,6 +64,57 @@ type RegistryConfig struct {
 
 var inputRegistries []RegistryConfig
 
+// Token cache to avoid redundant auth requests for the same registry/repository.
+type cachedToken struct {
+	token     string
+	expiresAt time.Time
+}
+
+var (
+	tokenCacheMu  sync.RWMutex
+	tokenCacheMap = make(map[string]*cachedToken)
+)
+
+// extractTokenCacheKey extracts a repository-scoped cache key from a registry URL.
+// URLs like https://registry/v2/repo/manifests/ref and https://registry/v2/repo/blobs/digest
+// all map to the same cache key based on the registry+repository prefix.
+func extractTokenCacheKey(url, user string) string {
+	for _, suffix := range []string{"/manifests/", "/blobs/", "/tags/"} {
+		if idx := strings.Index(url, suffix); idx != -1 {
+			return url[:idx] + "|" + user
+		}
+	}
+	return url + "|" + user
+}
+
+func getCachedToken(key string) (string, bool) {
+	tokenCacheMu.RLock()
+	defer tokenCacheMu.RUnlock()
+	cached, ok := tokenCacheMap[key]
+	if !ok {
+		return "", false
+	}
+	if time.Now().After(cached.expiresAt) {
+		return "", false
+	}
+	return cached.token, true
+}
+
+func setCachedToken(key, token string, expiresIn int) {
+	tokenCacheMu.Lock()
+	defer tokenCacheMu.Unlock()
+	ttl := time.Duration(expiresIn) * time.Second
+	if ttl <= 0 {
+		ttl = 60 * time.Second // default 60s TTL
+	}
+	// Apply safety margin: use 80% of the TTL to refresh before actual expiry
+	ttl = time.Duration(float64(ttl) * 0.8)
+	tokenCacheMap[key] = &cachedToken{
+		token:     token,
+		expiresAt: time.Now().Add(ttl),
+	}
+}
+
 const rateLimitMaxRetries = 5
 
 // handleRateLimitBackoff checks if the response is a 429 (Too Many Requests) and implements
@@ -673,6 +724,12 @@ func firstRequestForAuth(url string) (token string, err error) {
 }
 
 func firstRequestForAuth_internal(url, user, pass string) (token string, err error) {
+	cacheKey := extractTokenCacheKey(url, user)
+	if cached, ok := getCachedToken(cacheKey); ok {
+		log.WithFields(log.Fields{"url": url}).Debug("Using cached auth token")
+		return cached, nil
+	}
+
 	client := &http.Client{}
 
 	for attempt := 0; attempt <= rateLimitMaxRetries; attempt++ {
@@ -699,6 +756,8 @@ func firstRequestForAuth_internal(url, user, pass string) (token string, err err
 				"status code": resp.StatusCode,
 			}).Info("Return valid response, token not necessary.")
 			resp.Body.Close()
+			// Cache "no auth needed" with a short TTL
+			setCachedToken(cacheKey, "", 60)
 			return "", nil
 		}
 		if resp.StatusCode != 401 {
@@ -714,17 +773,20 @@ func firstRequestForAuth_internal(url, user, pass string) (token string, err err
 		// we first try to get the token with the authentication
 		// if we fail, and we might since the docker hub might not have our user
 		// we try again without authentication
-		token, err = requestAuthToken(WwwAuthenticate, user, pass)
+		var expiresIn int
+		token, expiresIn, err = requestAuthToken(WwwAuthenticate, user, pass)
 		if err == nil {
 			// happy path
+			setCachedToken(cacheKey, token, expiresIn)
 			return token, nil
 		}
 		fmt.Printf("We failed with authentication and we now go without for %s\n", url)
 		// some error, we should retry without auth
 		if user != "" || pass != "" {
-			token, err = requestAuthToken(WwwAuthenticate, "", "")
+			token, expiresIn, err = requestAuthToken(WwwAuthenticate, "", "")
 			if err == nil {
 				// happy path without auth
+				setCachedToken(cacheKey, token, expiresIn)
 				return token, nil
 			}
 		}
@@ -969,7 +1031,7 @@ func parseBearerToken(token string) (realm string, options map[string]string, er
 	return
 }
 
-func requestAuthToken(token, user, pass string) (authToken string, err error) {
+func requestAuthToken(token, user, pass string) (authToken string, expiresIn int, err error) {
 	realm, options, err := parseBearerToken(token)
 	if err != nil {
 		return
@@ -980,7 +1042,7 @@ func requestAuthToken(token, user, pass string) (authToken string, err error) {
 	for attempt := 0; attempt <= rateLimitMaxRetries; attempt++ {
 		req, reqErr := http.NewRequest("GET", realm, nil)
 		if reqErr != nil {
-			return "", reqErr
+			return "", 0, reqErr
 		}
 
 		query := req.URL.Query()
@@ -1025,10 +1087,16 @@ func requestAuthToken(token, user, pass string) (authToken string, err error) {
 			resp.Body.Close()
 			return
 		}
+		// Extract expires_in if present (typically 300s for Docker Hub)
+		if expiresInInterface, ok := jsonResp["expires_in"]; ok {
+			if v, ok := expiresInInterface.(float64); ok {
+				expiresIn = int(v)
+			}
+		}
 		resp.Body.Close()
 		return
 	}
-	return "", fmt.Errorf("max retries exceeded for rate limiting")
+	return "", 0, fmt.Errorf("max retries exceeded for rate limiting")
 }
 
 type LayerDownloader struct {
