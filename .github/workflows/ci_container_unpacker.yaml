@@ -63,9 +63,9 @@ jobs:
           ./ci/build_package.sh $PWD /tmp/build-ubuntu cvmfs
       - name: Install packages
         run: |
-          sudo apt-get -y remove "cvmfs*"
           sudo apt-get -y install /tmp/build-ubuntu*/*.deb
           sudo cvmfs_config setup
+          sudo systemctl stop autofs
           sudo systemctl start apache2
           sudo systemctl status apache2
       - name: Setup Go
