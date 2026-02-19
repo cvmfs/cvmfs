@@ -64,4 +64,3 @@ func TestIsInIgnoreList(t *testing.T) {
 		})
 	}
 }
-
