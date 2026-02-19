@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
+
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
@@ -73,6 +75,8 @@ var convertSingleImageCmd = &cobra.Command{
 			"repository":     wish.CvmfsRepo,
 			"total attempts": attempts}
 
+		var conversionErrors []string
+
 		if !skipFlat {
 			for i := 0; i < attempts; i++ {
 				err = lib.ConvertWishFlat(wish)
@@ -87,8 +91,8 @@ var convertSingleImageCmd = &cobra.Command{
 			}
 
 			if err != nil {
-				log.Error("Multiple Errors in converting singularity image")
-				return err
+				log.Error("Multiple Errors in converting singularity image, going on")
+				conversionErrors = append(conversionErrors, fmt.Sprintf("singularity: %s", err))
 			}
 		}
 
@@ -105,8 +109,8 @@ var convertSingleImageCmd = &cobra.Command{
 				}
 			}
 			if err != nil {
-				log.Error("Multiple Errors in converting layers")
-				return err
+				log.Error("Multiple Errors in converting layers, going on")
+				conversionErrors = append(conversionErrors, fmt.Sprintf("layers: %s", err))
 			}
 		}
 
@@ -123,8 +127,8 @@ var convertSingleImageCmd = &cobra.Command{
 				}
 			}
 			if err != nil {
-				log.Error("Multiple Errors in converting wish (docker)")
-				return err
+				log.Error("Multiple Errors in converting wish (docker), going on")
+				conversionErrors = append(conversionErrors, fmt.Sprintf("docker: %s", err))
 			}
 		}
 
@@ -141,9 +145,14 @@ var convertSingleImageCmd = &cobra.Command{
 				}
 			}
 			if err != nil {
-				log.Error("Multiple Errors in converting wish (podman)")
-				return err
+				log.Error("Multiple Errors in converting wish (podman), going on")
+				conversionErrors = append(conversionErrors, fmt.Sprintf("podman: %s", err))
 			}
+		}
+		if len(conversionErrors) > 0 {
+			summary := fmt.Sprintf("%d conversion error(s) for %s:\n  %s", len(conversionErrors), wish.InputName, strings.Join(conversionErrors, "\n  "))
+			l.Log().Error(summary)
+			return fmt.Errorf("%s", summary)
 		}
 		return nil
 	},
