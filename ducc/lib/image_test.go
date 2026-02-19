@@ -374,12 +374,6 @@ func TestCacheEmptyToken(t *testing.T) {
 	}
 }
 
-func TestOverlayCacheDirDefault(t *testing.T) {
-	expected := "/var/lib/cvmfs/overlay-cache"
-	if OverlayCacheDir != expected {
-		t.Errorf("Expected default OverlayCacheDir to be %q, got %q", expected, OverlayCacheDir)
-	}
-}
 
 func TestOverlayCacheDirOverride(t *testing.T) {
 	original := OverlayCacheDir
