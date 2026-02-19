@@ -374,7 +374,6 @@ func TestCacheEmptyToken(t *testing.T) {
 	}
 }
 
-
 func TestOverlayCacheDirOverride(t *testing.T) {
 	original := OverlayCacheDir
 	defer func() { OverlayCacheDir = original }()
