@@ -215,7 +215,7 @@ cvmfs_run_test() {
     $CVMFS_TEST_REPO || return 60
 
   # Verify cache files were created
-  local cache_files=$(ls "$cache_dir"/*.cache 2>/dev/null | wc -l)
+  local cache_files=$(ls "$cache_dir"/*.cache.db 2>/dev/null | wc -l)
   [ "$cache_files" -ge 1 ] || return 62
 
   # Second run: should be a cache hit
