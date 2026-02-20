@@ -16,6 +16,7 @@ produce_base_layer() {
   echo "base binary" > layer1/bin/app
   echo "base library" > layer1/lib/libfoo.so
   echo "base config" > layer1/etc/app.conf
+  touch emptyfile
   chmod 755 layer1/bin/app
 
   popdir

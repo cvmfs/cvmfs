@@ -457,6 +457,21 @@ bool CommandOverlay::PublishMergedEntries(
   // content lives in its own catalog database file.  This also allows
   // StoreMergeInCache to simply copy the resulting DB instead of
   // re-inserting every entry.
+
+  // Add a .cvmfscatalog marker file 
+  catalog::DirectoryEntryBase catalog_marker;
+  catalog_marker.name_ = NameString(".cvmfscatalog");
+  catalog_marker.mode_ = (S_IFREG | 0666);
+  catalog_marker.size_ = 0;
+  catalog_marker.mtime_ = time(NULL);
+  catalog_marker.uid_ = 0;
+  catalog_marker.gid_ = 0;
+  catalog_marker.linkcount_ = 1;
+  // Hash of the compressed empty file
+  catalog_marker.checksum_ = shash::MkFromHexPtr(
+            shash::HexPtr("e8ec3d88b62ebf526e4e5a4ff6162a3aa48a6b78"),
+            shash::kSuffixNone);  // hash of ""
+  catalog_mgr->AddFile(catalog_marker, XattrList(), dest_path_rel);
   // CreateNestedCatalog calls MakeRelativePath internally which prepends '/'.
   // Pass the stripped version to avoid a double leading slash.
   catalog_mgr->CreateNestedCatalog(dest_path_rel);
