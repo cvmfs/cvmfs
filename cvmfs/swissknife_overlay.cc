@@ -108,7 +108,7 @@ bool CommandOverlay::CheckCachedMerge(
   merged->clear();
 
   // Helper function to recursively read entries from a catalog path
-  bool success = ReadCatalogEntries(cached_catalog, "", "", "", "", merged);
+  const bool success = ReadCatalogEntries(cached_catalog, "", "", "", "", merged);
 
   delete cached_catalog;
 
