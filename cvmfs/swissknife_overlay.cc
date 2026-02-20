@@ -135,7 +135,7 @@ bool CommandOverlay::StoreMergeInCache(
 
   MkdirDeep(cache_dir, 0755);
 
-  const string cache_path = cache_dir + "/" + cache_key + "cache.db";
+  const string cache_path = cache_dir + "/" + cache_key + ".cache.db";
 
   // The nested catalog at dest_path already contains the complete set of
   // merged entries (created by PublishMergedEntries).  Simply copy its
