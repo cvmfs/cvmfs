@@ -137,6 +137,9 @@ cvmfs_server_overlay() {
   echo "Tagging $name"
   $user_shell "$tag_command" || { publish_failed $name; cvmfs_server_abort -f $name; die "Tagging failed\n\nExecuted Command:\n$tag_command"; }
 
+
+  echo "Flushing file system buffers"
+  sync
   # Finalize
   echo "Signing new manifest"
   sign_manifest $name $manifest      || { publish_failed $name; cvmfs_server_abort -f $name; die "Signing failed"; }
