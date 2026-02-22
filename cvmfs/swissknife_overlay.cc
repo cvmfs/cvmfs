@@ -205,6 +205,15 @@ bool CommandOverlay::ReadCatalogEntries(
   for (size_t i = 0; i < listing.size(); ++i) {
     const catalog::DirectoryEntry &dirent = listing[i];
     const string name = dirent.name().ToString();
+
+    // Skip CVMFS bookkeeping files — they are internal metadata and must not
+    // be carried over into the merged overlay.  PublishMergedEntries() will
+    // create its own .cvmfscatalog marker for the destination catalog.
+    if (name == ".cvmfscatalog" || name == ".cvmfsdirtab"
+        || name == ".cvmfsautocatalog") {
+      continue;
+    }
+
     const string child_catalog_path =
         catalog_root_path.empty() ? "/" + name : catalog_root_path + "/" + name;
     const string child_relative =

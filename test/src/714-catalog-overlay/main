@@ -223,9 +223,11 @@ cvmfs_run_test() {
     -l "layer1,layer2" \
     -d "/overlay_test6b" \
     -c "$cache_dir" \
-    $CVMFS_TEST_REPO 2>&1 | grep -q "Cache hit" || return 63
+    $CVMFS_TEST_REPO  | tee test714_6b.log   || return 63
 
-  check_repository $CVMFS_TEST_REPO -i || return 64
+  grep -q "Cache hit" test714_6b.log || return 64
+
+  check_repository $CVMFS_TEST_REPO -i || return 65
   echo "*** TEST 6 passed: cache hit/miss"
 
   # ============================================================================

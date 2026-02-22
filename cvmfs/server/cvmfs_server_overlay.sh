@@ -106,6 +106,12 @@ cvmfs_server_overlay() {
 
   # ---> do it!
   publish_before_hook $name
+
+  # check if we have open file descriptors on /cvmfs/<name>
+  [ $(count_wr_fds /cvmfs/$name) -eq 0 ] || { cvmfs_server_abort -f $name; die "Open writable file descriptors on $name"; }
+  local use_fd_fallback=0
+  handle_read_only_file_descriptors_on_mount_point $name $open_fd_dialog || use_fd_fallback=1
+
   publish_starting $name
 
   $user_shell "$overlay_command" || { publish_failed $name; cvmfs_server_abort -f $name; die "Overlay merge failed\n\nExecuted Command:\n$overlay_command"; }
@@ -114,7 +120,7 @@ cvmfs_server_overlay() {
   local trunk_hash=$(grep "^C" $manifest | tr -d C)
 
   if [ x"$upstream_type" = xgw ]; then
-    close_transaction $name 0
+    close_transaction $name $use_fd_fallback
     publish_after_hook $name
     publish_succeeded $name
     echo "Changes submitted to repository gateway"
@@ -145,8 +151,17 @@ cvmfs_server_overlay() {
   sign_manifest $name $manifest      || { publish_failed $name; cvmfs_server_abort -f $name; die "Signing failed"; }
   set_ro_root_hash $name $trunk_hash || { publish_failed $name; cvmfs_server_abort -f $name; die "Root hash update failed"; }
 
-  echo "Remounting newly created repository revision"
-  close_transaction $name 0
+  # check again for open file descriptors (potential race condition)
+  if has_file_descriptors_on_mount_point $name && \
+     [ $use_fd_fallback -ne 1 ]; then
+    file_descriptor_warning $name
+    echo "Forcing remount of already committed repository revision"
+    use_fd_fallback=1
+  else
+    echo "Remounting newly created repository revision"
+  fi
+
+  close_transaction $name $use_fd_fallback
   publish_after_hook $name
   publish_succeeded  $name
 }
