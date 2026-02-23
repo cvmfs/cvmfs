@@ -2,12 +2,15 @@
  * This file is part of the CernVM File System.
  *
  * Swissknife command for performing catalog-level overlays of multiple
- * subdirectories from a CVMFS repository, similar to how OverlayFS or
+ * subdirectories from a CVMFS repository, similar to OverlayFS or how
  * container engines merge container image layers.
  *
- * The overlay tool merges the catalog entries of multiple layer subdirectories
- * and publishes the result as a new subdirectory in the CVMFS repository,
- * following the same publish workflow as swissknife sync/ingest.
+ * The overlay tool merges the catalog entries of multiple layer subdirectories,
+ * typically corresponding to container layers, and publishes the result as 
+ * a new subdirectory in the CVMFS repository, typically corresponding to the flat 
+ * root file system of the container image. 
+ * 
+ * The publish workflow is taken from swissknife ingest.
  */
 
 #ifndef CVMFS_SWISSKNIFE_OVERLAY_H_
