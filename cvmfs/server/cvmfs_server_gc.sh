@@ -318,6 +318,11 @@ __do_gc_cmd()
       return 0
     fi
     is_garbage_collectable $name || die "Garbage Collection is not enabled for $name"
+    if is_stratum0 $name; then
+      if [ x"$(get_repo_info_from_url $CVMFS_STRATUM0 -g)" != x"yes" ]; then
+        die "Garbage collection is enabled in server.conf but not yet in the repository manifest. Run 'cvmfs_server transaction $name && cvmfs_server publish $name' to update the manifest, then retry."
+      fi
+    fi
     is_owner_or_root       $name || die "Permission denied: Repository $name is owned by $user"
 
     # figure out the URL of the repository
