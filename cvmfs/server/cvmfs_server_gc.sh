@@ -164,6 +164,12 @@ cvmfs_server_gc() {
     if [ $reconstruct_reflog -eq 1 ]; then reflog_reconstruct_msg="yes"; fi
 
     echo "Affected Repositories:         $names"
+    for _gc_name in $names; do
+      load_repo_config $_gc_name
+      if [ x"$CVMFS_GARBAGE_COLLECTION" != x"true" ]; then
+        echo "  WARNING: CVMFS_GARBAGE_COLLECTION is not enabled for $_gc_name"
+      fi
+    done
     echo "Dry Run (no actual deletion):  $dry_run_msg"
     echo "Needs Reflog reconstruction:   $reflog_reconstruct_msg"
     if [ $preserve_revisions -ge 0 ]; then
