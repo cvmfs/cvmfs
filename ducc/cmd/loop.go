@@ -82,14 +82,14 @@ var loopCmd = &cobra.Command{
 				// Check if this wish is in the ignore errors list
 				isIgnored := isInIgnoreList(wish.InputName, recipe.IgnoreErrorsList)
 
-        err = lib.ConvertWish(wish, convertAgain, overwriteLayer)
-        if err != nil {
-          if isIgnored {
-            l.LogE(err).WithFields(fields).Warning("Error in converting wish (layers), but image is in ignoreErrors list")
-          } else {
-            l.LogE(err).WithFields(fields).Error("Error in converting wish (layers), going on")
-            conversionErrors = append(conversionErrors, fmt.Sprintf("[%s] layers: %s", wish.InputName, err))
-          }
+				err = lib.ConvertWish(wish, convertAgain, overwriteLayer)
+				if err != nil {
+					if isIgnored {
+						l.LogE(err).WithFields(fields).Warning("Error in converting wish (layers), but image is in ignoreErrors list")
+					} else {
+						l.LogE(err).WithFields(fields).Error("Error in converting wish (layers), going on")
+						conversionErrors = append(conversionErrors, fmt.Sprintf("[%s] layers: %s", wish.InputName, err))
+					}
 				}
 				if !skipThinImage {
 					err = lib.ConvertWishDocker(wish)
