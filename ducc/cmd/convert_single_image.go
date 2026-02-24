@@ -19,7 +19,7 @@ var (
 
 func init() {
 	convertSingleImageCmd.Flags().BoolVarP(&skipFlat, "skip-flat", "s", false, "do not create a flat images (compatible with singularity)")
-	convertSingleImageCmd.Flags().BoolVarP(&skipLayers, "skip-layers", "d", false, "do not unpack the layers into the repository, implies --skip-thin-image and --skip-podman")
+	convertSingleImageCmd.Flags().BoolVarP(&skipLayers, "skip-layers", "d", false, "[DEPRECATED] this option is no longer functional, layers will be unpacked regardless. Use `docker save` and `cvmfs_server ingest` if you only need the flat image.")
 	convertSingleImageCmd.Flags().BoolVarP(&skipThinImage, "skip-thin-image", "i", true, "do not create and push the docker thin image")
 	convertSingleImageCmd.Flags().BoolVarP(&skipPodman, "skip-podman", "p", true, "do not create podman image store")
 	convertSingleImageCmd.Flags().StringVarP(&username, "username", "u", "", "username to use when pushing thin image into the docker registry")
@@ -38,8 +38,8 @@ var convertSingleImageCmd = &cobra.Command{
 		inputImage := args[0]
 		cvmfsRepo := args[1]
 
-		if skipLayers == true {
-			l.Log().Info("Skipping the creation of the thin image and podman store since provided --skip-layers")
+		if skipLayers {
+			l.Log().Warn("--skip-layers is deprecated and no longer functional: layers will be unpacked regardless. If you only need the flat image, use `docker save` and `cvmfs_server ingest` instead.")
 			skipThinImage = true
 			skipPodman = true
 		}
@@ -77,22 +77,20 @@ var convertSingleImageCmd = &cobra.Command{
 
 		var conversionErrors []string
 
-		if !skipLayers {
-			for i := 0; i < attempts; i++ {
-				err = lib.ConvertWish(wish, convertAgain, overwriteLayer)
-				log := l.LogE(err).WithFields(fields).
-					WithFields(log.Fields{"attempts number": i})
-				if err != nil {
-					log.Warning("Could not convert wish (layers), trying again")
-				} else {
-					log.Info("Successfully converted the layers")
-					break
-				}
-			}
+		for i := 0; i < attempts; i++ {
+			err = lib.ConvertWish(wish, convertAgain, overwriteLayer)
+			log := l.LogE(err).WithFields(fields).
+				WithFields(log.Fields{"attempts number": i})
 			if err != nil {
-				log.Error("Multiple Errors in converting layers, going on")
-				conversionErrors = append(conversionErrors, fmt.Sprintf("layers: %s", err))
+				log.Warning("Could not convert wish (layers), trying again")
+			} else {
+				log.Info("Successfully converted the layers")
+				break
 			}
+		}
+		if err != nil {
+			log.Error("Multiple Errors in converting layers, going on")
+			conversionErrors = append(conversionErrors, fmt.Sprintf("layers: %s", err))
 		}
 
 		if !skipFlat {

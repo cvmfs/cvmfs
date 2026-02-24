@@ -20,7 +20,7 @@ func init() {
 	loopCmd.Flags().BoolVarP(&overwriteLayer, "overwrite-layers", "f", false, "overwrite the layer if they are already inside the CVMFS repository")
 	loopCmd.Flags().BoolVarP(&convertAgain, "convert-again", "g", false, "convert again images that are already successfully converted")
 	loopCmd.Flags().BoolVarP(&skipFlat, "skip-flat", "s", false, "do not create a flat images (compatible with singularity)")
-	loopCmd.Flags().BoolVarP(&skipLayers, "skip-layers", "d", false, "do not unpack the layers into the repository, implies --skip-thin-image and --skip-podman")
+	loopCmd.Flags().BoolVarP(&skipLayers, "skip-layers", "d", false, "[DEPRECATED] this option is no longer functional, layers will be unpacked regardless. Use `docker save` and `cvmfs_server ingest` if you only need the flat image.")
 	loopCmd.Flags().BoolVarP(&skipThinImage, "skip-thin-image", "i", false, "do not create and push the docker thin image")
 	loopCmd.Flags().BoolVarP(&skipPodman, "skip-podman", "p", false, "do not create podman image store")
 	rootCmd.AddCommand(loopCmd)
@@ -53,6 +53,10 @@ var loopCmd = &cobra.Command{
 			}
 		}
 
+		if skipLayers {
+			l.Log().Warn("--skip-layers is deprecated and no longer functional: layers will be unpacked regardless. If you only need the flat image, use `docker save` and `cvmfs_server ingest` instead.")
+		}
+
 		for {
 			data, err := ioutil.ReadFile(args[0])
 			if err != nil {
@@ -74,12 +78,10 @@ var loopCmd = &cobra.Command{
 					"repository":   wish.CvmfsRepo,
 					"output image": wish.OutputName}
 				l.Log().WithFields(fields).Info("Start conversion of wish")
-				if !skipLayers {
-					err = lib.ConvertWish(wish, convertAgain, overwriteLayer)
-					if err != nil {
-						l.LogE(err).WithFields(fields).Error("Error in converting wish (layers), going on")
-						conversionErrors = append(conversionErrors, fmt.Sprintf("[%s] layers: %s", wish.InputName, err))
-					}
+				err = lib.ConvertWish(wish, convertAgain, overwriteLayer)
+				if err != nil {
+					l.LogE(err).WithFields(fields).Error("Error in converting wish (layers), going on")
+					conversionErrors = append(conversionErrors, fmt.Sprintf("[%s] layers: %s", wish.InputName, err))
 				}
 				if !skipThinImage {
 					err = lib.ConvertWishDocker(wish)
