@@ -1181,9 +1181,8 @@ func (ld *LayerDownloader) DownloadAndIngest(CVMFSRepo string, layer da.Layer) e
 
 // CreateFlatOverlay uses cvmfs_server overlay to merge all image layers into a
 // flat filesystem. It returns the singularity path (relative to /cvmfs/$REPO)
-// where the merged image is placed. If cacheDir is non-empty, it is passed to
-// cvmfs_server overlay via the -c flag to use as a dedicated cache location.
-func (img *Image) CreateFlatOverlay(CVMFSRepo string, cacheDir string) (singularityPath string, err error) {
+// where the merged image is placed.
+func (img *Image) CreateFlatOverlay(CVMFSRepo string) (singularityPath string, err error) {
 	manifest, err := img.GetManifest()
 	if err != nil {
 		return
@@ -1212,7 +1211,7 @@ func (img *Image) CreateFlatOverlay(CVMFSRepo string, cacheDir string) (singular
 	t := time.Now()
 	n.AddField("action", "start_overlay_merge").Send()
 
-	err = cvmfs.Overlay(CVMFSRepo, layerPaths, singularityPath, cacheDir)
+	err = cvmfs.Overlay(CVMFSRepo, layerPaths, singularityPath)
 
 	n.Elapsed(t).
 		AddField("action", "end_overlay_merge").

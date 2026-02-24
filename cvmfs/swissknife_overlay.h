@@ -59,31 +59,6 @@ class CommandOverlay : public Command {
 
  private:
   /**
-   * Compute SHA-256 cache key from the ordered list of layer paths.
-   */
-  std::string ComputeCacheKey(const std::vector<std::string> &layers) const;
-
-  /**
-   * Check if a valid cached catalog exists for the given cache key.
-   * The cached catalog is stored as a SQLite database file containing
-   * the merged overlay entries, so that re-running the same layer
-   * combination can skip the merge computation.
-   */
-  bool CheckCachedMerge(const std::string &cache_dir,
-                        const std::string &cache_key,
-                        std::map<std::string, OverlayEntry> *merged);
-
-  /**
-   * Store the merge result in the cache by copying the nested catalog
-   * database that was created at dest_path during PublishMergedEntries.
-   */
-  bool StoreMergeInCache(
-      const std::string &cache_dir,
-      const std::string &cache_key,
-      catalog::WritableCatalogManager *catalog_mgr,
-      const std::string &dest_path) const;
-
-  /**
    * Recursively read all entries from a catalog rooted at the given path.
    * The entries are stored with paths relative to the layer root.
    * When a nested catalog mountpoint is encountered and repo_base/temp_dir

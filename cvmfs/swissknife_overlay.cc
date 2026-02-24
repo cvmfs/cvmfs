@@ -62,108 +62,12 @@ ParameterList CommandOverlay::GetParams() const {
                "(bottom-to-top order)"));
   r.push_back(Parameter::Mandatory('d', "destination subdirectory path in "
                "repository for the merged overlay"));
-  r.push_back(Parameter::Optional('c', "cache directory for intermediate "
-               "merge results"));
   r.push_back(Parameter::Optional('e', "hash algorithm (default: sha1)"));
   r.push_back(Parameter::Optional('Z', "compression algorithm "
                "(default: zlib)"));
   r.push_back(Parameter::Optional('@', "proxy URL"));
-  r.push_back(Parameter::Switch('f', "force refresh (ignore cache)"));
   r.push_back(Parameter::Switch('L', "follow HTTP redirects"));
   return r;
-}
-
-
-string CommandOverlay::ComputeCacheKey(
-    const vector<string> &layers) const {
-  string combined;
-  for (size_t i = 0; i < layers.size(); ++i) {
-    if (i > 0) combined += "\n";
-    combined += layers[i];
-  }
-  return shash::Sha256String(combined);
-}
-
-
-bool CommandOverlay::CheckCachedMerge(
-    const string &cache_dir,
-    const string &cache_key,
-    map<string, OverlayEntry> *merged) {
-  if (cache_dir.empty()) return false;
-
-  const string cache_path = cache_dir + "/" + cache_key + ".cache.db";
-  if (!FileExists(cache_path)) return false;
-
-  // Open the cached catalog database
-  catalog::WritableCatalog *cached_catalog =
-      catalog::WritableCatalog::AttachFreely(
-          "", cache_path, shash::Any(shash::kSha1));
-  if (cached_catalog == NULL) {
-    LogCvmfs(kLogCvmfs, kLogStderr,
-             "Failed to open cached catalog: %s", cache_path.c_str());
-    return false;
-  }
-
-  // Read all entries from the cached catalog
-  merged->clear();
-
-  // Helper function to recursively read entries from a catalog path
-  const bool success = ReadCatalogEntries(cached_catalog, "", "", "", "", merged);
-
-  delete cached_catalog;
-
-  if (!success) {
-    LogCvmfs(kLogCvmfs, kLogStderr,
-             "Failed to read entries from cached catalog: %s",
-             cache_path.c_str());
-    return false;
-  }
-
-  LogCvmfs(kLogCvmfs, kLogStdout,
-           "Cache hit for key %s (%zu entries)",
-           cache_key.c_str(), merged->size());
-  return true;
-}
-
-
-bool CommandOverlay::StoreMergeInCache(
-    const string &cache_dir,
-    const string &cache_key,
-    catalog::WritableCatalogManager *catalog_mgr,
-    const string &dest_path) const {
-  if (cache_dir.empty()) return false;
-
-  MkdirDeep(cache_dir, 0755);
-
-  const string cache_path = cache_dir + "/" + cache_key + ".cache.db";
-
-  // The nested catalog at dest_path already contains the complete set of
-  // merged entries (created by PublishMergedEntries).  Simply copy its
-  // database file into the cache.
-  // GetHostingCatalog calls MakeRelativePath internally which prepends '/'.
-  // Strip any leading '/' to avoid a double leading slash.
-  const string dest_path_rel = (!dest_path.empty() && dest_path[0] == '/')
-      ? dest_path.substr(1) : dest_path;
-  catalog::WritableCatalog *nested_catalog =
-      catalog_mgr->GetHostingCatalog(dest_path_rel);
-  if (nested_catalog == NULL) {
-    LogCvmfs(kLogCvmfs, kLogStderr,
-             "Failed to find nested catalog for cache: %s",
-             dest_path.c_str());
-    return false;
-  }
-
-  const string db_path = nested_catalog->database_path();
-  if (!CopyPath2Path(db_path, cache_path)) {
-    LogCvmfs(kLogCvmfs, kLogStderr,
-             "Failed to copy nested catalog to cache: %s -> %s",
-             db_path.c_str(), cache_path.c_str());
-    return false;
-  }
-
-  LogCvmfs(kLogCvmfs, kLogStdout, "Stored merge result in cache: %s",
-           cache_key.c_str());
-  return true;
 }
 
 
@@ -463,9 +367,7 @@ bool CommandOverlay::PublishMergedEntries(
   }
 
   // Turn the destination directory into a nested catalog so that the overlay
-  // content lives in its own catalog database file.  This also allows
-  // StoreMergeInCache to simply copy the resulting DB instead of
-  // re-inserting every entry.
+  // content lives in its own catalog database file.
 
   // Add a .cvmfscatalog marker file 
   catalog::DirectoryEntryBase catalog_marker;
@@ -636,10 +538,6 @@ int CommandOverlay::Main(const ArgumentList &args) {
   if (dest_path.empty() || dest_path[0] != '/') {
     dest_path = "/" + dest_path;
   }
-  const string cache_dir =
-      (args.count('c') > 0) ? *args.find('c')->second : "";
-  const bool force_refresh = (args.count('f') > 0);
-
   shash::Algorithms hash_algorithm = shash::kSha1;
   if (args.find('e') != args.end()) {
     hash_algorithm = shash::ParseHashAlgorithm(*args.find('e')->second);
@@ -718,57 +616,64 @@ int CommandOverlay::Main(const ArgumentList &args) {
   LogCvmfs(kLogCvmfs, kLogStdout, "Root catalog hash: %s",
            old_root_hash.c_str());
 
-  // Check merge cache first (unless force refresh)
-  const string cache_key = ComputeCacheKey(layers);
+  // Load root catalog for reading layer entries
   map<string, OverlayEntry> merged;
-  bool cache_hit = false;
-
-  if (!force_refresh && !cache_dir.empty()) {
-    cache_hit = CheckCachedMerge(cache_dir, cache_key, &merged);
+  catalog::Catalog *root_catalog = LoadCatalogForPath(
+      stratum0, "", temp_dir, manifest->catalog_hash());
+  if (root_catalog == NULL) {
+    PrintError("Failed to load root catalog");
+    return 1;
   }
 
-  if (!cache_hit) {
-    // Load root catalog for reading layer entries
-    catalog::Catalog *root_catalog = LoadCatalogForPath(
-        stratum0, "", temp_dir, manifest->catalog_hash());
-    if (root_catalog == NULL) {
-      PrintError("Failed to load root catalog");
+  // Process layers bottom-to-top
+  for (size_t i = 0; i < layers.size(); ++i) {
+    string layer_path = MakeCanonicalPath(layers[i]);
+    // Ensure layer path starts with exactly one '/'
+    while (layer_path.length() > 1
+           && layer_path[0] == '/' && layer_path[1] == '/') {
+      layer_path = layer_path.substr(1);
+    }
+    if (layer_path.empty() || layer_path[0] != '/') {
+      layer_path = "/" + layer_path;
+    }
+
+    LogCvmfs(kLogCvmfs, kLogStdout, "Processing layer %zu: %s",
+             i, layer_path.c_str());
+
+    map<string, OverlayEntry> layer_entries;
+
+    // Find the catalog that contains this layer path (may be nested)
+    vector<catalog::Catalog *> loaded_catalogs;
+    catalog::Catalog *layer_catalog = FindCatalogForLayer(
+        stratum0, temp_dir, root_catalog, layer_path, &loaded_catalogs);
+    if (layer_catalog == NULL) {
+      for (size_t j = 0; j < loaded_catalogs.size(); ++j)
+        delete loaded_catalogs[j];
+      delete root_catalog;
       return 1;
     }
 
-    // Process layers bottom-to-top
-    for (size_t i = 0; i < layers.size(); ++i) {
-      string layer_path = MakeCanonicalPath(layers[i]);
-      // Ensure layer path starts with exactly one '/'
-      while (layer_path.length() > 1
-             && layer_path[0] == '/' && layer_path[1] == '/') {
-        layer_path = layer_path.substr(1);
-      }
-      if (layer_path.empty() || layer_path[0] != '/') {
-        layer_path = "/" + layer_path;
-      }
-      
-      LogCvmfs(kLogCvmfs, kLogStdout, "Processing layer %zu: %s",
-               i, layer_path.c_str());
+    catalog::DirectoryEntry subdir_entry;
+    const PathString ps_layer_path(layer_path.data(), layer_path.length());
+    if (!layer_catalog->LookupPath(ps_layer_path, &subdir_entry)) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "Unexpected: layer path not found after catalog resolution: %s",
+               layer_path.c_str());
+      for (size_t j = 0; j < loaded_catalogs.size(); ++j)
+        delete loaded_catalogs[j];
+      delete root_catalog;
+      return 1;
+    }
 
-      map<string, OverlayEntry> layer_entries;
-
-      // Find the catalog that contains this layer path (may be nested)
-      vector<catalog::Catalog *> loaded_catalogs;
-      catalog::Catalog *layer_catalog = FindCatalogForLayer(
-          stratum0, temp_dir, root_catalog, layer_path, &loaded_catalogs);
-      if (layer_catalog == NULL) {
-        for (size_t j = 0; j < loaded_catalogs.size(); ++j)
-          delete loaded_catalogs[j];
-        delete root_catalog;
-        return 1;
-      }
-
-      catalog::DirectoryEntry subdir_entry;
-      const PathString ps_layer_path(layer_path.data(), layer_path.length());
-      if (!layer_catalog->LookupPath(ps_layer_path, &subdir_entry)) {
+    // Check if the layer path itself is a nested catalog mountpoint;
+    // if so, load that catalog and read its entries.
+    if (subdir_entry.IsNestedCatalogMountpoint()) {
+      shash::Any nested_hash;
+      uint64_t nested_size;
+      if (!layer_catalog->FindNested(ps_layer_path, &nested_hash,
+                                     &nested_size)) {
         LogCvmfs(kLogCvmfs, kLogStderr,
-                 "Unexpected: layer path not found after catalog resolution: %s",
+                 "Failed to find nested catalog for %s",
                  layer_path.c_str());
         for (size_t j = 0; j < loaded_catalogs.size(); ++j)
           delete loaded_catalogs[j];
@@ -776,57 +681,40 @@ int CommandOverlay::Main(const ArgumentList &args) {
         return 1;
       }
 
-      // Check if the layer path itself is a nested catalog mountpoint;
-      // if so, load that catalog and read its entries.
-      if (subdir_entry.IsNestedCatalogMountpoint()) {
-        shash::Any nested_hash;
-        uint64_t nested_size;
-        if (!layer_catalog->FindNested(ps_layer_path, &nested_hash,
-                                       &nested_size)) {
-          LogCvmfs(kLogCvmfs, kLogStderr,
-                   "Failed to find nested catalog for %s",
-                   layer_path.c_str());
-          for (size_t j = 0; j < loaded_catalogs.size(); ++j)
-            delete loaded_catalogs[j];
-          delete root_catalog;
-          return 1;
-        }
-
-        catalog::Catalog *nested_catalog = LoadCatalogForPath(
-            stratum0, layer_path, temp_dir, nested_hash);
-        if (nested_catalog == NULL) {
-          LogCvmfs(kLogCvmfs, kLogStderr,
-                   "Failed to load nested catalog for %s",
-                   layer_path.c_str());
-          for (size_t j = 0; j < loaded_catalogs.size(); ++j)
-            delete loaded_catalogs[j];
-          delete root_catalog;
-          return 1;
-        }
-
-        ReadCatalogEntries(nested_catalog, layer_path, "",
-                           stratum0, temp_dir, &layer_entries);
-        delete nested_catalog;
-      } else {
-        ReadCatalogEntries(layer_catalog, layer_path, "",
-                           stratum0, temp_dir, &layer_entries);
+      catalog::Catalog *nested_catalog = LoadCatalogForPath(
+          stratum0, layer_path, temp_dir, nested_hash);
+      if (nested_catalog == NULL) {
+        LogCvmfs(kLogCvmfs, kLogStderr,
+                 "Failed to load nested catalog for %s",
+                 layer_path.c_str());
+        for (size_t j = 0; j < loaded_catalogs.size(); ++j)
+          delete loaded_catalogs[j];
+        delete root_catalog;
+        return 1;
       }
 
-      // Clean up any intermediate catalogs loaded during hierarchy walk
-      for (size_t j = 0; j < loaded_catalogs.size(); ++j)
-        delete loaded_catalogs[j];
-
-      LogCvmfs(kLogCvmfs, kLogStdout, "  Read %zu entries from layer %s",
-               layer_entries.size(), layer_path.c_str());
-
-      MergeLayer(layer_entries, &merged);
-
-      LogCvmfs(kLogCvmfs, kLogStdout, "  Merged total: %zu entries",
-               merged.size());
+      ReadCatalogEntries(nested_catalog, layer_path, "",
+                         stratum0, temp_dir, &layer_entries);
+      delete nested_catalog;
+    } else {
+      ReadCatalogEntries(layer_catalog, layer_path, "",
+                         stratum0, temp_dir, &layer_entries);
     }
 
-    delete root_catalog;
+    // Clean up any intermediate catalogs loaded during hierarchy walk
+    for (size_t j = 0; j < loaded_catalogs.size(); ++j)
+      delete loaded_catalogs[j];
+
+    LogCvmfs(kLogCvmfs, kLogStdout, "  Read %zu entries from layer %s",
+             layer_entries.size(), layer_path.c_str());
+
+    MergeLayer(layer_entries, &merged);
+
+    LogCvmfs(kLogCvmfs, kLogStdout, "  Merged total: %zu entries",
+             merged.size());
   }
+
+  delete root_catalog;
 
   // Set up WritableCatalogManager and publish merged entries
   LogCvmfs(kLogCvmfs, kLogStdout,
@@ -848,11 +736,6 @@ int CommandOverlay::Main(const ArgumentList &args) {
   if (!PublishMergedEntries(&catalog_manager, merged, dest_path)) {
     PrintError("Failed to publish merged entries");
     return 5;
-  }
-
-  // Cache the nested catalog that PublishMergedEntries created at dest_path
-  if (!cache_hit && !cache_dir.empty()) {
-    StoreMergeInCache(cache_dir, cache_key, &catalog_manager, dest_path);
   }
 
   // Commit catalog changes and produce updated manifest

@@ -487,9 +487,7 @@ func removeHashMarkerIfPresent(digest string) string {
 // a single flat image directory. The layers should be provided in bottom-to-top
 // order (base layer first). The destPath is the path inside the CVMFS repository
 // where the merged result will be placed (without the /cvmfs/$REPO prefix).
-// If cacheDir is non-empty, it is passed via the -c flag to cvmfs_server overlay
-// and the directory is created if it does not already exist.
-func Overlay(CVMFSRepo string, layerPaths []string, destPath string, cacheDir string) error {
+func Overlay(CVMFSRepo string, layerPaths []string, destPath string) error {
 	if len(layerPaths) == 0 {
 		return fmt.Errorf("no layer paths provided for overlay")
 	}
@@ -498,34 +496,22 @@ func Overlay(CVMFSRepo string, layerPaths []string, destPath string, cacheDir st
 
 	llog := func(ll *log.Entry) *log.Entry {
 		return ll.WithFields(log.Fields{
-			"action":   "overlay",
-			"repo":     CVMFSRepo,
-			"layers":   layers,
-			"dest":     destPath,
-			"cacheDir": cacheDir,
+			"action": "overlay",
+			"repo":   CVMFSRepo,
+			"layers": layers,
+			"dest":   destPath,
 		})
 	}
 
 	llog(l.Log()).Info("Starting overlay merge")
-
-	// Ensure the cache directory exists if specified
-	if cacheDir != "" {
-		if err := os.MkdirAll(cacheDir, 0755); err != nil {
-			llog(l.LogE(err)).Error("Error creating overlay cache directory")
-			return err
-		}
-	}
 
 	getLock(CVMFSRepo)
 	defer unlock(CVMFSRepo)
 
 	args := []string{"cvmfs_server", "overlay",
 		"-l", layers,
-		"-d", destPath}
-	if cacheDir != "" {
-		args = append(args, "-c", cacheDir)
-	}
-	args = append(args, CVMFSRepo)
+		"-d", destPath,
+		CVMFSRepo}
 
 	err := exec.ExecCommand(args...).Start()
 	if err != nil {

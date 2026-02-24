@@ -29,16 +29,6 @@ import (
 
 var NoPasswordError = 101
 
-// OverlayCacheDir is the path to the cache directory used by cvmfs_server overlay.
-// If empty, no -c flag is passed to cvmfs_server overlay.
-var OverlayCacheDir = "/var/tmp/cvmfs/overlay-cache"
-
-func init() {
-	if ocd := os.Getenv("DUCC_OVERLAY_CACHE_DIR"); ocd != "" {
-		OverlayCacheDir = ocd
-	}
-}
-
 type ConversionResult int
 
 const (
@@ -139,7 +129,7 @@ func ConvertWishFlat(wish WishFriendly) error {
 		i = i.Action("end_flat_overlay_conversion")
 
 		// Use cvmfs_server overlay to merge layers into a flat image
-		_, err = inputImage.CreateFlatOverlay(wish.CvmfsRepo, OverlayCacheDir)
+		_, err = inputImage.CreateFlatOverlay(wish.CvmfsRepo)
 		if err != nil {
 			if firstError == nil {
 				firstError = err

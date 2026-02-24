@@ -374,17 +374,4 @@ func TestCacheEmptyToken(t *testing.T) {
 	}
 }
 
-func TestOverlayCacheDirOverride(t *testing.T) {
-	original := OverlayCacheDir
-	defer func() { OverlayCacheDir = original }()
 
-	OverlayCacheDir = "/custom/cache/path"
-	if OverlayCacheDir != "/custom/cache/path" {
-		t.Errorf("Expected OverlayCacheDir to be /custom/cache/path, got %q", OverlayCacheDir)
-	}
-
-	OverlayCacheDir = ""
-	if OverlayCacheDir != "" {
-		t.Errorf("Expected OverlayCacheDir to be empty, got %q", OverlayCacheDir)
-	}
-}

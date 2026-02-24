@@ -99,7 +99,6 @@ produce_multi_layers() {
 cvmfs_run_test() {
   logfile=$1
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
-  local scratch_dir=$(pwd)
 
   echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
@@ -200,63 +199,17 @@ cvmfs_run_test() {
   echo "*** TEST 5 passed: multi-layer overlay"
 
   # ============================================================================
-  # TEST 6: Cache hit/miss scenarios
+  # TEST 6: Combined whiteout + opaque + override multi-layer
   # ============================================================================
 
-  echo "*** TEST 6: Cache behavior"
-  local cache_dir="${scratch_dir}/overlay_cache"
-  mkdir -p "$cache_dir"
-
-  # First run: cache miss - should generate and store
-  cvmfs_server overlay \
-    -l "layer1,layer2" \
-    -d "/overlay_test6a" \
-    -c "$cache_dir" \
-    $CVMFS_TEST_REPO || return 60
-
-  # Verify cache files were created
-  local cache_files=$(ls "$cache_dir"/*.cache.db 2>/dev/null | wc -l)
-  [ "$cache_files" -ge 1 ] || return 62
-
-  # Second run: should be a cache hit
-  cvmfs_server overlay \
-    -l "layer1,layer2" \
-    -d "/overlay_test6b" \
-    -c "$cache_dir" \
-    $CVMFS_TEST_REPO  | tee test714_6b.log   || return 63
-
-  grep -q "Cache hit" test714_6b.log || return 64
-
-  check_repository $CVMFS_TEST_REPO -i || return 65
-  echo "*** TEST 6 passed: cache hit/miss"
-
-  # ============================================================================
-  # TEST 7: Cache invalidation (force refresh)
-  # ============================================================================
-
-  echo "*** TEST 7: Cache invalidation"
-  cvmfs_server overlay \
-    -l "layer1,layer2" \
-    -d "/overlay_test7" \
-    -c "$cache_dir" \
-    -f \
-    $CVMFS_TEST_REPO || return 70
-
-  check_repository $CVMFS_TEST_REPO -i || return 71
-  echo "*** TEST 7 passed: cache invalidation"
-
-  # ============================================================================
-  # TEST 8: Combined whiteout + opaque + override multi-layer
-  # ============================================================================
-
-  echo "*** TEST 8: Combined multi-layer with all features"
+  echo "*** TEST 6: Combined multi-layer with all features"
   cvmfs_server overlay \
     -l "layer1,layer2,layer3,layer4" \
-    -d "/overlay_test8" \
-    $CVMFS_TEST_REPO || return 80
+    -d "/overlay_test6" \
+    $CVMFS_TEST_REPO || return 60
 
-  check_repository $CVMFS_TEST_REPO -i || return 81
-  echo "*** TEST 8 passed: combined multi-layer"
+  check_repository $CVMFS_TEST_REPO -i || return 61
+  echo "*** TEST 6 passed: combined multi-layer"
 
   # ============================================================================
 

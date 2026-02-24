@@ -1417,7 +1417,6 @@ Supported Commands:
                   Use '-' as -t argument to read the tarball from STDIN.
   overlay         -l <layer1,layer2,...> (comma-separated, bottom-to-top order)
                   -d <destination path>
-                  [-c <cache directory>] [-f force refresh]
                   <fully qualified name>
                   Merge multiple subdirectory catalogs using overlay semantics
                   and publish the result under the destination path.

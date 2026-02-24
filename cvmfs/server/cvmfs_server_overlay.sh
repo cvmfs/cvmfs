@@ -13,8 +13,6 @@
 cvmfs_server_overlay() {
   local layers=""
   local dest_path=""
-  local cache_dir=""
-  local force_refresh=0
   local name=""
 
   while [ "$2" != "" ]; do
@@ -26,12 +24,6 @@ cvmfs_server_overlay() {
         dest_path=$2
         # remove any duplicated slashes in pathname
         dest_path=$(echo $dest_path | tr -s / )
-        ;;
-      -c | --cache-dir )
-        cache_dir=$2
-        ;;
-      -f | --force )
-        force_refresh=1
         ;;
     esac
     shift
@@ -95,14 +87,6 @@ cvmfs_server_overlay() {
     -Z $compression_alg                          \
     $(get_swissknife_proxy)                      \
     $(get_follow_http_redirects_flag)"
-
-  if [ ! x"$cache_dir" = "x" ]; then
-    overlay_command="$overlay_command -c $cache_dir"
-  fi
-
-  if [ $force_refresh -eq 1 ]; then
-    overlay_command="$overlay_command -f"
-  fi
 
   # ---> do it!
   publish_before_hook $name
