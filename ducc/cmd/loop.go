@@ -23,6 +23,7 @@ func init() {
 	loopCmd.Flags().BoolVarP(&skipLayers, "skip-layers", "d", false, "[DEPRECATED] this option is no longer functional, layers will be unpacked regardless. Use `docker save` and `cvmfs_server ingest` if you only need the flat image.")
 	loopCmd.Flags().BoolVarP(&skipThinImage, "skip-thin-image", "i", false, "do not create and push the docker thin image")
 	loopCmd.Flags().BoolVarP(&skipPodman, "skip-podman", "p", false, "do not create podman image store")
+	loopCmd.Flags().IntVar(&maxConcurrentDownloads, "max-concurrent-downloads", 0, "maximum number of layer downloads in parallel (0 means unlimited)")
 	rootCmd.AddCommand(loopCmd)
 }
 
@@ -82,7 +83,7 @@ var loopCmd = &cobra.Command{
 				// Check if this wish is in the ignore errors list
 				isIgnored := isInIgnoreList(wish.InputName, recipe.IgnoreErrorsList)
 
-				err = lib.ConvertWish(wish, convertAgain, overwriteLayer)
+				err = lib.ConvertWish(wish, convertAgain, overwriteLayer, maxConcurrentDownloads)
 				if err != nil {
 					if isIgnored {
 						l.LogE(err).WithFields(fields).Warning("Error in converting wish (layers), but image is in ignoreErrors list")

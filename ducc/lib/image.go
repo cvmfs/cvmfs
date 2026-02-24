@@ -851,7 +851,7 @@ func (d *downloadedLayer) GetSize() int64 {
 	return 0
 }
 
-func (img *Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan<- string, stopGettingLayers <-chan bool, rootPath string) error {
+func (img *Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan<- string, stopGettingLayers <-chan bool, rootPath string, maxConcurrentDownloads int) error {
 	defer close(layersChan)
 	defer close(manifestChan)
 
@@ -888,6 +888,13 @@ func (img *Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan
 	}()
 	defer func() { killKiller <- true }()
 
+	// Use a semaphore to limit concurrent layer downloads if maxConcurrentDownloads > 0.
+	// A zero or negative value means unlimited concurrency.
+	var sem chan struct{}
+	if maxConcurrentDownloads > 0 {
+		sem = make(chan struct{}, maxConcurrentDownloads)
+	}
+
 	var wg sync.WaitGroup
 	defer wg.Wait()
 	// at this point we iterate each layer and we download it.
@@ -896,9 +903,15 @@ func (img *Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan
 			continue
 		}
 
+		if sem != nil {
+			sem <- struct{}{}
+		}
+
 		wg.Add(1)
 		go func(ctx context.Context, layer da.Layer) {
-
+			if sem != nil {
+				defer func() { <-sem }()
+			}
 			defer wg.Done()
 
 			l.Log().WithFields(
