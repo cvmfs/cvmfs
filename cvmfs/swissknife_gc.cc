@@ -121,7 +121,10 @@ int CommandGc::Main(const ArgumentList &args) {
 
   if (!manifest->garbage_collectable()) {
     LogCvmfs(kLogCvmfs, kLogStderr,
-             "repository does not allow garbage collection");
+             "repository does not allow garbage collection "
+             "(manifest does not have the garbage collection flag set; "
+             "ensure CVMFS_GARBAGE_COLLECTION=true in server.conf and "
+             "run a transaction + publish to update the manifest)");
     return 1;
   }
 
