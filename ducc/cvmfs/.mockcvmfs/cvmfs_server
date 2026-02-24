@@ -45,6 +45,25 @@ if [ "$1" == "ingest" ]; then
   fi
 fi
 
+# cvmfs_server overlay -l <layers> -d <dest> <repo>
+# Mock: just create the destination directory
+if [ "$1" == "overlay" ]; then
+  shift
+  layers=""
+  dest=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      -l) layers="$2"; shift 2 ;;
+      -d) dest="$2"; shift 2 ;;
+      *)  repo="$1"; shift ;;
+    esac
+  done
+  echo "overlay: layers=$layers dest=$dest repo=$repo"
+  mkdir -p "$CVMFS_TEST_REPO/$dest"
+  # Write a marker file so tests can verify the overlay was called
+  echo "layers=$layers" > "$CVMFS_TEST_REPO/$dest/.overlay_marker"
+fi
+
 # cvmfs_server ingest --catalog -t - -b <dir>
 arg2=$(echo $@ | cut -d ' ' -f 2)
 arg3=$(echo $@ | cut -d ' ' -f 3)

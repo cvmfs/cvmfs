@@ -1,0 +1,221 @@
+#!/bin/bash
+
+cvmfs_test_name="Catalog Overlay Tool"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+# Produce a base layer with some files and directories
+produce_base_layer() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  mkdir -p layer1/bin
+  mkdir -p layer1/lib
+  mkdir -p layer1/etc
+  echo "base binary" > layer1/bin/app
+  echo "base library" > layer1/lib/libfoo.so
+  echo "base config" > layer1/etc/app.conf
+  touch emptyfile
+  chmod 755 layer1/bin/app
+
+  popdir
+}
+
+# Produce a second layer that adds and overrides files
+produce_upper_layer() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  mkdir -p layer2/bin
+  mkdir -p layer2/lib
+  mkdir -p layer2/var/log
+  echo "updated binary" > layer2/bin/app
+  echo "new tool" > layer2/bin/tool
+  echo "additional lib" > layer2/lib/libbar.so
+  echo "log data" > layer2/var/log/app.log
+  chmod 755 layer2/bin/app
+  chmod 755 layer2/bin/tool
+
+  popdir
+}
+
+# Produce a third layer with whiteout files
+produce_whiteout_layer() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  mkdir -p layer3/lib
+  mkdir -p layer3/etc
+  # Whiteout: delete libfoo.so from lower layers
+  touch "layer3/lib/.wh.libfoo.so"
+  # Override config
+  echo "layer3 config" > layer3/etc/app.conf
+
+  popdir
+}
+
+# Produce a layer with opaque directory marker
+produce_opaque_layer() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  mkdir -p layer4/etc
+  # Opaque marker: hide all previous contents of etc/
+  touch "layer4/etc/.wh..wh..opq"
+  echo "completely new config" > layer4/etc/new.conf
+
+  popdir
+}
+
+# Produce a multi-layer scenario (5 layers)
+produce_multi_layers() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  # Layer A: base
+  mkdir -p layerA/data
+  echo "file1" > layerA/data/file1.txt
+  echo "file2" > layerA/data/file2.txt
+  echo "file3" > layerA/data/file3.txt
+
+  # Layer B: add and modify
+  mkdir -p layerB/data
+  echo "modified file1" > layerB/data/file1.txt
+  echo "file4" > layerB/data/file4.txt
+
+  # Layer C: whiteout file2
+  mkdir -p layerC/data
+  touch "layerC/data/.wh.file2.txt"
+  echo "file5" > layerC/data/file5.txt
+
+  popdir
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  # ============================================================================
+  # Populate all layers via normal transactions
+  # ============================================================================
+
+  echo "*** populating base layer (layer1)"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  produce_base_layer $repo_dir || return 3
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "*** populating upper layer (layer2)"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  produce_upper_layer $repo_dir || return 4
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "*** populating whiteout layer (layer3)"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  produce_whiteout_layer $repo_dir || return 5
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "*** populating opaque layer (layer4)"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  produce_opaque_layer $repo_dir || return 6
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "*** populating multi-layers (layerA, layerB, layerC)"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  produce_multi_layers $repo_dir || return 7
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  # ============================================================================
+  # TEST 1: Single layer overlay
+  # ============================================================================
+
+  echo "*** TEST 1: Single layer overlay"
+  cvmfs_server overlay \
+    -l "layer1" \
+    -d "overlay_test1" \
+    $CVMFS_TEST_REPO || return 10
+
+  echo "*** verify overlay result is accessible"
+  check_repository $CVMFS_TEST_REPO -i || return 11
+  echo "*** TEST 1 passed: single layer overlay"
+
+  # ============================================================================
+  # TEST 2: Two-layer overlay (upper overrides lower)
+  # ============================================================================
+
+  echo "*** TEST 2: Two-layer overlay"
+  cvmfs_server overlay \
+    -l "layer1,layer2" \
+    -d "overlay_test2" \
+    $CVMFS_TEST_REPO || return 20
+
+  check_repository $CVMFS_TEST_REPO -i || return 21
+  echo "*** TEST 2 passed: two-layer overlay"
+
+  # ============================================================================
+  # TEST 3: Whiteout handling
+  # ============================================================================
+
+  echo "*** TEST 3: Whiteout handling"
+  cvmfs_server overlay \
+    -l "layer1,layer3" \
+    -d "overlay_test3" \
+    $CVMFS_TEST_REPO || return 30
+
+  check_repository $CVMFS_TEST_REPO -i || return 31
+  echo "*** TEST 3 passed: whiteout handling"
+
+  # ============================================================================
+  # TEST 4: Opaque directory handling
+  # ============================================================================
+
+  echo "*** TEST 4: Opaque directory handling"
+  cvmfs_server overlay \
+    -l "layer1,layer4" \
+    -d "/overlay_test4" \
+    $CVMFS_TEST_REPO || return 40
+
+  check_repository $CVMFS_TEST_REPO -i || return 41
+  echo "*** TEST 4 passed: opaque directory handling"
+
+  # ============================================================================
+  # TEST 5: Multi-layer overlay (3+ layers)
+  # ============================================================================
+
+  echo "*** TEST 5: Multi-layer overlay"
+  cvmfs_server overlay \
+    -l "layerA,layerB,layerC" \
+    -d "/overlay_test5" \
+    $CVMFS_TEST_REPO || return 50
+
+  check_repository $CVMFS_TEST_REPO -i || return 51
+  echo "*** TEST 5 passed: multi-layer overlay"
+
+  # ============================================================================
+  # TEST 6: Combined whiteout + opaque + override multi-layer
+  # ============================================================================
+
+  echo "*** TEST 6: Combined multi-layer with all features"
+  cvmfs_server overlay \
+    -l "layer1,layer2,layer3,layer4" \
+    -d "/overlay_test6" \
+    $CVMFS_TEST_REPO || return 60
+
+  check_repository $CVMFS_TEST_REPO -i || return 61
+  echo "*** TEST 6 passed: combined multi-layer"
+
+  # ============================================================================
+
+  echo "*** final catalog and data integrity check"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  return 0
+}
+

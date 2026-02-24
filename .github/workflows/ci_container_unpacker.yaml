@@ -1,0 +1,98 @@
+name: container_unpacker
+on:
+  pull_request:
+    branches: [devel, cvmfs*]
+  push:
+  workflow_dispatch:
+
+jobs:
+  validate_unpacker:
+    runs-on: ubuntu-latest
+    steps:
+
+      - id: lsb-release
+        run: |
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            source /etc/lsb-release
+            echo "id=${DISTRIB_ID}" >> $GITHUB_OUTPUT
+            echo "release=${DISTRIB_RELEASE}" >> $GITHUB_OUTPUT
+            echo "codename=${DISTRIB_CODENAME}" >> $GITHUB_OUTPUT
+            echo "description=${DISTRIB_DESCRIPTION}" >> $GITHUB_OUTPUT
+            echo "id-release=${DISTRIB_ID}-${DISTRIB_RELEASE}" >> $GITHUB_OUTPUT
+            echo "arch=$(uname -m)" >> $GITHUB_OUTPUT
+          fi
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Create cache directories
+        run: |
+          mkdir -p /home/runner/.cache
+      - name: Restore CI cache
+        uses: actions/cache/restore@v4
+        id: cvmfs-ci-cache-restore
+        with:
+          path: /home/runner/.cache/
+          key: v3-cvmfs-ci-cache-${{ steps.lsb-release.outputs.id-release }}-${{ steps.lsb-release.outputs.arch }}
+      - name: Check for builddep package
+        id: cvmfs-builddep-check
+        run: |
+          if [ -f "/home/runner/.cache/cvmfs-build-deps_*_all.deb" ]; then
+            echo "package_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "package_exists=false" >> $GITHUB_OUTPUT
+          fi
+      - name: Generate build-dep metapackage
+        if: steps.cvmfs-builddep-check.outputs.package_exists != 'true'
+        run: |
+          sudo apt-get -y update
+          sudo apt-get install -y devscripts equivs
+          mk-build-deps ./packaging/debian/cvmfs/control
+          mv cvmfs-build-deps_*_all.deb /home/runner/.cache
+      - name: Install build dependencies
+        run: |
+          sudo apt-get install -y /home/runner/.cache/cvmfs-build-deps_*_all.deb
+      - name: Build packages
+        run: |
+          sudo apt-get -y update
+          sudo apt-get -y install devscripts ccache apache2 libapache2-mod-wsgi-py3
+          export CVMFS_EXTERNALS_PREFIX=/home/runner/.cache/cvmfs_externals_install
+          export CMAKE_CXX_COMPILER_LAUNCHER=ccache
+          mkdir /tmp/build-ubuntu
+          mkdir /tmp/build-ubuntu-config
+          ./ci/build_package.sh $PWD /tmp/build-ubuntu-config cvmfs-config
+          ./ci/build_package.sh $PWD /tmp/build-ubuntu cvmfs
+      - name: Install packages
+        run: |
+          sudo apt-get -y install /tmp/build-ubuntu*/*.deb
+          sudo cvmfs_config setup
+          sudo systemctl stop autofs
+          sudo systemctl start apache2
+          sudo systemctl status apache2
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+      - name: Build and install cvmfs_ducc
+        working-directory: ./ducc
+        run: |
+          sudo make install
+          cvmfs_ducc version || true
+      - name: Validate container unpacker
+        run: |
+          cd test/container
+          sudo ./validate_unpacker.sh -k -v -c https://registry.hub.docker.com/library/python:3.9
+      - name: Upload logs on failure
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: validate-unpacker-logs
+          path: |
+            /tmp/validate_unpacker.*
+      - name: Save CI cache
+        if: github.ref == 'refs/heads/devel' && github.event_name != 'pull_request'
+        uses: actions/cache/save@v4
+        id: cvmfs-ci-cache-save
+        with:
+          path: /home/runner/.cache/
+          key: v3-cvmfs-ci-cache-${{ steps.lsb-release.outputs.id-release }}-${{ steps.lsb-release.outputs.arch }}
+

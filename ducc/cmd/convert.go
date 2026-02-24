@@ -30,7 +30,7 @@ func init() {
 	convertCmd.Flags().BoolVarP(&overwriteLayer, "overwrite-layers", "f", false, "overwrite the layer if they are already inside the CVMFS repository")
 	convertCmd.Flags().BoolVarP(&convertAgain, "convert-again", "g", false, "convert again images that are already successfully converted")
 	convertCmd.Flags().BoolVarP(&skipFlat, "skip-flat", "s", false, "do not create a flat image (compatible with singularity)")
-	convertCmd.Flags().BoolVarP(&skipLayers, "skip-layers", "d", false, "do not unpack the layers into the repository, implies --skip-thin-image and --skip-podman")
+	convertCmd.Flags().BoolVarP(&skipLayers, "skip-layers", "d", false, "[DEPRECATED] this option is no longer functional, layers will be unpacked regardless. Use `docker save` and `cvmfs_server ingest` if you only need the flat image.")
 	convertCmd.Flags().BoolVarP(&skipThinImage, "skip-thin-image", "i", false, "do not create and push the docker thin image")
 	convertCmd.Flags().BoolVarP(&skipPodman, "skip-podman", "p", false, "do not create podman image store")
 	rootCmd.AddCommand(convertCmd)
@@ -57,6 +57,10 @@ var convertCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 		AliveMessage()
+
+		if skipLayers {
+			l.Log().Warn("--skip-layers is deprecated and no longer functional: layers will be unpacked regardless. If you only need the flat image, use `docker save` and `cvmfs_server ingest` instead.")
+		}
 
 		if (skipLayers == false) && (skipThinImage == false) {
 			_, err := lib.GetPassword()
@@ -90,15 +94,13 @@ var convertCmd = &cobra.Command{
 			// Check if this wish is in the ignore errors list
 			isIgnored := isInIgnoreList(wish.InputName, recipe.IgnoreErrorsList)
 
-			if !skipLayers {
-				err = lib.ConvertWish(wish, convertAgain, overwriteLayer)
-				if err != nil {
-					if isIgnored {
-						l.LogE(err).WithFields(fields).Warning("Error in converting wish (layers), but image is in ignoreErrors list")
-					} else {
-						l.LogE(err).WithFields(fields).Error("Error in converting wish (layers), going on")
-						conversionErrors = append(conversionErrors, fmt.Sprintf("[%s] layers: %s", wish.InputName, err))
-					}
+			err = lib.ConvertWish(wish, convertAgain, overwriteLayer)
+			if err != nil {
+				if isIgnored {
+					l.LogE(err).WithFields(fields).Warning("Error in converting wish (layers), but image is in ignoreErrors list")
+				} else {
+					l.LogE(err).WithFields(fields).Error("Error in converting wish (layers), going on")
+					conversionErrors = append(conversionErrors, fmt.Sprintf("[%s] layers: %s", wish.InputName, err))
 				}
 			}
 			if !skipThinImage {

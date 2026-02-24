@@ -1,7 +1,6 @@
 package lib
 
 import (
-	"archive/tar"
 	"compress/gzip"
 	"context"
 	"encoding/json"
@@ -24,7 +23,6 @@ import (
 	"github.com/olekukonko/tablewriter"
 	log "github.com/sirupsen/logrus"
 
-	constants "github.com/cvmfs/ducc/constants"
 	cvmfs "github.com/cvmfs/ducc/cvmfs"
 	da "github.com/cvmfs/ducc/docker-api"
 	l "github.com/cvmfs/ducc/log"
@@ -1181,144 +1179,48 @@ func (ld *LayerDownloader) DownloadAndIngest(CVMFSRepo string, layer da.Layer) e
 	return err
 }
 
-func (img *Image) CreateSneakyChainStructure(CVMFSRepo string) (err error, lastChainId string) {
-	// make sure we have the layers somewhere
+// CreateFlatOverlay uses cvmfs_server overlay to merge all image layers into a
+// flat filesystem. It returns the singularity path (relative to /cvmfs/$REPO)
+// where the merged image is placed.
+func (img *Image) CreateFlatOverlay(CVMFSRepo string) (singularityPath string, err error) {
 	manifest, err := img.GetManifest()
 	if err != nil {
 		return
 	}
 
-	// then we start creating the chain structure
-	chainIDs := manifest.GetChainIDs()
-
-	paths := []string{}
-	for _, chain := range chainIDs {
-		if chain == "" {
+	// Collect layer rootfs paths in bottom-to-top order (as they appear in the manifest)
+	layerPaths := []string{}
+	for _, layer := range manifest.Layers {
+		if layer.MediaType == "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip" {
 			continue
 		}
-		path := cvmfs.ChainPath(CVMFSRepo, chain.String())
-		dir := filepath.Dir(path)
-		if _, err := os.Stat(dir); err != nil {
-			paths = append(paths, dir)
-		}
+		layerDigest := strings.Split(layer.Digest, ":")[1]
+		layerPaths = append(layerPaths, cvmfs.TrimCVMFSRepoPrefix(cvmfs.LayerRootfsPath(CVMFSRepo, layerDigest)))
 	}
 
-	if len(paths) > 0 {
-		err = cvmfs.WithinTransaction(CVMFSRepo, func() error {
-			for _, dir := range paths {
-				if err := os.MkdirAll(dir, constants.DirPermision); err != nil {
-					return err
-				}
-				// create the .cvmfscatalog, we don't really care if it fails
-				f, _ := os.OpenFile(filepath.Join(dir, ".cvmfscatalog"),
-					os.O_CREATE|os.O_RDONLY, constants.FilePermision)
-				f.Close()
-			}
-			return nil
-		})
-		if err != nil {
-			l.LogE(err).Error("Impossible to create directory to contains the chainID")
-			return
-		}
+	if len(layerPaths) == 0 {
+		err = fmt.Errorf("no layers found for image %s", img.GetSimpleName())
+		return
 	}
 
-	dirtyChains := cvmfs.GetDirtyChains(CVMFSRepo)
-	if len(dirtyChains) > 0 {
-		err = cvmfs.WithinTransaction(CVMFSRepo, func() error {
-			for _, chain := range dirtyChains {
-				chainPath := cvmfs.ChainPath(CVMFSRepo, chain)
-				dirtyChainPath := cvmfs.DirtyChainPath(CVMFSRepo, chain)
-				if err := os.RemoveAll(chainPath); err != nil {
-					return err
-				}
-				if err := os.RemoveAll(dirtyChainPath); err != nil {
-					return err
-				}
-			}
-			return nil
-		})
-		if err != nil {
-			l.LogE(err).Error("Error in deleting dirty chains, unsafe to continue")
-			return
-		}
-	}
+	singularityPath = manifest.GetSingularityPath()
 
 	n := notification.NewNotification(NotificationService)
 	n = n.AddField("image", img.GetSimpleName())
 
-	n.AddField("action", "start_chains_ingestion").Send()
+	t := time.Now()
+	n.AddField("action", "start_overlay_merge").Send()
 
-	ld := NewLayerDownloader(img)
-	previous := ""
-	for i, chain := range chainIDs {
-		if chain == "" {
-			continue
-		}
-		digest := chain.String()
-		lastChainId = digest
-		layer := manifest.Layers[i]
+	err = cvmfs.Overlay(CVMFSRepo, layerPaths, singularityPath)
 
-		l.Log().WithFields(
-			log.Fields{"chain id": digest, "next layer": layer.Digest}).
-			Info("adding new chain")
+	n.Elapsed(t).
+		AddField("action", "end_overlay_merge").
+		Error(err).
+		Send()
 
-		path := cvmfs.ChainPath(CVMFSRepo, digest)
-
-		if _, err := os.Stat(path); err == nil {
-			// the chain is present, we skip the loop
-			l.Log().WithFields(log.Fields{"chain id": digest}).Info("skipping (already present)")
-			previous = chainIDs[i].String()
-			continue
-		}
-
-		downloadLayer := func() error {
-			// we need to get the layer tar reader here
-			layerStream, err := ld.DownloadLayer(layer)
-
-			// we should call this even if there were issues in creating the file
-			defer layerStream.Close()
-
-			if err != nil {
-				l.LogE(err).Error("Error in downloading the layer from the docker registry")
-				return err
-			}
-
-			tarReader := *tar.NewReader(layerStream.Path)
-
-			chainN := n.AddField("chain", chain.String()).
-				AddField("layer", strings.Split(layer.Digest, ":")[1]).
-				AddId()
-
-			t := time.Now()
-			chainN.Action("start_single_chain_ingestion").Send()
-
-			err = cvmfs.CreateSneakyChain(CVMFSRepo,
-				chain.String(),
-				previous,
-				tarReader)
-
-			chainN.Elapsed(t).
-				Action("end_single_chain_ingestion").
-				SizeBytes(layerStream.GetSize()).
-				Error(err).
-				Send()
-
-			return err
-		}
-		for attempt := 0; attempt < 5; attempt++ {
-			l.Log().Info("Start attempt: ", attempt)
-			err = downloadLayer()
-			if err == nil {
-				l.Log().Info("Attempt ", attempt, " success")
-				break
-			}
-			l.Log().Warn("Attempt ", attempt, " fail")
-		}
-		if err != nil {
-			l.LogE(err).Error("Error in creating the chain")
-			return err, lastChainId
-		}
-		previous = chainIDs[i].String()
+	if err != nil {
+		l.LogE(err).Error("Error in creating flat overlay for image")
+		return
 	}
 	return
 }
