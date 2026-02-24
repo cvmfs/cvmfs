@@ -164,6 +164,12 @@ cvmfs_server_gc() {
     if [ $reconstruct_reflog -eq 1 ]; then reflog_reconstruct_msg="yes"; fi
 
     echo "Affected Repositories:         $names"
+    for _gc_name in $names; do
+      load_repo_config $_gc_name
+      if [ x"$CVMFS_GARBAGE_COLLECTION" != x"true" ]; then
+        echo "  WARNING: CVMFS_GARBAGE_COLLECTION is not enabled for $_gc_name"
+      fi
+    done
     echo "Dry Run (no actual deletion):  $dry_run_msg"
     echo "Needs Reflog reconstruction:   $reflog_reconstruct_msg"
     if [ $preserve_revisions -ge 0 ]; then
@@ -318,6 +324,11 @@ __do_gc_cmd()
       return 0
     fi
     is_garbage_collectable $name || die "Garbage Collection is not enabled for $name"
+    if is_stratum0 $name; then
+      if [ x"$(get_repo_info_from_url $CVMFS_STRATUM0 -g)" != x"yes" ]; then
+        die "Garbage collection is enabled in server.conf but not yet in the repository manifest. Run 'cvmfs_server transaction $name && cvmfs_server publish $name' to update the manifest, then retry."
+      fi
+    fi
     is_owner_or_root       $name || die "Permission denied: Repository $name is owned by $user"
 
     # figure out the URL of the repository

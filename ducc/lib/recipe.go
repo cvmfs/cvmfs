@@ -1,7 +1,9 @@
 package lib
 
 import (
+	"io/ioutil"
 	"math/rand"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -18,11 +20,45 @@ type YamlRecipeV1 struct {
 	CVMFSRepo    string   `yaml:"cvmfs_repo"`
 	OutputFormat string   `yaml:"output_format"`
 	Input        []string `yaml:"input"`
+	IgnoreErrors []string `yaml:"ignoreErrors"`
+}
+
+type IgnoreErrorsConfig struct {
+	IgnoreErrors []string `yaml:"ignoreErrors"`
 }
 
 type Recipe struct {
-	Repo   string
-	Wishes chan WishFriendly
+	Repo             string
+	Wishes           chan WishFriendly
+	IgnoreErrorsList []string
+}
+
+// loadIgnoreErrorsList loads the ignore errors list from an external file if DUCC_IGNORE_ERRORS_FILE env var is set
+func loadIgnoreErrorsList() ([]string, error) {
+	ignoreFilePath := os.Getenv("DUCC_IGNORE_ERRORS_FILE")
+	if ignoreFilePath == "" {
+		return []string{}, nil
+	}
+
+	data, err := ioutil.ReadFile(ignoreFilePath)
+	if err != nil {
+		l.LogE(err).WithFields(log.Fields{"file": ignoreFilePath}).Warning("Failed to read ignore errors file from DUCC_IGNORE_ERRORS_FILE")
+		return []string{}, err
+	}
+
+	var ignoreConfig IgnoreErrorsConfig
+	err = yaml.Unmarshal(data, &ignoreConfig)
+	if err != nil {
+		l.LogE(err).WithFields(log.Fields{"file": ignoreFilePath}).Warning("Failed to parse ignore errors file")
+		return []string{}, err
+	}
+
+	l.Log().WithFields(log.Fields{
+		"file":  ignoreFilePath,
+		"count": len(ignoreConfig.IgnoreErrors),
+	}).Info("Loaded ignore errors list from external file")
+
+	return ignoreConfig.IgnoreErrors, nil
 }
 
 func ParseYamlRecipeV1(data []byte) (Recipe, error) {
@@ -31,6 +67,19 @@ func ParseYamlRecipeV1(data []byte) (Recipe, error) {
 	recipe := Recipe{}
 	recipe.Repo = recipeYamlV1.CVMFSRepo
 	recipe.Wishes = make(chan WishFriendly, 500)
+
+	// Load ignore errors list from recipe file
+	recipe.IgnoreErrorsList = recipeYamlV1.IgnoreErrors
+
+	// Load and merge ignore errors list from external file if DUCC_IGNORE_ERRORS_FILE is set
+	externalIgnoreList, errIgnore := loadIgnoreErrorsList()
+	if errIgnore == nil && len(externalIgnoreList) > 0 {
+		recipe.IgnoreErrorsList = append(recipe.IgnoreErrorsList, externalIgnoreList...)
+		l.Log().WithFields(log.Fields{
+			"total_count": len(recipe.IgnoreErrorsList),
+		}).Info("Merged ignore errors lists from recipe and external file")
+	}
+
 	var wg sync.WaitGroup
 	defer func() {
 		go func() {

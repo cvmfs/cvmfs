@@ -78,30 +78,50 @@ var loopCmd = &cobra.Command{
 					"repository":   wish.CvmfsRepo,
 					"output image": wish.OutputName}
 				l.Log().WithFields(fields).Info("Start conversion of wish")
-				err = lib.ConvertWish(wish, convertAgain, overwriteLayer)
-				if err != nil {
-					l.LogE(err).WithFields(fields).Error("Error in converting wish (layers), going on")
-					conversionErrors = append(conversionErrors, fmt.Sprintf("[%s] layers: %s", wish.InputName, err))
+
+				// Check if this wish is in the ignore errors list
+				isIgnored := isInIgnoreList(wish.InputName, recipe.IgnoreErrorsList)
+
+        err = lib.ConvertWish(wish, convertAgain, overwriteLayer)
+        if err != nil {
+          if isIgnored {
+            l.LogE(err).WithFields(fields).Warning("Error in converting wish (layers), but image is in ignoreErrors list")
+          } else {
+            l.LogE(err).WithFields(fields).Error("Error in converting wish (layers), going on")
+            conversionErrors = append(conversionErrors, fmt.Sprintf("[%s] layers: %s", wish.InputName, err))
+          }
 				}
 				if !skipThinImage {
 					err = lib.ConvertWishDocker(wish)
 					if err != nil {
-						l.LogE(err).WithFields(fields).Error("Error in converting wish (docker), going on")
-						conversionErrors = append(conversionErrors, fmt.Sprintf("[%s] docker: %s", wish.InputName, err))
+						if isIgnored {
+							l.LogE(err).WithFields(fields).Warning("Error in converting wish (docker), but image is in ignoreErrors list")
+						} else {
+							l.LogE(err).WithFields(fields).Error("Error in converting wish (docker), going on")
+							conversionErrors = append(conversionErrors, fmt.Sprintf("[%s] docker: %s", wish.InputName, err))
+						}
 					}
 				}
 				if !skipPodman {
 					err = lib.ConvertWishPodman(wish, convertAgain)
 					if err != nil {
-						l.LogE(err).WithFields(fields).Error("Error in converting wish (podman), going on")
-						conversionErrors = append(conversionErrors, fmt.Sprintf("[%s] podman: %s", wish.InputName, err))
+						if isIgnored {
+							l.LogE(err).WithFields(fields).Warning("Error in converting wish (podman), but image is in ignoreErrors list")
+						} else {
+							l.LogE(err).WithFields(fields).Error("Error in converting wish (podman), going on")
+							conversionErrors = append(conversionErrors, fmt.Sprintf("[%s] podman: %s", wish.InputName, err))
+						}
 					}
 				}
 				if !skipFlat {
 					err = lib.ConvertWishFlat(wish)
 					if err != nil {
-						l.LogE(err).WithFields(fields).Error("Error in converting wish (singularity), going on")
-						conversionErrors = append(conversionErrors, fmt.Sprintf("[%s] singularity: %s", wish.InputName, err))
+						if isIgnored {
+							l.LogE(err).WithFields(fields).Warning("Error in converting wish (singularity), but image is in ignoreErrors list")
+						} else {
+							l.LogE(err).WithFields(fields).Error("Error in converting wish (singularity), going on")
+							conversionErrors = append(conversionErrors, fmt.Sprintf("[%s] singularity: %s", wish.InputName, err))
+						}
 					}
 				}
 				checkQuitSignal()
