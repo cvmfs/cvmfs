@@ -373,5 +373,3 @@ func TestCacheEmptyToken(t *testing.T) {
 		t.Errorf("Expected empty token, got %q", token)
 	}
 }
-
-
