@@ -76,7 +76,7 @@ TEST_F(T_Acl, t1) {
   const char *textual =
     "user::rwx\n"
     "group::r-x\n"
-    "group:root:rwx\n"
+    "group:0:rwx\n"
     "group:1000:rwx\n"
     "mask::rwx\n"
     "other::---\n";
@@ -182,7 +182,7 @@ TEST_F(T_Acl, t8) {
 }
 
 TEST_F(T_Acl, t9) {
-  const char *textual = "u:2:rx,g:root:rx,g:2:rwx,u::-,g::-,o::-,m::-";
+  const char *textual = "u:2:rx,g:0:rx,g:2:rwx,u::-,g::-,o::-,m::-";
   unsigned char acl_binary_expected[] = {
     0x02, 0x00, 0x00, 0x00,
     0x01, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,
