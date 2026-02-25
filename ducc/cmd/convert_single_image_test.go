@@ -32,6 +32,17 @@ func TestCheckConvertSingleImageLocal(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+func TestCheckConvertSingleImageLocalMultiArch(t *testing.T) {
+	var err error
+	cmd := rootCmd
+	cmd.SetArgs([]string{"convert-single-image", "-m",
+		"registry.hub.docker.com/library/alpine:latest",
+		"-p", "-i", testutils.TestRepo})
+	err = cmd.Execute()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
 
 func TestCheckConvertSingleImageCmdShouldFail1(t *testing.T) {
 	var err error

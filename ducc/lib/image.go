@@ -440,7 +440,7 @@ func (img *Image) GetManifestList() (da.ManifestList, error) {
 	} else if err == nil {
 		var placeholderitem da.ManifestListItem
 		placeholderitem.Manifest = *manifest
-		placeholderitem.Platform.Architecture = "amd64" //for images without manifestlist, assume amd64 arch
+		placeholderitem.Platform.Architecture = "" //for images without manifestlist, assume amd64 arch
 		manifestList.Manifests = append(manifestList.Manifests, placeholderitem)
 		manifestList.MediaType = "SingleManifest"
 
@@ -681,6 +681,12 @@ func filterUsingGlob(pattern string, toFilter []string) ([]string, error) {
 	return result, nil
 }
 
+// GetSingularityPath2 returns the singularity path for a given manifest,
+// without needing to fetch the manifest from the image.
+func (img *Image) GetSingularityPath2(manifest da.Manifest) (string, error) {
+	return manifest.GetSingularityPath(), nil
+}
+
 // here is where in the FS we are going to store the singularity image
 func (img *Image) GetSingularityPath() (string, error) {
 	manifest, err := img.GetManifest()
@@ -689,6 +695,12 @@ func (img *Image) GetSingularityPath() (string, error) {
 		return "", err
 	}
 	return manifest.GetSingularityPath(), nil
+}
+
+// the one that the user see, without the /cvmfs/$repo.cern.ch prefix
+// used mostly by Singularity
+func (i *Image) GetPublicSymlinkPathWithArch(arch string) string {
+	return filepath.Join(arch, i.Registry, i.Repository+":"+i.GetSimpleReference())
 }
 
 // the one that the user see, without the /cvmfs/$repo.cern.ch prefix
@@ -831,6 +843,7 @@ func (d *downloadedLayer) IngestIntoCVMFS(CVMFSRepo string) error {
 		return err
 	}
 	ingestPath := cvmfs.TrimCVMFSRepoPrefix(layerPath)
+
 	err := cvmfs.Ingest(CVMFSRepo, d.Path,
 		"--catalog", "-t", "-",
 		"-b", ingestPath)
@@ -860,20 +873,13 @@ func (d *downloadedLayer) GetSize() int64 {
 	return 0
 }
 
-func (img *Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan<- string, stopGettingLayers <-chan bool, rootPath string, maxConcurrentDownloads int) error {
+func (img *Image) GetLayers(manifest da.Manifest, layersChan chan<- downloadedLayer, manifestChan chan<- string, stopGettingLayers <-chan bool, rootPath string, maxConcurrentDownloads int) error {
 	defer close(layersChan)
 	defer close(manifestChan)
 
 	layerDownloader := NewLayerDownloader(img)
 	_, err := layerDownloader.getToken()
 	if err != nil {
-		return err
-	}
-
-	// then we try to get the manifest from our database
-	manifest, err := img.GetManifest()
-	if err != nil {
-		l.LogE(err).Warn("Error in getting the manifest")
 		return err
 	}
 

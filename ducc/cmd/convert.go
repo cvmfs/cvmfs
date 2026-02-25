@@ -25,8 +25,8 @@ var (
 )
 
 var (
-	convertAgain, overwriteLayer, skipLayers, skipFlat, skipThinImage, skipPodman bool
-	maxConcurrentDownloads                                                        int
+	convertAgain, overwriteLayer, skipLayers, skipFlat, skipThinImage, skipPodman, multiArch bool
+	maxConcurrentDownloads                                                                   int
 )
 
 func init() {
@@ -36,6 +36,7 @@ func init() {
 	convertCmd.Flags().BoolVarP(&skipLayers, "skip-layers", "d", false, "[DEPRECATED] this option is no longer functional, layers will be unpacked regardless. Use `docker save` and `cvmfs_server ingest` if you only need the flat image.")
 	convertCmd.Flags().BoolVarP(&skipThinImage, "skip-thin-image", "i", false, "do not create and push the docker thin image")
 	convertCmd.Flags().BoolVarP(&skipPodman, "skip-podman", "p", false, "do not create podman image store")
+	convertCmd.Flags().BoolVarP(&multiArch, "multi-arch", "m", false, "convert all architectures for multi-arch images")
 	convertCmd.Flags().IntVar(&maxConcurrentDownloads, "max-concurrent-downloads", 0, "maximum number of layer downloads in parallel (0 means unlimited, env: DUCC_MAX_CONCURRENT_DOWNLOADS)")
 	rootCmd.AddCommand(convertCmd)
 }
@@ -114,7 +115,7 @@ var convertCmd = &cobra.Command{
 			// Check if this wish is in the ignore errors list
 			isIgnored := isInIgnoreList(wish.InputName, recipe.IgnoreErrorsList)
 
-			err = lib.ConvertWish(wish, convertAgain, overwriteLayer, maxConcurrentDownloads)
+			err = lib.ConvertWish(wish, convertAgain, overwriteLayer, multiArch, maxConcurrentDownloads)
 			if err != nil {
 				if isIgnored {
 					l.LogE(err).WithFields(fields).Warning("Error in converting wish (layers), but image is in ignoreErrors list")
@@ -146,7 +147,7 @@ var convertCmd = &cobra.Command{
 				}
 			}
 			if !skipFlat {
-				err = lib.ConvertWishFlat(wish)
+				err = lib.ConvertWishFlat(wish, multiArch)
 				if err != nil {
 					if isIgnored {
 						l.LogE(err).WithFields(fields).Warning("Error in converting wish (singularity), but image is in ignoreErrors list")

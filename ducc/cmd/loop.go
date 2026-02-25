@@ -85,7 +85,7 @@ var loopCmd = &cobra.Command{
 				// Check if this wish is in the ignore errors list
 				isIgnored := isInIgnoreList(wish.InputName, recipe.IgnoreErrorsList)
 
-				err = lib.ConvertWish(wish, convertAgain, overwriteLayer, maxConcurrentDownloads)
+				err = lib.ConvertWish(wish, convertAgain, overwriteLayer, false, maxConcurrentDownloads)
 				if err != nil {
 					if isIgnored {
 						l.LogE(err).WithFields(fields).Warning("Error in converting wish (layers), but image is in ignoreErrors list")
@@ -117,7 +117,7 @@ var loopCmd = &cobra.Command{
 					}
 				}
 				if !skipFlat {
-					err = lib.ConvertWishFlat(wish)
+					err = lib.ConvertWishFlat(wish, false)
 					if err != nil {
 						if isIgnored {
 							l.LogE(err).WithFields(fields).Warning("Error in converting wish (singularity), but image is in ignoreErrors list")
