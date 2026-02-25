@@ -28,9 +28,10 @@ func init() {
 }
 
 var loopCmd = &cobra.Command{
-	Use:   "loop <wish-list.yaml>",
-	Short: "An infinite loop that keep converting all the images",
-	Args:  cobra.ExactArgs(1),
+	Use:        "loop <wish-list.yaml>",
+	Short:      "An infinite loop that keep converting all the images",
+	Deprecated: "use an external scheduler (e.g. cron or systemd timer) with the 'convert' command instead",
+	Args:       cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		AliveMessage()
 		applyMaxConcurrentDownloadsEnv(cmd)
