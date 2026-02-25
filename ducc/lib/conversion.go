@@ -94,7 +94,10 @@ func ConvertWishFlat(wish WishFriendly, multiArch bool) error {
 		}
 		for _, manifestEntry := range filterManifestList(manifestList, multiArch) {
 			inputImage.Manifest = &(manifestEntry.Manifest)
-			nameWithArch := GetNameWithArch(manifestEntry)
+			nameWithArch := ""
+			if multiArch {
+				nameWithArch = GetNameWithArch(manifestEntry)
+			}
 			publicSymlinkPath := inputImage.GetPublicSymlinkPathWithArch(nameWithArch)
 			completePubSymPath := filepath.Join("/", "cvmfs", wish.CvmfsRepo, publicSymlinkPath)
 			pubDirInfo, errPub := os.Stat(completePubSymPath)
