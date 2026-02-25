@@ -107,7 +107,6 @@ bool SyncUnionTarball::Initialize() {
  * `first_iteration` boolean flag.
  */
 void SyncUnionTarball::Traverse() {
-  read_archive_signal_->Wakeup();
   assert(this->IsInitialized());
 
   /*
@@ -134,6 +133,9 @@ void SyncUnionTarball::Traverse() {
   // we are simply deleting entity from  the repo
   if (NULL == src)
     return;
+
+  // Prime the signal so the first Wait() in the loop below can proceed.
+  read_archive_signal_->Wakeup();
 
   struct archive_entry *entry = archive_entry_new();
   while (true) {
