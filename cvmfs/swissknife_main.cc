@@ -21,6 +21,7 @@
 #include "swissknife_lsrepo.h"
 #include "swissknife_migrate.h"
 #include "swissknife_notify.h"
+#include "swissknife_overlay.h"
 #include "swissknife_pull.h"
 #include "swissknife_reflog.h"
 #include "swissknife_scrub.h"
@@ -101,6 +102,7 @@ int main(int argc, char **argv) {
   command_list.push_back(new swissknife::Ingest());
   command_list.push_back(new swissknife::IngestSQL());
   command_list.push_back(new swissknife::CommandNotify());
+  command_list.push_back(new swissknife::CommandOverlay());
   command_list.push_back(new swissknife::CommandFileStats());
 
   if (argc < 2) {

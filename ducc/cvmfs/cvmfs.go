@@ -1,7 +1,6 @@
 package cvmfs
 
 import (
-	"archive/tar"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,14 +9,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	"golang.org/x/sys/unix"
-
 	copy "github.com/otiai10/copy"
-	"github.com/pkg/xattr"
 	log "github.com/sirupsen/logrus"
 
 	constants "github.com/cvmfs/ducc/constants"
 	da "github.com/cvmfs/ducc/docker-api"
+	exec "github.com/cvmfs/ducc/exec"
 	l "github.com/cvmfs/ducc/log"
 	temp "github.com/cvmfs/ducc/temp"
 )
@@ -374,31 +371,6 @@ func LayerPath(CVMFSRepo, layerDigest string) string {
 	return filepath.Join("/", "cvmfs", CVMFSRepo, constants.SubDirInsideRepo, layerDigest[0:2], layerDigest)
 }
 
-func ChainPath(CVMFSRepo, layerDigest string) string {
-	layerDigest = removeHashMarkerIfPresent(layerDigest)
-	return filepath.Join("/", "cvmfs", CVMFSRepo, constants.ChainSubDir, layerDigest[0:2], layerDigest)
-}
-
-func DirtyChainPath(CVMFSRepo, layerDigest string) string {
-	layerDigest = removeHashMarkerIfPresent(layerDigest)
-	return filepath.Join("/", "cvmfs", CVMFSRepo, constants.DirtyChainSubDir, layerDigest)
-}
-
-func GetDirtyChains(CVMFSRepo string) []string {
-	path := filepath.Join("/", "cvmfs", CVMFSRepo, constants.DirtyChainSubDir)
-	result := make([]string, 0)
-	dirs, err := ioutil.ReadDir(path)
-	if err != nil {
-		return result
-	}
-	for _, dir := range dirs {
-		if dir.IsDir() {
-			result = append(result, dir.Name())
-		}
-	}
-	return result
-}
-
 func LayerRootfsPath(CVMFSRepo, layerDigest string) string {
 	return filepath.Join(LayerPath(CVMFSRepo, layerDigest), "layerfs")
 }
@@ -518,241 +490,42 @@ func removeHashMarkerIfPresent(digest string) string {
 	return digest
 }
 
-func CreateSneakyChain(CVMFSRepo, newChainId, previousChainId string, layer tar.Reader) error {
-	repoName, _ := GetRepoAndSubdir(CVMFSRepo)
-	sneakyPath := filepath.Join("/", "var", "spool", "cvmfs", repoName, "scratch", "current")
-	newChainPath := ChainPath(CVMFSRepo, newChainId)
-	dirtyChainPath := DirtyChainPath(CVMFSRepo, newChainId)
-	sneakyChainPath := filepath.Join(sneakyPath, TrimCVMFSRepoPrefix(newChainPath))
-	// we need to create the directory were to do the template transaction
-	dir := filepath.Dir(newChainPath)
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		// if the directory does not exists, we create it
-
-		if err := WithinTransaction(CVMFSRepo, func() error {
-			os.MkdirAll(dir, constants.DirPermision)
-			filePath := filepath.Join(dir, ".cvmfscatalog")
-			f, err := os.OpenFile(filePath, os.O_CREATE|os.O_RDONLY, constants.FilePermision)
-			if err != nil {
-				l.LogE(err).Info("Error in creating ", filePath)
-				return err
-			}
-			f.Close()
-			l.Log().Info("Closed file: ", filePath)
-			return nil
-		}); err != nil {
-			return err
-		}
+// Overlay calls `cvmfs_server overlay` to merge multiple layer directories into
+// a single flat image directory. The layers should be provided in bottom-to-top
+// order (base layer first). The destPath is the path inside the CVMFS repository
+// where the merged result will be placed (without the /cvmfs/$REPO prefix).
+func Overlay(CVMFSRepo string, layerPaths []string, destPath string) error {
+	if len(layerPaths) == 0 {
+		return fmt.Errorf("no layer paths provided for overlay")
 	}
-	// then we need the template transaction to populate it
-	if previousChainId != "" {
-		// if it is the very first chain, we don't need the template transaction
-		opt := TemplateTransaction{
-			source:      TrimCVMFSRepoPrefix(ChainPath(CVMFSRepo, previousChainId)),
-			destination: TrimCVMFSRepoPrefix(newChainPath),
-		}
-		if err := WithinTransaction(CVMFSRepo, func() error {
-			source := ChainPath(CVMFSRepo, previousChainId)
-			sourceDirs, err := ioutil.ReadDir(source)
-			if err != nil {
-				return err
-			}
-			destination := newChainPath
-			destinationDirs, err := ioutil.ReadDir(destination)
-			if err != nil {
-				return err
-			}
 
-			if len(sourceDirs) != len(destinationDirs) {
-				return fmt.Errorf("Different number of directories between the source and the target directories during a template transaction. source: %s , # of dir: %d, target: %s, # of dirs: %d", source, len(sourceDirs), destination, len(destinationDirs))
-			}
+	layers := strings.Join(layerPaths, ",")
 
-			f, _ := os.OpenFile(filepath.Join(destination, ".cvmfscatalog"), os.O_CREATE|os.O_RDONLY, constants.FilePermision)
-			f.Close()
-			err = os.MkdirAll(dirtyChainPath, constants.DirPermision)
-			if err != nil {
-				return err
-			}
-			return nil
-		}, opt); err != nil {
-			return err
-		}
+	llog := func(ll *log.Entry) *log.Entry {
+		return ll.WithFields(log.Fields{
+			"action": "overlay",
+			"repo":   CVMFSRepo,
+			"layers": layers,
+			"dest":   destPath,
+		})
 	}
-	// finally we need the sneaky transaction to create the chain
-	if err := ExecuteAndOpenTransaction(CVMFSRepo, func() error {
-	loop:
-		for {
-			header, err := layer.Next()
-			if err == io.EOF {
-				f, _ := os.OpenFile(filepath.Join(sneakyChainPath, ".cvmfscatalog"), os.O_CREATE|os.O_RDONLY, constants.FilePermision)
-				f.Close()
-				return nil
-			}
 
-			if err != nil {
-				l.LogE(err).Error("Error in getting next layer")
-				return err
-			}
+	llog(l.Log()).Info("Starting overlay merge")
 
-			if header == nil {
-				continue loop
-			}
+	getLock(CVMFSRepo)
+	defer unlock(CVMFSRepo)
 
-			path := filepath.Join(sneakyChainPath, header.Name)
-			dir := filepath.Dir(path)
+	args := []string{"cvmfs_server", "overlay",
+		"-l", layers,
+		"-d", destPath,
+		CVMFSRepo}
 
-			os.MkdirAll(dir, constants.DirPermision)
-			if isWhiteout(path) {
-				// this will be an empty file
-				// check if it is an opaque directory or a standard whiteout file
-				base := filepath.Base(path)
-				if base == ".wh..wh..opq" {
-					// an opaque directory
-					if err := makeOpaqueDir(dir); err != nil {
-						l.LogE(err).Error("Error in making opaque directory")
-						return err
-					}
-				} else {
-					// a whiteout file
-					base = base[4:]
-					path := filepath.Join(dir, base)
-					if err := makeWhiteoutFile(path); err != nil {
-						l.LogE(err).Error("Error in creating whiteout file")
-						return err
-					}
-				}
-				continue
-			}
-
-			permissionMask := int64(0)
-			switch header.Typeflag {
-
-			case tar.TypeDir:
-				{
-					err := os.MkdirAll(path, constants.DirPermision)
-					if err != nil {
-						l.LogE(err).Error("Error in creating directory")
-						return err
-					}
-					permissionMask |= 0700
-				}
-			case tar.TypeReg, tar.TypeRegA:
-				{
-					f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, constants.FilePermision)
-					if err != nil {
-						l.LogE(err).Error("Error in creating file")
-						return err
-					}
-					if _, err = io.Copy(f, &layer); err != nil {
-						l.LogE(err).Error("Error in copying file from tar", path)
-						f.Close()
-						return err
-					}
-					f.Close()
-					permissionMask |= 0600
-				}
-			case tar.TypeLink:
-				{
-					// hardlink
-					// maybe we should just copy the file
-					oldLinkName := filepath.Join(sneakyChainPath, header.Linkname)
-					if err := os.Link(oldLinkName, path); err != nil {
-						l.LogE(err).Error("Error in creating hard link")
-						return err
-					}
-				}
-			case tar.TypeSymlink:
-				{
-					// symlink
-					if err := os.Symlink(header.Linkname, path); err != nil {
-						l.LogE(err).Error("Error in creating symbolic link")
-						return err
-					}
-					// TODO (smosciat)
-					// do we want to invoke also Lchmod ?
-					// the function does not really exist in std
-					os.Lchown(path, header.Uid, header.Gid)
-
-					continue loop
-				}
-			case tar.TypeChar, tar.TypeBlock, tar.TypeFifo:
-				{
-					// char device
-					var mode uint32
-					switch header.Typeflag {
-					case tar.TypeChar:
-						mode = unix.S_IFCHR
-					case tar.TypeBlock:
-						mode = unix.S_IFBLK
-					case tar.TypeFifo:
-						mode = unix.S_IFIFO
-					}
-					dev := unix.Mkdev(uint32(header.Devmajor), uint32(header.Devminor))
-					if err := unix.Mknod(path, uint32(os.FileMode(int64(mode)|header.Mode)), int(dev)); err != nil {
-						l.LogE(err).Error("Error in creating special file")
-						return err
-					}
-				}
-			default:
-				{
-					// unclear what to do here, just skip it
-					continue loop
-				}
-			}
-
-			// these are common to everything
-			if err := os.Chmod(path, os.FileMode(header.Mode|permissionMask)); err != nil {
-				l.LogE(err).Error("Error in chmod")
-				return err
-			}
-			// TODO(vavolkl): do we need to chown?
-			if os.Getenv("CVMFS_DUCC_NO_CHOWN") == "" {
-				if err := os.Chown(path, header.Uid, header.Gid); err != nil {
-					l.LogE(err).Error("Error in chown")
-					return err
-				}
-			}
-			if err := os.Chtimes(path, header.AccessTime, header.ModTime); err != nil {
-				l.LogE(err).Error("Error in chtimes")
-				return err
-			}
-		}
-	}); err != nil {
-		os.RemoveAll(filepath.Join(sneakyPath, ".chains"))
-		// the creation of the chain is not complete, we delete the template created as well
-		IngestDelete(CVMFSRepo, TrimCVMFSRepoPrefix(newChainPath))
-		// we catch a problem in the creation of the chain, and the chain was destructed
-		// we don't need anymore the dirty flag
-		IngestDelete(CVMFSRepo, TrimCVMFSRepoPrefix(dirtyChainPath))
+	err := exec.ExecCommand(args...).Start()
+	if err != nil {
+		llog(l.LogE(err)).Error("Error in overlay merge")
 		return err
 	}
-	// everything went well, this flag is not necessary anymore
-	os.RemoveAll(dirtyChainPath)
 
-	// now the transaction is open and the sneaky overlay is populated
-	// we don't need to do anything else at this point and we can close the transaction
-	return Publish(CVMFSRepo)
-}
-
-func isWhiteout(path string) bool {
-	base := filepath.Base(path)
-	if len(base) <= 3 {
-		return false
-	}
-	return base[0:4] == ".wh."
-}
-
-func makeWhiteoutFile(path string) error {
-	dev := unix.Mkdev(0, 0)
-	mode := os.FileMode(int64(unix.S_IFCHR) | 0000)
-	return unix.Mknod(path, uint32(mode), int(dev))
-}
-
-func makeOpaqueDir(path string) error {
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		if err := os.MkdirAll(path, constants.DirPermision); err != nil {
-			return err
-		}
-	}
-	return xattr.Set(path, "trusted.overlay.opaque", []byte("y"))
+	llog(l.Log()).Info("Overlay merge complete")
+	return nil
 }

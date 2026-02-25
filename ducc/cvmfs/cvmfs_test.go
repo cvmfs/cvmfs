@@ -218,3 +218,35 @@ func TestIngestDeleteSubdirPathHandling(t *testing.T) {
 		})
 	}
 }
+
+func TestOverlayEmptyLayers(t *testing.T) {
+	err := Overlay("testrepo", []string{}, "/dest")
+	if err == nil {
+		t.Fatal("Expected error for empty layer paths, got nil")
+	}
+	if !strings.Contains(err.Error(), "no layer paths provided") {
+		t.Fatalf("Unexpected error message: %s", err.Error())
+	}
+}
+
+func TestOverlay(t *testing.T) {
+	mockrepo := filepath.Clean("/" + os.Getenv("CVMFS_TEST_REPO"))
+	repoName := ".." + mockrepo
+
+	destPath := "overlay_test"
+	err := Overlay(repoName, []string{"layer1", "layer2"}, destPath)
+	if err != nil {
+		t.Fatalf("Overlay failed: %s", err)
+	}
+
+	// Verify the mock created the destination directory with a marker file
+	markerPath := filepath.Join(mockrepo, destPath, ".overlay_marker")
+	markerContent, err := os.ReadFile(markerPath)
+	if err != nil {
+		t.Fatalf("Failed to read overlay marker: %s", err)
+	}
+	content := string(markerContent)
+	if !strings.Contains(content, "layers=layer1,layer2") {
+		t.Fatalf("Marker file missing expected layers, got: %s", content)
+	}
+}

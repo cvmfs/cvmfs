@@ -1241,7 +1241,7 @@ is_subcommand() {
     resign list info tag list-tags lstags check transaction enter abort snapshot    \
     skeleton migrate list-catalogs diff checkout update-geodb gc catalog-chown      \
     eliminate-hardlinks eliminate-bulk-hashes fix-stats update-info update-repoinfo \
-    mount fix-permissions masterkeycard ingest merge-stats print-stats"
+    mount fix-permissions masterkeycard ingest overlay merge-stats print-stats"
 
   for possible_command in $supported_commands; do
     if [ x"$possible_command" = x"$subcommand" ]; then
@@ -1415,6 +1415,11 @@ Supported Commands:
                   Extract the content of the tarfile inside the base directory,
                   in the same transaction it also delete the required folders.
                   Use '-' as -t argument to read the tarball from STDIN.
+  overlay         -l <layer1,layer2,...> (comma-separated, bottom-to-top order)
+                  -d <destination path>
+                  <fully qualified name>
+                  Merge multiple subdirectory catalogs using overlay semantics
+                  and publish the result under the destination path.
   print-stats     [-o output_file]
                   [-t table_name]
                   [-s separator] - char
