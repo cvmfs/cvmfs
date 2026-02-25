@@ -3,7 +3,9 @@ package cmd
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
@@ -34,8 +36,23 @@ func init() {
 	convertCmd.Flags().BoolVarP(&skipLayers, "skip-layers", "d", false, "[DEPRECATED] this option is no longer functional, layers will be unpacked regardless. Use `docker save` and `cvmfs_server ingest` if you only need the flat image.")
 	convertCmd.Flags().BoolVarP(&skipThinImage, "skip-thin-image", "i", false, "do not create and push the docker thin image")
 	convertCmd.Flags().BoolVarP(&skipPodman, "skip-podman", "p", false, "do not create podman image store")
-	convertCmd.Flags().IntVar(&maxConcurrentDownloads, "max-concurrent-downloads", 0, "maximum number of layer downloads in parallel (0 means unlimited)")
+	convertCmd.Flags().IntVar(&maxConcurrentDownloads, "max-concurrent-downloads", 0, "maximum number of layer downloads in parallel (0 means unlimited, env: DUCC_MAX_CONCURRENT_DOWNLOADS)")
 	rootCmd.AddCommand(convertCmd)
+}
+
+// applyMaxConcurrentDownloadsEnv sets maxConcurrentDownloads from the
+// DUCC_MAX_CONCURRENT_DOWNLOADS environment variable when the CLI flag was not
+// explicitly provided.
+func applyMaxConcurrentDownloadsEnv(cmd *cobra.Command) {
+	if !cmd.Flags().Changed("max-concurrent-downloads") {
+		if envVal := os.Getenv("DUCC_MAX_CONCURRENT_DOWNLOADS"); envVal != "" {
+			if v, err := strconv.Atoi(envVal); err == nil {
+				maxConcurrentDownloads = v
+			} else {
+				l.Log().WithField("value", envVal).Warn("Invalid DUCC_MAX_CONCURRENT_DOWNLOADS value, ignoring")
+			}
+		}
+	}
 }
 
 // isInIgnoreList checks if an image name matches any pattern in the ignore list
@@ -59,6 +76,7 @@ var convertCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 		AliveMessage()
+		applyMaxConcurrentDownloadsEnv(cmd)
 
 		if skipLayers {
 			l.Log().Warn("--skip-layers is deprecated and no longer functional: layers will be unpacked regardless. If you only need the flat image, use `docker save` and `cvmfs_server ingest` instead.")

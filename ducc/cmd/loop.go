@@ -23,7 +23,7 @@ func init() {
 	loopCmd.Flags().BoolVarP(&skipLayers, "skip-layers", "d", false, "[DEPRECATED] this option is no longer functional, layers will be unpacked regardless. Use `docker save` and `cvmfs_server ingest` if you only need the flat image.")
 	loopCmd.Flags().BoolVarP(&skipThinImage, "skip-thin-image", "i", false, "do not create and push the docker thin image")
 	loopCmd.Flags().BoolVarP(&skipPodman, "skip-podman", "p", false, "do not create podman image store")
-	loopCmd.Flags().IntVar(&maxConcurrentDownloads, "max-concurrent-downloads", 0, "maximum number of layer downloads in parallel (0 means unlimited)")
+	loopCmd.Flags().IntVar(&maxConcurrentDownloads, "max-concurrent-downloads", 0, "maximum number of layer downloads in parallel (0 means unlimited, env: DUCC_MAX_CONCURRENT_DOWNLOADS)")
 	rootCmd.AddCommand(loopCmd)
 }
 
@@ -33,6 +33,7 @@ var loopCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		AliveMessage()
+		applyMaxConcurrentDownloadsEnv(cmd)
 		defer exec.ExecCommand("docker", "system", "prune", "--force", "--all")
 		showWeReceivedSignal := make(chan os.Signal, 1)
 		signal.Notify(showWeReceivedSignal, os.Interrupt)
