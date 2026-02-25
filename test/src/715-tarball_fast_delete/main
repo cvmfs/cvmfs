@@ -1,0 +1,132 @@
+#!/bin/bash
+
+cvmfs_test_name="Fast-delete a nested catalog directory via ingest"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+produce_tarball() {
+  local tarball_name=$1
+
+  mkdir tarball_foo
+  mkdir -p tarball_foo/a/b/c
+  mkdir -p tarball_foo/d/e/f
+
+  dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/1.txt
+  dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/2.txt
+  dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/3.txt
+  touch tarball_foo/a/.cvmfscatalog
+  dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/b/1.txt
+  dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/b/2.txt
+  dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/b/3.txt
+  touch tarball_foo/a/b/.cvmfscatalog
+  dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/b/c/1.txt
+  dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/b/c/2.txt
+  dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_foo/a/b/c/3.txt
+
+  dd bs=1024 count=5 2>/dev/null </dev/urandom >tarball_foo/d/e/f/foo.txt
+
+  echo "*** Generating a tarball in $tarball_name"
+  tar -cvf $tarball_name tarball_foo/
+
+  rm -rf tarball_foo
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local scratch_dir=$(pwd)
+  local tarfile=$scratch_dir/tarball.tar
+  local dir=tar_dir
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $USER || return $?
+
+  # ============================================================================
+
+  echo "*** generating a tarball $tarfile"
+  produce_tarball $tarfile
+
+  echo "*** ingesting the tarball in the directory $dir"
+  cvmfs_server ingest --base_dir $dir --tar_file $tarfile $CVMFS_TEST_REPO || return $?
+
+  echo "*** check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  echo "*** check that the nested catalogs were created"
+  cvmfs_server list-catalogs -x $CVMFS_TEST_REPO
+  cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$dir/tarball_foo/a$" || return 1
+  cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$dir/tarball_foo/a/b$" || return 2
+
+  echo "*** check that the files exist"
+  for d in a a/b a/b/c; do
+    for f in 1 2 3; do
+      file=$repo_dir/$dir/tarball_foo/$d/$f.txt
+      if [ ! -f $file ] || [ $(wc -c <$file) -ne 2048 ]; then
+        echo "*** Error not found file: $file"
+        return 3
+      fi
+    done
+  done
+
+  # ============================================================================
+
+  echo "*** fast-delete the nested catalog directory tarball_foo/a"
+  cvmfs_server ingest --fast-delete -d $dir/tarball_foo/a $CVMFS_TEST_REPO || return 10
+
+  echo "*** check catalog and data integrity after fast-delete"
+  check_repository $CVMFS_TEST_REPO -i || return 11
+
+  echo "*** check that the nested catalog at tarball_foo/a is gone"
+  cvmfs_server list-catalogs -x $CVMFS_TEST_REPO
+  cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$dir/tarball_foo/a$" && return 12
+  cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$dir/tarball_foo/a/b$" && return 13
+
+  echo "*** check that the directory tarball_foo/a is gone from the filesystem"
+  if [ -d $repo_dir/$dir/tarball_foo/a ]; then
+    echo "*** Error: directory $repo_dir/$dir/tarball_foo/a still exists"
+    return 14
+  fi
+
+  echo "*** check that other content is still intact"
+  file=$repo_dir/$dir/tarball_foo/d/e/f/foo.txt
+  file_size=$(wc -c <$file)
+  if [ ! -f $file ] || [ $file_size -ne 5120 ]; then
+    echo "*** Error not found file of size 5120: $file"
+    return 15
+  fi
+
+  # ============================================================================
+
+  echo "*** re-ingest the tarball to restore content, then fast-delete again"
+  cvmfs_server ingest --base_dir $dir --tar_file $tarfile $CVMFS_TEST_REPO || return 20
+
+  echo "*** check catalog and data integrity after re-ingest"
+  check_repository $CVMFS_TEST_REPO -i || return 21
+
+  echo "*** verify nested catalogs are back"
+  cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$dir/tarball_foo/a$" || return 22
+  cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$dir/tarball_foo/a/b$" || return 23
+
+  echo "*** fast-delete and ingest into a new dir in the same command"
+  local new_dir=tar_dir_new
+  cvmfs_server ingest --base_dir $new_dir --tar_file $tarfile --fast-delete -d $dir/tarball_foo/a $CVMFS_TEST_REPO || return 30
+
+  echo "*** check catalog and data integrity after combined ingest+fast-delete"
+  check_repository $CVMFS_TEST_REPO -i || return 31
+
+  echo "*** verify old nested catalog is gone"
+  cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$dir/tarball_foo/a$" && return 32
+
+  echo "*** verify new content was ingested"
+  if [ ! -d $repo_dir/$new_dir/tarball_foo ]; then
+    echo "*** Error: new tarball content not found"
+    return 33
+  fi
+
+  echo "*** verify new nested catalogs were created"
+  cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$new_dir/tarball_foo/a$" || return 34
+  cvmfs_server list-catalogs -x $CVMFS_TEST_REPO | grep "/$new_dir/tarball_foo/a/b$" || return 35
+
+  return 0
+}
+

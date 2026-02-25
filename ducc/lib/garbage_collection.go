@@ -23,7 +23,7 @@ func ConstructDeleteCommands(pathsToDelete []string, pathsPerBatchCommand int, C
 	repoName, _ := cvmfs.GetRepoAndSubdir(CVMFSRepo)
 
 	// we send pathsPerBatchCommand folders to deletion at a time
-	commandPrefix := []string{"cvmfs_server", "ingest"}
+	commandPrefix := []string{"cvmfs_server", "ingest", "--fast-delete"}
 	commands := make([][]string, 0)
 	command := commandPrefix
 	for i, path := range pathsToDelete {

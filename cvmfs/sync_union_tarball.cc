@@ -38,6 +38,7 @@ SyncUnionTarball::SyncUnionTarball(AbstractSyncMediator *mediator,
                                    const gid_t gid,
                                    const std::string &to_delete,
                                    const bool create_catalog_on_root,
+                                   const bool fast_delete,
                                    const std::string &path_delimiter)
     : SyncUnion(mediator, rdonly_path, "", "")
     , src(NULL)
@@ -47,6 +48,7 @@ SyncUnionTarball::SyncUnionTarball(AbstractSyncMediator *mediator,
     , gid_(gid)
     , to_delete_(to_delete)
     , create_catalog_on_root_(create_catalog_on_root)
+    , fast_delete_(fast_delete)
     , path_delimiter_(path_delimiter)
     , read_archive_signal_(new Signal) { }
 
@@ -125,7 +127,7 @@ void SyncUnionTarball::Traverse() {
         parent_path = "";
       const SharedPtr<SyncItem> sync_entry = CreateSyncItem(parent_path,
                                                             filename, kItemDir);
-      mediator_->Remove(sync_entry);
+      mediator_->Remove(sync_entry, fast_delete_);
     }
   }
 
