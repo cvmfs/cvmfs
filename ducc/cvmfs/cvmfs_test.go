@@ -76,7 +76,7 @@ func TestPublishToSubdir(t *testing.T) {
 
 	// Create a subdirectory in the mock repo to simulate a pre-existing state or just target it
 	subdirName := "target_subdir"
-	fullRepoPath := ".." + mockrepo + ":" + subdirName
+	fullRepoPath := ".." + mockrepo + "///" + subdirName
 
 	f, _ := os.CreateTemp("", "PublishSubdirTestFile")
 	t.Log("SubdirTestFile:", f.Name())
@@ -105,7 +105,7 @@ func TestPublishToSubdir(t *testing.T) {
 func TestPublishToSubdirAlreadyPrefixedPath(t *testing.T) {
 	mockrepo := filepath.Clean("/" + os.Getenv("CVMFS_TEST_REPO"))
 	subdirName := "prefixed_target_subdir"
-	fullRepoPath := ".." + mockrepo + ":" + subdirName
+	fullRepoPath := ".." + mockrepo + "///" + subdirName
 
 	f, err := os.CreateTemp("", "PublishSubdirPrefixedPathTestFile")
 	if err != nil {
@@ -142,7 +142,7 @@ func TestPublishToSubdirAlreadyPrefixedPath(t *testing.T) {
 func TestCreateCatalogIntoDirSubdir(t *testing.T) {
 	mockrepo := filepath.Clean("/" + os.Getenv("CVMFS_TEST_REPO"))
 	subdirName := "catalog_target_subdir"
-	fullRepoPath := ".." + mockrepo + ":" + subdirName
+	fullRepoPath := ".." + mockrepo + "///" + subdirName
 	dir := filepath.Join("catalog_test", "nested")
 
 	if err := CreateCatalogIntoDir(fullRepoPath, dir); err != nil {
@@ -163,7 +163,7 @@ func TestCreateCatalogIntoDirSubdir(t *testing.T) {
 func TestIngestDeleteSubdirPathHandling(t *testing.T) {
 	mockrepo := filepath.Clean("/" + os.Getenv("CVMFS_TEST_REPO"))
 	subdirName := "delete_target_subdir"
-	fullRepoPath := ".." + mockrepo + ":" + subdirName
+	fullRepoPath := ".." + mockrepo + "///" + subdirName
 
 	tests := []struct {
 		name         string
