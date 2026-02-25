@@ -13,6 +13,7 @@ ducc_test_403_clean_up() {
     echo -n "Cleaning up..."
 
     export DUCC_DOCKER_REGISTRY_PASS=""
+    export DUCC_OUTPUT_REGISTRY_PASS=""
 
     # delete the recipe file
     rm $CVMFS_TEST403_RECIPE
@@ -56,6 +57,7 @@ EOL
 
     # set the password to access the docker hub
     export DUCC_DOCKER_REGISTRY_PASS=mock_pass
+    export DUCC_OUTPUT_REGISTRY_PASS=mock_pass
 
     # crete the repository where to store the content
     echo -n "*** Creating CVMFS repo..."

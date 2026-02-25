@@ -61,8 +61,8 @@ var convertSingleImageCmd = &cobra.Command{
 		}
 
 		if !cvmfs.RepositoryExists(cvmfsRepo) {
-			l.Log().Error("The repository does not seem to exists.")
-			return fmt.Errorf("The repository does not seem to exists.")
+			l.Log().Errorf("The repository %s does not seem to exist.", cvmfsRepo)
+			return fmt.Errorf("The repository %s does not seem to exist.", cvmfsRepo)
 		}
 
 		input, err := lib.ParseImage(inputImage)

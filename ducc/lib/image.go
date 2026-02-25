@@ -824,7 +824,12 @@ func (d *downloadedLayer) IngestIntoCVMFS(CVMFSRepo string) error {
 		return nil
 	}
 	superDir := filepath.Dir(filepath.Dir(cvmfs.TrimCVMFSRepoPrefix(layerPath)))
-	go cvmfs.CreateCatalogIntoDir(CVMFSRepo, superDir)
+	if err := cvmfs.CreateCatalogIntoDir(CVMFSRepo, superDir); err != nil {
+		l.LogE(err).WithFields(
+			log.Fields{"layer": d.Name, "dir": superDir}).
+			Error("Error creating catalog for layer directory")
+		return err
+	}
 	ingestPath := cvmfs.TrimCVMFSRepoPrefix(layerPath)
 	err := cvmfs.Ingest(CVMFSRepo, d.Path,
 		"--catalog", "-t", "-",
@@ -833,7 +838,11 @@ func (d *downloadedLayer) IngestIntoCVMFS(CVMFSRepo string) error {
 		l.LogE(err).WithFields(
 			log.Fields{"layer": d.Name}).
 			Error("Some error in ingest the layer")
-		go cvmfs.IngestDelete(CVMFSRepo, ingestPath)
+		if errDelete := cvmfs.IngestDelete(CVMFSRepo, ingestPath); errDelete != nil {
+			l.LogE(errDelete).WithFields(
+				log.Fields{"layer": d.Name, "path": ingestPath}).
+				Warning("Error cleaning up failed ingest path")
+		}
 		return err
 	}
 	err = StoreLayerInfo(CVMFSRepo, layerDigest, d.Path)

@@ -5,6 +5,35 @@ echo "WARNING: This is a mock command for testing of ducc that does noops and si
 # Since /cvmfs + reponame  and /var/spool/cvmfs is hardcoded,
 # CVMFS_TEST_REPO is expected to look like ../../../tmp/testrepofolder
 
+# Helper function to extract repo name from repo or repo///subdir or repo/subdir
+get_repo_name() {
+    local repo="$1"
+    # Handle triple-slash separator (for testing): "../../tmp/mockrepo///subdir"
+    if [[ "$repo" == *"///"* ]]; then
+        echo "${repo%%///*}"
+    else
+        # Handle slash separator: "repo.cern.ch/subdir" or "../tmp/mockrepo"
+        echo "${repo%%/*}"
+    fi
+}
+
+# Helper function to extract subdir from repo specification
+get_subdir() {
+    local repo="$1"
+    # Handle triple-slash separator: "../../tmp/mockrepo///subdir"
+    if [[ "$repo" == *"///"* ]]; then
+        local rest="${repo#*///}"
+        echo "${rest%/}"
+    elif [[ "$repo" == *"/"* ]] && [[ "$repo" != ".."* ]]; then
+        # Handle slash separator only for absolute paths: "repo.cern.ch/subdir"
+        local rest="${repo#*/}"
+        echo "${rest%/}"
+    else
+        # Relative paths like "../../tmp/mockrepo" have no subdir
+        echo ""
+    fi
+}
+
 
 if [ "$1" == "list" ]; then
   echo "testunpacked.cern.ch"
@@ -14,8 +43,12 @@ fi
 # Template transaction (cvmfs_server transaction -T /from:/to)
 # just do a copy
 if [ "$1" == "transaction" ]; then
-  arg2=$(echo $@ | cut -d ' ' -f 2)
-  if [ "$arg2" == "-T" ]; then
+  repo_arg=$(echo $@ | cut -d ' ' -f 2)
+  if [[ "$repo_arg" == *"/"* ]]; then
+      echo "Transaction opened for subdirectory: $repo_arg"
+  fi
+  
+  if [ "$repo_arg" == "-T" ]; then
     arg3=$(echo $@ | cut -d ' ' -f 3)
     from=$(echo $arg3 | cut -d '=' -f 1)
     to=$(echo $arg3 | cut -d '=' -f 2)
@@ -40,8 +73,22 @@ fi
 if [ "$1" == "ingest" ]; then
   arg2=$(echo $@ | cut -d ' ' -f 2)
   if [ "$arg2" == "--delete" ]; then
-    echo "deleting /$CVMFS_TEST_REPO/$3"
-    rm -rf /$CVMFS_TEST_REPO/$3
+    # Get the repo argument (last one)
+    repo_arg=$(echo $@ | awk '{print $NF}')
+    # Extract repo name and subdir
+    repo_name=$(get_repo_name "$repo_arg")
+    subdir=$(get_subdir "$repo_arg")
+    
+    # Get the path to delete (3rd argument after --delete)
+    delete_path=$(echo $@ | cut -d ' ' -f 3)
+    
+    # If there's a subdir, prepend it to the delete path
+    if [ -n "$subdir" ]; then
+        delete_path="$subdir/$delete_path"
+    fi
+    
+    echo "deleting /$CVMFS_TEST_REPO/$delete_path (repo: $repo_name, subdir: $subdir)"
+    rm -rf /$CVMFS_TEST_REPO/$delete_path
   fi
 fi
 
@@ -64,7 +111,7 @@ if [ "$1" == "overlay" ]; then
   echo "layers=$layers" > "$CVMFS_TEST_REPO/$dest/.overlay_marker"
 fi
 
-# cvmfs_server ingest --catalog -t - -b <dir>
+# cvmfs_server ingest --catalog -t - -b <dir> <repo>
 arg2=$(echo $@ | cut -d ' ' -f 2)
 arg3=$(echo $@ | cut -d ' ' -f 3)
 arg4=$(echo $@ | cut -d ' ' -f 4)
@@ -74,9 +121,24 @@ if [ "$1" == "ingest" ]; then
     if [ "$arg3" == "-t" ]; then
       if [ "$arg4" == "-" ]; then
         if [ "$arg5" == "-b" ]; then
-          mkdir -p /$CVMFS_TEST_REPO/$6
+          # Get the base directory (6th argument)
+          base_dir="$6"
+          # Get the repo argument (7th argument)
+          repo_arg="$7"
+          
+          # Extract repo name and subdir
+          repo_name=$(get_repo_name "$repo_arg")
+          subdir=$(get_subdir "$repo_arg")
+          
+          # If there's a subdir, prepend it to the base directory
+          if [ -n "$subdir" ]; then
+              base_dir="$subdir/$base_dir"
+          fi
+          
+          echo "ingesting to $CVMFS_TEST_REPO/$base_dir (repo: $repo_name, subdir: $subdir)"
+          mkdir -p /$CVMFS_TEST_REPO/$base_dir
           cat - > /tmp/tmptar.tar
-          tar xf /tmp/tmptar.tar -C /$CVMFS_TEST_REPO/$6
+          tar xf /tmp/tmptar.tar -C /$CVMFS_TEST_REPO/$base_dir
         fi
       fi
     fi

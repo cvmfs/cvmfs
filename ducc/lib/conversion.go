@@ -216,12 +216,7 @@ func ConvertWishDocker(wish WishFriendly) (err error) {
 	var firstError error
 	for _, expandedImgTag := range wish.ExpandedTagImagesLayer {
 		tag := expandedImgTag.Tag
-		outputWithTag := *outputImage
-		if inputImage.TagWildcard {
-			outputWithTag.Tag = tag
-		} else {
-			outputWithTag.Tag = outputImage.Tag
-		}
+		outputWithTag := outputImageForExpandedTag(inputImage, outputImage, tag)
 
 		manifestPath := filepath.Join("/", "cvmfs", wish.CvmfsRepo, ".metadata", expandedImgTag.GetSimpleName(), "manifest.json")
 		if _, err := os.Stat(manifestPath); os.IsNotExist(err) {
@@ -238,16 +233,30 @@ func ConvertWishDocker(wish WishFriendly) (err error) {
 			layerPath := cvmfs.LayerRootfsPath(wish.CvmfsRepo, layerDigest)
 			layerLocations[layer.Digest] = layerPath
 		}
-		err = CreateThinImage(manifest, layerLocations, *expandedImgTag, *outputImage)
+		err = CreateThinImage(manifest, layerLocations, *expandedImgTag, outputWithTag)
 		if err != nil && firstError == nil {
 			firstError = err
 		}
-		err = PushImageToRegistry(*outputImage)
+		err = PushImageToRegistry(outputWithTag)
 		if err != nil && firstError == nil {
 			firstError = err
 		}
 	}
 	return firstError
+}
+
+func outputImageForExpandedTag(inputImage, outputImage *Image, expandedTag string) Image {
+	outputWithTag := *outputImage
+	if inputImage.TagWildcard {
+		outputWithTag.Tag = expandedTag
+	}
+	return outputWithTag
+}
+
+func outputRepositoryForImport(outputImage Image) string {
+	outputRepository := outputImage
+	outputRepository.Tag = ""
+	return outputRepository.GetSimpleName()
 }
 
 func ConvertWishPodman(wish WishFriendly, convertAgain bool) (err error) {
@@ -478,7 +487,7 @@ func CreateThinImage(manifest da.Manifest, layerLocations map[string]string, inp
 		return
 	}
 
-	dockerClient, err := client.NewClientWithOpts(client.WithVersion("1.19"))
+	dockerClient, err := NewDockerClient()
 	if err != nil {
 		return
 	}
@@ -496,7 +505,7 @@ func CreateThinImage(manifest da.Manifest, layerLocations map[string]string, inp
 	importResult, err := dockerClient.ImageImport(
 		context.Background(),
 		image,
-		outputImage.GetSimpleName(),
+		outputRepositoryForImport(outputImage),
 		importOptions)
 	if err != nil {
 		l.LogE(err).Error("Error in image import")
@@ -527,7 +536,7 @@ func PushImageToRegistry(outputImage Image) (err error) {
 	pushOptions := dockerImage.PushOptions{
 		RegistryAuth: authCredential,
 	}
-	dockerClient, err := client.NewClientWithOpts(client.WithVersion("1.19"))
+	dockerClient, err := NewDockerClient()
 	if err != nil {
 		return err
 	}
@@ -550,6 +559,15 @@ func PushImageToRegistry(outputImage Image) (err error) {
 	}
 	l.Log().Info("Finish pushing the image to the registry")
 	return
+}
+
+// NewDockerClient creates a Docker client that negotiates the API version with
+// the daemon to stay compatible across Docker releases.
+func NewDockerClient() (*client.Client, error) {
+	return client.NewClientWithOpts(
+		client.FromEnv,
+		client.WithAPIVersionNegotiation(),
+	)
 }
 
 func StoreLayerInfo(CVMFSRepo string, layerDigest string, r ReadHashCloseSizer) (err error) {

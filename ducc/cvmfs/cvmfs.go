@@ -33,7 +33,9 @@ func PublishToCVMFS(CVMFSRepo string, path string, target string) (err error) {
 	}()
 	l.Log().WithFields(log.Fields{"target": target, "action": "ingesting"}).Info("Start ingesting")
 
-	path = filepath.Join("/", "cvmfs", CVMFSRepo, path)
+	repoName, _ := GetRepoAndSubdir(CVMFSRepo)
+	path = PrefixRepoSubdirOnce(CVMFSRepo, path)
+	path = filepath.Join("/", "cvmfs", repoName, path)
 
 	l.Log().WithFields(log.Fields{"target": target, "action": "ingesting"}).Info("Start transaction")
 
@@ -438,14 +440,19 @@ func RemoveDirectory(CVMFSRepo string, dirPath ...string) error {
 }
 
 func CreateCatalogIntoDir(CVMFSRepo, dir string) (err error) {
-	catalogPath := filepath.Join("/", "cvmfs", CVMFSRepo, dir, ".cvmfscatalog")
+	repoName, _ := GetRepoAndSubdir(CVMFSRepo)
+	normalizedDir := PrefixRepoSubdirOnce(CVMFSRepo, dir)
+	catalogRelativePath := filepath.Join(normalizedDir, ".cvmfscatalog")
+	catalogPath := filepath.Join("/", "cvmfs", repoName, catalogRelativePath)
 	if _, err := os.Stat(catalogPath); os.IsNotExist(err) {
 		tmpFile, err := ioutil.TempFile("", "tempCatalog")
-		tmpFile.Close()
 		if err != nil {
 			return err
 		}
-		err = PublishToCVMFS(CVMFSRepo, TrimCVMFSRepoPrefix(catalogPath), tmpFile.Name())
+		if err := tmpFile.Close(); err != nil {
+			return err
+		}
+		err = PublishToCVMFS(repoName, catalogRelativePath, tmpFile.Name())
 		if err != nil {
 			return err
 		}

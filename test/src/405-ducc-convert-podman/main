@@ -6,12 +6,23 @@ cvmfs_test_suites="ducc"
 CVMFS_TEST405_RECIPE="$(pwd)/$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1).yaml"
 CVMFS_TEST405_REPOSITORY="$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1).cern.ch"
 CVMFS_TEST405_DUCC_ERR="$(pwd)/$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1).err"
+PODMAN_STORAGE_CONF=/etc/containers/storage.conf
+PODMAN_STORAGE_CONF_CREATED=0
 
 ducc_test_405_clean_up() {
+	local additionalstore="/cvmfs/$CVMFS_TEST405_REPOSITORY/podmanStore"
+
 	# delete the recipe file
     rm $CVMFS_TEST405_RECIPE
     # delete the logs and error from ducc
     rm $CVMFS_TEST405_DUCC_ERR
+
+	if [ "$PODMAN_STORAGE_CONF_CREATED" -eq 1 ]; then
+		sudo rm -f "$PODMAN_STORAGE_CONF"
+	elif [ -f "$PODMAN_STORAGE_CONF" ]; then
+		sudo sed -i -e "s|additionalimagestores = \\[\"$additionalstore\"\\]|additionalimagestores = []|" "$PODMAN_STORAGE_CONF"
+		sudo sed -i -e "/$CVMFS_TEST405_REPOSITORY\\/podmanStore/d" "$PODMAN_STORAGE_CONF"
+	fi
 
 	sudo cvmfs_server rmfs -f $CVMFS_TEST405_REPOSITORY
 }
@@ -50,18 +61,57 @@ EOL
         cvmfs_ducc convert --skip-flat --skip-thin-image $CVMFS_TEST405_RECIPE 2> $CVMFS_TEST405_DUCC_ERR || return 101
         grep "level=error" $CVMFS_TEST405_DUCC_ERR
     done
-    echo "*** Converted recipe successfully"
+	echo "*** Converted recipe successfully"
+
+	if [ ! -f "$PODMAN_STORAGE_CONF" ]; then
+		sudo mkdir -p /etc/containers || return 10
+		if [ -f /usr/share/containers/storage.conf ]; then
+			sudo cp /usr/share/containers/storage.conf "$PODMAN_STORAGE_CONF" || return 10
+		else
+			echo "podman storage config template missing, creating minimal $PODMAN_STORAGE_CONF"
+			PODMAN_STORAGE_CONF_CREATED=1
+			sudo tee "$PODMAN_STORAGE_CONF" > /dev/null << EOL
+[storage]
+driver = "overlay"
+runroot = "/run/containers/storage"
+graphroot = "/var/lib/containers/storage"
+
+[storage.options]
+additionalimagestores = []
+EOL
+		fi
+	fi
+	if ! sudo grep -q "additionalimage" "$PODMAN_STORAGE_CONF"; then
+		if sudo grep -q "^\[storage.options\]" "$PODMAN_STORAGE_CONF"; then
+			sudo sed -i -e "/^\[storage.options\]/a additionalimagestores = []" "$PODMAN_STORAGE_CONF" || return 10
+		else
+			sudo tee -a "$PODMAN_STORAGE_CONF" > /dev/null << EOL
+[storage.options]
+additionalimagestores = []
+EOL
+		fi
+	fi
 
 	# add the repository to configuration file
 	additionalstore="/cvmfs/"$CVMFS_TEST405_REPOSITORY"/podmanStore"
-	sudo sed -i -e "/additionalimage.*/a\"$additionalstore\"," /etc/containers/storage.conf || return 10
+	if sudo grep -q "additionalimagestores = \\[\\]" "$PODMAN_STORAGE_CONF"; then
+		sudo sed -i -e "s|additionalimagestores = \\[\\]|additionalimagestores = [\"$additionalstore\"]|" "$PODMAN_STORAGE_CONF" || return 10
+	else
+		sudo grep -q "additionalimage" "$PODMAN_STORAGE_CONF" || {
+			echo "missing additionalimagestores entry in $PODMAN_STORAGE_CONF"
+			return 10
+		}
+		sudo sed -i -e "/additionalimage.*/a\"$additionalstore\"," "$PODMAN_STORAGE_CONF" || return 10
+	fi
+	sudo grep -q "$CVMFS_TEST405_REPOSITORY/podmanStore" "$PODMAN_STORAGE_CONF" || {
+		echo "failed to inject additional image store in $PODMAN_STORAGE_CONF"
+		return 10
+	}
 
 	# run the image using podman
 	sudo podman run --rm ubuntu echo "hello from ubuntu container" || return $?
 
 	echo "*** Test successfull ***"
-
-	sudo sed -i "/$CVMFS_TEST405_REPOSITORY/d" /etc/containers/storage.conf
 
 	return 0
 }
