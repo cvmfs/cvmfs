@@ -44,7 +44,7 @@ func TestConstructDeleteCommandsSubdir(t *testing.T) {
 
 func TestConstructDeleteCommandsSubdirMockRepoFormat(t *testing.T) {
 	paths := []string{".layers/aa", "target_subdir/.layers/bb"}
-	commands, _ := ConstructDeleteCommands(paths, 10, "../../tmp/mockrepo:target_subdir")
+	commands, _ := ConstructDeleteCommands(paths, 10, "../../tmp/mockrepo///target_subdir")
 	if len(commands) != 1 {
 		t.Errorf("Delete command missing")
 	}

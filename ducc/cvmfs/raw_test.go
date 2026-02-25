@@ -10,8 +10,8 @@ func TestLockRepoKey(t *testing.T) {
 	}{
 		{"plain_repo", "repo.cern.ch", "repo.cern.ch"},
 		{"repo_with_subdir_slash", "repo.cern.ch/ducc/subdir", "repo.cern.ch"},
-		{"repo_with_subdir_colon", "repo.cern.ch:ducc/subdir", "repo.cern.ch"},
-		{"mock_repo_with_subdir", "../../tmp/mockrepo:target_subdir", "../../tmp/mockrepo"},
+		{"repo_with_subdir_triple_slash", "repo.cern.ch///ducc/subdir", "repo.cern.ch"},
+		{"mock_repo_with_subdir", "../../tmp/mockrepo///target_subdir", "../../tmp/mockrepo"},
 	}
 
 	for _, tc := range cases {
@@ -33,8 +33,8 @@ func TestTransactionRepoName(t *testing.T) {
 	}{
 		{"plain_repo", "repo.cern.ch", "repo.cern.ch"},
 		{"repo_with_subdir_slash", "repo.cern.ch/ducc/subdir", "repo.cern.ch"},
-		{"repo_with_subdir_colon", "repo.cern.ch:ducc/subdir", "repo.cern.ch"},
-		{"mock_repo_with_subdir", "../../tmp/mockrepo:target_subdir", "../../tmp/mockrepo"},
+		{"repo_with_subdir_triple_slash", "repo.cern.ch///ducc/subdir", "repo.cern.ch"},
+		{"mock_repo_with_subdir", "../../tmp/mockrepo///target_subdir", "../../tmp/mockrepo"},
 	}
 
 	for _, tc := range cases {

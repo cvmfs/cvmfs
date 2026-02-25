@@ -11,12 +11,12 @@ func TestGetRepoAndSubdir(t *testing.T) {
 		// Basic cases
 		{"repo.cern.ch", "repo.cern.ch", ""},
 		{"repo.cern.ch/subdir", "repo.cern.ch", "subdir"},
-		{"repo.cern.ch:subdir", "repo.cern.ch", "subdir"},
+		{"repo.cern.ch///subdir", "repo.cern.ch", "subdir"},
 		{"repo.cern.ch/nested/subdir", "repo.cern.ch", "nested/subdir"},
-		{"repo.cern.ch:nested/subdir", "repo.cern.ch", "nested/subdir"},
+		{"repo.cern.ch///nested/subdir", "repo.cern.ch", "nested/subdir"},
 		// Relative paths (for testing)
 		{"../../tmp/mockrepo", "../../tmp/mockrepo", ""},
-		{"../../tmp/mockrepo:subdir", "../../tmp/mockrepo", "subdir"},
+		{"../../tmp/mockrepo///subdir", "../../tmp/mockrepo", "subdir"},
 		{"/../../tmp/mockrepo", "/../../tmp/mockrepo", ""},
 		{"/tmp/mockrepo", "/tmp/mockrepo", ""},
 		{"/tmp/mockrepo/subdir", "/tmp/mockrepo/subdir", ""},
@@ -94,8 +94,8 @@ func TestPrefixRepoSubdirOnce(t *testing.T) {
 			expected: "compat",
 		},
 		{
-			name:     "mock_repo_colon_separator",
-			repo:     "../../tmp/mockrepo:target_subdir",
+			name:     "mock_repo_triple_slash_separator",
+			repo:     "../../tmp/mockrepo///target_subdir",
 			path:     ".layers/aa",
 			expected: "target_subdir/.layers/aa",
 		},

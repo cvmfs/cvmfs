@@ -5,12 +5,12 @@ echo "WARNING: This is a mock command for testing of ducc that does noops and si
 # Since /cvmfs + reponame  and /var/spool/cvmfs is hardcoded,
 # CVMFS_TEST_REPO is expected to look like ../../../tmp/testrepofolder
 
-# Helper function to extract repo name from repo or repo:subdir or repo/subdir
+# Helper function to extract repo name from repo or repo///subdir or repo/subdir
 get_repo_name() {
     local repo="$1"
-    # Handle colon separator (for testing): "../../tmp/mockrepo:subdir"
-    if [[ "$repo" == *":"* ]]; then
-        echo "${repo%%:*}"
+    # Handle triple-slash separator (for testing): "../../tmp/mockrepo///subdir"
+    if [[ "$repo" == *"///"* ]]; then
+        echo "${repo%%///*}"
     else
         # Handle slash separator: "repo.cern.ch/subdir" or "../tmp/mockrepo"
         echo "${repo%%/*}"
@@ -20,9 +20,9 @@ get_repo_name() {
 # Helper function to extract subdir from repo specification
 get_subdir() {
     local repo="$1"
-    # Handle colon separator: "../../tmp/mockrepo:subdir"
-    if [[ "$repo" == *":"* ]]; then
-        local rest="${repo#*:}"
+    # Handle triple-slash separator: "../../tmp/mockrepo///subdir"
+    if [[ "$repo" == *"///"* ]]; then
+        local rest="${repo#*///}"
         echo "${rest%/}"
     elif [[ "$repo" == *"/"* ]] && [[ "$repo" != ".."* ]]; then
         # Handle slash separator only for absolute paths: "repo.cern.ch/subdir"

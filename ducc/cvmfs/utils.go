@@ -11,17 +11,19 @@ import (
 // component is the repository name and the rest is the subdirectory path.
 //
 // For testing with mock repositories (relative paths like "../../tmp/mockrepo"),
-// use a colon separator: "../../tmp/mockrepo:subdir" to avoid ambiguity with
-// the slashes in the relative path itself.
+// use a triple-slash separator: "../../tmp/mockrepo///subdir" to avoid ambiguity
+// with the slashes in the relative path itself. The string stays a valid path
+// (multiple / are treated as one by the OS) and avoids headaches with filepaths
+// that could contain literal colons.
 //
 // Examples:
-//   - "unpacked.cern.ch"           → ("unpacked.cern.ch", "")
-//   - "unpacked.cern.ch/images"    → ("unpacked.cern.ch", "images")
-//   - "../../tmp/mock:subdir"      → ("../../tmp/mock", "subdir")
+//   - "unpacked.cern.ch"              → ("unpacked.cern.ch", "")
+//   - "unpacked.cern.ch/images"       → ("unpacked.cern.ch", "images")
+//   - "../../tmp/mock///subdir"       → ("../../tmp/mock", "subdir")
 func GetRepoAndSubdir(cvmfsRepo string) (repoName, subDir string) {
-	if strings.Contains(cvmfsRepo, ":") {
-		repoName, subDir, _ = strings.Cut(cvmfsRepo, ":")
-		subDir = strings.TrimSuffix(subDir, "/")
+	if idx := strings.Index(cvmfsRepo, "///"); idx >= 0 {
+		repoName = cvmfsRepo[:idx]
+		subDir = strings.TrimSuffix(cvmfsRepo[idx+3:], "/")
 		return
 	}
 	if strings.HasPrefix(cvmfsRepo, "..") || strings.HasPrefix(cvmfsRepo, "/..") {
