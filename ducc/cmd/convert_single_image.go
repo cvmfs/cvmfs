@@ -2,12 +2,16 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	"github.com/cvmfs/ducc/cvmfs"
+	exec "github.com/cvmfs/ducc/exec"
 	"github.com/cvmfs/ducc/lib"
 	l "github.com/cvmfs/ducc/log"
 )
@@ -66,6 +70,19 @@ var convertSingleImageCmd = &cobra.Command{
 			l.Log().Errorf("The repository %s does not seem to exist.", cvmfsRepo)
 			return fmt.Errorf("The repository %s does not seem to exist.", cvmfsRepo)
 		}
+
+		// Set up signal handler to abort the cvmfs transaction on Ctrl-C
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+		go func() {
+			sig := <-sigChan
+			repoName, _ := cvmfs.GetRepoAndSubdir(cvmfsRepo)
+			l.Log().WithFields(log.Fields{"signal": sig, "repo": repoName}).
+				Info("Received signal, trying to abort the cvmfs transaction")
+			exec.ExecCommand("cvmfs_server", "abort", "-f", repoName).Start()
+			os.Exit(1)
+		}()
+		defer signal.Stop(sigChan)
 
 		input, err := lib.ParseImage(inputImage)
 		wish, err := lib.CreateWish(input, thinImageName, cvmfsRepo, username, username)
