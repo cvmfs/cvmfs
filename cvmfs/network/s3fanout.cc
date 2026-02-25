@@ -24,6 +24,101 @@ using namespace std;  // NOLINT
 
 namespace s3fanout {
 
+/**
+ * Escapes characters that are not allowed in XML text content.
+ * Only & and < need escaping; >, ', " are safe in text nodes.
+ */
+static string XmlEscape(const string &input) {
+  string result;
+  result.reserve(input.size());
+  for (unsigned i = 0; i < input.size(); ++i) {
+    switch (input[i]) {
+      case '&': result += "&amp;"; break;
+      case '<': result += "&lt;"; break;
+      default:  result += input[i]; break;
+    }
+  }
+  return result;
+}
+
+
+/**
+ * Builds an S3 DeleteObjects XML request body for multi-object delete.
+ * Uses Quiet mode so the response only contains errors, not successes.
+ */
+string ComposeDeleteMultiXml(const vector<string> &keys) {
+  string xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+               "<Delete><Quiet>true</Quiet>\n";
+  // ~70 bytes per <Object><Key>...</Key></Object> entry
+  xml.reserve(xml.size() + keys.size() * 70 + 10);
+  for (unsigned i = 0; i < keys.size(); ++i) {
+    xml += "<Object><Key>" + XmlEscape(keys[i]) + "</Key></Object>\n";
+  }
+  xml += "</Delete>";
+  return xml;
+}
+
+
+/**
+ * Parses the S3 DeleteObjects error response XML.
+ * In Quiet mode, the response only contains <Error> elements for failed keys.
+ * Returns the number of errors found.
+ */
+unsigned ParseDeleteMultiResponse(const string &response,
+                                  vector<string> *error_keys,
+                                  vector<string> *error_codes,
+                                  vector<string> *error_messages) {
+  unsigned num_errors = 0;
+  string::size_type pos = 0;
+
+  while (true) {
+    const string::size_type err_start = response.find("<Error>", pos);
+    if (err_start == string::npos)
+      break;
+    const string::size_type err_end = response.find("</Error>", err_start);
+    if (err_end == string::npos)
+      break;
+
+    const string error_block = response.substr(err_start,
+                                                err_end - err_start);
+    num_errors++;
+
+    // Extract <Key>...</Key>
+    const string::size_type key_start = error_block.find("<Key>");
+    const string::size_type key_end = error_block.find("</Key>");
+    if (key_start != string::npos && key_end != string::npos) {
+      error_keys->push_back(
+          error_block.substr(key_start + 5, key_end - key_start - 5));
+    } else {
+      error_keys->push_back("");
+    }
+
+    // Extract <Code>...</Code>
+    const string::size_type code_start = error_block.find("<Code>");
+    const string::size_type code_end = error_block.find("</Code>");
+    if (code_start != string::npos && code_end != string::npos) {
+      error_codes->push_back(
+          error_block.substr(code_start + 6, code_end - code_start - 6));
+    } else {
+      error_codes->push_back("");
+    }
+
+    // Extract <Message>...</Message>
+    const string::size_type msg_start = error_block.find("<Message>");
+    const string::size_type msg_end = error_block.find("</Message>");
+    if (msg_start != string::npos && msg_end != string::npos) {
+      error_messages->push_back(
+          error_block.substr(msg_start + 9, msg_end - msg_start - 9));
+    } else {
+      error_messages->push_back("");
+    }
+
+    pos = err_end + 8;  // length of "</Error>"
+  }
+
+  return num_errors;
+}
+
 const char *S3FanoutManager::kCacheControlCas = "Cache-Control: max-age=259200";
 const unsigned S3FanoutManager::kDefault429ThrottleMs = 250;
 const unsigned S3FanoutManager::kMax429ThrottleMs = 10000;
@@ -189,11 +284,17 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
 
 
 /**
- * For the time being, ignore all received information in the HTTP body
+ * Captures the HTTP response body. For kReqDeleteMulti, the response contains
+ * XML error information. For other requests, the body is ignored.
  */
-static size_t CallbackCurlBody(char * /*ptr*/, size_t size, size_t nmemb,
-                               void * /*userdata*/) {
-  return size * nmemb;
+static size_t CallbackCurlBody(char *ptr, size_t size, size_t nmemb,
+                               void *userdata) {
+  const size_t num_bytes = size * nmemb;
+  JobInfo *info = static_cast<JobInfo *>(userdata);
+  if (info != NULL && info->request == JobInfo::kReqDeleteMulti) {
+    info->response_body.append(ptr, num_bytes);
+  }
+  return num_bytes;
 }
 
 
@@ -438,6 +539,7 @@ CURL *S3FanoutManager::AcquireCurlHandle() const {
     assert(retval == CURLE_OK);
     retval = curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, CallbackCurlBody);
     assert(retval == CURLE_OK);
+    // WRITEDATA is set per-request in InitializeRequest
   } else {
     handle = *(pool_handles_idle_->begin());
     pool_handles_idle_->erase(pool_handles_idle_->begin());
@@ -506,6 +608,14 @@ bool S3FanoutManager::MkV2Authz(const JobInfo &info,
   if (config_.x_amz_acl != "") {
     to_sign += "x-amz-acl:" + config_.x_amz_acl + "\n" +  // default ACL
                "/" + config_.bucket + "/" + info.object_key;
+  }
+  // S3 V2 requires subresources to be included in the string to sign.
+  // For kReqDeleteMulti, object_key is intentionally empty: the canonical
+  // resource becomes "/<bucket>/?delete", matching the POST URL.
+  if (info.request == JobInfo::kReqDeleteMulti) {
+    if (config_.x_amz_acl == "")
+      to_sign += "/" + config_.bucket + "/" + info.object_key;
+    to_sign += "?delete";
   }
   LogCvmfs(kLogS3Fanout, kLogDebug, "%s string to sign for: %s",
            request.c_str(), info.object_key.c_str());
@@ -621,8 +731,15 @@ bool S3FanoutManager::MkV4Authz(const JobInfo &info,
                                          : (string("/") + config_.bucket + "/"
                                             + info.object_key);
 
+  // V4 canonical query string: empty for most requests, "delete=" for
+  // multi-object delete (the S3 ?delete parameter has no value)
+  const string canonical_query = (info.request == JobInfo::kReqDeleteMulti)
+                                     ? "delete="
+                                     : "";
+
   const string canonical_request = GetRequestString(info) + "\n"
-                                   + GetUriEncode(uri, false) + "\n" + "\n"
+                                   + GetUriEncode(uri, false) + "\n"
+                                   + canonical_query + "\n"
                                    + canonical_headers + "\n" + signed_headers
                                    + "\n" + payload_hash;
 
@@ -646,6 +763,20 @@ bool S3FanoutManager::MkV4Authz(const JobInfo &info,
                      + ","
                        "Signature="
                      + signature);
+
+  // S3 requires Content-MD5 for multi-object delete
+  if (info.request == JobInfo::kReqDeleteMulti) {
+    shash::Any md5_hash(shash::kMd5);
+    unsigned char *data;
+    const unsigned int nbytes = info.origin->Data(
+        reinterpret_cast<void **>(&data), info.origin->GetSize(), 0);
+    assert(nbytes == info.origin->GetSize());
+    shash::HashMem(data, nbytes, &md5_hash);
+    headers->push_back(
+        "Content-MD5: "
+        + Base64(string(reinterpret_cast<char *>(md5_hash.digest),
+                        md5_hash.GetDigestSize())));
+  }
   return true;
 }
 
@@ -778,9 +909,9 @@ int S3FanoutManager::InitializeDnsSettings(CURL *handle,
 
 bool S3FanoutManager::MkPayloadHash(const JobInfo &info,
                                     string *hex_hash) const {
-  if ((info.request == JobInfo::kReqHeadOnly)
-      || (info.request == JobInfo::kReqHeadPut)
-      || (info.request == JobInfo::kReqDelete)) {
+  if (info.request == JobInfo::kReqHeadOnly
+      || info.request == JobInfo::kReqHeadPut
+      || info.request == JobInfo::kReqDelete) {
     switch (config_.authz_method) {
       case kAuthzAwsV2:
         hex_hash->clear();
@@ -800,7 +931,10 @@ bool S3FanoutManager::MkPayloadHash(const JobInfo &info,
     return true;
   }
 
-  // PUT, there is actually payload
+  // kReqDeleteMulti is a POST with a body (XML payload), same hashing as PUT
+  // falls through intentionally.
+
+  // PUT or POST with payload
   shash::Any payload_hash(shash::kMd5);
 
   unsigned char *data;
@@ -838,6 +972,8 @@ string S3FanoutManager::GetRequestString(const JobInfo &info) const {
       return "PUT";
     case JobInfo::kReqDelete:
       return "DELETE";
+    case JobInfo::kReqDeleteMulti:
+      return "POST";
     default:
       PANIC(NULL);
   }
@@ -857,6 +993,7 @@ string S3FanoutManager::GetContentType(const JobInfo &info) const {
     case JobInfo::kReqPutHtml:
       return "text/html";
     case JobInfo::kReqPutBucket:
+    case JobInfo::kReqDeleteMulti:
       return "text/xml";
     default:
       PANIC(NULL);
@@ -885,9 +1022,9 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
   InitializeDnsSettings(handle, complete_hostname_);
 
   CURLcode retval;
-  if ((info->request == JobInfo::kReqHeadOnly)
-      || (info->request == JobInfo::kReqHeadPut)
-      || (info->request == JobInfo::kReqDelete)) {
+  if (info->request == JobInfo::kReqHeadOnly
+      || info->request == JobInfo::kReqHeadPut
+      || info->request == JobInfo::kReqDelete) {
     retval = curl_easy_setopt(handle, CURLOPT_UPLOAD, 0);
     assert(retval == CURLE_OK);
     retval = curl_easy_setopt(handle, CURLOPT_NOBODY, 1);
@@ -901,6 +1038,18 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
       retval = curl_easy_setopt(handle, CURLOPT_CUSTOMREQUEST, NULL);
       assert(retval == CURLE_OK);
     }
+  } else if (info->request == JobInfo::kReqDeleteMulti) {
+    // POST request with XML body read from origin buffer
+    retval = curl_easy_setopt(handle, CURLOPT_UPLOAD, 1);
+    assert(retval == CURLE_OK);
+    retval = curl_easy_setopt(handle, CURLOPT_NOBODY, 0);
+    assert(retval == CURLE_OK);
+    retval = curl_easy_setopt(handle, CURLOPT_CUSTOMREQUEST, "POST");
+    assert(retval == CURLE_OK);
+    retval = curl_easy_setopt(handle, CURLOPT_INFILESIZE_LARGE,
+                              static_cast<curl_off_t>(info->origin->GetSize()));
+    assert(retval == CURLE_OK);
+    info->response_body.clear();
   } else {
     retval = curl_easy_setopt(handle, CURLOPT_CUSTOMREQUEST, NULL);
     assert(retval == CURLE_OK);
@@ -965,6 +1114,9 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
   retval = curl_easy_setopt(handle, CURLOPT_READDATA,
                             static_cast<void *>(info));
   assert(retval == CURLE_OK);
+  retval = curl_easy_setopt(handle, CURLOPT_WRITEDATA,
+                            static_cast<void *>(info));
+  assert(retval == CURLE_OK);
   retval = curl_easy_setopt(handle, CURLOPT_HTTPHEADER, info->http_headers);
   assert(retval == CURLE_OK);
   if (opt_ipv4_only_) {
@@ -1014,7 +1166,9 @@ void S3FanoutManager::SetUrlOptions(JobInfo *info) const {
     assert(retval == CURLE_OK);
   }
 
-  const string url = MkUrl(info->object_key);
+  string url = MkUrl(info->object_key);
+  if (info->request == JobInfo::kReqDeleteMulti)
+    url += "?delete";
   retval = curl_easy_setopt(curl_handle, CURLOPT_URL, url.c_str());
   assert(retval == CURLE_OK);
 
@@ -1167,11 +1321,14 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
   if (try_again) {
     if (info->request == JobInfo::kReqPutCas
         || info->request == JobInfo::kReqPutDotCvmfs
-        || info->request == JobInfo::kReqPutHtml) {
+        || info->request == JobInfo::kReqPutHtml
+        || info->request == JobInfo::kReqDeleteMulti) {
       LogCvmfs(kLogS3Fanout, kLogDebug, "Trying again to upload %s",
                info->object_key.c_str());
       // Reset origin
       info->origin->Rewind();
+      if (info->request == JobInfo::kReqDeleteMulti)
+        info->response_body.clear();
     }
     Backoff(info);
     info->error_code = kFailOk;

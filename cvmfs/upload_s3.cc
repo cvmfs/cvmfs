@@ -9,6 +9,7 @@
 #include <inttypes.h>
 #include <unistd.h>
 
+#include <set>
 #include <string>
 #include <vector>
 
@@ -17,6 +18,7 @@
 #include "options.h"
 #include "util/exception.h"
 #include "util/logging.h"
+#include "util/mutex.h"
 #include "util/posix.h"
 #include "util/string.h"
 
@@ -51,6 +53,7 @@ S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition)
     , authz_method_(s3fanout::kAuthzAwsV2)
     , peek_before_put_(true)
     , use_https_(false)
+    , batch_delete_enabled_(true)
     , proxy_("")
     , temporary_path_(spooler_definition.temporary_path)
     , x_amz_acl_("public-read") {
@@ -58,10 +61,16 @@ S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition)
          && spooler_definition.driver_type == SpoolerDefinition::S3);
 
   atomic_init32(&io_errors_);
+  const int mutex_ret = pthread_mutex_init(&delete_batch_mutex_, NULL);
+  assert(mutex_ret == 0);
 
   if (!ParseSpoolerDefinition(spooler_definition)) {
     PANIC(kLogStderr, "Error in parsing the spooler definition");
   }
+
+  // Disable batch delete for Azure (not supported)
+  if (authz_method_ == s3fanout::kAuthzAzure)
+    batch_delete_enabled_ = false;
 
   s3fanout::S3FanoutManager::S3Config s3config;
   s3config.access_key = access_key_;
@@ -99,6 +108,7 @@ S3Uploader::~S3Uploader() {
   // Signal termination to our own worker thread
   s3fanout_mgr_->PushCompletedJob(NULL);
   pthread_join(thread_collect_results_, NULL);
+  pthread_mutex_destroy(&delete_batch_mutex_);
 }
 
 
@@ -205,6 +215,10 @@ bool S3Uploader::ParseSpoolerDefinition(
     x_amz_acl_ = parameter;
   }
 
+  if (options_manager.GetValue("CVMFS_S3_BATCH_DELETE", &parameter)) {
+    batch_delete_enabled_ = options_manager.IsOn(parameter);
+  }
+
   if (options_manager.GetValue("CVMFS_S3_USE_HTTPS", &parameter)) {
     use_https_ = options_manager.IsOn(parameter);
   }
@@ -280,15 +294,50 @@ void *S3Uploader::MainCollectResults(void *data) {
     if (info->error_code != s3fanout::kFailOk) {
       if ((info->request != s3fanout::JobInfo::kReqHeadOnly)
           || (info->error_code != s3fanout::kFailNotFound)) {
-        LogCvmfs(kLogUploadS3, kLogStderr,
-                 "Upload job for '%s' failed. (error code: %d - %s)",
-                 info->object_key.c_str(), info->error_code,
-                 s3fanout::Code2Ascii(info->error_code));
+        if (info->request == s3fanout::JobInfo::kReqDeleteMulti) {
+          LogCvmfs(kLogUploadS3, kLogStderr,
+                   "Batch delete of %lu objects failed. (error code: %d - %s)",
+                   info->multi_delete_keys.size(), info->error_code,
+                   s3fanout::Code2Ascii(info->error_code));
+        } else {
+          LogCvmfs(kLogUploadS3, kLogStderr,
+                   "Upload job for '%s' failed. (error code: %d - %s)",
+                   info->object_key.c_str(), info->error_code,
+                   s3fanout::Code2Ascii(info->error_code));
+        }
         reply_code = 99;
         atomic_inc32(&uploader->io_errors_);
       }
     }
-    if (info->request == s3fanout::JobInfo::kReqDelete) {
+    if (info->request == s3fanout::JobInfo::kReqDeleteMulti) {
+      // Parse response for per-key errors
+      std::set<std::string> failed_keys;
+      if (info->error_code == s3fanout::kFailOk
+          && !info->response_body.empty()) {
+        std::vector<std::string> error_keys, error_codes, error_messages;
+        const unsigned num_errors = s3fanout::ParseDeleteMultiResponse(
+            info->response_body, &error_keys, &error_codes, &error_messages);
+        for (unsigned i = 0; i < num_errors; ++i) {
+          LogCvmfs(kLogUploadS3, kLogStderr,
+                   "S3 multi-delete error for key '%s': %s - %s",
+                   error_keys[i].c_str(), error_codes[i].c_str(),
+                   error_messages[i].c_str());
+          atomic_inc32(&uploader->io_errors_);
+          failed_keys.insert(error_keys[i]);
+        }
+      }
+      // Decrement jobs_in_flight_ once per key in the batch.
+      // Report per-key error code so callers can distinguish failures.
+      const unsigned batch_size = info->multi_delete_keys.size();
+      const int batch_error = (info->error_code != s3fanout::kFailOk) ? 99 : 0;
+      for (unsigned i = 0; i < batch_size; ++i) {
+        const int key_error = batch_error
+            ? batch_error
+            : (failed_keys.count(info->multi_delete_keys[i]) ? 99 : 0);
+        uploader->Respond(NULL, UploaderResults(UploaderResults::kRemove,
+                                                key_error));
+      }
+    } else if (info->request == s3fanout::JobInfo::kReqDelete) {
       uploader->Respond(NULL, UploaderResults());
     } else if (info->request == s3fanout::JobInfo::kReqHeadOnly) {
       if (info->error_code == s3fanout::kFailNotFound)
@@ -454,13 +503,57 @@ s3fanout::JobInfo *S3Uploader::CreateJobInfo(const std::string &path) const {
 
 void S3Uploader::DoRemoveAsync(const std::string &file_to_delete) {
   const std::string mangled_path = repository_alias_ + "/" + file_to_delete;
-  s3fanout::JobInfo *info = CreateJobInfo(mangled_path);
 
-  info->request = s3fanout::JobInfo::kReqDelete;
+  if (!batch_delete_enabled_) {
+    s3fanout::JobInfo *info = CreateJobInfo(mangled_path);
+    info->request = s3fanout::JobInfo::kReqDelete;
+    LogCvmfs(kLogUploadS3, kLogDebug, "Asynchronously removing %s/%s",
+             bucket_.c_str(), info->object_key.c_str());
+    s3fanout_mgr_->PushNewJob(info);
+    return;
+  }
 
-  LogCvmfs(kLogUploadS3, kLogDebug, "Asynchronously removing %s/%s",
-           bucket_.c_str(), info->object_key.c_str());
+  // Batch delete: collect keys and flush when batch is full
+  const MutexLockGuard guard(delete_batch_mutex_);
+  pending_deletes_.push_back(mangled_path);
+  if (pending_deletes_.size() >= kMaxBatchDeleteSize) {
+    FlushDeleteBatch();
+  }
+}
+
+
+void S3Uploader::FlushDeleteBatch() const {
+  // Caller must hold delete_batch_mutex_
+  if (pending_deletes_.empty())
+    return;
+
+  LogCvmfs(kLogUploadS3, kLogDebug,
+           "Flushing batch delete of %lu objects",
+           pending_deletes_.size());
+
+  // Build XML request body
+  const std::string xml = s3fanout::ComposeDeleteMultiXml(pending_deletes_);
+  FileBackedBuffer *buf = FileBackedBuffer::Create(kInMemoryObjectThreshold);
+  buf->Append(xml.data(), xml.length());
+  buf->Commit();
+
+  // The object_key for multi-delete is empty (URL is bucket root + ?delete)
+  s3fanout::JobInfo *info = new s3fanout::JobInfo("", NULL, buf);
+  info->request = s3fanout::JobInfo::kReqDeleteMulti;
+  info->multi_delete_keys.swap(pending_deletes_);
+
+  // Each key was already counted in jobs_in_flight_ by DoRemoveAsync().
+  // MainCollectResults will call Respond() once per key to balance them.
   s3fanout_mgr_->PushNewJob(info);
+}
+
+
+void S3Uploader::WaitForUpload() const {
+  {
+    const MutexLockGuard guard(delete_batch_mutex_);
+    FlushDeleteBatch();
+  }
+  AbstractUploader::WaitForUpload();
 }
 
 
