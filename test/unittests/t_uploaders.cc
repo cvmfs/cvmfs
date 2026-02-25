@@ -354,6 +354,26 @@ class T_Uploaders : public FileSandbox {
         response.reason = "Not Found";
       }
 
+    } else if (req.method == "POST"
+               && req.path.find("?delete") != std::string::npos) {
+      // Multi-object delete: parse <Key>...</Key> elements from XML body
+      std::string::size_type pos = 0;
+      while (true) {
+        std::string::size_type ks = req.body.find("<Key>", pos);
+        if (ks == std::string::npos)
+          break;
+        ks += 5;  // length of "<Key>"
+        std::string::size_type ke = req.body.find("</Key>", ks);
+        if (ke == std::string::npos)
+          break;
+        std::string key = req.body.substr(ks, ke - ks);
+        std::string path = T_Uploaders::dest_dir + "/" + key;
+        if (FileExists(path)) {
+          int retval = remove(path.c_str());
+          assert(retval == 0);
+        }
+        pos = ke + 6;  // length of "</Key>"
+      }
     } else if (req.method == "DELETE") {
       std::string path = T_Uploaders::dest_dir + "/" + req_file;
       if (FileExists(path)) {
