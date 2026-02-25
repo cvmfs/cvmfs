@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -38,20 +39,31 @@ const (
 )
 
 func GetNameWithArch(manifestEntry da.ManifestListItem) (nameWithArch string) {
-
-	nameWithArch = ""
-	//manifest := manifestEntry.Manifest
-
+	if manifestEntry.Platform.Architecture == "" {
+		return ""
+	}
 	if manifestEntry.Platform.Variant != nil {
-		nameWithArch = filepath.Join(".multiarch", nameWithArch, manifestEntry.Platform.Architecture+":"+*manifestEntry.Platform.Variant)
-	} else {
-		if manifestEntry.Platform.Architecture == "" {
-			nameWithArch = filepath.Join(nameWithArch, manifestEntry.Platform.Architecture)
-		} else {
-			nameWithArch = filepath.Join(".multiarch", nameWithArch, manifestEntry.Platform.Architecture)
+		return filepath.Join(".multiarch", manifestEntry.Platform.Architecture+":"+*manifestEntry.Platform.Variant)
+	}
+	return filepath.Join(".multiarch", manifestEntry.Platform.Architecture)
+}
+
+// filterManifestList returns the subset of manifests to process.
+// If multiArch is true, all manifests are returned.
+// If multiArch is false, only the manifest matching the native architecture is returned.
+func filterManifestList(manifestList da.ManifestList, multiArch bool) []da.ManifestListItem {
+	if multiArch {
+		return manifestList.Manifests
+	}
+	nativeArch := runtime.GOARCH
+	for _, entry := range manifestList.Manifests {
+		// Empty architecture means single-manifest (non-multi-arch) image; always include it
+		if entry.Platform.Architecture == "" || entry.Platform.Architecture == nativeArch {
+			return []da.ManifestListItem{entry}
 		}
 	}
-	return nameWithArch
+	// Fallback: if no match found, return all manifests
+	return manifestList.Manifests
 }
 
 func ConvertWishFlat(wish WishFriendly, multiArch bool) error {
@@ -71,26 +83,23 @@ func ConvertWishFlat(wish WishFriendly, multiArch bool) error {
 		l.LogE(err).Error("Error in creating catalog inside `.flat` directory")
 	}
 
-	//if _, err := os.Stat(filepath.Join("/", "cvmfs", wish.CvmfsRepo, ".multiarch", "current")); err != nil {
-	//	cvmfs.WithinTransaction(wish.CvmfsRepo, func() error {
-	//		os.MkdirAll(filepath.Join("/", "cvmfs", wish.CvmfsRepo, ".multiarch"), constants.DirPermision)
-	//		return os.Symlink("${CVMFS_DOCKER_ARCH:-"+filepath.Join("/", "cvmfs", wish.CvmfsRepo, ".multiarch", "amd64")+"}", filepath.Join("/", "cvmfs", wish.CvmfsRepo, ".multiarch", "current"))
-	//	})
-	//}
-	nameWithArch := ""
 	for _, inputImage := range wish.ExpandedTagImagesFlat {
-
-		manifestList, _ := inputImage.GetManifestList()
-		for _, manifestEntry := range manifestList.Manifests {
-
-			manifest := manifestEntry.Manifest
+		manifestList, err := inputImage.GetManifestList()
+		if err != nil {
+			l.LogE(err).Error("Error in getting the manifest list")
+			if firstError == nil {
+				firstError = err
+			}
+			continue
+		}
+		for _, manifestEntry := range filterManifestList(manifestList, multiArch) {
 			inputImage.Manifest = &(manifestEntry.Manifest)
-			nameWithArch = GetNameWithArch(manifestEntry)
+			nameWithArch := GetNameWithArch(manifestEntry)
 			publicSymlinkPath := inputImage.GetPublicSymlinkPathWithArch(nameWithArch)
 			completePubSymPath := filepath.Join("/", "cvmfs", wish.CvmfsRepo, publicSymlinkPath)
 			pubDirInfo, errPub := os.Stat(completePubSymPath)
 
-			singularityPrivatePath, err := inputImage.GetSingularityPath2(manifest)
+			singularityPrivatePath, err := inputImage.GetSingularityPath2(manifestEntry.Manifest)
 			if err != nil {
 				errF := fmt.Errorf("Error in getting the path where to save Singularity filesystem: %s", err)
 				l.LogE(err).Warning(errF)
@@ -343,34 +352,38 @@ func ConvertWish(wish WishFriendly, convertAgain, forceDownload, multiArch bool,
 	return firstError
 }
 
-func convertInputOutput(inputImage *Image, repo string, convertAgain, forceDownload bool, multiArch bool, maxConcurrentDownloads int) (err error) {
+func convertInputOutput(inputImage *Image, repo string, convertAgain, forceDownload bool, multiArch bool, maxConcurrentDownloads int) error {
 	manifestList, err := inputImage.GetManifestList()
-
-	for _, manifestEntry := range manifestList.Manifests {
+	if err != nil {
+		l.LogE(err).Error("Error in getting the manifest list")
+		return err
+	}
+	var firstError error
+	for _, manifestEntry := range filterManifestList(manifestList, multiArch) {
 		inputImage.Manifest = &(manifestEntry.Manifest)
 		nameWithArch := GetNameWithArch(manifestEntry)
 		nameWithArch = filepath.Join(nameWithArch, inputImage.GetSimpleName())
-		convertInputOutput2(inputImage, nameWithArch, repo, convertAgain, forceDownload, multiArch, maxConcurrentDownloads)
+		if err := convertInputOutput2(inputImage, nameWithArch, repo, convertAgain, forceDownload, maxConcurrentDownloads); err != nil {
+			if firstError == nil {
+				firstError = err
+			}
+		}
 	}
-	return err
+	return firstError
 }
 
-func convertInputOutput2(inputImage *Image, nameWithArch, repo string, convertAgain, forceDownload bool, multiArch bool, maxConcurrentDownloads int) (err error) {
+func convertInputOutput2(inputImage *Image, nameWithArch, repo string, convertAgain, forceDownload bool, maxConcurrentDownloads int) (err error) {
 	path := filepath.Join("/", "cvmfs", repo, ".metadata")
 	manifest, _ := inputImage.GetManifest()
 
 	manifestPath := filepath.Join(path, nameWithArch, "manifest.json")
-	l.Log().WithFields(log.Fields{"manifestPath": manifestPath}).Info(
-		"going for alreadyconverted")
 	alreadyConverted := AlreadyConverted(manifestPath, manifest.Config.Digest)
-	l.Log().WithFields(log.Fields{"alreadyConverted": alreadyConverted}).Info(
-		"Already converted result")
 
 	if alreadyConverted == ConversionMatch {
 		if !convertAgain {
 			l.Log().WithFields(log.Fields{"alreadyConverted": alreadyConverted}).Info(
 				"Already converted the image, skipping.")
-			//return
+			return nil
 		}
 	}
 
@@ -409,10 +422,6 @@ func convertInputOutput2(inputImage *Image, nameWithArch, repo string, convertAg
 			} else {
 				pathExists = true
 			}
-			l.Log().WithFields(
-				log.Fields{"pathExists": pathExists}).
-				Info("pathexists")
-
 			// need to run this into a goroutine to avoid a deadlock
 			wg.Add(1)
 			go func(layerDigest string) {
@@ -451,8 +460,7 @@ func convertInputOutput2(inputImage *Image, nameWithArch, repo string, convertAg
 		l.Log().Info("Finished pushing the layers into CVMFS")
 	}()
 	// we create a temp directory for all the files needed, when this function finish we can remove the temp directory cleaning up
-	tmpDir := ""
-	tmpDir, err = temp.UserDefinedTempDir("", "conversion")
+	tmpDir, err := temp.UserDefinedTempDir("", "conversion")
 	if err != nil {
 		l.LogE(err).Error("Error in creating a temporary directory for all the files")
 		return
@@ -460,10 +468,9 @@ func convertInputOutput2(inputImage *Image, nameWithArch, repo string, convertAg
 	defer os.RemoveAll(tmpDir)
 
 	// this will start to feed the above goroutine by writing into layersChanell
-	l.Log().Info("GetLayers", manifest)
 	err = inputImage.GetLayers(manifest, layersChanell, manifestChanell, stopGettingLayers, tmpDir, maxConcurrentDownloads)
 	if err != nil {
-		l.Log().Info("GetLayers err", err)
+		l.LogE(err).Error("Error in getting layers")
 		return err
 	}
 
@@ -478,12 +485,6 @@ func convertInputOutput2(inputImage *Image, nameWithArch, repo string, convertAg
 		wg.Done()
 	}()
 	wg.Wait()
-	manifestPath2 := filepath.Join(".metadata", nameWithArch, "manifest.json")
-	l.Log().Info("manifestPath2", manifestPath2)
-	errIng := cvmfs.PublishToCVMFS(repo, manifestPath2, <-manifestChanell)
-	if errIng != nil {
-		l.LogE(errIng).Error("Error in storing the manifest in the repository")
-	}
 
 	// we wait for the goroutines to finish
 	// and if there was no error we conclude everything writing the manifest into the repository
@@ -496,6 +497,12 @@ func convertInputOutput2(inputImage *Image, nameWithArch, repo string, convertAg
 	}
 
 	if noErrorInConversionValue {
+		manifestPath2 := filepath.Join(".metadata", nameWithArch, "manifest.json")
+		errIng := cvmfs.PublishToCVMFS(repo, manifestPath2, <-manifestChanell)
+		if errIng != nil {
+			l.LogE(errIng).Error("Error in storing the manifest in the repository")
+			return errIng
+		}
 
 		var errRemoveSchedule error
 		if alreadyConverted == ConversionNotMatch {
@@ -506,16 +513,11 @@ func convertInputOutput2(inputImage *Image, nameWithArch, repo string, convertAg
 				return errRemoveSchedule
 			}
 		}
-		if errIng == nil && errRemoveSchedule == nil {
-			l.Log().Info("Conversion completed")
-			return nil
-		}
-		return
-	} else {
-		l.Log().Warn("Some error during the conversion, we are not storing it into the database")
-		return
+		l.Log().Info("Conversion completed")
+		return nil
 	}
 
+	l.Log().Warn("Some error during the conversion, we are not storing it into the database")
 	return nil
 }
 
@@ -660,8 +662,6 @@ func StoreLayerInfo(CVMFSRepo string, layerDigest string, r ReadHashCloseSizer) 
 }
 
 func AlreadyConverted(manifestPath, reference string) ConversionResult {
-
-	fmt.Println(manifestPath)
 	manifestStat, err := os.Stat(manifestPath)
 	if os.IsNotExist(err) {
 		l.Log().Info("Manifest not existing")
@@ -687,7 +687,6 @@ func AlreadyConverted(manifestPath, reference string) ConversionResult {
 		l.LogE(err).Warning("Error in unmarshaling the manifest")
 		return ConversionNotFound
 	}
-	fmt.Printf("%s == %s\n", manifest.Config.Digest, reference)
 	if manifest.Config.Digest == reference {
 		return ConversionMatch
 	}

@@ -26,7 +26,7 @@ var (
 
 var (
 	convertAgain, overwriteLayer, skipLayers, skipFlat, skipThinImage, skipPodman, multiArch bool
-	maxConcurrentDownloads                                                                    int
+	maxConcurrentDownloads                                                                   int
 )
 
 func init() {

@@ -197,11 +197,6 @@ func SetupRegistries() {
 	}
 }
 
-//func (i *Image) GetNameWithArch() string {
-//	name := GetSimpleName()
-//  return name
-//}
-
 func (i *Image) GetSimpleName() string {
 	name := fmt.Sprintf("%s/%s", i.Registry, i.Repository)
 	if i.Tag == "" {
@@ -686,13 +681,9 @@ func filterUsingGlob(pattern string, toFilter []string) ([]string, error) {
 	return result, nil
 }
 
-// here is where in the FS we are going to store the singularity image
+// GetSingularityPath2 returns the singularity path for a given manifest,
+// without needing to fetch the manifest from the image.
 func (img *Image) GetSingularityPath2(manifest da.Manifest) (string, error) {
-	var err error
-	if err != nil {
-		l.LogE(err).Error("Error in getting the manifest to figureout the singularity path")
-		return "", err
-	}
 	return manifest.GetSingularityPath(), nil
 }
 
@@ -853,9 +844,6 @@ func (d *downloadedLayer) IngestIntoCVMFS(CVMFSRepo string) error {
 	}
 	ingestPath := cvmfs.TrimCVMFSRepoPrefix(layerPath)
 
-	l.Log().WithFields(
-		log.Fields{"ingestPath": ingestPath}).
-		Info("ingetstPath")
 	err := cvmfs.Ingest(CVMFSRepo, d.Path,
 		"--catalog", "-t", "-",
 		"-b", ingestPath)
