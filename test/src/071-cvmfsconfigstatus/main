@@ -1,6 +1,6 @@
 #!/bin/bash
 
-cvmfs_test_name="Check listing repositories in cvmfs_config"
+cvmfs_test_name="Check cvmfs_config status"
 cvmfs_test_suites="quick"
 
 cvmfs_run_test() {
@@ -17,6 +17,13 @@ cvmfs_run_test() {
   num_status=$(cvmfs_config status | wc -l)
   if [ $num_status -lt 1 ]; then
     return 11
+  fi
+
+  if ! running_on_osx; then
+    num_status=$(cvmfs_config status sft.cern.ch | wc -l)
+    if [ $num_status -lt 10 ]; then
+      return 20
+    fi
   fi
 
   return 0

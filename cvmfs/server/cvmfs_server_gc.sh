@@ -69,6 +69,8 @@ cvmfs_server_gc() {
   names=$(get_or_guess_multiple_repository_names "$@")
   check_multiple_repository_existence "$names"
 
+  local gclog=/var/log/cvmfs/gc.log
+
   if [ $all_collect -ne 0 ]; then
     # reduce the names to those that are collectable
     local collectable_names
@@ -89,14 +91,14 @@ cvmfs_server_gc() {
       for name in $names; do
         if is_stratum0 $name || __was_garbage_collected_upstream $name; then
           collectable_names="$collectable_names $name"
-        elif [ $dry_run -ne 0 ]; then
+        elif [ $dry_run -eq 0 ]; then
           # pretend that gc was done to keep monitors happy
           update_repo_status $name last_gc "`date --utc`"
         fi
       done
       names="`echo $collectable_names`"
       if [ -z "$names" ]; then
-        echo "There are no garbage-collectable repositories that were collected upstream"
+        echo "At `date` there are no garbage-collectable repositories that were collected upstream" >> $gclog
         exit
       fi
     fi
@@ -162,6 +164,12 @@ cvmfs_server_gc() {
     if [ $reconstruct_reflog -eq 1 ]; then reflog_reconstruct_msg="yes"; fi
 
     echo "Affected Repositories:         $names"
+    for _gc_name in $names; do
+      load_repo_config $_gc_name
+      if [ x"$CVMFS_GARBAGE_COLLECTION" != x"true" ]; then
+        echo "  WARNING: CVMFS_GARBAGE_COLLECTION is not enabled for $_gc_name"
+      fi
+    done
     echo "Dry Run (no actual deletion):  $dry_run_msg"
     echo "Needs Reflog reconstruction:   $reflog_reconstruct_msg"
     if [ $preserve_revisions -ge 0 ]; then
@@ -183,6 +191,16 @@ cvmfs_server_gc() {
     fi
   fi
 
+  # Use /dev/shm for the lock file because it is world-writable and goes
+  # away during reboot
+  local gc_all_lock=/dev/shm/cvmfs_is_gcing_all
+  if [ $all_collected -ne 0 ]; then
+    if ! acquire_lock $gc_all_lock; then
+      to_syslog "skipping starting cvmfs_server gc -a because $gc_all_lock held by active process"
+      return 1
+    fi
+  fi
+
   for name in $names; do
 
     if [ $all_collect -eq 0 ]; then
@@ -193,8 +211,6 @@ cvmfs_server_gc() {
                   "$preserve_timestamp"         \
                   "$deletion_log"
     else
-      local log=/var/log/cvmfs/gc.log
-
       (
       echo
       echo "Starting $name at `date`"
@@ -214,13 +230,17 @@ cvmfs_server_gc() {
         echo "ERROR from cvmfs_server gc!" >&2
       fi
       echo "Finished $name at `date`"
-      ) >> $log 2>&1
+      ) >> $gclog 2>&1
 
       # Always return success because this is used from cron and we
       #  don't want cron sending an email every time something fails.
       # Errors will be in the log.
     fi
   done
+
+  if [ $all_collected -ne 0 ]; then
+    release_lock $gc_all_lock
+  fi
 }
 
 __restore_cvmfs_gateway() {
@@ -304,6 +324,11 @@ __do_gc_cmd()
       return 0
     fi
     is_garbage_collectable $name || die "Garbage Collection is not enabled for $name"
+    if is_stratum0 $name; then
+      if [ x"$(get_repo_info_from_url $CVMFS_STRATUM0 -g)" != x"yes" ]; then
+        die "Garbage collection is enabled in server.conf but not yet in the repository manifest. Run 'cvmfs_server transaction $name && cvmfs_server publish $name' to update the manifest, then retry."
+      fi
+    fi
     is_owner_or_root       $name || die "Permission denied: Repository $name is owned by $user"
 
     # figure out the URL of the repository

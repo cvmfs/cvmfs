@@ -107,6 +107,24 @@ cvmfs_run_test() {
   [ "x$readme_chunk_offset" = "x0" ] || return 11
   [ "x$readme_chunk_size" = "x$readme_size" ] || return 12
 
+  echo "Test 'cleanup_unused_first' magic extended attribute"
+
+  local cleanup_unused_first_err=$(get_xattr cleanup_unused_first /cvmfs/grid.cern.ch 2>&1 1>/dev/null)
+  local cleanup_unused_first=$(get_xattr cleanup_unused_first /cvmfs/grid.cern.ch)
+  if [ "x$cleanup_unused_first" = "x" ] || [ "x$cleanup_unused_first_err" != "x" ]; then
+    return 13
+  fi
+
+  echo "Test 'list_open_hashes' magic extended attribute"
+
+  local list_open_hashes_err=$(get_xattr list_open_hashes /cvmfs/grid.cern.ch 2>&1 1>/dev/null)
+  local list_open_hashes=$(get_xattr list_open_hashes /cvmfs/grid.cern.ch)
+  if [ "$cleanup_unused_first" = "yes" ]; then
+    if [ "x$list_open_hashes" = "x" ] || [ "x$list_open_hashes_err" != "x" ]; then
+      return 14
+    fi
+  fi
+
   echo "*** Test log buffer (quite basic)"
   local logbuffer
   logbuffer=$(get_xattr logbuffer /cvmfs/grid.cern.ch/)

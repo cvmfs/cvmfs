@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -98,15 +99,28 @@ func checkImageType(msg string) (string, error) {
 		return "", fmt.Errorf("unexpected image URL format")
 	}
 
-	host := segments[len(segments)-3]
-	project := segments[len(segments)-2]
-	repoTag := segments[len(segments)-1]
-	repoParts := strings.SplitN(repoTag, ":", 2)
+	host := segments[0]
+	project := segments[1]
 
+	// Join the remaining segments (everything after host and project) using %252F
+	pathParts := segments[2:]
+	if len(pathParts) < 1 {
+		return "", fmt.Errorf("repository part is missing")
+	}
+	// The last segment is expected to contain the tag (e.g., repo:tag)
+	repoTag := pathParts[len(pathParts)-1]
+	repoParts := strings.SplitN(repoTag, ":", 2)
 	if len(repoParts) != 2 {
 		return "", fmt.Errorf("unexpected repo format in image URL")
 	}
-	repo, tag := repoParts[0], repoParts[1]
+	repoName := strings.Join(pathParts[:len(pathParts)-1], "%252F")
+	repo := repoName
+	if repo != "" {
+		repo += "%252F" + repoParts[0]
+	} else {
+		repo = repoParts[0]
+	}
+	tag := repoParts[1]
 
 	// Build API URL
 	apiURL := fmt.Sprintf("https://%s/api/v2.0/projects/%s/repositories/%s/artifacts/%s", host, project, repo, tag)
@@ -167,7 +181,18 @@ func ExecSIF(msg string, logfile_name string, repository_name string) {
 			log.Fatal(traErr)
 		}
 		p := "/cvmfs/" + repository_name + "/" + image
+		parentDir := filepath.Dir(p)
 		orasURI := "oras://" + image
+
+		// Create the parent directory before building
+		if _, statErr := os.Stat(parentDir); os.IsNotExist(statErr) {
+			log.Printf("Path does not exist, create: %s\n", parentDir)
+			if _, mkdErr := exec.Command("sudo", "mkdir", "-p", parentDir).Output(); mkdErr != nil {
+				_, err = exec.Command("sudo", "cvmfs_server", "abort", "-f", repository_name).Output()
+				log.Fatalf("Failed to create directory %s: %v", parentDir, mkdErr)
+			}
+		}
+
 		_, buiErr := exec.Command("sudo", "apptainer", "build", "--force", "--sandbox", p, orasURI).Output()
 		_, cleErr := exec.Command("sudo", "apptainer", "cache", "clean", "-f").Output()
 		if buiErr != nil {
@@ -259,6 +284,30 @@ func DeletePathsInRepo(repository_name string, paths_to_delete []string) (err er
 		if rmErr != nil {
 			_, err = exec.Command("sudo", "cvmfs_server", "abort", "-f", repository_name).Output()
 			log.Fatal(rmErr)
+		}
+		parent := filepath.Dir(p)
+		cvmfsRoot := "/cvmfs/" + repository_name
+		for {
+			if parent == cvmfsRoot || parent == "/" {
+				break
+			}
+			// Check if the directory is empty
+			entries, readErr := os.ReadDir(parent)
+			if readErr != nil {
+				log.Printf("Error reading directory %s: %v\n", parent, readErr)
+				break
+			}
+			if len(entries) > 0 {
+				break // Directory is not empty; stop cleaning up
+			}
+			// Attempt to remove the empty directory
+			rmDirErr := exec.Command("sudo", "rmdir", parent).Run()
+			if rmDirErr != nil {
+				log.Printf("Could not remove directory %s: %v\n", parent, rmDirErr)
+				break
+			}
+			// Move up to next parent
+			parent = filepath.Dir(parent)
 		}
 	}
 

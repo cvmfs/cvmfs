@@ -13,7 +13,7 @@
 
 #include "cache.h"
 #include "crypto/hash.h"
-#include "gtest/gtest_prod.h"
+#include "duplex_testing.h"
 #include "network/download.h"
 #include "network/sink.h"
 

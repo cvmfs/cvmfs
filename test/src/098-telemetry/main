@@ -74,6 +74,61 @@ CVMFS_INFLUX_METRIC_NAME=cvmfs_client_counters"
   echo "   delta value must NOT be 0"
   [ "$check_delta_dynamic" -eq "0" ] && echo "Warning! check_delta_dynamic equal to zero"
 
+  # Additional validation for default behavior (delta sending enabled)
+  echo "Default behavior validation"
+  echo "   _absolute suffix present in metric names?"
+  local absolute_suffix_count=$(grep $CVMFS_TEST_098_TMPFILE -e "_absolute,repo=" | wc -l)
+  [ "$absolute_suffix_count" -gt "0" ] || return 13
+
+  echo "   _delta metrics present?"
+  local delta_metrics_count=$(grep $CVMFS_TEST_098_TMPFILE -e "_delta,repo=" | wc -l)
+  [ "$delta_metrics_count" -gt "0" ] || return 14
+
+  echo "   ... Success"
+}
+
+check_no_delta_sending() {
+  echo "Check that delta sending can be disabled"
+
+  echo "   Mount $TEST098_REPO with CVMFS_INFLUX_SEND_DELTA=OFF"
+  test098_mount $TEST098_REPO "CVMFS_TELEMETRY_SEND=ON
+CVMFS_TELEMETRY_RATE=5
+CVMFS_INFLUX_HOST=localhost
+CVMFS_INFLUX_PORT=8093
+CVMFS_INFLUX_METRIC_NAME=cvmfs_client_counters
+CVMFS_INFLUX_SEND_DELTA=OFF"
+
+  echo "   UDP Listener: wait for 1 package from $TEST098_REPO"
+  $CVMFS_SYS_PYTHON $CVMFS_TEST_098_PYTHON_SCRIPT -d localhost -p 8093 -m 1 -i lhcb > ${CVMFS_TEST_098_TMPFILE}.nodelta
+
+  echo "   Do something to change counters"
+  cat /cvmfs/$TEST098_REPO/*.sh > /dev/null
+
+  echo "   UDP Listener: Wait for another package from $TEST098_REPO"
+  $CVMFS_SYS_PYTHON $CVMFS_TEST_098_PYTHON_SCRIPT -d localhost -p 8093 -m 1 -i lhcb >> ${CVMFS_TEST_098_TMPFILE}.nodelta
+
+  echo "   Umount $TEST098_REPO"
+  test098_unmount $TEST098_REPO
+
+  # do comparison
+  echo "   Check output in file ${CVMFS_TEST_098_TMPFILE}.nodelta"
+  local found=$(grep ${CVMFS_TEST_098_TMPFILE}.nodelta -e "catalog_revision" | wc -l)
+
+  echo "      Right number of lines?"
+  [ "$found" -eq "2" ] || return 20
+
+  echo "      No _absolute suffix in metric names?"
+  local absolute_count=$(grep ${CVMFS_TEST_098_TMPFILE}.nodelta -e "_absolute" | wc -l)
+  [ "$absolute_count" -eq "0" ] || return 21
+
+  echo "      No _delta metrics sent?"
+  local delta_count=$(grep ${CVMFS_TEST_098_TMPFILE}.nodelta -e "_delta" | wc -l)
+  [ "$delta_count" -eq "0" ] || return 22
+
+  echo "      Base metric name used?"
+  local base_metric_count=$(grep ${CVMFS_TEST_098_TMPFILE}.nodelta -e "cvmfs_client_counters,repo=" | wc -l)
+  [ "$base_metric_count" -eq "2" ] || return 23
+
   echo "   ... Success"
 }
 
@@ -90,6 +145,7 @@ cvmfs_run_test() {
   CVMFS_TEST_098_PYTHON_SCRIPT=$local_script_dir/udp_listener.py
 
   check_counter_increase || return $?
-  
+  check_no_delta_sending || return $?
+
   return 0
 }

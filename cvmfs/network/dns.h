@@ -15,7 +15,7 @@
 #include <vector>
 
 #include "duplex_cares.h"
-#include "gtest/gtest_prod.h"
+#include "duplex_testing.h"
 #include "util/atomic.h"
 #include "util/prng.h"
 #include "util/single_copy.h"

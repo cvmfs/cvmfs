@@ -66,10 +66,7 @@ func ConvertWishFlat(wish WishFriendly, multiArch bool) error {
 		nFlat.Elapsed(tFlat).AddField("action", "end_flat_conversion").Send()
 	}()
 
-	// it may happen at the very first round that this two calls return an error, let it be
-	if err := cvmfs.CreateCatalogIntoDir(wish.CvmfsRepo, ".chains"); err != nil {
-		l.LogE(err).Error("Error in creating catalog inside `.chains` directory")
-	}
+	// it may happen at the very first round that this call returns an error, let it be
 	if err := cvmfs.CreateCatalogIntoDir(wish.CvmfsRepo, ".flat"); err != nil {
 		l.LogE(err).Error("Error in creating catalog inside `.flat` directory")
 	}
@@ -160,24 +157,20 @@ func ConvertWishFlat(wish WishFriendly, multiArch bool) error {
 
 			i := n.AddField("image", inputImage.GetSimpleName()).AddId()
 			t1 := time.Now()
-			i.Action("start_single_chain_conversion").Send()
-			i = i.Action("end_single_chain_convertion")
+			i.Action("start_flat_overlay_conversion").Send()
+			i = i.Action("end_flat_overlay_conversion")
 
-			err, lastChain := inputImage.CreateSneakyChainStructure(wish.CvmfsRepo)
+			// Use cvmfs_server overlay to merge layers into a flat image
+			_, err = inputImage.CreateFlatOverlay(wish.CvmfsRepo)
 			if err != nil {
 				if firstError == nil {
 					firstError = err
 				}
-				l.LogE(err).Error("Error in creating the chain structure")
+				l.LogE(err).Error("Error in creating the flat overlay")
 				i.Error(err).Elapsed(t1).Send()
 				continue
 			}
 
-			if _, err := os.Stat(filepath.Dir(completeSingularityPriPath)); err != nil {
-				cvmfs.WithinTransaction(wish.CvmfsRepo, func() error {
-					return os.MkdirAll(filepath.Dir(completeSingularityPriPath), constants.DirPermision)
-				})
-			}
 			ociImage, err := inputImage.GetOCIImage()
 			if err != nil {
 				if firstError == nil {
@@ -187,7 +180,7 @@ func ConvertWishFlat(wish WishFriendly, multiArch bool) error {
 				i.Error(err).Elapsed(t1).Send()
 				continue
 			}
-			// we create the image with the correct singularity's dotfiles
+			// we create the singularity dotfiles inside the flat overlay result
 			err = cvmfs.WithinTransaction(wish.CvmfsRepo,
 				func() error {
 					if err := singularity.MakeBaseEnv(completeSingularityPriPath); err != nil {
@@ -203,10 +196,7 @@ func ConvertWishFlat(wish WishFriendly, multiArch bool) error {
 						return err
 					}
 					return nil
-				},
-				cvmfs.NewTemplateTransaction(
-					cvmfs.TrimCVMFSRepoPrefix(cvmfs.ChainPath(wish.CvmfsRepo, lastChain)),
-					singularityPrivatePath))
+				})
 
 			if err != nil {
 				if firstError == nil {
@@ -220,7 +210,7 @@ func ConvertWishFlat(wish WishFriendly, multiArch bool) error {
 
 			err = cvmfs.CreateSymlinkIntoCVMFS(wish.CvmfsRepo, publicSymlinkPath, singularityPrivatePath)
 			if err != nil {
-				errF := fmt.Errorf("Error in creating symlink for singularity image: %s", publicSymlinkPath)
+				errF := fmt.Errorf("Error in creating symlink for singularity image: %s", inputImage.GetSimpleName())
 				l.LogE(errF).WithFields(
 					log.Fields{"to": publicSymlinkPath, "from": singularityPrivatePath}).
 					Error("Error in creating symlink")
@@ -259,12 +249,7 @@ func ConvertWishDocker(wish WishFriendly) (err error) {
 	var firstError error
 	for _, expandedImgTag := range wish.ExpandedTagImagesLayer {
 		tag := expandedImgTag.Tag
-		outputWithTag := *outputImage
-		if inputImage.TagWildcard {
-			outputWithTag.Tag = tag
-		} else {
-			outputWithTag.Tag = outputImage.Tag
-		}
+		outputWithTag := outputImageForExpandedTag(inputImage, outputImage, tag)
 
 		manifestPath := filepath.Join("/", "cvmfs", wish.CvmfsRepo, ".metadata", expandedImgTag.GetSimpleName(), "manifest.json")
 		if _, err := os.Stat(manifestPath); os.IsNotExist(err) {
@@ -281,16 +266,30 @@ func ConvertWishDocker(wish WishFriendly) (err error) {
 			layerPath := cvmfs.LayerRootfsPath(wish.CvmfsRepo, layerDigest)
 			layerLocations[layer.Digest] = layerPath
 		}
-		err = CreateThinImage(manifest, layerLocations, *expandedImgTag, *outputImage)
+		err = CreateThinImage(manifest, layerLocations, *expandedImgTag, outputWithTag)
 		if err != nil && firstError == nil {
 			firstError = err
 		}
-		err = PushImageToRegistry(*outputImage)
+		err = PushImageToRegistry(outputWithTag)
 		if err != nil && firstError == nil {
 			firstError = err
 		}
 	}
 	return firstError
+}
+
+func outputImageForExpandedTag(inputImage, outputImage *Image, expandedTag string) Image {
+	outputWithTag := *outputImage
+	if inputImage.TagWildcard {
+		outputWithTag.Tag = expandedTag
+	}
+	return outputWithTag
+}
+
+func outputRepositoryForImport(outputImage Image) string {
+	outputRepository := outputImage
+	outputRepository.Tag = ""
+	return outputRepository.GetSimpleName()
 }
 
 func ConvertWishPodman(wish WishFriendly, convertAgain bool) (err error) {
@@ -327,7 +326,7 @@ func ConvertWishPodman(wish WishFriendly, convertAgain bool) (err error) {
 	return firstError
 }
 
-func ConvertWish(wish WishFriendly, convertAgain, forceDownload, multiArch bool) (err error) {
+func ConvertWish(wish WishFriendly, convertAgain, forceDownload, multiArch bool, maxConcurrentDownloads int) (err error) {
 	err = cvmfs.CreateCatalogIntoDir(wish.CvmfsRepo, constants.SubDirInsideRepo)
 	if err != nil {
 		l.LogE(err).WithFields(log.Fields{
@@ -336,7 +335,7 @@ func ConvertWish(wish WishFriendly, convertAgain, forceDownload, multiArch bool)
 	}
 	var firstError error
 	for _, expandedImgTag := range wish.ExpandedTagImagesLayer {
-		err = convertInputOutput(expandedImgTag, wish.CvmfsRepo, convertAgain, forceDownload, multiArch)
+		err = convertInputOutput(expandedImgTag, wish.CvmfsRepo, convertAgain, forceDownload, multiArch, maxConcurrentDownloads)
 		if err != nil && firstError == nil {
 			firstError = err
 		}
@@ -344,19 +343,19 @@ func ConvertWish(wish WishFriendly, convertAgain, forceDownload, multiArch bool)
 	return firstError
 }
 
-func convertInputOutput(inputImage *Image, repo string, convertAgain, forceDownload bool, multiArch bool) (err error) {
+func convertInputOutput(inputImage *Image, repo string, convertAgain, forceDownload bool, multiArch bool, maxConcurrentDownloads int) (err error) {
 	manifestList, err := inputImage.GetManifestList()
 
 	for _, manifestEntry := range manifestList.Manifests {
 		inputImage.Manifest = &(manifestEntry.Manifest)
 		nameWithArch := GetNameWithArch(manifestEntry)
 		nameWithArch = filepath.Join(nameWithArch, inputImage.GetSimpleName())
-		convertInputOutput2(inputImage, nameWithArch, repo, convertAgain, forceDownload, multiArch)
+		convertInputOutput2(inputImage, nameWithArch, repo, convertAgain, forceDownload, multiArch, maxConcurrentDownloads)
 	}
 	return err
 }
 
-func convertInputOutput2(inputImage *Image, nameWithArch, repo string, convertAgain, forceDownload bool, multiArch bool) (err error) {
+func convertInputOutput2(inputImage *Image, nameWithArch, repo string, convertAgain, forceDownload bool, multiArch bool, maxConcurrentDownloads int) (err error) {
 	path := filepath.Join("/", "cvmfs", repo, ".metadata")
 	manifest, _ := inputImage.GetManifest()
 
@@ -462,7 +461,7 @@ func convertInputOutput2(inputImage *Image, nameWithArch, repo string, convertAg
 
 	// this will start to feed the above goroutine by writing into layersChanell
 	l.Log().Info("GetLayers", manifest)
-	err = inputImage.GetLayers(manifest, layersChanell, manifestChanell, stopGettingLayers, tmpDir)
+	err = inputImage.GetLayers(manifest, layersChanell, manifestChanell, stopGettingLayers, tmpDir, maxConcurrentDownloads)
 	if err != nil {
 		l.Log().Info("GetLayers err", err)
 		return err
@@ -546,7 +545,7 @@ func CreateThinImage(manifest da.Manifest, layerLocations map[string]string, inp
 		return
 	}
 
-	dockerClient, err := client.NewClientWithOpts(client.WithVersion("1.19"))
+	dockerClient, err := NewDockerClient()
 	if err != nil {
 		return
 	}
@@ -564,7 +563,7 @@ func CreateThinImage(manifest da.Manifest, layerLocations map[string]string, inp
 	importResult, err := dockerClient.ImageImport(
 		context.Background(),
 		image,
-		outputImage.GetSimpleName(),
+		outputRepositoryForImport(outputImage),
 		importOptions)
 	if err != nil {
 		l.LogE(err).Error("Error in image import")
@@ -595,7 +594,7 @@ func PushImageToRegistry(outputImage Image) (err error) {
 	pushOptions := dockerImage.PushOptions{
 		RegistryAuth: authCredential,
 	}
-	dockerClient, err := client.NewClientWithOpts(client.WithVersion("1.19"))
+	dockerClient, err := NewDockerClient()
 	if err != nil {
 		return err
 	}
@@ -618,6 +617,15 @@ func PushImageToRegistry(outputImage Image) (err error) {
 	}
 	l.Log().Info("Finish pushing the image to the registry")
 	return
+}
+
+// NewDockerClient creates a Docker client that negotiates the API version with
+// the daemon to stay compatible across Docker releases.
+func NewDockerClient() (*client.Client, error) {
+	return client.NewClientWithOpts(
+		client.FromEnv,
+		client.WithAPIVersionNegotiation(),
+	)
 }
 
 func StoreLayerInfo(CVMFSRepo string, layerDigest string, r ReadHashCloseSizer) (err error) {

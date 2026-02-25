@@ -673,6 +673,7 @@ if (BUILD_SERVER)
        swissknife_main.cc
        swissknife_migrate.cc
        swissknife_notify.cc
+       swissknife_overlay.cc
        swissknife_pull.cc
        swissknife_reflog.cc
        swissknife_filestats.cc
@@ -708,7 +709,7 @@ if (BUILD_SERVER)
         ${RT_LIBRARY}
         ${VJSON_LIBRARIES}
         ${CAP_LIBRARIES}
-        ${LibArchive_LIBRARY}
+        LibArchive::LibArchive
         pthread
         dl
   )
@@ -822,7 +823,7 @@ if (BUILD_SERVER)
         ${ZLIB_LIBRARIES}
         ${VJSON_LIBRARIES}
         ${CAP_LIBRARIES}
-        ${LibArchive_LIBRARY}
+        LibArchive::LibArchive
         ${RT_LIBRARY}
         pthread
         dl
@@ -1110,7 +1111,7 @@ if(BUILD_RECEIVER)
         ${OPENSSL_LIBRARIES}
         ${ZLIB_LIBRARIES}
         ${RT_LIBRARY}
-        ${LibArchive_LIBRARY}
+        LibArchive::LibArchive
         pthread
         dl
   )
@@ -1272,6 +1273,7 @@ if (BUILD_PRELOADER)
                         ${RT_LIBRARY}
                         ${UUID_LIBRARIES}
                         ${VJSON_LIBRARIES}
+                        LibArchive::LibArchive
                         pthread
                         dl
   )

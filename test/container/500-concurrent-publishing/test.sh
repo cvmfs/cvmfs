@@ -1,3 +1,6 @@
+#!/bin/bash
+set -euo pipefail
+
 docker exec  cvmfs-pub1 cvmfs_server transaction
 docker exec  cvmfs-pub1 bash -c 'echo abc > /cvmfs/test.repo.org/testfile'
 docker exec  cvmfs-pub1 cvmfs_server publish
@@ -13,5 +16,4 @@ docker exec  cvmfs-pub2 cvmfs_server publish
 docker exec  cvmfs-gw1 cvmfs_server tag -l
 docker exec  cvmfs-gw1 cat /cvmfs/test.repo.org/another_file
 docker exec  cvmfs-gw1 cat /cvmfs/test.repo.org/testfile
-docker exec  cvmfs-gw1 cat /cvmfs/test.repo.org/testfile | tee | grep important_change ||  echo -e ERROR >&2; exit 1
-
+docker exec  cvmfs-gw1 grep important_change /cvmfs/test.repo.org/testfile

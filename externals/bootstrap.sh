@@ -51,6 +51,23 @@ print_hint() {
   echo "--> $msg"
 }
 
+# Helper function to remove a word from a space-separated list
+# Works consistently across macOS (BSD sed) and Linux (GNU sed)
+remove_word_from_list() {
+  local list="$1"
+  local word_to_remove="$2"
+
+  # Use a more portable approach that works on both BSD and GNU sed
+  # First, handle the word at the beginning of the list
+  list=$(echo "$list" | sed "s/^$word_to_remove //" | sed "s/^$word_to_remove$//")
+  # Then handle the word in the middle or end of the list
+  list=$(echo "$list" | sed "s/ $word_to_remove / /g" | sed "s/ $word_to_remove$//")
+  # Clean up any extra spaces
+  list=$(echo "$list" | sed 's/  */ /g' | sed 's/^ *//' | sed 's/ *$//')
+
+  echo "$list"
+}
+
 get_destination_dir() {
   local library_name="$1"
   echo "$externals_build_dir/build_$library_name"
@@ -267,29 +284,52 @@ build_lib() {
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 # Build a list of libs that need to be built
-missing_libs="libcurl libcrypto pacparser zlib sparsehash leveldb maxminddb protobuf sqlite3 vjson sha3 libarchive"
+# Check if BUILTIN_EXTERNALS_LIST is set and override missing_libs
+if [ x"$BUILTIN_EXTERNALS_LIST" != x"" ] && ! echo ";${BUILTIN_EXTERNALS_LIST};" | grep -qE ";(libarchive);"; then
+    # Convert semicolon-separated list to space-separated
+    missing_libs=$(echo "$BUILTIN_EXTERNALS_LIST" | tr ';' ' ')
+    echo "Bootstrap - Using custom externals list: $missing_libs"
+else
+    missing_libs="libcurl libcrypto pacparser zlib sparsehash leveldb maxminddb protobuf sqlite3 vjson sha3"
 
-if [ x"$BUILD_UBENCHMARKS" != x"" ]; then
-    missing_libs="$missing_libs googlebench"
-fi
-
-if [ x"$BUILD_GATEWAY" != x ] || [ x"$BUILD_DUCC" != x ] || [ x"$BUILD_SNAPSHOTTER" != x ]; then
-    required_go_minor_version="23"
-    if [ -n "$(command -v go)" ]; then
-      go_minor_version=`go version | { read _ _ v _; echo ${v#go}; } | cut -d '.' -f2`
-       if expr "'$go_minor_version" \< "'$required_go_minor_version"   > /dev/null ; then 
-         missing_libs="$missing_libs golang_rev2"
-       fi  
-    else
-      missing_libs="$missing_libs golang_rev2"
+    if [ x"$BUILD_UBENCHMARKS" != x"" ]; then
+        missing_libs="$missing_libs googlebench"
     fi
+
+    if [ x"$BUILD_GATEWAY" != x ] || [ x"$BUILD_DUCC" != x ] || [ x"$BUILD_SNAPSHOTTER" != x ]; then
+        required_go_minor_version="23"
+        if [ -n "$(command -v go)" ]; then
+          go_minor_version=`go version | { read _ _ v _; echo ${v#go}; } | cut -d '.' -f2`
+           if expr "'$go_minor_version" \< "'$required_go_minor_version"   > /dev/null ; then
+             missing_libs="$missing_libs golang_rev2"
+           fi
+        else
+          missing_libs="$missing_libs golang_rev2"
+        fi
+    fi
+
+    if [ x"$BUILD_QC_TESTS" != x"" ]; then
+        missing_libs="$missing_libs rapidcheck"
+    fi
+
+    echo "Bootstrap - Using default externals list: $missing_libs"
 fi
 
-echo $missing_libs
+# Apply exclusions if BUILTIN_EXTERNALS_EXCLUDE is set
+if [ x"$BUILTIN_EXTERNALS_EXCLUDE" != x"" ] && ! echo ";${BUILTIN_EXTERNALS_EXCLUDE};" | grep -qE ";(libarchive);"; then
+    # Convert semicolon-separated list to space-separated
+    exclude_libs=$(echo "$BUILTIN_EXTERNALS_EXCLUDE" | tr ';' ' ')
+    echo "Bootstrap - Excluding libraries: $exclude_libs"
 
+    # Remove each excluded library from missing_libs
+    for exclude_lib in $exclude_libs; do
+        missing_libs=$(remove_word_from_list "$missing_libs" "$exclude_lib")
+    done
 
-if [ x"$BUILD_QC_TESTS" != x"" ]; then
-    missing_libs="$missing_libs rapidcheck"
+    # Clean up any leading/trailing spaces
+    missing_libs=$(echo "$missing_libs" | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//')
+
+    echo "Bootstrap - Final externals list after exclusions: $missing_libs"
 fi
 
 if [ -f $externals_install_dir/.bootstrapDone ]; then
@@ -297,12 +337,12 @@ if [ -f $externals_install_dir/.bootstrapDone ]; then
   for l in $existing_libs; do
     # cleanup dependencies that are updated or no longer vendored
     if [ "$l" = "golang" ]; then
-      existing_libs=$(echo $existing_libs | sed  's/golang\b//')
+      existing_libs=$(remove_word_from_list "$existing_libs" "golang")
       if [ -d $externals_install_dir/go ]; then
         rm -rf $externals_install_dir/go
       fi
     elif [ "$l" = "googletest" ]; then
-      existing_libs=$(echo $existing_libs | sed  's/googletest\b//')
+      existing_libs=$(remove_word_from_list "$existing_libs" "googletest")
       if [ -d $externals_install_dir/include/gtest ]; then
         rm -rf $externals_install_dir/include/gtest
       fi
@@ -314,7 +354,7 @@ if [ -f $externals_install_dir/.bootstrapDone ]; then
       fi
     elif [ x"$l" != x ]; then
       echo "Bootstrap - found $l"
-      missing_libs=$(echo $missing_libs | sed -e "s/$l\b//")
+      missing_libs=$(remove_word_from_list "$missing_libs" "$l")
     fi
   done
 else

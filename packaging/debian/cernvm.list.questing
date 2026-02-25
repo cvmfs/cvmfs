@@ -1,0 +1,2 @@
+deb http://cvmrepo.s3.cern.ch/cvmrepo/apt questing-prod main
+# deb http://cvmrepo.s3.cern.ch/cvmrepo/apt questing-testing main

@@ -5,7 +5,7 @@
 # See externals/CMake-Register_External_Lib.txt for details on external inclusion
 #
 
-cmake_minimum_required (VERSION 3.12..3.30)
+cmake_minimum_required (VERSION 3.24..3.30)
 set (PROJECT_NAME "CernVM-FS")
 project (${PROJECT_NAME})
 
@@ -15,17 +15,24 @@ message ("Running CMake version ${CMAKE_VERSION}")
 # The version numbers
 #
 # DON'T DELETE
-## CVMFS_VERSION 2.13.1
+## CVMFS_VERSION 2.13.3
+## CVMFS_PRERELEASE 
 #---------------------
 set (CernVM-FS_VERSION_MAJOR 2)
 set (CernVM-FS_VERSION_MINOR 13)
-set (CernVM-FS_VERSION_PATCH 1)
+set (CernVM-FS_VERSION_PATCH 3)
 set (CernVM-FS_VERSION_STRING "${CernVM-FS_VERSION_MAJOR}.${CernVM-FS_VERSION_MINOR}.${CernVM-FS_VERSION_PATCH}")
-if (CMAKE_VERSION VERSION_LESS "3.12.0") 
+if (CMAKE_VERSION VERSION_LESS "3.12.0")
   add_definitions(-DCVMFS_VERSION="${CernVM-FS_VERSION_STRING}")
+  add_definitions(-DCVMFS_VERSION_MAJOR=${CernVM-FS_VERSION_MAJOR})
+  add_definitions(-DCVMFS_VERSION_MINOR=${CernVM-FS_VERSION_MINOR})
+  add_definitions(-DCVMFS_VERSION_PATCH=${CernVM-FS_VERSION_PATCH})
   add_definitions(-DCVMFS_PATCH_LEVEL="0")
 else()
   add_compile_definitions(CVMFS_VERSION="${CernVM-FS_VERSION_STRING}")
+  add_compile_definitions(CVMFS_VERSION_MAJOR=${CernVM-FS_VERSION_MAJOR})
+  add_compile_definitions(CVMFS_VERSION_MINOR=${CernVM-FS_VERSION_MINOR})
+  add_compile_definitions(CVMFS_VERSION_PATCH=${CernVM-FS_VERSION_PATCH})
   add_compile_definitions(CVMFS_PATCH_LEVEL="0")
 endif()
 
@@ -52,6 +59,35 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
   if (EXISTS /etc/arch-release OR EXISTS /etc/manjaro-release)
     set (ARCHLINUX TRUE)
   endif ()
+  if(EXISTS "/etc/os-release")
+    file(STRINGS "/etc/os-release" OS_RELEASE_LINES)
+    foreach(line ${OS_RELEASE_LINES})
+        if(line MATCHES "^ID=(.*)$")
+            set(DISTRO_ID ${CMAKE_MATCH_1})
+            string(REPLACE "\"" "" DISTRO_ID ${DISTRO_ID})
+        endif()
+        if(line MATCHES "^VERSION_ID=(.*)$")
+            set(DISTRO_VERSION ${CMAKE_MATCH_1})
+            string(REPLACE "\"" "" DISTRO_VERSION ${DISTRO_VERSION})
+        endif()
+        if(line MATCHES "^PLATFORM_ID=(.*)$")
+            set(PLATFORM_ID ${CMAKE_MATCH_1})
+            string(REPLACE "\"" "" PLATFORM_ID ${PLATFORM_ID})
+        endif()
+    endforeach()
+
+    # Use PLATFORM_ID if available, otherwise fall back to ID+VERSION_ID
+    if(PLATFORM_ID AND NOT PLATFORM_ID STREQUAL "")
+        # Extract the part after the colon from PLATFORM_ID (e.g., "platform:el9" -> "el9")
+        if(PLATFORM_ID MATCHES "^[^:]*:(.*)$")
+            set(DISTRO ${CMAKE_MATCH_1})
+        else()
+            set(DISTRO ${PLATFORM_ID})
+        endif()
+    else()
+        set(DISTRO "${DISTRO_ID}${DISTRO_VERSION}")
+    endif()
+  endif()
 else ()
   set (LINUX FALSE)
   set (DEBIAN FALSE)
@@ -174,11 +210,19 @@ if (NOT EXTERNALS_PREFIX)
   else()
     set(EXTERNALS_PREFIX ${CMAKE_SOURCE_DIR})
   endif()
-
-
 endif()
-set (EXTERNALS_BUILD_LOCATION     "${EXTERNALS_PREFIX}/externals_build")
-set (EXTERNALS_INSTALL_LOCATION   "${EXTERNALS_PREFIX}/externals_install")
+# Check if legacy directory names exist to try to avoid unnecessary rebuilds
+if(EXISTS "${EXTERNALS_PREFIX}/externals_build" AND EXISTS "${EXTERNALS_PREFIX}/externals_install")
+    set (EXTERNALS_BUILD_LOCATION     "${EXTERNALS_PREFIX}/externals_build")
+    set (EXTERNALS_INSTALL_LOCATION   "${EXTERNALS_PREFIX}/externals_install")
+else()
+    set (EXTERNALS_BUILD_LOCATION     "${EXTERNALS_PREFIX}/externals_build.${CMAKE_SYSTEM_PROCESSOR}")
+    set (EXTERNALS_INSTALL_LOCATION   "${EXTERNALS_PREFIX}/externals_install.${CMAKE_SYSTEM_PROCESSOR}")
+    if(DISTRO AND NOT DISTRO STREQUAL "")
+        string(APPEND EXTERNALS_INSTALL_LOCATION ".${DISTRO}")
+        string(APPEND EXTERNALS_BUILD_LOCATION ".${DISTRO}")
+    endif()
+endif()
 
 #
 # run the bootstrap shellscript (not needed in the distributed version of the source)
@@ -214,6 +258,12 @@ if (BUILTIN_EXTERNALS)
     if (BUILD_SNAPSHOTTER)
       set(ENV{BUILD_SNAPSHOTTER} "true")
     endif()
+    if (BUILTIN_EXTERNALS_LIST)
+      set(ENV{BUILTIN_EXTERNALS_LIST} "${BUILTIN_EXTERNALS_LIST}")
+    endif()
+    if (BUILTIN_EXTERNALS_EXCLUDE)
+      set(ENV{BUILTIN_EXTERNALS_EXCLUDE} "${BUILTIN_EXTERNALS_EXCLUDE}")
+    endif()
 
     message (STATUS "running bootstrap.sh ...")
     execute_process (
@@ -238,6 +288,8 @@ if (BUILTIN_EXTERNALS)
     set(ENV{BUILD_GATEWAY} "")
     set(ENV{BUILD_DUCC} "")
     set(ENV{BUILD_SNAPSHOTTER} "")
+    set(ENV{BUILTIN_EXTERNALS_LIST} "")
+    set(ENV{BUILTIN_EXTERNALS_EXCLUDE} "")
   endif (EXISTS "${CMAKE_SOURCE_DIR}/externals/bootstrap.sh")
 
   # In the case of built-in external libraries, we need to set CMAKE_PREFIX_PATH to
@@ -247,6 +299,16 @@ if (BUILTIN_EXTERNALS)
   message("Project prefix path: ${CMAKE_PREFIX_PATH}")
   message("System prefix path: ${CMAKE_SYSTEM_PREFIX_PATH}")
 endif(BUILTIN_EXTERNALS)
+
+
+# Migrate bootstrap.sh to cmake
+if(BUILTIN_EXTERNALS)
+  message(STATUS "Entering external dependencies setup")
+  add_subdirectory(externals)
+endif()
+
+# reset cache variables the externals may have changed
+set(CMAKE_BUILD_TYPE "" CACHE STRING "Build Type" FORCE)
 
 #
 # include some common functionality
@@ -318,8 +380,10 @@ if (NOT MACOSX)
                         attr/xattr.h)
 endif (NOT MACOSX)
 
-look_for_required_include_files (${REQUIRED_HEADERS})
-look_for_optional_include_files (${OPTIONAL_HEADERS})
+if (CHECK_SYSTEM_HEADERS)
+  look_for_required_include_files (${REQUIRED_HEADERS})
+  look_for_optional_include_files (${OPTIONAL_HEADERS})
+endif()
 
 
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${CMAKE_BINARY_DIR})
@@ -354,36 +418,9 @@ find_package (Libcrypto REQUIRED)
 message("Using libcrypto for libcvmfs_crypto from ${Libcrypto_INCLUDE_DIRS}")
 
 
-# GoogleTest
-set(GOOGLETEST_MIN_VERSION "1.10.0")
-if(USE_EXTERNAL_GOOGLETEST)
-  if (USE_EXTERNAL_GOOGLETEST STREQUAL AUTO)
-    find_package(GTest ${GOOGLETEST_MIN_VERSION})
-  else()
-    find_package(GTest ${GOOGLETEST_MIN_VERSION} REQUIRED)
-  endif()
-endif()
-
-if(NOT GTest_FOUND)
-  message(STATUS "Fetching local copy of Googletest library v1.17.0 for unit-tests...")
-  Include(FetchContent)
-  set(INSTALL_GTEST OFF)
-  FetchContent_Declare(
-    GoogleTest
-    URL        https://github.com/google/googletest/releases/download/v1.17.0/googletest-1.17.0.tar.gz
-               https://ecsft.cern.ch/dist/cvmfs/build_externals/googletest-1.17.0.tar.gz
-    URL_HASH MD5=b6f100bc2a5853a48046aa168ececf84
-    )
-  FetchContent_MakeAvailable(GoogleTest)
-endif()
-get_target_property(GTEST_INCLUDE_DIRS GTest::gtest INCLUDE_DIRECTORIES)
-set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${GTEST_INCLUDE_DIRS})
 
 find_package (VJSON REQUIRED)
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${VJSON_INCLUDE_DIRS})
-
-find_package (LibArchive REQUIRED)
-set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${LibArchive_INCLUDE_DIRS})
 
 # Almost all build targets require zlib and sha3
 if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_SERVER OR BUILD_SERVER_DEBUG OR
@@ -508,6 +545,7 @@ endif ()
 # compile the unit tests, if necessary
 #
 if (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
+  add_compile_definitions(_CVMFS_UNITTESTS_ENABLED)
   enable_testing ()
   add_custom_target (check ${CMAKE_CTEST_COMMAND} -VV)
   add_subdirectory (test/unittests)
@@ -552,7 +590,7 @@ endif ()
 # Documentation
 #
 install (
-  FILES                   README.md AUTHORS ChangeLog COPYING
+  FILES                   README.md CITATION.cff ChangeLog COPYING
   DESTINATION             share/doc/cvmfs-${CernVM-FS_VERSION_STRING}
   PERMISSIONS             OWNER_WRITE OWNER_READ GROUP_READ WORLD_READ
 )

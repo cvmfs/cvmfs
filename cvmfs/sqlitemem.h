@@ -14,7 +14,7 @@
 #include <vector>
 
 #include "duplex_sqlite3.h"
-#include "gtest/gtest_prod.h"
+#include "duplex_testing.h"
 
 class MallocArena;
 

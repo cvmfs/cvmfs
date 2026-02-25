@@ -1,0 +1,51 @@
+#!/bin/bash
+
+cvmfs_test_name="System Configuration Variables"
+cvmfs_test_suites="quick"
+
+CVMFS_CONFIG_FILE=/etc/cvmfs/default.local
+REPO=/cvmfs/atlas.cern.ch
+
+clean_up() {
+  sudo rm -rf $1
+}
+
+do_test() {
+    sudo cp src/108-global-config/default.local "${CVMFS_CONFIG_FILE}"
+    sudo sed -i "s|LOGFILE|$logfile|g" "$CVMFS_CONFIG_FILE"
+    sudo sed -i "s|PROXY_SERVER|$CVMFS_TEST_PROXY|g" "$CVMFS_CONFIG_FILE"
+
+    if [[ -n "$(mount | grep ${REPO})" ]]; then
+      sudo umount "${REPO}" > /dev/null
+    fi
+    ls "${REPO}" &> /dev/null
+    if ! grep -q -- "CVMFS_VERSION" "$logfile"; then
+      return 1
+    fi
+
+    if ! grep -q -- "CVMFS_ARCH" "$logfile"; then
+      return 2
+    fi
+
+    sudo rm -rf "${CVMFS_CONFIG_FILE}"
+}
+
+cvmfs_run_test() {
+  local logfile=$1
+
+  if [[ -z "$logfile" ]]; then
+    logfile=/tmp/version_env_test.log
+    touch $logfile
+    trap "eval 'clean_up $logfile'" EXIT HUP INT TERM || return $?
+  fi
+
+
+  if [[ -f "${CVMFS_CONFIG_FILE}" ]]; then
+    sudo mv "${CVMFS_CONFIG_FILE}" "${CVMFS_CONFIG_FILE}.bak"
+    do_test
+    sudo mv "${CVMFS_CONFIG_FILE}.bak" "${CVMFS_CONFIG_FILE}"
+  else
+    do_test
+  fi
+}
+

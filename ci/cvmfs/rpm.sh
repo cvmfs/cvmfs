@@ -33,6 +33,8 @@ done
 
 # retrieve the upstream version string from CVMFS
 cvmfs_version="$(get_cvmfs_version_from_cmake $CVMFS_SOURCE_LOCATION)"
+cvmfs_prerelease="$(get_cvmfs_prerelease_from_cmake $CVMFS_SOURCE_LOCATION)"
+cvmfs_version=${cvmfs_version}${cvmfs_prerelease}
 echo "detected upstream version: $cvmfs_version"
 
 echo "preparing build environment in '${CVMFS_RESULT_LOCATION}'..."

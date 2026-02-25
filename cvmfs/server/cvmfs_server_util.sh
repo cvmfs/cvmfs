@@ -360,30 +360,94 @@ __hc_transition() {
 }
 
 
+# Find an available file descriptor
+find_available_fd()
+{
+  # dash only supports single-digit file descriptors so the number
+  # of locks available is limited
+  local fd=3
+  local max=10
+  while [ $fd -lt $max ]; do
+    if [ ! -e /proc/$$/fd/$fd ]; then
+      echo $fd
+      return
+    fi
+    fd=$((fd + 1))
+  done
+  die "No file descriptor available"
+}
+
 ### Locking functions
 
+_lock_fds=""
+_lock_paths=""
 
 acquire_lock() {
   local path="$1"
+  local wait_for_lock="${2:-0}"
   local lock_file="${path}.lock"
-  exec 9<>${lock_file}
-  flock -n 9
-}
-
-
-wait_and_acquire_lock() {
-  local path="$1"
-  local lock_file="${path}.lock"
-  exec 9<>${lock_file}
-  flock 9
+  local lock_fd
+  while true; do
+    lock_fd=$(find_available_fd)
+    eval "exec ${lock_fd}<>${lock_file}"
+    if [ $wait_for_lock -eq 0 ]; then
+      if ! flock -n ${lock_fd}; then
+        # didn't get it, clean up and return failure
+        eval "exec ${lock_fd}<&-"
+        return 1
+      fi
+    else
+      flock ${lock_fd}
+    fi
+    # now have the lock
+    if [ -f $lock_file ]; then
+      # was not removed by the former lock holder, good
+      break
+    fi
+    # was removed by former lock holder; close and try again
+    eval "exec ${lock_fd}<&-"
+  done
+  # add the fd number and path to the two lists
+  _lock_fds="$_lock_fds $lock_fd"
+  _lock_paths="$_lock_paths $path"
 }
 
 
 release_lock() {
   local path="$1"
   local lock_file="${path}.lock"
+  local lock_fd=-1
+  # Find the index of $path in $_lock_paths and from that find $lock_fd.
+  # Would be much easier with an associative array if we could rely on bash.
+  local index=0
+  local lock_index=0
+  local lock_path
+  local new_paths=""
+  for lock_path in $_lock_paths; do
+    index=$((index + 1))
+    if [ "$path" = "$lock_path" ]; then
+      lock_index=$index
+    else
+      new_paths="$new_paths $lock_path"
+    fi
+  done
+  [ "$lock_index" != 0 ] || die "attempt to release $path lock when it was not acquired"
+  index=0
+  local fd
+  local new_fds
+  for fd in $_lock_fds; do
+    index=$((index + 1))
+    if [ "$index" = "$lock_index" ]; then
+      lock_fd=$fd
+    else
+      new_fds="$new_fds $fd"
+    fi
+  done
+  [ "$lock_fd" != -1 ] || die "_lock_fds and _lock_paths out of sync while releasing $path lock"
+  _lock_fds="$new_fds"
+  _lock_paths="$new_paths"
   rm -f $lock_file
-  exec 9<&-
+  eval "exec ${lock_fd}<&-"
 }
 
 
@@ -573,12 +637,14 @@ check_overlayfs_version() {
     if compare_versions "$krnl_version" -ge "$required_version" ; then
       # If the mounted filesystem name is long df will split output into two
       #  lines, so use tail -n +2 to skip first line and echo to combine them
-      local scratch_fstype=$(echo $(df -T /var/spool/cvmfs | tail -n +2) | awk {'print $2'})
+      local scratch_line="$(echo $(df -T /var/spool/cvmfs | tail -n +2))"
+      local scratch_fstype=$(echo $scratch_line | awk {'print $2'})
       if [ "x$scratch_fstype" = "xext3" ] || [ "x$scratch_fstype" = "xext4" ] ; then
         return 0
       fi
       if [ "x$scratch_fstype" = "xxfs" ] ; then
-        if [ "x$(xfs_info /var/spool/cvmfs 2>/dev/null | grep ftype=1)" != "x" ] ; then
+        local scratch_fsmnt=$(echo $scratch_line | awk {'print $7'})
+        if [ "x$(xfs_info $scratch_fsmnt 2>/dev/null | grep ftype=1)" != "x" ] ; then
           return 0
         else
           echo "XFS with ftype=0 is not supported for /var/spool/cvmfs. XFS with ftype=1 is required"
@@ -961,70 +1027,120 @@ _to_syslog_for_geoip() {
 
 _update_geodb_install() {
   local retcode=0
-  local dburl="${CVMFS_UPDATEGEO_URLBASE}?suffix=tar.gz"
+  local dburl="${CVMFS_UPDATEGEO_URLBASE}${CVMFS_UPDATEGEO_URLSUFFIX}"
   local dbfile="${CVMFS_UPDATEGEO_DIR}/${CVMFS_UPDATEGEO_DB}"
-  local download_target=${dbfile}.tgz
-  local untar_dir=${dbfile}.untar
+  local download_target
+  local untar_dir=""
 
-  if [ -z "$CVMFS_GEO_ACCOUNT_ID" ]; then
+  case "$CVMFS_UPDATEGEO_URLSUFFIX" in
+    *tar.gz|*.tgz)
+      download_target="${dbfile}.tgz"
+      untar_dir="${dbfile}.untar"
+      ;;
+    *.gz)
+      download_target="${dbfile}.gz"
+      ;;
+    *) echo "CVMFS_UPDATEGEO_URLSUFFIX ($CVMFS_UPDATEGEO_URLSUFFIX) ends in unrecognized suffix" >&2
+      _to_syslog_for_geoip "CVMFS_UPDATEGEO_URLSUFFIX ends in unrecognized suffix"
+      return 1
+      ;;
+  esac
+
+  local authopts=""
+  if [ "$CVMFS_UPDATEGEO_SOURCE" = "maxmind" ]; then
+    if [ -z "$CVMFS_GEO_ACCOUNT_ID" ]; then
       echo "CVMFS_GEO_ACCOUNT_ID not set" >&2
       _to_syslog_for_geoip "CVMFS_GEO_ACCOUNT_ID not set"
-      return 1
-  fi
-  if [ -z "$CVMFS_GEO_LICENSE_KEY" ]; then
+      return 2
+    fi
+    if [ -z "$CVMFS_GEO_LICENSE_KEY" ]; then
       echo "CVMFS_GEO_LICENSE_KEY not set" >&2
       _to_syslog_for_geoip "CVMFS_GEO_LICENSE_KEY not set"
-      return 1
+      return 3
+    fi
+    authopts="-u ${CVMFS_GEO_ACCOUNT_ID}:${CVMFS_GEO_LICENSE_KEY}"
   fi
 
   _to_syslog_for_geoip "started update from $dburl"
 
   # downloading the GeoIP database file
-  curl -L -sS  --connect-timeout 10 \
-            --max-time 60        \
-            -u "${CVMFS_GEO_ACCOUNT_ID}:${CVMFS_GEO_LICENSE_KEY}" \
-            "$dburl" > $download_target || true
-  if ! tar tzf $download_target >/dev/null 2>&1; then
-    local msg
-    if file $download_target|grep -q "ASCII text$"; then
-      msg="`cat -v $download_target|head -1`"
-    else
-      msg="file not valid tarball"
+  curl -L -sS --connect-timeout 10 \
+              --max-time 60        \
+              --retry 2            \
+              $authopts            \
+              "$dburl" -o $download_target || true
+
+  if [ -n "$untar_dir" ]; then
+    if ! tar tzf $download_target >/dev/null 2>&1; then
+      local msg
+      if file $download_target|grep -q "ASCII text$"; then
+        msg="`cat -v $download_target|head -1`"
+      else
+        msg="file not valid tarball"
+      fi
+      echo "failed to download geodb (see url in syslog): $msg" >&2
+      _to_syslog_for_geoip "failed to download from $dburl: $msg"
+      rm -f $download_target
+      return 4
     fi
-    echo "failed to download geodb (see url in syslog): $msg" >&2
-    _to_syslog_for_geoip "failed to download from $dburl: $msg"
-    rm -f $download_target
-    return 1
-  fi
 
-  # untar the GeoIP database file
-  rm -rf $untar_dir
-  mkdir -p $untar_dir
-  if ! tar xmf $download_target -C $untar_dir --no-same-owner 2>/dev/null; then
-    echo "failed to untar $download_target into $untar_dir" >&2
-    _to_syslog_for_geoip "failed to untar $download_target into $untar_dir"
-    rm -rf $download_target $untar_dir
-    return 2
-  fi
-
-  # get rid of the tarred GeoIP database
-  rm -f $download_target
-
-  # atomically install the GeoIP database
-  if ! mv -f $untar_dir/*/${CVMFS_UPDATEGEO_DB} $dbfile; then
-    echo "failed to install $dbfile" >&2
-    _to_syslog_for_geoip "failed to install $dbfile"
+    # untar the GeoIP database file
     rm -rf $untar_dir
-    return 3
+    mkdir -p $untar_dir
+    if ! tar xmf $download_target -C $untar_dir --no-same-owner 2>/dev/null; then
+      echo "failed to untar $download_target into $untar_dir" >&2
+      _to_syslog_for_geoip "failed to untar $download_target into $untar_dir"
+      rm -rf $download_target $untar_dir
+      return 5
+    fi
+
+    # get rid of the tarred GeoIP database
+    rm -f $download_target
+
+    # atomically install the GeoIP database
+    if ! mv -f $untar_dir/*/${CVMFS_UPDATEGEO_DB} $dbfile; then
+      echo "failed to install $dbfile" >&2
+      _to_syslog_for_geoip "failed to install $dbfile"
+      rm -rf $untar_dir
+      return 6
+    fi
+
+    # get rid of old database if present
+    rm -f ${CVMFS_UPDATEGEO_DIR}/${CVMFS_UPDATEGEO_OLDDB}
+
+    # get rid of any other files in the untar
+    rm -rf $untar_dir
+  else # must be .gz
+    if ! zcat $download_target >$dbfile.new; then
+      local msg
+      if file $download_target|grep -q "ASCII text$"; then
+        msg="`cat -v $download_target|head -1`"
+      else
+        msg="file could not be uncompressed"
+      fi
+      echo "failed to download geodb (see url in syslog): $msg" >&2
+      _to_syslog_for_geoip "failed to download from $dburl: $msg"
+      rm -f $download_target $dbfile.new
+      return 7
+    fi
+
+    rm -f $download_target
+
+    if ! mv -f $dbfile.new $dbfile; then
+      echo "failed to install $dbfile" >&2
+      _to_syslog_for_geoip "failed to install $dbfile"
+      rm -f $dbfile.new
+      return 8
+    fi
   fi
+
+  # Remove any old name .mmdb
+  find $CVMFS_UPDATEGEO_DIR -name '*.mmdb' ! -name $CVMFS_UPDATEGEO_DB | xargs -r rm -f
 
   if [ -w "$(get_global_info_v1_path)" ]; then
     # update repositories.json for the new geodb timestamp, if possible
     update_global_repository_info || die "fail (update global repository info)"
   fi
-
-  # get rid of other files in the untar
-  rm -rf $untar_dir
 
   set_selinux_httpd_context_if_needed "$CVMFS_UPDATEGEO_DIR"
 
@@ -1063,9 +1179,12 @@ _update_geodb() {
     CVMFS_GEO_DB_FILE=/usr/share/GeoIP/$CVMFS_UPDATEGEO_DB
   fi
   if [ -n "$CVMFS_GEO_DB_FILE" ]; then
+    if [ "$CVMFS_GEO_DB_FILE" = "NONE" ] || [ "$CVMFS_GEO_DB_FILE" = "none" ]; then
+      return 0
+    fi
     # This overrides the update/install; link to the given file instead.
     if [ ! -L "$dbfile" ] || [ "`readlink $dbfile`" != "$CVMFS_GEO_DB_FILE" ]; then
-      if [ "$CVMFS_GEO_DB_FILE" != "NONE" ] && [ ! -r "$CVMFS_GEO_DB_FILE" ]; then
+      if [ ! -r "$CVMFS_GEO_DB_FILE" ]; then
         echo "$CVMFS_GEO_DB_FILE doesn't exist or is not readable" >&2
         return 1
       fi
@@ -1122,7 +1241,7 @@ is_subcommand() {
     resign list info tag list-tags lstags check transaction enter abort snapshot    \
     skeleton migrate list-catalogs diff checkout update-geodb gc catalog-chown      \
     eliminate-hardlinks eliminate-bulk-hashes fix-stats update-info update-repoinfo \
-    mount fix-permissions masterkeycard ingest merge-stats print-stats"
+    mount fix-permissions masterkeycard ingest overlay merge-stats print-stats"
 
   for possible_command in $supported_commands; do
     if [ x"$possible_command" = x"$subcommand" ]; then
@@ -1296,6 +1415,11 @@ Supported Commands:
                   Extract the content of the tarfile inside the base directory,
                   in the same transaction it also delete the required folders.
                   Use '-' as -t argument to read the tarball from STDIN.
+  overlay         -l <layer1,layer2,...> (comma-separated, bottom-to-top order)
+                  -d <destination path>
+                  <fully qualified name>
+                  Merge multiple subdirectory catalogs using overlay semantics
+                  and publish the result under the destination path.
   print-stats     [-o output_file]
                   [-t table_name]
                   [-s separator] - char

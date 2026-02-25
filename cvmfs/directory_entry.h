@@ -30,6 +30,7 @@ class SyncItemDummyCatalog;
 }  // namespace publish
 namespace swissknife {
 class CommandMigrate;
+class CommandOverlay;
 class IngestSQL;
 }  // namespace swissknife
 
@@ -68,6 +69,7 @@ class DirectoryEntryBase {
   friend class publish::SyncItemTar;
   friend class publish::SyncItemDummyDir;
   friend class publish::SyncItemDummyCatalog;
+  friend class swissknife::CommandOverlay;
   friend class swissknife::IngestSQL;  // TODO(vvolkl): can probably avoided
                                        // with new setters
   // Simplify file system like _touch_ of DirectoryEntry objects

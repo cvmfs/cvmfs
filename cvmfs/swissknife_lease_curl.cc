@@ -16,6 +16,7 @@
 #include "util/posix.h"
 #include "util/string.h"
 
+long g_final_revision = -1;
 
 namespace {
 
@@ -161,6 +162,16 @@ bool MakeEndRequest(const std::string &method, const std::string &key_id,
     if (!ok) {
       LogCvmfs(kLogUploadGateway, kLogStderr,
                "Lease end request - error reply: %s", reply->data.c_str());
+    }
+    if (expect_final_revision) {
+      const JSON *reply_final_rev = JsonDocument::SearchInObject(
+          reply_json->root(), "final_revision", JSON_INT);
+      ok = (reply_final_rev != NULL);
+      if (ok) {
+        g_final_revision = reply_final_rev->int_value;
+      } else {
+        g_final_revision = -1;
+      }
     }
   }
 

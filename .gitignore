@@ -1,12 +1,13 @@
 test/test.log
 *.swp
+*.kate-swp
 test/mylog
 *.DS_Store
 *._.DS_Store
 ._*
 .fuse_hidden*
 build/
-build-*/
+/build*/
 benchmark/
 *.pyc
 test/cloud_testing/ec2_config.sh
@@ -23,13 +24,16 @@ python/MANIFEST
 .cproject
 .metadata
 .settings
+.cache
 RemoteSystemsTempFiles/
 
 # Externals
 externals/build_*/
 externals/.decompressionDone
-externals_build
-externals_install
+externals_build*
+externals_install*
+externals/*.tar*
+externals/download*
 
 # golang build products
 ducc/ducc

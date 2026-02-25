@@ -209,6 +209,7 @@ static void Usage(const std::string &exe) {
       "                         loaded catalogs (_not_ all cached ones)  \n"
       "  latency                show the latencies of different fuse     \n"
       "                         calls (requires CVMFS_INSTRUMENT_FUSE)   \n"
+      "  metrics prometheus     outputs all metrics in Prometheus format \n"
       "\n",
       exe.c_str(), exe.c_str());
 }

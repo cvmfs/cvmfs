@@ -1,7 +1,7 @@
 /**
  * This file is part of the CernVM File System.
  *
- * Implements stub callback functions for Fuse.  Their purpose is to
+ * Implements stub callback functions for Fuse. Their purpose is to
  * redirect calls to the cvmfs shared library and to block calls during the
  * update of the library.
  *
@@ -65,6 +65,7 @@ struct CvmfsOptions {
   int simple_options_parsing;
   int foreground;
   int fuse_debug;
+  int fuse_passthrough;
 
   // Ignored options
   int ign_netdev;
@@ -98,6 +99,8 @@ static struct fuse_opt cvmfs_array_opts[] = {
     CVMFS_SWITCH("simple_options_parsing", simple_options_parsing),
     CVMFS_SWITCH("foreground", foreground),
     CVMFS_SWITCH("fuse_debug", fuse_debug),
+    CVMFS_SWITCH("fuse_passthrough", fuse_passthrough),
+    CVMFS_SWITCH("fuse_passthru", fuse_passthrough),
 
     // Ignore these options
     CVMFS_SWITCH("_netdev", ign_netdev),
@@ -139,8 +142,10 @@ bool grab_mountpoint_ = false;
 bool parse_options_only_ = false;
 bool suid_mode_ = false;
 bool premounted_ = false;
+bool premount_fuse_ = true;
 bool disable_watchdog_ = false;
 bool simple_options_parsing_ = false;
+bool fuse_passthrough_ = false;
 void *library_handle_;
 Fence *fence_reload_;
 CvmfsExports *cvmfs_exports_;
@@ -169,8 +174,11 @@ static void Usage(const string &exename) {
                             "before mounting (required for autofs)\n"
     "  -o parse             Parse and print cvmfs parameters\n"
     "  -o cvmfs_suid        Enable suid mode\n"
+    "  -o debug             Enable debug to CVMFS_DEBUGLOG\n"
     "  -o disable_watchdog  Do not spawn a post mortem crash handler\n"
     "  -o foreground        Run in foreground\n"
+    "  -o fuse_passthrough  Enables FUSE passthrough (read requests bypass userspace, improves performance)\n"
+    "  -o fuse_passthru     Alias for fuse_passthrough\n"
     "  -o libfuse=[2,3]     Enforce a certain libfuse version\n"
     "Fuse mount options:\n"
     "  -o allow_other       allow access to other users\n"
@@ -419,6 +427,7 @@ static fuse_args *ParseCmdLine(int argc, char *argv[]) {
   if (cvmfs_options.fuse_debug) {
     fuse_opt_add_arg(mount_options, "-d");
   }
+  fuse_passthrough_ = cvmfs_options.fuse_passthrough;
 
   return mount_options;
 }
@@ -645,7 +654,7 @@ int FuseMain(int argc, char *argv[]) {
       // reload ignores the current state
       //
       // if you mount with debug but do not set CVMFS_DEBUGLOG and reload,
-      // you will reload with
+      // debug will be turned off
       if (std::string(argv[argc - 1]) == std::string("--debug")) {
         debug_mode_ = true;
       } else {
@@ -728,6 +737,10 @@ int FuseMain(int argc, char *argv[]) {
   } else {
     options_manager->ParseDefault(*repository_name_);
   }
+  if (options_manager->GetValue("CVMFS_PREMOUNT_FUSE", &parameter)
+      && options_manager->IsOff(parameter)) {
+    premount_fuse_ = false;
+  }
 
 #ifdef __APPLE__
   string volname = "-ovolname=" + *repository_name_;
@@ -788,6 +801,12 @@ int FuseMain(int argc, char *argv[]) {
   loader_exports_->device_id = "0:0";  // initially unknown, set after mount
   loader_exports_->disable_watchdog = disable_watchdog_;
   loader_exports_->simple_options_parsing = simple_options_parsing_;
+  loader_exports_->fuse_passthrough = fuse_passthrough_;
+  if (options_manager->GetValue("CVMFS_FUSE_PASSTHROUGH", &parameter)) {
+    // CVMFS_FUSE_PASSTHROUGH set to on in configs enables the feature.
+    // Presence of mount option can also enable the feature (but not disable it).
+    loader_exports_->fuse_passthrough |= options_manager->IsOn(parameter);
+  }
   if (config_files_)
     loader_exports_->config_files = *config_files_;
   else
@@ -882,52 +901,11 @@ int FuseMain(int argc, char *argv[]) {
     }
   }
 
-#if CVMFS_USE_LIBFUSE != 2
-  int premount_fd = -1;
-  if (!premounted_ && !suid_mode_ && getuid() == 0) {
-    // If not already premounted or using suid mode, premount the fuse
-    // mountpoint before dropping privileges to avoid the need for fusermount.
-    // Requires libfuse >= 3.3.0.
-    platform_stat64 info;
-    // Need to know if it is a directory or not
-    if (platform_stat(mount_point_->c_str(), &info) != 0) {
-      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
-               "Failed to stat mountpoint %s (%d)", mount_point_->c_str(),
-               errno);
-      return kFailPermission;
-    }
-    premount_fd = open("/dev/fuse", O_RDWR);
-    if (premount_fd == -1) {
-      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
-               "Failed to open /dev/fuse (%d)", errno);
-      return kFailPermission;
-    }
-    char opts[128];
-    snprintf(
-        opts, sizeof(opts), "fd=%i,rootmode=%o,user_id=0,group_id=0%s%s",
-        premount_fd, info.st_mode & S_IFMT,
-        MatchFuseOption(mount_options, "default_permissions")
-            ? ",default_permissions"
-            : "",
-        MatchFuseOption(mount_options, "allow_other") ? ",allow_other" : "");
-    unsigned long flags = MS_NOSUID | MS_NODEV | MS_RELATIME;
-    // Note that during the handling of the `CVMFS_MOUNT_RW` option, we ensure
-    // that at least one of `rw` or `ro` is part of the mount option string (we
-    // won't have both unset). If both `rw` and `ro` are set, the read-only
-    // option takes precedence.
-    if (MatchFuseOption(mount_options, "ro")) {
-      flags |= MS_RDONLY;
-    }
-    if (mount("cvmfs2", mount_point_->c_str(), "fuse", flags, opts) == -1) {
-      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
-               "Failed to mount -t fuse -o %s cvmfs2 %s (%d)", opts,
-               mount_point_->c_str(), errno);
-      return kFailPermission;
-    }
-  }
-#endif
 
   int fd_mountinfo = -1;  // needs to be declared before start using goto
+#if CVMFS_USE_LIBFUSE != 2
+  int premount_fd = -1;
+#endif
 
   // Drop credentials
   if ((uid_ != 0) || (gid_ != 0)) {
@@ -1061,6 +1039,69 @@ int FuseMain(int argc, char *argv[]) {
       goto cleanup;
     }
   }
+
+#if CVMFS_USE_LIBFUSE != 2
+  if (!premounted_ && !suid_mode_ && getuid() == 0 && premount_fuse_) {
+    // If not already premounted or using suid mode, premount the fuse
+    // mountpoint to avoid the need for fusermount.
+    // Requires libfuse >= 3.3.0.
+    //
+    if ((uid_ != 0) || (gid_ != 0)) {
+      if (!SwitchCredentials(0, getgid(), true)) {
+        LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+                 "failed to re-gain root permissions for mounting");
+        retval = kFailPermission;
+        goto cleanup;
+      }
+    }
+    platform_stat64 info;
+    // Need to know if it is a directory or not
+    if (platform_stat(mount_point_->c_str(), &info) != 0) {
+      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+               "Failed to stat mountpoint %s (%d)", mount_point_->c_str(),
+               errno);
+      return kFailPermission;
+    }
+    premount_fd = open("/dev/fuse", O_RDWR);
+    if (premount_fd == -1) {
+      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+               "Failed to open /dev/fuse (%d)", errno);
+      return kFailPermission;
+    }
+    char opts[128];
+    snprintf(
+        opts, sizeof(opts), "fd=%i,rootmode=%o,user_id=0,group_id=0%s%s",
+        premount_fd, info.st_mode & S_IFMT,
+        MatchFuseOption(mount_options, "default_permissions")
+            ? ",default_permissions"
+            : "",
+        MatchFuseOption(mount_options, "allow_other") ? ",allow_other" : "");
+    unsigned long flags = MS_NOSUID | MS_NODEV | MS_RELATIME;
+    // Note that during the handling of the `CVMFS_MOUNT_RW` option, we ensure
+    // that at least one of `rw` or `ro` is part of the mount option string (we
+    // won't have both unset). If both `rw` and `ro` are set, the read-only
+    // option takes precedence.
+    if (MatchFuseOption(mount_options, "ro")) {
+      flags |= MS_RDONLY;
+    }
+    if (mount("cvmfs2", mount_point_->c_str(), "fuse", flags, opts) == -1) {
+      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+               "Failed to mount -t fuse -o %s cvmfs2 %s (%d)", opts,
+               mount_point_->c_str(), errno);
+      return kFailPermission;
+    }
+
+    // Drop credentials
+    if ((uid_ != 0) || (gid_ != 0)) {
+      if (!SwitchCredentials(uid_, gid_, true /*retrievable*/)) {
+        LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+                 "Failed to drop credentials");
+        retval = kFailPermission;
+        goto cleanup;
+      }
+    }
+  }
+#endif
 
 
   struct fuse_lowlevel_ops loader_operations;
@@ -1198,6 +1239,10 @@ int FuseMain(int argc, char *argv[]) {
 #endif  // fuse2/3
   }
   SetLogMicroSyslog(*usyslog_path_);
+  if (retval != 0) {
+    LogCvmfs(kLogCvmfs, kLogSyslogErr, "CernVM-FS: fuse loop exited with error %i",
+             retval);
+  }
 
   loader_talk::Fini();
   cvmfs_exports_->fnFini();
@@ -1231,18 +1276,24 @@ int FuseMain(int argc, char *argv[]) {
   config_files_ = NULL;
   socket_path_ = NULL;
 
-  if (retval != 0)
+  // Decide whether to attempt a umount before exiting.
+  // The fuse main loop exists with 0 either when it is already umounted,
+  // or when the filesystem connection is aborted.
+  // In the first case we don't need to attempt to unmount,
+  // the second case we can ignore because it only ever happens on admin intervention.
+  if (retval != 0) {
     retval = kFailFuseLoop;
-  else
-    retval = kFailOk;
-
 #if CVMFS_USE_LIBFUSE != 2
-  if (premount_fd >= 0) {
     goto cleanup;
-  }
 #endif
+  } else {
+    retval = kFailOk;
+#if CVMFS_USE_LIBFUSE != 2
+    if (premount_fd >= 0) close(premount_fd);
+#endif
+  }
 
-  LogCvmfs(kLogCvmfs, kLogSyslog, "CernVM-FS: unmounted %s (%s)",
+  LogCvmfs(kLogCvmfs, kLogSyslog, "CernVM-FS: unmounted %s (%s) (exit success)",
            mount_point_->c_str(), repository_name_->c_str());
 
   delete repository_name_;
@@ -1259,13 +1310,13 @@ cleanup:
       LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
                "failed to re-gain root permissions for umounting");
       retval = kFailPermission;
-    } else if (umount(mount_point_->c_str()) < 0) {
+    // do lazy unmount and ignore if it is already unmounted
+    } else if (umount2(mount_point_->c_str(), MNT_DETACH) < 0 && errno != EINVAL && errno != ENOENT) {
       LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
-               "failed to umount %s (%d)", mount_point_->c_str(), errno);
-      retval = kFailPermission;
+                    "failed to umount %s (%d)", mount_point_->c_str(), errno);
     } else {
-      LogCvmfs(kLogCvmfs, kLogSyslog, "CernVM-FS: unmounted %s (%s)",
-               mount_point_->c_str(), repository_name_->c_str());
+      LogCvmfs(kLogCvmfs, kLogSyslog, "CernVM-FS: unmounted %s (%s) (error cleanup) ",
+                  mount_point_->c_str(), repository_name_->c_str());
     }
     close(premount_fd);
   }

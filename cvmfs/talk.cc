@@ -62,6 +62,8 @@
 using namespace std;  // NOLINT
 
 
+
+
 void TalkManager::Answer(int con_fd, const string &msg) {
   (void)send(con_fd, &msg[0], msg.length(), MSG_NOSIGNAL);
 }
@@ -825,6 +827,10 @@ void *TalkManager::MainResponder(void *data) {
       const string result = talk_mgr->FormatLatencies(*mount_point,
                                                       file_system);
       talk_mgr->Answer(con_fd, result);
+    } else if (line == "metrics prometheus") {
+      const string result = talk_mgr->FormatPrometheusMetrics(*mount_point,
+                                                              file_system);
+      talk_mgr->Answer(con_fd, result);
     } else {
       talk_mgr->Answer(con_fd, "unknown command\n");
     }
@@ -914,6 +920,470 @@ string TalkManager::FormatLatencies(const MountPoint &mount_point,
     memset(buffer, 0, sizeof(buffer));
     format_index = 0;
   }
+  return result;
+}
+
+string TalkManager::FormatPrometheusMetrics(MountPoint &mount_point,
+                                            FileSystem *file_system) {
+  string result;
+  const string fqrn = mount_point.fqrn();
+  const string mountpoint = cvmfs::loader_exports_->mount_point;
+
+  // Helper function to format a prometheus metric
+  class MetricFormatter {
+   public:
+    explicit MetricFormatter(string &result_ref) : result_(result_ref) {}
+    void operator()(const string &name, const string &type,
+                    const string &help, const string &labels,
+                    const string &value) {
+      result_ += "# HELP " + name + " " + help + "\n";
+      result_ += "# TYPE " + name + " " + type + "\n";
+      result_ += name + "{" + labels + "} " + value + "\n";
+    }
+   private:
+    string &result_;
+  };
+  MetricFormatter format_metric(result);
+
+  // Get cache information
+  QuotaManager *quota_mgr = file_system->cache_mgr()->quota_mgr();
+  if (quota_mgr->HasCapability(QuotaManager::kCapIntrospectSize)) {
+    const uint64_t size_unpinned = quota_mgr->GetSize();
+    const uint64_t size_pinned = quota_mgr->GetSizePinned();
+
+    format_metric("cvmfs_cached_bytes", "gauge",
+                  "CVMFS currently cached bytes.",
+                  "repo=\"" + fqrn + "\"", StringifyUint(size_unpinned));
+    format_metric("cvmfs_pinned_bytes", "gauge",
+                  "CVMFS currently pinned bytes.",
+                  "repo=\"" + fqrn + "\"", StringifyUint(size_pinned));
+  }
+
+  // Get cache limit from parameters
+  string cache_limit_str;
+  if (file_system->options_mgr()->GetValue("CVMFS_QUOTA_LIMIT", &cache_limit_str)) {
+    const uint64_t cache_limit_mb = String2Uint64(cache_limit_str);
+    const uint64_t cache_limit_bytes = cache_limit_mb * 1024 * 1024;
+    format_metric("cvmfs_total_cache_size_bytes", "gauge",
+                  "CVMFS configured cache size via CVMFS_QUOTA_LIMIT.",
+                  "repo=\"" + fqrn + "\"", StringifyUint(cache_limit_bytes));
+  }
+
+  // Get cache base directory for df information
+  string cache_base;
+  if (file_system->options_mgr()->GetValue("CVMFS_CACHE_BASE", &cache_base)) {
+    struct statvfs stat_info;
+    if (statvfs(cache_base.c_str(), &stat_info) == 0) {
+      const uint64_t total_size = static_cast<uint64_t>(stat_info.f_blocks) * stat_info.f_frsize;
+      const uint64_t avail_size = static_cast<uint64_t>(stat_info.f_bavail) * stat_info.f_frsize;
+
+      format_metric("cvmfs_physical_cache_size_bytes", "gauge",
+                    "CVMFS cache volume physical size.",
+                    "repo=\"" + fqrn + "\"", StringifyUint(total_size));
+      format_metric("cvmfs_physical_cache_avail_bytes", "gauge",
+                    "CVMFS cache volume physical free space available.",
+                    "repo=\"" + fqrn + "\"", StringifyUint(avail_size));
+    }
+  }
+
+  // Version and revision information
+  const string version = string(CVMFS_VERSION) + "." + string(CVMFS_PATCH_LEVEL);
+  const uint64_t revision = mount_point.catalog_mgr()->GetRevision();
+  format_metric("cvmfs_repo", "gauge",
+                "Shows the version of CVMFS used by this repository.",
+                "repo=\"" + fqrn + "\",mountpoint=\"" + mountpoint +
+                "\",version=\"" + version + "\",revision=\"" + StringifyUint(revision) + "\"",
+                "1");
+
+  // Statistics-based metrics
+  perf::Statistics *statistics = mount_point.statistics();
+
+  // Download statistics
+  const int64_t rx_bytes = statistics->Lookup("download.sz_transferred_bytes")->Get();
+  format_metric("cvmfs_rx_total", "counter",
+                "Shows the overall amount of downloaded bytes since mounting.",
+                "repo=\"" + fqrn + "\"", StringifyInt(rx_bytes));
+
+  const int64_t n_downloads = statistics->Lookup("fetch.n_downloads")->Get();
+  format_metric("cvmfs_ndownload_total", "counter",
+                "Shows the overall number of downloaded files since mounting.",
+                "repo=\"" + fqrn + "\"", StringifyInt(n_downloads));
+
+  // Hit rate calculation
+  const int64_t n_invocations = statistics->Lookup("fetch.n_invocations")->Get();
+  if (n_invocations > 0) {
+    const float hitrate = 100.0 * (1.0 - (static_cast<float>(n_downloads) /
+                                          static_cast<float>(n_invocations)));
+    format_metric("cvmfs_hitrate", "gauge",
+                  "CVMFS cache hit rate (%)",
+                  "repo=\"" + fqrn + "\"", StringifyDouble(hitrate));
+  } else {
+    format_metric("cvmfs_hitrate", "gauge",
+                  "CVMFS cache hit rate (%)",
+                  "repo=\"" + fqrn + "\"", "0");
+  }
+
+  // Speed calculation
+  const int64_t transfer_time = statistics->Lookup("download.sz_transfer_time")->Get();
+  if (transfer_time > 0) {
+    const int64_t speed = (1000 * (rx_bytes / 1024)) / transfer_time;
+    format_metric("cvmfs_speed", "gauge",
+                  "Shows the average download speed.",
+                  "repo=\"" + fqrn + "\"", StringifyInt(speed));
+  } else {
+    format_metric("cvmfs_speed", "gauge",
+                  "Shows the average download speed.",
+                  "repo=\"" + fqrn + "\"", "0");
+  }
+
+  // Uptime calculation
+  const time_t now = time(NULL);
+  const uint64_t uptime_seconds = now - cvmfs::loader_exports_->boot_time;
+  const uint64_t mount_epoch_time = now - uptime_seconds;
+  format_metric("cvmfs_uptime_seconds", "counter",
+                "Shows the time since the repo was mounted.",
+                "repo=\"" + fqrn + "\"", StringifyUint(uptime_seconds));
+  format_metric("cvmfs_mount_epoch_timestamp", "counter",
+                "Shows the epoch time the repo was mounted.",
+                "repo=\"" + fqrn + "\"", StringifyUint(mount_epoch_time));
+
+  // Catalog expiry - access through the TalkManager's remounter member
+  const time_t catalogs_valid_until = remounter_->catalogs_valid_until();
+  if (catalogs_valid_until != MountPoint::kIndefiniteDeadline) {
+    const int64_t expires_seconds = (catalogs_valid_until - now);
+    format_metric("cvmfs_repo_expires_seconds", "gauge",
+                  "Shows the remaining life time of the mounted root file catalog in seconds.",
+                  "repo=\"" + fqrn + "\"", StringifyInt(expires_seconds));
+  }
+
+  // I/O error count
+  const uint64_t nioerr = file_system->io_error_info()->count();
+  format_metric("cvmfs_nioerr_total", "counter",
+                "Shows the total number of I/O errors encountered since mounting.",
+                "repo=\"" + fqrn + "\"", StringifyUint(nioerr));
+
+  // Timeout information
+  unsigned timeout_proxy, timeout_direct;
+  mount_point.download_mgr()->GetTimeout(&timeout_proxy, &timeout_direct);
+  format_metric("cvmfs_timeout", "gauge",
+                "Shows the timeout for proxied connections in seconds.",
+                "repo=\"" + fqrn + "\"", StringifyUint(timeout_proxy));
+  format_metric("cvmfs_timeout_direct", "gauge",
+                "Shows the timeout for direct connections in seconds.",
+                "repo=\"" + fqrn + "\"", StringifyUint(timeout_direct));
+
+  // Last I/O error timestamp
+  const int64_t timestamp_last_ioerr = file_system->io_error_info()->timestamp_last();
+  format_metric("cvmfs_timestamp_last_ioerr", "counter",
+                "Shows the timestamp of the last ioerror.",
+                "repo=\"" + fqrn + "\"", StringifyInt(timestamp_last_ioerr));
+
+  // CPU usage from /proc/pid/stat
+  const pid_t pid = cvmfs::pid_;
+  const string proc_stat_path = "/proc/" + StringifyInt(pid) + "/stat";
+  FILE *stat_file = fopen(proc_stat_path.c_str(), "r");
+  if (stat_file) {
+    char stat_line[1024];
+    if (fgets(stat_line, sizeof(stat_line), stat_file)) {
+      vector<string> stat_fields = SplitString(string(stat_line), ' ');
+      if (stat_fields.size() > 15) {
+        const uint64_t utime = String2Uint64(stat_fields[13]);
+        const uint64_t stime = String2Uint64(stat_fields[14]);
+        const long clock_tick = sysconf(_SC_CLK_TCK);
+        if (clock_tick > 0) {
+          const double user_seconds = static_cast<double>(utime) / clock_tick;
+          const double system_seconds = static_cast<double>(stime) / clock_tick;
+          format_metric("cvmfs_cpu_user_total", "counter",
+                        "CPU time used in userspace by CVMFS mount in seconds.",
+                        "repo=\"" + fqrn + "\"", StringifyDouble(user_seconds));
+          format_metric("cvmfs_cpu_system_total", "counter",
+                        "CPU time used in the kernel system calls by CVMFS mount in seconds.",
+                        "repo=\"" + fqrn + "\"", StringifyDouble(system_seconds));
+        }
+      }
+    }
+    fclose(stat_file);
+  }
+
+  // File descriptor and directory counts
+  format_metric("cvmfs_usedfd", "gauge",
+                "Shows the number of open directories currently used by file system clients.",
+                "repo=\"" + fqrn + "\"",
+                file_system->no_open_files()->ToString());
+  format_metric("cvmfs_useddirp", "gauge",
+                "Shows the number of file descriptors currently issued to file system clients.",
+                "repo=\"" + fqrn + "\"",
+                file_system->no_open_dirs()->ToString());
+  format_metric("cvmfs_ndiropen", "gauge",
+                "Shows the overall number of opened directories.",
+                "repo=\"" + fqrn + "\"",
+                file_system->n_fs_dir_open()->ToString());
+
+  // Inode max
+  format_metric("cvmfs_inode_max", "gauge",
+                "Shows the highest possible inode with the current set of loaded catalogs.",
+                "repo=\"" + fqrn + "\"",
+                StringifyInt(mount_point.inode_annotation()->GetGeneration() +
+                           mount_point.catalog_mgr()->inode_gauge()));
+
+  // Process ID
+  format_metric("cvmfs_pid", "gauge",
+                "Shows the process id of the CernVM-FS Fuse process.",
+                "repo=\"" + fqrn + "\"", StringifyInt(pid));
+
+  // Catalog count
+  const int n_catalogs = mount_point.catalog_mgr()->GetNumCatalogs();
+  format_metric("cvmfs_nclg", "gauge",
+                "Shows the number of currently loaded nested catalogs.",
+                "repo=\"" + fqrn + "\"", StringifyInt(n_catalogs));
+
+  // Cleanup rate (24 hours)
+  if (quota_mgr->HasCapability(QuotaManager::kCapIntrospectCleanupRate)) {
+    const uint64_t period_s = 24 * 60 * 60;
+    const uint64_t cleanup_rate = quota_mgr->GetCleanupRate(period_s);
+    format_metric("cvmfs_ncleanup24", "gauge",
+                  "Shows the number of cache cleanups in the last 24 hours.",
+                  "repo=\"" + fqrn + "\"", StringifyUint(cleanup_rate));
+  } else {
+    format_metric("cvmfs_ncleanup24", "gauge",
+                  "Shows the number of cache cleanups in the last 24 hours.",
+                  "repo=\"" + fqrn + "\"", "-1");
+  }
+
+  // Active proxy
+  vector<vector<download::DownloadManager::ProxyInfo> > proxy_chain;
+  unsigned current_group;
+  mount_point.download_mgr()->GetProxyInfo(&proxy_chain, &current_group, NULL);
+  string active_proxy = "DIRECT";
+  if (proxy_chain.size() > 0 && current_group < proxy_chain.size() &&
+      proxy_chain[current_group].size() > 0) {
+    active_proxy = proxy_chain[current_group][0].url;
+  }
+  format_metric("cvmfs_active_proxy", "gauge",
+                "Shows the active proxy in use for this mount.",
+                "repo=\"" + fqrn + "\",proxy=\"" + active_proxy + "\"", "1");
+
+  // Proxy list metrics
+  for (unsigned int i = 0; i < proxy_chain.size(); i++) {
+    for (unsigned int j = 0; j < proxy_chain[i].size(); j++) {
+      format_metric("cvmfs_proxy", "gauge",
+                    "Shows all registered proxies for this repository.",
+                    "repo=\"" + fqrn + "\",group=\"" + StringifyInt(i) +
+                    "\",url=\"" + proxy_chain[i][j].url + "\"", "1");
+    }
+  }
+
+  // Internal affairs metrics (excluding histograms)
+
+  // Update string counters manually (same as internal affairs does)
+  mount_point.statistics()->Lookup("pathstring.n_instances")->Set(PathString::num_instances());
+  mount_point.statistics()->Lookup("pathstring.n_overflows")->Set(PathString::num_overflows());
+  mount_point.statistics()->Lookup("namestring.n_instances")->Set(NameString::num_instances());
+  mount_point.statistics()->Lookup("namestring.n_overflows")->Set(NameString::num_overflows());
+  mount_point.statistics()->Lookup("linkstring.n_instances")->Set(LinkString::num_instances());
+  mount_point.statistics()->Lookup("linkstring.n_overflows")->Set(LinkString::num_overflows());
+
+  // String statistics
+  const int64_t pathstring_instances = mount_point.statistics()->Lookup("pathstring.n_instances")->Get();
+  const int64_t pathstring_overflows = mount_point.statistics()->Lookup("pathstring.n_overflows")->Get();
+  const int64_t namestring_instances = mount_point.statistics()->Lookup("namestring.n_instances")->Get();
+  const int64_t namestring_overflows = mount_point.statistics()->Lookup("namestring.n_overflows")->Get();
+  const int64_t linkstring_instances = mount_point.statistics()->Lookup("linkstring.n_instances")->Get();
+  const int64_t linkstring_overflows = mount_point.statistics()->Lookup("linkstring.n_overflows")->Get();
+
+  format_metric("cvmfs_pathstring_instances", "gauge",
+                "Number of PathString instances.",
+                "repo=\"" + fqrn + "\"", StringifyInt(pathstring_instances));
+  format_metric("cvmfs_pathstring_overflows", "counter",
+                "Number of PathString overflows.",
+                "repo=\"" + fqrn + "\"", StringifyInt(pathstring_overflows));
+  format_metric("cvmfs_namestring_instances", "gauge",
+                "Number of NameString instances.",
+                "repo=\"" + fqrn + "\"", StringifyInt(namestring_instances));
+  format_metric("cvmfs_namestring_overflows", "counter",
+                "Number of NameString overflows.",
+                "repo=\"" + fqrn + "\"", StringifyInt(namestring_overflows));
+  format_metric("cvmfs_linkstring_instances", "gauge",
+                "Number of LinkString instances.",
+                "repo=\"" + fqrn + "\"", StringifyInt(linkstring_instances));
+  format_metric("cvmfs_linkstring_overflows", "counter",
+                "Number of LinkString overflows.",
+                "repo=\"" + fqrn + "\"", StringifyInt(linkstring_overflows));
+
+  // Tracker statistics (same as internal affairs does)
+  glue::InodeTracker::Statistics inode_stats = mount_point.inode_tracker()->GetStatistics();
+  const glue::DentryTracker::Statistics dentry_stats = mount_point.dentry_tracker()->GetStatistics();
+  const glue::PageCacheTracker::Statistics page_cache_stats = mount_point.page_cache_tracker()->GetStatistics();
+
+  // Update statistics manually
+  mount_point.statistics()->Lookup("inode_tracker.n_insert")->Set(atomic_read64(&inode_stats.num_inserts));
+  mount_point.statistics()->Lookup("inode_tracker.n_remove")->Set(atomic_read64(&inode_stats.num_removes));
+  mount_point.statistics()->Lookup("inode_tracker.no_reference")->Set(atomic_read64(&inode_stats.num_references));
+  mount_point.statistics()->Lookup("inode_tracker.n_hit_inode")->Set(atomic_read64(&inode_stats.num_hits_inode));
+  mount_point.statistics()->Lookup("inode_tracker.n_hit_path")->Set(atomic_read64(&inode_stats.num_hits_path));
+  mount_point.statistics()->Lookup("inode_tracker.n_miss_path")->Set(atomic_read64(&inode_stats.num_misses_path));
+  mount_point.statistics()->Lookup("dentry_tracker.n_insert")->Set(dentry_stats.num_insert);
+  mount_point.statistics()->Lookup("dentry_tracker.n_remove")->Set(dentry_stats.num_remove);
+  mount_point.statistics()->Lookup("dentry_tracker.n_prune")->Set(dentry_stats.num_prune);
+  mount_point.statistics()->Lookup("page_cache_tracker.n_insert")->Set(page_cache_stats.n_insert);
+  mount_point.statistics()->Lookup("page_cache_tracker.n_remove")->Set(page_cache_stats.n_remove);
+  mount_point.statistics()->Lookup("page_cache_tracker.n_open_direct")->Set(page_cache_stats.n_open_direct);
+  mount_point.statistics()->Lookup("page_cache_tracker.n_open_flush")->Set(page_cache_stats.n_open_flush);
+  mount_point.statistics()->Lookup("page_cache_tracker.n_open_cached")->Set(page_cache_stats.n_open_cached);
+
+  // Inode tracker metrics
+  format_metric("cvmfs_inode_tracker_inserts_total", "counter",
+                "Number of inode tracker insertions.",
+                "repo=\"" + fqrn + "\"", StringifyInt(atomic_read64(&inode_stats.num_inserts)));
+  format_metric("cvmfs_inode_tracker_removes_total", "counter",
+                "Number of inode tracker removals.",
+                "repo=\"" + fqrn + "\"", StringifyInt(atomic_read64(&inode_stats.num_removes)));
+  format_metric("cvmfs_inode_tracker_references", "gauge",
+                "Number of inode tracker references.",
+                "repo=\"" + fqrn + "\"", StringifyInt(atomic_read64(&inode_stats.num_references)));
+  format_metric("cvmfs_inode_tracker_hits_inode_total", "counter",
+                "Number of inode tracker inode hits.",
+                "repo=\"" + fqrn + "\"", StringifyInt(atomic_read64(&inode_stats.num_hits_inode)));
+  format_metric("cvmfs_inode_tracker_hits_path_total", "counter",
+                "Number of inode tracker path hits.",
+                "repo=\"" + fqrn + "\"", StringifyInt(atomic_read64(&inode_stats.num_hits_path)));
+  format_metric("cvmfs_inode_tracker_misses_path_total", "counter",
+                "Number of inode tracker path misses.",
+                "repo=\"" + fqrn + "\"", StringifyInt(atomic_read64(&inode_stats.num_misses_path)));
+
+  // Dentry tracker metrics
+  format_metric("cvmfs_dentry_tracker_inserts_total", "counter",
+                "Number of dentry tracker insertions.",
+                "repo=\"" + fqrn + "\"", StringifyInt(dentry_stats.num_insert));
+  format_metric("cvmfs_dentry_tracker_removes_total", "counter",
+                "Number of dentry tracker removals.",
+                "repo=\"" + fqrn + "\"", StringifyInt(dentry_stats.num_remove));
+  format_metric("cvmfs_dentry_tracker_prunes_total", "counter",
+                "Number of dentry tracker prunes.",
+                "repo=\"" + fqrn + "\"", StringifyInt(dentry_stats.num_prune));
+
+  // Page cache tracker metrics
+  format_metric("cvmfs_page_cache_tracker_inserts_total", "counter",
+                "Number of page cache tracker insertions.",
+                "repo=\"" + fqrn + "\"", StringifyInt(page_cache_stats.n_insert));
+  format_metric("cvmfs_page_cache_tracker_removes_total", "counter",
+                "Number of page cache tracker removals.",
+                "repo=\"" + fqrn + "\"", StringifyInt(page_cache_stats.n_remove));
+  format_metric("cvmfs_page_cache_tracker_opens_direct_total", "counter",
+                "Number of page cache tracker direct opens.",
+                "repo=\"" + fqrn + "\"", StringifyInt(page_cache_stats.n_open_direct));
+  format_metric("cvmfs_page_cache_tracker_opens_flush_total", "counter",
+                "Number of page cache tracker flush opens.",
+                "repo=\"" + fqrn + "\"", StringifyInt(page_cache_stats.n_open_flush));
+  format_metric("cvmfs_page_cache_tracker_opens_cached_total", "counter",
+                "Number of page cache tracker cached opens.",
+                "repo=\"" + fqrn + "\"", StringifyInt(page_cache_stats.n_open_cached));
+
+  // Cache mode information
+  if (file_system->cache_mgr()->id() == kPosixCacheManager) {
+    PosixCacheManager *cache_mgr = reinterpret_cast<PosixCacheManager *>(file_system->cache_mgr());
+    int cache_mode_value = 0;
+    switch (cache_mgr->cache_mode()) {
+      case PosixCacheManager::kCacheReadWrite:
+        cache_mode_value = 1;
+        break;
+      case PosixCacheManager::kCacheReadOnly:
+        cache_mode_value = 2;
+        break;
+      default:
+        cache_mode_value = 0;
+    }
+    format_metric("cvmfs_cache_mode", "gauge",
+                  "Cache mode (0=unknown, 1=read-write, 2=read-only).",
+                  "repo=\"" + fqrn + "\"", StringifyInt(cache_mode_value));
+  }
+
+  // Drainout and maintenance mode
+  bool drainout_mode;
+  bool maintenance_mode;
+  cvmfs::GetReloadStatus(&drainout_mode, &maintenance_mode);
+  format_metric("cvmfs_drainout_mode", "gauge",
+                "Drainout mode status (0=false, 1=true).",
+                "repo=\"" + fqrn + "\"", StringifyInt(drainout_mode ? 1 : 0));
+  format_metric("cvmfs_maintenance_mode", "gauge",
+                "Maintenance mode status (0=false, 1=true).",
+                "repo=\"" + fqrn + "\"", StringifyInt(maintenance_mode ? 1 : 0));
+
+  // SQLite statistics
+  int current, highwater;
+
+  sqlite3_status(SQLITE_STATUS_MALLOC_COUNT, &current, &highwater, 0);
+  format_metric("cvmfs_sqlite_malloc_count", "gauge",
+                "Number of SQLite allocations.",
+                "repo=\"" + fqrn + "\"", StringifyInt(current));
+
+  sqlite3_status(SQLITE_STATUS_MEMORY_USED, &current, &highwater, 0);
+  format_metric("cvmfs_sqlite_memory_used_bytes", "gauge",
+                "SQLite general purpose allocator memory used.",
+                "repo=\"" + fqrn + "\"", StringifyInt(current));
+  format_metric("cvmfs_sqlite_memory_used_highwater_bytes", "gauge",
+                "SQLite general purpose allocator memory used high water mark.",
+                "repo=\"" + fqrn + "\"", StringifyInt(highwater));
+
+  sqlite3_status(SQLITE_STATUS_MALLOC_SIZE, &current, &highwater, 0);
+  format_metric("cvmfs_sqlite_largest_malloc_bytes", "gauge",
+                "SQLite largest malloc size.",
+                "repo=\"" + fqrn + "\"", StringifyInt(highwater));
+
+  sqlite3_status(SQLITE_STATUS_PAGECACHE_USED, &current, &highwater, 0);
+  format_metric("cvmfs_sqlite_pagecache_used", "gauge",
+                "SQLite page cache allocations used.",
+                "repo=\"" + fqrn + "\"", StringifyInt(current));
+  format_metric("cvmfs_sqlite_pagecache_used_highwater", "gauge",
+                "SQLite page cache allocations used high water mark.",
+                "repo=\"" + fqrn + "\"", StringifyInt(highwater));
+
+  sqlite3_status(SQLITE_STATUS_PAGECACHE_OVERFLOW, &current, &highwater, 0);
+  format_metric("cvmfs_sqlite_pagecache_overflow_bytes", "gauge",
+                "SQLite page cache overflow bytes.",
+                "repo=\"" + fqrn + "\"", StringifyInt(current));
+  format_metric("cvmfs_sqlite_pagecache_overflow_highwater_bytes", "gauge",
+                "SQLite page cache overflow bytes high water mark.",
+                "repo=\"" + fqrn + "\"", StringifyInt(highwater));
+
+  sqlite3_status(SQLITE_STATUS_PAGECACHE_SIZE, &current, &highwater, 0);
+  format_metric("cvmfs_sqlite_largest_pagecache_bytes", "gauge",
+                "SQLite largest page cache allocation size.",
+                "repo=\"" + fqrn + "\"", StringifyInt(highwater));
+
+  sqlite3_status(SQLITE_STATUS_SCRATCH_USED, &current, &highwater, 0);
+  format_metric("cvmfs_sqlite_scratch_used", "gauge",
+                "SQLite scratch allocations used.",
+                "repo=\"" + fqrn + "\"", StringifyInt(current));
+  format_metric("cvmfs_sqlite_scratch_used_highwater", "gauge",
+                "SQLite scratch allocations used high water mark.",
+                "repo=\"" + fqrn + "\"", StringifyInt(highwater));
+
+  sqlite3_status(SQLITE_STATUS_SCRATCH_OVERFLOW, &current, &highwater, 0);
+  format_metric("cvmfs_sqlite_scratch_overflow", "gauge",
+                "SQLite scratch overflows.",
+                "repo=\"" + fqrn + "\"", StringifyInt(current));
+  format_metric("cvmfs_sqlite_scratch_overflow_highwater", "gauge",
+                "SQLite scratch overflows high water mark.",
+                "repo=\"" + fqrn + "\"", StringifyInt(highwater));
+
+  sqlite3_status(SQLITE_STATUS_SCRATCH_SIZE, &current, &highwater, 0);
+  format_metric("cvmfs_sqlite_largest_scratch_bytes", "gauge",
+                "SQLite largest scratch allocation size.",
+                "repo=\"" + fqrn + "\"", StringifyInt(highwater));
+
+  // NFS statistics (if applicable)
+  if (file_system->IsNfsSource()) {
+    format_metric("cvmfs_nfs_mode", "gauge",
+                  "NFS mode enabled (1=true, 0=false).",
+                  "repo=\"" + fqrn + "\"", "1");
+    // Note: NFS map statistics are complex strings, skipping detailed parsing for now
+  } else {
+    format_metric("cvmfs_nfs_mode", "gauge",
+                  "NFS mode enabled (1=true, 0=false).",
+                  "repo=\"" + fqrn + "\"", "0");
+  }
+
   return result;
 }
 

@@ -85,7 +85,7 @@ cvmfs_run_test() {
                     $CVMFS_STRATUM0                        \
                     /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub \
                     || return $num
-    sudo cvmfs_server snapshot ${replica_name}-$num
+    cvmfs_server snapshot ${replica_name}-$num
   done
 
   echo "*** disabling snapshots to second replica"
@@ -101,9 +101,10 @@ cvmfs_run_test() {
   delete_from_backend ${replica_name}-4 ".cvmfswhitelist"
 
   create_fake_gc_lock_until_contention ${replica_name}-1 &
+  sleep 1 # give time to create lock
 
   echo "*** running cvmfs_server check -a"
-  sudo cvmfs_server check -a || return 10
+  cvmfs_server check -a || return 10
 
   echo "*** contents of checks.log"
   cat /var/log/cvmfs/checks.log
@@ -120,17 +121,17 @@ cvmfs_run_test() {
   curl -f -s "$(get_repo_url ${replica_name}-4)/.cvmfs_status.json" | grep check_status.*failed || return 54
 
   echo "*** fix replica 4"
-  sudo cvmfs_server snapshot ${replica_name}-4 || return 55
+  cvmfs_server snapshot ${replica_name}-4 || return 55
 
   echo "*** do individual check on replica 4"
-  sudo cvmfs_server check ${replica_name}-4 || return 56
+  cvmfs_server check ${replica_name}-4 || return 56
 
   echo "*** verifying check now succeeded on replica 4"
   curl -f -s "$(get_repo_url ${replica_name}-4)/.cvmfs_status.json" | grep check_status.*succeeded || return 57
 
   create_fake_gc_lock ${replica_name}-1
   echo "*** verify that fake gc lock prevents gc"
-  sudo cvmfs_server gc -f ${replica_name}-1 2>&1 | grep aborting || return 60
+  cvmfs_server gc -f ${replica_name}-1 2>&1 | grep aborting || return 60
   remove_fake_gc_lock ${replica_name}-1
 
   return 0

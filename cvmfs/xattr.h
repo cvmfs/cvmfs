@@ -19,16 +19,21 @@
  *
  * First application of the extended attributes is security.capability in order
  * to support POSIX file capabilities.  Cvmfs' support for custom extended
- * attributes is limited to 256 attributes, with names <= 256 characters and
- * values <= 256 bytes.  Thus there is no need for big endian/little endian
- * conversion.  The name must not be the empty string and must not contain the
- * zero character.  There are no restrictions on the content.
+ * attributes is limited to 256 attributes, with names <= 255 characters and
+ * values <= 64k bytes. Note that values > 255 characters require cvmfs
+ * version >= 2.14.  Earlier versions will ignore all xattrs for a file
+ * if a big one is set. Attribute names must not be the empty string and
+ * must not contain the zero character. There are no restrictions on the content.
  */
 class XattrList {
  public:
-  static const uint8_t kVersion;
+  static const uint8_t kVersionSmall;  ///< Version 1, key and value < 255 chars
+  static const uint8_t kVersionBig;    ///< Version 2, value up to 64k chars
 
-  XattrList() : version_(kVersion) { }
+  static bool IsSupportedVersion(uint8_t v) {
+    return v == kVersionSmall || v == kVersionBig;
+  }
+
   static XattrList *CreateFromFile(const std::string &path);
 
   std::vector<std::string> ListKeys() const;
@@ -45,16 +50,28 @@ class XattrList {
   static XattrList *Deserialize(const unsigned char *inbuf,
                                 const unsigned size);
 
-  uint8_t version() { return version_; }
-
  private:
   struct XattrHeader {
-    XattrHeader() : version(kVersion), num_xattrs(0) { }
+    XattrHeader() : version(kVersionSmall), num_xattrs(0) { }
     explicit XattrHeader(const uint8_t num_xattrs)
-        : version(kVersion), num_xattrs(num_xattrs) { }
+        : version(kVersionSmall), num_xattrs(num_xattrs) { }
     uint8_t version;
     uint8_t num_xattrs;
   };
+
+  class XattrEntrySerializer {
+   public:
+    explicit XattrEntrySerializer(uint8_t version);
+    uint32_t GetHeaderSize() const { return version_ == kVersionBig ? 3 : 2; }
+    uint32_t Serialize(const std::string &key, const std::string &value,
+                       unsigned char *to);
+    uint32_t Deserialize(const unsigned char *from, uint32_t bufsize,
+                         std::string *key, std::string *value);
+
+   private:
+     uint8_t version_;
+  };
+
   struct XattrEntry {
     XattrEntry(const std::string &key, const std::string &value);
     XattrEntry() : len_key(0), len_value(0) { }
@@ -68,7 +85,6 @@ class XattrList {
     char data[512];
   };
 
-  uint8_t version_;
   std::map<std::string, std::string> xattrs_;
 };
 

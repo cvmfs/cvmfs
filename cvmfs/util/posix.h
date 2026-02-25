@@ -105,7 +105,8 @@ CVMFS_EXPORT int RecvFdFromSocket(int msg_fd);
 CVMFS_EXPORT std::string GetHostname();
 
 CVMFS_EXPORT bool SwitchCredentials(const uid_t uid, const gid_t gid,
-                                    const bool temporarily);
+                                    const bool temporarily,
+                                    const bool avoid_mutexes = false);
 
 CVMFS_EXPORT bool FileExists(const std::string &path);
 CVMFS_EXPORT int64_t GetFileSize(const std::string &path);

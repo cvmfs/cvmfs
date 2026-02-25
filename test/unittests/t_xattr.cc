@@ -21,6 +21,7 @@ class T_Xattr : public ::testing::Test {
   virtual void SetUp() {
     default_list.Set("keya", "valuea");
     default_list.Set("keyb", "valueb");
+    default_list.Set("large", std::string(1000, 'x'));
     default_list.Set("empty_key", "");
   }
 
@@ -82,12 +83,12 @@ TEST_F(T_Xattr, CreateFromFile) {
 #ifndef __APPLE__
   ASSERT_TRUE(platform_setxattr(tmp_path, "user.test2", "value2"));
   string long_string = "user." + string(250, 'x');
-  string too_long_string = "user." + string(300, 'x');
+  string very_long_string = string(1000, 'y');
   ASSERT_TRUE(platform_setxattr(tmp_path, long_string, long_string));
-  ASSERT_TRUE(platform_setxattr(tmp_path, "user.test3", too_long_string));
+  ASSERT_TRUE(platform_setxattr(tmp_path, "user.large", very_long_string));
   UniquePtr<XattrList> from_file3(XattrList::CreateFromFile(tmp_path));
   ASSERT_TRUE(from_file3.IsValid());
-  EXPECT_EQ(default_attrs + 3, from_file3->ListKeys().size());
+  EXPECT_EQ(default_attrs + 4, from_file3->ListKeys().size());
   EXPECT_TRUE(from_file3->Get("user.test", &value));
   EXPECT_TRUE(from_file3->Has("user.test"));
   EXPECT_EQ("value", value);
@@ -97,6 +98,9 @@ TEST_F(T_Xattr, CreateFromFile) {
   EXPECT_TRUE(from_file3->Get(long_string, &value));
   EXPECT_TRUE(from_file3->Has(long_string));
   EXPECT_EQ(long_string, value);
+  EXPECT_TRUE(from_file3->Has("user.large"));
+  EXPECT_TRUE(from_file3->Get("user.large", &value));
+  EXPECT_EQ(very_long_string, value);
 #endif
 }
 
@@ -111,7 +115,7 @@ TEST_F(T_Xattr, Deserialize) {
   UniquePtr<XattrList> xattr_list(XattrList::Deserialize(buf, size));
   free(buf);
   ASSERT_TRUE(xattr_list.IsValid());
-  EXPECT_EQ(3U, xattr_list->ListKeys().size());
+  EXPECT_EQ(default_list.ListKeys().size(), xattr_list->ListKeys().size());
   string value;
   EXPECT_TRUE(xattr_list->Get("keya", &value));
   EXPECT_TRUE(xattr_list->Has("keya"));
@@ -140,10 +144,11 @@ TEST_F(T_Xattr, DeserializeInvalid) {
   UniquePtr<XattrList> xl1(XattrList::Deserialize(buf, 0));
   EXPECT_FALSE(xl1.IsValid());
 
+  uint8_t version = buf[0];
   buf[0] = 255;
   UniquePtr<XattrList> xl2(XattrList::Deserialize(buf, size));
   EXPECT_FALSE(xl2.IsValid());
-  buf[0] = XattrList::kVersion;
+  buf[0] = version;
 
   UniquePtr<XattrList> xl3(XattrList::Deserialize(buf, 3));
   EXPECT_FALSE(xl3.IsValid());
@@ -191,10 +196,11 @@ TEST_F(T_Xattr, Get) {
 TEST_F(T_Xattr, ListKeys) {
   XattrList empty;
   EXPECT_TRUE(empty.ListKeys().empty());
-  ASSERT_EQ(3U, default_list.ListKeys().size());
+  ASSERT_EQ(4U, default_list.ListKeys().size());
   EXPECT_EQ("empty_key", default_list.ListKeys()[0]);
   EXPECT_EQ("keya", default_list.ListKeys()[1]);
   EXPECT_EQ("keyb", default_list.ListKeys()[2]);
+  EXPECT_EQ("large", default_list.ListKeys()[3]);
 }
 
 
@@ -206,11 +212,11 @@ TEST_F(T_Xattr, ListKeysPosix) {
   const char expect1[] = "user.a\0user.b\0keya\0";
   EXPECT_EQ(string(expect1, sizeof(expect1) - 1),
             empty.ListKeysPosix(existing_list));
-  const char expect2[] = "empty_key\0keya\0keyb\0";
-  EXPECT_EQ(string(expect2, sizeof(expect2) - 1),
+  const char expect2[] = "empty_key\0keya\0keyb\0large\0";
+  EXPECT_EQ(string(expect2, sizeof(expect2)-1),
             default_list.ListKeysPosix(""));
-  const char expect3[] = "user.a\0user.b\0empty_key\0keya\0keyb\0";
-  EXPECT_EQ(string(expect3, sizeof(expect3) - 1),
+  const char expect3[] = "user.a\0user.b\0empty_key\0keya\0keyb\0large\0";
+  EXPECT_EQ(string(expect3, sizeof(expect3)-1),
             default_list.ListKeysPosix(existing_list));
 }
 
@@ -227,9 +233,10 @@ TEST_F(T_Xattr, Set) {
   EXPECT_EQ("", value);
 
   // Invalid operations
-  string longstring(257, 'a');
-  EXPECT_FALSE(default_list.Set(longstring, "value"));
-  EXPECT_FALSE(default_list.Set("key", longstring));
+  string longkey(256, 'a');
+  string longvalue(64 * 1024 + 1, 'a');
+  EXPECT_FALSE(default_list.Set(longkey, "value"));
+  EXPECT_FALSE(default_list.Set("key", longvalue));
   string nullstring(1, '\0');
   EXPECT_FALSE(default_list.Set(nullstring, "value"));
 
@@ -273,6 +280,29 @@ TEST_F(T_Xattr, SerializeNull) {
   EXPECT_EQ(0U, size);
 }
 
+// Lists of small attributes should be serialized in the version 1 format,
+// digestable for old clients
+TEST_F(T_Xattr, SerializeCompat) {
+  XattrList list;
+  list.Set("key", "value");
+
+  unsigned char *buf;
+  unsigned size;
+
+  list.Serialize(&buf, &size);
+  EXPECT_TRUE(buf != NULL);
+  EXPECT_GT(size, 0u);
+
+  EXPECT_EQ(1, buf[0]);
+
+  XattrList *verify = XattrList::Deserialize(buf, size);
+  EXPECT_EQ(1u, verify->ListKeys().size());
+  string value;
+  EXPECT_TRUE(verify->Get("key", &value));
+  EXPECT_EQ("value", value);
+  delete verify;
+}
+
 
 TEST_F(T_Xattr, SerializeBlacklist) {
   std::vector<std::string> blacklist;
@@ -287,12 +317,13 @@ TEST_F(T_Xattr, SerializeBlacklist) {
   UniquePtr<XattrList> xattr_list(XattrList::Deserialize(buf, size));
   free(buf);
   ASSERT_TRUE(xattr_list.IsValid());
-  EXPECT_EQ(1U, xattr_list->ListKeys().size());
+  EXPECT_EQ(default_list.ListKeys().size() - 2, xattr_list->ListKeys().size());
   string value;
   EXPECT_TRUE(xattr_list->Get("keyb", &value));
   EXPECT_EQ("valueb", value);
 
   blacklist.push_back("keyb");
+  blacklist.push_back("large");
   default_list.Serialize(&buf, &size, &blacklist);
   EXPECT_EQ(0U, size);
   EXPECT_EQ(NULL, buf);
@@ -301,21 +332,21 @@ TEST_F(T_Xattr, SerializeBlacklist) {
 
 TEST_F(T_Xattr, Limits) {
   XattrList large_list;
-  string large_value(256, 'a');
-  for (unsigned i = 0; i < 256; ++i) {
+  string large_value(64 * 1024 - 1, 'a');
+  for (unsigned i = 0; i < 255; ++i) {
     char hex[4];
     snprintf(hex, sizeof(hex), "%02x", i);
     string large_key(128, hex[0]);
-    large_key += string(128, hex[1]);
+    large_key += string(127, hex[1]);
     EXPECT_TRUE(large_list.Set(large_key, large_value));
   }
-  EXPECT_EQ(256U, large_list.ListKeys().size());
-  for (unsigned i = 0; i < 256; ++i) {
+  EXPECT_EQ(255U, large_list.ListKeys().size());
+  for (unsigned i = 0; i < 255; ++i) {
     string value;
     char hex[4];
     snprintf(hex, sizeof(hex), "%02x", i);
     string large_key(128, hex[0]);
-    large_key += string(128, hex[1]);
+    large_key += string(127, hex[1]);
     EXPECT_TRUE(large_list.Get(large_key, &value));
     EXPECT_EQ(large_value, value);
   }

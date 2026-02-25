@@ -164,6 +164,11 @@ int Fetcher::Fetch(const CacheManager::LabeledObject &object,
              tls->download_job.GetGidPtr(),
              tls->download_job.GetPidPtr(),
              tls->download_job.GetInterruptCuePtr());
+  } else {
+    *(tls->download_job.GetUidPtr()) = -1;
+    *(tls->download_job.GetGidPtr()) = -1;
+    *(tls->download_job.GetPidPtr()) = -1;
+    *(tls->download_job.GetInterruptCuePtr()) = NULL;
   }
   tls->download_job.SetCompressed(object.label.zip_algorithm
                                   == zlib::kZlibDefault);

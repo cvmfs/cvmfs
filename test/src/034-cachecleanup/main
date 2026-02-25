@@ -2,21 +2,172 @@
 
 cvmfs_test_name="Cache cleanup"
 
+FILE_DB=/tmp/file.list
+OPEN_FILE_DB=/tmp/open_file.list
+
+CLEANUP_TARGET=772
+
+TARGET_REPO=atlas-condb.cern.ch
+
+vanilla_post=""
+
+cleanup(){
+  rm -rf $FILE_DB, $OPEN_FILE_DB
+  close_readers
+}
+
+is_greater(){
+  (( $1 > $2 ))
+}
+
+mount_repo_fresh(){
+  local is_enabled=$1
+  echo "Mounting $TARGET_REPO.."
+  cvmfs_umount "$TARGET_REPO"
+  cvmfs_mount "$TARGET_REPO" \
+    "CVMFS_QUOTA_LIMIT=1600" \
+    "CVMFS_CACHE_EXTERNAL_SIZE=750" \
+    "CVMFS_CACHE_CLEANUP_NONOPENLRU=$is_enabled" \
+    "CVMFS_CACHE_REFCOUNT=yes" \
+    "CVMFS_MIN_CHUNK_SIZE=200M" \
+    "CVMFS_SYSLOG_LEVEL=3" || return 1
+}
+
+pick_files_for_testing(){
+  find "/cvmfs/$TARGET_REPO" -type f -size +100M -size -200M -print0 | head -zn10 > $FILE_DB
+  head -zn5 $FILE_DB > $OPEN_FILE_DB
+}
+
+create_lru_access_pattern(){
+  echo "Creating an access pattern to establish an LRU chain.."
+  local file_list=$1
+  while IFS= read -r -d '' file; do
+    cat $file > /dev/null
+  done < $file_list
+}
+
+open_files(){
+  echo "Opening files until cleanup.."
+  local file_list=$1
+  while IFS= read -r -d '' file; do
+    tail -f "$file" &>/dev/null &
+  done < $file_list
+}
+
+close_readers(){
+  pkill tail
+}
+
+compute_actual_sizes(){
+  local total=0
+  while IFS= read -r -d '' file; do
+    size=$(stat --printf="%s" "$file")
+    size_mb=$(awk "BEGIN {printf \"%.2f\", $size/1024/1024}")
+    total=$(awk "BEGIN {printf \"%.2f\", $total + $size_mb}")
+  done < $FILE_DB
+
+  local subtotal=0
+  while IFS= read -r -d '' file; do
+    size=$(stat --printf="%s" "$file")
+    size_mb=$(awk "BEGIN {printf \"%.2f\", $size/1024/1024}")
+    subtotal=$(awk "BEGIN {printf \"%.2f\", $subtotal + $size_mb}")
+  done < $OPEN_FILE_DB
+
+  echo "$total $subtotal"
+}
+
+# returns the cache size in MB
+get_cache_size_linked(){
+  sudo du -c --block-size=1M /var/lib/cvmfs  | grep total | awk '/total/ {print$1}'
+}
+get_cache_size_unlinked(){
+  sudo lsof -nP +L1 2>/dev/null | ag cvmfs | ag REG | awk '{s+=$7} END {printf "%.2f\n", s/1024/1024}'
+}
+
+print_files(){
+  local file_list=$1
+  while IFS= read -r -d '' file; do
+    echo "$file"
+  done < $file_list
+}
+
+print_file_hashes(){
+  local file_list=$1
+  while IFS= read -r -d '' file; do
+    attr -g hash "$file"
+  done < $file_list
+}
+
+print_file_statistics(){
+  local file_sizes="$(compute_actual_sizes)"
+  local total=$(echo "$file_sizes" | awk '{ print $1 }')
+  local subtotal=$(echo "$file_sizes" | awk '{ print $2 }')
+  echo -e "\tTotal file size is: $total MB"
+  echo -e "\tOpen files size is: $subtotal MB"
+}
+
+print_cache_statistics(){
+  sleep 0.5
+  echo -e "\t$ statistics:"
+  echo -e "\t\tlinked: $(get_cache_size_linked) MB"
+  echo -e "\t\tunlinked: $(get_cache_size_unlinked) MB"
+}
+test_vanilla_lru(){
+  mount_repo_fresh "no"
+  sudo cvmfs_config wipecache > /dev/null && echo "Whipping cache.. OK" || $(echo "Wipping cache.. FAILED!" && return 20)
+  
+  open_files "$OPEN_FILE_DB" &> /dev/null
+  create_lru_access_pattern $FILE_DB
+
+  print_cache_statistics
+  echo -n "Target: $CLEANUP_TARGET. Cleaning up.. "
+  sudo cvmfs_talk -i "$TARGET_REPO" cleanup $CLEANUP_TARGET || $(echo "FAILED" && return 21)
+  print_cache_statistics
+  vanilla_post=$(get_cache_size_linked)
+  close_readers
+}
+
+test_advanced_lru(){
+  mount_repo_fresh "yes"
+  sudo cvmfs_config wipecache > /dev/null && echo "Whipping cache.. OK" || $(echo "Wipping cache.. FAILED!" && return 30)
+  
+  open_files "$OPEN_FILE_DB" &> /dev/null
+  create_lru_access_pattern $FILE_DB
+
+  echo "Retrieving the open hashes.."
+  local open_hashes="$(attr -qg list_open_hashes /cvmfs/$TARGET_REPO)"
+  if [ "x$open_hashes" = "x" ]; then
+    return 31
+  fi
+  print_cache_statistics
+  local pre=$(get_cache_size_linked)
+  echo -n "Target: $CLEANUP_TARGET. Cleaning up.. "
+  sudo cvmfs_talk -i "$TARGET_REPO" cleanup $CLEANUP_TARGET || $(echo "FAILED" && return 32)
+  print_cache_statistics
+  local post=$(get_cache_size_linked)
+  if [ "$pre" -eq "$post" ]; then
+    return 33
+  elif [ "$post" -gt "$pre" ]; then
+    return 34
+  fi
+  if [ "$vanilla_post" -eq "$post" ]; then
+    return 35
+  elif [ "$post" -gt "$vanilla_post" ]; then
+    return 36
+  fi
+  return 0
+}
+
 cvmfs_run_test() {
   logfile=$1
 
-  cvmfs_mount "atlas.cern.ch,atlas-condb.cern.ch" \
-    "CVMFS_QUOTA_LIMIT=750" "CVMFS_CACHE_EXTERNAL_SIZE=750" || return 1
+  mount_repo_fresh "no"
+  pick_files_for_testing
+  print_file_statistics
 
-  find /cvmfs/atlas-condb.cern.ch -type f -size +100M -size -200M | head -n 64 | \
-    xargs file > /dev/null || return 1
-
-  turnover=$(sudo cvmfs_talk -i atlas-condb.cern.ch cleanup rate 120)
-  echo "number of cleanup in the last 2 hours: $turnover"
-  if [[ turnover -le 0 ]]; then
-    return 2
-  fi
-
+  test_vanilla_lru
+  test_advanced_lru || return $?
+  cleanup
   return 0
 }
 

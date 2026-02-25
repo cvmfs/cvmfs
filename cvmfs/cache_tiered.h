@@ -10,7 +10,7 @@
 #include <string>
 
 #include "cache.h"
-#include "gtest/gtest_prod.h"
+#include "duplex_testing.h"
 
 /**
  * Cache manager implementation that provides a hierarchical cache.

@@ -17,7 +17,7 @@
 #include <string>
 #include <vector>
 
-#include "gtest/gtest_prod.h"
+#include "duplex_testing.h"
 #include "mountpoint.h"
 #include "options.h"
 #include "statistics.h"
@@ -46,6 +46,9 @@ class TelemetryAggregator : SingleCopy {
   FRIEND_TEST(T_TelemetryAggregator, FailCreate);
   FRIEND_TEST(T_TelemetryAggregator, ExtraFields_Tags);
   FRIEND_TEST(T_TelemetryAggregator, UpdateCounters_WithExtraFields_Tags);
+  FRIEND_TEST(T_TelemetryAggregator, SendDeltaDisabled);
+  FRIEND_TEST(T_TelemetryAggregator, SendDeltaEnabledByDefault);
+  FRIEND_TEST(T_TelemetryAggregator, SendDeltaExplicitlyEnabled);
 
  public:
   /**

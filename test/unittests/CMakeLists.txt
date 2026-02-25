@@ -4,6 +4,50 @@
 
 if (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
 
+# GoogleTest
+set(GOOGLETEST_MIN_VERSION "1.10.0")
+if(USE_EXTERNAL_GOOGLETEST)
+  if (USE_EXTERNAL_GOOGLETEST STREQUAL AUTO)
+    find_package(GTest ${GOOGLETEST_MIN_VERSION})
+  else()
+    find_package(GTest ${GOOGLETEST_MIN_VERSION} REQUIRED)
+  endif()
+endif()
+
+if(NOT GTest_FOUND)
+  message(STATUS "Fetching local copy of Googletest library v1.17.0 for unit-tests...")
+  Include(FetchContent)
+  set(INSTALL_GTEST OFF)
+
+  # Check if local file exists first
+  set(GOOGLETEST_LOCAL_PATH "${PROJECT_SOURCE_DIR}/externals/googletest-1.17.0.tar.gz")
+
+  if(EXISTS "${GOOGLETEST_LOCAL_PATH}")
+      message(STATUS "Using local GoogleTest archive: ${GOOGLETEST_LOCAL_PATH}")
+      FetchContent_Declare(
+          GoogleTest
+          #DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+          DOWNLOAD_DIR ${PROJECT_SOURCE_DIR}/externals
+          URL "file://${GOOGLETEST_LOCAL_PATH}"
+          URL_HASH MD5=b6f100bc2a5853a48046aa168ececf84
+      )
+  else()
+      message(STATUS "Local GoogleTest archive not found, downloading from remote")
+      FetchContent_Declare(
+          GoogleTest
+          #DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+          DOWNLOAD_DIR ${PROJECT_SOURCE_DIR}/externals
+          URL https://github.com/google/googletest/releases/download/v1.17.0/googletest-1.17.0.tar.gz
+              https://ecsft.cern.ch/dist/cvmfs/build_externals/googletest-1.17.0.tar.gz
+          URL_HASH MD5=b6f100bc2a5853a48046aa168ececf84
+      )
+  endif()
+
+FetchContent_MakeAvailable(GoogleTest)
+endif()
+get_target_property(GTEST_INCLUDE_DIRS GTest::gtest INCLUDE_DIRECTORIES)
+set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${GTEST_INCLUDE_DIRS})
+
 set (CVMFS_SOURCE_DIR "${CMAKE_SOURCE_DIR}/cvmfs")
 set (CVMFS_UNITTEST_COMMON_CFLAGS "-DCVMFS_LIBCVMFS -D_FILE_OFFSET_BITS=64 -fexceptions")
 
@@ -226,7 +270,7 @@ if (BUILD_SERVER)
         ${ZLIB_LIBRARIES}
         ${VJSON_LIBRARIES}
         ${CAP_LIBRARIES}
-        ${LibArchive_LIBRARY}
+        LibArchive::LibArchive
         ${RT_LIBRARY}
         pthread
         dl
@@ -544,6 +588,7 @@ endif ()
 set (CVMFS_UNITTESTS_LINK_LIBRARIES "")
 list (APPEND CVMFS_UNITTESTS_LINK_LIBRARIES
       GTest::gtest
+      GTest::gmock
       ${OPENSSL_LIBRARIES}
       ${CURL_LIBRARIES}
       ${CARES_LIBRARIES} ${CARES_LDFLAGS}
@@ -554,16 +599,181 @@ list (APPEND CVMFS_UNITTESTS_LINK_LIBRARIES
       ${PACPARSER_LIBRARIES}
       ${VJSON_LIBRARIES}
       ${PROTOBUF_LITE_LIBRARY}
-      ${LibArchive_LIBRARY}
+      LibArchive::LibArchive
       ${RT_LIBRARY}
       pthread
       dl
 )
 
+set(CVMFS_UNITTEST_MOCKFUSE_SOURCES
+  # test steering
+  main_mockfuse.cc
+
+  # test utility functions
+  #../common/env.cc
+  ../common/testutil.cc
+  ../common/catalog_test_tools.cc
+
+  t_cvmfs.cc
+  ${CVMFS_SOURCE_DIR}/acl.cc
+  ${CVMFS_SOURCE_DIR}/authz/authz.cc
+  ${CVMFS_SOURCE_DIR}/authz/authz_curl.cc
+  ${CVMFS_SOURCE_DIR}/authz/authz_fetch.cc
+  ${CVMFS_SOURCE_DIR}/authz/authz_session.cc
+  ${CVMFS_SOURCE_DIR}/auto_umount.cc
+  ${CVMFS_SOURCE_DIR}/backoff.cc
+  ${CVMFS_SOURCE_DIR}/cache.cc
+  ${CVMFS_SOURCE_DIR}/cache_extern.cc
+  ${CVMFS_SOURCE_DIR}/cache_posix.cc
+  ${CVMFS_SOURCE_DIR}/cache_plugin/channel.cc
+  ${CVMFS_SOURCE_DIR}/cache_ram.cc
+  ${CVMFS_SOURCE_DIR}/cache_stream.cc
+  ${CVMFS_SOURCE_DIR}/cache_tiered.cc
+  ${CVMFS_SOURCE_DIR}/cache_transport.cc
+  ${CVMFS_SOURCE_DIR}/catalog.cc
+  ${CVMFS_SOURCE_DIR}/catalog_counters.cc
+  ${CVMFS_SOURCE_DIR}/catalog_downloader.cc
+  ${CVMFS_SOURCE_DIR}/catalog_mgr_client.cc
+  ${CVMFS_SOURCE_DIR}/catalog_mgr_ro.cc
+  ${CVMFS_SOURCE_DIR}/catalog_mgr_rw.cc
+  ${CVMFS_SOURCE_DIR}/catalog_sql.cc
+  ${CVMFS_SOURCE_DIR}/catalog_rw.cc
+  ${CVMFS_SOURCE_DIR}/catalog_virtual.cc
+  ${CVMFS_SOURCE_DIR}/clientctx.cc
+  ${CVMFS_SOURCE_DIR}/compat.cc
+  ${CVMFS_SOURCE_DIR}/compression/compression.cc
+  ${CVMFS_SOURCE_DIR}/cvmfs_suid_util.cc
+  ${CVMFS_SOURCE_DIR}/directory_entry.cc
+  ${CVMFS_SOURCE_DIR}/duplex_fuse.cc
+  ${CVMFS_SOURCE_DIR}/fd_refcount_mgr.cc
+  ${CVMFS_SOURCE_DIR}/fetch.cc
+  ${CVMFS_SOURCE_DIR}/file_chunk.cc
+  ${CVMFS_SOURCE_DIR}/file_watcher.cc
+  ${CVMFS_SOURCE_DIR}/fuse_evict.cc
+  ${CVMFS_SOURCE_DIR}/fuse_remount.cc
+  ${CVMFS_SOURCE_DIR}/gateway_util.cc
+  ${CVMFS_SOURCE_DIR}/globals.cc
+  ${CVMFS_SOURCE_DIR}/glue_buffer.cc
+  ${CVMFS_SOURCE_DIR}/history_sql.cc
+  ${CVMFS_SOURCE_DIR}/history_sqlite.cc
+  ${CVMFS_SOURCE_DIR}/ingestion/chunk_detector.cc
+  ${CVMFS_SOURCE_DIR}/ingestion/item.cc
+  ${CVMFS_SOURCE_DIR}/ingestion/item_mem.cc
+  ${CVMFS_SOURCE_DIR}/ingestion/pipeline.cc
+  ${CVMFS_SOURCE_DIR}/ingestion/task_chunk.cc
+  ${CVMFS_SOURCE_DIR}/ingestion/task_compress.cc
+  ${CVMFS_SOURCE_DIR}/ingestion/task_hash.cc
+  ${CVMFS_SOURCE_DIR}/ingestion/task_read.cc
+  ${CVMFS_SOURCE_DIR}/ingestion/task_register.cc
+  ${CVMFS_SOURCE_DIR}/ingestion/task_write.cc
+  ${CVMFS_SOURCE_DIR}/json_document.cc
+  ${CVMFS_SOURCE_DIR}/kvstore.cc
+  #  ${CVMFS_SOURCE_DIR}/libcvmfs.cc
+  #  ${CVMFS_SOURCE_DIR}/libcvmfs_int.cc
+  #  ${CVMFS_SOURCE_DIR}/libcvmfs_legacy.cc
+  #  ${CVMFS_SOURCE_DIR}/libcvmfs_options.cc
+  ${CVMFS_SOURCE_DIR}/magic_xattr.cc
+  ${CVMFS_SOURCE_DIR}/malloc_arena.cc
+  ${CVMFS_SOURCE_DIR}/malloc_heap.cc
+  ${CVMFS_SOURCE_DIR}/manifest.cc
+  ${CVMFS_SOURCE_DIR}/manifest_fetch.cc
+  ${CVMFS_SOURCE_DIR}/monitor.cc
+  ${CVMFS_SOURCE_DIR}/mountpoint.cc
+  ${CVMFS_SOURCE_DIR}/network/dns.cc
+  ${CVMFS_SOURCE_DIR}/network/download.cc
+  ${CVMFS_SOURCE_DIR}/network/jobinfo.cc
+  ${CVMFS_SOURCE_DIR}/network/s3fanout.cc
+  ${CVMFS_SOURCE_DIR}/network/sink_file.cc
+  ${CVMFS_SOURCE_DIR}/network/sink_mem.cc
+  ${CVMFS_SOURCE_DIR}/network/sink_path.cc
+  ${CVMFS_SOURCE_DIR}/notification_client.cc
+  ${CVMFS_SOURCE_DIR}/notify/messages.cc
+  ${CVMFS_SOURCE_DIR}/notify/subscriber_supervisor.cc
+  ${CVMFS_SOURCE_DIR}/notify/subscriber_sse.cc
+  ${CVMFS_SOURCE_DIR}/options.cc
+  ${CVMFS_SOURCE_DIR}/pack.cc
+  ${CVMFS_SOURCE_DIR}/path_filters/dirtab.cc
+  ${CVMFS_SOURCE_DIR}/path_filters/relaxed_path_filter.cc
+  ${CVMFS_SOURCE_DIR}/pathspec/pathspec.cc
+  ${CVMFS_SOURCE_DIR}/pathspec/pathspec_pattern.cc
+  ${CVMFS_SOURCE_DIR}/quota.cc
+  ${CVMFS_SOURCE_DIR}/quota_posix.cc
+  ${CVMFS_SOURCE_DIR}/quota_listener.cc
+  ${CVMFS_SOURCE_DIR}/receiver/commit_processor.cc
+  ${CVMFS_SOURCE_DIR}/receiver/params.cc
+  ${CVMFS_SOURCE_DIR}/receiver/payload_processor.cc
+  ${CVMFS_SOURCE_DIR}/receiver/reactor.cc
+  ${CVMFS_SOURCE_DIR}/receiver/session_token.cc
+  ${CVMFS_SOURCE_DIR}/reflog.cc
+  ${CVMFS_SOURCE_DIR}/reflog_sql.cc
+  ${CVMFS_SOURCE_DIR}/repository_tag.cc
+  ${CVMFS_SOURCE_DIR}/resolv_conf_event_handler.cc
+  ${CVMFS_SOURCE_DIR}/ring_buffer.cc
+  ${CVMFS_SOURCE_DIR}/sanitizer.cc
+  ${CVMFS_SOURCE_DIR}/server_tool.cc
+  ${CVMFS_SOURCE_DIR}/session_context.cc
+  ${CVMFS_SOURCE_DIR}/signing_tool.cc
+  ${CVMFS_SOURCE_DIR}/shortstring.cc
+  ${CVMFS_SOURCE_DIR}/sql.cc
+  ${CVMFS_SOURCE_DIR}/sqlitemem.cc
+  ${CVMFS_SOURCE_DIR}/sqlitevfs.cc
+  ${CVMFS_SOURCE_DIR}/ssl.cc
+  ${CVMFS_SOURCE_DIR}/statistics.cc
+  ${CVMFS_SOURCE_DIR}/statistics_database.cc
+  ${CVMFS_SOURCE_DIR}/supervisor.cc
+  ${CVMFS_SOURCE_DIR}/swissknife.cc
+  ${CVMFS_SOURCE_DIR}/swissknife_assistant.cc
+  ${CVMFS_SOURCE_DIR}/swissknife_history.cc
+  ${CVMFS_SOURCE_DIR}/swissknife_lease_json.cc
+  ${CVMFS_SOURCE_DIR}/swissknife_lease_curl.cc
+  ${CVMFS_SOURCE_DIR}/sync_item.cc
+  ${CVMFS_SOURCE_DIR}/sync_item_dummy.cc
+  ${CVMFS_SOURCE_DIR}/sync_item_tar.cc
+  ${CVMFS_SOURCE_DIR}/sync_mediator.cc
+  ${CVMFS_SOURCE_DIR}/sync_union.cc
+  ${CVMFS_SOURCE_DIR}/sync_union_tarball.cc
+  ${CVMFS_SOURCE_DIR}/talk.cc
+  ${CVMFS_SOURCE_DIR}/telemetry_aggregator.cc
+  ${CVMFS_SOURCE_DIR}/telemetry_aggregator_influx.cc
+  ${CVMFS_SOURCE_DIR}/tracer.cc
+  ${CVMFS_SOURCE_DIR}/upload.cc
+  ${CVMFS_SOURCE_DIR}/upload_facility.cc
+  ${CVMFS_SOURCE_DIR}/upload_local.cc
+  ${CVMFS_SOURCE_DIR}/upload_gateway.cc
+  ${CVMFS_SOURCE_DIR}/upload_s3.cc
+  ${CVMFS_SOURCE_DIR}/upload_spooler_definition.cc
+  ${CVMFS_SOURCE_DIR}/url.cc
+  ${CVMFS_SOURCE_DIR}/whitelist.cc
+  ${CVMFS_SOURCE_DIR}/wpad.cc
+  ${CVMFS_SOURCE_DIR}/xattr.cc
+
+  cache.pb.cc cache.pb.h
+)
+
+# Add file watcher implementation for mockfuse tests
+if (MACOSX)
+  list (APPEND CVMFS_UNITTEST_MOCKFUSE_SOURCES ${CVMFS_SOURCE_DIR}/file_watcher_kqueue.cc)
+else ()
+  if (CVMFS_ENABLE_INOTIFY)
+    list (APPEND CVMFS_UNITTEST_MOCKFUSE_SOURCES ${CVMFS_SOURCE_DIR}/file_watcher_inotify.cc)
+  endif ()
+endif ()
+
+add_executable (cvmfs_unittests_mockfuse ${CVMFS_UNITTEST_MOCKFUSE_SOURCES})
+add_dependencies (cvmfs_unittests_mockfuse cache.pb.generated-unittests)
+set_target_properties (cvmfs_unittests_mockfuse PROPERTIES
+	COMPILE_FLAGS "${CVMFS_UNITTEST_COMMON_CFLAGS}  -g"
+)
+target_link_libraries (cvmfs_unittests_mockfuse
+                       cvmfs_crypto
+                       cvmfs_util
+		       ${FUSE3_LIBRARIES}
+                       ${CVMFS_UNITTESTS_LINK_LIBRARIES})
+
 add_executable (cvmfs_unittests ${CVMFS_UNITTEST_SOURCES})
 add_dependencies (cvmfs_unittests cache.pb.generated-unittests)
 set_target_properties (cvmfs_unittests PROPERTIES
-                       COMPILE_FLAGS "${CVMFS_UNITTEST_COMMON_CFLAGS}"
+	COMPILE_FLAGS "${CVMFS_UNITTEST_COMMON_CFLAGS}"
 )
 target_link_libraries (cvmfs_unittests
                        cvmfs_crypto

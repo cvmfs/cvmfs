@@ -1,0 +1,125 @@
+#!/bin/bash
+cvmfs_test_name="Page cache tracker corner case #3520"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+CVMFS_TEST_708_MOUNTPOINT=""
+CVMFS_TEST_708_PID_HELPER=
+cleanup() {
+  echo "running cleanup()"
+
+  if [ ! -z $CVMFS_TEST_708_MOUNTPOINT ]; then
+    echo "resume" > ${CVMFS_TEST_708_MOUNTPOINT}c/barrier01
+  fi
+
+  if [ ! -z $CVMFS_TEST_708_PID_HELPER ]; then
+    kill -USR1 $CVMFS_TEST_708_PID_HELPER
+    wait $CVMFS_TEST_708_PID_HELPER
+  fi
+
+  if [ ! -z $CVMFS_TEST_708_MOUNTPOINT ]; then
+    sudo umount $CVMFS_TEST_708_MOUNTPOINT
+    rmdir $CVMFS_TEST_708_MOUNTPOINT
+  fi
+}
+
+get_inode() {
+  stat --format=%i $1
+}
+
+get_ninsert() {
+  sudo cvmfs_talk -p ${CVMFS_TEST_708_MOUNTPOINT}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO \
+    internal affairs | grep ^page_cache_tracker.n_insert | cut -d\| -f2
+}
+
+get_ndirect() {
+  sudo cvmfs_talk -p ${CVMFS_TEST_708_MOUNTPOINT}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO \
+    internal affairs | grep ^page_cache_tracker.n_open_direct | cut -d\| -f2
+}
+
+cvmfs_run_test() {
+  local logfile=$1
+  local src_location=$2
+
+  echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "*** create repository structure"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  dd if=/dev/urandom of=/cvmfs/$CVMFS_TEST_REPO/foo bs=20M count=1 || return 1
+  md5sum /cvmfs/$CVMFS_TEST_REPO/foo || return 2
+  publish_repo $CVMFS_TEST_REPO || return 3
+  local nchunks=$(get_xattr chunks /cvmfs/$CVMFS_TEST_REPO/foo)
+  echo "*** /cvmfs/$CVMFS_TEST_REPO/foo has $nchunks chunks"
+  [ $nchunks -gt 1 ] || return 4
+
+  echo "*** setup cleanup handler"
+  trap cleanup EXIT HUP INT TERM || return 10
+
+  echo "*** create pure cvmfs mountpoint of the new repository"
+  mkdir mnt
+  CVMFS_TEST_708_MOUNTPOINT="$(pwd)/mnt"
+  do_local_mount "$CVMFS_TEST_708_MOUNTPOINT" \
+                 "$CVMFS_TEST_REPO" \
+                 "$(get_repo_url $CVMFS_TEST_REPO)" \
+                 "" \
+                 "CVMFS_DEBUGLOG=$(pwd)/debug.log\n_CVMFS_TEST_BARRIER_OPEN_CHUNKED=${CVMFS_TEST_708_MOUNTPOINT}c/barrier01" || return 11
+
+  echo "*** keep a file open with the old content"
+  gcc -Wall -pthread -o openwaitprint ${src_location}/openwaitprint.c || return 20
+  echo "pause" > ${CVMFS_TEST_708_MOUNTPOINT}c/barrier01 || return 21
+  ./openwaitprint ${CVMFS_TEST_708_MOUNTPOINT}/foo > foo.old &
+  CVMFS_TEST_708_PID_HELPER=$!
+  echo "*** PID of openwaitprint is $CVMFS_TEST_708_PID_HELPER"
+  local inode_foo=$(get_inode ${CVMFS_TEST_708_MOUNTPOINT}/foo)
+  echo "*** inode of /foo: $inode_foo"
+
+  echo "*** change content of /foo"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  echo "bar" > /cvmfs/$CVMFS_TEST_REPO/foo || return 30
+  publish_repo $CVMFS_TEST_REPO || return 31
+
+  echo "*** apply new catalog revision"
+  sudo cvmfs_talk -p ${CVMFS_TEST_708_MOUNTPOINT}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO remount sync || return 40
+  local ninsert=$(get_ninsert)
+  echo "*** Number of page cache tracker inserts: $ninsert"
+  echo "*** inode of /foo: $(get_inode ${CVMFS_TEST_708_MOUNTPOINT}/foo)"
+  # Not true anymore since fixed
+  # [ $inode_foo -eq $(get_inode ${CVMFS_TEST_708_MOUNTPOINT}/foo) ] || return 42
+
+  echo "resume" > ${CVMFS_TEST_708_MOUNTPOINT}c/barrier01 || return 43
+  sleep 2
+  ninsert=$(get_ninsert)
+  echo "*** Number of page cache tracker inserts: $ninsert"
+  [ $ninsert -eq 1 ] || return 44
+
+  echo -n "*** break reading... "
+  sudo cvmfs_talk -p ${CVMFS_TEST_708_MOUNTPOINT}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO \
+    proxy set http://no-such-host.cern.ch:3128
+
+  echo -n "*** print the file with the new content: "
+  cat ${CVMFS_TEST_708_MOUNTPOINT}/foo && return 50
+
+  echo -n "*** re-enable reading... "
+  sudo cvmfs_talk -p ${CVMFS_TEST_708_MOUNTPOINT}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO \
+    proxy set DIRECT
+  cat ${CVMFS_TEST_708_MOUNTPOINT}/foo > foo.new || return 52
+  [ "x$(cat foo.new)" = "xbar" ] || return 52
+
+  sudo cvmfs_talk -p ${CVMFS_TEST_708_MOUNTPOINT}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO \
+    internal affairs | grep ^page_cache_tracker
+  local ndirect=$(get_ndirect)
+  # Not true anymore since fixed
+  # [ $ndirect -eq 1 ] || return 53
+
+  cleanup
+  CVMFS_TEST_708_PID_HELPER=
+  local mntpnt=$CVMFS_TEST_708_MOUNTPOINT
+  CVMFS_TEST_708_MOUNTPOINT=
+
+  sleep 5
+  echo "*** checking stack trace file ${mntpnt}c/$CVMFS_TEST_REPO/stacktrace.$CVMFS_TEST_REPO"
+  [ -f ${mntpnt}c/$CVMFS_TEST_REPO/stacktrace.$CVMFS_TEST_REPO ] && return 51
+
+  return 0
+}

@@ -33,18 +33,29 @@ var locksMap = make(map[string]*sync.Mutex)
 var locksFile = make(map[string]fSLock)
 var lockMap = &sync.Mutex{}
 
+func lockRepoKey(CVMFSRepo string) string {
+	repoName, _ := GetRepoAndSubdir(CVMFSRepo)
+	return repoName
+}
+
+func transactionRepoName(CVMFSRepo string) string {
+	repoName, _ := GetRepoAndSubdir(CVMFSRepo)
+	return repoName
+}
+
 func getLock(CVMFSRepo string) {
+	key := lockRepoKey(CVMFSRepo)
 	lockMap.Lock()
-	lc := locksMap[CVMFSRepo]
+	lc := locksMap[key]
 	if lc == nil {
-		locksMap[CVMFSRepo] = &sync.Mutex{}
-		lc = locksMap[CVMFSRepo]
+		locksMap[key] = &sync.Mutex{}
+		lc = locksMap[key]
 	}
-	f := locksFile[CVMFSRepo]
+	f := locksFile[key]
 	if f == nil {
 		f = newFSLock("/tmp/DUCC.lock")
-		locksFile[CVMFSRepo] = f
-		f = locksFile[CVMFSRepo]
+		locksFile[key] = f
+		f = locksFile[key]
 	}
 	lockMap.Unlock()
 
@@ -61,9 +72,10 @@ func getLock(CVMFSRepo string) {
 }
 
 func unlock(CVMFSRepo string) {
+	key := lockRepoKey(CVMFSRepo)
 	lockMap.Lock()
-	l := locksMap[CVMFSRepo]
-	f := locksFile[CVMFSRepo]
+	l := locksMap[key]
+	f := locksFile[key]
 	lockMap.Unlock()
 
 	l.Unlock()
@@ -75,7 +87,7 @@ func ExecuteAndOpenTransaction(CVMFSRepo string, f func() error, options ...Tran
 	for _, opt := range options {
 		cmd = append(cmd, opt.ToString())
 	}
-	cmd = append(cmd, CVMFSRepo)
+	cmd = append(cmd, transactionRepoName(CVMFSRepo))
 	getLock(CVMFSRepo)
 	if err := f(); err != nil {
 		unlock(CVMFSRepo)
@@ -97,8 +109,9 @@ func OpenTransaction(CVMFSRepo string, options ...TransactionOption) error {
 }
 
 func Publish(CVMFSRepo string) error {
+	repoName, _ := GetRepoAndSubdir(CVMFSRepo)
 	defer unlock(CVMFSRepo)
-	err := exec.ExecCommand("cvmfs_server", "publish", CVMFSRepo).Start()
+	err := exec.ExecCommand("cvmfs_server", "publish", repoName).Start()
 	if err != nil {
 		l.LogE(err).WithFields(
 			log.Fields{"repo": CVMFSRepo}).
@@ -125,7 +138,8 @@ func Abort(CVMFSRepo string) error {
 }
 
 func abort(CVMFSRepo string) error {
-	return exec.ExecCommand("cvmfs_server", "abort", "-f", CVMFSRepo).Start()
+	repoName, _ := GetRepoAndSubdir(CVMFSRepo)
+	return exec.ExecCommand("cvmfs_server", "abort", "-f", repoName).Start()
 }
 
 func RepositoryExists(CVMFSRepo string) bool {
@@ -138,11 +152,36 @@ func RepositoryExists(CVMFSRepo string) bool {
 	}
 	stdoutString := string(stdout.Bytes())
 
-	if strings.Contains(stdoutString, CVMFSRepo) {
-		return true
-	} else {
-		return false
+	// remove sub directory in case it was passed
+	repo, _ := GetRepoAndSubdir(CVMFSRepo)
+	return repositoryExistsInList(stdoutString, repo)
+}
+
+func repositoryExistsInList(stdoutString, repo string) bool {
+	candidates := map[string]struct{}{
+		repo: {},
 	}
+	if strings.HasPrefix(repo, "/") {
+		candidates[strings.TrimPrefix(repo, "/")] = struct{}{}
+		candidates[".."+repo] = struct{}{}
+	}
+	if strings.HasPrefix(repo, "..") {
+		candidates[strings.TrimPrefix(repo, "..")] = struct{}{}
+	}
+
+	for _, line := range strings.Split(stdoutString, "\n") {
+		line = strings.TrimSpace(line)
+		if _, ok := candidates[line]; ok {
+			return true
+		}
+		fields := strings.Fields(line)
+		if len(fields) > 0 {
+			if _, ok := candidates[fields[0]]; ok {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func WithinTransaction(CVMFSRepo string, f func() error, opts ...TransactionOption) error {
@@ -158,18 +197,21 @@ func WithinTransaction(CVMFSRepo string, f func() error, opts ...TransactionOpti
 }
 
 func Ingest(CVMFSRepo string, input io.ReadCloser, options ...string) error {
+	repoName, _ := GetRepoAndSubdir(CVMFSRepo)
 	cmd := []string{"cvmfs_server", "ingest"}
 	for _, opt := range options {
 		cmd = append(cmd, opt)
 	}
-	cmd = append(cmd, CVMFSRepo)
+	cmd = append(cmd, repoName)
 	getLock(CVMFSRepo)
 	defer unlock(CVMFSRepo)
 	return exec.ExecCommand(cmd...).StdIn(input).Start()
 }
 
 func IngestDelete(CVMFSRepo string, path string) error {
+	repoName, _ := GetRepoAndSubdir(CVMFSRepo)
+	path = PrefixRepoSubdirOnce(CVMFSRepo, path)
 	getLock(CVMFSRepo)
 	defer unlock(CVMFSRepo)
-	return exec.ExecCommand("cvmfs_server", "ingest", "--delete", path, CVMFSRepo).Start()
+	return exec.ExecCommand("cvmfs_server", "ingest", "--delete", path, repoName).Start()
 }

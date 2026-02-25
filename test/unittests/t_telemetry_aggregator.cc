@@ -230,4 +230,96 @@ TEST_F(T_TelemetryAggregator, UpdateCounters_WithExtraFields_Tags) {
   EXPECT_NO_FATAL_FAILURE(String2Uint64(delta_payload_split[2]));
 }
 
+TEST_F(T_TelemetryAggregator, SendDeltaDisabled) {
+  // Test with CVMFS_INFLUX_SEND_DELTA=OFF
+  options_manager_.SetValue("CVMFS_INFLUX_SEND_DELTA", "OFF");
+
+  int telemetry_send_rate_sec = 10;
+  perf::TelemetryAggregatorInflux telemetry_influx(
+      &statistics_, telemetry_send_rate_sec, &options_manager_, NULL, fqrn_);
+  EXPECT_FALSE(telemetry_influx.is_zombie_);
+
+  // Increment some counters
+  perf::Inc(c1_);
+  perf::Xadd(c3_, 10);
+  statistics_.SnapshotCounters(&telemetry_influx.counters_,
+                               &telemetry_influx.timestamp_);
+
+  string payload = telemetry_influx.MakePayload();
+
+  // When delta sending is disabled, metric name should NOT have _absolute suffix
+  string expected_header = "influx_test,repo=" + fqrn_;
+  string expected_fields = "test.c1=1,test.c3=10";
+
+  std::vector<std::string> payload_split = SplitString(payload, ' ');
+  RemoveWhitespace(&payload_split);
+
+  EXPECT_EQ(payload_split.size(), 3u);
+  EXPECT_STREQ(expected_header.c_str(), payload_split[0].c_str());
+  EXPECT_STREQ(expected_fields.c_str(), payload_split[1].c_str());
+  EXPECT_NO_FATAL_FAILURE(String2Uint64(payload_split[2]));
+
+  // Verify that old_counters is empty (no delta tracking)
+  EXPECT_EQ(telemetry_influx.old_counters_.size(), 0u);
+}
+
+TEST_F(T_TelemetryAggregator, SendDeltaEnabledByDefault) {
+  // Test that delta sending is enabled by default (no CVMFS_INFLUX_SEND_DELTA set)
+
+  int telemetry_send_rate_sec = 10;
+  perf::TelemetryAggregatorInflux telemetry_influx(
+      &statistics_, telemetry_send_rate_sec, &options_manager_, NULL, fqrn_);
+  EXPECT_FALSE(telemetry_influx.is_zombie_);
+
+  // Increment some counters
+  perf::Inc(c1_);
+  perf::Xadd(c3_, 10);
+  statistics_.SnapshotCounters(&telemetry_influx.counters_,
+                               &telemetry_influx.timestamp_);
+
+  string payload = telemetry_influx.MakePayload();
+
+  // When delta sending is enabled (default), metric name should have _absolute suffix
+  string expected_header = "influx_test_absolute,repo=" + fqrn_;
+  string expected_fields = "test.c1=1,test.c3=10";
+
+  std::vector<std::string> payload_split = SplitString(payload, ' ');
+  RemoveWhitespace(&payload_split);
+
+  EXPECT_EQ(payload_split.size(), 3u);
+  EXPECT_STREQ(expected_header.c_str(), payload_split[0].c_str());
+  EXPECT_STREQ(expected_fields.c_str(), payload_split[1].c_str());
+  EXPECT_NO_FATAL_FAILURE(String2Uint64(payload_split[2]));
+}
+
+TEST_F(T_TelemetryAggregator, SendDeltaExplicitlyEnabled) {
+  // Test with CVMFS_INFLUX_SEND_DELTA=ON
+  options_manager_.SetValue("CVMFS_INFLUX_SEND_DELTA", "ON");
+
+  int telemetry_send_rate_sec = 10;
+  perf::TelemetryAggregatorInflux telemetry_influx(
+      &statistics_, telemetry_send_rate_sec, &options_manager_, NULL, fqrn_);
+  EXPECT_FALSE(telemetry_influx.is_zombie_);
+
+  // Increment some counters
+  perf::Inc(c1_);
+  perf::Xadd(c3_, 10);
+  statistics_.SnapshotCounters(&telemetry_influx.counters_,
+                               &telemetry_influx.timestamp_);
+
+  string payload = telemetry_influx.MakePayload();
+
+  // When delta sending is explicitly enabled, metric name should have _absolute suffix
+  string expected_header = "influx_test_absolute,repo=" + fqrn_;
+  string expected_fields = "test.c1=1,test.c3=10";
+
+  std::vector<std::string> payload_split = SplitString(payload, ' ');
+  RemoveWhitespace(&payload_split);
+
+  EXPECT_EQ(payload_split.size(), 3u);
+  EXPECT_STREQ(expected_header.c_str(), payload_split[0].c_str());
+  EXPECT_STREQ(expected_fields.c_str(), payload_split[1].c_str());
+  EXPECT_NO_FATAL_FAILURE(String2Uint64(payload_split[2]));
+}
+
 }  // END namespace perf

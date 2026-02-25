@@ -18,8 +18,8 @@
 
 #include "cache.h"
 #include "crypto/hash.h"
+#include "duplex_testing.h"
 #include "file_watcher.h"
-#include "gtest/gtest_prod.h"
 #include "loader.h"
 #include "magic_xattr.h"
 #include "util/algorithm.h"
@@ -100,6 +100,7 @@ class FileSystem : SingleCopy, public BootFactory {
   FRIEND_TEST(T_MountPoint, CacheSettings);
   FRIEND_TEST(T_MountPoint, CheckInstanceName);
   FRIEND_TEST(T_MountPoint, CheckPosixCacheSettings);
+  FRIEND_TEST(T_Cvmfs, Basics);
 
  public:
   enum Type {
@@ -251,6 +252,9 @@ class FileSystem : SingleCopy, public BootFactory {
   cvmfs::Uuid *uuid_cache() { return uuid_cache_; }
   std::string workspace() { return workspace_; }
 
+ protected:
+  void SetHasCustomVfs(bool setting) { has_custom_sqlitevfs_ = setting; }
+
  private:
   /**
    * Only one instance may be alive at any given time
@@ -270,7 +274,8 @@ class FileSystem : SingleCopy, public BootFactory {
         , cache_base_defined(false)
         , cache_dir_defined(false)
         , quota_limit(0)
-        , do_refcount(true) { }
+        , do_refcount(true)
+        , cleanup_unused_first(false) { }
     bool is_shared;
     bool is_alien;
     bool is_managed;
@@ -283,6 +288,7 @@ class FileSystem : SingleCopy, public BootFactory {
      */
     int64_t quota_limit;
     bool do_refcount;
+    bool cleanup_unused_first;
     std::string cache_path;
     /**
      * Different from cache_path only if CVMFS_WORKSPACE or
@@ -297,7 +303,6 @@ class FileSystem : SingleCopy, public BootFactory {
 
   explicit FileSystem(const FileSystemInfo &fs_info);
 
-  static void SetupGlobalEnvironmentParams();
   void SetupLogging();
   void CreateStatistics();
   void SetupSqlite();
@@ -500,6 +505,7 @@ class MountPoint : SingleCopy, public BootFactory {
   unsigned GetMaxTtlMn();
   unsigned GetEffectiveTtlSec();
   void SetMaxTtlMn(unsigned value_minutes);
+  void SetMaxTtlSec(unsigned value_secs);
   void ReEvaluateAuthz();
 
   AuthzSessionManager *authz_session_mgr() { return authz_session_mgr_; }
@@ -548,6 +554,10 @@ class MountPoint : SingleCopy, public BootFactory {
   bool ReloadBlacklists();
   void DisableCacheSymlinks();
   void EnableFuseExpireEntry();
+
+  MountPoint(const std::string &fqrn,
+             FileSystem *file_system,
+             OptionsManager *options_mgr);
 
  private:
   /**
@@ -598,9 +608,6 @@ class MountPoint : SingleCopy, public BootFactory {
   static const int kDefaultTelemetrySendRateSec = 5 * 60;  // 5min
   static const int kMinimumTelemetrySendRateSec = 5;       // 5sec
 
-  MountPoint(const std::string &fqrn,
-             FileSystem *file_system,
-             OptionsManager *options_mgr);
 
   void CreateStatistics();
   void CreateAuthz();
@@ -681,3 +688,4 @@ class MountPoint : SingleCopy, public BootFactory {
 };  // class MointPoint
 
 #endif  // CVMFS_MOUNTPOINT_H_
+

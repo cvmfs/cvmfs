@@ -67,7 +67,7 @@ cvmfs_run_test() {
   cvmfs_server publish -v $CVMFS_TEST_REPO | tee logfile3.txt || return 24
 
   rem_value=$(grep -w "rem" logfile3.txt | wc -l)
-  if [ $rem_counter != $rem_values ]
+  if [ $rem_counter != $rem_value ]
   then
     echo "There is a missmatch between the number of deletions printed and the ones performed" && return 25
   fi

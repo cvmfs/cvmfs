@@ -13,7 +13,7 @@
 #include "backoff.h"
 #include "catalog_mgr.h"
 #include "crypto/hash.h"
-#include "gtest/gtest_prod.h"
+#include "duplex_testing.h"
 #include "manifest_fetch.h"
 #include "shortstring.h"
 

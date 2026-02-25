@@ -164,8 +164,6 @@ bool FileSystem::CheckPosixCacheSettings(
 FileSystem *FileSystem::Create(const FileSystem::FileSystemInfo &fs_info) {
   UniquePtr<FileSystem> file_system(new FileSystem(fs_info));
 
-  file_system->SetupGlobalEnvironmentParams();
-
   file_system->SetupLogging();
   LogCvmfs(kLogCvmfs, kLogDebug, "Options:\n%s",
            file_system->options_mgr()->Dump().c_str());
@@ -306,6 +304,14 @@ FileSystem::PosixCacheSettings FileSystem::DeterminePosixCacheSettings(
                              &optarg)
       && options_mgr_->IsOff(optarg)) {
     settings.do_refcount = false;
+  }
+
+  if (options_mgr_->GetValue(
+          MkCacheParm("CVMFS_CACHE_CLEANUP_NONOPENLRU", instance), &optarg)
+      && options_mgr_->IsOn(optarg)) {
+    // Enable this policy only in a refcounted cache.
+    // Because it's the reference counter who will say if a file is open.
+    settings.cleanup_unused_first = settings.do_refcount;
   }
 
   if (options_mgr_->GetValue(MkCacheParm("CVMFS_CACHE_SHARED", instance),
@@ -680,11 +686,10 @@ CacheManager *FileSystem::SetupPosixCacheMgr(const string &instance) {
   if (!CheckPosixCacheSettings(settings))
     return NULL;
   UniquePtr<PosixCacheManager> cache_mgr(PosixCacheManager::Create(
-      settings.cache_path,
-      settings.is_alien,
+      settings.cache_path, settings.is_alien,
       settings.avoid_rename ? PosixCacheManager::kRenameLink
                             : PosixCacheManager::kRenameNormal,
-      settings.do_refcount));
+      settings.do_refcount, settings.cleanup_unused_first));
   if (!cache_mgr.IsValid()) {
     boot_error_ = "Failed to setup posix cache '" + instance + "' in "
                   + settings.cache_path + ": " + strerror(errno);
@@ -840,18 +845,8 @@ bool FileSystem::SetupCwd() {
 }
 
 
-/**
- * Environment variables useful, e.g., for variant symlinks
- */
-void FileSystem::SetupGlobalEnvironmentParams() {
-  setenv("CVMFS_ARCH", GetArch().c_str(), 1 /* overwrite */);
-}
-
-
 void FileSystem::SetupLoggingStandalone(const OptionsManager &options_mgr,
                                         const std::string &prefix) {
-  SetupGlobalEnvironmentParams();
-
   string optarg;
   if (options_mgr.GetValue("CVMFS_SYSLOG_LEVEL", &optarg))
     SetLogSyslogLevel(String2Uint64(optarg));
@@ -1015,6 +1010,7 @@ bool FileSystem::SetupPosixQuotaMgr(
       return false;
     }
   }
+  quota_mgr->SetCleanupPolicy(settings.cleanup_unused_first);
 
   const int retval = cache_mgr->AcquireQuotaManager(quota_mgr);
   assert(retval);
@@ -1924,11 +1920,18 @@ void MountPoint::SetMaxTtlMn(unsigned value_minutes) {
   max_ttl_sec_ = value_minutes * 60;
 }
 
+void MountPoint::SetMaxTtlSec(unsigned value_secs) {
+  const MutexLockGuard lock_guard(lock_max_ttl_);
+  max_ttl_sec_ = value_secs;
+}
+
 bool MountPoint::SetupBehavior() {
   string optarg;
 
   if (options_mgr_->GetValue("CVMFS_MAX_TTL", &optarg))
     SetMaxTtlMn(String2Uint64(optarg));
+  if (options_mgr_->GetValue("CVMFS_MAX_TTL_SECS", &optarg))
+    SetMaxTtlSec(String2Uint64(optarg));
 
   if (options_mgr_->GetValue("CVMFS_KCACHE_TIMEOUT", &optarg)) {
     // Can be negative and should then be interpreted as 0.0
@@ -2263,3 +2266,4 @@ bool MountPoint::SetupOwnerMaps() {
 
   return true;
 }
+

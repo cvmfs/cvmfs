@@ -75,6 +75,7 @@
 #include "crypto/crypto_util.h"
 #include "crypto/hash.h"
 #include "directory_entry.h"
+#include "duplex_fuse.h"
 #include "fence.h"
 #include "fetch.h"
 #include "file_chunk.h"
@@ -107,9 +108,9 @@
 #include "util/logging.h"
 #include "util/mutex.h"
 #include "util/pointer.h"
+#include "util/posix.h"
 #include "util/smalloc.h"
 #include "util/string.h"
-#include "util/posix.h"
 #include "util/testing.h"
 #include "util/uuid.h"
 #include "wpad.h"
@@ -119,6 +120,7 @@ using namespace std;  // NOLINT
 
 namespace cvmfs {
 
+#ifndef __TEST_CVMFS_MOCKFUSE  // will be mocked in tests
 FileSystem *file_system_ = NULL;
 MountPoint *mount_point_ = NULL;
 TalkManager *talk_mgr_ = NULL;
@@ -126,7 +128,16 @@ NotificationClient *notification_client_ = NULL;
 Watchdog *watchdog_ = NULL;
 FuseRemounter *fuse_remounter_ = NULL;
 InodeGenerationInfo inode_generation_info_;
+#endif  // __TEST_CVMFS_MOCKFUSE
 
+#ifdef FUSE_CAP_PASSTHROUGH
+typedef struct fuse_passthru_ctx {
+  int backing_id;
+  int refcount;
+} fuse_passthru_ctx_t;
+static std::unordered_map<fuse_ino_t, fuse_passthru_ctx_t> *fuse_passthru_tracker = NULL;
+pthread_mutex_t fuse_passthru_tracker_lock = PTHREAD_MUTEX_INITIALIZER;
+#endif
 
 /**
  * For cvmfs_opendir / cvmfs_readdir
@@ -157,7 +168,7 @@ DirectoryHandles *directory_handles_ = NULL;
 pthread_mutex_t lock_directory_handles_ = PTHREAD_MUTEX_INITIALIZER;
 uint64_t next_directory_handle_ = 0;
 
-unsigned max_open_files_; /**< maximum allowed number of open files */
+unsigned int max_open_files_; /**< maximum allowed number of open files */
 /**
  * The refcounted cache manager should suppress checking the current number
  * of files opened through cvmfs_open() against the process' file descriptor
@@ -222,7 +233,7 @@ void GetReloadStatus(bool *drainout_mode, bool *maintenance_mode) {
   *maintenance_mode = fuse_remounter_->IsInMaintenanceMode();
 }
 
-
+#ifndef __TEST_CVMFS_MOCKFUSE  // will be mocked in tests
 static bool UseWatchdog() {
   if (loader_exports_ == NULL || loader_exports_->version < 2) {
     return true;  // spawn watchdog by default
@@ -232,6 +243,7 @@ static bool UseWatchdog() {
 
   return !loader_exports_->disable_watchdog;
 }
+#endif
 
 std::string PrintInodeGeneration() {
   return "init-catalog-revision: "
@@ -276,6 +288,7 @@ static bool HasDifferentContent(const catalog::DirectoryEntry &dirent,
   return true;
 }
 
+#ifndef __TEST_CVMFS_MOCKFUSE
 /**
  * When we lookup an inode (cvmfs_lookup(), cvmfs_opendir()), we usually provide
  * the live inode, i.e. the one in the inode tracker.  However, if the inode
@@ -446,6 +459,7 @@ static uint64_t GetDirentForPath(const PathString &path,
     mount_point_->md5path_cache()->InsertNegative(md5path);
   return 0;
 }
+#endif
 
 
 static bool GetPathForInode(const fuse_ino_t ino, PathString *path) {
@@ -1229,7 +1243,6 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
         fuse_reply_err(req, EIO);
         return;
       }
-      fuse_remounter_->fence()->Leave();
 
       chunk_tables->Lock();
       // Check again to avoid race
@@ -1247,7 +1260,6 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
         chunk_tables->inode2references.Insert(unique_inode, refctr + 1);
       }
     } else {
-      fuse_remounter_->fence()->Leave();
       uint32_t refctr;
       const bool retval = chunk_tables->inode2references.Lookup(unique_inode,
                                                                 &refctr);
@@ -1270,7 +1282,10 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
                                                           &chunk_reflist);
     assert(retval);
 
-    fi->fh = chunk_tables->next_handle;
+    // The following block used to be outside the remount fence.
+    // Now that the issue is fixed, we must not use the barrier anymore
+    // because the remount will then never take place in test 708.
+    // CVMFS_TEST_INJECT_BARRIER("_CVMFS_TEST_BARRIER_OPEN_CHUNKED");
     if (dirent.IsDirectIo()) {
       open_directives = mount_point_->page_cache_tracker()->OpenDirect();
     } else {
@@ -1278,6 +1293,10 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
           ino, chunk_reflist.HashChunkList(), dirent.GetStatStructure());
     }
     FillOpenFlags(open_directives, fi);
+
+    fuse_remounter_->fence()->Leave();
+
+    fi->fh = chunk_tables->next_handle;
     fi->fh = static_cast<uint64_t>(-static_cast<int64_t>(fi->fh));
     ++chunk_tables->next_handle;
     chunk_tables->Unlock();
@@ -1306,6 +1325,44 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
                fd);
       fi->fh = fd;
       FillOpenFlags(open_directives, fi);
+#ifdef FUSE_CAP_PASSTHROUGH
+      if (loader_exports_->fuse_passthrough) {
+        if(!dirent.IsChunkedFile()) {
+          /* "Currently there should be only one backing id per node / backing file."
+           * So says libfuse documentation on fuse_passthrough_open().
+           * So we reuse and refcount backing id based on inode.
+           * Passthrough can be used with libfuse methods open, opendir, create,
+           * but since CVMFS is read-only and has synthesizes its directories,
+           * we only need to handle it in `open`. */
+          int backing_id;
+          pthread_mutex_lock(&fuse_passthru_tracker_lock);
+          auto iter = fuse_passthru_tracker->find(ino);
+          if (iter == fuse_passthru_tracker->end()) {
+            auto pair_with_iterator = fuse_passthru_tracker->emplace(ino, fuse_passthru_ctx_t());
+            assert(pair_with_iterator.second == true);
+            iter = pair_with_iterator.first;
+            fuse_passthru_ctx_t &entry = iter->second;
+
+            backing_id = fuse_passthrough_open(req, fd);
+            assert(backing_id != 0);
+            entry.backing_id = backing_id;
+            entry.refcount++;
+          } else {
+            fuse_passthru_ctx_t &entry = iter->second;
+            assert(entry.refcount > 0);
+            backing_id = entry.backing_id;
+            entry.refcount++;
+          }
+          pthread_mutex_unlock(&fuse_passthru_tracker_lock);
+
+          fi->backing_id = backing_id;
+
+          /* according to libfuse example/passthrough_hp.cc:
+           * "open in passthrough mode must drop old page cache" */
+          fi->keep_cache = false;
+        }
+      }
+#endif
       fuse_reply_open(req, fi);
       return;
     } else {
@@ -1313,10 +1370,8 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
         perf::Dec(file_system_->no_open_files());
       LogCvmfs(kLogCvmfs, kLogSyslogErr, "open file descriptor limit exceeded");
       // not returning an fd, so close the page cache tracker entry if required
-      if (!dirent.IsDirectIo()) {
-        fuse_remounter_->fence()->Enter();
+      if (!dirent.IsDirectIo() && !open_directives.direct_io) {
         mount_point_->page_cache_tracker()->Close(ino);
-        fuse_remounter_->fence()->Leave();
       }
       fuse_reply_err(req, EMFILE);
       perf::Inc(file_system_->n_emfile());
@@ -1327,10 +1382,8 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
 
   // fd < 0
   // the download has failed. Close the page cache tracker entry if required
-  if (!dirent.IsDirectIo()) {
-    fuse_remounter_->fence()->Enter();
+  if (!dirent.IsDirectIo() && !open_directives.direct_io) {
     mount_point_->page_cache_tracker()->Close(ino);
-    fuse_remounter_->fence()->Leave();
   }
 
   LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
@@ -1364,6 +1417,10 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
                        struct fuse_file_info *fi) {
   const HighPrecisionTimer guard_timer(file_system_->hist_fs_read());
 
+  const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
+  FuseInterruptCue ic(&req);
+  const ClientCtxGuard ctxgd(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid, &ic);
+
   LogCvmfs(kLogCvmfs, kLogDebug,
            "cvmfs_read inode: %" PRIu64 " reading %lu bytes from offset %ld "
            "fd %lu",
@@ -1385,11 +1442,6 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
   const int64_t fd = static_cast<int64_t>(fi->fh);
   uint64_t abs_fd = (fd < 0) ? -fd : fd;
   ClearBit(glue::PageCacheTracker::kBitDirectIo, &abs_fd);
-
-  const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
-  FuseInterruptCue ic(&req);
-  const ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid,
-                                 &ic);
 
   // Do we have a a chunked file?
   if (fd < 0) {
@@ -1609,6 +1661,30 @@ static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
     if (file_system_->cache_mgr()->Close(abs_fd) == 0) {
       perf::Dec(file_system_->no_open_files());
     }
+#ifdef FUSE_CAP_PASSTHROUGH
+    if (loader_exports_->fuse_passthrough) {
+
+      if (fi->backing_id != 0) {
+        int ret;
+        pthread_mutex_lock(&fuse_passthru_tracker_lock);
+        auto iter = fuse_passthru_tracker->find(ino);
+        assert(iter != fuse_passthru_tracker->end());
+        fuse_passthru_ctx_t &entry = iter->second;
+        assert(entry.refcount > 0);
+        assert(entry.backing_id == fi->backing_id);
+        entry.refcount--;
+        if (entry.refcount == 0) {
+          ret = fuse_passthrough_close(req, fi->backing_id);
+          if (ret < 0) {
+            LogCvmfs(kLogCvmfs, kLogDebug, "fuse_passthrough_close(fd=%ld) failed: %d", fd, ret);
+            assert(false);
+          }
+          fuse_passthru_tracker->erase(iter);
+        }
+        pthread_mutex_unlock(&fuse_passthru_tracker_lock);
+      }
+    }
+#endif
   }
   fuse_reply_err(req, 0);
 }
@@ -2082,11 +2158,46 @@ static void cvmfs_init(void *userdata, struct fuse_conn_info *conn) {
         FUSE_VERSION);
   }
 #endif
+
+#ifdef FUSE_CAP_PASSTHROUGH
+  if (conn->capable & FUSE_CAP_PASSTHROUGH) {
+    if (loader_exports_->fuse_passthrough) {
+      conn->want |= FUSE_CAP_PASSTHROUGH;
+      /* "Passthrough and writeback cache are conflicting modes"
+       * libfuse example/passthrough_hp.cc says,
+       * but we don't use writeback cache mode in CVMFS. */
+      pthread_mutex_lock(&fuse_passthru_tracker_lock);
+      assert(!fuse_passthru_tracker);
+      fuse_passthru_tracker = new std::unordered_map<fuse_ino_t,
+                                                     fuse_passthru_ctx_t>();
+      pthread_mutex_unlock(&fuse_passthru_tracker_lock);
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+               "FUSE: Passthrough enabled.");
+    } else {
+      LogCvmfs(kLogCvmfs, kLogDebug,
+               "FUSE: Passthrough enabled in build, available at runtime, but "
+               "not enabled by the config option.");
+    }
+  } else {
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+             "FUSE: Passthrough enabled in build but unavailable at runtime.");
+  }
+#else
+  LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+           "FUSE: Passthrough disabled in this build.");
+#endif
 }
 
 static void cvmfs_destroy(void *unused __attribute__((unused))) {
   // The debug log is already closed at this point
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_destroy");
+#ifdef FUSE_CAP_PASSTHROUGH
+  pthread_mutex_lock(&fuse_passthru_tracker_lock);
+  assert(fuse_passthru_tracker);
+  delete fuse_passthru_tracker;
+  fuse_passthru_tracker = NULL;
+  pthread_mutex_unlock(&fuse_passthru_tracker_lock);
+#endif
 }
 
 /**
@@ -2158,6 +2269,8 @@ string *g_boot_error = NULL;
 __attribute__((
     visibility("default"))) loader::CvmfsExports *g_cvmfs_exports = NULL;
 
+
+#ifndef __TEST_CVMFS_MOCKFUSE  // will be mocked in tests
 /**
  * Begin section of cvmfs.cc-specific magic extended attributes
  */
@@ -2349,6 +2462,17 @@ static int Init(const loader::LoaderExports *loader_exports) {
              ->do_refcount()) {
     cvmfs::check_fd_overflow_ = false;
   }
+  if (cvmfs::file_system_->cache_mgr()->id() == kPosixCacheManager) {
+    PosixCacheManager *pcm = dynamic_cast<PosixCacheManager *>(
+        cvmfs::file_system_->cache_mgr());
+    if (pcm != nullptr) {
+      PosixQuotaManager *pqm = dynamic_cast<PosixQuotaManager *>(
+          pcm->quota_mgr());
+      if (pqm != nullptr) {
+        pqm->RegisterMountpoint(loader_exports->mount_point);
+      }
+    }
+  }
 
   cvmfs::mount_point_ = MountPoint::Create(loader_exports->repository_name,
                                            cvmfs::file_system_);
@@ -2432,6 +2556,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
 
   return loader::kFailOk;
 }
+#endif  // __TEST_CVMFS_MOCKFUSE
 
 
 /**
@@ -2571,7 +2696,7 @@ static bool MaintenanceMode(const int fd_progress) {
   return true;
 }
 
-
+#ifndef __TEST_CVMFS_MOCKFUSE
 static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
   string msg_progress;
 
@@ -3002,6 +3127,7 @@ static void FreeSavedState(const int fd_progress,
     }
   }
 }
+#endif
 
 
 static void __attribute__((constructor)) LibraryMain() {
@@ -3013,9 +3139,11 @@ static void __attribute__((constructor)) LibraryMain() {
   g_cvmfs_exports->fnFini = Fini;
   g_cvmfs_exports->fnGetErrorMsg = GetErrorMsg;
   g_cvmfs_exports->fnMaintenanceMode = MaintenanceMode;
+#ifndef __TEST_CVMFS_MOCKFUSE
   g_cvmfs_exports->fnSaveState = SaveState;
   g_cvmfs_exports->fnRestoreState = RestoreState;
   g_cvmfs_exports->fnFreeSavedState = FreeSavedState;
+#endif
   cvmfs::SetCvmfsOperations(&g_cvmfs_exports->cvmfs_operations);
 }
 
@@ -3024,3 +3152,4 @@ static void __attribute__((destructor)) LibraryExit() {
   delete g_cvmfs_exports;
   g_cvmfs_exports = NULL;
 }
+

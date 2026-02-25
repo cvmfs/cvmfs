@@ -13,6 +13,7 @@ else()
     set(MAN_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}")
     file(MAKE_DIRECTORY ${MAN_OUTPUT_DIR})
 
+    if (BUILD_CVMFS)
     # cvmfs2
     add_custom_command(
         OUTPUT "${MAN_OUTPUT_DIR}/cvmfs2.1"
@@ -24,7 +25,7 @@ else()
             --output=${MAN_OUTPUT_DIR}/cvmfs2.1
             --name "cvmfs2: fuse client for the CernVM-Filesystem" 
             "$<TARGET_FILE:cvmfs2>"
-        DEPENDS cvmfs2
+        DEPENDS cvmfs2 cvmfs_fuse3 cvmfs_fuse3_stub
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/cvmfs/
         COMMENT "Generating man page for cvmfs2"
         VERBATIM
@@ -60,9 +61,10 @@ else()
         DESTINATION ${CMAKE_INSTALL_MANDIR}/man1
         COMPONENT documentation
     )
-    if (BUILD_SERVER) 
+    endif (BUILD_CVMFS)
 
     # cvmfs_server
+    if (BUILD_SERVER) 
     add_custom_command(
         OUTPUT "${MAN_OUTPUT_DIR}/cvmfs_server.1"
         COMMAND ${CMAKE_CURRENT_LIST_DIR}/generate_manpage_cvmfs_server.sh

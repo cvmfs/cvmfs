@@ -31,6 +31,11 @@
   %define build_snapshotter 1
 %endif
 
+# flag to control building of unittests.
+# No tests are built by default, can be overriden 
+# with rpmbuild --define="build_testing 1"
+%{!?build_testing: %define build_testing 0}
+
 
 # List of platforms that require systemd/autofs fix as described in CVM-1200
 %if 0%{?rhel} >= 7 || 0%{?fedora} || 0%{?sle12} || 0%{?sle15}
@@ -69,8 +74,9 @@
 
 Summary: CernVM File System
 Name: cvmfs
-Version: 2.13.1
-Release: 1%{?dist}
+Version: 2.13.3
+%global base_version %(echo %{version} | cut -d'~' -f1)
+Release: 2%{?dist}
 URL: https://cernvm.cern.ch/fs/
 Source0: https://ecsft.cern.ch/dist/cvmfs/%{name}-%{version}/%{name}-%{version}.tar.gz
 %if 0%{?selinux_cvmfs}
@@ -170,6 +176,8 @@ Requires: util-linux
 Requires: cvmfs-config
 Requires: cvmfs-libs = %{version}-%{release}
 Requires: cvmfs-fuse3 = %{version}-%{release}
+Provides: group(cvmfs)
+Provides: user(cvmfs)
 
 # SELinux integration
 # These are needed to build the selinux policy module.
@@ -198,7 +206,12 @@ Common utility libraries for CernVM-FS packages
 Summary: additional libraries to enable libfuse3 support
 Group: Applications/System
 Requires: cvmfs-libs = %{version}-%{release}
+# fuse library package name differs on suse
+%if 0%{?suse_version}
+Requires: libfuse3-3
+%else
 Requires: fuse3-libs >= 3.3.0
+%endif
 %description fuse3
 Shared libraries implementing the CernVM-FS fuse module based on libfuse3
 
@@ -272,12 +285,14 @@ Requires: cvmfs-libs = %{version}-%{release}
 CernVM-FS shrinkwrap utility to export /cvmfs file system trees into container
 images.
 
+%if 0%{?build_testing}
 %package unittests
 Summary: CernVM-FS unit tests binary
 Group: Application/System
 Requires: cvmfs-libs = %{version}-%{release}
 %description unittests
 CernVM-FS unit tests binary.  This RPM is not required except for testing.
+%endif
 
 %if 0%{?build_gateway}
 %package gateway
@@ -350,6 +365,12 @@ BUILD_LIBFUSE2=no
 %if 0%{?build_fuse2}
 BUILD_LIBFUSE2=yes
 %endif
+BUILD_UNITTESTS=no
+INSTALL_UNITTESTS=no
+%if 0%{?build_testing}
+BUILD_UNITTESTS=yes
+INSTALL_UNITTESTS=yes
+%endif
 
 cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} \
   -DBUILD_SERVER=yes \
@@ -359,11 +380,11 @@ cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} \
   -DBUILD_LIBCVMFS=yes \
   -DBUILD_LIBCVMFS_CACHE=yes \
   -DBUILD_SHRINKWRAP=yes \
-  -DBUILD_UNITTESTS=yes \
+  -DBUILD_UNITTESTS=$BUILD_UNITTESTS \
   -DBUILD_GATEWAY=$BUILD_GATEWAY \
   -DBUILD_DUCC=$BUILD_DUCC \
   -DBUILD_SNAPSHOTTER=$BUILD_SNAPSHOTTER \
-  -DINSTALL_UNITTESTS=yes \
+  -DINSTALL_UNITTESTS=$INSTALL_UNITTESTS \
   -DBUILD_LIBFUSE2=$BUILD_LIBFUSE2 \
   -DCMAKE_INSTALL_PREFIX:PATH=/usr .
 
@@ -415,8 +436,10 @@ popd
 %pretrans shrinkwrap
 %check_transaction
 
+%if 0%{?build_testing}
 %pretrans unittests
 %check_transaction
+%endif
 
 %if 0%{?build_gateway}
 %pretrans gateway
@@ -473,12 +496,12 @@ rm -f $RPM_BUILD_ROOT/etc/cvmfs/serverorder.sh
 # Fix docdir on SuSE
 %if 0%{?suse_version}
 mkdir -p %RPM_BUILD_ROOT/usr/share/doc/package/%{name}
-mv $RPM_BUILD_ROOT/usr/share/doc/%{name}-%{version} %RPM_BUILD_ROOT/usr/share/doc/package/%{name}
+mv $RPM_BUILD_ROOT/usr/share/doc/%{name}-%{base_version} %RPM_BUILD_ROOT/usr/share/doc/package/%{name}
 %endif
 
 # Fix docdir on Fedora
 %if 0%{?fedora} || 0%{?rhel} >= 8
-rm -rf $RPM_BUILD_ROOT/usr/share/doc/%{name}-%{version}
+rm -rf $RPM_BUILD_ROOT/usr/share/doc/%{name}-%{base_version}
 %endif
 
 %if 0%{?selinux_cvmfs}
@@ -510,7 +533,7 @@ mkdir -p $RPM_BUILD_ROOT/var/lib/cvmfs-gateway
 
 %post
 if [ $1 -eq 1 ]; then
-   mkdir /cvmfs
+   mkdir -p /cvmfs
    chmod 755 /cvmfs
 fi
 %if 0%{?selinux_cvmfs}
@@ -625,11 +648,11 @@ systemctl daemon-reload
 %{_bindir}/cvmfs2
 %if 0%{?build_fuse2} 
 %{_libdir}/libcvmfs_fuse_stub.so
-%{_libdir}/libcvmfs_fuse_stub.so.%{version}
+%{_libdir}/libcvmfs_fuse_stub.so.%{base_version}
 %{_libdir}/libcvmfs_fuse.so
-%{_libdir}/libcvmfs_fuse.so.%{version}
+%{_libdir}/libcvmfs_fuse.so.%{base_version}
 %{_libdir}/libcvmfs_fuse_debug.so
-%{_libdir}/libcvmfs_fuse_debug.so.%{version}
+%{_libdir}/libcvmfs_fuse_debug.so.%{base_version}
 %endif
 %{_bindir}/cvmfs_talk
 %{_bindir}/cvmfs_fsck
@@ -657,7 +680,7 @@ systemctl daemon-reload
 %config %{_sysconfdir}/cvmfs/default.conf
 %dir %{_sysconfdir}/bash_completion.d
 %config(noreplace) %{_sysconfdir}/bash_completion.d/cvmfs
-%doc COPYING AUTHORS README.md ChangeLog
+%doc COPYING CITATION.cff README.md ChangeLog
 %{_unitdir}/cvmfs-reload.service
 %doc %{_mandir}/man1/cvmfs2.1.gz
 %doc %{_mandir}/man1/cvmfs_config.1.gz
@@ -665,34 +688,34 @@ systemctl daemon-reload
 %files libs
 %defattr(-,root,root)
 %{_libdir}/libcvmfs_cache.so
-%{_libdir}/libcvmfs_cache.so.%{version}
+%{_libdir}/libcvmfs_cache.so.%{base_version}
 %{_libdir}/libcvmfs_client.so
-%{_libdir}/libcvmfs_client.so.%{version}
+%{_libdir}/libcvmfs_client.so.%{base_version}
 %{_libdir}/libcvmfs_crypto.so
-%{_libdir}/libcvmfs_crypto.so.%{version}
+%{_libdir}/libcvmfs_crypto.so.%{base_version}
 %{_libdir}/libcvmfs_crypto_debug.so
-%{_libdir}/libcvmfs_crypto_debug.so.%{version}
+%{_libdir}/libcvmfs_crypto_debug.so.%{base_version}
 %{_libdir}/libcvmfs_util.so
-%{_libdir}/libcvmfs_util.so.%{version}
+%{_libdir}/libcvmfs_util.so.%{base_version}
 %{_libdir}/libcvmfs_util_debug.so
-%{_libdir}/libcvmfs_util_debug.so.%{version}
-%doc COPYING AUTHORS README.md ChangeLog
+%{_libdir}/libcvmfs_util_debug.so.%{base_version}
+%doc COPYING CITATION.cff README.md ChangeLog
 
 %files fuse3
 %defattr(-,root,root)
 %{_libdir}/libcvmfs_fuse3_stub.so
-%{_libdir}/libcvmfs_fuse3_stub.so.%{version}
+%{_libdir}/libcvmfs_fuse3_stub.so.%{base_version}
 %{_libdir}/libcvmfs_fuse3.so
-%{_libdir}/libcvmfs_fuse3.so.%{version}
+%{_libdir}/libcvmfs_fuse3.so.%{base_version}
 %{_libdir}/libcvmfs_fuse3_debug.so
-%{_libdir}/libcvmfs_fuse3_debug.so.%{version}
-%doc COPYING AUTHORS README.md ChangeLog
+%{_libdir}/libcvmfs_fuse3_debug.so.%{base_version}
+%doc COPYING CITATION.cff README.md ChangeLog
 
 %files devel
 %defattr(-,root,root)
 %{_includedir}/libcvmfs.h
 %{_includedir}/libcvmfs_cache.h
-%doc COPYING AUTHORS README.md ChangeLog
+%doc COPYING CITATION.cff README.md ChangeLog
 
 %files server
 %defattr(-,root,root)
@@ -706,9 +729,9 @@ systemctl daemon-reload
 %{_bindir}/cvmfs_server
 %{_bindir}/cvmfs_rsync
 %{_libdir}/libcvmfs_server.so
-%{_libdir}/libcvmfs_server.so.%{version}
+%{_libdir}/libcvmfs_server.so.%{base_version}
 %{_libdir}/libcvmfs_server_debug.so
-%{_libdir}/libcvmfs_server_debug.so.%{version}
+%{_libdir}/libcvmfs_server_debug.so.%{base_version}
 %{_sysconfdir}/cvmfs/cvmfs_server_hooks.sh.demo
 %dir %{_sysconfdir}/cvmfs/repositories.d
 %dir /var/log/cvmfs
@@ -716,9 +739,14 @@ systemctl daemon-reload
 /usr/share/cvmfs-server/
 /var/lib/cvmfs-server/
 /var/spool/cvmfs/README
-%doc COPYING AUTHORS README.md ChangeLog
-%config(noreplace) %{_sysconfdir}/logrotate.d/cvmfs-statsdb
+%doc COPYING CITATION.cff README.md ChangeLog
 %config(noreplace) %{_sysconfdir}/logrotate.d/cvmfs
+%config(noreplace) %{_sysconfdir}/logrotate.d/cvmfs-statsdb
+# sqlite version on rhel8 is too old for the statsdb logrotate script (needs >= 3.27)
+%define sqlite_version %(sqlite3 --version 2>/dev/null | cut -d' ' -f1 || echo "0")
+%if "%(echo '%{sqlite_version}' | awk 'BEGIN{print ("%{sqlite_version}" < "3.27")}')" == "1"
+%exclude %{_sysconfdir}/logrotate.d/cvmfs-statsdb
+%endif
 %doc %{_mandir}/man1/cvmfs_server.1.gz
 %doc %{_mandir}/man1/cvmfs_swissknife.1.gz
 
@@ -726,15 +754,17 @@ systemctl daemon-reload
 %defattr(-,root,root)
 %{_bindir}/cvmfs_shrinkwrap
 /usr/libexec/cvmfs/shrinkwrap/spec_builder.py*
-%doc COPYING AUTHORS README.md ChangeLog
+%doc COPYING CITATION.cff README.md ChangeLog
 
+%if 0%{?build_testing}
 %files unittests
 %defattr(-,root,root)
 %{_bindir}/cvmfs_unittests
 %{_bindir}/cvmfs_test_cache
 %{_bindir}/cvmfs_test_shrinkwrap
 %{_bindir}/cvmfs_test_publish
-%doc COPYING AUTHORS README.md ChangeLog
+%doc COPYING CITATION.cff README.md ChangeLog
+%endif
 
 %if 0%{?build_gateway}
 %files gateway
@@ -763,9 +793,12 @@ systemctl daemon-reload
 
 %changelog
 # - When using fuse3, require at least version 3.3.0 (for premounting).
-* Fri May 23 2025 Valentin Volkl <vavolkl@cern.ch>> - 2.13.0
+* Wed Aug 27 2025 Valentin Volkl <vavolkl@cern.ch> - 2.13.3
+- Make building of unittests optional 
+- Silence a mkdir warning when /cvmfs already exists
+* Fri May 23 2025 Valentin Volkl <vavolkl@cern.ch> - 2.13.0
 - Add logrotate config files and tidy to satisfy rpmlint v2.6
-* Mon Mar 3 2025 Dave Dykstra <dwd@cern.ch>> - 2.12.7-2
+* Mon Mar 3 2025 Dave Dykstra <dwd@cern.ch> - 2.12.7-2
 - Apply pretrans transaction check to all subpackages that need to
   have their version stay in sync
 * Mon Dec 2 2024 Valentin Volkl <vavolkl@cern.ch> - 2.12

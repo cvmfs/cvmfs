@@ -298,19 +298,6 @@ bool CommandPull::PullRecursion(catalog::Catalog *catalog,
                                 const std::string &path) {
   assert(catalog);
 
-  // Previous catalogs
-  if (pull_history) {
-    const shash::Any previous_catalog = catalog->GetPreviousRevision();
-    if (previous_catalog.IsNull()) {
-      LogCvmfs(kLogCvmfs, kLogStdout, "Start of catalog, no more history");
-    } else {
-      LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from historic catalog %s",
-               previous_catalog.ToString().c_str());
-      const bool retval = Pull(previous_catalog, path);
-      if (!retval)
-        return false;
-    }
-  }
 
   // Nested catalogs (in a nested code block because goto fail...)
   {
@@ -323,7 +310,9 @@ bool CommandPull::PullRecursion(catalog::Catalog *catalog,
          ++i) {
       LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from catalog at %s",
                i->mountpoint.c_str());
-      const bool retval = Pull(i->hash, i->mountpoint.ToString());
+      shash::Any previous_catalog_hash;  // expected to be null for subcatalog
+      const bool retval = Pull(i->hash, i->mountpoint.ToString(),
+                         previous_catalog_hash);
       if (!retval)
         return false;
     }
@@ -333,10 +322,12 @@ bool CommandPull::PullRecursion(catalog::Catalog *catalog,
 }
 
 bool CommandPull::Pull(const shash::Any &catalog_hash,
-                       const std::string &path) {
+                       const std::string &path,
+                       shash::Any &previous_catalog) {
   int retval;
   download::Failures dl_retval;
   assert(shash::kSuffixCatalog == catalog_hash.suffix);
+  previous_catalog.SetNull();
 
   // Check if the catalog already exists
   if (Peek(catalog_hash)) {
@@ -469,9 +460,11 @@ bool CommandPull::Pull(const shash::Any &catalog_hash,
            atomic_read64(&overall_chunks) - gauge_chunks);
 
   retval = PullRecursion(catalog, path);
-
+  previous_catalog = catalog->GetPreviousRevision();
   delete catalog;
   unlink(file_catalog.c_str());
+
+
   WaitForStorage();
   if (!retval)
     return false;
@@ -501,6 +494,8 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   manifest::ManifestEnsemble ensemble;
   shash::Any meta_info_hash;
   string meta_info;
+  shash::Any previous_catalog_hash;
+  shash::Any current_catalog_hash;
 
   // Option parsing
   if (args.find('c') != args.end())
@@ -777,8 +772,16 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   }
 
   LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from trunk catalog at /");
-  retval = Pull(ensemble.manifest->catalog_hash(), "");
-  pull_history = false;
+  current_catalog_hash = ensemble.manifest->catalog_hash();
+  do {
+    retval = Pull(current_catalog_hash, "", previous_catalog_hash);
+    if (pull_history && !previous_catalog_hash.IsNull()) {
+      LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from historic catalog %s",
+               previous_catalog_hash.ToString().c_str());
+    }
+    current_catalog_hash = previous_catalog_hash;
+  } while (pull_history && !previous_catalog_hash.IsNull());
+
   if (!historic_tags.empty()) {
     LogCvmfs(kLogCvmfs, kLogStdout, "Checking tagged snapshots...");
   }
@@ -791,7 +794,17 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from %s repository tag",
              i->name.c_str());
     apply_timestamp_threshold = false;
-    const bool retval2 = Pull(i->root_hash, "");
+
+    bool retval2;
+    current_catalog_hash = i->root_hash;
+    do {
+      retval2 = Pull(current_catalog_hash, "", previous_catalog_hash);
+      if (pull_history && !previous_catalog_hash.IsNull()) {
+        LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from historic catalog %s",
+                 previous_catalog_hash.ToString().c_str());
+      }
+      current_catalog_hash = previous_catalog_hash;
+    } while (pull_history && !previous_catalog_hash.IsNull());
     retval = retval && retval2;
   }
 
