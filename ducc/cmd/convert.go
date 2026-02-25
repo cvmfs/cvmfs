@@ -4,14 +4,17 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	cvmfs "github.com/cvmfs/ducc/cvmfs"
+	exec "github.com/cvmfs/ducc/exec"
 	"github.com/cvmfs/ducc/lib"
 	l "github.com/cvmfs/ducc/log"
 )
@@ -104,6 +107,19 @@ var convertCmd = &cobra.Command{
 			l.LogE(err).Error("The repository does not seem to exists.")
 			return err
 		}
+
+		// Set up signal handler to abort the cvmfs transaction on Ctrl-C
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+		go func() {
+			sig := <-sigChan
+			repoName, _ := cvmfs.GetRepoAndSubdir(recipe.Repo)
+			l.Log().WithFields(log.Fields{"signal": sig, "repo": repoName}).
+				Info("Received signal, trying to abort the cvmfs transaction")
+			exec.ExecCommand("cvmfs_server", "abort", "-f", repoName).Start()
+			os.Exit(1)
+		}()
+		defer signal.Stop(sigChan)
 		var conversionErrors []string
 		for wish := range recipe.Wishes {
 			fields := log.Fields{"input image": wish.InputName,
