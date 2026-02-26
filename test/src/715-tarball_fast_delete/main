@@ -71,7 +71,7 @@ cvmfs_run_test() {
   # ============================================================================
 
   echo "*** fast-delete the nested catalog directory tarball_foo/a"
-  cvmfs_server ingest --fast-delete -d $dir/tarball_foo/a $CVMFS_TEST_REPO || return 10
+  cvmfs_server ingest --fast-delete $dir/tarball_foo/a $CVMFS_TEST_REPO || return 10
 
   echo "*** check catalog and data integrity after fast-delete"
   check_repository $CVMFS_TEST_REPO -i || return 11
@@ -109,7 +109,7 @@ cvmfs_run_test() {
 
   echo "*** fast-delete and ingest into a new dir in the same command"
   local new_dir=tar_dir_new
-  cvmfs_server ingest --base_dir $new_dir --tar_file $tarfile --fast-delete -d $dir/tarball_foo/a $CVMFS_TEST_REPO || return 30
+  cvmfs_server ingest --base_dir $new_dir --tar_file $tarfile --fast-delete $dir/tarball_foo/a $CVMFS_TEST_REPO || return 30
 
   echo "*** check catalog and data integrity after combined ingest+fast-delete"
   check_repository $CVMFS_TEST_REPO -i || return 31

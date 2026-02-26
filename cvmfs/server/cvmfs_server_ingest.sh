@@ -69,7 +69,14 @@ cvmfs_server_ingest() {
       ;;
       -f | --fast-delete )
         fast_delete=true
-      ;;
+        if [ "x$to_delete" = "x" ]
+        then
+          to_delete="$(echo $2 | tr -s /)"
+        else
+          to_delete="$to_delete///$(echo $2 | tr -s /)"
+          multiple_delete=1
+        fi
+        ;;
     esac
     shift
   done
