@@ -19,7 +19,9 @@ namespace publish {
 
 class MockSyncMediator : public AbstractSyncMediator {
  public:
-  MockSyncMediator() : n_register(0), n_reg(0), n_lnk(0), n_dir(0) { }
+  MockSyncMediator()
+      : n_register(0), n_reg(0), n_lnk(0), n_dir(0),
+        n_remove(0), last_fast_delete(false) { }
   virtual ~MockSyncMediator() { }
 
   virtual void RegisterUnionEngine(SyncUnion * /* engine */) { n_register++; }
@@ -35,7 +37,11 @@ class MockSyncMediator : public AbstractSyncMediator {
     }
   }
   virtual void Touch(SharedPtr<SyncItem> /* entry */) { }
-  virtual void Remove(SharedPtr<SyncItem> /* entry */) { }
+  virtual void Remove(SharedPtr<SyncItem> /* entry */,
+                      bool fast_delete = false) {
+    n_remove++;
+    last_fast_delete = fast_delete;
+  }
   virtual void Replace(SharedPtr<SyncItem> /* entry */) { }
   virtual void Clone(const std::string /* from */, const std::string /* to */) {
   }
@@ -59,6 +65,8 @@ class MockSyncMediator : public AbstractSyncMediator {
   int n_reg;
   int n_lnk;
   int n_dir;
+  int n_remove;
+  bool last_fast_delete;
 };  // class MockSyncMediator
 
 }  // namespace publish

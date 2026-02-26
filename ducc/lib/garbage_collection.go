@@ -33,7 +33,7 @@ func ConstructDeleteCommands(pathsToDelete []string, pathsPerBatchCommand int, C
 			commands = append(commands, command)
 			command = commandPrefix
 		}
-		command = append(command, "--delete", path)
+		command = append(command, "--fast-delete", path)
 	}
 	command = append(command, repoName)
 	commands = append(commands, command)

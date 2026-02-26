@@ -37,6 +37,7 @@ struct SyncParameters {
       , stop_for_catalog_tweaks(false)
       , include_xattrs(false)
       , enable_mtime_ns(false)
+      , fast_delete(false)
       , external_data(false)
       , direct_io(false)
       , voms_authz(false)
@@ -90,6 +91,7 @@ struct SyncParameters {
   bool stop_for_catalog_tweaks;
   bool include_xattrs;
   bool enable_mtime_ns;
+  bool fast_delete;
   bool external_data;
   bool direct_io;
   bool voms_authz;

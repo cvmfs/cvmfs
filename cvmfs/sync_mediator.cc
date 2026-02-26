@@ -229,11 +229,11 @@ void SyncMediator::Touch(SharedPtr<SyncItem> entry) {
 /**
  * Remove an entry from the repository. Directories will be recursively removed.
  */
-void SyncMediator::Remove(SharedPtr<SyncItem> entry) {
+void SyncMediator::Remove(SharedPtr<SyncItem> entry, bool fast_delete) {
   EnsureAllowed(entry);
 
   if (entry->WasDirectory()) {
-    RemoveDirectoryRecursively(entry);
+    RemoveDirectoryRecursively(entry, fast_delete);
     return;
   }
 
@@ -623,8 +623,58 @@ void SyncMediator::LeaveAddedDirectoryCallback(const std::string &parent_dir,
 }
 
 
-void SyncMediator::RemoveDirectoryRecursively(SharedPtr<SyncItem> entry) {
-  // Delete a directory AFTER it was emptied here,
+void SyncMediator::RemoveDirectoryRecursively(SharedPtr<SyncItem> entry,
+                                              bool fast_delete) {
+  const std::string directory_path = entry->GetRelativePath();
+
+  // Fast delete: skip filesystem traversal for nested catalog directories.
+  // Instead of recursively walking the filesystem and removing each entry,
+  // we just remove the nested catalog reference from the parent catalog
+  // (with merge=false so entries are not copied to the parent) and then
+  // remove the mountpoint directory entry.
+  if (fast_delete && catalog_manager_->IsTransitionPoint(directory_path)) {
+    // Get the nested catalog's counters before removal so we can update
+    // publish statistics with the total number of removed entries
+    std::string subcatalog_path;
+    shash::Any hash;
+    PathString ps_path;
+    ps_path.Assign(directory_path.data(), directory_path.length());
+    const catalog::Counters counters =
+        catalog_manager_->LookupCounters(ps_path, &subcatalog_path, &hash);
+    {
+      perf::Xadd(counters_->n_files_removed,
+          static_cast<int64_t>(counters.self.regular_files
+                               + counters.subtree.regular_files));
+      perf::Xadd(counters_->n_directories_removed,
+          static_cast<int64_t>(counters.self.directories
+                               + counters.subtree.directories));
+      perf::Xadd(counters_->n_symlinks_removed,
+          static_cast<int64_t>(counters.self.symlinks
+                               + counters.subtree.symlinks));
+      perf::Xadd(counters_->sz_removed_bytes,
+          static_cast<int64_t>(counters.self.file_size
+                               + counters.subtree.file_size));
+    }
+
+    // Remove nested catalog (merge=false: just remove the reference and
+    // adjust parent subtree counters, don't copy entries into parent)
+    const std::string notice = "Nested catalog at " + entry->GetUnionPath();
+    reporter_->OnRemove(notice, catalog::DirectoryEntry());
+    if (!params_->dry_run) {
+      catalog_manager_->RemoveNestedCatalog(directory_path, false);
+    }
+
+    // Remove the mountpoint directory entry from the parent catalog
+    reporter_->OnRemove(entry->GetUnionPath(), catalog::DirectoryEntry());
+    if (!params_->dry_run) {
+      catalog_manager_->RemoveDirectory(directory_path);
+    }
+    perf::Inc(counters_->n_directories_removed);
+
+    return;
+  }
+
+  // Normal path: delete a directory AFTER it was emptied here,
   // because it would start up another recursion
 
   const bool recurse = false;
