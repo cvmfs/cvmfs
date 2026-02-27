@@ -39,7 +39,7 @@ class StatisticsTemplate;
 namespace signature {
 class SignatureManager;
 }
-class SyncParameters;
+struct SyncParameters;
 namespace upload {
 class Spooler;
 }
