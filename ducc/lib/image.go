@@ -873,7 +873,7 @@ func (d *downloadedLayer) GetSize() int64 {
 	return 0
 }
 
-func (img *Image) GetLayers(manifest da.Manifest, layersChan chan<- downloadedLayer, manifestChan chan<- string, stopGettingLayers <-chan bool, rootPath string, maxConcurrentDownloads int) error {
+func (img *Image) GetLayers(manifest da.Manifest, layersChan chan<- downloadedLayer, manifestChan chan<- string, stopGettingLayers <-chan bool, rootPath string, maxConcurrentDownloads int, CVMFSRepo string, forceDownload bool) error {
 	defer close(layersChan)
 	defer close(manifestChan)
 
@@ -928,6 +928,15 @@ func (img *Image) GetLayers(manifest da.Manifest, layersChan chan<- downloadedLa
 				defer func() { <-sem }()
 			}
 			defer wg.Done()
+
+			layerDigest := strings.Split(layer.Digest, ":")[1]
+			layerPath := cvmfs.LayerRootfsPath(CVMFSRepo, layerDigest)
+			if !forceDownload {
+				if _, err := os.Stat(layerPath); err == nil {
+					l.Log().WithFields(log.Fields{"layer": layer.Digest}).Info("Skipping download of layer, already exists")
+					return
+				}
+			}
 
 			l.Log().WithFields(
 				log.Fields{"layer": layer.Digest}).

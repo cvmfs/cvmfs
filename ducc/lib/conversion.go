@@ -12,7 +12,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"sync"
 	"time"
 
 	constants "github.com/cvmfs/ducc/constants"
@@ -395,18 +394,11 @@ func convertInputOutput2(inputImage *Image, nameWithArch, repo string, convertAg
 	stopGettingLayers := make(chan bool, 1)
 	noErrorInConversion := make(chan bool, 1)
 
-	layerDigestChan := make(chan string, 10)
-
 	n := notification.NewNotification(NotificationService)
 	n = n.AddField("image", inputImage.GetSimpleName())
 
 	go func() {
 		noErrors := true
-		var wg sync.WaitGroup
-		defer func() {
-			wg.Wait()
-			close(layerDigestChan)
-		}()
 		defer func() {
 			noErrorInConversion <- noErrors
 			stopGettingLayers <- true
@@ -414,49 +406,26 @@ func convertInputOutput2(inputImage *Image, nameWithArch, repo string, convertAg
 		}()
 
 		for layer := range layersChanell {
+			layerDigest := strings.Split(layer.Name, ":")[1]
 
 			l.Log().WithFields(log.Fields{"layer": layer.Name}).Info("Start Ingesting the file into CVMFS")
-			layerDigest := strings.Split(layer.Name, ":")[1]
-			layerPath := cvmfs.LayerRootfsPath(repo, layerDigest)
 
-			var pathExists bool
-			if _, err := os.Stat(layerPath); os.IsNotExist(err) {
-				pathExists = false
-			} else {
-				pathExists = true
+			ln := n.AddField("layer", layerDigest).AddId()
+			ln.Action("start_layer_conversion").Send()
+
+			t1 := time.Now()
+			err = layer.IngestIntoCVMFS(repo)
+
+			ln.Elapsed(t1).Action("end_layer_conversion").Error(err).SizeBytes(layer.GetSize()).Send()
+
+			if err != nil {
+				l.LogE(err).Error("Error in ingesting the layer in cvmfs")
+				noErrors = false
 			}
-			// need to run this into a goroutine to avoid a deadlock
-			wg.Add(1)
-			go func(layerDigest string) {
-				layerDigestChan <- layerDigest
-				wg.Done()
-			}(layerDigest)
-
-			if pathExists == false || forceDownload {
-
-				ln := n.AddField("layer", layerDigest).AddId()
-				ln.Action("start_layer_conversion").Send()
-
-				t1 := time.Now()
-				err = layer.IngestIntoCVMFS(repo)
-
-				ln.Elapsed(t1).Action("end_layer_conversion").Error(err).SizeBytes(layer.GetSize()).Send()
-
-				if err != nil {
-					l.LogE(err).Error("Error in ingesting the layer in cvmfs")
-					noErrors = false
-				}
-				if err == nil {
-					n.Action("publish_layer").AddField("layer_digest", layerDigest).Send()
-				}
-				l.Log().WithFields(
-					log.Fields{"layer": layer.Name}).
-					Info("Finish Ingesting the file")
-			} else {
-				l.Log().WithFields(
-					log.Fields{"layer": layer.Name}).
-					Info("Skipping ingestion of layer, already exists")
+			if err == nil {
+				n.Action("publish_layer").AddField("layer_digest", layerDigest).Send()
 			}
+			l.Log().WithFields(log.Fields{"layer": layer.Name}).Info("Finish Ingesting the file")
 
 			layer.Close()
 		}
@@ -471,23 +440,21 @@ func convertInputOutput2(inputImage *Image, nameWithArch, repo string, convertAg
 	defer os.RemoveAll(tmpDir)
 
 	// this will start to feed the above goroutine by writing into layersChanell
-	err = inputImage.GetLayers(manifest, layersChanell, manifestChanell, stopGettingLayers, tmpDir, maxConcurrentDownloads)
+	err = inputImage.GetLayers(manifest, layersChanell, manifestChanell, stopGettingLayers, tmpDir, maxConcurrentDownloads, repo, forceDownload)
 	if err != nil {
 		l.LogE(err).Error("Error in getting layers")
 		return err
 	}
 
-	var wg sync.WaitGroup
-
+	// Collect all layer digests from the manifest for backlink saving,
+	// including layers that were skipped because they already existed.
 	var layerDigests []string
-	wg.Add(1)
-	go func() {
-		for layerDigest := range layerDigestChan {
-			layerDigests = append(layerDigests, layerDigest)
+	for _, layer := range manifest.Layers {
+		if layer.MediaType == "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip" {
+			continue
 		}
-		wg.Done()
-	}()
-	wg.Wait()
+		layerDigests = append(layerDigests, strings.Split(layer.Digest, ":")[1])
+	}
 
 	// we wait for the goroutines to finish
 	// and if there was no error we conclude everything writing the manifest into the repository
