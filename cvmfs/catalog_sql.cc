@@ -1369,8 +1369,9 @@ SqlAllChunks::SqlAllChunks(const CatalogDatabase &database) {
                + StringifyInt(shash::kSuffixMicroCatalog) + " END "
                + "AS chunk_type, " + flags2hash + "," + flags2compression
                + "FROM catalog WHERE (hash IS NOT NULL) AND "
-                 "(flags & "
-               + StringifyInt(SqlDirent::kFlagFileExternal) + " = 0)";
+                 " (flags & "
+               + StringifyInt(SqlDirent::kFlagFileExternal |
+                              SqlDirent::kFlagFileChunk) + " = 0)";
   if (database.schema_version() >= 2.4 - CatalogDatabase::kSchemaEpsilon) {
     sql += " UNION "
            "SELECT DISTINCT chunks.hash, "
