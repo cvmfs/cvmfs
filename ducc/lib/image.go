@@ -749,6 +749,20 @@ func firstRequestForAuth_internal(url, user, pass string) (token string, err err
 			return "", reqErr
 		}
 
+		// Advertise support for both Docker v2 and OCI manifest types.
+		// Without this, registries that store OCI manifests return 404
+		// (MANIFEST_UNKNOWN) instead of 200/401, breaking auth detection.
+		req.Header.Set("Accept", "application/vnd.docker.distribution.manifest.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.index.v1+json")
+
+		// for debugging: log curl command corresponding to request
+		if log.IsLevelEnabled(log.TraceLevel) {
+			curlcmd, curlErr := curling.NewFromRequest(req)
+			if curlErr != nil {
+				log.Fatal(curlErr)
+			}
+			log.Trace(curlcmd)
+		}
+
 		resp, respErr := client.Do(req)
 		if respErr != nil {
 			l.LogE(respErr).Error("Error in making the first request for auth")
