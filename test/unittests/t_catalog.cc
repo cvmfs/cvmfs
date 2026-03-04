@@ -481,7 +481,7 @@ TEST_F(T_Catalog, AttachSchema09) {
   cvmfs::PathSink out(temp_path);
 
   const UniquePtr<zip::Decompressor>
-                  decompressor(zip::Decompressor::Construct(zip::kDefault));
+                  decompressor(zip::Decompressor::Construct(zip::kZlib));
   const zip::StreamStates res = decompressor->
                                             DecompressStream(&catalog_in, &out);
   EXPECT_EQ(res, zip::kStreamEnd);
@@ -533,7 +533,7 @@ TEST_F(T_Catalog, AttachSchema10) {
   cvmfs::PathSink out(temp_path);
 
   const UniquePtr<zip::Decompressor>
-                  decompressor(zip::Decompressor::Construct(zip::kDefault));
+                  decompressor(zip::Decompressor::Construct(zip::kZlib));
   const zip::StreamStates res = decompressor->
                                             DecompressStream(&catalog_in, &out);
   EXPECT_EQ(res, zip::kStreamEnd);
