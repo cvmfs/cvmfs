@@ -104,6 +104,12 @@ create_cvmfs_source_tarball() {
                       ${source_directory}/ducc               \
                       $tar_name
   rm -r $tar_name/test/benchmarks
+
+  # Vendor Go dependencies so offline builds (e.g. koji) work without network access
+  for godir in ducc gateway snapshotter; do
+    (cd ${tmpd}/${tar_name}/${godir} && go mod vendor)
+  done
+
   tar czf $destination_path $tar_name || true
   local retval=$?
   cd ..
