@@ -29,6 +29,7 @@ target_link_libraries (s3benchmark
                        ${ZLIB_LIBRARIES}
                        ${OPENSSL_LIBRARIES}
                        ${VJSON_LIBRARIES}
+                       LibArchive::LibArchive
                        pthread
                        dl
 )
