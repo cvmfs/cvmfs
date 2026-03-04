@@ -13,26 +13,38 @@ namespace download {
 atomic_int64 JobInfo::next_uuid = 0;
 
 JobInfo::JobInfo(const std::string *u, const bool compressed, const bool ph,
-         const shash::Any *h, cvmfs::Sink *s) {
-  JobInfo(u, compressed ? zip::Algorithm::kDefault : zip::Algorithm::kNoCompression, ph, h, s);
-}
-
-JobInfo::JobInfo(const std::string *u, zip::Algorithm compression, const bool ph,
-         const shash::Any *h, cvmfs::Sink *s) {
-  Init(compression);
+         const shash::Any *h, cvmfs::Sink *s)
+{
+  Init(compressed ? zip::Algorithm::kDefault : zip::Algorithm::kNoCompression);
 
   url_ = u;
   probe_hosts_ = ph;
+  head_request_ = false;
   expected_hash_ = h;
   sink_ = s;
 }
 
-JobInfo::JobInfo(const std::string *u, const bool ph) {
+JobInfo::JobInfo(const std::string *u, zip::Algorithm compression, const bool ph,
+         const shash::Any *h, cvmfs::Sink *s)
+{
+  Init(compression);
+
+  url_ = u;
+  probe_hosts_ = ph;
+  head_request_ = false;
+  expected_hash_ = h;
+  sink_ = s;
+}
+
+JobInfo::JobInfo(const std::string *u, const bool ph)
+{
   Init(zip::kNoCompression);
 
   url_ = u;
   probe_hosts_ = ph;
   head_request_ = true;
+  expected_hash_ = NULL;
+  sink_ = NULL;
 }
 
 
