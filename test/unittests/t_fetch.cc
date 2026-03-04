@@ -41,7 +41,7 @@ class T_Fetcher : public ::testing::Test {
     unsigned char z = 'z';
 
     const UniquePtr<zip::Compressor>
-                        compress(zip::Compressor::Construct(zip::kZlibDefault));
+                        compress(zip::Compressor::Construct(zip::kDefault));
     const UniquePtr<zip::Compressor>
                         copy(zip::Compressor::Construct(zip::kNoCompression));
 

@@ -435,7 +435,7 @@ TEST_F(T_Download, LocalFile2Sink) {
   shash::Any checksum(shash::kMd5);
 
   const UniquePtr<zip::Compressor>
-                        compress(zip::Compressor::Construct(zip::kZlibDefault));
+                        compress(zip::Compressor::Construct(zip::kDefault));
   zip::InputMem in_mem(reinterpret_cast<unsigned char*>(rnd_buf), size);
   cvmfs::FileSink out_f(fdest, true);
 

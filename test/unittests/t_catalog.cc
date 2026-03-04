@@ -383,7 +383,7 @@ TEST_F(T_Catalog, Chunks) {
   unsigned counter = 0;
   while (catalog->AllChunksNext(&hash, &compression_alg)) {
     ++counter;
-    EXPECT_EQ(zip::kZlibDefault, compression_alg);
+    EXPECT_EQ(zip::kDefault, compression_alg);
   }
   EXPECT_TRUE(catalog->AllChunksEnd());
   EXPECT_EQ(4u, counter);  // number of files with content + empty hash
@@ -481,7 +481,7 @@ TEST_F(T_Catalog, AttachSchema09) {
   cvmfs::PathSink out(temp_path);
 
   const UniquePtr<zip::Decompressor>
-                  decompressor(zip::Decompressor::Construct(zip::kZlibDefault));
+                  decompressor(zip::Decompressor::Construct(zip::kDefault));
   const zip::StreamStates res = decompressor->
                                             DecompressStream(&catalog_in, &out);
   EXPECT_EQ(res, zip::kStreamEnd);
@@ -533,7 +533,7 @@ TEST_F(T_Catalog, AttachSchema10) {
   cvmfs::PathSink out(temp_path);
 
   const UniquePtr<zip::Decompressor>
-                  decompressor(zip::Decompressor::Construct(zip::kZlibDefault));
+                  decompressor(zip::Decompressor::Construct(zip::kDefault));
   const zip::StreamStates res = decompressor->
                                             DecompressStream(&catalog_in, &out);
   EXPECT_EQ(res, zip::kStreamEnd);

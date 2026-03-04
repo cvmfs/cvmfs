@@ -465,7 +465,7 @@ bool CatalogTestTool::DirSpecAtRootHash(const shash::Any& root_hash,
 CatalogTestTool::~CatalogTestTool() {}
 
 upload::Spooler* CatalogTestTool::CreateSpooler(const std::string& config) {
-   upload::SpoolerDefinition definition(config, shash::kSha1, zip::kZlibDefault,
+   upload::SpoolerDefinition definition(config, shash::kSha1, zip::kDefault,
                                         false, true, 4194304, 8388608, 16777216,
                                         "dummy_token", "dummy_key");
   return upload::Spooler::Construct(definition);
@@ -516,7 +516,7 @@ void CatalogTestTool::CreateHistory(
   history_hash->suffix = shash::kSuffixHistory;
 
   const UniquePtr<zip::Compressor>
-                        compress(zip::Compressor::Construct(zip::kZlibDefault));
+                        compress(zip::Compressor::Construct(zip::kDefault));
   zip::InputPath input(history_path);
   cvmfs::NullSink out_null;
   // TODO(heretherebedragons) for what do we need the hash here?
@@ -678,7 +678,7 @@ void CatalogTestTool::CreateKeys(
   hash_cert->suffix = shash::kSuffixCertificate;
 
   const UniquePtr<zip::Compressor>
-                        compress(zip::Compressor::Construct(zip::kZlibDefault));
+                        compress(zip::Compressor::Construct(zip::kDefault));
   zip::InputPath in_path(repo_path_ + "/testrepo.crt");
   cvmfs::NullSink out_null;
   // TODO(heretherebedragons) for what do we need the hash here?

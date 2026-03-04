@@ -25,7 +25,6 @@ enum Algorithms {
   kZlib = 0,
   kNoCompression,
   kZstd,
-  kZlibDefault = kZlib,
   kDefault = kZlib,
 };
 

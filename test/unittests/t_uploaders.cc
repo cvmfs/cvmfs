@@ -184,7 +184,7 @@ class T_Uploaders : public FileSandbox {
 
     SpoolerDefinition sd(definition,
                          shash::kSha1,
-                         zip::kZlibDefault,
+                         zip::kDefault,
                          generate_legacy_bulk_chunks,
                          use_file_chunking,
                          min_chunk_size,

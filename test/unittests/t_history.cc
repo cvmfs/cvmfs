@@ -228,7 +228,7 @@ class T_History : public ::testing::Test {
     std::string  decoded;
     ASSERT_TRUE(Debase64(base64, &decoded)) << "failed to decode base64";
     const UniquePtr<zip::Decompressor>
-                  decompressor(zip::Decompressor::Construct(zip::kZlibDefault));
+                  decompressor(zip::Decompressor::Construct(zip::kZlib));
     zip::InputMem decoded_ro(reinterpret_cast<unsigned char*>(
                                 const_cast<char*>(decoded.data())),
                               decoded.size());

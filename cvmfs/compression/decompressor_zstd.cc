@@ -22,12 +22,12 @@ ZstdDecompressor::~ZstdDecompressor() {
 }
 
 bool ZstdDecompressor::WillHandle(const zip::Algorithms &alg) {
-  return alg == kZstdDefault;
+  return alg == kZstd;
 }
 
 
 Decompressor* ZstdDecompressor::Clone() {
-  ZstdDecompressor* other = new ZstdDecompressor(zip::kZstdDefault);
+  ZstdDecompressor* other = new ZstdDecompressor(zip::kZstd);
 
   // WARNING WARNING WARNING
   // not implemented
