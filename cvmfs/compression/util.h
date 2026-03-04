@@ -11,7 +11,7 @@
 
 namespace zip {
 
-enum StreamStates {
+enum StreamState {
   kStreamDataError = 0,
   kStreamIOError,
   kStreamContinue,
@@ -19,14 +19,16 @@ enum StreamStates {
   kStreamError,
   kStreamOutBufFull,  // output buffer full: needs handling but no fatal error
 };
+typedef StreamState StreamStates;
 
 // Do not change order of algorithms. Used as flags in the catalog
-enum Algorithms {
+enum Algorithm {
   kZlib = 0,
   kNoCompression,
   kZstd,
   kDefault = kZlib,
 };
+typedef Algorithm Algorithms;
 
 /**
  * Aborts if string doesn't match any of the algorithms.
