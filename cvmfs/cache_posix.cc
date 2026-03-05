@@ -285,10 +285,11 @@ PosixCacheManager *PosixCacheManager::Create(
   const string &cache_path,
   const bool alien_cache,
   const RenameWorkarounds rename_workaround,
-  const bool do_refcount)
+  const bool do_refcount,
+  zip::Algorithm compression_alg)
 {
   UniquePtr<PosixCacheManager> cache_manager(
-    new PosixCacheManager(cache_path, alien_cache, do_refcount));
+    new PosixCacheManager(cache_path, alien_cache, do_refcount, compression_alg));
   assert(cache_manager.IsValid());
 
   cache_manager->rename_workaround_ = rename_workaround;

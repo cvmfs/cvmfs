@@ -222,7 +222,7 @@ class CacheManager : SingleCopy {
   }
 
  protected:
-  CacheManager();
+  CacheManager(zip::Algorithm compression_alg = zip::Algorithm::kDefault);
 
   // Unless overwritten, Saving/Restoring states will crash the Fuse module
   virtual void *DoSaveState() { return NULL; }
