@@ -27,8 +27,8 @@ class T_StreamingCacheManager : public ::testing::Test {
     const zip::StreamStates retval = compress->Compress(&in_mem, &out_mem);
     EXPECT_EQ(retval, zip::kStreamEnd);
 
-    const std::string zipped_data(reinterpret_cast<char *>(out_mem.data()),
-                            out_mem.pos() + 1);
+    const std::string zipped_data(reinterpret_cast<char*>(out_mem.data()),
+                                  out_mem.pos());
     HashString(zipped_data, hash);
     EXPECT_TRUE(SafeWriteToFile(zipped_data, "data/" + hash->MakePath(), 0600));
   }
