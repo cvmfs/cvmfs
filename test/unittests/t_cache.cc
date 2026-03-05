@@ -34,7 +34,9 @@ class T_CacheManager : public ::testing::Test {
     tmp_path_ = CreateTempDir("./cvmfs_ut_cache_manager");
     cache_mgr_ = PosixCacheManager::Create(tmp_path_, false);
     ASSERT_TRUE(cache_mgr_ != NULL);
-    alien_cache_mgr_ = PosixCacheManager::Create(tmp_path_, true);
+    alien_cache_mgr_ = PosixCacheManager::Create(
+        tmp_path_, /*alien_cache=*/true, /*rename_workaround=*/PosixCacheManager::kRenameNormal,
+        /*do_refcount=*/false, /*compression_alg=*/zip::Algorithm::kZlib);
     ASSERT_TRUE(alien_cache_mgr_ != NULL);
 
     ASSERT_TRUE(cache_mgr_->CommitFromMem(
