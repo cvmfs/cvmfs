@@ -260,7 +260,9 @@ class T_IngestionStress : public FileSandbox {
      const bool use_chunking = true)
   {
     IngestionPipeline pipeline(
-      uploader_, MockSpoolerDefinition(generate_legacy_bulk_hashes));
+        uploader_,
+        MockSpoolerDefinition(generate_legacy_bulk_hashes,
+                              /*compression_alg=*/zip::Algorithm::kZlib));
     pipeline.Spawn();
 
     for (unsigned i = 0; i < file_paths.size(); ++i) {
@@ -467,7 +469,11 @@ TEST_F(T_IngestionStress, ProcessMultipeFilesWithoutChunkingSlow) {
 }
 
 TEST_F(T_IngestionStress, ProcessMultipleFilesInSeparateWavesSlow) {
-  IngestionPipeline pipeline(uploader_, MockSpoolerDefinition());
+  /* Zlib is selected due to hardcoded expected hashes */
+  IngestionPipeline pipeline(
+      uploader_,
+      MockSpoolerDefinition(/*generate_legacy_bulk_chunks=*/true,
+                            /*compression_alg=*/zip::Algorithm::kZlib));
   pipeline.Spawn();
 
   // first wave...
@@ -531,7 +537,10 @@ atomic_int64 CallbackTest::counter = 0;
 }  // anonymous namespace
 
 TEST_F(T_IngestionStress, ProcessingCallbackForSmallFile) {
-  IngestionPipeline pipeline(uploader_, MockSpoolerDefinition());
+  IngestionPipeline pipeline(
+      uploader_,
+      MockSpoolerDefinition(/*generate_legacy_bulk_chunks=*/true,
+                            /*compression_alg=*/zip::Algorithm::kZlib));
   pipeline.Spawn();
   pipeline.RegisterListener(&CallbackTest::CallbackFn);
 
@@ -547,7 +556,10 @@ TEST_F(T_IngestionStress, ProcessingCallbackForSmallFile) {
 }
 
 TEST_F(T_IngestionStress, ProcessingCallbackForBigFile) {
-  IngestionPipeline pipeline(uploader_, MockSpoolerDefinition());
+  IngestionPipeline pipeline(
+      uploader_,
+      MockSpoolerDefinition(/*generate_legacy_bulk_chunks=*/true,
+                            /*compression_alg=*/zip::Algorithm::kZlib));
   pipeline.Spawn();
   pipeline.RegisterListener(&CallbackTest::CallbackFn);
 
@@ -589,7 +601,9 @@ TEST_F(T_IngestionStress, RealWorldSlow) {
 
   uploader_->keep_results = false;
   IngestionPipeline pipeline(
-    uploader_, MockSpoolerDefinition(false /* bulk chunks */));
+      uploader_,
+      MockSpoolerDefinition(false /* bulk chunks */,
+                            /*compression_alg=*/zip::Algorithm::kZlib));
 
   int N = 250000;
   pipeline.Spawn();
