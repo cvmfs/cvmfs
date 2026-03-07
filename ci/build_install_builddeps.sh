@@ -171,6 +171,13 @@ install_deps_deb() {
 
 install_deps_rhel() {
   [ -f "$RPM_SPEC" ] || die "RPM spec file not found at $RPM_SPEC"
+  if ! check_available rpmbuild; then
+    if [[ "$PKG_MGR" = "dnf" ]]; then
+      $SUDO dnf -y install rpm-build
+    else
+      $SUDO yum -y install rpm-build
+    fi
+  fi
   if [[ "$PKG_MGR" = "dnf" ]]; then
     $SUDO dnf -y install dnf-plugins-core || true
     if check_available dnf; then
