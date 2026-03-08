@@ -843,6 +843,11 @@ func (d *downloadedLayer) Close() error {
 }
 
 func (d *downloadedLayer) IngestIntoCVMFS(CVMFSRepo string) error {
+	return d.IngestIntoCVMFSWithLogger(nil, CVMFSRepo)
+}
+
+func (d *downloadedLayer) IngestIntoCVMFSWithLogger(logger *log.Entry, CVMFSRepo string) error {
+	logger = l.Ensure(logger)
 	layerDigest := strings.Split(d.Name, ":")[1]
 	layerPath := cvmfs.LayerRootfsPath(CVMFSRepo, layerDigest)
 	if _, err := os.Stat(layerPath); err == nil {
@@ -850,29 +855,26 @@ func (d *downloadedLayer) IngestIntoCVMFS(CVMFSRepo string) error {
 		return nil
 	}
 	superDir := filepath.Dir(filepath.Dir(cvmfs.TrimCVMFSRepoPrefix(layerPath)))
-	if err := cvmfs.CreateCatalogIntoDir(CVMFSRepo, superDir); err != nil {
-		l.LogE(err).WithFields(
-			log.Fields{"layer": d.Name, "dir": superDir}).
+	if err := cvmfs.CreateCatalogIntoDirWithLogger(logger, CVMFSRepo, superDir); err != nil {
+		logger.WithFields(log.Fields{"layer": d.Name, "dir": superDir, "error": err}).
 			Error("Error creating catalog for layer directory")
 		return err
 	}
 	ingestPath := cvmfs.TrimCVMFSRepoPrefix(layerPath)
 
-	err := cvmfs.Ingest(CVMFSRepo, d.Path,
+	err := cvmfs.IngestWithLogger(logger, CVMFSRepo, d.Path,
 		"--catalog", "-t", "-",
 		"-b", ingestPath)
 	if err != nil {
-		l.LogE(err).WithFields(
-			log.Fields{"layer": d.Name}).
+		logger.WithFields(log.Fields{"layer": d.Name, "error": err}).
 			Error("Some error in ingest the layer")
-		if errDelete := cvmfs.IngestDelete(CVMFSRepo, ingestPath); errDelete != nil {
-			l.LogE(errDelete).WithFields(
-				log.Fields{"layer": d.Name, "path": ingestPath}).
+		if errDelete := cvmfs.IngestDeleteWithLogger(logger, CVMFSRepo, ingestPath); errDelete != nil {
+			logger.WithFields(log.Fields{"layer": d.Name, "path": ingestPath, "error": errDelete}).
 				Warning("Error cleaning up failed ingest path")
 		}
 		return err
 	}
-	err = StoreLayerInfo(CVMFSRepo, layerDigest, d.Path)
+	err = StoreLayerInfoWithLogger(logger, CVMFSRepo, layerDigest, d.Path)
 	if err != nil {
 		return err
 	}
@@ -888,10 +890,15 @@ func (d *downloadedLayer) GetSize() int64 {
 }
 
 func (img *Image) GetLayers(manifest da.Manifest, layersChan chan<- downloadedLayer, manifestChan chan<- string, stopGettingLayers <-chan bool, rootPath string, maxConcurrentDownloads int, CVMFSRepo string, forceDownload bool) error {
+	return img.GetLayersWithLogger(nil, manifest, layersChan, manifestChan, stopGettingLayers, rootPath, maxConcurrentDownloads, CVMFSRepo, forceDownload)
+}
+
+func (img *Image) GetLayersWithLogger(logger *log.Entry, manifest da.Manifest, layersChan chan<- downloadedLayer, manifestChan chan<- string, stopGettingLayers <-chan bool, rootPath string, maxConcurrentDownloads int, CVMFSRepo string, forceDownload bool) error {
+	logger = l.Ensure(logger)
 	defer close(layersChan)
 	defer close(manifestChan)
 
-	layerDownloader := NewLayerDownloader(img)
+	layerDownloader := NewLayerDownloaderWithLogger(logger, img)
 	_, err := layerDownloader.getToken()
 	if err != nil {
 		return err
@@ -910,7 +917,7 @@ func (img *Image) GetLayers(manifest da.Manifest, layersChan chan<- downloadedLa
 		case <-stopGettingLayers:
 			err := fmt.Errorf("detect errors, stop getting layer")
 			errorChannel <- err
-			l.LogE(err).Error("Detect error, stop getting layers")
+			logger.WithField("error", err).Error("Detect error, stop getting layers")
 			cancel()
 			return
 		}
@@ -945,21 +952,20 @@ func (img *Image) GetLayers(manifest da.Manifest, layersChan chan<- downloadedLa
 
 			layerDigest := strings.Split(layer.Digest, ":")[1]
 			layerPath := cvmfs.LayerRootfsPath(CVMFSRepo, layerDigest)
+			layerLogger := logger.WithField("layer", layer.Digest)
 			if !forceDownload {
 				if _, err := os.Stat(layerPath); err == nil {
-					l.Log().WithFields(log.Fields{"layer": layer.Digest}).Info("Skipping download of layer, already exists")
+					layerLogger.Trace("Skipping download of layer, already exists")
 					return
 				}
 			}
 
-			l.Log().WithFields(
-				log.Fields{"layer": layer.Digest}).
-				Info("Start working on layer")
+			layerLogger.Trace("Start working on layer")
 
 			toSend, err := layerDownloader.DownloadLayer(layer)
 
 			if err != nil {
-				l.LogE(err).Error("Error in downloading a layer")
+				layerLogger.WithField("error", err).Error("Error in downloading a layer")
 				toSend.Close()
 				return
 			}
@@ -975,13 +981,13 @@ func (img *Image) GetLayers(manifest da.Manifest, layersChan chan<- downloadedLa
 	// finally we marshal the manifest and store it into a file
 	manifestBytes, err := json.Marshal(manifest)
 	if err != nil {
-		l.LogE(err).Error("Error in marshaling the manifest")
+		logger.WithField("error", err).Error("Error in marshaling the manifest")
 		return err
 	}
 	manifestPath := filepath.Join(rootPath, "manifest.json")
 	err = ioutil.WriteFile(manifestPath, manifestBytes, 0666)
 	if err != nil {
-		l.LogE(err).Error("Error in writing the manifest to file")
+		logger.WithField("error", err).Error("Error in writing the manifest to file")
 		return err
 	}
 	// ship the manifest file
@@ -998,6 +1004,11 @@ func (img *Image) GetLayers(manifest da.Manifest, layersChan chan<- downloadedLa
 }
 
 func (img *Image) downloadLayer(layer da.Layer, token string) (toSend downloadedLayer, err error) {
+	return img.downloadLayerWithLogger(nil, layer, token)
+}
+
+func (img *Image) downloadLayerWithLogger(logger *log.Entry, layer da.Layer, token string) (toSend downloadedLayer, err error) {
+	logger = l.Ensure(logger)
 	layerUrl := getLayerUrl(img, layer.Digest)
 	if token == "" {
 		token, err = firstRequestForAuth(layerUrl)
@@ -1010,15 +1021,13 @@ func (img *Image) downloadLayer(layer da.Layer, token string) (toSend downloaded
 		client := &http.Client{}
 		req, errR := http.NewRequest("GET", layerUrl, nil)
 		if errR != nil {
-			l.LogE(errR).Error("Impossible to create the HTTP request.")
+			logger.WithField("error", errR).Error("Impossible to create the HTTP request")
 			err = errR
 			break
 		}
 		req.Header.Set("Authorization", token)
 		resp, errReq := client.Do(req)
-		l.Log().WithFields(
-			log.Fields{"layer": layer.Digest, "size in MB": (layer.Size / 1e6)}).
-			Info("Make request for layer")
+		logger.WithField("size in MB", (layer.Size / 1e6)).Trace("Make request for layer")
 		if errReq != nil {
 			err = errReq
 			break
@@ -1034,7 +1043,7 @@ func (img *Image) downloadLayer(layer da.Layer, token string) (toSend downloaded
 			gread, errG := gzip.NewReader(resp.Body)
 			if errG != nil {
 				err = errG
-				l.LogE(err).Warning("Error in creating the zip to unzip the layer")
+				logger.WithField("error", err).Warning("Error in creating the zip to unzip the layer")
 				resp.Body.Close()
 				continue
 			}
@@ -1043,20 +1052,20 @@ func (img *Image) downloadLayer(layer da.Layer, token string) (toSend downloaded
 			return toSend, nil
 		} else {
 			err = fmt.Errorf("layer not received, status code: %d", resp.StatusCode)
-			l.LogE(err).Warning("Received status code ", resp.StatusCode)
+			logger.WithField("error", err).Warnf("Received status code %d", resp.StatusCode)
 			resp.Body.Close()
 			if resp.StatusCode == 401 {
 				// try to get the token again
 				newToken, errToken := firstRequestForAuth(layerUrl)
 				if errToken != nil {
-					l.LogE(errToken).Warning("Error in refreshing the token")
+					logger.WithField("error", errToken).Warning("Error in refreshing the token")
 				} else {
 					token = newToken
 				}
 			}
 		}
 	}
-	l.LogE(err).Warning("return from error path")
+	logger.WithField("error", err).Warning("Return from error path")
 	return
 }
 
@@ -1150,13 +1159,22 @@ func requestAuthToken(token, user, pass string) (authToken string, expiresIn int
 
 type LayerDownloader struct {
 	image    *Image
+	logger   *log.Entry
 	token    string
 	attempts map[string]int
 	lock     sync.Mutex
 }
 
 func NewLayerDownloader(image *Image) LayerDownloader {
-	return LayerDownloader{image: image, token: "", attempts: make(map[string]int)}
+	return NewLayerDownloaderWithLogger(nil, image)
+}
+
+func NewLayerDownloaderWithLogger(logger *log.Entry, image *Image) LayerDownloader {
+	return LayerDownloader{image: image, logger: l.Ensure(logger), token: "", attempts: make(map[string]int)}
+}
+
+func (ld *LayerDownloader) loggerForLayer(layer da.Layer) *log.Entry {
+	return l.Ensure(ld.logger).WithField("layer", layer.Digest)
 }
 
 func (ld *LayerDownloader) getToken() (token string, err error) {
@@ -1188,6 +1206,7 @@ func (ld *LayerDownloader) getToken() (token string, err error) {
 }
 
 func (ld *LayerDownloader) DownloadLayer(layer da.Layer) (downloadedLayer, error) {
+	logger := ld.loggerForLayer(layer)
 	token, err := ld.getToken()
 	if err != nil {
 		return downloadedLayer{}, err
@@ -1200,9 +1219,9 @@ func (ld *LayerDownloader) DownloadLayer(layer da.Layer) (downloadedLayer, error
 	// if the layer is bigger than 50M we download it using the disk storage
 	if att == 0 && layer.Size < 50e6 {
 		// in this case it is smaller and we do an early exit
-		return ld.image.downloadLayer(layer, token)
+		return ld.image.downloadLayerWithLogger(logger, layer, token)
 	}
-	inMem, err := ld.image.downloadLayer(layer, token)
+	inMem, err := ld.image.downloadLayerWithLogger(logger, layer, token)
 	if err != nil {
 		return inMem, err
 	}
@@ -1214,6 +1233,11 @@ func (ld *LayerDownloader) DownloadLayer(layer da.Layer) (downloadedLayer, error
 }
 
 func (ld *LayerDownloader) DownloadAndIngest(CVMFSRepo string, layer da.Layer) error {
+	return ld.DownloadAndIngestWithLogger(nil, CVMFSRepo, layer)
+}
+
+func (ld *LayerDownloader) DownloadAndIngestWithLogger(logger *log.Entry, CVMFSRepo string, layer da.Layer) error {
+	ld.logger = l.Ensure(logger)
 	err := error(nil)
 	for i := 0; i <= 5; i += 1 {
 		to_ingest, err := ld.DownloadLayer(layer)
@@ -1222,7 +1246,7 @@ func (ld *LayerDownloader) DownloadAndIngest(CVMFSRepo string, layer da.Layer) e
 			continue
 		}
 		defer to_ingest.Close()
-		err = to_ingest.IngestIntoCVMFS(CVMFSRepo)
+		err = to_ingest.IngestIntoCVMFSWithLogger(ld.loggerForLayer(layer), CVMFSRepo)
 		if err == nil {
 			return nil
 		}
@@ -1234,6 +1258,11 @@ func (ld *LayerDownloader) DownloadAndIngest(CVMFSRepo string, layer da.Layer) e
 // flat filesystem. It returns the singularity path (relative to /cvmfs/$REPO)
 // where the merged image is placed.
 func (img *Image) CreateFlatOverlay(CVMFSRepo string) (singularityPath string, err error) {
+	return img.CreateFlatOverlayWithLogger(nil, CVMFSRepo)
+}
+
+func (img *Image) CreateFlatOverlayWithLogger(logger *log.Entry, CVMFSRepo string) (singularityPath string, err error) {
+	logger = l.Ensure(logger)
 	manifest, err := img.GetManifest()
 	if err != nil {
 		return
@@ -1262,7 +1291,7 @@ func (img *Image) CreateFlatOverlay(CVMFSRepo string) (singularityPath string, e
 	t := time.Now()
 	n.AddField("action", "start_overlay_merge").Send()
 
-	err = cvmfs.Overlay(CVMFSRepo, layerPaths, singularityPath)
+	err = cvmfs.OverlayWithLogger(logger, CVMFSRepo, layerPaths, singularityPath)
 
 	n.Elapsed(t).
 		AddField("action", "end_overlay_merge").
@@ -1270,7 +1299,7 @@ func (img *Image) CreateFlatOverlay(CVMFSRepo string) (singularityPath string, e
 		Send()
 
 	if err != nil {
-		l.LogE(err).Error("Error in creating flat overlay for image")
+		logger.WithField("error", err).Error("Error in creating flat overlay for image")
 		return
 	}
 	return

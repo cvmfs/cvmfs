@@ -96,9 +96,11 @@ var convertSingleImageCmd = &cobra.Command{
 			"total attempts": attempts}
 
 		var conversionErrors []string
+		totalSummary := lib.ConversionSummary{}
 
 		for i := 0; i < attempts; i++ {
-			err = lib.ConvertWish(wish, convertAgain, overwriteLayer, multiArch, maxConcurrentDownloads)
+			attemptSummary, err := lib.ConvertWish(wish, convertAgain, overwriteLayer, multiArch, maxConcurrentDownloads)
+			totalSummary.Merge(attemptSummary)
 			log := l.LogE(err).WithFields(fields).
 				WithFields(log.Fields{"attempts number": i})
 			if err != nil {
@@ -112,6 +114,7 @@ var convertSingleImageCmd = &cobra.Command{
 			log.Error("Multiple Errors in converting layers, going on")
 			conversionErrors = append(conversionErrors, fmt.Sprintf("layers: %s", err))
 		}
+		logConversionSummary(fmt.Sprintf("Conversion summary for %s:", wish.InputName), totalSummary)
 
 		if !skipFlat {
 			for i := 0; i < attempts; i++ {

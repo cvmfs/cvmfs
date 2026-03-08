@@ -1,7 +1,10 @@
 package cmd
 
 import (
+	"strings"
 	"testing"
+
+	"github.com/cvmfs/ducc/lib"
 )
 
 func TestIsInIgnoreList(t *testing.T) {
@@ -62,5 +65,26 @@ func TestIsInIgnoreList(t *testing.T) {
 				t.Errorf("isInIgnoreList(%q, %v) = %v, expected %v", tt.imageName, tt.ignoreList, result, tt.expected)
 			}
 		})
+	}
+}
+
+func TestFormatConversionSummary(t *testing.T) {
+	summary := lib.ConversionSummary{
+		Added:   []string{"z-image", "a-image"},
+		Updated: []string{"updated-image"},
+	}
+
+	formatted := formatConversionSummary("Conversion summary:", summary)
+
+	expectedLines := []string{
+		"Conversion summary:",
+		"Added (2): a-image, z-image",
+		"Updated (1): updated-image",
+		"Skipped (0): none",
+	}
+	for _, line := range expectedLines {
+		if !strings.Contains(formatted, line) {
+			t.Fatalf("expected formatted summary to contain %q, got %q", line, formatted)
+		}
 	}
 }

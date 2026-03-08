@@ -76,6 +76,7 @@ var loopCmd = &cobra.Command{
 				os.Exit(RepoNotExistsError)
 			}
 			var conversionErrors []string
+			iterationSummary := lib.ConversionSummary{}
 			for wish := range recipe.Wishes {
 				fields := log.Fields{"input image": wish.InputName,
 					"repository":   wish.CvmfsRepo,
@@ -85,7 +86,8 @@ var loopCmd = &cobra.Command{
 				// Check if this wish is in the ignore errors list
 				isIgnored := isInIgnoreList(wish.InputName, recipe.IgnoreErrorsList)
 
-				err = lib.ConvertWish(wish, convertAgain, overwriteLayer, false, maxConcurrentDownloads)
+				summary, err := lib.ConvertWish(wish, convertAgain, overwriteLayer, false, maxConcurrentDownloads)
+				iterationSummary.Merge(summary)
 				if err != nil {
 					if isIgnored {
 						l.LogE(err).WithFields(fields).Warning("Error in converting wish (layers), but image is in ignoreErrors list")
@@ -129,6 +131,7 @@ var loopCmd = &cobra.Command{
 				}
 				checkQuitSignal()
 			}
+			logConversionSummary("Conversion summary for this iteration:", iterationSummary)
 			if len(conversionErrors) > 0 {
 				summary := fmt.Sprintf("%d conversion error(s) in this iteration:\n  %s", len(conversionErrors), strings.Join(conversionErrors, "\n  "))
 				l.Log().Error(summary)
