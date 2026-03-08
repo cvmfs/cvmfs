@@ -9,7 +9,6 @@ cd $HERE/../..
 
 CLIENT_TEST_LOGFILE=/tmp/cvmfs-client-test.log
 SERVER_TEST_LOGFILE=/tmp/cvmfs-server-test.log
-MIGRATION_TEST_LOGFILE=/tmp/cvmfs-migration-test.log
 
 echo "running CernVM-FS client test cases..."
 ./run.sh $CLIENT_TEST_LOGFILE -s "quick"                                      \
@@ -77,9 +76,5 @@ CVMFS_TEST_UNIONFS=overlayfs                                                  \
                                  src/7*                                       \
                               || exit 1
 
-echo "running CernVM-FS migration tests..."
-export CVMFS_CLIENT_PACKAGE="$(ls /tmp/cvmfs-[1-9*]*.rpm)"
-CVMFS_TEST_CLASS_NAME=MigrationTests ./run.sh $MIGRATION_TEST_LOGFILE         \
-                              migration_tests/001*                            \
-                              migration_tests/500*
-
+# Hotpatch/migration coverage runs via test_migration.sh in the standalone
+# GitHub Actions workflow.
