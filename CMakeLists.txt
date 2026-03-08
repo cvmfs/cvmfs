@@ -189,6 +189,16 @@ endif ()
 #
 # include file with user-defined options
 #
+
+# workaround for an issue with the libfuse3 target
+if (MACOS)
+  set(BUILD_MANPAGES_DEFAULT OFF)
+  set(BUILTIN_EXTERNALS_EXCLUDE_DEFAULT "sqlite3;zlib")
+else()
+  set(BUILD_MANPAGES_DEFAULT ON)
+  set(BUILTIN_EXTERNALS_EXCLUDE_DEFAULT "")
+endif()
+
 include (cvmfs_options)
 
 #
@@ -596,7 +606,9 @@ install (
 )
 
 # Man pages
-add_subdirectory(doc/manpages)
+if (BUILD_MANPAGES)
+  add_subdirectory(doc/manpages)
+endif()
 
 # Doxygen
 if (BUILD_DOCUMENTATION)

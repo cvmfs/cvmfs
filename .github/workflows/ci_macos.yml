@@ -39,7 +39,6 @@ jobs:
           mkdir -p build
           export USE_MACFUSE_KEXT=OFF
           export CVMFS_TEST_USE_MACFUSE_KEXT=OFF
-          export CVMFS_EXTERNALS_EXCLUDE="sqlite3;zlib"
           export CPATH=$CPATH:/usr/local/include
           ./ci/build_package.sh ${GITHUB_WORKSPACE} ${GITHUB_WORKSPACE}/build cvmfs
 
