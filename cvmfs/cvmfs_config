@@ -1,7 +1,7 @@
 #!/bin/bash
 # Common configuration tasks for CernVM-FS
 
-SCRIPT_LOCATION=$(cd "$(dirname "$0")"; pwd)
+SCRIPT_LOCATION=$(dirname "$(command -v "$0")")
 INSTALL_BASE=$(echo "$SCRIPT_LOCATION" | sed -e 's/^\(.*\)\/bin$/\1/')
 SBIN_BASE="$( [ x"$INSTALL_BASE" = x"/usr" ] && echo "/sbin" || echo "${INSTALL_BASE}/sbin" )"
 
