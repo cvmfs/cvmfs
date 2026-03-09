@@ -104,6 +104,7 @@ struct JobInfo : SingleCopy {
     kReqPutHtml,       // HTML file - display instead of downloading
     kReqPutBucket,     // bucket creation
     kReqDelete,
+    kReqDeleteMulti,   // S3 multi-object delete (POST /?delete)
   };
 
   const std::string object_key;
@@ -133,6 +134,10 @@ struct JobInfo : SingleCopy {
         smalloc(sizeof(char) * CURL_ERROR_SIZE));
   }
   ~JobInfo() { free(errorbuffer); }
+
+  // For kReqDeleteMulti: keys included in the batch, and response body
+  std::vector<std::string> multi_delete_keys;
+  std::string response_body;
 
   // Internal state, don't touch
   CURL *curl_handle;
@@ -341,6 +346,12 @@ class S3FanoutManager : SingleCopy {
 
   std::string dot_cvmfs_cache_control_header;           // Cache-Control: max-age=...
 };  // S3FanoutManager
+
+std::string ComposeDeleteMultiXml(const std::vector<std::string> &keys);
+unsigned ParseDeleteMultiResponse(const std::string &response,
+                                  std::vector<std::string> *error_keys,
+                                  std::vector<std::string> *error_codes,
+                                  std::vector<std::string> *error_messages);
 
 }  // namespace s3fanout
 

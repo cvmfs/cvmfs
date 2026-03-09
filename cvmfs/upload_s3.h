@@ -67,6 +67,7 @@ class S3Uploader : public AbstractUploader {
                                       const shash::Any &content_hash);
 
   virtual void DoRemoveAsync(const std::string &file_to_delete);
+  virtual void WaitForUpload() const;
   virtual bool Peek(const std::string &path);
   virtual bool Mkdir(const std::string &path);
   virtual bool PlaceBootstrappingShortcut(const shash::Any &object);
@@ -111,9 +112,12 @@ class S3Uploader : public AbstractUploader {
   bool ParseSpoolerDefinition(const SpoolerDefinition &spooler_definition);
   void UploadJobInfo(s3fanout::JobInfo *info);
 
-  s3fanout::JobInfo *CreateJobInfo(const std::string &path) const;
+  static const unsigned kMaxBatchDeleteSize = 1000;
 
-  UniquePtr<s3fanout::S3FanoutManager> s3fanout_mgr_;
+  s3fanout::JobInfo *CreateJobInfo(const std::string &path) const;
+  void FlushDeleteBatch() const;
+
+  mutable UniquePtr<s3fanout::S3FanoutManager> s3fanout_mgr_;
   std::string repository_alias_;
   std::string host_name_port_;
   std::string host_name_;
@@ -129,6 +133,7 @@ class S3Uploader : public AbstractUploader {
   s3fanout::AuthzMethods authz_method_;
   bool peek_before_put_;
   bool use_https_;
+  bool batch_delete_enabled_;
   std::string proxy_;
 
   const std::string temporary_path_;
@@ -136,6 +141,9 @@ class S3Uploader : public AbstractUploader {
   pthread_t thread_collect_results_;
 
   std::string x_amz_acl_;
+
+  mutable pthread_mutex_t delete_batch_mutex_;
+  mutable std::vector<std::string> pending_deletes_;
 };  // S3Uploader
 
 }  // namespace upload
