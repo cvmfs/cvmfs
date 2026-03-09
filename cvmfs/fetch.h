@@ -108,10 +108,10 @@ class Fetcher : SingleCopy {
           download::DownloadManager *download_mgr,
           BackoffThrottle *backoff_throttle,
           perf::StatisticsTemplate statistics);
-  ~Fetcher();
+  virtual ~Fetcher();
 
-  int Fetch(const CacheManager::LabeledObject &object,
-            const std::string &alt_url = "");
+  virtual int Fetch(const CacheManager::LabeledObject &object,
+                    const std::string &alt_url = "");
 
   void ReplaceCacheManager(CacheManager *new_cache_mgr) {
     cache_mgr_ = new_cache_mgr;
@@ -192,3 +192,4 @@ class Fetcher : SingleCopy {
 }  // namespace cvmfs
 
 #endif  // CVMFS_FETCH_H_
+

@@ -108,7 +108,8 @@ enum LogSource {
   kLogReflog,
   kLogKvStore,
   kLogTelemetry,
-  kLogCurl
+  kLogCurl,
+  kLogBundleMgr
 };
 
 const int kLogWarning = kLogStdout | kLogShowSource | kLogNormal;
@@ -161,3 +162,4 @@ CVMFS_EXPORT void PrintError(const std::string &message);
 #endif
 
 #endif  // CVMFS_UTIL_LOGGING_INTERNAL_H_
+

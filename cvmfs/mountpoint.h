@@ -491,6 +491,8 @@ class StatfsCache : SingleCopy {
  * destruction explicit and also to keep the include list for this header small.
  */
 class MountPoint : SingleCopy, public BootFactory {
+  friend class T_BundleMgr;
+
  public:
   /**
    * If catalog reload fails, try again in 3 minutes

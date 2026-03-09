@@ -233,6 +233,7 @@ if (BUILD_CVMFS)
   set (CVMFS_FUSE_SOURCES
        ${CVMFS_COMMON_CLIENT_SOURCES}
        auto_umount.cc
+       bundle_mgr.cc
        compat.cc
        cvmfs.cc
        fuse_evict.cc
