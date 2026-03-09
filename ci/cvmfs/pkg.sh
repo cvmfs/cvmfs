@@ -37,9 +37,9 @@ pkg_build_dir=${CVMFS_RESULT_LOCATION}/pkg_result
 [ ! -d $pkg_install_dir ]           || die "build directory was used before ($pkg_install_dir exists)"
 [ ! -d $pkg_build_dir ]             || die "build directory was used before ($pkg_build_dir exists)"
 [ ! -d $pkg_resource_dir ]          || die "build directory was used before ($pkg_resource_dir exists)"
-which pkgbuild     > /dev/null 2>&1 || die "didn't find 'pkgbuild' utility"
-which productbuild > /dev/null 2>&1 || die "didn't find 'productbuild' utility"
-which tiffutil     > /dev/null 2>&1 || die "didn't find 'tiffutil' utility"
+command -v pkgbuild     > /dev/null 2>&1 || die "didn't find 'pkgbuild' utility"
+command -v productbuild > /dev/null 2>&1 || die "didn't find 'productbuild' utility"
+command -v tiffutil     > /dev/null 2>&1 || die "didn't find 'tiffutil' utility"
 
 # setup environment
 mkdir -p $pkg_install_dir

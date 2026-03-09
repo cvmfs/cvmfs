@@ -31,7 +31,7 @@ guess_package_url() {
     [ "x$architecture" = x"x86_64" ] && architecture="amd64"
     [ "x$architecture" = x"i686" ] && architecture="i386"
     local flavor="$(lsb_release -si | tr [:upper:] [:lower:])$(lsb_release -sr)"
-    package_file_name="${package_name}_${short_cvmfs_version_string}~${release}+${flavor}_${architecture}.deb"
+    package_file_name="${package_name}_${short_cvmfs_version_string}+${flavor}_${architecture}.deb"
 
   # CentOS 7, 8
   elif [ x${short_id} = x"CentOS" ] || \
@@ -257,6 +257,30 @@ uninstall_package() {
     sudo apt-get --assume-yes purge $pkg_names
   else
     return 1
+  fi
+}
+
+
+# Find a single package file by name prefix in CVMFS_PACKAGE_DIR.
+# Prefers .rpm on rpm-based systems, .deb otherwise.
+find_new_package() {
+  local name="$1"
+  local dir="${CVMFS_PACKAGE_DIR:-/tmp}"
+  if has_binary rpm; then
+    ls ${dir}/${name}*.rpm 2>/dev/null | head -1
+  else
+    ls ${dir}/${name}*.deb 2>/dev/null | head -1
+  fi
+}
+
+
+# Install all CernVM-FS packages found in CVMFS_PACKAGE_DIR.
+install_new_packages() {
+  local dir="${CVMFS_PACKAGE_DIR:-/tmp}"
+  if has_binary rpm; then
+    install_packages ${dir}/cvmfs*.rpm
+  else
+    install_packages ${dir}/cvmfs*.deb
   fi
 }
 

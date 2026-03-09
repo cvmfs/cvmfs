@@ -98,11 +98,11 @@ cvmfs_run_test() {
   fi
 
   # download upstream package
-  current_version=$(package_version $CVMFS_CLIENT_PACKAGE)
+  current_version=$(package_version $(find_new_package cvmfs))
   echo "Version of testee:        $current_version"
   # FIX ME: We want to test upgrading from more than just one base version
   # previous_version=$(decrement_version $current_version)
-  previous_version="2.10.0"
+  previous_version="2.13.3"
   echo "Version to be downloaded: $previous_version"
   upstream_packages=""
   for name in cvmfs cvmfs-libs cvmfs-fuse3; do
@@ -163,7 +163,7 @@ cvmfs_run_test() {
   echo "updating CernVM-FS package to version $current_version"
   kill -0 $tar_pid || return 11 # tar finished already >.<
   kill -0 $chksum_pid || return 11 # checksumming finished already >.<
-  install_packages "$CVMFS_LIBS_PACKAGE" "$CVMFS_FUSE_PACKAGE" "$CVMFS_CLIENT_PACKAGE"
+  install_new_packages
   if ! kill -0 $tar_pid; then
     echo "WARNING: tar finished before upgrading"
     CVMFS_GENERAL_WARNING_FLAG=1

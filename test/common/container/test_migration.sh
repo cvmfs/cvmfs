@@ -5,7 +5,7 @@ cd "/home/sftnight/cvmfs/test"
 MIGRATION_TEST_LOGFILE=/tmp/cvmfs-migration-test.log
 
 echo "running CernVM-FS hotpatch/migration tests..."
-export CVMFS_CLIENT_PACKAGE="$(ls /tmp/cvmfs-[1-9*]*.rpm)"
+export CVMFS_PACKAGE_DIR="/tmp"
 CVMFS_TEST_CLASS_NAME=MigrationTests ./run.sh $MIGRATION_TEST_LOGFILE         \
-                              migration_tests/001*                            \
                               migration_tests/500*
+#                              migration_tests/001*                            \

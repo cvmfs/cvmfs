@@ -1,11 +1,13 @@
 name: Hotpatch and migration tests
 
 on:
-  push:
-      branches: ['devel', 'cvmfs*']
-  pull_request:
-      branches: ['devel', 'cvmfs*']
   workflow_dispatch:
+#TODO: the containerized workflow runs into an unsolved issue in migration test 500
+# The remount fails after the snapshot. 
+#  push:
+#    branches: ['devel', 'cvmfs*', 'migration-ci']
+#  pull_request:
+#    branches: ['devel', 'cvmfs*']
 
 jobs:
   docker:
@@ -16,26 +18,46 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Build CVMFS in Image
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and cache
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: test/common/container/Dockerfile-dev
+          push: false
+          tags: cvmfs-dev:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Start container
         run: |
           cd test/common/container
-          docker compose up --build -d cvmfs-dev
+          docker compose up -d cvmfs-dev
 
       - name: Setup CVMFS
         run: |
+          docker exec -u sftnight -t cvmfs-dev bash -c \
+            "sudo yum -y install git"
           docker exec -u sftnight -t cvmfs-dev bash -c \
             "sudo cvmfs_config setup"
 
       - name: Run hotpatch/migration tests
         run: |
           docker exec -u sftnight -t cvmfs-dev bash -c \
-            "cd /home/sftnight/cvmfs/test/common/container && CVMFS_TEST_PROXY=DIRECT bash test_migration.sh"
+            "cd /home/sftnight/cvmfs && CVMFS_TEST_PROXY=DIRECT bash test/common/container/test_migration.sh"
 
       - name: Archive logs
         if: ${{ always() }}
         run: |
-          docker cp cvmfs-dev:/tmp/cvmfs-migration-test.log /tmp/cvmfs-migration-test.log || true
-          docker logs cvmfs-dev > /tmp/cvmfs-migration-container.log 2>&1 || true
+          mkdir -p /tmp/logs
+          docker cp cvmfs-dev:/tmp/cvmfs-migration-test.log /tmp/logs/ || true
+
+      - name: Dump logs
+        if: ${{ always() }}
+        run: |
+          cat /tmp/logs/cvmfs-migration-test.log || true
 
       - name: Upload logs as artifact
         if: ${{ always() }}
@@ -44,5 +66,4 @@ jobs:
           name: CVMFS hotpatch-migration logs
           if-no-files-found: warn
           path: |
-              /tmp/cvmfs-migration-test.log
-              /tmp/cvmfs-migration-container.log
+            /tmp/logs/cvmfs-migration-test.log

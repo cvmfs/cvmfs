@@ -1,5 +1,5 @@
 # Stage 1: Builder
-FROM gitlab-registry.cern.ch/cernvm/build-images/centos_x86_64:9 AS builder
+FROM almalinux:9 AS builder
 
 USER root
 # This is a workaround for a sudo error that started after an 
@@ -7,20 +7,29 @@ USER root
 RUN chmod 0400 /etc/shadow
 
 
-RUN dnf install -y rpm-build
 
-RUN echo '%sftnight ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+RUN mkdir -p /home/sftnight/buildpackage /home/sftnight/buildpackage_config /home/sftnight/cvmfs /tmp/packaging/rpm/ /tmp/ci
 
-USER sftnight
+ENV CVMFS_EXTERNALS_PREFIX=$HOME/.cache/cvmfs_externals_install
+ENV CMAKE_CXX_COMPILER_LAUNCHER=ccache
 
-RUN mkdir -p /home/sftnight/buildpackage
-RUN mkdir -p /home/sftnight/buildpackage_config
-RUN mkdir -p /home/sftnight/cvmfs
+# Install build dependencies
+RUN dnf -y install dnf-utils && dnf config-manager --set-enabled crb && dnf install -y epel-release && dnf -y install ccache && dnf clean all
 
-# Copy the repo
-COPY . /home/sftnight/cvmfs
-RUN cd /home/sftnight/cvmfs; ./ci/build_package.sh $PWD $PWD/../buildpackage/ cvmfs
-RUN cd /home/sftnight/cvmfs; ./ci/build_package.sh $PWD $PWD/../buildpackage_config/ cvmfs-config
+
+COPY ./ci/build_install_builddeps.sh /tmp/ci
+COPY ./packaging/rpm/cvmfs-universal.spec /tmp/packaging/rpm
+RUN --mount=type=cache,target=/var/cache/dnf \
+    cd /tmp/ && ./ci/build_install_builddeps.sh --install
+
+RUN --mount=type=bind,source=.,target=/home/sftnight/cvmfs \
+    cd /home/sftnight/cvmfs && ./ci/build_package.sh /home/sftnight/cvmfs /home/sftnight/buildpackage_config/ cvmfs-config
+
+RUN --mount=type=bind,source=.,target=/home/sftnight/cvmfs \
+    --mount=type=cache,target=/root/.cache/ccache \
+    --mount=type=cache,target=/root/.cache/cvmfs_externals_install \
+    cd /home/sftnight/cvmfs && ./ci/build_package.sh /home/sftnight/cvmfs /home/sftnight/buildpackage/ cvmfs
+
 
 # Stage 2: Final
 FROM almalinux:9
@@ -31,10 +40,6 @@ USER root
 # upgrade to the build image. Similar to https://github.com/apptainer/apptainer/issues/2756 but not quite clear
 RUN chmod 0400 /etc/shadow
 
-# Copy and install binaries from the builder stage
-COPY --from=builder /home/sftnight/buildpackage/RPMS/x86_64/ /tmp/.
-COPY --from=builder /home/sftnight/buildpackage_config/RPMS/noarch/ /tmp/.
-RUN dnf -y install /tmp/*.rpm
 
 # cloudtest dependencies
 RUN dnf install -y \
@@ -59,10 +64,15 @@ RUN dnf install -y \
     wget \
     ;
 
-RUN pip3 install flask
 # Create the sftnight user
 RUN useradd -m -s /bin/bash sftnight
 RUN echo '%sftnight ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+
+# Copy and install binaries from the builder stage
+COPY --from=builder /home/sftnight/cvmfs /home/sftnight
+COPY --from=builder /home/sftnight/buildpackage/RPMS/x86_64/ /tmp/.
+COPY --from=builder /home/sftnight/buildpackage_config/RPMS/noarch/ /tmp/.
+RUN dnf -y install /tmp/*.rpm
 
 ENV USER sftnight
 
