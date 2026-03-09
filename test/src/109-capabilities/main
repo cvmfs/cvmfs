@@ -32,6 +32,10 @@ cvmfs_run_test() {
   dec="$(capsh --decode=$cap|cut -d= -f2)"
   echo "CapPrm: $dec"
   [ "$dec" == "cap_dac_read_search" ] || return 11
+  cap="$(sudo sed -n 's/^CapEff:[^0]*//p' /proc/$pid/status)"
+  dec="$(capsh --decode=$cap|cut -d= -f2)"
+  echo "CapEff: $dec"
+  [ "$dec" == "" ] || return 17
 
   echo "check default capabilities on the watchdog cvmfs process"
   pid=$(sudo cvmfs_talk -i $repo pid watchdog)
@@ -41,6 +45,10 @@ cvmfs_run_test() {
   dec="$(capsh --decode=$cap|cut -d= -f2)"
   echo "CapPrm: $dec"
   [ "$dec" == "cap_sys_ptrace,cap_sys_admin" ] || return 13
+  cap="$(sudo sed -n 's/^CapEff:[^0]*//p' /proc/$pid/status)"
+  dec="$(capsh --decode=$cap|cut -d= -f2)"
+  echo "CapEff: $dec"
+  [ "$dec" == "" ] || return 18
   cap="$(sudo sed -n 's/^CapInh:[^0]*//p' /proc/$pid/status)"
   dec="$(capsh --decode=$cap|cut -d= -f2)"
   echo "CapInh: $dec"
@@ -54,6 +62,10 @@ cvmfs_run_test() {
   dec="$(capsh --decode=$cap|cut -d= -f2)"
   echo "CapPrm: $dec"
   [ "$dec" == "" ] || return 16
+  cap="$(sudo sed -n 's/^CapEff:[^0]*//p' /proc/$pid/status)"
+  dec="$(capsh --decode=$cap|cut -d= -f2)"
+  echo "CapEff: $dec"
+  [ "$dec" == "" ] || return 19
 
   echo "reloading $repo"
   sudo cvmfs_config reload $repo || return 20
@@ -66,6 +78,10 @@ cvmfs_run_test() {
   dec="$(capsh --decode=$cap|cut -d= -f2)"
   echo "CapPrm: $dec"
   [ "$dec" == "cap_dac_read_search" ] || return 31
+  cap="$(sudo sed -n 's/^CapEff:[^0]*//p' /proc/$pid/status)"
+  dec="$(capsh --decode=$cap|cut -d= -f2)"
+  echo "CapEff: $dec"
+  [ "$dec" == "" ] || return 37
 
   echo "check env-reading capabilities on the watchdog cvmfs process"
   pid=$(sudo cvmfs_talk -i $repo pid watchdog)
@@ -75,6 +91,10 @@ cvmfs_run_test() {
   dec="$(capsh --decode=$cap|cut -d= -f2)"
   echo "CapPrm: $dec"
   [ "$dec" == "cap_sys_ptrace,cap_sys_admin" ] || return 33
+  cap="$(sudo sed -n 's/^CapEff:[^0]*//p' /proc/$pid/status)"
+  dec="$(capsh --decode=$cap|cut -d= -f2)"
+  echo "CapEff: $dec"
+  [ "$dec" == "" ] || return 38
   cap="$(sudo sed -n 's/^CapInh:[^0]*//p' /proc/$pid/status)"
   dec="$(capsh --decode=$cap|cut -d= -f2)"
   echo "CapInh: $dec"
@@ -88,6 +108,10 @@ cvmfs_run_test() {
   dec="$(capsh --decode=$cap|cut -d= -f2)"
   echo "CapPrm: $dec"
   [ "$dec" == "" ] || return 36
+  cap="$(sudo sed -n 's/^CapEff:[^0]*//p' /proc/$pid/status)"
+  dec="$(capsh --decode=$cap|cut -d= -f2)"
+  echo "CapEff: $dec"
+  [ "$dec" == "" ] || return 39
 
   return 0
 }
