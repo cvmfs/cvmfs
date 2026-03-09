@@ -202,6 +202,38 @@ inline bool platform_allow_ptrace(const pid_t pid) {
 }
 
 /**
+ *  Set current process to be marked dumpable
+ *
+ * @return     true when successful
+ */
+inline bool platform_set_dumpable() {
+#ifdef PR_SET_DUMPABLE
+  const int retval = prctl(PR_SET_DUMPABLE, 1, 0, 0, 0);
+  return (retval == 0);
+#else
+  // On other platforms this is currently a no-op
+  return true;
+#endif
+}
+
+/**
+ *  Set current process to be keep capabilities on uid switch
+ *
+ * @param set  true to set keepcaps, false to reset it
+ *
+ * @return     true when successful
+ */
+inline bool platform_keepcaps(bool set) {
+#ifdef PR_SET_KEEPCAPS
+  const int retval = prctl(PR_SET_KEEPCAPS, set ? 1 : 0, 0, 0, 0);
+  return (retval == 0);
+#else
+  // On other platforms this is currently a no-op
+  return true;
+#endif
+}
+
+/**
  * File system functions, ensure 64bit versions.
  */
 typedef struct dirent64 platform_dirent64;

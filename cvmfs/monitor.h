@@ -18,6 +18,30 @@
 #include "util/pointer.h"
 #include "util/single_copy.h"
 
+
+/**
+ * Information for the FUSE module to communicate with the watchdog process
+ * that needs to be preserved through reloads.
+ */
+class WatchdogState {
+ friend class Watchdog;
+ public:
+  WatchdogState() :
+    version(0),
+    watchdog_write_fd(-1),
+    listener_read_fd(-1),
+    spawned(false),
+    pid(0)
+  { }
+ private:
+  unsigned version;
+  int watchdog_write_fd;
+  int listener_read_fd;
+  bool spawned;
+  pid_t pid;
+};
+
+
 /**
  * This class can fork a watchdog process that listens on a pipe and prints a
  * stackstrace into syslog, when cvmfs fails.  The crash dump is also appended
@@ -35,12 +59,15 @@ class Watchdog : SingleCopy {
   /**
    * Crash cleanup handler signature.
    */
-  typedef void (*FnOnCrash)(void);
+  typedef void (*FnOnExit)(const bool crashed);
 
-  static Watchdog *Create(FnOnCrash on_crash);
+  static Watchdog *Create(FnOnExit on_exit, WatchdogState *saved_state = 0);
   static pid_t GetPid();
   ~Watchdog();
   void Spawn(const std::string &crash_dump_path);
+  void ClearOnExitFn() { on_exit_ = NULL; }
+  void EnterMaintenanceMode() { maintenance_mode_ = true; }
+  void SaveState(WatchdogState *state);
 
   /**
    * Signals that watchdog should not receive. If it does, report and exit.
@@ -64,6 +91,7 @@ class Watchdog : SingleCopy {
     enum Flags {
       kProduceStacktrace = 0,
       kQuit,
+      kQuitWithExit,
       kSupervise,
       kUnknown,
     };
@@ -89,8 +117,9 @@ class Watchdog : SingleCopy {
                                       void *context);
   static void SendTrace(int sig, siginfo_t *siginfo, void *context);
 
-  explicit Watchdog(FnOnCrash on_crash);
+  explicit Watchdog(FnOnExit on_exit);
   void Fork();
+  void RestoreState(WatchdogState *saved_state);
   bool WaitForSupervisee();
   SigactionMap SetSignalHandlers(const SigactionMap &signal_handlers);
   void Supervise();
@@ -100,6 +129,7 @@ class Watchdog : SingleCopy {
   std::string ReadUntilGdbPrompt(int fd_pipe);
 
   bool spawned_;
+  bool maintenance_mode_;
   std::string crash_dump_path_;
   std::string exe_path_;
   pid_t watchdog_pid_;
@@ -109,7 +139,7 @@ class Watchdog : SingleCopy {
   /// Send the terminate signal to the listener
   UniquePtr<Pipe<kPipeThreadTerminator> > pipe_terminate_;
   pthread_t thread_listener_;
-  FnOnCrash on_crash_;
+  FnOnExit on_exit_;
   platform_spinlock lock_handler_;
   stack_t sighandler_stack_;
   SigactionMap old_signal_handlers_;

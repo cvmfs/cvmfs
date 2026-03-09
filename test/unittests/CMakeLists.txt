@@ -143,6 +143,7 @@ if (BUILD_SHRINKWRAP)
                          cvmfs_crypto
                          cvmfs_util
                          GTest::gtest
+                         ${CAP_LIBRARIES}
                          pthread
                          dl
   )
@@ -599,6 +600,7 @@ list (APPEND CVMFS_UNITTESTS_LINK_LIBRARIES
       ${PACPARSER_LIBRARIES}
       ${VJSON_LIBRARIES}
       ${PROTOBUF_LITE_LIBRARY}
+      ${CAP_LIBRARIES}
       LibArchive::LibArchive
       ${RT_LIBRARY}
       pthread

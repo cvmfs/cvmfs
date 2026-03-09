@@ -47,8 +47,6 @@ class SyncUnionOverlayfs : public SyncUnion {
   void CheckForBrokenHardlink(SharedPtr<SyncItem> entry) const;
   void MaskFileHardlinks(SharedPtr<SyncItem> entry) const;
 
-  bool ObtainSysAdminCapability() const;
-
  private:
   bool IsOpaqueDirPath(const std::string &path) const;
 

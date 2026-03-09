@@ -43,6 +43,7 @@
 #include "options.h"
 #include "sanitizer.h"
 #include "util/atomic.h"
+#include "util/capabilities.h"
 #include "util/exception.h"
 #include "util/logging.h"
 #include "util/platform.h"
@@ -554,6 +555,7 @@ static CvmfsExports *LoadLibrary(const bool debug_mode,
   return *exports_ptr;
 }
 
+
 Failures Reload(const int fd_progress, const bool stop_and_go,
                 const ReloadMode reload_mode) {
   int retval;
@@ -690,7 +692,7 @@ int FuseMain(int argc, char *argv[]) {
                  alien_cache_dir.c_str(), uid_owner, gid_owner);
         return 1;
       }
-      retval = SwitchCredentials(uid_owner, gid_owner, false);
+      retval = SwitchCredentials(uid_owner, gid_owner, false /* temporarily */);
       if (!retval) {
         LogCvmfs(kLogCvmfs, kLogStderr, "Failed to impersonate %d:%d",
                  uid_owner, gid_owner);
@@ -722,10 +724,26 @@ int FuseMain(int argc, char *argv[]) {
 
   string parameter;
   OptionsManager *options_manager;
+  bool restore_origids = false;
+  uid_t origuid;
+  gid_t origgid;
   if (simple_options_parsing_) {
     options_manager = new SimpleOptionsParser(
         new DefaultOptionsTemplateManager(*repository_name_));
   } else {
+    if ((uid_ != 0) || (gid_ != 0)) {
+      // temporarily switch to requested uid/gid while running bash parser
+      origuid = geteuid();
+      origgid = getegid();
+      if ((uid_ != origuid) || (gid_ != origgid)) {
+        if (!SwitchCredentials(uid_, gid_, true /* temporarily */)) {
+          LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+                   "Failed to switch credentials for options parser");
+          return kFailPermission;
+        }
+        restore_origids = true;
+      }
+    }
     options_manager = new BashOptionsManager(
         new DefaultOptionsTemplateManager(*repository_name_));
   }
@@ -737,6 +755,14 @@ int FuseMain(int argc, char *argv[]) {
   } else {
     options_manager->ParseDefault(*repository_name_);
   }
+  if (restore_origids) {
+    if (!SwitchCredentials(origuid, origgid, true /* temporarily */)) {
+      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+               "Failed to switch credentials back after options parser");
+      return kFailPermission;
+    }
+  }
+
   if (options_manager->GetValue("CVMFS_PREMOUNT_FUSE", &parameter)
       && options_manager->IsOff(parameter)) {
     premount_fuse_ = false;
@@ -902,12 +928,16 @@ int FuseMain(int argc, char *argv[]) {
   }
 
 
-  int fd_mountinfo = -1;  // needs to be declared before start using goto
+  // these need to be declared before start using goto
+  int fd_mountinfo = -1;
+  const bool delegated_unmount = (!suid_mode_ && !disable_watchdog_);
+  bool dounmount = false;
 #if CVMFS_USE_LIBFUSE != 2
   int premount_fd = -1;
 #endif
 
-  // Drop credentials
+  // Drop credentials, most likely temporarily since by default there is
+  // a watchdog
   if ((uid_ != 0) || (gid_ != 0)) {
     LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: running with credentials %d:%d",
              uid_, gid_);
@@ -921,7 +951,9 @@ int FuseMain(int argc, char *argv[]) {
   }
   if (disable_watchdog_) {
     LogCvmfs(kLogCvmfs, kLogDebug, "No watchdog, enabling core files");
-    prctl(PR_SET_DUMPABLE, 1, 0, 0, 0);
+    if (!platform_set_dumpable()) {
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogWarning, "Failed to set process dumpable");
+    }
   }
 
   // Only set usyslog now, otherwise file permissions are wrong
@@ -1047,7 +1079,7 @@ int FuseMain(int argc, char *argv[]) {
     // Requires libfuse >= 3.3.0.
     //
     if ((uid_ != 0) || (gid_ != 0)) {
-      if (!SwitchCredentials(0, getgid(), true)) {
+      if (!SwitchCredentials(0, getgid(), true /* temporarily */)) {
         LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
                  "failed to re-gain root permissions for mounting");
         retval = kFailPermission;
@@ -1068,6 +1100,7 @@ int FuseMain(int argc, char *argv[]) {
                "Failed to open /dev/fuse (%d)", errno);
       return kFailPermission;
     }
+    dounmount = true;
     char opts[128];
     snprintf(
         opts, sizeof(opts), "fd=%i,rootmode=%o,user_id=0,group_id=0%s%s",
@@ -1102,7 +1135,6 @@ int FuseMain(int argc, char *argv[]) {
     }
   }
 #endif
-
 
   struct fuse_lowlevel_ops loader_operations;
   SetFuseOperations(&loader_operations);
@@ -1158,8 +1190,8 @@ int FuseMain(int argc, char *argv[]) {
   }
 #endif
 
-  // drop credentials
   if (suid_mode_) {
+    // Drop credentials again for now
     const bool retrievable = !disable_watchdog_;
     if (!SwitchCredentials(uid_, gid_, retrievable)) {
       LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
@@ -1169,6 +1201,22 @@ int FuseMain(int argc, char *argv[]) {
       goto cleanup;
     }
   }
+#ifndef __APPLE__
+  else if (getuid() != geteuid()) {
+    // Switch to using only capabilities before starting threads
+    // because switching the uid after threads are created affects
+    // all threads and causes race conditions.
+    platform_keepcaps(true);
+    if (!SwitchCredentials(uid_, gid_, false /* temporarily */)) {
+      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+               "failed to switch to only capabilities after mounting");
+      cvmfs_exports_->fnFini();
+      retval = kFailPermission;
+      goto cleanup;
+    }
+    platform_keepcaps(false);
+  }
+#endif
 
   // Determine device id
   fd_mountinfo = open("/proc/self/mountinfo", O_RDONLY);
@@ -1204,8 +1252,23 @@ int FuseMain(int argc, char *argv[]) {
   if (!foreground_)
     Daemonize();
 
+  // Note that this has a side effect of significantly reducing capabilities
+  // after it starts things that need more privileges
   cvmfs_exports_->fnSpawn();
+
   loader_talk::Spawn();
+
+  if (delegated_unmount) {
+    // Unmounting in this case might be delegated to the watchdog process.
+    // Allow ptracing by the watchdog.
+    if (!platform_set_dumpable()) {
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogWarning, "Failed to set process dumpable");
+    }
+    // but still disallow core dump
+    if (!SetLimitCore(0)) {
+      LogCvmfs(kLogCvmfs, kLogDebug, "Failed to set core dump limit to 0");
+    }
+  }
 
   SetLogMicroSyslog("");
   retval = fuse_set_signal_handlers(session);
@@ -1239,15 +1302,58 @@ int FuseMain(int argc, char *argv[]) {
 #endif  // fuse2/3
   }
   SetLogMicroSyslog(*usyslog_path_);
+
+  // Decide whether we will need to do our own unmount.
+  // Decide here because we need to know at this point before tearing down
+  // the cvmfs module with fnFini() whether or not the unmount will be
+  // delegated to the watchdog, because when the cvmfs module shuts down
+  // it sends a message to the watchdog.
+  // The fuse main loop exits with 0 either when it is already unmounted,
+  // or when the filesystem connection is aborted.
+  // In the first case we don't need to attempt to unmount, and
+  // the second case we can ignore because it only ever happens on
+  // admin intervention.
+  // Otherwise it exits non-zero and we should unmount if it was premounted.
   if (retval != 0) {
     LogCvmfs(kLogCvmfs, kLogSyslogErr, "CernVM-FS: fuse loop exited with error %i",
              retval);
+    retval = kFailFuseLoop;
+  } else {
+    retval = kFailOk;
+    // already unmounted
+    dounmount = false;
+  }
+
+  if (dounmount && delegated_unmount) {
+    if (cvmfs_exports_->version == 1) {
+      // This can happen if the cvmfs version was downgraded.  The
+      // watchdog won't know how to do a clean unmount, so the best we
+      // can do is to force a crash so it will do a crash cleanup.
+      LogCvmfs(kLogCvmfs, kLogSyslog,
+               "Watchdog too old for clean error unmount on %s, forcing crash",
+               mount_point_->c_str());
+      assert(false);
+    }
+  } else if (cvmfs_exports_->version > 1) {
+    // This tells the watchdog to not unmount.
+    // The default if this is not run (when version > 1) is for it to unmount.
+    cvmfs_exports_->fnClearExit();
   }
 
   loader_talk::Fini();
   cvmfs_exports_->fnFini();
 
-  // Unmount
+  if (!delegated_unmount) {
+    // Restore privileges for unmount even if we don't need to do it
+    // ourselves, because the fuse library might need it.
+    if (!ObtainSysAdminCapability()) {
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+                "Failed to regain SYS_ADMIN capability for doing unmount");
+    }
+  }
+
+  // fuse functions will unmount if they can and think they need to.
+  // They won't ever unmount if it has been premounted.
 #if CVMFS_USE_LIBFUSE == 2
   fuse_remove_signal_handlers(session);
   fuse_session_remove_chan(channel);
@@ -1276,18 +1382,9 @@ int FuseMain(int argc, char *argv[]) {
   config_files_ = NULL;
   socket_path_ = NULL;
 
-  // Decide whether to attempt a umount before exiting.
-  // The fuse main loop exists with 0 either when it is already umounted,
-  // or when the filesystem connection is aborted.
-  // In the first case we don't need to attempt to unmount,
-  // the second case we can ignore because it only ever happens on admin intervention.
-  if (retval != 0) {
-    retval = kFailFuseLoop;
-#if CVMFS_USE_LIBFUSE != 2
+  if (dounmount) {
     goto cleanup;
-#endif
   } else {
-    retval = kFailOk;
 #if CVMFS_USE_LIBFUSE != 2
     if (premount_fd >= 0) close(premount_fd);
 #endif
@@ -1305,8 +1402,8 @@ int FuseMain(int argc, char *argv[]) {
 
 cleanup:
 #if CVMFS_USE_LIBFUSE != 2
-  if (premount_fd >= 0) {
-    if (!SwitchCredentials(0, getgid(), true)) {
+  if (dounmount && !delegated_unmount) {
+    if (!SwitchCredentials(0, getgid(), true /* temporarily */)) {
       LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
                "failed to re-gain root permissions for umounting");
       retval = kFailPermission;
@@ -1318,8 +1415,8 @@ cleanup:
       LogCvmfs(kLogCvmfs, kLogSyslog, "CernVM-FS: unmounted %s (%s) (error cleanup) ",
                   mount_point_->c_str(), repository_name_->c_str());
     }
-    close(premount_fd);
   }
+  if (premount_fd >= 0) close(premount_fd);
 #endif
 
   delete repository_name_;

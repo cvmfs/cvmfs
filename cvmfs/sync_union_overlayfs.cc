@@ -6,15 +6,19 @@
 
 #include "sync_union_overlayfs.h"
 
-#include <sys/capability.h>
+#include <sys/types.h>
 
+#include <cassert>
 #include <string>
 #include <vector>
 
+#include "sync_item.h"
 #include "sync_mediator.h"
 #include "sync_union.h"
+#include "util/capabilities.h"
 #include "util/exception.h"
 #include "util/fs_traversal.h"
+#include "util/logging.h"
 #include "util/shared_ptr.h"
 
 namespace publish {
@@ -30,87 +34,6 @@ bool SyncUnionOverlayfs::Initialize() {
   // trying to obtain CAP_SYS_ADMIN to read 'trusted' xattrs in the scratch
   // directory of an OverlayFS installation
   return ObtainSysAdminCapability() && SyncUnion::Initialize();
-}
-
-bool ObtainSysAdminCapabilityInternal(cap_t caps) {
-  /*const*/ const cap_value_t
-      cap = CAP_SYS_ADMIN;  // is non-const as cap_set_flag()
-                            // expects a non-const pointer
-                            // on RHEL 5 and older
-
-// do sanity-check if supported in <sys/capability.h> otherwise just pray...
-// Note: CAP_SYS_ADMIN is a rather common capability and is very likely to be
-//       supported by all our target systems. If it is not, one of the next
-//       commands will fail with a less descriptive error message.
-#ifdef CAP_IS_SUPPORTED
-  if (!CAP_IS_SUPPORTED(cap)) {
-    LogCvmfs(kLogUnionFs, kLogStderr, "System doesn't support CAP_SYS_ADMIN");
-    return false;
-  }
-#endif
-
-  if (caps == NULL) {
-    LogCvmfs(kLogUnionFs, kLogStderr,
-             "Failed to obtain capability state "
-             "of current process (errno: %d)",
-             errno);
-    return false;
-  }
-
-  cap_flag_value_t cap_state;
-  if (cap_get_flag(caps, cap, CAP_EFFECTIVE, &cap_state) != 0) {
-    LogCvmfs(kLogUnionFs, kLogStderr,
-             "Failed to check effective set for "
-             "CAP_SYS_ADMIN (errno: %d)",
-             errno);
-    return false;
-  }
-
-  if (cap_state == CAP_SET) {
-    LogCvmfs(kLogUnionFs, kLogDebug, "CAP_SYS_ADMIN is already effective");
-    return true;
-  }
-
-  if (cap_get_flag(caps, cap, CAP_PERMITTED, &cap_state) != 0) {
-    LogCvmfs(kLogUnionFs, kLogStderr,
-             "Failed to check permitted set for "
-             "CAP_SYS_ADMIN (errno: %d)",
-             errno);
-    return false;
-  }
-
-  if (cap_state != CAP_SET) {
-    LogCvmfs(kLogUnionFs, kLogStderr,
-             "CAP_SYS_ADMIN cannot be obtained. It's "
-             "not in the process's permitted-set.");
-    return false;
-  }
-
-  if (cap_set_flag(caps, CAP_EFFECTIVE, 1, &cap, CAP_SET) != 0) {
-    LogCvmfs(kLogUnionFs, kLogStderr,
-             "Cannot set CAP_SYS_ADMIN as effective "
-             "for the current process (errno: %d)",
-             errno);
-    return false;
-  }
-
-  if (cap_set_proc(caps) != 0) {
-    LogCvmfs(kLogUnionFs, kLogStderr,
-             "Cannot reset capabilities for current "
-             "process (errno: %d)",
-             errno);
-    return false;
-  }
-
-  LogCvmfs(kLogUnionFs, kLogDebug, "Successfully obtained CAP_SYS_ADMIN");
-  return true;
-}
-
-bool SyncUnionOverlayfs::ObtainSysAdminCapability() const {
-  cap_t caps = cap_get_proc();
-  const bool result = ObtainSysAdminCapabilityInternal(caps);
-  cap_free(caps);
-  return result;
 }
 
 void SyncUnionOverlayfs::PreprocessSyncItem(SharedPtr<SyncItem> entry) const {

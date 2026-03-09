@@ -38,6 +38,12 @@ class AuthzFetcher {
   virtual AuthzStatus Fetch(const QueryInfo &query_info,
                             AuthzToken *authz_token,
                             unsigned *ttl) = 0;
+
+  /*
+   * Once membership is known, see if the helper process needs to be
+   * launched.  Run from a privileged thread.
+   */
+  virtual AuthzStatus CheckHelper(const std::string &membership) = 0;
 };
 
 
@@ -54,6 +60,11 @@ class AuthzStaticFetcher : public AuthzFetcher {
     *authz_token = AuthzToken();
     *ttl = ttl_;
     return status_;
+  }
+
+  virtual AuthzStatus CheckHelper(const std::string &membership)
+  {
+    return kAuthzOk;
   }
 
  private:
@@ -120,6 +131,8 @@ class AuthzExternalFetcher : public AuthzFetcher, SingleCopy {
   virtual AuthzStatus Fetch(const QueryInfo &query_info,
                             AuthzToken *authz_token,
                             unsigned *ttl);
+
+  virtual AuthzStatus CheckHelper(const std::string &membership);
 
  private:
   /**

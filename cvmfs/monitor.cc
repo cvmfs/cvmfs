@@ -41,6 +41,7 @@
 #if defined(CVMFS_FUSE_MODULE)
 #include "cvmfs.h"
 #endif
+#include "util/capabilities.h"
 #include "util/exception.h"
 #include "util/logging.h"
 #include "util/platform.h"
@@ -64,10 +65,13 @@ int Watchdog::g_suppressed_signals[] = {
 int Watchdog::g_crash_signals[] = {SIGQUIT, SIGILL, SIGABRT, SIGFPE,
                                    SIGSEGV, SIGBUS, SIGPIPE, SIGXFSZ};
 
-Watchdog *Watchdog::Create(FnOnCrash on_crash) {
+Watchdog *Watchdog::Create(FnOnExit on_exit, WatchdogState *saved_state) {
   assert(instance_ == NULL);
-  instance_ = new Watchdog(on_crash);
-  instance_->Fork();
+  instance_ = new Watchdog(on_exit);
+  if (saved_state != NULL)
+    instance_->RestoreState(saved_state);
+  else
+    instance_->Fork();
   return instance_;
 }
 
@@ -80,10 +84,11 @@ string Watchdog::GenerateStackTrace(pid_t pid) {
   int retval;
   string result = "";
 
-  // re-gain root permissions to allow for ptrace of died cvmfs2 process
-  const bool retrievable = true;
-  if (!SwitchCredentials(0, getgid(), retrievable)) {
-    result += "failed to re-gain root permissions... still give it a try\n";
+  // Get capability to ptrace the dead main cvmfs2 process.
+  // This is often necessary because the main process can have its own 
+  // elevated capability which would otherwise block ptrace.
+  if (!ObtainSysPtraceCapability()) {
+    result += "failed to gain ptrace capability... still give it a try\n";
   }
 
   // run gdb and attach to the dying process
@@ -402,6 +407,24 @@ void Watchdog::Fork() {
         case 0: {
           pipe_watchdog_->CloseWriteFd();
           Daemonize();
+          if ((geteuid() != 0) && SetuidCapabilityPermitted()) {
+            const std::vector<cap_value_t> nocaps;
+            if (on_exit_) {
+              // Reduce to minimum capabilities, which unfortunately is
+              // still quite powerful.
+              // CAP_SYS_ADMIN is needed to unmount, and CAP_SYS_PTRACE
+              // is needed in order to get a stack trace since one of
+              // the main process threads is privileged.
+              const std::vector<cap_value_t> reservecaps = {CAP_SYS_ADMIN, CAP_SYS_PTRACE};
+              const std::vector<cap_value_t> inheritcaps = {CAP_SYS_PTRACE};
+              assert(ClearPermittedCapabilities(reservecaps, inheritcaps));
+            } else {
+              // Only need to be able to do the stack trace, and the
+              // main process needs no extra capabilities, so we can
+              // drop all capabilities.
+              assert(ClearPermittedCapabilities(nocaps, nocaps));
+            }
+          }
           // send the watchdog PID to the supervisee
           const pid_t watchdog_pid = getpid();
           pipe_pid.Write(watchdog_pid);
@@ -508,6 +531,7 @@ bool Watchdog::WaitForSupervisee() {
   return true;
 }
 
+
 /**
  * Set up the signal handling and kick off the supervision.
  */
@@ -546,6 +570,12 @@ void Watchdog::Spawn(const std::string &crash_dump_path) {
                                     MainWatchdogListener, this);
   assert(retval == 0);
 
+  if (spawned_) {
+    // This happens after a reload, when the watchdog process is
+    // already running so we can exit here.
+    return;
+  }
+
   pipe_watchdog_->Write(ControlFlow::kSupervise);
   const size_t path_size = crash_dump_path.size();
   pipe_watchdog_->Write(path_size);
@@ -560,6 +590,12 @@ void Watchdog::Spawn(const std::string &crash_dump_path) {
 void *Watchdog::MainWatchdogListener(void *data) {
   Watchdog *watchdog = static_cast<Watchdog *>(data);
   LogCvmfs(kLogMonitor, kLogDebug, "starting watchdog listener");
+
+  if ((getuid() != 0) && SetuidCapabilityPermitted()) {
+    // Drop all capabilities, none are needed in the listener
+    const std::vector<cap_value_t> nocaps;
+    assert(ClearPermittedCapabilities(nocaps, nocaps));
+  }
 
   struct pollfd watch_fds[2];
   watch_fds[0].fd = watchdog->pipe_listener_->GetReadFd();
@@ -603,14 +639,19 @@ void Watchdog::Supervise() {
   if (!pipe_watchdog_->TryRead<ControlFlow::Flags>(&control_flow)) {
     LogEmergency("watchdog: unexpected termination ("
                  + StringifyInt(control_flow) + ")");
-    if (on_crash_)
-      on_crash_();
+    if (on_exit_)
+      on_exit_(true /* crashed */);
   } else {
     switch (control_flow) {
       case ControlFlow::kProduceStacktrace:
         LogEmergency(ReportStacktrace());
-        if (on_crash_)
-          on_crash_();
+        if (on_exit_)
+          on_exit_(true /* crashed */);
+        break;
+
+      case ControlFlow::kQuitWithExit:
+        if (on_exit_)
+          on_exit_(false /* crashed */);
         break;
 
       case ControlFlow::kQuit:
@@ -624,11 +665,40 @@ void Watchdog::Supervise() {
 }
 
 
-Watchdog::Watchdog(FnOnCrash on_crash)
+/**
+ * Save the state of the watchdog listener thread before reload.
+ */
+void Watchdog::SaveState(WatchdogState *saved_state) {
+  saved_state->spawned = spawned_;
+  saved_state->pid = watchdog_pid_;
+  if (spawned_) {
+    saved_state->watchdog_write_fd = pipe_watchdog_->GetWriteFd();
+    saved_state->listener_read_fd = pipe_listener_->GetReadFd();
+  }
+}
+
+
+/**
+ * Restore the state of the watchdog listener reload
+ */
+void Watchdog::RestoreState(WatchdogState *saved_state) {
+  watchdog_pid_ = saved_state->pid;
+  if (!saved_state->spawned) {
+    return;
+  }
+  pipe_watchdog_ = new Pipe<kPipeWatchdog>(-1, saved_state->watchdog_write_fd);
+  pipe_listener_ = new Pipe<kPipeWatchdogSupervisor>(saved_state->listener_read_fd, -1);
+  spawned_ = true;
+}
+
+
+Watchdog::Watchdog(FnOnExit on_exit)
     : spawned_(false)
+    , maintenance_mode_(false)
     , exe_path_(string(platform_getexepath()))
     , watchdog_pid_(0)
-    , on_crash_(on_crash) {
+    , on_exit_(on_exit)
+{
   const int retval = platform_spinlock_init(&lock_handler_, 0);
   assert(retval == 0);
   memset(&sighandler_stack_, 0, sizeof(sighandler_stack_));
@@ -649,14 +719,26 @@ Watchdog::~Watchdog() {
     free(sighandler_stack_.ss_sp);
     sighandler_stack_.ss_size = 0;
 
+    // The watchdog listener thread exits on any message received
     pipe_terminate_->Write(ControlFlow::kQuit);
     pthread_join(thread_listener_, NULL);
     pipe_terminate_->Close();
   }
 
-  pipe_watchdog_->Write(ControlFlow::kQuit);
-  pipe_watchdog_->CloseWriteFd();
-  pipe_listener_->CloseReadFd();
+  if (!maintenance_mode_) {
+    // Shutdown the watchdog except when doing a reload
+    if (on_exit_) {
+      pipe_watchdog_->Write(ControlFlow::kQuitWithExit);
+    } else {
+      pipe_watchdog_->Write(ControlFlow::kQuit);
+    }
+    pipe_watchdog_->CloseWriteFd();
+    pipe_listener_->CloseReadFd();
+  } else {
+    // Release the references to the watchdog pipes without closing them
+    pipe_watchdog_.Release();
+    pipe_listener_.Release();
+  }
 
   platform_spinlock_destroy(&lock_handler_);
   LogCvmfs(kLogMonitor, kLogDebug, "monitor stopped");

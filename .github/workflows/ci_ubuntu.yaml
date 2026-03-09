@@ -210,7 +210,8 @@ jobs:
           export CVMFS_TESTCASES=${{ github.event.inputs.testCases || '"src/0* src/1* src/5* src/6* src/7* src/8*"' }}
           export CVMFS_TEST_SUITES=${{ github.event.inputs.testSuites || 'quick' }}
           CVMFS_TEST_PROXY=http://localhost:3128 \
-          CVMFS_TEST_USER=$(whoami) \
+          CVMFS_TEST_USER=$(id -un) \
+          CVMFS_TEST_GROUP=$(id -gn) \
           ./run.sh /tmp/test.log    \
                    -s "${CVMFS_TEST_SUITES}"  \
                    -x src/095-fuser   \

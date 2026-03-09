@@ -61,7 +61,7 @@ cvmfs_run_test() {
   echo "mount secure mount point"
   secure_mount $mntpnt || return 20
 
-  echo "No memberhsip string set, this should work"
+  echo "No membership string set, this should work"
   sudo -u nobody /bin/sh -c "cat ${mntpnt}/hello_world" || return 30
   secure_unmount
 
@@ -99,12 +99,21 @@ cvmfs_run_test() {
   sudo -u nobody setsid /bin/sh -c "cat ${mntpnt}/hello_world" && return 74
   echo "Waiting for rate-limit timeout to pass"
   sleep 11
-  echo "authz helper should be restarted on access"
-  sudo -u nobody setsid /bin/sh -c "cat ${mntpnt}/hello_world" || return 75
+  #
+  # The helper can no longer be restarted on access because the main fuse
+  # thread has given up its privileges, but it is restarted on reload
+  #
+  # echo "authz helper should be restarted on access"
+  echo "reloading $mntpnt to restart helper"
+  sudo cvmfs2 __RELOAD__ $(get_cache_directory $mntpnt)/cvmfs.$CVMFS_TEST_REPO \
+        --debug || return 75
+  echo "Waiting for reload to finish"
+  sleep 2
+  sudo -u nobody setsid /bin/sh -c "cat ${mntpnt}/hello_world" || return 76
   local authz_helper_pid_new=$(pgrep -P $secure_mnt_pid cvmfs_allow)
   echo "new authz helper pid $authz_helper_pid_new"
-  [ "x$authz_helper_pid_new" = "x" ] && return 76
-  [ "x$authz_helper_pid" = "x$authz_helper_pid_new" ] && return 77
+  [ "x$authz_helper_pid_new" = "x" ] && return 77
+  [ "x$authz_helper_pid" = "x$authz_helper_pid_new" ] && return 78
 
   echo "checking authz attribute"
   attr -l $mntpnt || return 72

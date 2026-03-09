@@ -52,6 +52,7 @@
 #include "duplex_sqlite3.h"
 #include "monitor.h"
 #include "statistics.h"
+#include "util/capabilities.h"
 #include "util/concurrency.h"
 #include "util/exception.h"
 #include "util/logging.h"
@@ -1202,6 +1203,16 @@ int PosixQuotaManager::MainCacheManager(int argc, char **argv) {
 
   if (!foreground)
     Daemonize();
+
+  if ((geteuid() != 0) && SetuidCapabilityPermitted()) {
+    // Permanently drop credentials
+    const std::vector<cap_value_t> nocaps;
+    assert(ClearPermittedCapabilities(nocaps, nocaps));
+    // Leave this process ptraceable
+    assert(platform_set_dumpable());
+    // but without core dumps
+    assert(SetLimitCore(0));
+  }
 
   const UniquePtr<Watchdog> watchdog(Watchdog::Create(NULL));
   assert(watchdog.IsValid());

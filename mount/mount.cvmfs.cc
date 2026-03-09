@@ -6,6 +6,7 @@
  */
 
 #include <errno.h>
+#include <pwd.h>
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -423,6 +424,18 @@ int main(int argc, char **argv) {
   }
   const string mountpoint = argv[optind + 1];
 
+  // We don't know for sure what uid cvmfs will run under until we have
+  // parsed the options, but we want to avoid parsing the options as root;
+  // it's a chicken-and-egg problem.  So this first time parse the
+  // options as the user/group of the "cvmfs" user if it exists.  If it
+  // doesn't, they will be parsed as root.  Since cvmfs packaging always
+  // adds a cvmfs user, this case is unlikely.
+
+  struct passwd *pw = getpwnam("cvmfs");
+  if (pw != NULL) {
+    (void) SwitchCredentials(pw->pw_uid, pw->pw_gid, true);
+  }
+
   options_manager_.ParseDefault("");
   const string fqrn = MkFqrn(device);
   // Bail in case we could not form a Fqrn
@@ -434,6 +447,10 @@ int main(int argc, char **argv) {
   options_manager_.SwitchTemplateManager(
       new DefaultOptionsTemplateManager(fqrn));
   options_manager_.ParseDefault(fqrn);
+
+  if (pw != NULL) {
+    (void) SwitchCredentials(0, 0, true);
+  }
 
   string optarg;
   if (options_manager_.GetValue("CVMFS_SYSLOG_LEVEL", &optarg))

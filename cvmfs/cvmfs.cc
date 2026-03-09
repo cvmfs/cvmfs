@@ -60,6 +60,7 @@
 #include <utility>
 #include <vector>
 
+#include "authz/authz_fetch.h"
 #include "authz/authz_session.h"
 #include "auto_umount.h"
 #include "backoff.h"
@@ -104,6 +105,9 @@
 #include "telemetry_aggregator.h"
 #include "tracer.h"
 #include "util/algorithm.h"
+#include "util/atomic.h"
+#include "util/capabilities.h"
+#include "util/concurrency.h"
 #include "util/exception.h"
 #include "util/logging.h"
 #include "util/mutex.h"
@@ -157,8 +161,8 @@ struct DirectoryListing {
 const loader::LoaderExports *loader_exports_ = NULL;
 OptionsManager *options_mgr_ = NULL;
 pid_t pid_ = 0; /**< will be set after daemon() */
-quota::ListenerHandle *watchdog_listener_ = NULL;
-quota::ListenerHandle *unpin_listener_ = NULL;
+quota::ListenerHandle *quota_watchdog_listener_ = NULL;
+quota::ListenerHandle *quota_unpin_listener_ = NULL;
 
 
 typedef google::dense_hash_map<uint64_t, DirectoryListing,
@@ -234,14 +238,30 @@ void GetReloadStatus(bool *drainout_mode, bool *maintenance_mode) {
 }
 
 #ifndef __TEST_CVMFS_MOCKFUSE  // will be mocked in tests
-static bool UseWatchdog() {
-  if (loader_exports_ == NULL || loader_exports_->version < 2) {
-    return true;  // spawn watchdog by default
+// returns whether or not to start a watchdog
+static bool ShouldStartWatchdog() {
+  assert(loader_exports_ != NULL);
+
+  if (loader_exports_->version < 2) {
+    return true;  // spawn watchdog by default during reload
                   // Note: with library versions before 2.1.8 it might not
                   //       create stack traces properly in all cases
   }
 
-  return !loader_exports_->disable_watchdog;
+  if (loader_exports_->saved_states.size() == 0) {
+    // This is the initial loader run, not a reload
+    return !loader_exports_->disable_watchdog;
+  }
+
+  // This is a reload
+
+  if ((loader_exports_->version < 6) && !loader_exports_->disable_watchdog) {
+    // This is an older loader so need to start a watchdog
+    return true;
+  }
+
+  // Newer loader so the watchdog should have kept running through reload
+  return false;
 }
 #endif
 
@@ -2230,13 +2250,13 @@ static void SetCvmfsOperations(struct fuse_lowlevel_ops *cvmfs_operations) {
 
 // Called by cvmfs_talk when switching into read-only cache mode
 void UnregisterQuotaListener() {
-  if (cvmfs::unpin_listener_) {
-    quota::UnregisterListener(cvmfs::unpin_listener_);
-    cvmfs::unpin_listener_ = NULL;
+  if (cvmfs::quota_unpin_listener_) {
+    quota::UnregisterListener(cvmfs::quota_unpin_listener_);
+    cvmfs::quota_unpin_listener_ = NULL;
   }
-  if (cvmfs::watchdog_listener_) {
-    quota::UnregisterListener(cvmfs::watchdog_listener_);
-    cvmfs::watchdog_listener_ = NULL;
+  if (cvmfs::quota_watchdog_listener_) {
+    quota::UnregisterListener(cvmfs::quota_watchdog_listener_);
+    cvmfs::quota_watchdog_listener_ = NULL;
   }
 }
 
@@ -2434,15 +2454,17 @@ static int Init(const loader::LoaderExports *loader_exports) {
   FileSystem::SetupLoggingStandalone(*cvmfs::options_mgr_,
                                      loader_exports->repository_name);
 
-  // Monitor, check for maximum number of open files
-  if (cvmfs::UseWatchdog()) {
+  // Start a watchdog if this is the first time or if this is a reload with
+  // an old loader that expected the FUSE module to start a watchdog
+  if (cvmfs::ShouldStartWatchdog()) {
     auto_umount::SetMountpoint(loader_exports->mount_point);
-    cvmfs::watchdog_ = Watchdog::Create(auto_umount::UmountOnCrash);
+    cvmfs::watchdog_ = Watchdog::Create(auto_umount::UmountOnExit);
     if (cvmfs::watchdog_ == NULL) {
       *g_boot_error = "failed to initialize watchdog.";
       return loader::kFailMonitor;
     }
   }
+
   cvmfs::max_open_files_ = CheckMaxOpenFiles();
 
   FileSystem::FileSystemInfo fs_info;
@@ -2560,15 +2582,39 @@ static int Init(const loader::LoaderExports *loader_exports) {
 
 
 /**
- * Things that have to be executed after fork() / daemon()
+ * Things that have to be executed after fork() / daemon().
+ * Reduces capabilities for the processes or threads that don't need
+ * them, including the current thread.
  */
 static void Spawn() {
-  // First thing: kick off the watchdog while we still have a single-threaded
-  // well-defined state
+  // Start the first threads in this process
+  // This is called at initialization time or after reload
+
+  // If there's a watchdog, kick it off first thing while we still have a
+  // single-threaded well-defined state and before dropping privileges
+  // at initialization time.
   cvmfs::pid_ = getpid();
   if (cvmfs::watchdog_) {
     cvmfs::watchdog_->Spawn(GetCurrentWorkingDirectory() + "/stacktrace."
                             + cvmfs::mount_point_->fqrn());
+  }
+
+  // Start the helper before dropping capabilities, if it isn't running
+  cvmfs::mount_point_->authz_fetcher()->CheckHelper(
+                                        cvmfs::mount_point_->membership_req());
+
+  if ((getuid() != 0) && SetuidCapabilityPermitted()) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "Reducing to minimum capabilities");
+    // Earlier switched to using elevated capabilities without real uid root,
+    // now reduce to minimum capabilities.
+    const std::vector<cap_value_t> nocaps;
+    // CAP_DAC_READ_SEARCH will be sometimes needed for a future feature;
+    // for now reserve it all the time for testing.
+    const std::vector<cap_value_t> reservecaps = {CAP_DAC_READ_SEARCH};
+    assert(ClearPermittedCapabilities(reservecaps, nocaps));
+  } else {
+    LogCvmfs(kLogCvmfs, kLogDebug, "Not clearing capabilities, uid %d euid%d",
+                                   getuid(), geteuid());
   }
 
   cvmfs::fuse_remounter_->Spawn();
@@ -2586,9 +2632,9 @@ static void Spawn() {
   QuotaManager *quota_mgr = cvmfs::file_system_->cache_mgr()->quota_mgr();
   quota_mgr->Spawn();
   if (quota_mgr->HasCapability(QuotaManager::kCapListeners)) {
-    cvmfs::watchdog_listener_ = quota::RegisterWatchdogListener(
+    cvmfs::quota_watchdog_listener_ = quota::RegisterWatchdogListener(
         quota_mgr, cvmfs::mount_point_->uuid()->uuid() + "-watchdog");
-    cvmfs::unpin_listener_ = quota::RegisterUnpinListener(
+    cvmfs::quota_unpin_listener_ = quota::RegisterUnpinListener(
         quota_mgr,
         cvmfs::mount_point_->catalog_mgr(),
         cvmfs::mount_point_->uuid()->uuid() + "-unpin");
@@ -2631,25 +2677,32 @@ static void ShutdownMountpoint() {
   delete cvmfs::notification_client_;
   cvmfs::notification_client_ = NULL;
 
-  // The remonter has a reference to the mount point and the inode generation
+  // The remounter has a reference to the mount point and the inode generation
   delete cvmfs::fuse_remounter_;
   cvmfs::fuse_remounter_ = NULL;
 
   // The unpin listener requires the catalog, so this must be unregistered
   // before the catalog manager is removed
-  if (cvmfs::unpin_listener_ != NULL) {
-    quota::UnregisterListener(cvmfs::unpin_listener_);
-    cvmfs::unpin_listener_ = NULL;
+  if (cvmfs::quota_unpin_listener_ != NULL) {
+    quota::UnregisterListener(cvmfs::quota_unpin_listener_);
+    cvmfs::quota_unpin_listener_ = NULL;
   }
-  if (cvmfs::watchdog_listener_ != NULL) {
-    quota::UnregisterListener(cvmfs::watchdog_listener_);
-    cvmfs::watchdog_listener_ = NULL;
+  if (cvmfs::quota_watchdog_listener_ != NULL) {
+    quota::UnregisterListener(cvmfs::quota_watchdog_listener_);
+    cvmfs::quota_watchdog_listener_ = NULL;
   }
 
   delete cvmfs::directory_handles_;
   delete cvmfs::mount_point_;
   cvmfs::directory_handles_ = NULL;
   cvmfs::mount_point_ = NULL;
+}
+
+
+static void ClearExit() {
+  if (cvmfs::watchdog_ != NULL) {
+    cvmfs::watchdog_->ClearOnExitFn();
+  }
 }
 
 
@@ -2661,6 +2714,9 @@ static void Fini() {
   cvmfs::file_system_ = NULL;
   cvmfs::options_mgr_ = NULL;
 
+  if (cvmfs::loader_exports_->version < 6) {
+    ClearExit();
+  }
   delete cvmfs::watchdog_;
   cvmfs::watchdog_ = NULL;
 
@@ -2692,6 +2748,9 @@ static bool MaintenanceMode(const int fd_progress) {
                       cvmfs::mount_point_->kcache_timeout_sec()))
                   + "s)\n";
   SendMsg2Socket(fd_progress, msg_progress);
+  if (cvmfs::watchdog_ != NULL && cvmfs::loader_exports_->version >= 6) {
+    cvmfs::watchdog_->EnterMaintenanceMode();
+  }
   cvmfs::fuse_remounter_->EnterMaintenanceMode();
   return true;
 }
@@ -2785,6 +2844,17 @@ static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
   state_fuse->state_id = loader::kStateFuse;
   state_fuse->state = saved_fuse_state;
   saved_states->push_back(state_fuse);
+
+  if (cvmfs::watchdog_ != NULL && cvmfs::loader_exports_->version >= 6) {
+    msg_progress = "Saving watchdog listener state\n";
+    SendMsg2Socket(fd_progress, msg_progress);
+    WatchdogState *saved_watchdog_state = new WatchdogState();
+    cvmfs::watchdog_->SaveState(saved_watchdog_state);
+    loader::SavedState *state_watchdog = new loader::SavedState();
+    state_watchdog->state_id = loader::kStateWatchdog;
+    state_watchdog->state = saved_watchdog_state;
+    saved_states->push_back(state_watchdog);
+  }
 
   // Close open file catalogs
   ShutdownMountpoint();
@@ -3037,7 +3107,18 @@ static bool RestoreState(const int fd_progress,
         cvmfs::mount_point_->EnableFuseExpireEntry();
       SendMsg2Socket(fd_progress, " done\n");
     }
+
+    if (saved_states[i]->state_id == loader::kStateWatchdog) {
+      SendMsg2Socket(fd_progress, "Restoring watchdog listener state... ");
+      WatchdogState *watchdog_state = static_cast<WatchdogState *>(
+          saved_states[i]->state);
+      cvmfs::watchdog_ = Watchdog::Create(auto_umount::UmountOnExit,
+                                          watchdog_state);
+      assert(cvmfs::watchdog_ != NULL);
+      SendMsg2Socket(fd_progress, " done\n");
+    }
   }
+
   if (cvmfs::mount_point_->inode_annotation()) {
     const uint64_t saved_generation = cvmfs::inode_generation_info_
                                           .inode_generation;
@@ -3122,6 +3203,10 @@ static void FreeSavedState(const int fd_progress,
         SendMsg2Socket(fd_progress, "Releasing fuse state\n");
         delete static_cast<cvmfs::FuseState *>(saved_states[i]->state);
         break;
+      case loader::kStateWatchdog:
+        SendMsg2Socket(fd_progress, "Releasing watchdog listener state\n");
+        delete static_cast<WatchdogState *>(saved_states[i]->state);
+        break;
       default:
         break;
     }
@@ -3145,6 +3230,7 @@ static void __attribute__((constructor)) LibraryMain() {
   g_cvmfs_exports->fnFreeSavedState = FreeSavedState;
 #endif
   cvmfs::SetCvmfsOperations(&g_cvmfs_exports->cvmfs_operations);
+  g_cvmfs_exports->fnClearExit = ClearExit;
 }
 
 

@@ -19,6 +19,7 @@
 #include "monitor.h"
 #include "options.h"
 #include "sanitizer.h"
+#include "util/capabilities.h"
 #include "util/concurrency.h"
 #include "util/logging.h"
 #include "util/platform.h"
@@ -195,6 +196,18 @@ void AuthzExternalFetcher::ExecHelper() {
       sigaction(Watchdog::g_suppressed_signals[i], &signal_handler, NULL);
     }
 
+    if ((getuid() != 0) && SetuidCapabilityPermitted()) {
+      // The helper expects traditional real uid root credentials
+      const uid_t uid = geteuid();
+      const gid_t gid = getegid();
+      if (!SwitchCredentials(0, 0, false) ||
+          !SwitchCredentials(uid, gid, true)) {
+        syslog(LOG_USER | LOG_ERR,
+          "failed to switch back to real uid 0 for authz helper");
+        _exit(1);
+      }
+    }
+
     execve(argv0, argv, &envp[0]);
     syslog(LOG_USER | LOG_ERR, "failed to start authz helper %s (%d)", argv0,
            errno);
@@ -212,9 +225,25 @@ void AuthzExternalFetcher::ExecHelper() {
 }
 
 
-AuthzStatus AuthzExternalFetcher::Fetch(const QueryInfo &query_info,
-                                        AuthzToken *authz_token,
-                                        unsigned *ttl) {
+AuthzStatus AuthzExternalFetcher::CheckHelper(
+  const std::string &membership)
+{
+  if ((fd_send_ < 0) && (membership != "")) {
+    if (progname_.empty())
+      progname_ = FindHelper(membership);
+    ExecHelper();
+    if (!Handshake())
+      return kAuthzNoHelper;
+  }
+  return kAuthzOk;
+}
+
+
+AuthzStatus AuthzExternalFetcher::Fetch(
+  const QueryInfo &query_info,
+  AuthzToken *authz_token,
+  unsigned *ttl)
+{
   *ttl = kDefaultTtl;
 
   const MutexLockGuard lock_guard(lock_);
@@ -230,12 +259,7 @@ AuthzStatus AuthzExternalFetcher::Fetch(const QueryInfo &query_info,
   bool retval;
 
   if (fd_send_ < 0) {
-    if (progname_.empty())
-      progname_ = FindHelper(query_info.membership);
-    ExecHelper();
-    retval = Handshake();
-    if (!retval)
-      return kAuthzNoHelper;
+    return kAuthzNoHelper;
   }
   assert((fd_send_ >= 0) && (fd_recv_ >= 0));
 

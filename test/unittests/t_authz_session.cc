@@ -23,6 +23,11 @@ class TestAuthzFetcher : public AuthzFetcher {
     *authz_token = next_token;
     return next_status;
   }
+  virtual AuthzStatus CheckHelper(
+    const std::string &membership)
+  {
+    return kAuthzOk;
+  }
 
   unsigned next_ttl;
   AuthzToken next_token;

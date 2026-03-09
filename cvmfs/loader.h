@@ -104,7 +104,8 @@ enum StateId {
   kStateOpenFiles,         // >= 2.4
   kStateDentryTracker,     // >= 2.7 (renamed from kStateNentryTracker in 2.10)
   kStatePageCacheTracker,  // >= 2.10
-  kStateFuse               // >= 2.11
+  kStateFuse,              // >= 2.11
+  kStateWatchdog,          // >= 2.14
 
   // Note: kStateOpenFilesXXX was renamed to kStateOpenChunksXXX as of 2.4
 };
@@ -153,10 +154,12 @@ typedef std::vector<LoadEvent *> EventList;
  * CernVM-FS 2.4.0 --> Version 4
  * CernVM-FS 2.7.0 --> Version 4, fuse_channel --> fuse_channel_or_session
  * CernVM-FS 2.8.2 --> Version 5, add device_id
+ * CernVM-FS 2.14.0 --> Version 6, no change to fields, but signifies that the
+ *                      main watchdog process does not restart during reload
  */
 struct LoaderExports {
   LoaderExports()
-      : version(5)
+      : version(6)
       , size(sizeof(LoaderExports))
       , boot_time(0)
       , foreground(false)
@@ -209,13 +212,20 @@ struct LoaderExports {
  * This contains the public interface of the cvmfs fuse module.
  * Whenever something changes, change the version number.
  * A global CvmfsExports struct is looked up by the loader via dlsym.
+ * Since the cvmfs fuse module gets replaced each time there's an
+ * upgrade or downgrade, the only way to get a cvmfs module older than
+ * the loader is via a downgrade, which is an unusual situation.  
+ * It is still possible, however, so code that uses newer fields should
+ * check the version before doing so.
  *
  * Note: as of cvmfs version 2.8, we set cvmfs_operations.forget_multi on new
  * enough fuse
+ *
+ * CernVM-FS 2.14.0 --> Version 2, add fnClearExit
  */
 struct CvmfsExports {
   CvmfsExports() {
-    version = 1;
+    version = 2;
     size = sizeof(CvmfsExports);
     fnAltProcessFlavor = NULL;
     fnInit = NULL;
@@ -227,6 +237,7 @@ struct CvmfsExports {
     fnRestoreState = NULL;
     fnFreeSavedState = NULL;
     memset(&cvmfs_operations, 0, sizeof(cvmfs_operations));
+    fnClearExit = NULL;
   }
 
   uint32_t version;
@@ -244,6 +255,9 @@ struct CvmfsExports {
   void (*fnFreeSavedState)(const int fd_progress,
                            const StateList &saved_states);
   struct fuse_lowlevel_ops cvmfs_operations;
+
+  // added with CernVM-FS 2.14.0 (CvmfsExports Version: 2)
+  void (*fnClearExit)(); 
 };
 
 enum ReloadMode {

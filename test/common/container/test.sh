@@ -1,6 +1,11 @@
 #!/bin/bash
 
-cd "/home/sftnight/cvmfs/test"
+HERE="${0%/*}"
+if [ "$HERE" = "$0" ]; then
+    # no slash in $0
+    HERE="$PWD"
+fi
+cd $HERE/../..
 
 TEST_LOG_DIRECTORY=/tmp
 CLIENT_TEST_LOGFILE=/tmp/cvmfs-client-test.log
