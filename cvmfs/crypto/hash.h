@@ -151,7 +151,7 @@ struct CVMFS_EXPORT Digest {
       return kAlgorithmIds[digest_.algorithm][position - hash_length_];
     }
 
-    char ToHex(const char c) const {
+    static char ToHex(const char c) {
       return static_cast<char>(c + ((c <= 9) ? '0' : 'a' - 10));
     }
 
@@ -472,7 +472,63 @@ struct CVMFS_EXPORT Any : public Digest<kMaxDigestSize, kAny> {
   Md5 CastToMd5();
 };
 
+const size_t kShortDigestSize = kMaxDigestSize;
+struct CVMFS_EXPORT Short : public Digest<kShortDigestSize, kAny> {
+  explicit Short(const Any &full) : Digest<kShortDigestSize, kAny>() {
+    algorithm = full.algorithm;
+    suffix = full.suffix;
+    digest_size_ = kShortDigestSize / 4;
+    hex_size_ = 2 * digest_size_ + kAlgorithmIdSizes[algorithm];
+    memcpy(digest, full.digest, kShortDigestSize);
+  }
 
+  bool operator==(const Short &other) const {
+    if (this->algorithm != other.algorithm) {
+      return false;
+    }
+    if (this->digest_size_ != other.digest_size_) {
+      return false;
+    }
+    for (unsigned i = 0; i < digest_size_; ++i) {
+      if (this->digest[i] != other.digest[i])
+        return false;
+    }
+    return true;
+  }
+
+  std::string ToString(const bool with_suffix = false) {
+    const Hex hex(this);
+    const bool use_suffix = with_suffix && HasSuffix();
+    const unsigned string_length = hex_size_ + use_suffix;
+    std::string result(string_length, 0);
+
+    for (unsigned int i = 0; i < hex_size_; ++i) {
+      result[i] = hex[i];
+    }
+
+    if (use_suffix) {
+      result[string_length - 1] = suffix;
+    }
+
+    assert(result.length() == string_length);
+    return result;
+  }
+
+  bool Collide(const Any &other) const {
+    if (this->algorithm != other.algorithm) {
+      return false;
+    }
+    for (unsigned i = 0; i < digest_size_; ++i) {
+      if (this->digest[i] != other.digest[i])
+        return false;
+    }
+    return true;
+  }
+
+ private:
+  size_t digest_size_;
+  size_t hex_size_;
+};
 /**
  * Actual operations on digests, like "hash a file", "hash a buffer", or
  * iterative operations.
@@ -548,3 +604,4 @@ CVMFS_EXPORT Any MkFromSuffixedHexPtr(const HexPtr hex);
 #endif
 
 #endif  // CVMFS_CRYPTO_HASH_H_
+

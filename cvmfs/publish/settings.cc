@@ -201,7 +201,7 @@ void SettingsStorage::MakeGateway(const std::string &host,
                                   const std::string &tmp_dir) {
   type_ = upload::SpoolerDefinition::Gateway;
   endpoint_ = "http://" + host + ":" + StringifyInt(port) + "/api/v1";
-  tmp_dir_ = tmp_dir_;
+  tmp_dir_ = tmp_dir;
 }
 
 void SettingsStorage::SetLocator(const std::string &locator) {

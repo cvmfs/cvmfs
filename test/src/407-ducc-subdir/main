@@ -1,0 +1,86 @@
+#!/bin/bash
+cvmfs_test_name="DUCC repository subdirectory ingestion"
+cvmfs_test_autofs_on_startup=true
+cvmfs_test_suites="ducc"
+
+CVMFS_TEST407_RECIPE="$(pwd)/$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1).yaml"
+CVMFS_TEST407_REPOSITORY="$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1).cern.ch"
+CVMFS_TEST407_SUBDIR="ducc/subdir"
+CVMFS_TEST407_DUCC_ERR="$(pwd)/$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1).err"
+ducc_test_407_max_attempts=3
+
+ducc_test_407_clean_up() {
+    echo -n "Cleaning up..."
+
+    rm $CVMFS_TEST407_RECIPE
+    rm $CVMFS_TEST407_DUCC_ERR
+
+    sudo cvmfs_server rmfs -f $CVMFS_TEST407_REPOSITORY
+
+    echo "done"
+}
+
+cvmfs_run_test() {
+    trap ducc_test_407_clean_up EXIT HUP INT TERM
+
+    echo -n "*** Creating recipe file..."
+    cat > $CVMFS_TEST407_RECIPE << EOL
+version: 1
+user: mock_user
+cvmfs_repo: '$CVMFS_TEST407_REPOSITORY/$CVMFS_TEST407_SUBDIR'
+output_format: '\$(scheme)://localhost:5000/mock/\$(image)'
+input:
+    - 'https://registry.hub.docker.com/library/ubuntu:latest'
+EOL
+    echo "done"
+
+    echo -n "*** Creating CVMFS repo..."
+    create_empty_repo $CVMFS_TEST407_REPOSITORY $USER || return $?
+    echo "done"
+
+    echo "*** Starting test."
+    echo "*** Converting recipe..."
+    local attempt=1
+    local conversion_ok=0
+    while [ $attempt -le $ducc_test_407_max_attempts ]
+    do
+        rm -f $CVMFS_TEST407_DUCC_ERR
+        cvmfs_ducc convert --skip-flat --skip-thin-image --skip-podman $CVMFS_TEST407_RECIPE 2> $CVMFS_TEST407_DUCC_ERR
+        local retval=$?
+        grep -q "level=error" $CVMFS_TEST407_DUCC_ERR
+        local has_level_error=$?
+
+        if [ $retval -eq 0 ] && [ $has_level_error -eq 1 ]; then
+            conversion_ok=1
+            break
+        fi
+
+        echo "*** Conversion attempt ${attempt}/${ducc_test_407_max_attempts} failed (retval=$retval)."
+        attempt=$((attempt+1))
+        sleep 1
+    done
+    if [ $conversion_ok -ne 1 ]; then
+        echo "*** Conversion failed after ${ducc_test_407_max_attempts} attempts. Last DUCC stderr follows:"
+        cat $CVMFS_TEST407_DUCC_ERR
+        return 101
+    fi
+    echo "*** Convert recipe successfully"
+
+    echo "*** Check integrity of the repository..."
+    check_repository $CVMFS_TEST407_REPOSITORY -i || return 102
+    echo "*** Repository checked successfully"
+
+    subdir_root="/cvmfs/$CVMFS_TEST407_REPOSITORY/$CVMFS_TEST407_SUBDIR"
+    ls "$subdir_root/.layers" || return 111
+    ls "$subdir_root/.metadata" || return 112
+    ls "$subdir_root/.metadata/registry.hub.docker.com/library/ubuntu:latest" || return 113
+
+    [ ! -e "/cvmfs/$CVMFS_TEST407_REPOSITORY/.layers" ] || return 114
+    [ ! -e "/cvmfs/$CVMFS_TEST407_REPOSITORY/.metadata" ] || return 115
+    [ ! -e "/cvmfs/$CVMFS_TEST407_REPOSITORY/registry.hub.docker.com" ] || return 116
+    [ ! -e "/cvmfs/$CVMFS_TEST407_REPOSITORY/$CVMFS_TEST407_SUBDIR/$CVMFS_TEST407_SUBDIR/.layers" ] || return 117
+    [ ! -e "/cvmfs/$CVMFS_TEST407_REPOSITORY/$CVMFS_TEST407_SUBDIR/$CVMFS_TEST407_SUBDIR/.metadata" ] || return 118
+
+    echo "*** Test successful"
+    return 0
+}

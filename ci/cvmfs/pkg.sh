@@ -54,12 +54,13 @@ echo "detected upstream version: $cvmfs_version"
 
 echo "building CernVM-FS $cvmfs_version in '$CVMFS_RESULT_LOCATION' from '$CVMFS_SOURCE_LOCATION'"
 cd $CVMFS_RESULT_LOCATION
-cmake -DCMAKE_INSTALL_PREFIX:PATH=$CVMFS_INSTALL_PREFIX \
+
+cmake -DCMAKE_INSTALL_PREFIX:PATH=$CVMFS_INSTALL_PREFIX          \
+      -DBUILTIN_EXTERNALS_EXCLUDE=${CVMFS_EXTERNALS_EXCLUDE:-""} \
       -DCMAKE_CXX_STANDARD=11                           \
       -DBUILD_SERVER=no                                 \
       -DBUILD_SERVER_DEBUG=no                           \
       -DBUILD_UNITTESTS=no                              \
-      -DBUILTIN_EXTERNALS_EXCLUDE=${CVMFS_EXTERNALS_EXCLUDE:-""}                             \
       -DUSE_MACFUSE_KEXT=${USE_MACFUSE_KEXT:-ON}        \
       $OPENSSL_INCLUDE                                  \
       $CVMFS_SOURCE_LOCATION

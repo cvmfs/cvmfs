@@ -36,16 +36,16 @@ get_package_type() {
   # Build the cvmfs service container if the build container says so
   [ -f /cvmfs-package-type ]  && cat /cvmfs-package-type && return 0
 
-  which dpkg > /dev/null 2>&1 && echo "deb" && return 0
-  which rpm  > /dev/null 2>&1 && echo "rpm" && return 0
+  command -v dpkg > /dev/null 2>&1 && echo "deb" && return 0
+  command -v rpm  > /dev/null 2>&1 && echo "rpm" && return 0
   [ x"$(uname)" = x"Darwin" ] && echo "pkg" && return 0
   return 1
 }
 
 get_default_compiler_arch() {
   local compiler=""
-  which gcc   > /dev/null 2>&1 && compiler="gcc"
-  which clang > /dev/null 2>&1 && compiler="clang"
+  command -v gcc   > /dev/null 2>&1 && compiler="gcc"
+  command -v clang > /dev/null 2>&1 && compiler="clang"
   [ ! -z $compiler ] && $compiler -dumpmachine | grep -ohe '^[^-]\+'
 }
 
@@ -104,6 +104,12 @@ create_cvmfs_source_tarball() {
                       ${source_directory}/ducc               \
                       $tar_name
   rm -r $tar_name/test/benchmarks
+
+  # Vendor Go dependencies so offline builds (e.g. koji) work without network access
+  for godir in ducc gateway snapshotter; do
+    (cd ${tmpd}/${tar_name}/${godir} && go mod vendor)
+  done
+
   tar czf $destination_path $tar_name || true
   local retval=$?
   cd ..
@@ -241,10 +247,10 @@ can_build_ducc() {
   if [ $arch != "amd64" ]; then
     return 1
   fi
-  which go > /dev/null 2>&1 && which go-junit-report > /dev/null 2>&1
+  command -v go > /dev/null 2>&1 && command -v go-junit-report > /dev/null 2>&1
 }
 
 # The gateway services require a Go compiler
 can_build_gateway() {
-  which go > /dev/null 2>&1 && which go-junit-report > /dev/null 2>&1
+  command -v go > /dev/null 2>&1 && command -v go-junit-report > /dev/null 2>&1
 }

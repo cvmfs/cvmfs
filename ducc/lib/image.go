@@ -1,17 +1,19 @@
 package lib
 
 import (
-	"archive/tar"
 	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"math"
+	"math/rand"
 	"net/http"
 	"os"
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -21,7 +23,6 @@ import (
 	"github.com/olekukonko/tablewriter"
 	log "github.com/sirupsen/logrus"
 
-	constants "github.com/cvmfs/ducc/constants"
 	cvmfs "github.com/cvmfs/ducc/cvmfs"
 	da "github.com/cvmfs/ducc/docker-api"
 	l "github.com/cvmfs/ducc/log"
@@ -60,6 +61,112 @@ type RegistryConfig struct {
 }
 
 var inputRegistries []RegistryConfig
+
+// Token cache to avoid redundant auth requests for the same registry/repository.
+type cachedToken struct {
+	token     string
+	expiresAt time.Time
+}
+
+var (
+	tokenCacheMu  sync.RWMutex
+	tokenCacheMap = make(map[string]*cachedToken)
+)
+
+// extractTokenCacheKey extracts a repository-scoped cache key from a registry URL.
+// URLs like https://registry/v2/repo/manifests/ref and https://registry/v2/repo/blobs/digest
+// all map to the same cache key based on the registry+repository prefix.
+func extractTokenCacheKey(url, user string) string {
+	for _, suffix := range []string{"/manifests/", "/blobs/", "/tags/"} {
+		if idx := strings.Index(url, suffix); idx != -1 {
+			return url[:idx] + "|" + user
+		}
+	}
+	return url + "|" + user
+}
+
+func getCachedToken(key string) (string, bool) {
+	tokenCacheMu.RLock()
+	defer tokenCacheMu.RUnlock()
+	cached, ok := tokenCacheMap[key]
+	if !ok {
+		return "", false
+	}
+	if time.Now().After(cached.expiresAt) {
+		return "", false
+	}
+	return cached.token, true
+}
+
+func setCachedToken(key, token string, expiresIn int) {
+	tokenCacheMu.Lock()
+	defer tokenCacheMu.Unlock()
+	ttl := time.Duration(expiresIn) * time.Second
+	if ttl <= 0 {
+		ttl = 60 * time.Second // default 60s TTL
+	}
+	// Apply safety margin: use 80% of the TTL to refresh before actual expiry
+	ttl = time.Duration(float64(ttl) * 0.8)
+	tokenCacheMap[key] = &cachedToken{
+		token:     token,
+		expiresAt: time.Now().Add(ttl),
+	}
+}
+
+const rateLimitMaxRetries = 5
+
+// handleRateLimitBackoff checks if the response is a 429 (Too Many Requests) and implements
+// exponential backoff with jitter. Returns true if a retry should be attempted.
+func handleRateLimitBackoff(resp *http.Response, attempt int, maxRetries int) bool {
+	if resp.StatusCode != 429 {
+		return false
+	}
+
+	if attempt >= maxRetries {
+		l.Log().WithFields(log.Fields{
+			"attempt":     attempt,
+			"status_code": resp.StatusCode,
+		}).Warning("Max retries reached for 429 response")
+		return false
+	}
+
+	// Check for Retry-After header
+	var waitDuration time.Duration
+	if retryAfter := resp.Header.Get("Retry-After"); retryAfter != "" {
+		// Try to parse as seconds (integer)
+		if seconds, err := strconv.Atoi(retryAfter); err == nil {
+			waitDuration = time.Duration(seconds) * time.Second
+		} else {
+			// Try to parse as HTTP date
+			if retryTime, err := time.Parse(time.RFC1123, retryAfter); err == nil {
+				waitDuration = time.Until(retryTime)
+				if waitDuration < 0 {
+					waitDuration = 0
+				}
+			}
+		}
+	}
+
+	// If no Retry-After header or parsing failed, use exponential backoff
+	if waitDuration == 0 {
+		// Exponential backoff: 2^attempt seconds, with a max of 60 seconds
+		backoffSeconds := math.Min(math.Pow(2, float64(attempt)), 60)
+		waitDuration = time.Duration(backoffSeconds) * time.Second
+	}
+
+	// Add jitter (±25% randomization)
+	jitter := time.Duration(float64(waitDuration) * 0.25 * (2*rand.Float64() - 1))
+	waitDuration += jitter
+
+	l.Log().WithFields(log.Fields{
+		"attempt":       attempt,
+		"wait_duration": waitDuration,
+		"status_code":   resp.StatusCode,
+	}).Info("Rate limited by registry (429), backing off before retry")
+
+	time.Sleep(waitDuration)
+	return true
+}
 
 func SetupRegistries() {
 	regs := os.Getenv("DUCC_AUTH_REGISTRIES")
@@ -333,7 +440,7 @@ func (img *Image) GetManifestList() (da.ManifestList, error) {
 	} else if err == nil {
 		var placeholderitem da.ManifestListItem
 		placeholderitem.Manifest = *manifest
-		placeholderitem.Platform.Architecture = "amd64" //for images without manifestlist, assume amd64 arch
+		placeholderitem.Platform.Architecture = "" //for images without manifestlist, assume amd64 arch
 		manifestList.Manifests = append(manifestList.Manifests, placeholderitem)
 		manifestList.MediaType = "SingleManifest"
 
@@ -479,25 +586,47 @@ func (img *Image) ExpandWildcard() (<-chan *Image, <-chan *Image, error) {
 	}
 
 	client := http.Client{}
-	req, err := http.NewRequest("GET", url, nil)
-	req.Header.Set("Authorization", token)
 
-	resp, err := client.Do(req)
-	if err != nil {
-		errF := fmt.Errorf("error making the request for retrieving the tags: %s", err)
-		l.LogE(err).WithFields(log.Fields{"url": url}).Error(errF)
-		return r1, r2, errF
+	for attempt := 0; attempt <= rateLimitMaxRetries; attempt++ {
+		req, reqErr := http.NewRequest("GET", url, nil)
+		if reqErr != nil {
+			errF := fmt.Errorf("error creating the request for retrieving the tags: %s", reqErr)
+			l.LogE(reqErr).WithFields(log.Fields{"url": url}).Error(errF)
+			return r1, r2, errF
+		}
+		req.Header.Set("Authorization", token)
+
+		resp, respErr := client.Do(req)
+		if respErr != nil {
+			errF := fmt.Errorf("error making the request for retrieving the tags: %s", respErr)
+			l.LogE(respErr).WithFields(log.Fields{"url": url}).Error(errF)
+			return r1, r2, errF
+		}
+
+		// Handle 429 rate limiting
+		if handleRateLimitBackoff(resp, attempt, rateLimitMaxRetries) {
+			resp.Body.Close()
+			continue
+		}
+
+		if resp.StatusCode >= 400 {
+			errF := fmt.Errorf("error status code (%d) trying to retrieve the tags", resp.StatusCode)
+			l.LogE(errF).WithFields(log.Fields{"status code": resp.StatusCode, "url": url}).Error(errF)
+			resp.Body.Close()
+			return r1, r2, errF
+		}
+		if err = json.NewDecoder(resp.Body).Decode(&tagsList); err != nil {
+			errF := fmt.Errorf("error in decoding the tags from the server: %s", err)
+			l.LogE(err).Error(errF)
+			resp.Body.Close()
+			return r1, r2, errF
+		}
+		resp.Body.Close()
+		// Successfully decoded, break out of retry loop
+		break
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode >= 400 {
-		errF := fmt.Errorf("error status code (%d) trying to retrieve the tags", resp.StatusCode)
-		l.LogE(err).WithFields(log.Fields{"status code": resp.StatusCode, "url": url}).Error(errF)
-		return r1, r2, errF
-	}
-	if err = json.NewDecoder(resp.Body).Decode(&tagsList); err != nil {
-		errF := fmt.Errorf("error in decoding the tags from the server: %s", err)
-		l.LogE(err).Error(errF)
-		return r1, r2, errF
+	if tagsList.Tags == nil {
+		return r1, r2, fmt.Errorf("max retries exceeded for rate limiting while retrieving tags")
 	}
 	pattern := img.Tag
 	filteredTags, err := filterUsingGlob(pattern, tagsList.Tags)
@@ -552,6 +681,12 @@ func filterUsingGlob(pattern string, toFilter []string) ([]string, error) {
 	return result, nil
 }
 
+// GetSingularityPath2 returns the singularity path for a given manifest,
+// without needing to fetch the manifest from the image.
+func (img *Image) GetSingularityPath2(manifest da.Manifest) (string, error) {
+	return manifest.GetSingularityPath(), nil
+}
+
 // here is where in the FS we are going to store the singularity image
 func (img *Image) GetSingularityPath() (string, error) {
 	manifest, err := img.GetManifest()
@@ -560,6 +695,12 @@ func (img *Image) GetSingularityPath() (string, error) {
 		return "", err
 	}
 	return manifest.GetSingularityPath(), nil
+}
+
+// the one that the user see, without the /cvmfs/$repo.cern.ch prefix
+// used mostly by Singularity
+func (i *Image) GetPublicSymlinkPathWithArch(arch string) string {
+	return filepath.Join(arch, i.Registry, i.Repository+":"+i.GetSimpleReference())
 }
 
 // the one that the user see, without the /cvmfs/$repo.cern.ch prefix
@@ -593,45 +734,90 @@ func firstRequestForAuth(url string) (token string, err error) {
 }
 
 func firstRequestForAuth_internal(url, user, pass string) (token string, err error) {
-	resp, err := http.Get(url)
-	if err != nil {
-		l.LogE(err).Error("Error in making the first request for auth")
-		return "", err
+	cacheKey := extractTokenCacheKey(url, user)
+	if cached, ok := getCachedToken(cacheKey); ok {
+		log.WithFields(log.Fields{"url": url}).Debug("Using cached auth token")
+		return cached, nil
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode < 300 && resp.StatusCode >= 200 {
-		log.WithFields(log.Fields{
-			"status code": resp.StatusCode,
-		}).Info("Return valid response, token not necessary.")
-		return
-	}
-	if resp.StatusCode != 401 {
-		log.WithFields(log.Fields{
-			"url":         url,
-			"status code": resp.StatusCode,
-		}).Info("Expected status code 401.")
-		return "", err
-	}
-	WwwAuthenticate := resp.Header["Www-Authenticate"][0]
-	// we first try to get the token with the authentication
-	// if we fail, and we might since the docker hub might not have our user
-	// we try again without authentication
-	token, err = requestAuthToken(WwwAuthenticate, user, pass)
-	if err == nil {
-		// happy path
-		return token, nil
-	}
-	fmt.Printf("We failed with authentication and we now go without for %s\n", url)
-	// some error, we should retry without auth
-	if user != "" || pass != "" {
-		token, err = requestAuthToken(WwwAuthenticate, "", "")
+
+	client := &http.Client{}
+
+	for attempt := 0; attempt <= rateLimitMaxRetries; attempt++ {
+		req, reqErr := http.NewRequest("GET", url, nil)
+		if reqErr != nil {
+			l.LogE(reqErr).Error("Error in creating the first request for auth")
+			return "", reqErr
+		}
+
+		// Advertise support for both Docker v2 and OCI manifest types.
+		// Without this, registries that store OCI manifests return 404
+		// (MANIFEST_UNKNOWN) instead of 200/401, breaking auth detection.
+		req.Header.Set("Accept", "application/vnd.docker.distribution.manifest.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.index.v1+json")
+
+		// for debugging: log curl command corresponding to request
+		if log.IsLevelEnabled(log.TraceLevel) {
+			curlcmd, curlErr := curling.NewFromRequest(req)
+			if curlErr != nil {
+				log.Fatal(curlErr)
+			}
+			log.Trace(curlcmd)
+		}
+
+		resp, respErr := client.Do(req)
+		if respErr != nil {
+			l.LogE(respErr).Error("Error in making the first request for auth")
+			return "", respErr
+		}
+
+		// Handle 429 rate limiting
+		if handleRateLimitBackoff(resp, attempt, rateLimitMaxRetries) {
+			resp.Body.Close()
+			continue
+		}
+
+		if resp.StatusCode < 300 && resp.StatusCode >= 200 {
+			log.WithFields(log.Fields{
+				"status code": resp.StatusCode,
+			}).Info("Return valid response, token not necessary.")
+			resp.Body.Close()
+			// Cache "no auth needed" with a short TTL
+			setCachedToken(cacheKey, "", 60)
+			return "", nil
+		}
+		if resp.StatusCode != 401 {
+			log.WithFields(log.Fields{
+				"url":         url,
+				"status code": resp.StatusCode,
+			}).Info("Expected status code 401.")
+			resp.Body.Close()
+			return "", fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		}
+		WwwAuthenticate := resp.Header["Www-Authenticate"][0]
+		resp.Body.Close()
+		// we first try to get the token with the authentication
+		// if we fail, and we might since the docker hub might not have our user
+		// we try again without authentication
+		var expiresIn int
+		token, expiresIn, err = requestAuthToken(WwwAuthenticate, user, pass)
 		if err == nil {
-			// happy path without auth
+			// happy path
+			setCachedToken(cacheKey, token, expiresIn)
 			return token, nil
 		}
+		fmt.Printf("We failed with authentication and we now go without for %s\n", url)
+		// some error, we should retry without auth
+		if user != "" || pass != "" {
+			token, expiresIn, err = requestAuthToken(WwwAuthenticate, "", "")
+			if err == nil {
+				// happy path without auth
+				setCachedToken(cacheKey, token, expiresIn)
+				return token, nil
+			}
+		}
+		l.LogE(err).Error("Error in getting the authentication token")
+		return "", err
 	}
-	l.LogE(err).Error("Error in getting the authentication token")
-	return "", err
+	return "", fmt.Errorf("max retries exceeded for rate limiting")
 }
 
 func getLayerUrl(img *Image, layerDigest string) string {
@@ -664,8 +850,14 @@ func (d *downloadedLayer) IngestIntoCVMFS(CVMFSRepo string) error {
 		return nil
 	}
 	superDir := filepath.Dir(filepath.Dir(cvmfs.TrimCVMFSRepoPrefix(layerPath)))
-	go cvmfs.CreateCatalogIntoDir(CVMFSRepo, superDir)
+	if err := cvmfs.CreateCatalogIntoDir(CVMFSRepo, superDir); err != nil {
+		l.LogE(err).WithFields(
+			log.Fields{"layer": d.Name, "dir": superDir}).
+			Error("Error creating catalog for layer directory")
+		return err
+	}
 	ingestPath := cvmfs.TrimCVMFSRepoPrefix(layerPath)
+
 	err := cvmfs.Ingest(CVMFSRepo, d.Path,
 		"--catalog", "-t", "-",
 		"-b", ingestPath)
@@ -673,7 +865,11 @@ func (d *downloadedLayer) IngestIntoCVMFS(CVMFSRepo string) error {
 		l.LogE(err).WithFields(
 			log.Fields{"layer": d.Name}).
 			Error("Some error in ingest the layer")
-		go cvmfs.IngestDelete(CVMFSRepo, ingestPath)
+		if errDelete := cvmfs.IngestDelete(CVMFSRepo, ingestPath); errDelete != nil {
+			l.LogE(errDelete).WithFields(
+				log.Fields{"layer": d.Name, "path": ingestPath}).
+				Warning("Error cleaning up failed ingest path")
+		}
 		return err
 	}
 	err = StoreLayerInfo(CVMFSRepo, layerDigest, d.Path)
@@ -691,20 +887,13 @@ func (d *downloadedLayer) GetSize() int64 {
 	return 0
 }
 
-func (img *Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan<- string, stopGettingLayers <-chan bool, rootPath string) error {
+func (img *Image) GetLayers(manifest da.Manifest, layersChan chan<- downloadedLayer, manifestChan chan<- string, stopGettingLayers <-chan bool, rootPath string, maxConcurrentDownloads int, CVMFSRepo string, forceDownload bool) error {
 	defer close(layersChan)
 	defer close(manifestChan)
 
 	layerDownloader := NewLayerDownloader(img)
 	_, err := layerDownloader.getToken()
 	if err != nil {
-		return err
-	}
-
-	// then we try to get the manifest from our database
-	manifest, err := img.GetManifest()
-	if err != nil {
-		l.LogE(err).Warn("Error in getting the manifest")
 		return err
 	}
 
@@ -728,6 +917,13 @@ func (img *Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan
 	}()
 	defer func() { killKiller <- true }()
 
+	// Use a semaphore to limit concurrent layer downloads if maxConcurrentDownloads > 0.
+	// A zero or negative value means unlimited concurrency.
+	var sem chan struct{}
+	if maxConcurrentDownloads > 0 {
+		sem = make(chan struct{}, maxConcurrentDownloads)
+	}
+
 	var wg sync.WaitGroup
 	defer wg.Wait()
 	// at this point we iterate each layer and we download it.
@@ -736,10 +932,25 @@ func (img *Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan
 			continue
 		}
 
+		if sem != nil {
+			sem <- struct{}{}
+		}
+
 		wg.Add(1)
 		go func(ctx context.Context, layer da.Layer) {
-
+			if sem != nil {
+				defer func() { <-sem }()
+			}
 			defer wg.Done()
+
+			layerDigest := strings.Split(layer.Digest, ":")[1]
+			layerPath := cvmfs.LayerRootfsPath(CVMFSRepo, layerDigest)
+			if !forceDownload {
+				if _, err := os.Stat(layerPath); err == nil {
+					l.Log().WithFields(log.Fields{"layer": layer.Digest}).Info("Skipping download of layer, already exists")
+					return
+				}
+			}
 
 			l.Log().WithFields(
 				log.Fields{"layer": layer.Digest}).
@@ -794,11 +1005,11 @@ func (img *Image) downloadLayer(layer da.Layer, token string) (toSend downloaded
 			return
 		}
 	}
-	for i := 0; i <= 5; i++ {
+	for i := 0; i <= rateLimitMaxRetries; i++ {
 		err = nil
 		client := &http.Client{}
 		req, errR := http.NewRequest("GET", layerUrl, nil)
-		if err != nil {
+		if errR != nil {
 			l.LogE(errR).Error("Impossible to create the HTTP request.")
 			err = errR
 			break
@@ -812,11 +1023,19 @@ func (img *Image) downloadLayer(layer da.Layer, token string) (toSend downloaded
 			err = errReq
 			break
 		}
+
+		// Handle 429 rate limiting
+		if handleRateLimitBackoff(resp, i, rateLimitMaxRetries) {
+			resp.Body.Close()
+			continue
+		}
+
 		if 200 <= resp.StatusCode && resp.StatusCode < 300 {
 			gread, errG := gzip.NewReader(resp.Body)
 			if errG != nil {
 				err = errG
 				l.LogE(err).Warning("Error in creating the zip to unzip the layer")
+				resp.Body.Close()
 				continue
 			}
 			path := NewReadAndHash(gread)
@@ -825,6 +1044,7 @@ func (img *Image) downloadLayer(layer da.Layer, token string) (toSend downloaded
 		} else {
 			err = fmt.Errorf("layer not received, status code: %d", resp.StatusCode)
 			l.LogE(err).Warning("Received status code ", resp.StatusCode)
+			resp.Body.Close()
 			if resp.StatusCode == 401 {
 				// try to get the token again
 				newToken, errToken := firstRequestForAuth(layerUrl)
@@ -860,52 +1080,72 @@ func parseBearerToken(token string) (realm string, options map[string]string, er
 	return
 }
 
-func requestAuthToken(token, user, pass string) (authToken string, err error) {
+func requestAuthToken(token, user, pass string) (authToken string, expiresIn int, err error) {
 	realm, options, err := parseBearerToken(token)
 	if err != nil {
 		return
 	}
-	req, err := http.NewRequest("GET", realm, nil)
-	if err != nil {
-		return
-	}
-
-	query := req.URL.Query()
-	for k, v := range options {
-		query.Add(k, v)
-	}
-	if user != "" && pass != "" {
-		query.Add("offline_token", "true")
-		req.SetBasicAuth(user, pass)
-	}
-	req.URL.RawQuery = query.Encode()
 
 	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		err = fmt.Errorf("error in getting the token, http request failed %s", err)
-		return
-	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode >= 400 {
-		err = fmt.Errorf("authorization error %s", resp.Status)
-		return
-	}
+	for attempt := 0; attempt <= rateLimitMaxRetries; attempt++ {
+		req, reqErr := http.NewRequest("GET", realm, nil)
+		if reqErr != nil {
+			return "", 0, reqErr
+		}
 
-	var jsonResp map[string]interface{}
-	err = json.NewDecoder(resp.Body).Decode(&jsonResp)
-	if err != nil {
+		query := req.URL.Query()
+		for k, v := range options {
+			query.Add(k, v)
+		}
+		if user != "" && pass != "" {
+			query.Add("offline_token", "true")
+			req.SetBasicAuth(user, pass)
+		}
+		req.URL.RawQuery = query.Encode()
+
+		resp, respErr := client.Do(req)
+		if respErr != nil {
+			err = fmt.Errorf("error in getting the token, http request failed %s", respErr)
+			return
+		}
+
+		// Handle 429 rate limiting
+		if handleRateLimitBackoff(resp, attempt, rateLimitMaxRetries) {
+			resp.Body.Close()
+			continue
+		}
+
+		if resp.StatusCode >= 400 {
+			err = fmt.Errorf("authorization error %s", resp.Status)
+			resp.Body.Close()
+			return
+		}
+
+		var jsonResp map[string]interface{}
+		err = json.NewDecoder(resp.Body).Decode(&jsonResp)
+		if err != nil {
+			resp.Body.Close()
+			return
+		}
+		authTokenInterface, ok := jsonResp["token"]
+		if ok {
+			authToken = "Bearer " + authTokenInterface.(string)
+		} else {
+			err = fmt.Errorf("didn't get the token key from the server")
+			resp.Body.Close()
+			return
+		}
+		// Extract expires_in if present (typically 300s for Docker Hub)
+		if expiresInInterface, ok := jsonResp["expires_in"]; ok {
+			if v, ok := expiresInInterface.(float64); ok {
+				expiresIn = int(v)
+			}
+		}
+		resp.Body.Close()
 		return
 	}
-	authTokenInterface, ok := jsonResp["token"]
-	if ok {
-		authToken = "Bearer " + authTokenInterface.(string)
-	} else {
-		err = fmt.Errorf("didn't get the token key from the server")
-		return
-	}
-	return
+	return "", 0, fmt.Errorf("max retries exceeded for rate limiting")
 }
 
 type LayerDownloader struct {
@@ -990,144 +1230,48 @@ func (ld *LayerDownloader) DownloadAndIngest(CVMFSRepo string, layer da.Layer) e
 	return err
 }
 
-func (img *Image) CreateSneakyChainStructure(CVMFSRepo string) (err error, lastChainId string) {
-	// make sure we have the layers somewhere
+// CreateFlatOverlay uses cvmfs_server overlay to merge all image layers into a
+// flat filesystem. It returns the singularity path (relative to /cvmfs/$REPO)
+// where the merged image is placed.
+func (img *Image) CreateFlatOverlay(CVMFSRepo string) (singularityPath string, err error) {
 	manifest, err := img.GetManifest()
 	if err != nil {
 		return
 	}
 
-	// then we start creating the chain structure
-	chainIDs := manifest.GetChainIDs()
-
-	paths := []string{}
-	for _, chain := range chainIDs {
-		if chain == "" {
+	// Collect layer rootfs paths in bottom-to-top order (as they appear in the manifest)
+	layerPaths := []string{}
+	for _, layer := range manifest.Layers {
+		if layer.MediaType == "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip" {
 			continue
 		}
-		path := cvmfs.ChainPath(CVMFSRepo, chain.String())
-		dir := filepath.Dir(path)
-		if _, err := os.Stat(dir); err != nil {
-			paths = append(paths, dir)
-		}
+		layerDigest := strings.Split(layer.Digest, ":")[1]
+		layerPaths = append(layerPaths, cvmfs.TrimCVMFSRepoPrefix(cvmfs.LayerRootfsPath(CVMFSRepo, layerDigest)))
 	}
 
-	if len(paths) > 0 {
-		err = cvmfs.WithinTransaction(CVMFSRepo, func() error {
-			for _, dir := range paths {
-				if err := os.MkdirAll(dir, constants.DirPermision); err != nil {
-					return err
-				}
-				// create the .cvmfscatalog, we don't really care if it fails
-				f, _ := os.OpenFile(filepath.Join(dir, ".cvmfscatalog"),
-					os.O_CREATE|os.O_RDONLY, constants.FilePermision)
-				f.Close()
-			}
-			return nil
-		})
-		if err != nil {
-			l.LogE(err).Error("Impossible to create directory to contains the chainID")
-			return
-		}
+	if len(layerPaths) == 0 {
+		err = fmt.Errorf("no layers found for image %s", img.GetSimpleName())
+		return
 	}
 
-	dirtyChains := cvmfs.GetDirtyChains(CVMFSRepo)
-	if len(dirtyChains) > 0 {
-		err = cvmfs.WithinTransaction(CVMFSRepo, func() error {
-			for _, chain := range dirtyChains {
-				chainPath := cvmfs.ChainPath(CVMFSRepo, chain)
-				dirtyChainPath := cvmfs.DirtyChainPath(CVMFSRepo, chain)
-				if err := os.RemoveAll(chainPath); err != nil {
-					return err
-				}
-				if err := os.RemoveAll(dirtyChainPath); err != nil {
-					return err
-				}
-			}
-			return nil
-		})
-		if err != nil {
-			l.LogE(err).Error("Error in deleting dirty chains, unsafe to continue")
-			return
-		}
-	}
+	singularityPath = manifest.GetSingularityPath()
 
 	n := notification.NewNotification(NotificationService)
 	n = n.AddField("image", img.GetSimpleName())
 
-	n.AddField("action", "start_chains_ingestion").Send()
+	t := time.Now()
+	n.AddField("action", "start_overlay_merge").Send()
 
-	ld := NewLayerDownloader(img)
-	previous := ""
-	for i, chain := range chainIDs {
-		if chain == "" {
-			continue
-		}
-		digest := chain.String()
-		lastChainId = digest
-		layer := manifest.Layers[i]
+	err = cvmfs.Overlay(CVMFSRepo, layerPaths, singularityPath)
 
-		l.Log().WithFields(
-			log.Fields{"chain id": digest, "next layer": layer.Digest}).
-			Info("adding new chain")
+	n.Elapsed(t).
+		AddField("action", "end_overlay_merge").
+		Error(err).
+		Send()
 
-		path := cvmfs.ChainPath(CVMFSRepo, digest)
-
-		if _, err := os.Stat(path); err == nil {
-			// the chain is present, we skip the loop
-			l.Log().WithFields(log.Fields{"chain id": digest}).Info("skipping (already present)")
-			previous = chainIDs[i].String()
-			continue
-		}
-
-		downloadLayer := func() error {
-			// we need to get the layer tar reader here
-			layerStream, err := ld.DownloadLayer(layer)
-
-			// we should call this even if there were issues in creating the file
-			defer layerStream.Close()
-
-			if err != nil {
-				l.LogE(err).Error("Error in downloading the layer from the docker registry")
-				return err
-			}
-
-			tarReader := *tar.NewReader(layerStream.Path)
-
-			chainN := n.AddField("chain", chain.String()).
-				AddField("layer", strings.Split(layer.Digest, ":")[1]).
-				AddId()
-
-			t := time.Now()
-			chainN.Action("start_single_chain_ingestion").Send()
-
-			err = cvmfs.CreateSneakyChain(CVMFSRepo,
-				chain.String(),
-				previous,
-				tarReader)
-
-			chainN.Elapsed(t).
-				Action("end_single_chain_ingestion").
-				SizeBytes(layerStream.GetSize()).
-				Error(err).
-				Send()
-
-			return err
-		}
-		for attempt := 0; attempt < 5; attempt++ {
-			l.Log().Info("Start attempt: ", attempt)
-			err = downloadLayer()
-			if err == nil {
-				l.Log().Info("Attempt ", attempt, " success")
-				break
-			}
-			l.Log().Warn("Attempt ", attempt, " fail")
-		}
-		if err != nil {
-			l.LogE(err).Error("Error in creating the chain")
-			return err, lastChainId
-		}
-		previous = chainIDs[i].String()
+	if err != nil {
+		l.LogE(err).Error("Error in creating flat overlay for image")
+		return
 	}
 	return
 }
@@ -1169,37 +1313,49 @@ func makeGetRequest(url string, headers map[string]string) ([]byte, error) {
 	}
 
 	client := &http.Client{}
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		l.LogE(err).Error("Impossible to create a HTTP request")
-		return nil, err
-	}
 
-	req.Header.Set("Authorization", token)
-	for k, v := range headers {
-		req.Header.Set(k, v)
-	}
-
-	// for debugging: log curl command corresponding to request
-	if log.IsLevelEnabled(log.TraceLevel) {
-		curlcmd, err := curling.NewFromRequest(req)
-		if err != nil {
-			log.Fatal(err)
+	for attempt := 0; attempt <= rateLimitMaxRetries; attempt++ {
+		req, reqErr := http.NewRequest("GET", url, nil)
+		if reqErr != nil {
+			l.LogE(reqErr).Error("Impossible to create a HTTP request")
+			return nil, reqErr
 		}
-		log.Trace(curlcmd)
+
+		req.Header.Set("Authorization", token)
+		for k, v := range headers {
+			req.Header.Set(k, v)
+		}
+
+		// for debugging: log curl command corresponding to request
+		if log.IsLevelEnabled(log.TraceLevel) {
+			curlcmd, curlErr := curling.NewFromRequest(req)
+			if curlErr != nil {
+				log.Fatal(curlErr)
+			}
+			log.Trace(curlcmd)
+		}
+
+		resp, respErr := client.Do(req)
+		if respErr != nil {
+			l.LogE(respErr).Error("Error in making the HTTP request")
+			return nil, respErr
+		}
+
+		// Handle 429 rate limiting
+		if handleRateLimitBackoff(resp, attempt, rateLimitMaxRetries) {
+			resp.Body.Close()
+			continue
+		}
+
+		body, bodyErr := ioutil.ReadAll(resp.Body)
+		resp.Body.Close()
+		if bodyErr != nil {
+			l.LogE(bodyErr).Error("Error in reading the second http response")
+			return nil, bodyErr
+		}
+
+		return body, nil
 	}
 
-	resp, err := client.Do(req)
-	if err != nil {
-		l.LogE(err).Error("Error in making the HTTP request")
-		return nil, err
-	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		l.LogE(err).Error("Error in reading the second http response")
-		return nil, err
-	}
-
-	return body, nil
+	return nil, fmt.Errorf("max retries exceeded for rate limiting")
 }

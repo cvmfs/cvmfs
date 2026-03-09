@@ -8,11 +8,9 @@ require (
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/otiai10/copy v1.14.1
-	github.com/pkg/xattr v0.4.10
 	github.com/rubyist/lockfile v0.0.0-20140818014254-a66de41d77a7
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.9.1
-	golang.org/x/sys v0.33.0
 	gopkg.in/yaml.v2 v2.4.0
 )
 
@@ -22,7 +20,7 @@ require (
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/containerd/stargz-snapshotter/estargz v0.16.3 // indirect
 	github.com/distribution/reference v0.6.0 // indirect
-	github.com/docker/cli v28.1.1+incompatible // indirect
+	github.com/docker/cli v29.2.0+incompatible // indirect
 	github.com/docker/distribution v2.8.3+incompatible // indirect
 	github.com/docker/docker-credential-helpers v0.9.3 // indirect
 	github.com/docker/go-connections v0.5.0 // indirect
@@ -48,7 +46,7 @@ require (
 	github.com/moby/sys/userns v0.1.0 // indirect
 	github.com/moby/term v0.5.2 // indirect
 	github.com/opencontainers/image-spec v1.1.1 // indirect
-	github.com/opencontainers/selinux v1.11.0 // indirect
+	github.com/opencontainers/selinux v1.13.0 // indirect
 	github.com/otiai10/mint v1.6.3 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
@@ -62,6 +60,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.35.0 // indirect
 	golang.org/x/net v0.39.0 // indirect
 	golang.org/x/sync v0.14.0 // indirect
+	golang.org/x/sys v0.33.0 // indirect
 )
 
 go 1.24.0

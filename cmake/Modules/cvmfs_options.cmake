@@ -23,7 +23,8 @@ option (BUILD_UNITTESTS_DEBUG   "Build the CernVM-FS unit test set with verbose 
 option (BUILD_UBENCHMARKS       "Build the CernVM-FS micro benchmarks"                             OFF)
 option (BUILD_QC_TESTS          "Build the QuickCheck property random tests"                       OFF)
 option (BUILD_STRESS_TESTS      "Build the stress tests"                                           OFF)
-option (BUILD_DOCUMENTATION     "Build the CerVM-FS documentation using Doxygen"                   OFF)
+option (BUILD_DOCUMENTATION     "Build the CernVM-FS documentation using Doxygen"                   OFF)
+option (BUILD_MANPAGES          "Build the CernVM-FS manpages"                                      ${BUILD_MANPAGES_DEFAULT})
 option (BUILD_COVERAGE          "Compile to collect code coverage reports"                         OFF)
 option (BUILD_LIBFUSE2          "Build the libraries for libfuse2 support"                         OFF)
 option (BUILD_GATEWAY           "Build cvmfs_gateway, requires go compiler"                        OFF)
@@ -59,7 +60,7 @@ option (USE_EXTERNAL_GOOGLETEST "Use external (non-vendored) googletest installa
 # List of external libraries to build (overrides default list in bootstrap.sh)
 set (BUILTIN_EXTERNALS_LIST "" CACHE STRING "Semicolon-separated list of external libraries to build (overrides default list). Eg =libcurl;libcrypto;pacparser")
 # List of external libraries to exclude from building
-set (BUILTIN_EXTERNALS_EXCLUDE "" CACHE STRING "Semicolon-separated list of external libraries to exclude from building")
+set (BUILTIN_EXTERNALS_EXCLUDE ${BUILTIN_EXTERNALS_EXCLUDE_DEFAULT} CACHE STRING "Semicolon-separated list of external libraries to exclude from building")
 
 
 option (ENABLE_ASAN             "Enable the Address Sanitizer"                                     OFF)

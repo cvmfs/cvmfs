@@ -509,7 +509,6 @@ TEST_F(T_Catalog, AttachSchema09) {
 
   WritableCatalog *catalog = WritableCatalog::AttachFreely("", temp_path,
                                                            shash::Any());
-  unlink(temp_path.c_str());
   EXPECT_TRUE(catalog != NULL);
 
   int nchunk = 0;
@@ -533,6 +532,8 @@ TEST_F(T_Catalog, AttachSchema09) {
   shash::Any previous_revision = shash::MkFromHexPtr(
       shash::HexPtr("5fd3e9d6dd96ffb23228fa0be88356b7347e815e"));
   EXPECT_EQ(catalog->GetPreviousRevision(), previous_revision);
+  delete catalog;
+  unlink(temp_path.c_str());
 }
 
 TEST_F(T_Catalog, AttachSchema10) {

@@ -673,6 +673,7 @@ if (BUILD_SERVER)
        swissknife_main.cc
        swissknife_migrate.cc
        swissknife_notify.cc
+       swissknife_overlay.cc
        swissknife_pull.cc
        swissknife_reflog.cc
        swissknife_filestats.cc
@@ -1269,6 +1270,7 @@ if (BUILD_PRELOADER)
                         ${RT_LIBRARY}
                         ${UUID_LIBRARIES}
                         ${VJSON_LIBRARIES}
+                        LibArchive::LibArchive
                         pthread
                         dl
   )

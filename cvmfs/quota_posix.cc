@@ -542,7 +542,7 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
 
     open_files_.clear();
     open_files_ = (cleanup_unused_first_) ? CollectAllOpenHashes()
-                                          : std::vector<shash::Any>();
+                                          : std::vector<shash::Short>();
 
     for (i = 0; i < N; ++i) {
       // That's a critical condition.  We must not delete a not yet inserted
@@ -553,9 +553,18 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
 
       // Avoid evicting open files hopping there are enough more recently used
       // files to satisfy the cleanup request
-      const bool is_open = std::find(open_files_.begin(), open_files_.end(),
-                                     candidates[i].hash)
+/*
+      const bool is_open = std::find_if(
+                               open_files_.begin(), open_files_.end(),
+                               [&candidates, &i](const auto &elem) -> bool {
+                                 return elem.Collide(candidates[i].hash);
+                               })
                            != open_files_.end();
+*/
+      bool is_open=false;
+      for(auto it=open_files_.begin();it!=open_files_.end();++it){
+        if (it->Collide(candidates[i].hash)){is_open=true; break;}
+      }
 
       if (is_pinned) {
         SkipEviction(candidates[i]);
@@ -1392,7 +1401,7 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
       if (return_pipe < 0)
         continue;
 
-      std::vector<shash::Any> gh = quota_mgr->CollectAllOpenHashes();
+      std::vector<shash::Short> gh = quota_mgr->CollectAllOpenHashes();
       std::string result;
       for (auto it = gh.begin(); it != gh.end(); ++it) {
         result += (*it).ToString() + "\n";
@@ -2297,13 +2306,13 @@ void *PosixQuotaManager::CollectMountpointsHashes(void *data) {
   }
   const MutexLockGuard lock_guard(handler->l);
   for (auto hash_str : hash_strs) {
-    handler->of.push_back(shash::MkFromHexPtr(shash::HexPtr(hash_str)));
+    handler->of.push_back(shash::Short( shash::MkFromHexPtr(shash::HexPtr(hash_str)) ));
   }
 #endif
   pthread_exit(nullptr);
 }
 
-std::vector<shash::Any> PosixQuotaManager::CollectAllOpenHashes() {
+std::vector<shash::Short> PosixQuotaManager::CollectAllOpenHashes() {
   std::vector<CollectorHandler *> handlers;
   std::vector<pthread_t *> threads;
   open_files_.clear();

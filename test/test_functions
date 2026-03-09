@@ -2691,11 +2691,12 @@ EOF'
 
     echo "  Starting repository gateway"
     sudo $gateway_script start
-    # Let the service boot up
-    sleep 1
-    $gateway_script status
-    $gateway_script status
-    $gateway_script status
+
+    # Wait for gateway to be ready with timeout
+    if ! timeout 30 bash -c "until $gateway_script status &>/dev/null; do sleep 1; done"; then
+        echo "Gateway failed to start within 30 seconds" >&2
+        return 1
+    fi
 }
 
 restart_repository_gateway() {

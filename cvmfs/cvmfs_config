@@ -1257,10 +1257,6 @@ _cvmfs_reload_pause() {
   local mountpoint="$1"
   local debug_flag=""
  
-  if [ "x${CVMFS_DEBUGLOG}" != "x" ]; then
-    debug_flag="--debug"
-  fi
-
   cd "$mountpoint" 2>/dev/null || return
   get_attr fqrn ${mountpoint}; fqrn=$attr_value
   get_attr pid ${mountpoint}; pid=$attr_value
@@ -1269,6 +1265,12 @@ _cvmfs_reload_pause() {
     cd /
     return 1
   fi
+
+  cvmfs_readconfig $fqrn || die "Failed to read CernVM-FS configuration of $fqrn"
+  if [ "x${CVMFS_DEBUGLOG}" != "x" ]; then
+    debug_flag="--debug"
+  fi
+
   echo "Pausing ${fqrn} on ${mountpoint}"
   cd "$mountpoint" &&
     rm -f ${CVMFS_RELOAD_SOCKETS}/cvmfs.pause/$(echo -n "$mountpoint" | base64_nowrap) && \
@@ -1309,12 +1311,14 @@ cvmfs_reload() {
     shift
     cache_directories=$(list_cache_directories)
   elif [ "x$1" != "x" ]; then
+    org=$1
+    fqrn=$(cvmfs_mkfqrn $org)
+    cvmfs_readconfig $fqrn || die "Failed to read CernVM-FS configuration of $fqrn"
+
     if [ "x${CVMFS_DEBUGLOG}" != "x" ]; then
       debug_flag="--debug"
     fi
 
-    org=$1
-    fqrn=$(cvmfs_mkfqrn $org)
     cvmfs2 __RELOAD__ ${CVMFS_RELOAD_SOCKETS}/cvmfs.$fqrn ${debug_flag}
     return $?
   fi

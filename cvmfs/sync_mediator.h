@@ -115,7 +115,7 @@ class AbstractSyncMediator {
 
   virtual void Add(SharedPtr<SyncItem> entry) = 0;
   virtual void Touch(SharedPtr<SyncItem> entry) = 0;
-  virtual void Remove(SharedPtr<SyncItem> entry) = 0;
+  virtual void Remove(SharedPtr<SyncItem> entry, bool fast_delete = false) = 0;
   virtual void Replace(SharedPtr<SyncItem> entry) = 0;
   virtual void Clone(const std::string from, const std::string to) = 0;
 
@@ -158,7 +158,7 @@ class SyncMediator : public virtual AbstractSyncMediator {
 
   void Add(SharedPtr<SyncItem> entry);
   void Touch(SharedPtr<SyncItem> entry);
-  void Remove(SharedPtr<SyncItem> entry);
+  void Remove(SharedPtr<SyncItem> entry, bool fast_delete = false);
   void Replace(SharedPtr<SyncItem> entry);
   void Clone(const std::string from, const std::string to);
 
@@ -201,7 +201,8 @@ class SyncMediator : public virtual AbstractSyncMediator {
                                const std::string &link_name);
   void TouchDirectoryCallback(const std::string &parent_dir,
                               const std::string &dir_name);
-  void RemoveDirectoryRecursively(SharedPtr<SyncItem> entry);
+  void RemoveDirectoryRecursively(SharedPtr<SyncItem> entry,
+                                  bool fast_delete = false);
   void RemoveFileCallback(const std::string &parent_dir,
                           const std::string &file_name);
   void RemoveSymlinkCallback(const std::string &parent_dir,

@@ -162,7 +162,7 @@ list_deps_rpm() {
 install_deps_deb() {
   [ -f "$DEB_CONTROL" ] || die "Debian control file not found at $DEB_CONTROL"
   $SUDO apt-get -y update
-  if ! check_available mk-build-deps; then
+  if ! check_available mk-build-deps || ! dpkg -s equivs >/dev/null 2>&1; then
     $SUDO apt-get -y install devscripts equivs
   fi
   # Use mk-build-deps to create and install the meta-package, then remove it
@@ -171,6 +171,13 @@ install_deps_deb() {
 
 install_deps_rhel() {
   [ -f "$RPM_SPEC" ] || die "RPM spec file not found at $RPM_SPEC"
+  if ! check_available rpmbuild; then
+    if [[ "$PKG_MGR" = "dnf" ]]; then
+      $SUDO dnf -y install rpm-build
+    else
+      $SUDO yum -y install rpm-build
+    fi
+  fi
   if [[ "$PKG_MGR" = "dnf" ]]; then
     $SUDO dnf -y install dnf-plugins-core || true
     if check_available dnf; then
