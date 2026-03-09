@@ -60,6 +60,7 @@
 #include "auto_umount.h"
 #include "backoff.h"
 #include "bigvector.h"
+#include "bundle_mgr.h"
 #include "cache.h"
 #include "cache_posix.h"
 #include "cache_stream.h"
@@ -1198,6 +1199,19 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   }
 
   perf::Inc(file_system_->n_fs_open());  // Count actual open / fetch operations
+
+  if (dirent.IsBundleTrigger()) {
+    // fetch dependences if not there already
+    PathString trigger_path;
+    assert(GetPathForInode(ino,&trigger_path) && "Unable to retrieve the path of the trigger file");
+    BundleMgr bundle_mgr(mount_point_,  trigger_path);
+    if (bundle_mgr) {
+      bundle_mgr.Fetch();
+    } else {
+      LogCvmfs(kLogCvmfs, kLogDebug,
+               "Couldn't fetch bundle associated to file %s", path.c_str());
+    }
+  }
 
   glue::PageCacheTracker::OpenDirectives open_directives;
   if (!dirent.IsChunkedFile()) {
