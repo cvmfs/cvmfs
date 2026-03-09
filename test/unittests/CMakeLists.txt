@@ -339,6 +339,7 @@ set(CVMFS_UNITTEST_SOURCES
   t_bigqueue.cc
   t_bigvector.cc
   t_blocking_counter.cc
+  t_bundle_file_mgr.cc
   t_cache.cc
   t_cache_extern.cc
   t_cache_ram.cc
