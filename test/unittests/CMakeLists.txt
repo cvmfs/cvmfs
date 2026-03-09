@@ -340,6 +340,7 @@ set(CVMFS_UNITTEST_SOURCES
   t_bigqueue.cc
   t_bigvector.cc
   t_blocking_counter.cc
+  t_bundle_mgr.cc
   t_bundle_file_mgr.cc
   t_cache.cc
   t_cache_extern.cc
@@ -455,6 +456,7 @@ set(CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/authz/authz_fetch.cc
   ${CVMFS_SOURCE_DIR}/authz/authz_session.cc
   ${CVMFS_SOURCE_DIR}/backoff.cc
+  ${CVMFS_SOURCE_DIR}/bundle_mgr.cc
   ${CVMFS_SOURCE_DIR}/cache.cc
   ${CVMFS_SOURCE_DIR}/cache_extern.cc
   ${CVMFS_SOURCE_DIR}/cache_posix.cc
@@ -625,6 +627,7 @@ set(CVMFS_UNITTEST_MOCKFUSE_SOURCES
   ${CVMFS_SOURCE_DIR}/authz/authz_session.cc
   ${CVMFS_SOURCE_DIR}/auto_umount.cc
   ${CVMFS_SOURCE_DIR}/backoff.cc
+  ${CVMFS_SOURCE_DIR}/bundle_mgr.cc
   ${CVMFS_SOURCE_DIR}/cache.cc
   ${CVMFS_SOURCE_DIR}/cache_extern.cc
   ${CVMFS_SOURCE_DIR}/cache_posix.cc

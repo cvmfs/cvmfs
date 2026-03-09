@@ -202,6 +202,8 @@ class ShortString {
   static uint64_t num_instances() { return atomic_read64(&num_instances_); }
   static uint64_t num_overflows() { return atomic_read64(&num_overflows_); }
 
+  operator bool() const { return not IsEmpty(); }
+
  private:
   std::string *long_string_;
   char stack_[StackSize + 1];  // +1 to add a final '\0' if necessary
@@ -231,3 +233,4 @@ bool IsSubPath(const PathString &parent, const PathString &path);
 #endif
 
 #endif  // CVMFS_SHORTSTRING_H_
+
