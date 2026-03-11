@@ -136,6 +136,7 @@ num_warnings=0
 
 TEST_ID_WIDTH=24
 TEST_STATUS_WIDTH=6
+TEST_TIMESTAMP_WIDTH=6
 STATUS_LAYOUT_MIN_COLUMNS=100
 STATUS_LAYOUT="aligned"
 STATUS_COLOR_ENABLED=0
@@ -190,7 +191,11 @@ test_display_id() {
 
 test_elapsed_display() {
   local elapsed_ms="$1"
-  echo "$(milliseconds_to_seconds "$elapsed_ms")s"
+  local elapsed_tenths=$(( (elapsed_ms + 50) / 100 ))
+  local elapsed_seconds=$(( elapsed_tenths / 10 ))
+  local elapsed_fraction=$(( elapsed_tenths % 10 ))
+
+  printf '%3d.%1ds' "$elapsed_seconds" "$elapsed_fraction"
 }
 
 is_positive_integer() {
@@ -299,28 +304,43 @@ format_section_heading() {
   fi
 }
 
-format_status_entry() {
+format_status_entry_prefix() {
   local test_id="$1"
   local test_name="$2"
-  local status="$3"
-  local detail="$4"
-  local status_label
-  local status_padding=""
-  local status_padding_width=0
+  local test_padding=""
+  local test_padding_width=0
 
   : "$test_name"
+
+  if [ "$STATUS_LAYOUT" = "compact" ]; then
+    printf "%s" "$test_id"
+  else
+    test_padding_width=$((TEST_ID_WIDTH - ${#test_id} - 1))
+    if [ "$test_padding_width" -gt 0 ]; then
+      printf -v test_padding '%*s' "$test_padding_width" ''
+      test_padding="${test_padding// /.}"
+    fi
+
+    printf "%s %s " "$test_id" "$test_padding"
+  fi
+}
+
+format_status_entry_suffix() {
+  local status="$1"
+  local timestamp="$2"
+  local detail="$3"
+  local status_label
+
   status_label="$(format_status_label "$status")"
 
   if [ "$STATUS_LAYOUT" = "compact" ]; then
-    printf "%s | %s" "$test_id" "$status_label"
+    printf " | %s" "$status_label"
   else
-    status_padding_width=$((TEST_STATUS_WIDTH - ${#status}))
-    if [ "$status_padding_width" -gt 0 ]; then
-      printf -v status_padding '%*s' "$status_padding_width" ''
-      status_padding="${status_padding// /.}"
-    fi
+    printf "%s" "$status_label"
+  fi
 
-    printf "%-${TEST_ID_WIDTH}s | %s%s" "$test_id" "$status_padding" "$status_label"
+  if [ -n "$timestamp" ] || [ -n "$detail" ]; then
+    printf " | %${TEST_TIMESTAMP_WIDTH}s" "$timestamp"
   fi
 
   if [ -n "$detail" ]; then
@@ -328,13 +348,41 @@ format_status_entry() {
   fi
 }
 
+format_status_entry() {
+  local test_id="$1"
+  local test_name="$2"
+  local status="$3"
+  local timestamp="$4"
+  local detail="$5"
+
+  format_status_entry_prefix "$test_id" "$test_name"
+  format_status_entry_suffix "$status" "$timestamp" "$detail"
+}
+
 print_test_status() {
   local test_id="$1"
   local test_name="$2"
   local status="$3"
-  local detail="$4"
+  local timestamp="$4"
+  local detail="$5"
 
-  format_status_entry "$test_id" "$test_name" "$status" "$detail"
+  format_status_entry "$test_id" "$test_name" "$status" "$timestamp" "$detail"
+  printf "\n"
+}
+
+print_test_status_prefix() {
+  local test_id="$1"
+  local test_name="$2"
+
+  format_status_entry_prefix "$test_id" "$test_name"
+}
+
+print_test_status_suffix() {
+  local status="$1"
+  local timestamp="$2"
+  local detail="$3"
+
+  format_status_entry_suffix "$status" "$timestamp" "$detail"
   printf "\n"
 }
 
@@ -343,10 +391,11 @@ append_status_digest() {
   local test_id="$2"
   local test_name="$3"
   local status="$4"
-  local detail="$5"
+  local timestamp="$5"
+  local detail="$6"
   local digest_entry
 
-  digest_entry="$(format_status_entry "$test_id" "$test_name" "$status" "$detail")"
+  digest_entry="$(format_status_entry "$test_id" "$test_name" "$status" "$timestamp" "$detail")"
 
   printf -v "$digest_var" '%s%s\n' "${!digest_var}" "$digest_entry"
 }
@@ -363,18 +412,6 @@ print_digest_section() {
   elif [ -n "$empty_message" ]; then
     echo "$empty_message"
   fi
-}
-
-print_preview_group() {
-  local title="$1"
-  local preview_content="$2"
-
-  if [ -z "$preview_content" ]; then
-    return
-  fi
-
-  printf '%s\n' "$(format_section_heading "$title")"
-  printf "%s" "$preview_content"
 }
 
 run_test_with_timeout() {
@@ -501,12 +538,11 @@ scratch_basedir="${CVMFS_TEST_SCRATCH}/scratch"
 [ ! -d $scratch_basedir ] || rm -fR $scratch_basedir
 mkdir -p $scratch_basedir
 
-preview_run_entries=""
-preview_suite_skip_entries=""
-preview_excluded_entries=""
 preview_run_count=0
 preview_suite_skip_count=0
 preview_excluded_count=0
+preview_suite_skip_entries=""
+preview_excluded_entries=""
 issue_digest_entries=""
 
 get_iso8601_timestamp > ${scratch_basedir}/starttime
@@ -517,27 +553,32 @@ for t in $testsuite
 do
   TEST_DISPLAY_ID="$(test_display_id "$t")"
   if contains "$exclusions" $t; then
-    append_status_digest preview_excluded_entries "$TEST_DISPLAY_ID" "" "SKIP" "excluded via -x"
     preview_excluded_count=$((preview_excluded_count+1))
+    printf -v preview_excluded_entries '%s%s\n' "$preview_excluded_entries" "$TEST_DISPLAY_ID"
     continue
   fi
 
   if ! is_in_suite $t $labels; then
-    append_status_digest preview_suite_skip_entries "$TEST_DISPLAY_ID" "" "SKIP" "suite restriction"
     preview_suite_skip_count=$((preview_suite_skip_count+1))
+    printf -v preview_suite_skip_entries '%s%s\n' "$preview_suite_skip_entries" "$TEST_DISPLAY_ID"
     continue
   fi
 
-  append_status_digest preview_run_entries "$TEST_DISPLAY_ID" "" "RUN" ""
   preview_run_count=$((preview_run_count+1))
 done
 
-if [ -n "$preview_run_entries$preview_suite_skip_entries$preview_excluded_entries" ]; then
+if [ "$preview_run_count" -gt 0 ] || [ "$preview_suite_skip_count" -gt 0 ] || [ "$preview_excluded_count" -gt 0 ]; then
   echo ""
   printf '%s\n' "$(format_section_heading "Selection preview:")"
-  print_preview_group "Will run ($preview_run_count):" "$preview_run_entries"
-  print_preview_group "Ignored by suite (-s) ($preview_suite_skip_count):" "$preview_suite_skip_entries"
-  print_preview_group "Excluded by -x ($preview_excluded_count):" "$preview_excluded_entries"
+  echo "Will run $preview_run_count tests."
+  if [ "$preview_suite_skip_count" -gt 0 ]; then
+    printf '%s\n' "$(format_section_heading "Ignored by suite (-s) ($preview_suite_skip_count):")"
+    printf "%s" "$preview_suite_skip_entries"
+  fi
+  if [ "$preview_excluded_count" -gt 0 ]; then
+    printf '%s\n' "$(format_section_heading "Excluded by -x ($preview_excluded_count):")"
+    printf "%s" "$preview_excluded_entries"
+  fi
 fi
 
 # run the tests
@@ -560,8 +601,8 @@ do
 
   if ! mkdir -p $scratchdir; then
     report_failure "failed to create $scratchdir" >> $logfile
-    print_test_status "$TEST_DISPLAY_ID" "$(basename "$t")" "FAIL" "failed to create scratchdir"
-    append_status_digest issue_digest_entries "$TEST_DISPLAY_ID" "$(basename "$t")" "FAIL" "failed to create scratchdir"
+    print_test_status "$TEST_DISPLAY_ID" "$(basename "$t")" "FAIL" "" "failed to create scratchdir"
+    append_status_digest issue_digest_entries "$TEST_DISPLAY_ID" "$(basename "$t")" "FAIL" "" "failed to create scratchdir"
     continue
   fi
 
@@ -574,9 +615,9 @@ do
   cvmfs_test_autofs_on_startup=true # might be overwritten by some tests
   if ! . $t/main; then
     report_failure "failed to source $t/main" >> $logfile
-    print_test_status "$TEST_DISPLAY_ID" "$(basename "$t")" "FAIL" "failed to source main"
+    print_test_status "$TEST_DISPLAY_ID" "$(basename "$t")" "FAIL" "" "failed to source main"
     echo "101" > ${scratchdir}/retval
-    append_status_digest issue_digest_entries "$TEST_DISPLAY_ID" "$(basename "$t")" "FAIL" "retval 101, failed to source main"
+    append_status_digest issue_digest_entries "$TEST_DISPLAY_ID" "$(basename "$t")" "FAIL" "" "retval 101, failed to source main"
     continue
   fi
 
@@ -617,7 +658,7 @@ do
   if [ $setup_retval -ne 0 ]; then
     to_syslog "Test $TEST_NR (${cvmfs_test_name}) failed (setup)"
     report_failure "failed to setup environment (retval: $setup_retval)" >> $logfile
-    print_test_status "$TEST_DISPLAY_ID" "$cvmfs_test_name" "FAIL" "setup retval $setup_retval"
+    print_test_status "$TEST_DISPLAY_ID" "$cvmfs_test_name" "FAIL" "" "setup retval $setup_retval"
     echo "0"         > ${scratchdir}/elapsed
     echo "102"       > ${scratchdir}/retval
     # Allow non-regular files e.g. /dev/stdout to be used as logfile.
@@ -626,15 +667,17 @@ do
       wc -l < "$logfile" > ${scratchdir}/log_end
     fi
     touch              ${scratchdir}/failure
-    append_status_digest issue_digest_entries "$TEST_DISPLAY_ID" "$cvmfs_test_name" "FAIL" "retval 102, setup retval $setup_retval"
+    append_status_digest issue_digest_entries "$TEST_DISPLAY_ID" "$cvmfs_test_name" "FAIL" "" "retval 102, setup retval $setup_retval"
     continue
   fi
 
   # run the test
+  print_test_status_prefix "$TEST_DISPLAY_ID" "$cvmfs_test_name"
   test_start=$(get_millisecond_epoch)
   run_test_with_timeout "$t" "$workdir" "$logfile" "$cvmfs_test_timeout" "$TEST_ROOT"
   RETVAL=$?
   if [ $RETVAL -eq 130 ] || [ $RETVAL -eq 143 ]; then
+    printf "\n"
     to_syslog "Test Suite interrupted"
     exit $RETVAL
   fi
@@ -661,15 +704,15 @@ do
       to_syslog "Test $TEST_NR (${cvmfs_test_name}) finished successfully"
       report_passed "Test passed" >> $logfile
       touch ${scratchdir}/success
-      print_test_status "$TEST_DISPLAY_ID" "$cvmfs_test_name" "PASS" "$TEST_ELAPSED_DISPLAY"
+      print_test_status_suffix "PASS" "$TEST_ELAPSED_DISPLAY" ""
       ;;
     $CVMFS_MEMORY_WARNING)
       clean_workdir
       to_syslog "Test $TEST_NR (${cvmfs_test_name}) finished with memory warning"
       report_warning "Memory limit exceeded!" >> $logfile
       touch ${scratchdir}/memorywarning
-      print_test_status "$TEST_DISPLAY_ID" "$cvmfs_test_name" "WARN" "memory limit exceeded, $TEST_ELAPSED_DISPLAY"
-      append_status_digest issue_digest_entries "$TEST_DISPLAY_ID" "$cvmfs_test_name" "WARN" "memory limit exceeded, $TEST_ELAPSED_DISPLAY"
+      print_test_status_suffix "WARN" "$TEST_ELAPSED_DISPLAY" "memory limit exceeded"
+      append_status_digest issue_digest_entries "$TEST_DISPLAY_ID" "$cvmfs_test_name" "WARN" "$TEST_ELAPSED_DISPLAY" "memory limit exceeded"
       ;;
     $CVMFS_TIME_WARNING)
       clean_workdir
@@ -677,31 +720,31 @@ do
       report_warning "Time limit exceeded!" >> $logfile
       tail -n 50 /var/log/messages /var/log.syslog >> $logfile 2>/dev/null
       touch ${scratchdir}/timewarning
-      print_test_status "$TEST_DISPLAY_ID" "$cvmfs_test_name" "WARN" "time limit exceeded, $TEST_ELAPSED_DISPLAY"
-      append_status_digest issue_digest_entries "$TEST_DISPLAY_ID" "$cvmfs_test_name" "WARN" "time limit exceeded, $TEST_ELAPSED_DISPLAY"
+      print_test_status_suffix "WARN" "$TEST_ELAPSED_DISPLAY" "time limit exceeded"
+      append_status_digest issue_digest_entries "$TEST_DISPLAY_ID" "$cvmfs_test_name" "WARN" "$TEST_ELAPSED_DISPLAY" "time limit exceeded"
       ;;
     $CVMFS_GENERAL_WARNING)
       clean_workdir
       to_syslog "Test $TEST_NR (${cvmfs_test_name}) finished with warning"
       report_warning "Test case finished with warnings!" >> $logfile
       touch ${scratchdir}/generalwarning
-      print_test_status "$TEST_DISPLAY_ID" "$cvmfs_test_name" "WARN" "warning, $TEST_ELAPSED_DISPLAY"
-      append_status_digest issue_digest_entries "$TEST_DISPLAY_ID" "$cvmfs_test_name" "WARN" "warning, $TEST_ELAPSED_DISPLAY"
+      print_test_status_suffix "WARN" "$TEST_ELAPSED_DISPLAY" "warning"
+      append_status_digest issue_digest_entries "$TEST_DISPLAY_ID" "$cvmfs_test_name" "WARN" "$TEST_ELAPSED_DISPLAY" "warning"
       ;;
     $CVMFS_TEST_RETVAL_TIMEOUT)
       to_syslog "Test $TEST_NR (${cvmfs_test_name}) timed out"
       report_failure "Testcase timed out" $workdir >> $logfile
       touch ${scratchdir}/failure
-      print_test_status "$TEST_DISPLAY_ID" "$cvmfs_test_name" "FAIL" "timeout, $TEST_ELAPSED_DISPLAY"
-      append_status_digest issue_digest_entries "$TEST_DISPLAY_ID" "$cvmfs_test_name" "FAIL" "retval $CVMFS_TEST_RETVAL_TIMEOUT (timeout), $TEST_ELAPSED_DISPLAY"
+      print_test_status_suffix "FAIL" "$TEST_ELAPSED_DISPLAY" "timeout"
+      append_status_digest issue_digest_entries "$TEST_DISPLAY_ID" "$cvmfs_test_name" "FAIL" "$TEST_ELAPSED_DISPLAY" "retval $CVMFS_TEST_RETVAL_TIMEOUT (timeout)"
       ;;
     *)
       to_syslog "Test $TEST_NR (${cvmfs_test_name}) failed"
       report_failure "Testcase failed with RETVAL $RETVAL" $workdir >> $logfile
       tail -n 50 /var/log/messages /var/log.syslog >> $logfile 2>/dev/null
       touch ${scratchdir}/failure
-      print_test_status "$TEST_DISPLAY_ID" "$cvmfs_test_name" "FAIL" "retval $RETVAL, $TEST_ELAPSED_DISPLAY"
-      append_status_digest issue_digest_entries "$TEST_DISPLAY_ID" "$cvmfs_test_name" "FAIL" "retval $RETVAL, $TEST_ELAPSED_DISPLAY"
+      print_test_status_suffix "FAIL" "$TEST_ELAPSED_DISPLAY" "retval $RETVAL"
+      append_status_digest issue_digest_entries "$TEST_DISPLAY_ID" "$cvmfs_test_name" "FAIL" "$TEST_ELAPSED_DISPLAY" "retval $RETVAL"
       ;;
   esac
 
@@ -743,7 +786,12 @@ echo "Failures: $num_failures"
 echo ""
 echo "took $(milliseconds_to_human_readable $testsuite_time_elapsed)"
 
-print_digest_section "Warnings / failures digest:" "$issue_digest_entries" "  none"
+if [ -n "$issue_digest_entries" ]; then
+  print_digest_section "Warnings / failures digest:" "$issue_digest_entries" ""
+elif [ "$num_warnings" -eq 0 ] && [ "$num_failures" -eq 0 ]; then
+  echo ""
+  printf '%s\n' "$(format_section_heading "All executed tests ran successfully.")"
+fi
 
 to_syslog "Test Suite finished"
 
