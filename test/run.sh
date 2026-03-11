@@ -578,6 +578,7 @@ if [ "$preview_run_count" -gt 0 ] || [ "$preview_suite_skip_count" -gt 0 ] || [ 
   if [ "$preview_excluded_count" -gt 0 ]; then
     printf '%s\n' "$(format_section_heading "Excluded by -x ($preview_excluded_count):")"
     printf "%s" "$preview_excluded_entries"
+    printf "\n"
   fi
 fi
 
