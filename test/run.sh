@@ -1,25 +1,70 @@
 #!/bin/bash
 
 usage() {
-  echo "$0 <logfile> [-o xUnit XML output] [-s suite labels] [-x <exclusion list> --] [test list]"
+  echo "$0 [logfile] [-o xUnit XML output] [-s suite labels] [-x <exclusion list> --] [test list]"
   echo "  -- or --"
-  echo "$0 <logfile> -s3 <S3 storage path>"
+  echo "$0 [logfile] -s3 <S3 storage path>"
+}
+
+git_source_revision() {
+  local source_tree="$1"
+  local git_root
+  local git_revision
+
+  if ! command -v git >/dev/null 2>&1; then
+    return 0
+  fi
+
+  git_root="$(git -C "$source_tree" rev-parse --show-toplevel 2>/dev/null)" || return 0
+  git_revision="$(git -C "$git_root" rev-parse --short=12 HEAD 2>/dev/null)" || return 0
+
+  if [ -n "$(git -C "$git_root" status --porcelain 2>/dev/null)" ]; then
+    git_revision="${git_revision}-dirty"
+  fi
+
+  printf '%s' "$git_revision"
 }
 
 export LC_ALL=C
 
-# set up a log file
-logfile=$1
-if [ -z $logfile ]; then
-  usage
+SCRIPT_DIR=$(cd "$(dirname "$0")"; pwd)
+CURRENT_DIR=$(pwd)
+SOURCE_GIT_REVISION="$(git_source_revision "$SCRIPT_DIR")"
+
+if [ "$CURRENT_DIR" != "$SCRIPT_DIR" ]; then
+  echo "Warning: run.sh must be started from its parent directory: $SCRIPT_DIR"
+  echo "Fatal: please cd $SCRIPT_DIR and run ./run.sh from there"
   exit 1
 fi
+
+# set up a log file
+logfile_arg_consumed=0
+default_logfile_used=0
+case "${1:-}" in
+  ''|-*)
+    logfile="/tmp/cvmfs-test-logs/cvmfs-test-log-$(date +'%Y%m%d-%H%M%S').log"
+    default_logfile_used=1
+    if ! mkdir -p "$(dirname "$logfile")"; then
+      echo "failed to create log directory $(dirname "$logfile")"
+      exit 1
+    fi
+    ;;
+  *)
+    logfile=$1
+    logfile_arg_consumed=1
+    ;;
+esac
+
 if ! echo "$logfile" | grep -q ^/; then
   logfile=$(pwd)/$(basename $logfile)
 fi
 
-if [ "x$2" = "x-s3" ]; then
-  s3_storage=$3
+if [ "$logfile_arg_consumed" -eq 1 ]; then
+  shift
+fi
+
+if [ "x$1" = "x-s3" ]; then
+  s3_storage=$2
   if [ "x$s3_storage" = "x" ]; then
     usage
     exit 1
@@ -29,6 +74,9 @@ if [ "x$2" = "x-s3" ]; then
     exit 1
   fi
   echo "Starting S3 test server" > $logfile
+  if [ -n "$SOURCE_GIT_REVISION" ]; then
+    echo "Source tree git revision: $SOURCE_GIT_REVISION" >> $logfile
+  fi
   mkdir -p $s3_storage/{config,mc_config,data}
 
   s3_config=$s3_storage/test_s3.conf
@@ -76,13 +124,18 @@ fi
 
 echo "Start test suite for cvmfs $(cvmfs2 --version)" > $logfile
 date >> $logfile
+if [ -n "$SOURCE_GIT_REVISION" ]; then
+  echo "Source tree git revision: $SOURCE_GIT_REVISION" >> $logfile
+fi
 
 # read command line parameters
-shift
 test_exclusions=0
 xml_output=""
 debug=""
 labels="$CVMFS_TEST_SUITES"
+suite_option_provided=0
+default_suite_used=0
+default_testsuite_used=0
 while getopts "xo:ds:" option; do
   case $option in
     x)
@@ -96,6 +149,7 @@ while getopts "xo:ds:" option; do
     ;;
     s)
       labels="$OPTARG"
+      suite_option_provided=1
     ;;
     ?)
       usage
@@ -117,15 +171,50 @@ fi
 
 testsuite="$@"
 if [ -z "$testsuite" ]; then
-  testsuite=$(find src -mindepth 1 -maxdepth 1 -type d | sort)
+  if [ "$suite_option_provided" -eq 0 ]; then
+    if [ -z "$labels" ]; then
+      labels="quick"
+      default_suite_used=1
+    fi
+    testsuite="src/0* src/1* src/5* src/6*"
+    default_testsuite_used=1
+  else
+    testsuite=$(find src -mindepth 1 -maxdepth 1 -type d | sort)
+  fi
+fi
+
+default_cli_parameters=""
+if [ "$default_logfile_used" -eq 1 ]; then
+  default_cli_parameters="logfile=$logfile"
+fi
+if [ "$default_suite_used" -eq 1 ]; then
+  if [ -n "$default_cli_parameters" ]; then
+    default_cli_parameters="$default_cli_parameters; "
+  fi
+  default_cli_parameters="${default_cli_parameters}-s quick"
+fi
+if [ "$default_testsuite_used" -eq 1 ]; then
+  if [ -n "$default_cli_parameters" ]; then
+    default_cli_parameters="$default_cli_parameters; "
+  fi
+  default_cli_parameters="${default_cli_parameters}-- src/0* src/1* src/5* src/6*"
 fi
 
 if [ "x$labels" != "x" ]; then
   echo "Limiting test cases to suite(s): $labels"
 fi
 
+echo "Starting CernVM-FS integration test run at $(date)"
+echo "Logging test output to $logfile"
+if [ -n "$SOURCE_GIT_REVISION" ]; then
+  echo "Running from git revision $SOURCE_GIT_REVISION"
+fi
+if [ -n "$default_cli_parameters" ]; then
+  echo "Defaulted CLI parameters for this run: $default_cli_parameters"
+fi
+
 # start running the tests
-TEST_ROOT=$(cd "$(dirname "$0")"; pwd)
+TEST_ROOT="$SCRIPT_DIR"
 export TEST_ROOT
 
 num_tests=0
@@ -359,6 +448,15 @@ format_status_entry() {
   format_status_entry_suffix "$status" "$timestamp" "$detail"
 }
 
+append_preview_skip_entry() {
+  local preview_var="$1"
+  local test_id="$2"
+  local preview_entry
+
+  preview_entry="$(format_status_entry "$test_id" "" "SKIP" "" "")"
+  printf -v "$preview_var" '%s%s\n' "${!preview_var}" "$preview_entry"
+}
+
 print_test_status() {
   local test_id="$1"
   local test_name="$2"
@@ -554,13 +652,13 @@ do
   TEST_DISPLAY_ID="$(test_display_id "$t")"
   if contains "$exclusions" $t; then
     preview_excluded_count=$((preview_excluded_count+1))
-    printf -v preview_excluded_entries '%s%s\n' "$preview_excluded_entries" "$TEST_DISPLAY_ID"
+    append_preview_skip_entry preview_excluded_entries "$TEST_DISPLAY_ID"
     continue
   fi
 
   if ! is_in_suite $t $labels; then
     preview_suite_skip_count=$((preview_suite_skip_count+1))
-    printf -v preview_suite_skip_entries '%s%s\n' "$preview_suite_skip_entries" "$TEST_DISPLAY_ID"
+    append_preview_skip_entry preview_suite_skip_entries "$TEST_DISPLAY_ID"
     continue
   fi
 
