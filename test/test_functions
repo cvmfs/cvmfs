@@ -22,8 +22,8 @@ CVMFS_TEST_SYSLOG_TARGET=${CVMFS_TEST_SYSLOG_TARGET:=/var/log/cvmfs-testing.log}
 
 CVMFS_TEST_REPO=${CVMFS_TEST_REPO:=test.cern.ch}
 CVMFS_TEST_REPO_MORE=${CVMFS_TEST_REPO_MORE:=test-more.cern.ch}
-CVMFS_TEST_USER=${CVMFS_TEST_USER:=sftnight}   # user and group are used to over-
-CVMFS_TEST_GROUP=${CVMFS_TEST_GROUP:=sftnight} # write the owner of files for testing
+CVMFS_TEST_USER=${CVMFS_TEST_USER:=$(id -un)}   # user and group are used to over-
+CVMFS_TEST_GROUP=${CVMFS_TEST_GROUP:=$(id -gn)} # write the owner of files for testing
 CVMFS_TEST_GEO_LICENSE_KEY=${CVMFS_TEST_GEO_LICENSE_KEY:=}
 CVMFS_TEST_GEO_ACCOUNT_ID=${CVMFS_TEST_GEO_ACCOUNT_ID:=}
 
