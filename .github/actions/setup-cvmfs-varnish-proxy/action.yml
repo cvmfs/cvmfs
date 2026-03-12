@@ -1,0 +1,57 @@
+name: Setup CVMFS Varnish proxy
+description: >-
+  Install and launch a local Varnish proxy for CVMFS using the upstream
+  cvmfs-contrib/varnish-cvmfs VCL as the configuration baseline.
+
+# Workflow-facing contract intentionally stays close to setup-squid-proxy:
+# a caller selects a local port and gets back proxy-url. The main behavior
+# differences are the VCL config file, file-backed storage.bin cache layout,
+# and log collection via varnishlog/varnishncsa instead of Squid log files.
+inputs:
+  port:
+    description: Local TCP port exposed by the Varnish proxy.
+    required: false
+    default: '3128'
+  config-path:
+    description: Path to the Varnish VCL configuration file written by this action.
+    required: false
+    default: /etc/varnish/cvmfs.vcl
+  system-cache-dir:
+    description: System cache directory used by Varnish for storage.bin and runtime state.
+    required: false
+    default: /var/cache/varnish
+  system-log-dir:
+    description: System log directory populated by varnishlog and varnishncsa.
+    required: false
+    default: /var/log/varnish
+  restore-cache-dir:
+    description: Runner cache directory restored into the Varnish cache before startup.
+    required: false
+    default: '$HOME/.cache/varnishcache/varnish-cache'
+  restore-log-dir:
+    description: Runner cache directory restored into the Varnish log directory before startup.
+    required: false
+    default: '$HOME/.cache/varnishcache/varnish-logs'
+  cache-size:
+    description: File-backed cache size passed to varnishd (for example 2G).
+    required: false
+    default: 2G
+outputs:
+  proxy-url:
+    description: HTTP proxy URL for CVMFS clients.
+    value: ${{ steps.start.outputs.proxy-url }}
+runs:
+  using: composite
+  steps:
+    - id: start
+      shell: bash
+      env:
+        INPUT_ACTION_PATH: ${{ github.action_path }}
+        INPUT_PORT: ${{ inputs.port }}
+        INPUT_CONFIG_PATH: ${{ inputs.config-path }}
+        INPUT_SYSTEM_CACHE_DIR: ${{ inputs.system-cache-dir }}
+        INPUT_SYSTEM_LOG_DIR: ${{ inputs.system-log-dir }}
+        INPUT_RESTORE_CACHE_DIR: ${{ inputs.restore-cache-dir }}
+        INPUT_RESTORE_LOG_DIR: ${{ inputs.restore-log-dir }}
+        INPUT_CACHE_SIZE: ${{ inputs.cache-size }}
+      run: bash "${{ github.action_path }}/start-varnish.sh"

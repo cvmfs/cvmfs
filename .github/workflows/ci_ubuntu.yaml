@@ -45,111 +45,9 @@ jobs:
         with:
           path: /home/runner/.cache/
           key: v3-cvmfs-ci-cache-${{ steps.lsb-release.outputs.id-release }}-${{ steps.lsb-release.outputs.arch }}
-      - name: Create Squid cache directories
-        run: |
-          sudo mkdir -p /var/cache/squid
-          sudo mkdir -p /var/log/squid
-          sudo mkdir -p /etc/squid
-
-          # Copy cached data from user space to system directories
-          if [ -d "$HOME/.cache/squidcache/squid-cache" ] && [ "$(ls -A $HOME/.cache/squidcache/squid-cache)" ]; then
-            echo " Restoring squid cache"
-            sudo mv  $HOME/.cache/squidcache/squid-cache/* /var/cache/squid/ 2>/dev/null || true
-          fi
-
-          if [ -d "$HOME/.cache/squidcache/squid-logs" ] && [ "$(ls -A $HOME/.cache/squidcache/squid-logs)" ]; then
-            sudo mv $HOME/.cache/squidcache/squid-logs/* /var/log/squid/ 2>/dev/null || true
-          fi
-
-          # Set proper ownership
-          sudo chown -R proxy:proxy /var/cache/squid
-          sudo chown -R proxy:proxy /var/log/squid
-          sudo chmod -R 755 /var/cache/squid
-      - name: Install Squid
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y squid squidclient
-
-      - name: Configure Squid
-        run: |
-          sudo tee /etc/squid/squid.conf > /dev/null <<EOF
-          # Cache configuration
-          cache_dir ufs /var/cache/squid 2000 16 256
-          cache_mem 256 MB
-          maximum_object_size 100 MB
-          maximum_object_size_in_memory 512 KB
-
-          # Access control
-          acl localnet src 10.0.0.0/8
-          acl localnet src 172.16.0.0/12
-          acl localnet src 192.168.0.0/16
-          acl localnet src fc00::/7
-          acl localnet src fe80::/10
-
-          acl SSL_ports port 443
-          acl Safe_ports port 80
-          acl Safe_ports port 21
-          acl Safe_ports port 443
-          acl Safe_ports port 70
-          acl Safe_ports port 210
-          acl Safe_ports port 1025-65535
-          acl Safe_ports port 280
-          acl Safe_ports port 488
-          acl Safe_ports port 591
-          acl Safe_ports port 777
-          acl CONNECT method CONNECT
-
-          # Access rules
-          http_access deny !Safe_ports
-          http_access deny CONNECT !SSL_ports
-          http_access allow localnet
-          http_access allow localhost
-          http_access deny all
-
-          # Network configuration
-          http_port 3128
-
-          # Logging
-          access_log /var/log/squid/access.log
-          cache_log /var/log/squid/cache.log
-
-          # Cache behavior
-           refresh_pattern . 1440 50% 10080 ignore-no-cache ignore-private override-expire ignore-reload
-
-          EOF
-
-      - name: Set permissions for Squid cache
-        run: |
-          sudo chown -R proxy:proxy /var/cache/squid
-          sudo chown -R proxy:proxy /var/log/squid
-          sudo chmod -R 755 /var/cache/squid
-      - name: Initialize Squid cache if needed
-        run: |
-          # Only initialize if cache directory structure doesn't exist
-          #sudo systemctl stop squid
-          #if [ ! -d "/var/cache/squid/00" ]; then
-          #  sudo -u proxy squid -z
-          #fi
-          echo "skip"
-          # Stop and disable auto-started service
-          sudo systemctl stop squid
-          sudo systemctl disable squid
-
-          # Clear any PID files
-          sudo rm -f /run/squid.pid /var/run/squid.pid
-
-          # Kill any remaining processes
-          sudo pkill -f squid || true
-          sleep 2
-
-          # Initialize cache if needed
-          if [ ! -d "/var/cache/squid/00" ]; then
-            sudo -u proxy squid -z -f /etc/squid/squid.conf
-          fi
-      - name: Start Squid service
-        run: |
-          sudo systemctl start squid
-          sudo systemctl enable squid
+      - name: Setup Squid proxy
+        id: squid-proxy
+        uses: ./.github/actions/setup-squid-proxy
       - name: Check for builddep package
         id: cvmfs-builddep-check
         run: |
@@ -209,7 +107,7 @@ jobs:
 
           export CVMFS_TESTCASES=${{ github.event.inputs.testCases || '"src/0* src/1* src/5* src/6* src/7* src/8*"' }}
           export CVMFS_TEST_SUITES=${{ github.event.inputs.testSuites || 'quick' }}
-          CVMFS_TEST_PROXY=http://localhost:3128 \
+          CVMFS_TEST_PROXY=${{ steps.squid-proxy.outputs.proxy-url }} \
           CVMFS_TEST_USER=$(id -un) \
           CVMFS_TEST_GROUP=$(id -gn) \
           ./run.sh /tmp/test.log    \
