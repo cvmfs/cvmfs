@@ -341,7 +341,7 @@ void cvmcache_get_session(cvmcache_session *session) {
 void cvmcache_spawn_watchdog(const char *crash_dump_file) {
   if (g_watchdog != NULL)
     return;
-  g_watchdog = Watchdog::Create(NULL, false);
+  g_watchdog = Watchdog::Create(NULL, false /* needs_read_environ */);
   assert(g_watchdog != NULL);
   g_watchdog->Spawn((crash_dump_file != NULL) ? string(crash_dump_file) : "");
 }
