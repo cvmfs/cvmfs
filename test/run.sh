@@ -670,7 +670,7 @@ if [ "$preview_run_count" -gt 0 ] || [ "$preview_suite_skip_count" -gt 0 ] || [ 
   printf '%s\n' "$(format_section_heading "Selection preview:")"
   echo "Will run $preview_run_count tests."
   if [ "$preview_suite_skip_count" -gt 0 ]; then
-    printf '%s\n' "$(format_section_heading "Ignored by suite (-s) ($preview_suite_skip_count):")"
+    printf '%s\n' "$(format_section_heading "Excluded by suite (-s) ($preview_suite_skip_count):")"
     printf "%s" "$preview_suite_skip_entries"
   fi
   if [ "$preview_excluded_count" -gt 0 ]; then
