@@ -18,6 +18,11 @@ using namespace std;  // NOLINT
 
 namespace catalog {
 
+// Emergency fallback: if CVMFS_NO_IGNORE_LEGACY_BULKHASHES is set, revert to the
+// old behavior of including bulk hashes for chunked files.
+bool g_ignore_legacy_bulk_hashes =
+    (getenv("CVMFS_NO_IGNORE_LEGACY_BULKHASHES") == NULL);
+
 /**
  * NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE
  * Always remember to update the legacy catalog migration classes to produce a
@@ -1357,6 +1362,10 @@ SqlAllChunks::SqlAllChunks(const CatalogDatabase &database) {
                                        SqlDirent::kFlagPosCompression)
                                    + ") " + "AS compression_algorithm ";
 
+  if (!g_ignore_legacy_bulk_hashes)
+    LogCvmfs(kLogCatalog, kLogDebug, "CVMFS_NO_IGNORE_LEGACY_BULKHASHES is set, "
+		     "legacy bulk hashes won't be ignored in catalog operations");
+
   // TODO(reneme): this depends on shash::kSuffix* being a char!
   //               it should be more generic or replaced entirely
   // TODO(reneme): this is practically the same as SqlListContentHashes and
@@ -1371,7 +1380,9 @@ SqlAllChunks::SqlAllChunks(const CatalogDatabase &database) {
                + "FROM catalog WHERE (hash IS NOT NULL) AND "
                  " (flags & "
                + StringifyInt(SqlDirent::kFlagFileExternal |
-                              SqlDirent::kFlagFileChunk) + " = 0)";
+                              (g_ignore_legacy_bulk_hashes
+                                   ? SqlDirent::kFlagFileChunk
+                                   : 0)) + " = 0)";
   if (database.schema_version() >= 2.4 - CatalogDatabase::kSchemaEpsilon) {
     sql += " UNION "
            "SELECT DISTINCT chunks.hash, "

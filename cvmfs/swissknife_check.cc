@@ -366,7 +366,8 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
     // and only run requests once per hash
     const bool entry_needs_check = !entries[i].checksum().IsNull() &&
                                    !entries[i].IsExternalFile() &&
-                                   !entries[i].IsChunkedFile() &&
+                                   !(catalog::g_ignore_legacy_bulk_hashes &&
+                                     entries[i].IsChunkedFile()) &&
                                    // fallback cli option can force the entry to
                                    // be checked
                                    (no_duplicates_map_
