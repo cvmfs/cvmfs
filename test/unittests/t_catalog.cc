@@ -359,7 +359,11 @@ TEST_F(T_Catalog, Chunks) {
     EXPECT_EQ(zlib::kZlibDefault, compression_alg);
   }
   EXPECT_TRUE(catalog->AllChunksEnd());
-  EXPECT_EQ(4u, counter);  // number of files with content + empty hash
+  // Expect the number of chunks in files plus the number of hashes in
+  // files with no chunks.
+  // In particular the file '/foo' has both a hash and a chunk but the
+  // hash is ignored because bulk hashes are no longer used.
+  EXPECT_EQ(3u, counter);
 }
 
 TEST_F(T_Catalog, Statistics) {

@@ -364,8 +364,10 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
   for (unsigned i = 0; i < entries.size(); ++i) {
     // for performance reasons, keep track of files already checked
     // and only run requests once per hash
-    const bool entry_needs_check = !entries[i].checksum().IsNull()
-                                   && !entries[i].IsExternalFile() &&
+    const bool entry_needs_check = !entries[i].checksum().IsNull() &&
+                                   !entries[i].IsExternalFile() &&
+                                   !(catalog::g_ignore_legacy_bulk_hashes &&
+                                     entries[i].IsChunkedFile()) &&
                                    // fallback cli option can force the entry to
                                    // be checked
                                    (no_duplicates_map_

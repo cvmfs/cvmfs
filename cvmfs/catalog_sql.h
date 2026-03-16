@@ -35,6 +35,10 @@ class XattrList;
 
 namespace catalog {
 
+// Set to false via CVMFS_NO_IGNORE_LEGACY_BULKHASHES env var to restore the
+// pre-2.14 behavior of including bulk hashes for chunked files.
+extern bool g_ignore_legacy_bulk_hashes;
+
 class Catalog;
 
 
