@@ -1335,7 +1335,7 @@ Supported Commands:
                   Re-publishes the given tag as the new latest revision.
                   All snapshots between trunk and the target tag become
                   inaccessible.  Without a tag name, trunk-previous is used.
-  resign          [ -w path to existing whitelist ]
+  resign          [ -w path to existing whitelist (avoids need for config) ]
                   [ -d days until expiration (default 30) ]
                   [ -f don't ask again ]
                   <fully qualified name>
