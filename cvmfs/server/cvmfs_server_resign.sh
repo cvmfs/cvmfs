@@ -100,7 +100,7 @@ cvmfs_server_resign() {
 
         local wl="$(get_upstream_config $CVMFS_UPSTREAM_STORAGE)/.cvmfswhitelist"
         local crt=/etc/cvmfs/keys/$name.crt
-        if [ ! -f "$wl" ] || [ -f $crt ]; then
+        if [ ! -f "$wl" ] || [ -f "$crt" ]; then
           # create from scratch
           wl=""
         fi
