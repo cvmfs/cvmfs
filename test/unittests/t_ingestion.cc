@@ -110,6 +110,7 @@ class T_Ingestion : public ::testing::Test {
     delete uploader_;
     EXPECT_EQ(0U, BlockItem::managed_bytes());
   }
+  void ExerciseCompressionRoundtrip(zip::Algorithm alg);
 
   Tube<DummyItem> tube_;
   TubeConsumerGroup<DummyItem> task_group_;
@@ -553,7 +554,7 @@ TEST_F(T_Ingestion, TaskCompressNull) {
 }
 
 
-TEST_F(T_Ingestion, TaskCompress) {
+void T_Ingestion::ExerciseCompressionRoundtrip(zip::Algorithm alg) {
   Tube<BlockItem> tube_in;
   Tube<BlockItem> *tube_out = new Tube<BlockItem>();
   TubeGroup<BlockItem> tube_group_out;
@@ -595,7 +596,7 @@ TEST_F(T_Ingestion, TaskCompress) {
   b_stop->MakeStop();
   tube_in.EnqueueBack(b_stop);
 
-  compressor_ = zip::Compressor::Construct(zip::kDefault);
+  compressor_ = zip::Compressor::Construct(alg);
   zip::InputMem in(block_raw.data(), block_raw.size());
   cvmfs::MemSink comp_single_block(0, block_raw.size()/2);
   zip::StreamStates res = compressor_->Compress(&in, &comp_single_block);
@@ -608,7 +609,7 @@ TEST_F(T_Ingestion, TaskCompress) {
   unsigned char *ptr_read_decomp = reinterpret_cast<unsigned char *>(
                                                      smalloc(block_raw.size()));
   // check that decompressed is equal to
-  zip::Decompressor *decomp(zip::Decompressor::Construct(zip::kDefault));
+  zip::Decompressor *decomp(zip::Decompressor::Construct(alg));
   zip::InputMem in_decomp(comp_single_block.data(), comp_single_block.pos());
   cvmfs::MemSink out_decomp(0, block_raw.size() + 100);
 
@@ -663,6 +664,13 @@ TEST_F(T_Ingestion, TaskCompress) {
   free(ptr_read_large);
   free(ptr_read_decomp);
   task_group.Terminate();
+}
+
+
+TEST_F(T_Ingestion, TaskCompress) {
+  ExerciseCompressionRoundtrip(zip::Algorithm::kZlib);
+  ExerciseCompressionRoundtrip(zip::Algorithm::kNoCompression);
+  ExerciseCompressionRoundtrip(zip::Algorithm::kZstd);
 }
 
 
