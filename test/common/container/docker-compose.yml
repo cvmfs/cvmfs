@@ -2,11 +2,14 @@
 
 services:
     cvmfs-dev:
-        image: ghcr.io/vvolkl/cvmfs-dev:latest
+        image: ghcr.io/cvmfs/cvmfs-dev:latest
         container_name: cvmfs-dev
         hostname: cvmfs-dev
         privileged: true
         cgroup: host # required to run sbin/init with cgroups v2
+        build:
+            context: ../../..
+            dockerfile: test/common/container/Dockerfile-dev
         volumes:
             - /sys/fs/cgroup:/sys/fs/cgroup
             - var_spool_cvmfs:/var/spool/cvmfs

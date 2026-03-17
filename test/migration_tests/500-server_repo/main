@@ -100,7 +100,7 @@ cvmfs_run_test() {
   publish_repo $MIGRATIONTEST_500_REPO || return 20
 
   # synchronize stratum1 with stratum0
-  sudo cvmfs_server snapshot $MIGRATIONTEST_500_REPLICA || return 21
+  cvmfs_server snapshot $MIGRATIONTEST_500_REPLICA || return 21
 
   # check that test files were successfully replicated
   testfile2_object="c8e126bfcef0d8b8dce3daf99cf0219c8ba3011a"

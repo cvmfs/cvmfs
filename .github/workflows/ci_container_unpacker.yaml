@@ -2,8 +2,6 @@ name: container_unpacker
 on:
   pull_request:
     branches: [devel, cvmfs*]
-  push:
-    branches: [devel, cvmfs*]
   workflow_dispatch:
 
 jobs:
