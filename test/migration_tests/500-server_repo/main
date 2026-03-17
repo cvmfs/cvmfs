@@ -58,14 +58,9 @@ cvmfs_run_test() {
   echo "installing CernVM-FS server $previous_version"
   install_packages $upstream_packages || return 4
 
-  # make CernVM-FS ready to go
-  #echo "setting up CernVM-FS (cvmfs_config setup)"
-  #sudo cvmfs_config setup nostart noautofs    || return 5
-  #sudo cvmfs_config chksetup || return 5
-
   # make sure that autofs is not running
-  #echo "switching off autofs"
-  #autofs_switch off || return 6
+  echo "switching off autofs"
+  autofs_switch off || return 6
 
   # create a testing repository
   create_empty_repo $MIGRATIONTEST_500_REPO $CVMFS_TEST_USER || return 7
@@ -83,7 +78,7 @@ cvmfs_run_test() {
                   /etc/cvmfs/keys/${MIGRATIONTEST_500_REPO}.pub || return 11
 
   # synchronize stratum1 with stratum0
-  sudo cvmfs_server snapshot $MIGRATIONTEST_500_REPLICA || return 12
+  cvmfs_server snapshot $MIGRATIONTEST_500_REPLICA || return 12
 
   export CVMFS_SERVER_DEBUG=3
   start_transaction $MIGRATIONTEST_500_REPO || return 13
