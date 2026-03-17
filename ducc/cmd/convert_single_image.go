@@ -99,13 +99,15 @@ var convertSingleImageCmd = &cobra.Command{
 
 		var conversionErrors []string
 		totalSummary := lib.ConversionSummary{}
+		var layerErr error
 
 		for i := 0; i < attempts; i++ {
-			attemptSummary, err := lib.ConvertWish(wish, convertAgain, overwriteLayer, multiArch, maxConcurrentDownloads)
+			var attemptSummary lib.ConversionSummary
+			attemptSummary, layerErr = lib.ConvertWish(wish, convertAgain, overwriteLayer, multiArch, maxConcurrentDownloads)
 			totalSummary.Merge(attemptSummary)
-			log := l.LogE(err).WithFields(fields).
+			log := l.LogE(layerErr).WithFields(fields).
 				WithFields(log.Fields{"attempts number": i})
-			if err != nil {
+			if layerErr != nil {
 				log.Warning("Could not convert wish (layers), trying again")
 			} else {
 				if len(totalSummary.Added) == 0 && len(totalSummary.Updated) == 0 {
@@ -116,28 +118,31 @@ var convertSingleImageCmd = &cobra.Command{
 				break
 			}
 		}
-		if err != nil {
+		if layerErr != nil {
 			log.Error("Multiple Errors in converting layers, going on")
-			conversionErrors = append(conversionErrors, fmt.Sprintf("layers: %s", err))
+			conversionErrors = append(conversionErrors, fmt.Sprintf("layers: %s", layerErr))
 		}
 		logConversionSummary(fmt.Sprintf("Conversion summary for %s:", wish.InputName), totalSummary)
 
 		if !skipFlat {
-			for i := 0; i < attempts; i++ {
-				err = lib.ConvertWishFlat(wish, multiArch)
-				log := l.LogE(err).WithFields(fields).
-					WithFields(log.Fields{"attempts number": i})
-				if err != nil {
-					log.Warning("Error in converting singularity image, trying again")
-				} else {
-					log.Info("Successfully created the singularity image")
-					break
+			if layerErr != nil {
+				l.LogE(layerErr).WithFields(fields).Warning("Skipping overlay: layer ingestion had errors")
+			} else {
+				for i := 0; i < attempts; i++ {
+					err = lib.ConvertWishFlat(wish, multiArch)
+					log := l.LogE(err).WithFields(fields).
+						WithFields(log.Fields{"attempts number": i})
+					if err != nil {
+						log.Warning("Error in converting singularity image, trying again")
+					} else {
+						log.Info("Successfully created the singularity image")
+						break
+					}
 				}
-			}
-
-			if err != nil {
-				log.Error("Multiple Errors in converting singularity image, going on")
-				conversionErrors = append(conversionErrors, fmt.Sprintf("singularity: %s", err))
+				if err != nil {
+					log.Error("Multiple Errors in converting singularity image, going on")
+					conversionErrors = append(conversionErrors, fmt.Sprintf("singularity: %s", err))
+				}
 			}
 		}
 

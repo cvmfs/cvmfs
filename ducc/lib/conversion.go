@@ -636,7 +636,7 @@ func convertInputOutput2(inputImage *Image, imageLabel, nameWithArch, repo strin
 	}
 
 	logger.Warn("Some error during the conversion, we are not storing it into the database")
-	return ConversionUnknown, nil
+	return ConversionUnknown, fmt.Errorf("error ingesting one or more layers for image %s", inputImage.GetSimpleName())
 }
 
 func CreateThinImage(manifest da.Manifest, layerLocations map[string]string, inputImage, outputImage Image) (err error) {
