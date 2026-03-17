@@ -79,8 +79,7 @@ detect_platform() {
     PKG_MGR="apt-get"; OS_FAMILY="deb"; return 0
   fi
   if echo "$like_all" | grep -Eq '(rhel|centos|fedora|rocky|almalinux|ol)'; then
-    if check_available dnf; then PKG_MGR="dnf"; else PKG_MGR="yum"; fi
-    OS_FAMILY="rhel"; return 0
+    PKG_MGR="dnf"; OS_FAMILY="rhel"; return 0
   fi
   if echo "$like_all" | grep -Eq '(suse|sles|opensuse)'; then
     PKG_MGR="zypper"; OS_FAMILY="suse"; return 0
@@ -88,7 +87,6 @@ detect_platform() {
   # Fallbacks by package manager availability
   if check_available apt-get; then PKG_MGR="apt-get"; OS_FAMILY="deb"; return 0; fi
   if check_available dnf; then PKG_MGR="dnf"; OS_FAMILY="rhel"; return 0; fi
-  if check_available yum; then PKG_MGR="yum"; OS_FAMILY="rhel"; return 0; fi
   if check_available zypper; then PKG_MGR="zypper"; OS_FAMILY="suse"; return 0; fi
   return 1
 }
@@ -172,35 +170,15 @@ install_deps_deb() {
 install_deps_rhel() {
   [ -f "$RPM_SPEC" ] || die "RPM spec file not found at $RPM_SPEC"
   if ! check_available rpmbuild; then
-    if [[ "$PKG_MGR" = "dnf" ]]; then
-      $SUDO dnf -y install rpm-build
-    else
-      $SUDO yum -y install rpm-build
-    fi
+    $SUDO dnf -y install rpm-build
   fi
-  if [[ "$PKG_MGR" = "dnf" ]]; then
-    $SUDO dnf -y install dnf-plugins-core || true
-    if check_available dnf; then
-      $SUDO dnf builddep -y "$RPM_SPEC" && return 0
-    fi
-  fi
-  if [[ "$PKG_MGR" = "yum" ]]; then
-    $SUDO yum -y install yum-utils || true
-    if check_available yum-builddep; then
-      $SUDO yum-builddep -y "$RPM_SPEC" && return 0
-    else
-      $SUDO yum builddep -y "$RPM_SPEC" && return 0 || true
-    fi
-  fi
+  $SUDO dnf -y install dnf-plugins-core || true
+  $SUDO dnf builddep -y "$RPM_SPEC" && return 0
   # Fallback: parse spec and install packages directly
   local pkgs
   pkgs=$(list_deps_rpm "$RPM_SPEC" || true)
   [ -n "${pkgs:-}" ] || die "Could not determine RPM build dependencies"
-  if [[ "$PKG_MGR" = "dnf" ]]; then
-    $SUDO dnf -y install $pkgs
-  else
-    $SUDO yum -y install $pkgs
-  fi
+  $SUDO dnf -y install $pkgs
 }
 
 install_deps_suse() {

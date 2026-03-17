@@ -1,14 +1,20 @@
-name: container_unpacker
+name: Hotpatch and migration tests (Ubuntu)
+
 on:
+  push:
+    branches: ['devel', 'cvmfs*', 'migration-ci']
   pull_request:
-    branches: [devel, cvmfs*]
+    branches: ['devel', 'cvmfs*']
   workflow_dispatch:
 
 jobs:
-  validate_unpacker:
+  ubuntu:
+    name: "Hotpatch/migration tests (Ubuntu, no Docker)"
     runs-on: ubuntu-latest
-    steps:
+    env:
+      CVMFS_PACKAGE_DIR: /tmp/build
 
+    steps:
       - id: lsb-release
         run: |
           if [ "$RUNNER_OS" == "Linux" ]; then
@@ -20,18 +26,21 @@ jobs:
             echo "id-release=${DISTRIB_ID}-${DISTRIB_RELEASE}" >> $GITHUB_OUTPUT
             echo "arch=$(uname -m)" >> $GITHUB_OUTPUT
           fi
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Create cache directories
         run: |
           mkdir -p /home/runner/.cache
+
       - name: Restore CI cache
         uses: actions/cache/restore@v4
         id: cvmfs-ci-cache-restore
         with:
           path: /home/runner/.cache/
           key: v3-cvmfs-ci-cache-${{ steps.lsb-release.outputs.id-release }}-${{ steps.lsb-release.outputs.arch }}
+
       - name: Check for builddep package
         id: cvmfs-builddep-check
         run: |
@@ -40,6 +49,7 @@ jobs:
           else
             echo "package_exists=false" >> $GITHUB_OUTPUT
           fi
+
       - name: Generate build-dep metapackage
         if: steps.cvmfs-builddep-check.outputs.package_exists != 'true'
         run: |
@@ -47,51 +57,72 @@ jobs:
           sudo apt-get install -y devscripts equivs
           mk-build-deps ./packaging/debian/cvmfs/control
           mv cvmfs-build-deps_*_all.deb /home/runner/.cache
+
       - name: Install build dependencies
         run: |
           sudo apt-get install -y /home/runner/.cache/cvmfs-build-deps_*_all.deb
-      - name: Build packages
+
+      - name: Build and install CVMFS config packages
         run: |
-          sudo apt-get -y update
-          sudo apt-get -y install devscripts ccache apache2 libapache2-mod-wsgi-py3
+          mkdir -p /tmp/cvmfs-config
+          ./ci/build_package.sh $PWD /tmp/cvmfs-config cvmfs-config
+          sudo apt-get install -y /tmp/cvmfs-config/*.deb
+
+      - name: Build CVMFS debian packages
+        run: |
+          sudo apt-get -y install ccache
           export CVMFS_EXTERNALS_PREFIX=/home/runner/.cache/cvmfs_externals_install
           export CMAKE_CXX_COMPILER_LAUNCHER=ccache
-          mkdir /tmp/build-ubuntu
-          mkdir /tmp/build-ubuntu-config
-          ./ci/build_package.sh $PWD /tmp/build-ubuntu-config cvmfs-config
-          ./ci/build_package.sh $PWD /tmp/build-ubuntu cvmfs
-      - name: Install packages
+          mkdir -p $CVMFS_PACKAGE_DIR
+          ./ci/build_package.sh $PWD $CVMFS_PACKAGE_DIR cvmfs
+
+      - name: Check CCache Hits
         run: |
-          sudo apt-get -y install /tmp/build-ubuntu*/*.deb
+          ccache -s
+
+      - name: Install runtime dependencies
+        run: |
+          sudo apt-get -y install \
+            apache2 \
+            attr \
+            autofs \
+            fuse3 \
+            jq \
+            libapache2-mod-wsgi-py3 \
+            lsof \
+            netcat-openbsd \
+            python3 \
+            sqlite3 \
+            wget
+
+      - name: Install CVMFS packages
+        run: |
+          sudo apt-get install -y $CVMFS_PACKAGE_DIR/*.deb 
+
+      - name: Setup CVMFS
+        run: |
           sudo cvmfs_config setup
-          sudo systemctl stop autofs
           sudo systemctl start apache2
-          sudo systemctl status apache2
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.24.x'
-      - name: Build and install cvmfs_ducc
-        working-directory: ./ducc
+
+      - name: Run hotpatch/migration tests
         run: |
-          sudo make install
-          cvmfs_ducc version || true
-      - name: Validate container unpacker
-        run: |
-          cd test/container
-          sudo ./validate_unpacker.sh -k -v -c https://registry.hub.docker.com/library/python:3.9
-      - name: Upload logs on failure
+          cd test
+          CVMFS_TEST_PROXY=DIRECT CVMFS_TEST_CLASS_NAME=MigrationTests \
+            ./run.sh /tmp/cvmfs-migration-test.log \
+            migration_tests/001-hotpatch \
+            migration_tests/500-server_repo
+
+      - name: Dump logs
         if: ${{ failure() }}
+        run: |
+          cat /tmp/cvmfs-migration-test.log || true
+
+      - name: Upload logs as artifact
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
-          name: validate-unpacker-logs
+          name: CVMFS hotpatch-migration Ubuntu logs
+          if-no-files-found: warn
           path: |
-            /tmp/validate_unpacker.*
-      - name: Save CI cache
-        if: github.ref == 'refs/heads/devel' && github.event_name != 'pull_request'
-        uses: actions/cache/save@v4
-        id: cvmfs-ci-cache-save
-        with:
-          path: /home/runner/.cache/
-          key: v3-cvmfs-ci-cache-${{ steps.lsb-release.outputs.id-release }}-${{ steps.lsb-release.outputs.arch }}
+            /tmp/cvmfs-migration-test.log
 

@@ -7,7 +7,6 @@ if [ "$HERE" = "$0" ]; then
 fi
 cd $HERE/../..
 
-TEST_LOG_DIRECTORY=/tmp
 CLIENT_TEST_LOGFILE=/tmp/cvmfs-client-test.log
 SERVER_TEST_LOGFILE=/tmp/cvmfs-server-test.log
 
@@ -77,3 +76,5 @@ CVMFS_TEST_UNIONFS=overlayfs                                                  \
                                  src/7*                                       \
                               || exit 1
 
+# Hotpatch/migration coverage runs via test_migration.sh in the standalone
+# GitHub Actions workflow.

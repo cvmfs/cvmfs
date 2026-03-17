@@ -25,23 +25,25 @@ jobs:
           docker exec -u sftnight -t cvmfs-dev bash -c \
             "sudo cvmfs_config setup"
 
-      - name: Run Tests
+      - name: Run client/server tests
         run: |
           docker exec -u sftnight -t cvmfs-dev bash -c \
             "cd /home/sftnight/cvmfs/test/common/container && CVMFS_TEST_PROXY=DIRECT bash test.sh"
 
       - name: Archive logs
-        if: ${{ always () }}
+        if: ${{ always() }}
         run: |
-          docker cp cvmfs-dev:/tmp/cvmfs-client-test.log /tmp/cvmfs-client-test.log
-          docker cp cvmfs-dev:/tmp/cvmfs-server-test.log /tmp/cvmfs-server-test.log
+          for logname in client server; do
+            log=/tmp/cvmfs-$logname-test.log
+            docker cp cvmfs-dev:$log $log || true
+          done
 
       - name: Upload logs as artifact
-        if: ${{ always () }}
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
-        with: 
-          name: CVMFS test logs
+        with:
+          name: CVMFS client-server test logs
+          if-no-files-found: warn
           path: |
               /tmp/cvmfs-client-test.log
               /tmp/cvmfs-server-test.log
-

@@ -1,4 +1,4 @@
-#! /usr/bin/env python2
+#! /usr/bin/env python3
 
 # Copyright (C) 2008-2009 by Guy Rutenberg
 
@@ -26,7 +26,12 @@ def tarsum(input_file, hash, output_file):
         hash - The name of the hash to use. Must be supported by hashlib.
         output_file - A FILE to write the computed signatures to.
         """
-        tar = tarfile.open(mode="r:*", fileobj=input_file)
+        mode = "r:*"
+        try:
+            input_file.tell()
+        except (AttributeError, OSError):
+            mode = "r|*"
+        tar = tarfile.open(mode=mode, fileobj=input_file)
 
         chunk_size = 100*1024
         store_digests = {}
@@ -63,9 +68,9 @@ def main():
     if option.output:
         output_file = open(option.output, "w")
 
-    input_file = sys.stdin
+    input_file = sys.stdin.buffer
     if len(args)==1 and args[0]!="-":
-        input_file = open(args[0], "r")
+        input_file = open(args[0], "rb")
 
     tarsum(input_file, option.checksum, output_file)
 

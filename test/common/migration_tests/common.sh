@@ -31,7 +31,7 @@ guess_package_url() {
     [ "x$architecture" = x"x86_64" ] && architecture="amd64"
     [ "x$architecture" = x"i686" ] && architecture="i386"
     local flavor="$(lsb_release -si | tr [:upper:] [:lower:])$(lsb_release -sr)"
-    package_file_name="${package_name}_${short_cvmfs_version_string}~${release}+${flavor}_${architecture}.deb"
+    package_file_name="${package_name}_${short_cvmfs_version_string}+${flavor}_${architecture}.deb"
 
   # CentOS 7, 8
   elif [ x${short_id} = x"CentOS" ] || \
@@ -108,7 +108,7 @@ version_lower_or_equal() {
 
 has_binary() {
   local binary_name=$1
-  which $binary_name > /dev/null 2>&1
+  command -v $binary_name > /dev/null 2>&1
 }
 
 
@@ -259,6 +259,30 @@ uninstall_package() {
 }
 
 
+# Find a single package file by name prefix in CVMFS_PACKAGE_DIR.
+# Prefers .rpm on rpm-based systems, .deb otherwise.
+find_new_package() {
+  local name="$1"
+  local dir="${CVMFS_PACKAGE_DIR:-/tmp}"
+  if has_binary rpm; then
+    ls ${dir}/${name}*.rpm 2>/dev/null | head -1
+  else
+    ls ${dir}/${name}*.deb 2>/dev/null | head -1
+  fi
+}
+
+
+# Install all CernVM-FS packages found in CVMFS_PACKAGE_DIR.
+install_new_packages() {
+  local dir="${CVMFS_PACKAGE_DIR:-/tmp}"
+  if has_binary rpm; then
+    install_packages ${dir}/cvmfs*.rpm
+  else
+    install_packages ${dir}/cvmfs*.deb
+  fi
+}
+
+
 #
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 #
@@ -269,14 +293,23 @@ if [ x"$CVMFS_CLIENT_PACKAGE" = x"" ] || [ ! -f $CVMFS_CLIENT_PACKAGE ]; then
   echo "CernVM-FS client package '$CVMFS_CLIENT_PACKAGE' not found!"
 fi
 
-if [ x"$CVMFS_SERVER_PACKAGE" = x"" ] || [ ! -f $CVMFS_SERVER_PACKAGE ]; then
+if [ x"$CVMFS_SERVER_PACKAGE" = x"" ]; then
+  CVMFS_SERVER_PACKAGE="${CVMFS_CLIENT_PACKAGE/cvmfs/cvmfs-server}"
+fi
+if [ ! -f $CVMFS_SERVER_PACKAGE ]; then
   echo "CernVM-FS server package '$CVMFS_SERVER_PACKAGE' not found!"
 fi
 
-if [ x"$CVMFS_CONFIG_PACKAGE" = x"" ] || [ ! -f $CVMFS_CONFIG_PACKAGE ]; then
-  echo "CernVM-FS config package '$CVMFS_CONFIG_PACKAGE' not found!"
+if [ x"$CVMFS_LIBS_PACKAGE" = x"" ]; then
+  CVMFS_LIBS_PACKAGE="${CVMFS_CLIENT_PACKAGE/cvmfs/cvmfs-libs}"
+fi
+if [ ! -f $CVMFS_LIBS_PACKAGE ]; then
+  echo "CernVM-FS libs package '$CVMFS_LIBS_PACKAGE' not found!"
 fi
 
-if [ x"$CVMFS_LIBS_PACKAGE" = x"" ] || [ ! -f $CVMFS_LIBS_PACKAGE ]; then
-  echo "CernVM-FS libs package '$CVMFS_LIBS_PACKAGE' not found!"
+if [ x"$CVMFS_FUSE_PACKAGE" = x"" ]; then
+  CVMFS_FUSE_PACKAGE="${CVMFS_CLIENT_PACKAGE/cvmfs/cvmfs-fuse3}"
+fi
+if [ ! -f $CVMFS_FUSE_PACKAGE ]; then
+  echo "CernVM-FS fuse package '$CVMFS_FUSE_PACKAGE' not found!"
 fi
