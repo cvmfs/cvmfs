@@ -6,6 +6,11 @@
 #
 
 cmake_minimum_required (VERSION 3.24..3.30)
+
+# Enable creation of compile_commands.json by default. Needed by LSPs, useful for devs
+# Must be set before project() so the generator picks it up
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE INTERNAL "Export compile_commands.json for LSPs")
+
 set (PROJECT_NAME "CernVM-FS")
 project (${PROJECT_NAME})
 

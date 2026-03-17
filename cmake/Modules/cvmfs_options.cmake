@@ -64,8 +64,4 @@ set (BUILTIN_EXTERNALS_EXCLUDE ${BUILTIN_EXTERNALS_EXCLUDE_DEFAULT} CACHE STRING
 
 
 option (ENABLE_ASAN             "Enable the Address Sanitizer"                                     OFF)
-# Enable creation of compile_commands.json by default. Needed by LSPs, useful for devs
-if(NOT DEFINED CMAKE_EXPORT_COMPILE_COMMANDS)
-    set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-endif()
 option (CHECK_SYSTEM_HEADERS    "Check System for required headers"                                 OFF)
