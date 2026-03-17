@@ -7,8 +7,8 @@ MIGRATIONTEST_500_REPLICA="migrationtest-stratum1.cern.ch"
 
 cleanup() {
   echo "running cleanup()"
-  #destroy_repo $MIGRATIONTEST_500_REPO
-  #destroy_repo $MIGRATIONTEST_500_REPLICA
+  destroy_repo $MIGRATIONTEST_500_REPO
+  destroy_repo $MIGRATIONTEST_500_REPLICA
 }
 
 cvmfs_run_test() {

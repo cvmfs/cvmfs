@@ -108,9 +108,7 @@ version_lower_or_equal() {
 
 has_binary() {
   local binary_name=$1
-  # use `type` instead of `which` because as a dependency of cvmfs the latter
-  # can be deleted as an unused dependency when the cvmfs package is deleted
-  type $binary_name > /dev/null 2>&1
+  command -v $binary_name > /dev/null 2>&1
 }
 
 
