@@ -65,7 +65,7 @@ func getLock(CVMFSRepo string) {
 		// this may happen if the kernel detect a deadlock
 		// it should never happen in our case, (of a single global lock)
 		// but still we can protect against it
-		l.LogE(err).Info("Error in getting the FS lock")
+		l.LogE(err).Warning("Error in getting the FS lock")
 		time.Sleep(100 * time.Millisecond)
 		err = f.LockWriteB()
 	}
