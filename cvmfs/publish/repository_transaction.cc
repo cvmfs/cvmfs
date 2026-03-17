@@ -116,6 +116,9 @@ void Publisher::TransactionImpl(bool waiting_on_lease) {
   }
 
   in_transaction_.Set();
+  // Pre-create the publishing lock file so that Abort() can acquire it even
+  // if the disk fills up before abort is called.
+  is_publishing_.Touch();
   ConstructSpoolers();
   if (marker.IsValid())
     settings_.GetTransaction()->SetBaseHash(marker->hash());

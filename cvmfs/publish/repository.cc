@@ -156,6 +156,8 @@ void Repository::DownloadRootObjects(const std::string &url,
   std::string reflog_path;
   FILE *reflog_fd = CreateTempFile(tmp_dir + "/reflog", kPrivateFileMode, "w",
                                    &reflog_path);
+  if (reflog_fd == NULL)
+    throw EPublish("cannot create reflog temp file (disk full?)");
   const std::string reflog_url = url + "/.cvmfsreflog";
   // TODO(jblomer): verify reflog hash
   // shash::Any reflog_hash(manifest_->GetHashAlgorithm());
@@ -181,6 +183,8 @@ void Repository::DownloadRootObjects(const std::string &url,
   std::string tags_path;
   FILE *tags_fd = CreateTempFile(tmp_dir + "/tags", kPrivateFileMode, "w",
                                  &tags_path);
+  if (tags_fd == NULL)
+    throw EPublish("cannot create tags temp file (disk full?)");
   if (!manifest_->history().IsNull()) {
     const std::string tags_url = url + "/data/"
                                  + manifest_->history().MakePath();
@@ -646,6 +650,13 @@ Publisher::Publisher(const SettingsPublisher &settings, const bool exists)
                    EPublish::kFailLayoutRevision);
   }
 
+  // Session and managed node are needed even when skipping downloads (e.g.
+  // for abort under disk-full conditions), so initialize them before the
+  // early return below.
+  if (settings.is_managed())
+    managed_node_ = new ManagedNode(this);
+  session_ = new Session(settings_, llvl_);
+
   if (!exists)
     return;
 
@@ -685,9 +696,6 @@ Publisher::Publisher(const SettingsPublisher &settings, const bool exists)
       throw EPublish("corrupted keychain");
   }
 
-  if (settings.is_managed())
-    managed_node_ = new ManagedNode(this);
-  session_ = new Session(settings_, llvl_);
   if (in_transaction_.IsSet())
     ConstructSpoolers();
 }

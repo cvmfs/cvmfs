@@ -84,6 +84,18 @@ bool ServerLockFile::TryLock() {
 }
 
 
+void ServerLockFile::Touch() {
+  if (fd_ >= 0)
+    return;
+  // Pre-create the lock file without locking it, so that a subsequent Lock()
+  // can open the existing file even when the disk is full (e.g. during abort
+  // after the repository's spool area has been filled up).
+  const int fd = open(path_.c_str(), O_RDONLY | O_CREAT, 0600);
+  if (fd >= 0)
+    close(fd);
+}
+
+
 void ServerLockFile::Unlock() {
   const int old_fd = fd_;
   assert(old_fd >= 0);

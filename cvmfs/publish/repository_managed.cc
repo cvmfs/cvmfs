@@ -63,16 +63,21 @@ void Publisher::ManagedNode::ClearScratch() {
       tmp_dir = publisher_->settings_.transaction().spool_area().tmp_dir();
 
   const std::string waste_dir = CreateTempDir(scratch_wastebin + "/waste");
-  if (waste_dir.empty())
-    throw EPublish("cannot create wastebin directory");
-  const int rvi = rename(scratch_dir.c_str(),
-                         (waste_dir + "/delete-me").c_str());
-  if (rvi != 0)
-    throw EPublish("cannot move scratch directory to wastebin");
-
-  publisher_->CreateDirectoryAsOwner(scratch_dir, kDefaultDirMode);
-
-  AlterMountpoint(kAlterScratchWipe, kLogSyslog);
+  if (!waste_dir.empty()) {
+    // Normal case: move scratch contents to wastebin for async cleanup.
+    const int rvi = rename(scratch_dir.c_str(),
+                           (waste_dir + "/delete-me").c_str());
+    if (rvi != 0)
+      throw EPublish("cannot move scratch directory to wastebin");
+    publisher_->CreateDirectoryAsOwner(scratch_dir, kDefaultDirMode);
+    AlterMountpoint(kAlterScratchWipe, kLogSyslog);
+  } else {
+    // Disk full: cannot create a wastebin directory. Clean scratch/current
+    // in place synchronously instead (deletion does not require free space).
+    RunSuidHelper("clear_scratch", publisher_->settings_.fqrn());
+    // scratch_dir still exists and is now empty; chown without allocating space
+    publisher_->CreateDirectoryAsOwner(scratch_dir, kDefaultDirMode);
+  }
 
   std::vector<mode_t> modes;
   std::vector<std::string> names;
@@ -100,9 +105,13 @@ int Publisher::ManagedNode::Check(bool is_quiet) {
 
   int result = kFailOk;
 
-  shash::Any expected_hash = publisher_->manifest()->catalog_hash();
+  // expected_hash is left null when manifest is not available (e.g. abort
+  // with exists=false), in which case the root hash comparison is skipped.
   const UniquePtr<CheckoutMarker> marker(CheckoutMarker::CreateFrom(
       publisher_->settings_.transaction().spool_area().checkout_marker()));
+  shash::Any expected_hash;
+  if (publisher_->manifest() != NULL)
+    expected_hash = publisher_->manifest()->catalog_hash();
   if (marker.IsValid())
     expected_hash = marker->hash();
 
@@ -114,13 +123,15 @@ int Publisher::ManagedNode::Check(bool is_quiet) {
     const bool retval = platform_getxattr(rdonly_mnt, root_hash_xattr,
                                           &root_hash_str);
     if (retval) {
-      const shash::Any root_hash = shash::MkFromHexPtr(
-          shash::HexPtr(root_hash_str), shash::kSuffixCatalog);
-      if (expected_hash != root_hash) {
-        if (marker.IsValid()) {
-          result |= kFailRdOnlyWrongRevision;
-        } else {
-          result |= kFailRdOnlyOutdated;
+      if (!expected_hash.IsNull()) {
+        const shash::Any root_hash = shash::MkFromHexPtr(
+            shash::HexPtr(root_hash_str), shash::kSuffixCatalog);
+        if (expected_hash != root_hash) {
+          if (marker.IsValid()) {
+            result |= kFailRdOnlyWrongRevision;
+          } else {
+            result |= kFailRdOnlyOutdated;
+          }
         }
       }
     } else {

@@ -134,7 +134,10 @@ int CmdAbort::Main(const Options &options) {
   }
 
   UniquePtr<Publisher> publisher;
-  publisher = new Publisher(*settings);
+  // Pass exists=false to skip downloading the whitelist and manifest, which
+  // would fail under disk-full conditions. Abort only needs the session (to
+  // drop any gateway lease) and the managed node (to repair mount points).
+  publisher = new Publisher(*settings, false /* exists */);
 
   LogCvmfs(kLogCvmfs, kLogSyslog, "(%s) aborting transaction",
            settings->fqrn().c_str());
