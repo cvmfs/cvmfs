@@ -65,13 +65,15 @@ int Watchdog::g_suppressed_signals[] = {
 int Watchdog::g_crash_signals[] = {SIGQUIT, SIGILL, SIGABRT, SIGFPE,
                                    SIGSEGV, SIGBUS, SIGPIPE, SIGXFSZ};
 
-Watchdog *Watchdog::Create(FnOnExit on_exit, WatchdogState *saved_state) {
+Watchdog *Watchdog::Create(FnOnExit on_exit,
+                           bool needs_read_environ,
+                           WatchdogState *saved_state) {
   assert(instance_ == NULL);
   instance_ = new Watchdog(on_exit);
   if (saved_state != NULL)
     instance_->RestoreState(saved_state);
   else
-    instance_->Fork();
+    instance_->Fork(needs_read_environ);
   return instance_;
 }
 
@@ -389,7 +391,7 @@ Watchdog::SigactionMap Watchdog::SetSignalHandlers(
 /**
  * Fork the watchdog process and put it on hold until Spawn() is called.
  */
-void Watchdog::Fork() {
+void Watchdog::Fork(bool needs_read_environ) {
   Pipe<kPipeWatchdogPid> pipe_pid;
   pipe_watchdog_ = new Pipe<kPipeWatchdog>();
   pipe_listener_ = new Pipe<kPipeWatchdogSupervisor>();
@@ -413,11 +415,18 @@ void Watchdog::Fork() {
               // Reduce to minimum capabilities, which unfortunately is
               // still quite powerful.
               // CAP_SYS_ADMIN is needed to unmount, and CAP_SYS_PTRACE
-              // is needed in order to get a stack trace since one of
-              // the main process threads is privileged.
-              const std::vector<cap_value_t> reservecaps = {CAP_SYS_ADMIN, CAP_SYS_PTRACE};
-              const std::vector<cap_value_t> inheritcaps = {CAP_SYS_PTRACE};
-              assert(ClearPermittedCapabilities(reservecaps, inheritcaps));
+              // is needed when needs_read_environ is true because then
+              // the main Fuse process has elevated capabilities and
+              // ptrace (needed for collecting a stack trace) is not
+              // allowed on a process with more capabilities.
+              if (needs_read_environ) {
+                const std::vector<cap_value_t> reservecaps = {CAP_SYS_ADMIN, CAP_SYS_PTRACE};
+                const std::vector<cap_value_t> inheritcaps = {CAP_SYS_PTRACE};
+                assert(ClearPermittedCapabilities(reservecaps, inheritcaps));
+              } else {
+                const std::vector<cap_value_t> reservecaps = {CAP_SYS_ADMIN};
+                assert(ClearPermittedCapabilities(reservecaps, nocaps));
+              }
             } else {
               // Only need to be able to do the stack trace, and the
               // main process needs no extra capabilities, so we can
@@ -506,6 +515,9 @@ bool Watchdog::WaitForSupervisee() {
 
   switch (control_flow) {
     case ControlFlow::kQuit:
+      return false;
+    case ControlFlow::kQuitWithExit:
+      if (on_exit_) on_exit_(false);
       return false;
     case ControlFlow::kSupervise:
       break;

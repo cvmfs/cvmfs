@@ -210,7 +210,8 @@ struct LoaderExports {
 
 /**
  * This contains the public interface of the cvmfs fuse module.
- * Whenever something changes, change the version number.
+ * Whenever something changes, change the version number and add only
+ * to the end of the struct.
  * A global CvmfsExports struct is looked up by the loader via dlsym.
  * Since the cvmfs fuse module gets replaced each time there's an
  * upgrade or downgrade, the only way to get a cvmfs module older than

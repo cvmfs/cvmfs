@@ -82,7 +82,7 @@ class JobInfo {
   InterruptCue *interrupt_cue_;
   cvmfs::Sink *sink_;
   const shash::Any *expected_hash_;
-  const std::string *extra_info_;
+  const std::string *path_info_;
 
   // Allow byte ranges to be specified.
   off_t range_offset_;
@@ -134,6 +134,8 @@ class JobInfo {
     data_tube_.Destroy();
   }
 
+  static bool EscapeUrlChar(unsigned char input, char output[3]);
+
   void CreatePipeJobResults() {
     pipe_job_results = new Pipe<kPipeDownloadJobsResults>();
   }
@@ -181,7 +183,7 @@ class JobInfo {
   InterruptCue *interrupt_cue() const { return interrupt_cue_; }
   cvmfs::Sink *sink() const { return sink_; }
   const shash::Any *expected_hash() const { return expected_hash_; }
-  const std::string *extra_info() const { return extra_info_; }
+  const std::string *path_info() const { return path_info_; }
 
   off_t range_offset() const { return range_offset_; }
   off_t range_size() const { return range_size_; }
@@ -212,7 +214,7 @@ class JobInfo {
   bool allow_failure() const { return allow_failure_; }
   int64_t id() const { return id_; }
 
-
+  std::string GetInfoHeaderContents(const std::string &templ);
   void SetUrl(const std::string *url) { url_ = url; }
   void SetCompressed(bool compressed) { compressed_ = compressed; }
   void SetProbeHosts(bool probe_hosts) { probe_hosts_ = probe_hosts; }
@@ -221,9 +223,6 @@ class JobInfo {
     follow_redirects_ = follow_redirects;
   }
   void SetForceNocache(bool force_nocache) { force_nocache_ = force_nocache; }
-  void SetPid(pid_t pid) { pid_ = pid; }
-  void SetUid(uid_t uid) { uid_ = uid; }
-  void SetGid(gid_t gid) { gid_ = gid; }
   void SetCredData(void *cred_data) { cred_data_ = cred_data; }
   void SetInterruptCue(InterruptCue *interrupt_cue) {
     interrupt_cue_ = interrupt_cue;
@@ -232,7 +231,7 @@ class JobInfo {
   void SetExpectedHash(const shash::Any *expected_hash) {
     expected_hash_ = expected_hash;
   }
-  void SetExtraInfo(const std::string *extra_info) { extra_info_ = extra_info; }
+  void SetPathInfo(const std::string *path_info) { path_info_ = path_info; }
 
   void SetRangeOffset(off_t range_offset) { range_offset_ = range_offset; }
   void SetRangeSize(off_t range_size) { range_size_ = range_size; }

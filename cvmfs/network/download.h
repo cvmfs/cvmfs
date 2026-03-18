@@ -242,6 +242,9 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   bool SetShardingPolicy(const ShardingPolicySelector type);
   void SetFailoverIndefinitely();
   void SetFqrn(const std::string &fqrn) { fqrn_ = fqrn; }
+  void SetInfoHeaderTemplate(const std::string &templ) {
+    info_header_template_ = templ;
+  }
 
   unsigned num_hosts() {
     if (opt_host_.chain)
@@ -291,10 +294,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   void CheckHostInfoReset(const std::string &typ, HostInfo &info,
                           JobInfo *jobinfo, time_t &now);
 
-  bool EscapeUrlChar(unsigned char input, char output[3]);
   std::string EscapeUrl(const int64_t jobinfo_id, const std::string &url);
-  unsigned EscapeHeader(const std::string &header, char *escaped_buf,
-                        size_t buf_size);
 
   inline std::vector<ProxyInfo> *current_proxy_group() const {
     return (opt_proxy_groups_
@@ -324,6 +324,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   pthread_mutex_t *lock_options_;
   pthread_mutex_t *lock_synchronous_mode_;
   std::string opt_dns_server_;
+  std::string info_header_template_;
   unsigned opt_timeout_proxy_;
   unsigned opt_timeout_direct_;
   unsigned opt_low_speed_limit_;

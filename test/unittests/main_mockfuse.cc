@@ -11,7 +11,7 @@
 #include "monitor.h"
 
 int main(int argc, char **argv) {
-  Watchdog *watchdog = Watchdog::Create(NULL);
+  Watchdog *watchdog = Watchdog::Create(NULL, false /* needs_read_environ */);
   assert(watchdog != NULL);
   //  watchdog->Spawn("/tmp/stacktrace.cvmfs_unittests");
   //CvmfsEnvironment *env = new CvmfsEnvironment(argc, argv);

@@ -2207,12 +2207,29 @@ void MountPoint::SetupHttpTuning() {
       && options_mgr_->IsOn(optarg)) {
     download_mgr_->EnableRedirects();
   }
-  if (options_mgr_->GetValue("CVMFS_SEND_INFO_HEADER", &optarg)
-      && options_mgr_->IsOn(optarg)) {
+  if (options_mgr_->GetValue("CVMFS_INFO_HEADER", &optarg) && (optarg != ""))
+  {
     download_mgr_->EnableInfoHeader();
+    download_mgr_->SetInfoHeaderTemplate(optarg);
+  } else if (options_mgr_->GetValue("CVMFS_SEND_INFO_HEADER", &optarg)
+      && options_mgr_->IsOn(optarg))
+  {
+    download_mgr_->EnableInfoHeader();
+    download_mgr_->SetInfoHeaderTemplate("%{path}");
   }
 }
 
+/*
+ * Check whether permission is needed to read from user process environment.
+ */
+bool MountPoint::NeedsReadEnviron(OptionsManager *omgr) {
+  // This is a class (static) method because it is used early, before 
+  // all the above initialization is done, so can't rely on mountpoint
+  // object data.
+  string info_header;
+  omgr->GetValue("CVMFS_INFO_HEADER", &info_header);
+  return (info_header.find("%{env:") != std::string::npos);
+}
 
 void MountPoint::SetupInodeAnnotation() {
   string optarg;
