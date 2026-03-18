@@ -21,132 +21,146 @@ compare_file_checksum() {
 check_recursion_depth() {
     local min_dir=$1
     local max_dir=$2
+    local log_start=${3:-0}
     echo "  Checking receiver recursion depth"
-    syslog=$(cat_syslog | tail -n 100)
-    # To guarantee finding the correct line in the syslog (and not that of a previous use of the receiver), search for the last occurrence of 'CVMFS receiver started'.
-    receiver_start_string="CVMFS receiver started"
-    receiver_directory="catalog diff tool entering directory"
-    last_receiver_start=$(echo "$syslog" | grep -n "$receiver_start_string" | tail -n 1 | cut -d: -f1)
-    if [[ -n "$last_receiver_start" ]]; then
-        directories=$(echo "$syslog" | tail -n +"$last_receiver_start" | grep "$receiver_directory")
-        # Check if the miniimum depth directory was entered
-        if [[ "$directories" != *"'$1'"* ]]; then
-            echo "  Receiver did not enter /cvmfs/test.repo.org$1"
+    local debug_log="/var/log/cvmfs_receiver/debug.log"
+    local directories
+    directories=$(sudo tail -n +"$((log_start + 1))" "$debug_log" 2>/dev/null | grep "DiffRec: recursing into")
+    # Check if the minimum depth directory was entered
+    if [[ -n "$min_dir" ]]; then
+        if [[ "$directories" != *"DiffRec: recursing into $min_dir"* ]]; then
+            echo "  Receiver did not enter $min_dir"
             return 1
         fi
-        # Check if the maximum depth directory was not entered
-        if [[ "$directories" == *"'$2'"* ]]; then
-            echo "  Receiver unnecessarily recursed into /cvmfs/test.repo.org$2 directory"
-            return 2
-        fi
     else
-        echo "  Did not find receiver start in syslog"
-        return 3
+        if [[ -z "$directories" ]]; then
+            echo "  Receiver did not recurse into any directory"
+            return 1
+        fi
+    fi
+    # Check if the maximum depth directory was not entered
+    if [[ "$directories" == *"DiffRec: recursing into $max_dir"* ]]; then
+        echo "  Receiver unnecessarily recursed into $max_dir directory"
+        return 2
     fi
 
     return 0
 }
 
+cleanup() {
+    sudo mv /etc/cvmfs/gateway/user.json.orig /etc/cvmfs/gateway/user.json
+}
+
 cvmfs_run_test() {
     set_up_repository_gateway || return 1
+
+    sudo cp /etc/cvmfs/gateway/user.json /etc/cvmfs/gateway/user.json.orig || return 2
+    jq '.receiver_path = "/usr/bin/cvmfs_receiver_debug"' \
+        /etc/cvmfs/gateway/user.json > user.json.new || return 3
+    sudo mv user.json.new /etc/cvmfs/gateway/user.json || return 4
+    trap cleanup EXIT HUP INT TERM || return 5
+    restart_repository_gateway || return 6
 
     echo "  Checking transaction + publish"
 
     ## Transaction 1
     echo "  Starting transaction 1 (Creating a deep directory tree which is assigned to nested catalogs)"
-    cvmfs_server transaction test.repo.org || return 2
+    cvmfs_server transaction test.repo.org || return 7
 
     echo "  Create a deep directory hierarchy"
-    mkdir -p /cvmfs/test.repo.org/a || return 3
-    mkdir -p /cvmfs/test.repo.org/a/b || return 4
-    echo "New file" > /cvmfs/test.repo.org/a/b/c || return 5
-    touch /cvmfs/test.repo.org/a/.cvmfscatalog || return 6
-    touch /cvmfs/test.repo.org/a/b/.cvmfscatalog || return 7
+    mkdir -p /cvmfs/test.repo.org/a || return 8
+    mkdir -p /cvmfs/test.repo.org/a/b || return 9
+    echo "New file" > /cvmfs/test.repo.org/a/b/c || return 10
+    touch /cvmfs/test.repo.org/a/.cvmfscatalog || return 11
+    touch /cvmfs/test.repo.org/a/b/.cvmfscatalog || return 12
 
     echo "  Publishing changes 1"
-    cvmfs_server publish -v test.repo.org || return 8
-    cvmfs_server check -i test.repo.org || return 9
+    cvmfs_server publish -v test.repo.org || return 13
+    cvmfs_server check -i test.repo.org || return 14
 
     echo "  Checking results 1"
-    compare_file_checksum /cvmfs/test.repo.org/a/b/c f1885b1a57c71cacbd923fc5e9aefef3 || return 10
+    compare_file_checksum /cvmfs/test.repo.org/a/b/c f1885b1a57c71cacbd923fc5e9aefef3 || return 15
 
 
     ## Transaction 2
     echo "  Starting transaction 2 (Removing highest level nested catalog)"
-    cvmfs_server transaction test.repo.org || return 11
+    cvmfs_server transaction test.repo.org || return 16
 
     echo "  Remove the directory containing the highest level nested catalog"
-    rm -rfv /cvmfs/test.repo.org/a || return 12
+    rm -rfv /cvmfs/test.repo.org/a || return 17
 
     echo "  Publishing changes 2"
-    cvmfs_server publish -v test.repo.org || return 13
-    cvmfs_server check -i test.repo.org || return 14
+    log_start=$(sudo wc -l /var/log/cvmfs_receiver/debug.log 2>/dev/null | awk '{print $1}' || echo 0)
+    cvmfs_server publish -v test.repo.org || return 18
+    cvmfs_server check -i test.repo.org || return 19
 
-    check_recursion_depth "" "/a" || return 15
+    check_recursion_depth "" "/a" "$log_start" || return 20
 
 
     ## Transaction 3
     echo "  Starting transaction 3 (Creating a deep directory tree which is assigned to nested catalogs)"
-    cvmfs_server transaction test.repo.org || return 16
+    cvmfs_server transaction test.repo.org || return 21
 
     echo "  Create a deep directory hierarchy"
-    mkdir -p /cvmfs/test.repo.org/a || return 17
-    mkdir -p /cvmfs/test.repo.org/a/b || return 18
-    mkdir -p /cvmfs/test.repo.org/a/b/c || return 19
-    echo "New file" > /cvmfs/test.repo.org/a/b/c/d || return 20
-    touch /cvmfs/test.repo.org/a/b/.cvmfscatalog || return 21
-    touch /cvmfs/test.repo.org/a/b/c/.cvmfscatalog || return 22
+    mkdir -p /cvmfs/test.repo.org/a || return 22
+    mkdir -p /cvmfs/test.repo.org/a/b || return 23
+    mkdir -p /cvmfs/test.repo.org/a/b/c || return 24
+    echo "New file" > /cvmfs/test.repo.org/a/b/c/d || return 25
+    touch /cvmfs/test.repo.org/a/b/.cvmfscatalog || return 26
+    touch /cvmfs/test.repo.org/a/b/c/.cvmfscatalog || return 27
 
     echo "  Publishing changes 3"
-    cvmfs_server publish -v test.repo.org || return 23
-    cvmfs_server check -i test.repo.org || return 24
-
-    echo "  Checking results 3"
-    compare_file_checksum /cvmfs/test.repo.org/a/b/c/d f1885b1a57c71cacbd923fc5e9aefef3 || return 25
-
-    ## Transaction 4
-    echo "  Starting transaction 4 (Removing the highest directory)"
-    cvmfs_server transaction test.repo.org || return 26
-
-    echo "  Remove the highest directory"
-    rm -rfv /cvmfs/test.repo.org/a || return 27
-
-    echo "  Publishing changes 4"
     cvmfs_server publish -v test.repo.org || return 28
     cvmfs_server check -i test.repo.org || return 29
 
-    check_recursion_depth "/a" "/a/b" || return 30
+    echo "  Checking results 3"
+    compare_file_checksum /cvmfs/test.repo.org/a/b/c/d f1885b1a57c71cacbd923fc5e9aefef3 || return 30
+
+    ## Transaction 4
+    echo "  Starting transaction 4 (Removing the highest directory)"
+    cvmfs_server transaction test.repo.org || return 31
+
+    echo "  Remove the highest directory"
+    rm -rfv /cvmfs/test.repo.org/a || return 32
+
+    echo "  Publishing changes 4"
+    log_start=$(sudo wc -l /var/log/cvmfs_receiver/debug.log 2>/dev/null | awk '{print $1}' || echo 0)
+    cvmfs_server publish -v test.repo.org || return 33
+    cvmfs_server check -i test.repo.org || return 34
+
+    check_recursion_depth "/a" "/a/b" "$log_start" || return 35
 
     ## Transaction 5
     echo "  Starting transaction 5 (Creating a deep directory tree which is assigned to nested catalogs)"
-    cvmfs_server transaction test.repo.org || return 31
+    cvmfs_server transaction test.repo.org || return 36
 
     echo "  Create a deep directory hierarchy"
-    mkdir -p /cvmfs/test.repo.org/a || return 32
-    mkdir -p /cvmfs/test.repo.org/a/b || return 33
-    echo "New file" > /cvmfs/test.repo.org/a/b/c || return 34
-    touch /cvmfs/test.repo.org/a/.cvmfscatalog || return 35
-    touch /cvmfs/test.repo.org/a/b/.cvmfscatalog || return 36
+    mkdir -p /cvmfs/test.repo.org/a || return 37
+    mkdir -p /cvmfs/test.repo.org/a/b || return 38
+    echo "New file" > /cvmfs/test.repo.org/a/b/c || return 39
+    touch /cvmfs/test.repo.org/a/.cvmfscatalog || return 40
+    touch /cvmfs/test.repo.org/a/b/.cvmfscatalog || return 41
 
     echo "  Publishing changes 5"
-    cvmfs_server publish -v test.repo.org || return 37
-    cvmfs_server check -i test.repo.org || return 38
-
-    echo "  Checking results 5"
-    compare_file_checksum /cvmfs/test.repo.org/a/b/c f1885b1a57c71cacbd923fc5e9aefef3 || return 39
-
-    ## Transaction 6
-    echo "  Starting transaction 6 (Manually removing a nested catalog)"
-    cvmfs_server transaction test.repo.org || return 40
-
-    echo "  Removing nested catalog in /a/b"
-    rm -rfv /cvmfs/test.repo.org/a/b/.cvmfscatalog || return 41
-
-    echo "  Publishing changes 6"
     cvmfs_server publish -v test.repo.org || return 42
     cvmfs_server check -i test.repo.org || return 43
 
-    check_recursion_depth "" "/a" || return 44
+    echo "  Checking results 5"
+    compare_file_checksum /cvmfs/test.repo.org/a/b/c f1885b1a57c71cacbd923fc5e9aefef3 || return 44
+
+    ## Transaction 6
+    echo "  Starting transaction 6 (Manually removing a nested catalog)"
+    cvmfs_server transaction test.repo.org || return 45
+
+    echo "  Removing nested catalog in /a/b"
+    rm -rfv /cvmfs/test.repo.org/a/b/.cvmfscatalog || return 46
+
+    echo "  Publishing changes 6"
+    log_start=$(sudo wc -l /var/log/cvmfs_receiver/debug.log 2>/dev/null | awk '{print $1}' || echo 0)
+    cvmfs_server publish -v test.repo.org || return 47
+    cvmfs_server check -i test.repo.org || return 48
+
+    check_recursion_depth "" "/a" "$log_start" || return 49
 
     return 0
 }
