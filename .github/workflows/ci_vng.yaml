@@ -6,9 +6,9 @@ on:
   workflow_dispatch:
     inputs:
       inputTestCases:
-        description: 'Ex. ../src/0* ../src/1*'    
+        description: 'Ex. ../src/0* ../src/1*'
         required: true
-        default: '../src/0* ../src/1*'
+        default: '../src/00[1-9] ../src/010'
       inputSuites:
         description: 'Test scenario tags'
         required: true
@@ -100,8 +100,8 @@ jobs:
         run: |
           cd test/vng_testing
 
-          export CVMFS_TESTCASES=${{ github.event.inputs.testCases || '"../src/0* ../src/1*"' }}
-          export CVMFS_TEST_SUITES=${{ github.event.inputs.testSuites || 'quick' }}
+          export CVMFS_TESTCASES=${{ github.event.inputs.inputTestCases || '"../src/00[1-9] ../src/010"' }}
+          export CVMFS_TEST_SUITES=${{ github.event.inputs.inputSuites || 'quick' }}
           ./run.sh -s "${CVMFS_TEST_SUITES}"  \
                    -x ../src/095-fuser   \
                       ../src/004-davinci                              \
