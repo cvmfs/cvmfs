@@ -475,6 +475,8 @@ wait_for_umount() {
 }
 
 cvmfs_clean() {
+  pkill   openwaitprint || true
+  pidwait openwaitprint || true
   sudo env CVMFS_USE_MACFUSE_KEXT="$CVMFS_TEST_USE_MACFUSE_KEXT" cvmfs_config umount > /dev/null  || return 100
   sudo sh -c "rm -rf /var/lib/cvmfs/*"                  || return 101
   sudo rm -f /etc/cvmfs/default.local                    || return 102
