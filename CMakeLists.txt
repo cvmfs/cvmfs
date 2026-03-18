@@ -433,10 +433,6 @@ find_package (Libcrypto REQUIRED)
 message("Using libcrypto for libcvmfs_crypto from ${Libcrypto_INCLUDE_DIRS}")
 
 
-
-find_package (VJSON REQUIRED)
-set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${VJSON_INCLUDE_DIRS})
-
 # Almost all build targets require zlib and sha3
 if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_SERVER OR BUILD_SERVER_DEBUG OR
     BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG OR BUILD_PRELOADER OR

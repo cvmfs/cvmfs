@@ -9,7 +9,6 @@
 #include <limits>
 
 #include "crypto/encrypt.h"
-#include "json.h"
 #include "json_document.h"
 #include "util/logging.h"
 #include "util/platform.h"
@@ -104,7 +103,7 @@ bool GetTokenPublicId(const std::string &token, std::string *public_id) {
     return false;
   }
 
-  *public_id = token_id->string_value;
+  *public_id = token_id->get<std::string>();
 
   return true;
 }
@@ -148,7 +147,7 @@ TokenCheckResult CheckToken(const std::string &token, const std::string &secret,
   }
 
   std::string encrypted_body;
-  if (!Debase64(blob->string_value, &encrypted_body)) {
+  if (!Debase64(blob->get<std::string>(), &encrypted_body)) {
     return kInvalid;
   }
 
@@ -171,13 +170,13 @@ TokenCheckResult CheckToken(const std::string &token, const std::string &secret,
   }
 
   // TODO(radu): can we still use monotonic time if the process restarts?
-  const uint64_t expiry_time = String2Uint64(expiry->string_value);
+  const uint64_t expiry_time = String2Uint64(expiry->get<std::string>());
   const uint64_t current_time = platform_monotonic_time();
   if (current_time > expiry_time) {
     return kExpired;
   }
 
-  *lease_path = path->string_value;
+  *lease_path = path->get<std::string>();
 
   return kValid;
 }

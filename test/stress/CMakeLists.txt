@@ -28,8 +28,8 @@ target_link_libraries (s3benchmark
                        ${CARES_LIBRARIES} ${CARES_LDFLAGS}
                        ${ZLIB_LIBRARIES}
                        ${OPENSSL_LIBRARIES}
-                       ${VJSON_LIBRARIES}
                        LibArchive::LibArchive
+                       nlohmann_json::nlohmann_json
                        pthread
                        dl
 )

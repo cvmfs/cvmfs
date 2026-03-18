@@ -138,7 +138,7 @@ set (UBENCHMARKS_LINK_LIBRARIES ${GOOGLEBENCH_LIBRARIES}
                                 ${ZLIB_LIBRARIES}
                                 ${RT_LIBRARY}
                                 ${SQLITE3_LIBRARY}
-                                ${VJSON_LIBRARIES}
+                                nlohmann_json::nlohmann_json
                                 pthread dl)
 
 target_link_libraries (${PROJECT_UBENCHMARKS_NAME} ${UBENCHMARKS_LINK_LIBRARIES})

@@ -165,29 +165,30 @@ static LeaseReply ParseAcquireReply(const CurlBuffer &buffer,
   const JSON *result = JsonDocument::SearchInObject(reply->root(), "status",
                                                     JSON_STRING);
   if (result != NULL) {
-    const std::string status = result->string_value;
+    const std::string status = result->get<std::string>();
     if (status == "ok") {
       LogCvmfs(kLogCvmfs, llvl | kLogStdout, "Gateway reply: ok");
       const JSON *token = JsonDocument::SearchInObject(
           reply->root(), "session_token", JSON_STRING);
       if (token != NULL) {
         LogCvmfs(kLogCvmfs, kLogDebug, "Session token: %s",
-                 token->string_value);
-        *session_token = token->string_value;
+                 token->get<std::string>().c_str());
+        *session_token = token->get<std::string>();
         return kLeaseReplySuccess;
       }
     } else if (status == "path_busy") {
       const JSON *time_remaining = JsonDocument::SearchInObject(
           reply->root(), "time_remaining", JSON_STRING);
-      LogCvmfs(
-          kLogCvmfs, llvl | kLogStdout, "Path busy. Time remaining = %s",
-          (time_remaining != NULL) ? time_remaining->string_value : "UNKNOWN");
+      LogCvmfs(kLogCvmfs, llvl | kLogStdout, "Path busy. Time remaining = %s",
+               (time_remaining != NULL)
+                   ? time_remaining->get<std::string>().c_str()
+                   : "UNKNOWN");
       return kLeaseReplyBusy;
     } else if (status == "error") {
       const JSON *reason = JsonDocument::SearchInObject(reply->root(), "reason",
                                                         JSON_STRING);
       LogCvmfs(kLogCvmfs, llvl | kLogStdout, "Error: '%s'",
-               (reason != NULL) ? reason->string_value : "");
+               (reason != NULL) ? reason->get<std::string>().c_str() : "");
     } else {
       LogCvmfs(kLogCvmfs, llvl | kLogStdout, "Unknown reply. Status: %s",
                status.c_str());
@@ -211,7 +212,7 @@ static LeaseReply ParseDropReply(const CurlBuffer &buffer, int llvl) {
   const JSON *result = JsonDocument::SearchInObject(reply->root(), "status",
                                                     JSON_STRING);
   if (result != NULL) {
-    const std::string status = result->string_value;
+    const std::string status = result->get<std::string>();
     if (status == "ok") {
       LogCvmfs(kLogCvmfs, llvl | kLogStdout, "Gateway reply: ok");
       return kLeaseReplySuccess;
@@ -221,7 +222,7 @@ static LeaseReply ParseDropReply(const CurlBuffer &buffer, int llvl) {
       const JSON *reason = JsonDocument::SearchInObject(reply->root(), "reason",
                                                         JSON_STRING);
       LogCvmfs(kLogCvmfs, llvl | kLogStdout, "Error from gateway: '%s'",
-               (reason != NULL) ? reason->string_value : "");
+               (reason != NULL) ? reason->get<std::string>().c_str() : "");
     } else {
       LogCvmfs(kLogCvmfs, llvl | kLogStdout, "Unknown reply. Status: %s",
                status.c_str());

@@ -5,6 +5,7 @@ include(${CMAKE_SOURCE_DIR}/cmake/Modules/ExternalDepMacros.cmake)
 set(EXTERNALS_INSTALL_TARGETS "")
 
 add_subdirectory(libarchive)
+add_subdirectory(json)
 
 add_custom_target(install_externals
   COMMAND ${CMAKE_COMMAND} --install ${CMAKE_BINARY_DIR}

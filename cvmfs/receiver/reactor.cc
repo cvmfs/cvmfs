@@ -161,14 +161,14 @@ bool Reactor::ExtractStatsFromReq(JsonDocument *req, perf::Statistics *stats,
     return false;
   }
 
-  perf::Xadd(counters.n_chunks_added, n_chunks_added->int_value);
-  perf::Xadd(counters.n_chunks_duplicated, n_chunks_duplicated->int_value);
-  perf::Xadd(counters.n_catalogs_added, n_catalogs_added->int_value);
-  perf::Xadd(counters.sz_uploaded_bytes, sz_uploaded_bytes->int_value);
+  perf::Xadd(counters.n_chunks_added, n_chunks_added->get<int>());
+  perf::Xadd(counters.n_chunks_duplicated, n_chunks_duplicated->get<int>());
+  perf::Xadd(counters.n_catalogs_added, n_catalogs_added->get<int>());
+  perf::Xadd(counters.sz_uploaded_bytes, sz_uploaded_bytes->get<int>());
   perf::Xadd(counters.sz_uploaded_catalog_bytes,
-             sz_uploaded_catalog_bytes->int_value);
+             sz_uploaded_catalog_bytes->get<int>());
 
-  *start_time = start_time_json->string_value;
+  *start_time = start_time_json->get<std::string>();
 
   return true;
 }
@@ -221,8 +221,9 @@ bool Reactor::HandleGenerateToken(const std::string &req, std::string *reply) {
   std::string public_token_id;
   std::string token_secret;
 
-  if (!GenerateSessionToken(key_id->string_value, path->string_value,
-                            max_lease_time->int_value, &session_token,
+  if (!GenerateSessionToken(key_id->get<std::string>(),
+                            path->get<std::string>(),
+                            max_lease_time->get<int>(), &session_token,
                             &public_token_id, &token_secret)) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
              "HandleGenerateToken: Could not generate session token.");
@@ -284,8 +285,8 @@ bool Reactor::HandleCheckToken(const std::string &req, std::string *reply) {
 
   std::string path;
   JsonStringGenerator input;
-  const TokenCheckResult ret = CheckToken(token->string_value,
-                                          secret->string_value, &path);
+  const TokenCheckResult ret = CheckToken(token->get<std::string>(),
+                                          secret->get<std::string>(), &path);
   switch (ret) {
     case kExpired:
       // Expired token
@@ -350,8 +351,8 @@ bool Reactor::HandleSubmitPayload(int fdin, const std::string &req,
   proc->SetStatistics(&statistics);
   JsonStringGenerator reply_input;
   const PayloadProcessor::Result res = proc->Process(
-      fdin, digest_json->string_value, path_json->string_value,
-      header_size_json->int_value);
+      fdin, digest_json->get<std::string>(), path_json->get<std::string>(),
+      header_size_json->get<int>());
 
   switch (res) {
     case PayloadProcessor::kPathViolation:
@@ -430,14 +431,14 @@ bool Reactor::HandleCommit(const std::string &req, std::string *reply) {
   const UniquePtr<CommitProcessor> proc(MakeCommitProcessor());
   proc->SetStatistics(&statistics, start_time);
   const shash::Any old_root_hash = shash::MkFromSuffixedHexPtr(
-      shash::HexPtr(old_root_hash_json->string_value));
+      shash::HexPtr(old_root_hash_json->get<std::string>()));
   const shash::Any new_root_hash = shash::MkFromSuffixedHexPtr(
-      shash::HexPtr(new_root_hash_json->string_value));
-  const RepositoryTag repo_tag(tag_name_json->string_value,
-                               tag_description_json->string_value);
+      shash::HexPtr(new_root_hash_json->get<std::string>()));
+  const RepositoryTag repo_tag(tag_name_json->get<std::string>(),
+                               tag_description_json->get<std::string>());
   const CommitProcessor::Result res = proc->Process(
-      lease_path_json->string_value, old_root_hash, new_root_hash, repo_tag,
-      &final_revision);
+      lease_path_json->get<std::string>(), old_root_hash, new_root_hash,
+      repo_tag, &final_revision);
 
   JsonStringGenerator reply_input;
   switch (res) {

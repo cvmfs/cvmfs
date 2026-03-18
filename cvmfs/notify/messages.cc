@@ -6,7 +6,6 @@
 
 #include <cassert>
 
-#include "json.h"
 #include "json_document.h"
 #include "util/logging.h"
 #include "util/pointer.h"

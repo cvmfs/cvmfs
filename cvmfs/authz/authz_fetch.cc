@@ -395,7 +395,7 @@ bool AuthzExternalFetcher::ParseMsg(const std::string &json_msg,
     return false;
   }
 
-  JSON *json_authz = JsonDocument::SearchInObject(
+  const JSON *json_authz = JsonDocument::SearchInObject(
       json_document->root(), "cvmfs_authz_v1", JSON_OBJECT);
   if (json_authz == NULL) {
     LogCvmfs(kLogAuthz, kLogSyslogErr | kLogDebug,
@@ -424,10 +424,10 @@ bool AuthzExternalFetcher::ParseMsg(const std::string &json_msg,
 }
 
 
-bool AuthzExternalFetcher::ParseMsgId(JSON *json_authz,
+bool AuthzExternalFetcher::ParseMsgId(const JSON *json_authz,
                                       AuthzExternalMsg *binary_msg) {
-  JSON *json_msgid = JsonDocument::SearchInObject(json_authz, "msgid",
-                                                  JSON_INT);
+  const JSON *json_msgid = JsonDocument::SearchInObject(json_authz, "msgid",
+                                                        JSON_INT);
   if (json_msgid == NULL) {
     LogCvmfs(kLogAuthz, kLogSyslogErr | kLogDebug,
              "\"msgid\" not found in json from authz helper %s",
@@ -436,16 +436,16 @@ bool AuthzExternalFetcher::ParseMsgId(JSON *json_authz,
     return false;
   }
 
-  if ((json_msgid->int_value < 0)
-      || (json_msgid->int_value >= kAuthzMsgInvalid)) {
+  if ((json_msgid->get<int>() < 0)
+      || (json_msgid->get<int>() >= kAuthzMsgInvalid)) {
     LogCvmfs(kLogAuthz, kLogSyslogErr | kLogDebug,
              "invalid \"msgid\" in json from authz helper %s: %d",
-             progname_.c_str(), json_msgid->int_value);
+             progname_.c_str(), json_msgid->get<int>());
     EnterFailState();
     return false;
   }
 
-  binary_msg->msgid = static_cast<AuthzExternalMsgIds>(json_msgid->int_value);
+  binary_msg->msgid = static_cast<AuthzExternalMsgIds>(json_msgid->get<int>());
   return true;
 }
 
@@ -454,10 +454,10 @@ bool AuthzExternalFetcher::ParseMsgId(JSON *json_authz,
  * A permit must contain the authorization status.  Optionally it can come with
  * a "time to live" of the answer and a token (e.g. X.509 proxy certificate).
  */
-bool AuthzExternalFetcher::ParsePermit(JSON *json_authz,
+bool AuthzExternalFetcher::ParsePermit(const JSON *json_authz,
                                        AuthzExternalMsg *binary_msg) {
-  JSON *json_status = JsonDocument::SearchInObject(json_authz, "status",
-                                                   JSON_INT);
+  const JSON *json_status = JsonDocument::SearchInObject(json_authz, "status",
+                                                         JSON_INT);
   if (json_status == NULL) {
     LogCvmfs(kLogAuthz, kLogSyslogErr | kLogDebug,
              "\"status\" not found in json from authz helper %s",
@@ -465,28 +465,30 @@ bool AuthzExternalFetcher::ParsePermit(JSON *json_authz,
     EnterFailState();
     return false;
   }
-  if ((json_status->int_value < 0)
-      || (json_status->int_value > kAuthzUnknown)) {
+  if ((json_status->get<int>() < 0)
+      || (json_status->get<int>() > kAuthzUnknown)) {
     binary_msg->permit.status = kAuthzUnknown;
   } else {
     binary_msg->permit.status = static_cast<AuthzStatus>(
-        json_status->int_value);
+        json_status->get<int>());
   }
 
-  JSON *json_ttl = JsonDocument::SearchInObject(json_authz, "ttl", JSON_INT);
+  const JSON *json_ttl = JsonDocument::SearchInObject(json_authz, "ttl",
+                                                      JSON_INT);
   if (json_ttl == NULL) {
     LogCvmfs(kLogAuthz, kLogDebug, "no ttl, using default");
     binary_msg->permit.ttl = kDefaultTtl;
   } else {
-    binary_msg->permit.ttl = std::max(kMinTtl, json_ttl->int_value);
+    binary_msg->permit.ttl = std::max(kMinTtl, json_ttl->get<int>());
   }
 
-  JSON *json_token = JsonDocument::SearchInObject(json_authz, "x509_proxy",
-                                                  JSON_STRING);
+  const JSON *json_token = JsonDocument::SearchInObject(
+      json_authz, "x509_proxy", JSON_STRING);
   if (json_token != NULL) {
     binary_msg->permit.token.type = kTokenX509;
     string token_binary;
-    const bool valid_base64 = Debase64(json_token->string_value, &token_binary);
+    const bool valid_base64 = Debase64(json_token->get<string>(),
+                                       &token_binary);
     if (!valid_base64) {
       LogCvmfs(kLogAuthz, kLogSyslogErr | kLogDebug,
                "invalid Base64 in 'x509_proxy' from authz helper %s",
@@ -508,13 +510,14 @@ bool AuthzExternalFetcher::ParsePermit(JSON *json_authz,
                                             JSON_STRING);
   if (json_token != NULL) {
     binary_msg->permit.token.type = kTokenBearer;
-    const unsigned size = strlen(json_token->string_value);
+    const unsigned size = json_token->get<string>().size();
     binary_msg->permit.token.size = size;
     if (size > 0) {
       // The token is passed to the AuthzSessionManager, which takes care of
       // freeing the memory
       binary_msg->permit.token.data = smalloc(size);
-      memcpy(binary_msg->permit.token.data, json_token->string_value, size);
+      memcpy(binary_msg->permit.token.data, json_token->get<string>().data(),
+             size);
 
       LogCvmfs(kLogAuthz, kLogDebug,
                "Got a bearer_token from authz_helper. "
@@ -540,10 +543,10 @@ bool AuthzExternalFetcher::ParsePermit(JSON *json_authz,
 }
 
 
-bool AuthzExternalFetcher::ParseRevision(JSON *json_authz,
+bool AuthzExternalFetcher::ParseRevision(const JSON *json_authz,
                                          AuthzExternalMsg *binary_msg) {
-  JSON *json_revision = JsonDocument::SearchInObject(json_authz, "revision",
-                                                     JSON_INT);
+  const JSON *json_revision = JsonDocument::SearchInObject(
+      json_authz, "revision", JSON_INT);
   if (json_revision == NULL) {
     LogCvmfs(kLogAuthz, kLogSyslogErr | kLogDebug,
              "\"revision\" not found in json from authz helper %s",
@@ -552,15 +555,15 @@ bool AuthzExternalFetcher::ParseRevision(JSON *json_authz,
     return false;
   }
 
-  if (json_revision->int_value < 0) {
+  if (json_revision->get<int>() < 0) {
     LogCvmfs(kLogAuthz, kLogSyslogErr | kLogDebug,
              "invalid \"revision\" in json from authz helper %s: %d",
-             progname_.c_str(), json_revision->int_value);
+             progname_.c_str(), json_revision->get<int>());
     EnterFailState();
     return false;
   }
 
-  binary_msg->protocol_revision = json_revision->int_value;
+  binary_msg->protocol_revision = json_revision->get<int>();
   return true;
 }
 

@@ -117,6 +117,7 @@ BuildRequires: pkgconfig
 BuildRequires: %{cvmfs_python_devel}
 BuildRequires: unzip
 BuildRequires: zlib-devel
+BuildRequires: json-devel
 %if 0%{?rhel} >= 7 || 0%{?fedora} || 0%{?sle12} || 0%{?sle15}
 BuildRequires: systemd
 %endif
@@ -229,6 +230,7 @@ BuildRequires: %{cvmfs_python_devel}
 BuildRequires: libcap-devel
 BuildRequires: help2man
 BuildRequires: unzip
+BuildRequires: json-devel
 BuildRequires: %{cvmfs_python_setuptools}
 %if 0%{?suse_version}
   %if 0%{?suse_version} < 1500
