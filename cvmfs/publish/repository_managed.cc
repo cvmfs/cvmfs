@@ -75,7 +75,10 @@ void Publisher::ManagedNode::ClearScratch() {
     // Disk full: cannot create a wastebin directory. Clean scratch/current
     // in place synchronously instead (deletion does not require free space).
     RunSuidHelper("clear_scratch", publisher_->settings_.fqrn());
-    // scratch_dir still exists and is now empty; chown without allocating space
+    // scratch_dir still exists and is now empty; chown without allocating space.
+    // AlterMountpoint(kAlterScratchWipe) is intentionally skipped: it runs
+    // clear_scratch_async to clean the wastebin, but no wastebin was created
+    // in this path so there is nothing to clean asynchronously.
     publisher_->CreateDirectoryAsOwner(scratch_dir, kDefaultDirMode);
   }
 

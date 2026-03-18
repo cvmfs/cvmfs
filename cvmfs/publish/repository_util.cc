@@ -17,6 +17,7 @@
 
 #include "crypto/hash.h"
 #include "publish/except.h"
+#include "util/logging.h"
 #include "util/posix.h"
 #include "util/string.h"
 
@@ -90,9 +91,14 @@ void ServerLockFile::Touch() {
   // Pre-create the lock file without locking it, so that a subsequent Lock()
   // can open the existing file even when the disk is full (e.g. during abort
   // after the repository's spool area has been filled up).
-  const int fd = open(path_.c_str(), O_RDONLY | O_CREAT, 0600);
-  if (fd >= 0)
+  const int fd = open(path_.c_str(), O_WRONLY | O_CREAT, 0600);
+  if (fd >= 0) {
     close(fd);
+  } else {
+    LogCvmfs(kLogCvmfs, kLogSyslogWarn,
+             "failed to pre-create lock file %s (errno: %d)",
+             path_.c_str(), errno);
+  }
 }
 
 

@@ -84,6 +84,9 @@ cvmfs_run_test() {
   abort_transaction $CVMFS_TEST_REPO
   local abort_result=$?
 
+  # Free disk space before returning so the framework's cleanup can proceed.
+  cleanup
+
   if [ $abort_result -ne 0 ]; then
     echo "FAILED: Could not abort transaction under disk full conditions (exit code: $abort_result)"
     return 100
