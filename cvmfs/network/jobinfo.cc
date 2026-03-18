@@ -137,37 +137,49 @@ std::string EscapeHeader(const std::string &header) {
  * Return the filled-in template of CVMFS_INFO_HEADER
  */
 std::string JobInfo::GetInfoHeaderContents(const std::string &templ) {
+  enum ParseMode {
+    kParseModeDefault,       // reading literal characters
+    kParseModeAfterPercent,  // just saw '%'
+    kParseModeInKey,         // inside '%{...}'
+  };
+
+  enum MatchMode {
+    kMatchModeSkipping,    // skipping to next '\0' separator
+    kMatchModeMatching,    // comparing chars against variable name
+    kMatchModeCollecting,  // name matched, collecting value
+  };
+
   std::string answer = "";
   std::string key;
-  int parsemode = 0;  // 0 default, 1 after '%', 2 after '%{'
-  int envsize = -1;
-  char *envbuf = NULL;
+  ParseMode parsemode = kParseModeDefault;
+  std::vector<char> envbuf;
+  bool env_attempted = false;
 
   for (std::string::const_iterator i = templ.begin(); i != templ.end(); i++) {
     const char c = *i;
     switch (parsemode) {
-    case 0:
+    case kParseModeDefault:
       if (c == '%') {
-        parsemode = 1;
+        parsemode = kParseModeAfterPercent;
         key = "";
       } else {
         answer += c;
       }
       break;
-    case 1:
+    case kParseModeAfterPercent:
       if (c == '{') {
-        parsemode = 2;
+        parsemode = kParseModeInKey;
       } else {
-        parsemode = 0;
+        parsemode = kParseModeDefault;
         answer += '%';
         answer += c;
       }
       break;
-    case 2:
+    case kParseModeInKey:
       if (c != '}') {
         key += c;
       } else {
-        parsemode = 0;
+        parsemode = kParseModeDefault;
         if (key == "path") {
           if (path_info_ != NULL) {
             answer += EscapeHeader(*path_info_);
@@ -193,9 +205,9 @@ std::string JobInfo::GetInfoHeaderContents(const std::string &templ) {
             answer += "-";
           }
         } else if (key.substr(0, 4) == "env:") {
+          if (!env_attempted) {
+            env_attempted = true;
 #ifndef __APPLE__
-          if (envsize == -1) {
-            envsize = 0;
             if (pid_ != static_cast<pid_t>(-1)) {
               ObtainDacReadSearchCapability();
               ObtainSysPtraceCapability();
@@ -214,17 +226,13 @@ std::string JobInfo::GetInfoHeaderContents(const std::string &templ) {
                 }
                 if ((n >= 0) && (size > 0)) {
                   if (lseek(fd, 0, SEEK_SET) >= 0) {
-                    envbuf = static_cast<char *>(malloc(size));
-                    if (envbuf != NULL) {
-                      if (read(fd, envbuf, size) > 0) {
-                        envsize = size;
-                        LogCvmfs(kLogDownload, kLogDebug,
-                          "(job id %" PRId64 ") read %d bytes from %s",
-                          id_, size, fname.c_str());
-                      } else {
-                        free(envbuf);
-                        envbuf = NULL;
-                      }
+                    envbuf.resize(size);
+                    if (read(fd, envbuf.data(), size) > 0) {
+                      LogCvmfs(kLogDownload, kLogDebug,
+                        "(job id %" PRId64 ") read %d bytes from %s",
+                        id_, size, fname.c_str());
+                    } else {
+                      envbuf.clear();
                     }
                   }
                 }
@@ -237,24 +245,24 @@ std::string JobInfo::GetInfoHeaderContents(const std::string &templ) {
               DropSysPtraceCapability();
               DropDacReadSearchCapability();
             }
-          }
 #endif
-          if (envbuf != NULL) {
+          }
+          if (!envbuf.empty()) {
             const char * const var = key.c_str() + 4; // everything after "env:"
             const char *varp = var;
             std::string val = "";
-            int matchmode = 1;
-            const char * const endp = envbuf + envsize;
-            for (const char *p = envbuf; p < endp; p++) {
-              switch(matchmode) {
-              case 0:
+            MatchMode matchmode = kMatchModeMatching;
+            const char * const endp = envbuf.data() + envbuf.size();
+            for (const char *p = envbuf.data(); p < endp; p++) {
+              switch (matchmode) {
+              case kMatchModeSkipping:
                 // skipping to next null character
                 if (*p == '\0') {
                   varp = var;
-                  matchmode = 1;
+                  matchmode = kMatchModeMatching;
                 }
                 break;
-              case 1:
+              case kMatchModeMatching:
                 // matching variable name
                 if (*p == '\0') {
                   // premature end without an '='
@@ -264,13 +272,13 @@ std::string JobInfo::GetInfoHeaderContents(const std::string &templ) {
                   ++varp;
                 } else if ((*varp == '\0') && (*p == '=')) {
                   // matched
-                  matchmode = 2;
+                  matchmode = kMatchModeCollecting;
                 } else {
                   // didn't match
-                  matchmode = 0;
+                  matchmode = kMatchModeSkipping;
                 }
                 break;
-              case 2:
+              case kMatchModeCollecting:
                 // matched, collecting value
                 if (*p == '\0') {
                   // all done
@@ -278,8 +286,6 @@ std::string JobInfo::GetInfoHeaderContents(const std::string &templ) {
                   break;
                 }
                 val += *p;
-                break;
-              default:
                 break;
               }
             }
@@ -291,13 +297,8 @@ std::string JobInfo::GetInfoHeaderContents(const std::string &templ) {
         }
       }
       break;
-    default:
-      break;
     }
   }
-
-  if (envbuf != NULL)
-    free(envbuf);
 
   return answer;
 }
