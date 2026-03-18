@@ -819,12 +819,7 @@ if (BUILD_SERVER)
         ${OPENSSL_LIBRARIES}
         ${SQLITE3_LIBRARY}
         ${ZLIB_LIBRARIES}
-<<<<<<< HEAD
-        ${VJSON_LIBRARIES}
-=======
         nlohmann_json::nlohmann_json
-        ${CAP_LIBRARIES}
->>>>>>> d8c0db226 (link to nlohmann json)
         LibArchive::LibArchive
         ${RT_LIBRARY}
         pthread
