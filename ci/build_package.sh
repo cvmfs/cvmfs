@@ -49,6 +49,9 @@ echo "++ $command_tmpl"
 [ -f $build_script ] || die "build script $build_script doesn't exist"
 [ -x $build_script ] || die "build script $build_script is not executable"
 
+# if available, setup a go module proxy
+host cvm-gomod-proxy1.cern.ch > /dev/null 2>&1 && export GOPROXY=http://cvm-gomod-proxy1.cern.ch:3000
+
 # run the build script
 echo "switching to $CVMFS_BUILD_LOCATION..."
 cd "$CVMFS_BUILD_LOCATION"
