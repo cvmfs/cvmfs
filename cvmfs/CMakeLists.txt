@@ -675,6 +675,7 @@ if (BUILD_SERVER)
        swissknife_overlay.cc
        swissknife_pull.cc
        swissknife_reflog.cc
+       swissknife_rotate_statsdb.cc
        swissknife_filestats.cc
        swissknife_scrub.cc
        swissknife_sign.cc

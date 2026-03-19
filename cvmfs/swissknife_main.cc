@@ -24,6 +24,7 @@
 #include "swissknife_overlay.h"
 #include "swissknife_pull.h"
 #include "swissknife_reflog.h"
+#include "swissknife_rotate_statsdb.h"
 #include "swissknife_scrub.h"
 #include "swissknife_sign.h"
 #include "swissknife_sync.h"
@@ -104,6 +105,7 @@ int main(int argc, char **argv) {
   command_list.push_back(new swissknife::CommandNotify());
   command_list.push_back(new swissknife::CommandOverlay());
   command_list.push_back(new swissknife::CommandFileStats());
+  command_list.push_back(new swissknife::CommandRotateStatsDB());
 
   if (argc < 2) {
     Usage();
