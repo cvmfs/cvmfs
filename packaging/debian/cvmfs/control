@@ -75,7 +75,8 @@ Depends:
  tar,
  cvmfs-libs (= ${binary:Version}),
  cvmfs-fuse3 (= ${binary:Version}),
- ${misc:Depends}
+ ${misc:Depends},
+ ${shlibs:Depends}
 Recommends:
  apache2,
  logrotate

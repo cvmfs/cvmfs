@@ -117,7 +117,12 @@ BuildRequires: pkgconfig
 BuildRequires: %{cvmfs_python_devel}
 BuildRequires: unzip
 BuildRequires: zlib-devel
+%if 0%{?suse_version}
+BuildRequires: nlohmann_json
+%else
 BuildRequires: json-devel
+%endif
+BuildRequires: libarchive-devel
 %if 0%{?rhel} >= 7 || 0%{?fedora} || 0%{?sle12} || 0%{?sle15}
 BuildRequires: systemd
 %endif
@@ -135,6 +140,11 @@ Requires: curl
 Requires: attr
 Requires: zlib
 Requires: gdb
+%if 0%{?suse_version}
+Requires: libarchive13
+%else
+Requires: libarchive
+%endif
 # Account for different package names
 %if 0%{?suse_version}
 Requires: aaa_base
@@ -230,7 +240,12 @@ BuildRequires: %{cvmfs_python_devel}
 BuildRequires: libcap-devel
 BuildRequires: help2man
 BuildRequires: unzip
+%if 0%{?suse_version}
+BuildRequires: nlohmann_json
+%else
 BuildRequires: json-devel
+%endif
+BuildRequires: libarchive-devel
 BuildRequires: %{cvmfs_python_setuptools}
 %if 0%{?suse_version}
   %if 0%{?suse_version} < 1500
@@ -263,6 +278,11 @@ Requires: rsync
 Requires: usbutils
 Requires: sqlite
 Requires: tar
+%if 0%{?suse_version}
+Requires: libarchive13
+%else
+Requires: libarchive
+%endif
 %if 0%{?rhel} >= 6 || 0%{?fedora} || 0%{?suse_version} >= 1300
 Requires: jq
 %endif
@@ -795,6 +815,8 @@ systemctl daemon-reload
 
 %changelog
 # - When using fuse3, require at least version 3.3.0 (for premounting).
+* Thu Mar 19 2026 Valentin Volkl <vavolkl@cern.ch> - 2.14.0
+- Add new libarchive and json system dependencies 
 * Wed Aug 27 2025 Valentin Volkl <vavolkl@cern.ch> - 2.13.3
 - Make building of unittests optional 
 - Silence a mkdir warning when /cvmfs already exists
