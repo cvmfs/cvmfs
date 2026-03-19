@@ -744,11 +744,6 @@ systemctl daemon-reload
 %doc COPYING CITATION.cff README.md ChangeLog
 %config(noreplace) %{_sysconfdir}/logrotate.d/cvmfs
 %config(noreplace) %{_sysconfdir}/logrotate.d/cvmfs-statsdb
-# sqlite version on rhel8 is too old for the statsdb logrotate script (needs >= 3.27)
-%define sqlite_version %(sqlite3 --version 2>/dev/null | cut -d' ' -f1 || echo "0")
-%if "%(echo '%{sqlite_version}' | awk 'BEGIN{print ("%{sqlite_version}" < "3.27")}')" == "1"
-%exclude %{_sysconfdir}/logrotate.d/cvmfs-statsdb
-%endif
 %doc %{_mandir}/man1/cvmfs_server.1.gz
 %doc %{_mandir}/man1/cvmfs_swissknife.1.gz
 
