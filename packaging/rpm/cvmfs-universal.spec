@@ -118,7 +118,7 @@ BuildRequires: %{cvmfs_python_devel}
 BuildRequires: unzip
 BuildRequires: zlib-devel
 %if 0%{?suse_version}
-BuildRequires: nlohmann_json
+BuildRequires: nlohmann_json-devel
 %else
 BuildRequires: json-devel
 %endif
@@ -241,7 +241,7 @@ BuildRequires: libcap-devel
 BuildRequires: help2man
 BuildRequires: unzip
 %if 0%{?suse_version}
-BuildRequires: nlohmann_json
+BuildRequires: nlohmann_json-devel
 %else
 BuildRequires: json-devel
 %endif
