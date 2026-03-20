@@ -96,6 +96,7 @@ fi
 DEB_BUILD_OPTIONS=parallel=$cpu_cores debuild ${DEBUILD_ARGS} --prepend-path=/usr/local/go/bin \
   -e  CVMFS_EXTERNALS_PREFIX="${CVMFS_EXTERNALS_PREFIX}" \
   -e  CMAKE_CXX_COMPILER_LAUNCHER="${CMAKE_CXX_COMPILER_LAUNCHER}" \
+  -e  GOPROXY="${GOPROXY}" \
   --check-dirname-level 0 \
   -us -uc
 cd ${CVMFS_RESULT_LOCATION}
