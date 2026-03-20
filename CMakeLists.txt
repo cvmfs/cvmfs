@@ -196,7 +196,7 @@ endif ()
 #
 
 # workaround for an issue with the libfuse3 target
-if (MACOS)
+if (MACOSX)
   set(BUILD_MANPAGES_DEFAULT OFF)
   set(BUILTIN_EXTERNALS_EXCLUDE_DEFAULT "sqlite3;zlib")
 else()
