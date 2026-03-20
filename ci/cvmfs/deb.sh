@@ -93,7 +93,17 @@ DEBUILD_ARGS=""
 if [ x"$CVMFS_LINT_PKG" = x ]; then
   DEBUILD_ARGS="--no-lintian"
 fi
-DEB_BUILD_OPTIONS=parallel=$cpu_cores debuild ${DEBUILD_ARGS} --prepend-path=/usr/local/go/bin \
+# debuild sanitises PATH, so a custom cmake installed by bootstrap_cmake.sh
+# must be injected explicitly via --prepend-path.  Set CVMFS_CMAKE_DIR to the
+# directory that contains the cmake binary (e.g. externals_install/bin) before
+# calling this script or build_package.sh.
+DEBUILD_CMAKE_PATH=""
+if [ -n "${CVMFS_CMAKE_DIR:-}" ]; then
+  DEBUILD_CMAKE_PATH="--prepend-path=${CVMFS_CMAKE_DIR}"
+fi
+DEB_BUILD_OPTIONS=parallel=$cpu_cores debuild ${DEBUILD_ARGS} \
+  --prepend-path=/usr/local/go/bin \
+  ${DEBUILD_CMAKE_PATH} \
   -e  CVMFS_EXTERNALS_PREFIX="${CVMFS_EXTERNALS_PREFIX}" \
   -e  CMAKE_CXX_COMPILER_LAUNCHER="${CMAKE_CXX_COMPILER_LAUNCHER}" \
   -e  GOPROXY="${GOPROXY}" \

@@ -21,6 +21,44 @@ die() { echo "ERROR: $*" >&2; exit 1; }
 log() { echo "[builddeps] $*"; }
 check_available() { command -v "$1" >/dev/null 2>&1; }
 
+# cmake_version_ge A B — succeeds when cmake version A >= B
+cmake_version_ge() {
+  local a="$1" b="$2"
+  IFS='.' read -ra av <<< "$a"
+  IFS='.' read -ra bv <<< "$b"
+  local i
+  for i in 0 1 2; do
+    local an="${av[$i]:-0}"
+    local bn="${bv[$i]:-0}"
+    (( an > bn )) && return 0
+    (( an < bn )) && return 1
+  done
+  return 0
+}
+
+bootstrap_cmake_if_needed() {
+  local min_ver="3.24.0"
+  local current_ver=""
+  if check_available cmake; then
+    current_ver="$(cmake --version 2>/dev/null \
+      | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || true)"
+  fi
+  if [ -n "$current_ver" ] && cmake_version_ge "$current_ver" "$min_ver"; then
+    log "cmake ${current_ver} is sufficient (>= ${min_ver})"
+    return 0
+  fi
+  if [ -n "$current_ver" ]; then
+    log "cmake ${current_ver} < ${min_ver} — bootstrapping a newer cmake"
+  else
+    log "cmake not found — bootstrapping cmake"
+  fi
+  local cmake_dir_line
+  cmake_dir_line="$("${SCRIPT_DIR}/bootstrap_cmake.sh")"
+  eval "$cmake_dir_line"
+  export CVMFS_CMAKE_DIR
+  log "cmake bootstrapped at: ${CVMFS_CMAKE_DIR}/cmake"
+}
+
 get_script_dir() { cd "$(dirname "$0")" && pwd; }
 
 ########################
@@ -218,6 +256,7 @@ case "$MODE" in
       die "Unsupported OS family for install: $OS_FAMILY"
     fi
     log "Build dependencies installed successfully"
+    bootstrap_cmake_if_needed
     ;;
   *) die "Unknown mode: $MODE";;
 esac
