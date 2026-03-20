@@ -46,7 +46,6 @@ if can_build_gateway; then
 fi
 
 
-export GOPROXY="http://cvm-gomod-proxy1.cern.ch:3000|https://proxy.golang.org|direct"
 
 echo "configuring using CMake..."
 cmake -DBUILD_SERVER=$build_server          \
