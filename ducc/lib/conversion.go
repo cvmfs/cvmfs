@@ -235,6 +235,10 @@ func ConvertWishFlat(wish WishFriendly, multiArch bool) error {
 					}
 				}
 				if err == nil {
+					imageLogger.WithFields(log.Fields{
+						"flat path":    completeSingularityPriPath,
+						"symlink path": completePubSymPath,
+					}).Info("Updated flat image symlink")
 					n.Action("publish_flat_image").AddField("public_path", publicSymlinkPath).AddField("private_path", singularityPrivatePath).Send()
 				}
 				continue
@@ -255,6 +259,10 @@ func ConvertWishFlat(wish WishFriendly, multiArch bool) error {
 					}
 				}
 				if err == nil {
+					imageLogger.WithFields(log.Fields{
+						"flat path":    completeSingularityPriPath,
+						"symlink path": completePubSymPath,
+					}).Info("Created flat image symlink")
 					n.Action("publish_flat_image").AddField("public_path", publicSymlinkPath).AddField("private_path", singularityPrivatePath).Send()
 				}
 				continue
@@ -327,6 +335,10 @@ func ConvertWishFlat(wish WishFriendly, multiArch bool) error {
 			}
 			i.Error(err).Elapsed(t1).Send()
 			if err == nil {
+				imageLogger.WithFields(log.Fields{
+					"flat path":    completeSingularityPriPath,
+					"symlink path": completePubSymPath,
+				}).Info("Created flat image and symlink")
 				n.Action("publish_flat_image").AddField("public_path", publicSymlinkPath).AddField("private_path", singularityPrivatePath).Send()
 			}
 			continue
