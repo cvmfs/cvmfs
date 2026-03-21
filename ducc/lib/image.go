@@ -721,6 +721,31 @@ func (i *Image) GetPublicSymlinkPath() string {
 	return filepath.Join(i.Registry, i.Repository+":"+i.GetSimpleReference())
 }
 
+// GetVariantSymlinkTarget returns the raw symlink target string for a CVMFS
+// variant symlink placed at GetPublicSymlinkPath().  The target embeds a
+// $(CVMFS_ARCH:-defaultArch) expression so the CVMFS client resolves it to
+// the architecture-specific flat image for the current host at runtime.
+//
+// For example, if the public path is "docker.io/user/myimage:latest" and
+// defaultArch is "amd64", the returned target is:
+//
+//	../../.multiarch/$(CVMFS_ARCH:-amd64)/docker.io/user/myimage:latest
+//
+// which, with CVMFS_ARCH=arm64 set in the client config, resolves to
+// .multiarch/arm64/docker.io/user/myimage:latest relative to the repo root.
+func (i *Image) GetVariantSymlinkTarget(defaultArch string) string {
+	publicPath := i.GetPublicSymlinkPath()
+	parentDir := filepath.Dir(publicPath)
+	// Count the number of directory components between the repo root and the
+	// symlink's containing directory; that many "../" steps bring us back to
+	// the repo root from the symlink's location.
+	depth := len(strings.Split(parentDir, "/"))
+	upSteps := strings.Repeat("../", depth)
+	varExpr := fmt.Sprintf("$(CVMFS_ARCH:-%s)", defaultArch)
+	// Explicit string join to preserve the $(VAR) expression intact.
+	return upSteps + ".multiarch/" + varExpr + "/" + publicPath
+}
+
 func (img *Image) getByteManifestList() ([]byte, error) {
 	url := img.GetManifestUrl("")
 	return makeGetRequest(url, map[string]string{"Accept": "application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.index.v1+json"})

@@ -406,6 +406,27 @@ func ConvertWishFlat(wish WishFriendly, multiArch bool) error {
 			continue
 
 		}
+
+		// After processing all architectures for this image, create (or update)
+		// the user-facing variant symlink at <registry>/<repo>:<tag>.  The
+		// symlink contains a $(CVMFS_ARCH:-<native>) expression so that the
+		// CVMFS client resolves it to the correct architecture-specific flat
+		// image at runtime without any server-side changes.
+		if multiArch {
+			variantPath := inputImage.GetPublicSymlinkPath()
+			variantTarget := inputImage.GetVariantSymlinkTarget(runtime.GOARCH)
+			variantLogger := l.WithImage(inputImage.GetSimpleName())
+			variantLogger.WithFields(log.Fields{
+				"symlink path": variantPath,
+				"target":       variantTarget,
+			}).Debug("Creating multiarch variant symlink")
+			if vErr := cvmfs.CreateVariantSymlinkIntoCVMFSWithLogger(variantLogger, wish.CvmfsRepo, variantPath, variantTarget); vErr != nil {
+				variantLogger.WithField("error", vErr).Warning("Failed to create variant symlink for multiarch image")
+				if firstError == nil {
+					firstError = vErr
+				}
+			}
+		}
 	}
 	if multiArch {
 		createMultiarchAliasSymlinksWithLogger(nil, wish.CvmfsRepo)
