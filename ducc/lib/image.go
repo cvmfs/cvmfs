@@ -974,7 +974,6 @@ func (img *Image) GetLayersWithLogger(logger *log.Entry, manifest da.Manifest, l
 
 			layerLogger.Trace("Start working on layer")
 
-			t0 := time.Now()
 			toSend, err := layerDownloader.DownloadLayer(layer)
 
 			if err != nil {
@@ -982,10 +981,6 @@ func (img *Image) GetLayersWithLogger(logger *log.Entry, manifest da.Manifest, l
 				toSend.Close()
 				return
 			}
-			layerLogger.WithFields(log.Fields{
-				"duration":    time.Since(t0).Round(time.Millisecond),
-				"size":        fmt.Sprintf("%.1f MB", float64(layer.Size)/1e6),
-			}).Info("Layer download finished")
 			select {
 			case layersChan <- toSend:
 				return
