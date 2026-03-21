@@ -1,0 +1,37 @@
+#!/bin/bash
+cvmfs_test_name="Repository gateway bootstrap without initial publisher mount"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+
+cvmfs_run_test() {
+    local repo="test.repo.org"
+
+    set_up_repository_gateway -P || return 1
+    load_repo_config $repo || return 2
+
+    echo "*** check bootstrap leaves the repository unmounted"
+    cat /proc/mounts | grep -e " /cvmfs/${repo} " && return 3
+    cat /proc/mounts | grep -e " ${CVMFS_SPOOL_DIR}/rdonly " && return 4
+
+    echo "*** check mountpoint configuration was still created"
+    local fstab_entries=$(grep -c "# added by CernVM-FS for ${repo}" /etc/fstab || true)
+    [ $fstab_entries -eq 2 ] || return 5
+
+    echo "*** check no root hash was pinned during bootstrap"
+    grep -q '^CVMFS_ROOT_HASH=' ${CVMFS_SPOOL_DIR}/client.local && return 6
+
+    echo "*** check bootstrap artifacts are published"
+    curl -sIf ${CVMFS_STRATUM0}/.cvmfspublished >/dev/null || return 7
+    curl -sIf ${CVMFS_STRATUM0}/.cvmfswhitelist >/dev/null || return 8
+
+    echo "*** open a regular gateway transaction after bootstrap"
+    cvmfs_server transaction $repo || return 9
+    echo "bootstrap" > /cvmfs/${repo}/bootstrap.txt || return 10
+    cvmfs_server publish $repo || return 11
+    cvmfs_server check -i $repo || return 12
+
+    grep -qx "bootstrap" /cvmfs/${repo}/bootstrap.txt || return 13
+
+    return 0
+}

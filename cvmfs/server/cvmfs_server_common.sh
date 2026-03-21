@@ -1189,9 +1189,8 @@ EOF
 }
 
 
-setup_and_mount_new_repository() {
+setup_new_repository_mountpoints() {
   local name=$1
-  local http_timeout=15
 
   # get repository information
   load_repo_config $name
@@ -1218,6 +1217,15 @@ EOF
   fi
   local user_shell="$(get_user_shell $name)"
   $user_shell "touch ${CVMFS_SPOOL_DIR}/client.local"
+}
+
+
+mount_new_repository() {
+  local name=$1
+  local http_timeout=15
+
+  load_repo_config $name
+  local rdonly_dir="${CVMFS_SPOOL_DIR}/rdonly"
 
   # avoid racing against apache; we can safely ignore the certificate validation
   # at this step, we only want to check that the endpoint is up.
@@ -1241,6 +1249,14 @@ EOF
       /run/systemd/generator '' '' 2>/dev/null || true
     systemctl daemon-reload
   fi
+}
+
+
+setup_and_mount_new_repository() {
+  local name=$1
+
+  setup_new_repository_mountpoints $name || return 1
+  mount_new_repository $name
 }
 
 

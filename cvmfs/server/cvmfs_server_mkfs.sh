@@ -102,6 +102,7 @@ cvmfs_server_mkfs() {
   local external_data=false
   local require_masterkeycard=0
   local ignore_manifest_overwrite=0
+  local no_publisher=0
 
   local configure_apache=1
   local voms_authz=""
@@ -109,8 +110,11 @@ cvmfs_server_mkfs() {
 
   # parameter handling
   OPTIND=1
-  while getopts "Xw:u:o:mf:vgG:a:zs:k:pRV:Z:x:I" option; do
+  while getopts "PXw:u:o:mf:vgG:a:zs:k:pRV:Z:x:I" option; do
     case $option in
+      P)
+        no_publisher=1
+      ;;
       X)
         external_data=true
       ;;
@@ -208,6 +212,9 @@ cvmfs_server_mkfs() {
 
   # sanity checks
   local upstream_type=$(get_upstream_type $upstream)
+  if [ $no_publisher -eq 1 ] && [ x"$upstream_type" = xgw ]; then
+    die "No-publisher bootstrap expects direct repository storage for the initial mkfs step. Create the backend repository first and switch to a gw,... upstream afterwards."
+  fi
   check_repository_existence $name  && die "The repository $name already exists"
   # if upstream is a gateway, we expect the repository to not be empty.
   if [ x"$upstream_type" != xgw ]; then
@@ -370,17 +377,25 @@ cvmfs_server_mkfs() {
   fi
   echo "done"
 
-  echo -n "Mounting CernVM-FS Storage... "
-  setup_and_mount_new_repository $name || die "fail"
-  echo "done"
+  if [ $no_publisher -eq 1 ]; then
+    echo -n "Configuring CernVM-FS Mount Points... "
+    setup_new_repository_mountpoints $name || die "fail"
+    echo "done"
+  else
+    echo -n "Mounting CernVM-FS Storage... "
+    setup_and_mount_new_repository $name || die "fail"
+    echo "done"
+  fi
 
   if [ $replicable -eq 1 ]; then
     cvmfs_server_alterfs -m on $name
   fi
 
-  health_check $name || die "fail! (health check after mount)"
+  if [ $no_publisher -eq 0 ]; then
+    health_check $name || die "fail! (health check after mount)"
+  fi
 
-  if [ x"$upstream_type" != xgw -a "x$voms_authz" = "x" ]; then
+  if [ $no_publisher -eq 0 ] && [ x"$upstream_type" != xgw -a "x$voms_authz" = "x" ]; then
       echo -n "Initial commit... "
       cvmfs_server_transaction $name > /dev/null || die "fail (transaction)"
       echo "New CernVM-FS repository for $name" > /cvmfs/${name}/new_repository

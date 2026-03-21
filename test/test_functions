@@ -2640,6 +2640,8 @@ find_or_build_cvmfs_preload() {
 
 # Sets up the CVMFS repository gateway application
 set_up_repository_gateway() {
+    local mkfs_args=("$@")
+
     echo "Setting up repository gateway"
 
     gateway_script=/usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh
@@ -2677,7 +2679,7 @@ set_up_repository_gateway() {
 EOF'
 
     echo "  Creating test repo"
-    create_repo test.repo.org `whoami`
+    create_repo test.repo.org `whoami` NO "${mkfs_args[@]}"
 
     echo "  Writing API key file"
     sudo bash -c 'cat <<EOF > /etc/cvmfs/keys/test.repo.org.gw

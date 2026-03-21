@@ -1289,6 +1289,7 @@ Supported Commands:
                   [-z enable garbage collection] [-v volatile content]
                   [-Z compression algorithm (default: zlib)]
                   [-k path to existing keychain] [-p no apache config]
+                  [-P no publisher bootstrap]
                   [-R require masterkeycard key ]
                   [-V VOMS authorization] [-X (external data)]
                   [-x proxy url]
