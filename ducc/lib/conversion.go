@@ -495,6 +495,33 @@ func convertInputOutput2(inputImage *Image, imageLabel, nameWithArch, repo strin
 		}
 	}
 
+	// Classify layers into those already present in CVMFS and those that need
+	// to be downloaded and ingested, mirroring the forceDownload logic in
+	// GetLayersWithLogger so the message accurately reflects what will happen.
+	var layersToConvert, layersPresent []string
+	for _, layer := range manifest.Layers {
+		if layer.MediaType == "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip" {
+			continue
+		}
+		digest := strings.Split(layer.Digest, ":")[1]
+		shortDigest := digest
+		if len(shortDigest) > 12 {
+			shortDigest = shortDigest[:12]
+		}
+		layerPath := cvmfs.LayerRootfsPath(repo, digest)
+		if !forceDownload {
+			if _, statErr := os.Stat(layerPath); statErr == nil {
+				layersPresent = append(layersPresent, shortDigest)
+				continue
+			}
+		}
+		layersToConvert = append(layersToConvert, shortDigest)
+	}
+	logger.WithFields(log.Fields{
+		"layers to convert": layersToConvert,
+		"layers present":    layersPresent,
+	}).Info("Starting layer conversion")
+
 	layersChanell := make(chan downloadedLayer, 10)
 	manifestChanell := make(chan string, 1)
 	stopGettingLayers := make(chan bool, 1)

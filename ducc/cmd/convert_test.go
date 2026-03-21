@@ -1,10 +1,7 @@
 package cmd
 
 import (
-	"strings"
 	"testing"
-
-	"github.com/cvmfs/ducc/lib"
 )
 
 func TestIsInIgnoreList(t *testing.T) {
@@ -68,23 +65,30 @@ func TestIsInIgnoreList(t *testing.T) {
 	}
 }
 
-func TestFormatConversionSummary(t *testing.T) {
-	summary := lib.ConversionSummary{
-		Added:   []string{"z-image", "a-image"},
-		Updated: []string{"updated-image"},
+func TestSortedImageList(t *testing.T) {
+	result := sortedImageList([]string{"z-image", "a-image", "m-image"})
+	expected := []string{"a-image", "m-image", "z-image"}
+	if len(result) != len(expected) {
+		t.Fatalf("expected %v, got %v", expected, result)
 	}
-
-	formatted := formatConversionSummary("Conversion summary:", summary)
-
-	expectedLines := []string{
-		"Conversion summary:",
-		"Added (2): a-image, z-image",
-		"Updated (1): updated-image",
-		"AlreadyConverted (0): none",
-	}
-	for _, line := range expectedLines {
-		if !strings.Contains(formatted, line) {
-			t.Fatalf("expected formatted summary to contain %q, got %q", line, formatted)
+	for i, v := range expected {
+		if result[i] != v {
+			t.Fatalf("expected %v at index %d, got %v", v, i, result[i])
 		}
+	}
+}
+
+func TestSortedImageListEmpty(t *testing.T) {
+	result := sortedImageList([]string{})
+	if len(result) != 0 {
+		t.Fatalf("expected empty slice, got %v", result)
+	}
+}
+
+func TestSortedImageListDoesNotMutateInput(t *testing.T) {
+	input := []string{"z-image", "a-image"}
+	_ = sortedImageList(input)
+	if input[0] != "z-image" {
+		t.Fatalf("sortedImageList mutated the input slice")
 	}
 }
