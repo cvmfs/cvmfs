@@ -29,6 +29,18 @@ import (
 	notification "github.com/cvmfs/ducc/notification"
 )
 
+var (
+	logCurlReqOnce    sync.Once
+	logCurlReqEnabled bool
+)
+
+func logCurlEnabled() bool {
+	logCurlReqOnce.Do(func() {
+		logCurlReqEnabled = os.Getenv("DUCC_DEBUG_LOG_CURL_REQ") != ""
+	})
+	return logCurlReqEnabled
+}
+
 type ManifestRequest struct {
 	Image    Image
 	Password string
@@ -755,12 +767,12 @@ func firstRequestForAuth_internal(url, user, pass string) (token string, err err
 		req.Header.Set("Accept", "application/vnd.docker.distribution.manifest.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.index.v1+json")
 
 		// for debugging: log curl command corresponding to request
-		if log.IsLevelEnabled(log.TraceLevel) {
+		if logCurlEnabled() {
 			curlcmd, curlErr := curling.NewFromRequest(req)
 			if curlErr != nil {
 				log.Fatal(curlErr)
 			}
-			log.Trace(curlcmd)
+			log.Debug(curlcmd)
 		}
 
 		resp, respErr := client.Do(req)
@@ -1356,12 +1368,12 @@ func makeGetRequest(url string, headers map[string]string) ([]byte, error) {
 		}
 
 		// for debugging: log curl command corresponding to request
-		if log.IsLevelEnabled(log.TraceLevel) {
+		if logCurlEnabled() {
 			curlcmd, curlErr := curling.NewFromRequest(req)
 			if curlErr != nil {
 				log.Fatal(curlErr)
 			}
-			log.Trace(curlcmd)
+			log.Debug(curlcmd)
 		}
 
 		resp, respErr := client.Do(req)
