@@ -51,7 +51,7 @@ func NewOnDiskReadAndHash(r io.ReadCloser) (*OnDiskReadAndHash, error) {
 		os.RemoveAll(f.Name())
 		return &OnDiskReadAndHash{}, err
 	}
-	l.Log().Info("Done downloading")
+	l.Log().Trace("Done downloading")
 	readAndHash := NewReadAndHash(f)
 	return &OnDiskReadAndHash{ReadAndHash: readAndHash, path: f.Name()}, nil
 }

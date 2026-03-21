@@ -31,6 +31,7 @@ type Recipe struct {
 	Repo             string
 	Wishes           chan WishFriendly
 	IgnoreErrorsList []string
+	OutputFormat     string
 }
 
 // loadIgnoreErrorsList loads the ignore errors list from an external file if DUCC_IGNORE_ERRORS_FILE env var is set
@@ -67,6 +68,7 @@ func ParseYamlRecipeV1(data []byte) (Recipe, error) {
 	recipe := Recipe{}
 	recipe.Repo = recipeYamlV1.CVMFSRepo
 	recipe.Wishes = make(chan WishFriendly, 500)
+	recipe.OutputFormat = recipeYamlV1.OutputFormat
 
 	// Load ignore errors list from recipe file
 	recipe.IgnoreErrorsList = recipeYamlV1.IgnoreErrors
@@ -102,15 +104,11 @@ func ParseYamlRecipeV1(data []byte) (Recipe, error) {
 	for reg, inputImages := range registryMap {
 		wg.Add(1)
 		go func(inputImages []Image, reg string) {
-			l.Log().Info("Starting with", inputImages[0])
 			defer wg.Done()
 			for _, input := range inputImages {
 				if reg == "gitlab-registry.cern.ch" {
 					time.Sleep(500*time.Millisecond + time.Duration(rand.Intn(500))*time.Millisecond)
 				}
-
-				l.Log().Info(reg)
-				l.Log().Info(input)
 
 				output := formatOutputImage(recipeYamlV1.OutputFormat, input)
 				wish, err := CreateWish(input, output, recipeYamlV1.CVMFSRepo, recipeYamlV1.User, recipeYamlV1.User)
@@ -129,7 +127,6 @@ func formatOutputImage(OutputFormat string, inputImage Image) string {
 
 	if OutputFormat == "" {
 		OutputFormat = "$(scheme)://$(registry)/$(repository)_thin:$(tag)"
-		l.Log().Info("Using default output image name ", OutputFormat)
 	}
 
 	s := strings.Replace(OutputFormat, "$(scheme)", inputImage.Scheme, 5)

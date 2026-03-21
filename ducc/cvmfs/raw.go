@@ -65,7 +65,7 @@ func getLock(CVMFSRepo string) {
 		// this may happen if the kernel detect a deadlock
 		// it should never happen in our case, (of a single global lock)
 		// but still we can protect against it
-		l.LogE(err).Info("Error in getting the FS lock")
+		l.LogE(err).Warning("Error in getting the FS lock")
 		time.Sleep(100 * time.Millisecond)
 		err = f.LockWriteB()
 	}
@@ -83,6 +83,12 @@ func unlock(CVMFSRepo string) {
 }
 
 func ExecuteAndOpenTransaction(CVMFSRepo string, f func() error, options ...TransactionOption) error {
+	return ExecuteAndOpenTransactionWithLogger(nil, CVMFSRepo, f, options...)
+}
+
+func ExecuteAndOpenTransactionWithLogger(logger *log.Entry, CVMFSRepo string, f func() error, options ...TransactionOption) error {
+	logger = l.Ensure(logger)
+	transactionLogger := logger.WithFields(log.Fields{"repo": CVMFSRepo, "action": "transaction"})
 	cmd := []string{"cvmfs_server", "transaction"}
 	for _, opt := range options {
 		cmd = append(cmd, opt.ToString())
@@ -93,53 +99,66 @@ func ExecuteAndOpenTransaction(CVMFSRepo string, f func() error, options ...Tran
 		unlock(CVMFSRepo)
 		return err
 	}
-	err := exec.ExecCommand(cmd...).Start()
+	err := exec.ExecCommandWithLogger(transactionLogger, cmd...).Start()
 	if err != nil {
-		l.LogE(err).WithFields(
-			log.Fields{"repo": CVMFSRepo}).
-			Error("Error in opening the transaction")
-		Abort(CVMFSRepo)
+		transactionLogger.WithField("error", err).Error("Error in opening the transaction")
+		AbortWithLogger(logger, CVMFSRepo)
 	}
 	return err
 
 }
 
 func OpenTransaction(CVMFSRepo string, options ...TransactionOption) error {
-	return ExecuteAndOpenTransaction(CVMFSRepo, func() error { return nil }, options...)
+	return OpenTransactionWithLogger(nil, CVMFSRepo, options...)
+}
+
+func OpenTransactionWithLogger(logger *log.Entry, CVMFSRepo string, options ...TransactionOption) error {
+	return ExecuteAndOpenTransactionWithLogger(logger, CVMFSRepo, func() error { return nil }, options...)
 }
 
 func Publish(CVMFSRepo string) error {
+	return PublishWithLogger(nil, CVMFSRepo)
+}
+
+func PublishWithLogger(logger *log.Entry, CVMFSRepo string) error {
+	logger = l.Ensure(logger)
+	publishLogger := logger.WithFields(log.Fields{"repo": CVMFSRepo, "action": "publish"})
 	repoName, _ := GetRepoAndSubdir(CVMFSRepo)
 	defer unlock(CVMFSRepo)
-	err := exec.ExecCommand("cvmfs_server", "publish", repoName).Start()
+	err := exec.ExecCommandWithLogger(publishLogger, "cvmfs_server", "publish", repoName).Start()
 	if err != nil {
-		l.LogE(err).WithFields(
-			log.Fields{"repo": CVMFSRepo}).
-			Error("Error in publishing the repository")
-		abort(CVMFSRepo)
+		publishLogger.WithField("error", err).Error("Error in publishing the repository")
+		abortWithLogger(logger, CVMFSRepo)
 		return err
 	}
 
-	l.LogE(err).WithFields(
-		log.Fields{"repo": CVMFSRepo}).
-		Info("Publish complete")
+	publishLogger.Trace("Publish complete")
 	return nil
 }
 
 func Abort(CVMFSRepo string) error {
+	return AbortWithLogger(nil, CVMFSRepo)
+}
+
+func AbortWithLogger(logger *log.Entry, CVMFSRepo string) error {
 	defer unlock(CVMFSRepo)
-	err := abort(CVMFSRepo)
+	err := abortWithLogger(logger, CVMFSRepo)
 	if err != nil {
-		l.LogE(err).WithFields(
-			log.Fields{"repo": CVMFSRepo}).
+		l.Ensure(logger).WithFields(log.Fields{"repo": CVMFSRepo, "action": "abort", "error": err}).
 			Error("Error in abort the transaction")
 	}
 	return err
 }
 
 func abort(CVMFSRepo string) error {
+	return abortWithLogger(nil, CVMFSRepo)
+}
+
+func abortWithLogger(logger *log.Entry, CVMFSRepo string) error {
+	logger = l.Ensure(logger)
+	abortLogger := logger.WithFields(log.Fields{"repo": CVMFSRepo, "action": "abort"})
 	repoName, _ := GetRepoAndSubdir(CVMFSRepo)
-	return exec.ExecCommand("cvmfs_server", "abort", "-f", repoName).Start()
+	return exec.ExecCommandWithLogger(abortLogger, "cvmfs_server", "abort", "-f", repoName).Start()
 }
 
 func RepositoryExists(CVMFSRepo string) bool {
@@ -185,18 +204,28 @@ func repositoryExistsInList(stdoutString, repo string) bool {
 }
 
 func WithinTransaction(CVMFSRepo string, f func() error, opts ...TransactionOption) error {
-	err := OpenTransaction(CVMFSRepo, opts...)
+	return WithinTransactionWithLogger(nil, CVMFSRepo, f, opts...)
+}
+
+func WithinTransactionWithLogger(logger *log.Entry, CVMFSRepo string, f func() error, opts ...TransactionOption) error {
+	err := OpenTransactionWithLogger(logger, CVMFSRepo, opts...)
 	if err != nil {
 		return err
 	}
 	err = f()
 	if err != nil {
-		return Abort(CVMFSRepo)
+		return AbortWithLogger(logger, CVMFSRepo)
 	}
-	return Publish(CVMFSRepo)
+	return PublishWithLogger(logger, CVMFSRepo)
 }
 
 func Ingest(CVMFSRepo string, input io.ReadCloser, options ...string) error {
+	return IngestWithLogger(nil, CVMFSRepo, input, options...)
+}
+
+func IngestWithLogger(logger *log.Entry, CVMFSRepo string, input io.ReadCloser, options ...string) error {
+	logger = l.Ensure(logger)
+	ingestLogger := logger.WithFields(log.Fields{"repo": CVMFSRepo, "action": "ingest"})
 	repoName, _ := GetRepoAndSubdir(CVMFSRepo)
 	cmd := []string{"cvmfs_server", "ingest"}
 	for _, opt := range options {
@@ -205,13 +234,19 @@ func Ingest(CVMFSRepo string, input io.ReadCloser, options ...string) error {
 	cmd = append(cmd, repoName)
 	getLock(CVMFSRepo)
 	defer unlock(CVMFSRepo)
-	return exec.ExecCommand(cmd...).StdIn(input).Start()
+	return exec.ExecCommandWithLogger(ingestLogger, cmd...).StdIn(input).Start()
 }
 
 func IngestDelete(CVMFSRepo string, path string) error {
+	return IngestDeleteWithLogger(nil, CVMFSRepo, path)
+}
+
+func IngestDeleteWithLogger(logger *log.Entry, CVMFSRepo string, path string) error {
+	logger = l.Ensure(logger)
+	ingestLogger := logger.WithFields(log.Fields{"repo": CVMFSRepo, "action": "ingest delete", "path": path})
 	repoName, _ := GetRepoAndSubdir(CVMFSRepo)
 	path = PrefixRepoSubdirOnce(CVMFSRepo, path)
 	getLock(CVMFSRepo)
 	defer unlock(CVMFSRepo)
-	return exec.ExecCommand("cvmfs_server", "ingest", "--delete", path, repoName).Start()
+	return exec.ExecCommandWithLogger(ingestLogger, "cvmfs_server", "ingest", "--delete", path, repoName).Start()
 }

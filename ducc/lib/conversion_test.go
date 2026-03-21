@@ -1,6 +1,10 @@
 package lib
 
-import "testing"
+import (
+	"testing"
+
+	da "github.com/cvmfs/ducc/docker-api"
+)
 
 func TestOutputImageForExpandedTagWildcard(t *testing.T) {
 	input := &Image{TagWildcard: true}
@@ -34,5 +38,52 @@ func TestOutputRepositoryForImport(t *testing.T) {
 
 	if got != "localhost:5000/mock/repo" {
 		t.Fatalf("expected repository-only reference, got %q", got)
+	}
+}
+
+func TestConversionSummaryPrefersAddedOverOtherStates(t *testing.T) {
+	summary := ConversionSummary{}
+	summary.Add(ConversionMatch, "example:latest")
+	summary.Add(ConversionNotMatch, "example:latest")
+	summary.Add(ConversionNotFound, "example:latest")
+
+	if len(summary.Added) != 1 || summary.Added[0] != "example:latest" {
+		t.Fatalf("expected image to be tracked as added, got %+v", summary)
+	}
+	if len(summary.Updated) != 0 {
+		t.Fatalf("expected no updated images, got %+v", summary.Updated)
+	}
+	if len(summary.AlreadyConverted) != 0 {
+		t.Fatalf("expected no already-converted images, got %+v", summary.AlreadyConverted)
+	}
+}
+
+func TestConversionSummaryMergeKeepsHighestPriorityState(t *testing.T) {
+	summary := ConversionSummary{AlreadyConverted: []string{"img-a", "img-b"}}
+	summary.Merge(ConversionSummary{Updated: []string{"img-a"}, Added: []string{"img-b"}})
+
+	if len(summary.Added) != 1 || summary.Added[0] != "img-b" {
+		t.Fatalf("expected img-b to be added, got %+v", summary)
+	}
+	if len(summary.Updated) != 1 || summary.Updated[0] != "img-a" {
+		t.Fatalf("expected img-a to be updated, got %+v", summary)
+	}
+	if len(summary.AlreadyConverted) != 0 {
+		t.Fatalf("expected already-converted images to be cleared, got %+v", summary.AlreadyConverted)
+	}
+}
+
+func TestImageNameWithPlatform(t *testing.T) {
+	variant := "v8"
+	image := &Image{Registry: "registry.example.org", Repository: "team/demo", Tag: "latest"}
+	manifestEntry := da.ManifestListItem{}
+	manifestEntry.Platform.OS = "linux"
+	manifestEntry.Platform.Architecture = "arm64"
+	manifestEntry.Platform.Variant = &variant
+
+	got := imageNameWithPlatform(image, manifestEntry)
+	want := "registry.example.org/team/demo:latest (linux/arm64/v8)"
+	if got != want {
+		t.Fatalf("expected %q, got %q", want, got)
 	}
 }

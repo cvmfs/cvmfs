@@ -51,8 +51,10 @@ var convertSingleImageCmd = &cobra.Command{
 			skipPodman = true
 		}
 		if thinImageName == "" {
-			l.Log().Info("Skipping the creation of the thin image since did not provided a name for the thin image using the --thin-image-name flag")
-			skipThinImage = true
+			if !skipThinImage {
+				l.Log().Trace("Skipping the creation of the thin image since no name was provided via --thin-image-name")
+				skipThinImage = true
+			}
 			// we need a thinImageName to parse the wish
 			thinImageName = inputImage + "_thin"
 		}
@@ -96,15 +98,21 @@ var convertSingleImageCmd = &cobra.Command{
 			"total attempts": attempts}
 
 		var conversionErrors []string
+		totalSummary := lib.ConversionSummary{}
 
 		for i := 0; i < attempts; i++ {
-			err = lib.ConvertWish(wish, convertAgain, overwriteLayer, multiArch, maxConcurrentDownloads)
+			attemptSummary, err := lib.ConvertWish(wish, convertAgain, overwriteLayer, multiArch, maxConcurrentDownloads)
+			totalSummary.Merge(attemptSummary)
 			log := l.LogE(err).WithFields(fields).
 				WithFields(log.Fields{"attempts number": i})
 			if err != nil {
 				log.Warning("Could not convert wish (layers), trying again")
 			} else {
-				log.Info("Successfully converted the layers")
+				if len(totalSummary.Added) == 0 && len(totalSummary.Updated) == 0 {
+					log.Info("All layers already converted, nothing to do")
+				} else {
+					log.Info("Successfully converted the layers")
+				}
 				break
 			}
 		}
@@ -112,6 +120,7 @@ var convertSingleImageCmd = &cobra.Command{
 			log.Error("Multiple Errors in converting layers, going on")
 			conversionErrors = append(conversionErrors, fmt.Sprintf("layers: %s", err))
 		}
+		logConversionSummary(fmt.Sprintf("Conversion summary for %s:", wish.InputName), totalSummary)
 
 		if !skipFlat {
 			for i := 0; i < attempts; i++ {

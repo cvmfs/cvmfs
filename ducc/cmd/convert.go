@@ -121,7 +121,12 @@ var convertCmd = &cobra.Command{
 			os.Exit(1)
 		}()
 		defer signal.Stop(sigChan)
+		if !skipThinImage && recipe.OutputFormat == "" {
+			l.Log().Info("Using default output image name $(scheme)://$(registry)/$(repository)_thin:$(tag)")
+		}
+
 		var conversionErrors []string
+		totalSummary := lib.ConversionSummary{}
 		for wish := range recipe.Wishes {
 			fields := log.Fields{"input image": wish.InputName,
 				"repository":   wish.CvmfsRepo,
@@ -131,13 +136,20 @@ var convertCmd = &cobra.Command{
 			// Check if this wish is in the ignore errors list
 			isIgnored := isInIgnoreList(wish.InputName, recipe.IgnoreErrorsList)
 
-			err = lib.ConvertWish(wish, convertAgain, overwriteLayer, multiArch, maxConcurrentDownloads)
+			summary, err := lib.ConvertWish(wish, convertAgain, overwriteLayer, multiArch, maxConcurrentDownloads)
+			totalSummary.Merge(summary)
 			if err != nil {
 				if isIgnored {
 					l.LogE(err).WithFields(fields).Warning("Error in converting wish (layers), but image is in ignoreErrors list")
 				} else {
 					l.LogE(err).WithFields(fields).Error("Error in converting wish (layers), going on")
 					conversionErrors = append(conversionErrors, fmt.Sprintf("[%s] layers: %s", wish.InputName, err))
+				}
+			} else {
+				if len(summary.Added) == 0 && len(summary.Updated) == 0 {
+					l.Log().WithFields(fields).Info("All layers already converted, nothing to do")
+				} else {
+					l.Log().WithFields(fields).Info("Successfully converted the layers")
 				}
 			}
 			if !skipThinImage {
@@ -174,6 +186,7 @@ var convertCmd = &cobra.Command{
 				}
 			}
 		}
+		logConversionSummary("Conversion summary:", totalSummary)
 		if len(conversionErrors) > 0 {
 			summary := fmt.Sprintf("%d conversion error(s):\n  %s", len(conversionErrors), strings.Join(conversionErrors, "\n  "))
 			l.Log().Error(summary)

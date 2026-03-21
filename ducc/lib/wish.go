@@ -83,6 +83,17 @@ func CreateWish(inputImg Image, outputImage, cvmfsRepo, userInput, userOutput st
 	}()
 	wg.Wait()
 
+	if iImage.TagWildcard {
+		tags := make([]string, 0, len(expandedTagImagesLayer))
+		for _, img := range expandedTagImagesLayer {
+			tags = append(tags, img.Tag)
+		}
+		l.Log().WithFields(log.Fields{
+			"input image":   inputImg.WholeName(),
+			"expanded tags": tags,
+		}).Info("Expanded wildcard")
+	}
+
 	wish.ExpandedTagImagesLayer = expandedTagImagesLayer
 	wish.ExpandedTagImagesFlat = expandedTagImagesFlat
 
