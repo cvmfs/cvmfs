@@ -373,3 +373,59 @@ func TestCacheEmptyToken(t *testing.T) {
 		t.Errorf("Expected empty token, got %q", token)
 	}
 }
+
+func TestGetVariantSymlinkTarget(t *testing.T) {
+	tests := []struct {
+		name        string
+		registry    string
+		repository  string
+		tag         string
+		defaultArch string
+		want        string
+	}{
+		{
+			name:        "two-component repo",
+			registry:    "docker.io",
+			repository:  "user/myimage",
+			tag:         "latest",
+			defaultArch: "amd64",
+			// symlink at "docker.io/user/myimage:latest"
+			// parent dir "docker.io/user" has depth 2 → two "../"
+			want: "../../.multiarch/$(CVMFS_ARCH:-amd64)/docker.io/user/myimage:latest",
+		},
+		{
+			name:        "single-component repo",
+			registry:    "registry.cern.ch",
+			repository:  "myimage",
+			tag:         "v1",
+			defaultArch: "arm64",
+			// symlink at "registry.cern.ch/myimage:v1"
+			// parent dir "registry.cern.ch" has depth 1 → one "../"
+			want: "../.multiarch/$(CVMFS_ARCH:-arm64)/registry.cern.ch/myimage:v1",
+		},
+		{
+			name:        "three-component repo",
+			registry:    "registry.cern.ch",
+			repository:  "project/sub/img",
+			tag:         "1.0",
+			defaultArch: "amd64",
+			// symlink at "registry.cern.ch/project/sub/img:1.0"
+			// parent dir "registry.cern.ch/project/sub" has depth 3 → three "../"
+			want: "../../../.multiarch/$(CVMFS_ARCH:-amd64)/registry.cern.ch/project/sub/img:1.0",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			img := Image{
+				Registry:   tt.registry,
+				Repository: tt.repository,
+				Tag:        tt.tag,
+			}
+			got := img.GetVariantSymlinkTarget(tt.defaultArch)
+			if got != tt.want {
+				t.Errorf("GetVariantSymlinkTarget(%q) = %q, want %q", tt.defaultArch, got, tt.want)
+			}
+		})
+	}
+}

@@ -11,8 +11,11 @@ get_repo_name() {
     # Handle triple-slash separator (for testing): "../../tmp/mockrepo///subdir"
     if [[ "$repo" == *"///"* ]]; then
         echo "${repo%%///*}"
+    elif [[ "$repo" == ".."* ]] || [[ "$repo" == "/.."* ]]; then
+        # Relative/mock-absolute paths like "../../tmp/mockrepo" or "/../../../../tmp/mock" - return as-is
+        echo "$repo"
     else
-        # Handle slash separator: "repo.cern.ch/subdir" or "../tmp/mockrepo"
+        # Handle slash separator: "repo.cern.ch/subdir"
         echo "${repo%%/*}"
     fi
 }
@@ -24,12 +27,14 @@ get_subdir() {
     if [[ "$repo" == *"///"* ]]; then
         local rest="${repo#*///}"
         echo "${rest%/}"
-    elif [[ "$repo" == *"/"* ]] && [[ "$repo" != ".."* ]]; then
-        # Handle slash separator only for absolute paths: "repo.cern.ch/subdir"
+    elif [[ "$repo" == ".."* ]] || [[ "$repo" == "/.."* ]]; then
+        # Relative/mock-absolute paths like "../../tmp/mockrepo" or "/../../../../tmp/mock" have no subdir
+        echo ""
+    elif [[ "$repo" == *"/"* ]]; then
+        # Handle slash separator only for normal paths: "repo.cern.ch/subdir"
         local rest="${repo#*/}"
         echo "${rest%/}"
     else
-        # Relative paths like "../../tmp/mockrepo" have no subdir
         echo ""
     fi
 }

@@ -172,6 +172,71 @@ func CreateSymlinkIntoCVMFSWithLogger(logger *log.Entry, CVMFSRepo, newLinkName,
 	return err
 }
 
+// CreateVariantSymlinkIntoCVMFS creates a CVMFS variant symlink whose target
+// is stored verbatim (without path resolution or existence checks).  The
+// rawTarget may contain CVMFS variable-expansion expressions such as
+// $(CVMFS_ARCH:-amd64); the CVMFS client will expand them at read time.
+//
+// newLinkName is the symlink path relative to the repository root
+// (without the /cvmfs/<repo>/ prefix).  rawTarget is the exact string that
+// will be stored as the symlink destination.
+func CreateVariantSymlinkIntoCVMFS(CVMFSRepo, newLinkName, rawTarget string) error {
+	return CreateVariantSymlinkIntoCVMFSWithLogger(nil, CVMFSRepo, newLinkName, rawTarget)
+}
+
+func CreateVariantSymlinkIntoCVMFSWithLogger(logger *log.Entry, CVMFSRepo, newLinkName, rawTarget string) (err error) {
+	logger = l.Ensure(logger)
+	fullLinkName := filepath.Join("/", "cvmfs", CVMFSRepo, newLinkName)
+
+	llog := func(entry *log.Entry) *log.Entry {
+		return l.Ensure(entry).WithFields(log.Fields{
+			"action":    "create variant symlink",
+			"repo":      CVMFSRepo,
+			"link name": fullLinkName,
+			"target":    rawTarget,
+		})
+	}
+
+	err = WithinTransactionWithLogger(logger, CVMFSRepo, func() error {
+		linkDir := filepath.Dir(fullLinkName)
+		if mkErr := os.MkdirAll(linkDir, constants.DirPermision); mkErr != nil {
+			llog(l.LogE(mkErr)).WithField("directory", linkDir).
+				Error("Error in creating the directory for the variant symlink")
+			return mkErr
+		}
+
+		// If the symlink already exists with the identical target, skip.
+		if existing, readErr := os.Readlink(fullLinkName); readErr == nil && existing == rawTarget {
+			llog(logger).Trace("Variant symlink already up to date, skipping")
+			return nil
+		}
+
+		// Remove any existing symlink; refuse to overwrite a real file/dir.
+		if lstat, lstatErr := os.Lstat(fullLinkName); !os.IsNotExist(lstatErr) {
+			if lstat.Mode()&os.ModeSymlink != 0 {
+				if rmErr := os.Remove(fullLinkName); rmErr != nil {
+					err := fmt.Errorf("error removing existing variant symlink: %s", rmErr)
+					llog(l.LogE(err)).Error("Error removing existing variant symlink")
+					return err
+				}
+			} else {
+				err := fmt.Errorf("refusing to overwrite non-symlink with variant symlink at %s", fullLinkName)
+				llog(l.LogE(err)).Error("Error creating variant symlink")
+				return err
+			}
+		}
+
+		if symErr := os.Symlink(rawTarget, fullLinkName); symErr != nil {
+			llog(l.LogE(symErr)).Error("Error in creating the variant symlink")
+			return symErr
+		}
+		llog(logger).Info("Created variant symlink")
+		return nil
+	})
+
+	return err
+}
+
 type Backlink struct {
 	Origin []string `json:"origin"`
 }

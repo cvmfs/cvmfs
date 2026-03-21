@@ -32,11 +32,30 @@ func TestCheckConvertSingleImageLocal(t *testing.T) {
 		t.Fatal(err)
 	}
 }
-func TestCheckConvertSingleImageLocalMultiArch(t *testing.T) {
+
+func TestCheckConvertSingleImageCmdDockerhubMultiArch(t *testing.T) {
+	if !*testutils.Online {
+		t.Skip("Skipping test in offline mode.")
+	}
 	var err error
 	cmd := rootCmd
 	cmd.SetArgs([]string{"convert-single-image", "-m",
 		"registry.hub.docker.com/library/alpine:latest",
+		"-p", "-i", testutils.TestRepo})
+	err = cmd.Execute()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestCheckConvertSingleImageLocalMultiArch(t *testing.T) {
+	if !*testutils.LocalRegistry {
+		t.Skip("Skipping test that needs local registry.")
+	}
+	var err error
+	cmd := rootCmd
+	cmd.SetArgs([]string{"convert-single-image", "-m",
+		testutils.GetTestRegistryUrl() + "multi-arch-test:latest",
 		"-p", "-i", testutils.TestRepo})
 	err = cmd.Execute()
 	if err != nil {
@@ -60,6 +79,9 @@ func TestCheckConvertSingleImageCmdShouldFail1(t *testing.T) {
 }
 
 func TestCheckConvertSingleImageCmdShouldFail2(t *testing.T) {
+	if !*testutils.Online {
+		t.Skip("Skipping test in offline mode.")
+	}
 	var err error
 	cmd := rootCmd
 	cmd.SetArgs([]string{"convert-single-image",
