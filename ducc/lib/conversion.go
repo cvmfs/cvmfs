@@ -141,6 +141,42 @@ func GetNameWithArch(manifestEntry da.ManifestListItem) (nameWithArch string) {
 	return filepath.Join(".multiarch", manifestEntry.Platform.Architecture)
 }
 
+// archAliases maps non-normalized Docker/OCI architecture identifiers to
+// the directory names used under .multiarch/ (as produced by GetNameWithArch).
+// Architectures with a variant use the "arch:variant" form that
+// GetNameWithArch writes to disk (e.g. "arm:v6", not "arm/v6").
+var archAliases = map[string]string{
+	"aarch64": "arm64",
+	"armhf":   "arm",
+	"armel":   "arm:v6",
+	"i386":    "386",
+	"x86_64":  "amd64",
+	"x86-64":  "amd64",
+}
+
+// createMultiarchAliasSymlinksWithLogger creates a .multiarch/<alias> symlink
+// for every entry in archAliases whose normalized target directory already
+// exists under .multiarch/ in the repository.  Aliases that map to a
+// non-existent target are silently skipped.
+func createMultiarchAliasSymlinksWithLogger(logger *log.Entry, repo string) {
+	for alias, normalized := range archAliases {
+		normalizedFullPath := filepath.Join("/", "cvmfs", repo, ".multiarch", normalized)
+		if _, err := os.Stat(normalizedFullPath); err != nil {
+			// Normalized arch directory does not exist in this repo yet; skip.
+			continue
+		}
+		aliasPath := filepath.Join(".multiarch", alias)
+		normalizedPath := filepath.Join(".multiarch", normalized)
+		if err := cvmfs.CreateSymlinkIntoCVMFSWithLogger(logger, repo, aliasPath, normalizedPath); err != nil {
+			l.Ensure(logger).WithFields(log.Fields{
+				"alias":      aliasPath,
+				"normalized": normalizedPath,
+				"error":      err,
+			}).Warning("Failed to create .multiarch alias symlink")
+		}
+	}
+}
+
 // filterManifestList returns the subset of manifests to process.
 // If multiArch is true, all manifests are returned.
 // If multiArch is false, only the manifest matching the native architecture is returned.
@@ -344,6 +380,9 @@ func ConvertWishFlat(wish WishFriendly, multiArch bool) error {
 			continue
 
 		}
+	}
+	if multiArch {
+		createMultiarchAliasSymlinksWithLogger(nil, wish.CvmfsRepo)
 	}
 	return firstError
 }

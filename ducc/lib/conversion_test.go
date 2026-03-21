@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"path/filepath"
 	"testing"
 
 	da "github.com/cvmfs/ducc/docker-api"
@@ -85,5 +86,66 @@ func TestImageNameWithPlatform(t *testing.T) {
 	want := "registry.example.org/team/demo:latest (linux/arm64/v8)"
 	if got != want {
 		t.Fatalf("expected %q, got %q", want, got)
+	}
+}
+
+// TestArchAliasesAllPointToKnownNormalizedNames verifies that every value in
+// archAliases matches the directory name that GetNameWithArch would produce
+// (i.e. the base component of the .multiarch/<dir> path).
+func TestArchAliasesAllPointToKnownNormalizedNames(t *testing.T) {
+	// Build the set of normalized arch dir names that GetNameWithArch can emit.
+	type archVariant struct{ arch, variant string }
+	cases := []archVariant{
+		{"arm64", ""},
+		{"arm", ""},
+		{"arm", "v6"},
+		{"386", ""},
+		{"amd64", ""},
+	}
+	validDirs := map[string]struct{}{}
+	for _, c := range cases {
+		entry := da.ManifestListItem{}
+		entry.Platform.Architecture = c.arch
+		if c.variant != "" {
+			entry.Platform.Variant = &c.variant
+		}
+		nameWithArch := GetNameWithArch(entry)
+		validDirs[filepath.Base(nameWithArch)] = struct{}{}
+	}
+
+	for alias, normalized := range archAliases {
+		if _, ok := validDirs[normalized]; !ok {
+			t.Errorf("archAliases[%q] = %q is not a known .multiarch dir name", alias, normalized)
+		}
+	}
+}
+
+// TestArchAliasesNonNormalizedNamesAreDistinct checks that no alias key is
+// itself a normalized arch name (that would create a self-referential entry).
+func TestArchAliasesNonNormalizedNamesAreDistinct(t *testing.T) {
+	normalizedSet := map[string]struct{}{}
+	for _, v := range archAliases {
+		normalizedSet[v] = struct{}{}
+	}
+	for alias := range archAliases {
+		if _, ok := normalizedSet[alias]; ok {
+			t.Errorf("archAliases key %q is also a normalized arch name — would create a self-referential symlink", alias)
+		}
+	}
+}
+
+// TestGetNameWithArchForAliasedArches verifies that the non-normalized arch
+// names in archAliases do NOT appear as Platform.Architecture values that
+// GetNameWithArch would normalise on its own (they come from the registry
+// verbatim, so a separate alias symlink is required).
+func TestGetNameWithArchForAliasedArches(t *testing.T) {
+	for alias, normalized := range archAliases {
+		entry := da.ManifestListItem{}
+		entry.Platform.Architecture = alias
+		got := GetNameWithArch(entry)
+		wantNot := filepath.Join(".multiarch", normalized)
+		if got == wantNot {
+			t.Errorf("GetNameWithArch with arch=%q already returns %q; alias symlink would be redundant", alias, wantNot)
+		}
 	}
 }
