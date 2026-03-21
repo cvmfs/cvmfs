@@ -80,7 +80,7 @@ func TestFormatConversionSummary(t *testing.T) {
 		"Conversion summary:",
 		"Added (2): a-image, z-image",
 		"Updated (1): updated-image",
-		"Skipped (0): none",
+		"AlreadyConverted (0): none",
 	}
 	for _, line := range expectedLines {
 		if !strings.Contains(formatted, line) {

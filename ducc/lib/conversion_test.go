@@ -53,13 +53,13 @@ func TestConversionSummaryPrefersAddedOverOtherStates(t *testing.T) {
 	if len(summary.Updated) != 0 {
 		t.Fatalf("expected no updated images, got %+v", summary.Updated)
 	}
-	if len(summary.Skipped) != 0 {
-		t.Fatalf("expected no skipped images, got %+v", summary.Skipped)
+	if len(summary.AlreadyConverted) != 0 {
+		t.Fatalf("expected no already-converted images, got %+v", summary.AlreadyConverted)
 	}
 }
 
 func TestConversionSummaryMergeKeepsHighestPriorityState(t *testing.T) {
-	summary := ConversionSummary{Skipped: []string{"img-a", "img-b"}}
+	summary := ConversionSummary{AlreadyConverted: []string{"img-a", "img-b"}}
 	summary.Merge(ConversionSummary{Updated: []string{"img-a"}, Added: []string{"img-b"}})
 
 	if len(summary.Added) != 1 || summary.Added[0] != "img-b" {
@@ -68,8 +68,8 @@ func TestConversionSummaryMergeKeepsHighestPriorityState(t *testing.T) {
 	if len(summary.Updated) != 1 || summary.Updated[0] != "img-a" {
 		t.Fatalf("expected img-a to be updated, got %+v", summary)
 	}
-	if len(summary.Skipped) != 0 {
-		t.Fatalf("expected skipped images to be cleared, got %+v", summary.Skipped)
+	if len(summary.AlreadyConverted) != 0 {
+		t.Fatalf("expected already-converted images to be cleared, got %+v", summary.AlreadyConverted)
 	}
 }
 

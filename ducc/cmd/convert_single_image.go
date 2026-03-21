@@ -106,7 +106,11 @@ var convertSingleImageCmd = &cobra.Command{
 			if err != nil {
 				log.Warning("Could not convert wish (layers), trying again")
 			} else {
-				log.Info("Successfully converted the layers")
+				if len(totalSummary.Added) == 0 && len(totalSummary.Updated) == 0 {
+					log.Info("All layers already converted, nothing to do")
+				} else {
+					log.Info("Successfully converted the layers")
+				}
 				break
 			}
 		}

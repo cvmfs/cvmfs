@@ -40,9 +40,9 @@ const (
 const ConversionUnknown ConversionResult = -1
 
 type ConversionSummary struct {
-	Added   []string
-	Updated []string
-	Skipped []string
+	Added            []string
+	Updated          []string
+	AlreadyConverted []string
 }
 
 func removeImage(images []string, image string) []string {
@@ -80,19 +80,19 @@ func (s *ConversionSummary) Add(result ConversionResult, image string) {
 	switch result {
 	case ConversionNotFound:
 		s.Updated = removeImage(s.Updated, image)
-		s.Skipped = removeImage(s.Skipped, image)
+		s.AlreadyConverted = removeImage(s.AlreadyConverted, image)
 		s.addUnique(&s.Added, image)
 	case ConversionNotMatch:
 		if containsImage(s.Added, image) {
 			return
 		}
-		s.Skipped = removeImage(s.Skipped, image)
+		s.AlreadyConverted = removeImage(s.AlreadyConverted, image)
 		s.addUnique(&s.Updated, image)
 	case ConversionMatch:
 		if containsImage(s.Added, image) || containsImage(s.Updated, image) {
 			return
 		}
-		s.addUnique(&s.Skipped, image)
+		s.addUnique(&s.AlreadyConverted, image)
 	}
 }
 
@@ -103,7 +103,7 @@ func (s *ConversionSummary) Merge(other ConversionSummary) {
 	for _, image := range other.Updated {
 		s.Add(ConversionNotMatch, image)
 	}
-	for _, image := range other.Skipped {
+	for _, image := range other.AlreadyConverted {
 		s.Add(ConversionMatch, image)
 	}
 }

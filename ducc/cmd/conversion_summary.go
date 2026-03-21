@@ -18,7 +18,7 @@ func formatConversionSummary(prefix string, summary lib.ConversionSummary) strin
 		prefix,
 		formatConversionSummaryLine("Added", summary.Added),
 		formatConversionSummaryLine("Updated", summary.Updated),
-		formatConversionSummaryLine("Skipped", summary.Skipped),
+		formatConversionSummaryLine("AlreadyConverted", summary.AlreadyConverted),
 	)
 }
 
