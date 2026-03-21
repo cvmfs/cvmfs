@@ -121,6 +121,10 @@ var convertCmd = &cobra.Command{
 			os.Exit(1)
 		}()
 		defer signal.Stop(sigChan)
+		if !skipThinImage && recipe.OutputFormat == "" {
+			l.Log().Info("Using default output image name $(scheme)://$(registry)/$(repository)_thin:$(tag)")
+		}
+
 		var conversionErrors []string
 		totalSummary := lib.ConversionSummary{}
 		for wish := range recipe.Wishes {
@@ -140,6 +144,12 @@ var convertCmd = &cobra.Command{
 				} else {
 					l.LogE(err).WithFields(fields).Error("Error in converting wish (layers), going on")
 					conversionErrors = append(conversionErrors, fmt.Sprintf("[%s] layers: %s", wish.InputName, err))
+				}
+			} else {
+				if len(summary.Added) == 0 && len(summary.Updated) == 0 {
+					l.Log().WithFields(fields).Info("All layers already converted, nothing to do")
+				} else {
+					l.Log().WithFields(fields).Info("Successfully converted the layers")
 				}
 			}
 			if !skipThinImage {
