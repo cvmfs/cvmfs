@@ -142,36 +142,62 @@ func GetNameWithArch(manifestEntry da.ManifestListItem) (nameWithArch string) {
 }
 
 // archAliases maps non-normalized Docker/OCI architecture identifiers to
-// the directory names used under .multiarch/ (as produced by GetNameWithArch).
-// Architectures with a variant use the "arch:variant" form that
+// candidate .multiarch/ directory names in preference order.  The first
+// candidate directory that exists in the repository is used as the symlink
+// target.  Architectures with a variant use the "arch:variant" form that
 // GetNameWithArch writes to disk (e.g. "arm:v6", not "arm/v6").
-var archAliases = map[string]string{
-	"aarch64": "arm64",
-	"armhf":   "arm",
-	"armel":   "arm:v6",
-	"i386":    "386",
-	"x86_64":  "amd64",
-	"x86-64":  "amd64",
+//
+// "arm64" is listed as an alias for "arm64:v8" because the OCI spec treats
+// arm64 without an explicit variant as equivalent to v8, and many registries
+// only publish the variant form.  "aarch64" prefers plain "arm64" when it
+// exists, and falls back to "arm64:v8" for the same reason.
+var archAliases = map[string][]string{
+	"aarch64": {"arm64", "arm64:v8"},
+	"arm64":   {"arm64:v8"},
+	"armhf":   {"arm"},
+	"armel":   {"arm:v6"},
+	"i386":    {"386"},
+	"x86_64":  {"amd64"},
+	"x86-64":  {"amd64"},
 }
 
 // createMultiarchAliasSymlinksWithLogger creates a .multiarch/<alias> symlink
-// for every entry in archAliases whose normalized target directory already
-// exists under .multiarch/ in the repository.  Aliases that map to a
-// non-existent target are silently skipped.
+// for every entry in archAliases whose first existing candidate directory is
+// found under .multiarch/ in the repository.
+//
+// If the alias name already exists as a real (non-symlink) directory the
+// repository has native content for that arch and no alias is created.
+// Aliases whose every candidate is absent are silently skipped.
 func createMultiarchAliasSymlinksWithLogger(logger *log.Entry, repo string) {
-	for alias, normalized := range archAliases {
-		normalizedFullPath := filepath.Join("/", "cvmfs", repo, ".multiarch", normalized)
-		if _, err := os.Stat(normalizedFullPath); err != nil {
-			// Normalized arch directory does not exist in this repo yet; skip.
+	for alias, candidates := range archAliases {
+		// If the alias name is itself a real directory, native content exists
+		// for that arch — no symlink alias is needed or wanted.
+		aliasFullPath := filepath.Join("/", "cvmfs", repo, ".multiarch", alias)
+		if lstat, err := os.Lstat(aliasFullPath); err == nil && lstat.Mode()&os.ModeSymlink == 0 {
 			continue
 		}
+
+		// Pick the first candidate directory that exists.
+		target := ""
+		for _, candidate := range candidates {
+			candidateFullPath := filepath.Join("/", "cvmfs", repo, ".multiarch", candidate)
+			if _, err := os.Stat(candidateFullPath); err == nil {
+				target = candidate
+				break
+			}
+		}
+		if target == "" {
+			// None of the candidate arch directories exist in this repo; skip.
+			continue
+		}
+
 		aliasPath := filepath.Join(".multiarch", alias)
-		normalizedPath := filepath.Join(".multiarch", normalized)
-		if err := cvmfs.CreateSymlinkIntoCVMFSWithLogger(logger, repo, aliasPath, normalizedPath); err != nil {
+		targetPath := filepath.Join(".multiarch", target)
+		if err := cvmfs.CreateSymlinkIntoCVMFSWithLogger(logger, repo, aliasPath, targetPath); err != nil {
 			l.Ensure(logger).WithFields(log.Fields{
-				"alias":      aliasPath,
-				"normalized": normalizedPath,
-				"error":      err,
+				"alias":  aliasPath,
+				"target": targetPath,
+				"error":  err,
 			}).Warning("Failed to create .multiarch alias symlink")
 		}
 	}
