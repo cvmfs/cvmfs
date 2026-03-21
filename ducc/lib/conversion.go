@@ -567,6 +567,9 @@ func convertInputOutput2(inputImage *Image, imageLabel, nameWithArch, repo strin
 				noErrors = false
 			}
 			if err == nil {
+				layerLogger.WithFields(log.Fields{
+					"duration": time.Since(t1).Round(time.Millisecond),
+				}).Info("Layer ingest into CVMFS finished")
 				n.Action("publish_layer").AddField("layer_digest", layerDigest).Send()
 			}
 			layerLogger.Trace("Finished ingesting the file")
