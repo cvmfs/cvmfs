@@ -136,14 +136,14 @@ var convertCmd = &cobra.Command{
 			// Check if this wish is in the ignore errors list
 			isIgnored := isInIgnoreList(wish.InputName, recipe.IgnoreErrorsList)
 
-			summary, err := lib.ConvertWish(wish, convertAgain, overwriteLayer, multiArch, maxConcurrentDownloads)
+			summary, layerErr := lib.ConvertWish(wish, convertAgain, overwriteLayer, multiArch, maxConcurrentDownloads)
 			totalSummary.Merge(summary)
-			if err != nil {
+			if layerErr != nil {
 				if isIgnored {
-					l.LogE(err).WithFields(fields).Warning("Error in converting wish (layers), but image is in ignoreErrors list")
+					l.LogE(layerErr).WithFields(fields).Warning("Error in converting wish (layers), but image is in ignoreErrors list")
 				} else {
-					l.LogE(err).WithFields(fields).Error("Error in converting wish (layers), going on")
-					conversionErrors = append(conversionErrors, fmt.Sprintf("[%s] layers: %s", wish.InputName, err))
+					l.LogE(layerErr).WithFields(fields).Error("Error in converting wish (layers), going on")
+					conversionErrors = append(conversionErrors, fmt.Sprintf("[%s] layers: %s", wish.InputName, layerErr))
 				}
 			} else {
 				if len(summary.Added) == 0 && len(summary.Updated) == 0 {
@@ -175,13 +175,17 @@ var convertCmd = &cobra.Command{
 				}
 			}
 			if !skipFlat {
-				err = lib.ConvertWishFlat(wish, multiArch)
-				if err != nil {
-					if isIgnored {
-						l.LogE(err).WithFields(fields).Warning("Error in converting wish (singularity), but image is in ignoreErrors list")
-					} else {
-						l.LogE(err).WithFields(fields).Error("Error in converting wish (singularity), going on")
-						conversionErrors = append(conversionErrors, fmt.Sprintf("[%s] singularity: %s", wish.InputName, err))
+				if layerErr != nil {
+					l.LogE(layerErr).WithFields(fields).Warning("Skipping overlay: layer ingestion had errors")
+				} else {
+					err = lib.ConvertWishFlat(wish, multiArch)
+					if err != nil {
+						if isIgnored {
+							l.LogE(err).WithFields(fields).Warning("Error in converting wish (singularity), but image is in ignoreErrors list")
+						} else {
+							l.LogE(err).WithFields(fields).Error("Error in converting wish (singularity), going on")
+							conversionErrors = append(conversionErrors, fmt.Sprintf("[%s] singularity: %s", wish.InputName, err))
+						}
 					}
 				}
 			}
