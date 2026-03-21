@@ -552,7 +552,7 @@ func convertInputOutput2(inputImage *Image, imageLabel, nameWithArch, repo strin
 			layerDigest := strings.Split(layer.Name, ":")[1]
 			layerLogger := logger.WithField("layer", layer.Name)
 
-			layerLogger.Trace("Start ingesting the file into CVMFS")
+			layerLogger.Info("Start ingesting layer into CVMFS")
 
 			ln := n.AddField("layer", layerDigest).AddId()
 			ln.Action("start_layer_conversion").Send()
