@@ -522,8 +522,8 @@ func convertInputOutput2(inputImage *Image, imageLabel, nameWithArch, repo strin
 		layersToConvert = append(layersToConvert, shortDigest)
 	}
 	logger.WithFields(log.Fields{
-		"layers to convert":    layersToConvert,
-		"already converted":    layersAlreadyConverted,
+		"layers to convert": layersToConvert,
+		"already converted": layersAlreadyConverted,
 	}).Info("Starting layer conversion")
 
 	if alreadyConverted == ConversionMatch {
