@@ -51,8 +51,10 @@ var convertSingleImageCmd = &cobra.Command{
 			skipPodman = true
 		}
 		if thinImageName == "" {
-			l.Log().Info("Skipping the creation of the thin image since did not provided a name for the thin image using the --thin-image-name flag")
-			skipThinImage = true
+			if !skipThinImage {
+				l.Log().Trace("Skipping the creation of the thin image since no name was provided via --thin-image-name")
+				skipThinImage = true
+			}
 			// we need a thinImageName to parse the wish
 			thinImageName = inputImage + "_thin"
 		}
