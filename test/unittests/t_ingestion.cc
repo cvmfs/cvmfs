@@ -628,7 +628,7 @@ void T_Ingestion::ExerciseCompressionRoundtrip(zip::Algorithm alg) {
   BlockItem *b = NULL;
   do {
     delete b;
-    b = tube_out->PopFront();
+    b = tube_out->PopFront(); // hang! lap_no == 2
 
     EXPECT_EQ(1, b->tag());
     EXPECT_EQ(&file_large, b->file_item());

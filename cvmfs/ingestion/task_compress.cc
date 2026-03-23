@@ -33,6 +33,9 @@ void TaskCompress::Process(BlockItem *input_block) {
     output_block = new BlockItem(tag, allocator_);
     output_block->SetFileItem(input_block->file_item());
     output_block->SetChunkItem(input_block->chunk_item());
+    // FIXME either
+    // - adapt size to not run into ENOSPC in output->Write(); upper limit would be whole input size
+    // - do not use Adopt(is_owner=false) mode
     output_block->MakeData(compressor->CompressUpperBound(input_block->size()));
     tag_map_.Insert(tag, output_block);
   }
@@ -53,7 +56,7 @@ void TaskCompress::Process(BlockItem *input_block) {
       output_block = new BlockItem(tag, allocator_);
       output_block->SetFileItem(input_block->file_item());
       output_block->SetChunkItem(input_block->chunk_item());
-      output_block->MakeData(kCompressedBlockSize);
+      output_block->MakeData(compressor->CompressUpperBound(input_block->size()));
       tag_map_.Insert(tag, output_block);
     }
   } while (ret_compress != zip::kStreamEnd
