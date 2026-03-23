@@ -33,7 +33,7 @@ void TaskCompress::Process(BlockItem *input_block) {
     output_block = new BlockItem(tag, allocator_);
     output_block->SetFileItem(input_block->file_item());
     output_block->SetChunkItem(input_block->chunk_item());
-    output_block->MakeData(kCompressedBlockSize);
+    output_block->MakeData(compressor->CompressUpperBound(input_block->size()));
     tag_map_.Insert(tag, output_block);
   }
 
