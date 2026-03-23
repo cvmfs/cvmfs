@@ -22,6 +22,7 @@ func DeleteImageFromCVMFS(CVMFSRepo string, img *Image, dryRun bool) (bool, erro
 	symlinkPath := filepath.Join("/", "cvmfs", CVMFSRepo, img.GetPublicSymlinkPath())
 	manifestDir := filepath.Join("/", "cvmfs", CVMFSRepo, ".metadata", img.GetSimpleName())
 	multiarchBase := filepath.Join("/", "cvmfs", CVMFSRepo, ".multiarch")
+	metadataBase := filepath.Join("/", "cvmfs", CVMFSRepo, ".metadata")
 
 	_, symlinkErr := os.Lstat(symlinkPath)
 	_, manifestErr := os.Stat(manifestDir)
@@ -29,8 +30,9 @@ func DeleteImageFromCVMFS(CVMFSRepo string, img *Image, dryRun bool) (bool, erro
 	symlinkExists := symlinkErr == nil
 	manifestExists := manifestErr == nil
 	multiarchPaths := findMultiarchImagePaths(multiarchBase, img)
+	multiarchMetadataDirs := findMultiarchMetadataDirs(metadataBase, img)
 
-	if !symlinkExists && !manifestExists && len(multiarchPaths) == 0 {
+	if !symlinkExists && !manifestExists && len(multiarchPaths) == 0 && len(multiarchMetadataDirs) == 0 {
 		l.Log().WithFields(log.Fields{"image": img.GetSimpleName()}).
 			Info("Image not found in CVMFS, nothing to delete")
 		return false, nil
@@ -45,6 +47,9 @@ func DeleteImageFromCVMFS(CVMFSRepo string, img *Image, dryRun bool) (bool, erro
 		}
 		for _, p := range multiarchPaths {
 			fmt.Printf("[dry-run] Would delete .multiarch symlink: %s\n", p)
+		}
+		for _, p := range multiarchMetadataDirs {
+			fmt.Printf("[dry-run] Would delete .metadata/.multiarch manifest dir: %s\n", p)
 		}
 		return true, nil
 	}
@@ -63,6 +68,11 @@ func DeleteImageFromCVMFS(CVMFSRepo string, img *Image, dryRun bool) (bool, erro
 		for _, p := range multiarchPaths {
 			if err := os.Remove(p); err != nil && !os.IsNotExist(err) {
 				return fmt.Errorf("error removing .multiarch symlink %s: %w", p, err)
+			}
+		}
+		for _, p := range multiarchMetadataDirs {
+			if err := os.RemoveAll(p); err != nil && !os.IsNotExist(err) {
+				return fmt.Errorf("error removing .metadata/.multiarch manifest dir %s: %w", p, err)
 			}
 		}
 		return nil
@@ -107,6 +117,44 @@ func findMultiarchImagePaths(multiarchBase string, img *Image) []string {
 		}
 		p := filepath.Join(multiarchBase, entry.Name(), relPath)
 		if _, err := os.Lstat(p); err == nil {
+			result = append(result, p)
+		}
+	}
+	return result
+}
+
+// findMultiarchMetadataDirs returns the absolute paths of per-architecture
+// manifest directories for the given image inside the .metadata tree.
+//
+// During conversion, a manifest is stored for each platform at:
+//
+//	.metadata/.multiarch/<arch>/<simpleName>/manifest.json
+//
+// This function scans the top-level entries of .metadata/.multiarch/, skips
+// alias symlinks (e.g. aarch64 → arm64) and non-directory entries, and
+// returns every directory of the form <archDir>/<img.GetSimpleName()> that
+// actually exists.
+func findMultiarchMetadataDirs(metadataBase string, img *Image) []string {
+	multiarchMetaBase := filepath.Join(metadataBase, ".multiarch")
+	entries, err := ioutil.ReadDir(multiarchMetaBase)
+	if err != nil {
+		// .metadata/.multiarch does not exist or is unreadable — nothing to clean up.
+		return nil
+	}
+
+	simpleName := img.GetSimpleName() // <registry>/<repo>:<tag>
+	var result []string
+	for _, entry := range entries {
+		// Skip alias symlinks (e.g. aarch64 → arm64); they point to other arch
+		// directories and must not be removed.
+		if entry.Mode()&os.ModeSymlink != 0 {
+			continue
+		}
+		if !entry.IsDir() {
+			continue
+		}
+		p := filepath.Join(multiarchMetaBase, entry.Name(), simpleName)
+		if _, err := os.Stat(p); err == nil {
 			result = append(result, p)
 		}
 	}
