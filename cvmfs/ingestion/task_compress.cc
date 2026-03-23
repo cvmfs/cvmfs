@@ -50,8 +50,8 @@ void TaskCompress::Process(BlockItem *input_block) {
     ret_compress = compressor->CompressStream(&in_comp, &out_comp, flush);
     output_block->set_size(out_comp.pos());
 
-    if (output_block->IsFull()) {
-      assert(ret_compress == zip::kStreamOutBufFull || ret_compress == zip::kStreamEnd);
+    if (/*output_block->IsFull()*/ret_compress == zip::kStreamOutBufFull || ret_compress == zip::kStreamEnd) {
+      //assert(ret_compress == zip::kStreamOutBufFull || ret_compress == zip::kStreamEnd);
       tubes_out_->Dispatch(output_block);
       output_block = new BlockItem(tag, allocator_);
       output_block->SetFileItem(input_block->file_item());
