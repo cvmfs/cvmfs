@@ -321,7 +321,9 @@ TEST_F(T_Fetcher, FetchUncompressed) {
   lbl.path = "x";
   int fd =
     fetcher_->Fetch(CacheManager::LabeledObject(hash_uncompressed_, lbl));
-  EXPECT_EQ(-EIO, fd);
+  if (zip::Algorithm::kDefault != zip::Algorithm::kNoCompression) {
+    EXPECT_EQ(-EIO, fd);
+  }
 
   lbl.zip_algorithm = zip::kNoCompression;
   fd = fetcher_->Fetch(CacheManager::LabeledObject(hash_uncompressed_, lbl));
