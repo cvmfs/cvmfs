@@ -176,7 +176,7 @@ var convertCmd = &cobra.Command{
 							conversionErrors = append(conversionErrors, fmt.Sprintf("[%s] singularity: %s", wish.InputName, err))
 						}
 					} else if !skipPodman {
-						if podmanErr := lib.ConvertWishPodman(wish); podmanErr != nil {
+						if podmanErr := lib.ConvertWishPodman(wish, multiArch); podmanErr != nil {
 							if isIgnored {
 								l.LogE(podmanErr).WithFields(fields).Warning("Error publishing podman store, but image is in ignoreErrors list")
 							} else {

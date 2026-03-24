@@ -142,7 +142,7 @@ var convertSingleImageCmd = &cobra.Command{
 					log.Error("Multiple Errors in converting singularity image, going on")
 					conversionErrors = append(conversionErrors, fmt.Sprintf("singularity: %s", err))
 				} else if !skipPodman {
-					if podmanErr := lib.ConvertWishPodman(wish); podmanErr != nil {
+					if podmanErr := lib.ConvertWishPodman(wish, multiArch); podmanErr != nil {
 						l.LogE(podmanErr).WithFields(fields).Error("Error publishing podman store, going on")
 						conversionErrors = append(conversionErrors, fmt.Sprintf("podman: %s", podmanErr))
 					}
