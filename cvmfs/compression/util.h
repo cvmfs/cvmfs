@@ -26,10 +26,14 @@ enum Algorithm {
   kZlib = 0,
   kNoCompression,
   kZstd,
-#ifdef CVMFS_COMPRESSION_DEFAULT_ZSTD
+#if defined(CVMFS_COMPRESSION_DEFAULT_ZSTD)
   kDefault = kZstd,
-#else
+#elif defined(CVMFS_COMPRESSION_DEFAULT_ZLIB)
   kDefault = kZlib,
+#elif defined(CVMFS_COMPRESSION_DEFAULT_NONE)
+  kDefault = kNoCompression,
+#else
+#error "Define CVMFS_COMPRESSION_DEFAULT_(something)"
 #endif
 };
 typedef Algorithm Algorithms;
