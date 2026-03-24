@@ -83,8 +83,8 @@ func (img *Image) PublishPodmanStoreWithLogger(logger *log.Entry, CVMFSRepo stri
 	}
 
 	imageID := strings.TrimPrefix(manifest.Config.Digest, "sha256:")
-	repoName, _ := cvmfs.GetRepoAndSubdir(CVMFSRepo)
-	storeRoot := filepath.Join("/cvmfs", repoName, podmanStoreRoot)
+	repoName, subDir := cvmfs.GetRepoAndSubdir(CVMFSRepo)
+	storeRoot := filepath.Join("/cvmfs", repoName, subDir, podmanStoreRoot)
 
 	// Idempotency check: skip if this imageID is already in images.json.
 	imagesJSONPath := filepath.Join(storeRoot, "overlay-images", "images.json")
@@ -98,7 +98,7 @@ func (img *Image) PublishPodmanStoreWithLogger(logger *log.Entry, CVMFSRepo stri
 
 	// Verify flat image is present in the repo.
 	flatRelPath := manifest.GetSingularityPath()
-	flatAbsPath := filepath.Join("/cvmfs", repoName, flatRelPath)
+	flatAbsPath := filepath.Join("/cvmfs", repoName, subDir, flatRelPath)
 	if _, err := os.Stat(flatAbsPath); err != nil {
 		return fmt.Errorf("flat image not found at %s (run convert without --skip-flat first): %w",
 			flatAbsPath, err)

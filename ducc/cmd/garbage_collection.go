@@ -84,7 +84,7 @@ var garbageCollectionCmd = &cobra.Command{
 			}
 			layersToDelete = append(layersToDelete, candidateDelete)
 		}
-		podmanPathsToDelete, _ := lib.FindPodmanPathsToDelete(CVMFSRepo, layersToDelete)
+		podmanPathsToDelete, _ := lib.FindPodmanPathsToDelete(CVMFSRepo, imagesToDelete)
 
 		// we remove the prefix to the paths and we accumulate them in a single array
 		// we remove the prefix to pass them to `cvmfs_server ingest --delete $path_with_no_prefix CVMFSRepo`
