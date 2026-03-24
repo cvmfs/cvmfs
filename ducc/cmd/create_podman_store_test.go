@@ -4,14 +4,13 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/cvmfs/ducc/lib"
 	"github.com/cvmfs/ducc/testutils"
 )
 
-// TestFlatLayerIDDeterministic verifies that flatLayerID always produces the
-// same output for the same input and that distinct inputs produce distinct IDs.
 func TestFlatLayerIDDeterministic(t *testing.T) {
 	id1 := lib.FlatLayerID("abc123")
 	id2 := lib.FlatLayerID("abc123")
@@ -22,13 +21,11 @@ func TestFlatLayerIDDeterministic(t *testing.T) {
 	if id1 == id3 {
 		t.Errorf("flatLayerID collision for different inputs")
 	}
-	// Must be exactly 64 hex chars (sha256)
 	if len(id1) != 64 {
 		t.Errorf("flatLayerID length %d, want 64", len(id1))
 	}
 }
 
-// TestDirSizeEmpty verifies that an empty directory has size 0.
 func TestDirSizeEmpty(t *testing.T) {
 	dir := t.TempDir()
 	sz, err := lib.DirSize(dir)
@@ -40,7 +37,6 @@ func TestDirSizeEmpty(t *testing.T) {
 	}
 }
 
-// TestDirSizeKnown creates files of known sizes and checks the total.
 func TestDirSizeKnown(t *testing.T) {
 	dir := t.TempDir()
 	for _, pair := range []struct {
@@ -67,8 +63,6 @@ func TestDirSizeKnown(t *testing.T) {
 	}
 }
 
-// TestReadOrGenerateLinkIDIdempotent checks that reading an existing link file
-// returns the same ID without regenerating it.
 func TestReadOrGenerateLinkIDIdempotent(t *testing.T) {
 	dir := t.TempDir()
 	linkFile := filepath.Join(dir, "link")
@@ -89,16 +83,28 @@ func TestReadOrGenerateLinkIDIdempotent(t *testing.T) {
 	}
 }
 
+// testImageRef returns the image reference for the single-arch amd64 image
+// that TestRegistrySetup pushes to the local registry.
+func testImageRef() string {
+	return testutils.GetTestRegistryUrl() + "multi-arch-test:amd64"
+}
+
 // TestCreatePodmanStoreMissingFlat verifies that createPodmanStore returns an
-// error when the flat image does not exist on the CVMFS mount, without
-// requiring a running CVMFS instance.
+// error when the flat image directory is absent from the (mock) CVMFS mount.
+// It uses the local test registry so no real internet access is needed.
 func TestCreatePodmanStoreMissingFlat(t *testing.T) {
-	if !*testutils.Online {
-		t.Skip("Skipping test in offline mode.")
+	if !*testutils.LocalRegistry {
+		t.Skip("Skipping test that needs local registry.")
 	}
+
+	// Point cvmfsRoot at an empty temp dir – the flat image won't be there.
+	origRoot := cvmfsRoot
+	cvmfsRoot = t.TempDir()
+	defer func() { cvmfsRoot = origRoot }()
+
 	storeDir := filepath.Join(t.TempDir(), "store")
 	err := createPodmanStore(
-		"https://registry.hub.docker.com/library/alpine:latest",
+		testImageRef(),
 		"no-such-repo.cern.ch",
 		storeDir,
 	)
@@ -107,18 +113,16 @@ func TestCreatePodmanStoreMissingFlat(t *testing.T) {
 	}
 }
 
-// TestCreatePodmanStoreStructure runs the full command against a real image and
-// a pre-existing flat directory, then checks that every required store file is
-// present and well-formed.
+// TestCreatePodmanStoreStructure verifies the full directory layout written by
+// createPodmanStore.  A fake flat image is created under a temporary directory
+// that replaces the real /cvmfs mount (via the cvmfsRoot package variable).
+// The image is pulled from the local test registry so no internet is required.
 func TestCreatePodmanStoreStructure(t *testing.T) {
-	if !*testutils.Online {
-		t.Skip("Skipping test in offline mode.")
+	if !*testutils.LocalRegistry {
+		t.Skip("Skipping test that needs local registry.")
 	}
 
-	// Build a minimal fake flat directory that looks like a CVMFS flat image.
-	// createPodmanStore only checks that the path exists via os.Stat; it does
-	// not inspect its contents.
-	imageRef := "https://registry.hub.docker.com/library/alpine:latest"
+	imageRef := testImageRef()
 
 	img, err := lib.ParseImage(imageRef)
 	if err != nil {
@@ -129,71 +133,37 @@ func TestCreatePodmanStoreStructure(t *testing.T) {
 		t.Fatalf("GetManifest: %v", err)
 	}
 
-	// Construct the expected flat path and create it as a temp dir so
-	// createPodmanStore's os.Stat check passes.
+	imageID := strings.TrimPrefix(manifest.Config.Digest, "sha256:")
 	flatRelPath := manifest.GetSingularityPath()
-	fakeRepo := "fake-cvmfs-test.cern.ch"
-	fakeCVMFSRoot := t.TempDir()
-	flatAbsPath := filepath.Join(fakeCVMFSRoot, "cvmfs", fakeRepo, flatRelPath)
-	if err := os.MkdirAll(flatAbsPath, 0755); err != nil {
+
+	// Build a mock CVMFS root containing the flat image directory.
+	fakeRoot := t.TempDir()
+	const fakeRepo = "test-repo.cern.ch"
+	flatAbsPath := filepath.Join(fakeRoot, fakeRepo, flatRelPath)
+	if err := os.MkdirAll(filepath.Join(flatAbsPath, "etc"), 0755); err != nil {
 		t.Fatalf("creating fake flat dir: %v", err)
 	}
-	// Write a small file so dirSize returns a non-zero value.
-	if err := os.WriteFile(filepath.Join(flatAbsPath, "etc", "os-release"),
-		[]byte("ID=alpine\n"), 0644); err != nil {
-		if mkErr := os.MkdirAll(filepath.Join(flatAbsPath, "etc"), 0755); mkErr != nil {
-			t.Fatal(mkErr)
-		}
-		if err := os.WriteFile(filepath.Join(flatAbsPath, "etc", "os-release"),
-			[]byte("ID=alpine\n"), 0644); err != nil {
-			t.Fatal(err)
-		}
+	// Write a real file so that DirSize returns a value > 0.
+	if err := os.WriteFile(
+		filepath.Join(flatAbsPath, "etc", "os-release"),
+		[]byte("ID=test\n"), 0644,
+	); err != nil {
+		t.Fatalf("writing sentinel file: %v", err)
 	}
 
-	// Patch the flat path lookup: createPodmanStore builds the path as
-	// filepath.Join("/cvmfs", repoName, flatRelPath).  We can't easily redirect
-	// "/cvmfs" in tests, so we override it by symlinking.
-	// Instead, re-implement the store creation inline against our fake root.
+	// Redirect createPodmanStore away from /cvmfs to our fake root.
+	origRoot := cvmfsRoot
+	cvmfsRoot = fakeRoot
+	defer func() { cvmfsRoot = origRoot }()
+
 	storeDir := filepath.Join(t.TempDir(), "podmanstore")
-
-	// Use the cobra command directly so we exercise the full code path through
-	// the registered flags and RunE.
-	// Because the flat-path check is hard-wired to /cvmfs, we skip the
-	// end-to-end command test and call the helper directly after overriding
-	// the flat root via a symlink trick.
-	//
-	// Create /tmp/cvmfs symlink pointing to our fake root, if writable.
-	// If that isn't possible in this environment, skip.
-	fakeMount := filepath.Join(fakeCVMFSRoot, "cvmfs")
-	realCVMFS := "/cvmfs"
-	savedReal := ""
-	if info, statErr := os.Lstat(realCVMFS); statErr == nil && info.IsDir() {
-		// /cvmfs exists – we can't override it; exercise what we can.
-		t.Logf("/cvmfs already exists; skipping store-creation end-to-end sub-test")
-	} else {
-		// /cvmfs doesn't exist in this environment; create a symlink
-		savedReal = realCVMFS
-		if symlinkErr := os.Symlink(fakeMount, realCVMFS); symlinkErr != nil {
-			t.Skipf("cannot create /cvmfs symlink (%v); skipping end-to-end", symlinkErr)
-		}
-		defer os.Remove(savedReal)
-	}
-	_ = savedReal
-
 	if err := createPodmanStore(imageRef, fakeRepo, storeDir); err != nil {
 		t.Fatalf("createPodmanStore: %v", err)
 	}
 
-	// Verify required files.
-	imageID := func() string {
-		s := manifest.Config.Digest
-		if len(s) > 7 {
-			return s[7:]
-		}
-		return s
-	}()
 	layerID := lib.FlatLayerID(imageID)
 
+	// ---- check that all expected paths exist --------------------------------
 	checks := []string{
 		filepath.Join(storeDir, "overlay", layerID, "diff"),
 		filepath.Join(storeDir, "overlay", layerID, "link"),
@@ -205,11 +175,21 @@ func TestCreatePodmanStoreStructure(t *testing.T) {
 	}
 	for _, path := range checks {
 		if _, statErr := os.Lstat(path); statErr != nil {
-			t.Errorf("missing expected store file: %s", path)
+			t.Errorf("missing expected store path: %s", path)
 		}
 	}
 
-	// Validate layers.json has diff-digest and diff-size set.
+	// ---- diff symlink must point back into our fake flat dir ----------------
+	diffPath := filepath.Join(storeDir, "overlay", layerID, "diff")
+	target, err := os.Readlink(diffPath)
+	if err != nil {
+		t.Fatalf("readlink diff: %v", err)
+	}
+	if target != flatAbsPath {
+		t.Errorf("diff symlink target = %q, want %q", target, flatAbsPath)
+	}
+
+	// ---- layers.json --------------------------------------------------------
 	layersRaw, err := os.ReadFile(filepath.Join(storeDir, "overlay-layers", "layers.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -228,7 +208,7 @@ func TestCreatePodmanStoreStructure(t *testing.T) {
 		t.Error("layers.json: diff-size must be > 0")
 	}
 
-	// Validate images.json references the layer and image.
+	// ---- images.json --------------------------------------------------------
 	imagesRaw, err := os.ReadFile(filepath.Join(storeDir, "overlay-images", "images.json"))
 	if err != nil {
 		t.Fatal(err)

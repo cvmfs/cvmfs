@@ -47,6 +47,11 @@ import (
 	l "github.com/cvmfs/ducc/log"
 )
 
+// cvmfsRoot is the filesystem root under which CVMFS repositories are mounted.
+// It defaults to "/cvmfs" but can be overridden in tests to avoid requiring a
+// real CVMFS mount.
+var cvmfsRoot = "/cvmfs"
+
 func init() {
 	rootCmd.AddCommand(createPodmanStoreCmd)
 }
@@ -107,7 +112,7 @@ func createPodmanStore(imageRef, cvmfsRepo, storeDir string) error {
 	if idx := strings.Index(cvmfsRepo, "/"); idx != -1 {
 		repoName = cvmfsRepo[:idx]
 	}
-	flatAbsPath := filepath.Join("/cvmfs", repoName, flatRelPath)
+	flatAbsPath := filepath.Join(cvmfsRoot, repoName, flatRelPath)
 
 	if _, statErr := os.Stat(flatAbsPath); statErr != nil {
 		return fmt.Errorf(
