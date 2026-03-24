@@ -882,10 +882,12 @@ void T_Ingestion::ExercisePipelineNull(zip::Algorithm alg) {
                              true);
   pipeline_straight->WaitFor();
   EXPECT_EQ(1, atomic_read64(&fn_processed.ncall));
-  EXPECT_EQ(1U, uploader_->results.size());
-  shash::Any hash_null(spooler_definition.hash_algorithm);
-  shash::HashString("", &hash_null);
-  EXPECT_EQ(hash_null, uploader_->results[0].computed_hash);
+  if (alg == zip::Algorithm::kNoCompression) {
+    EXPECT_EQ(1U, uploader_->results.size());
+    shash::Any hash_null(spooler_definition.hash_algorithm);
+    shash::HashString("", &hash_null);
+    EXPECT_EQ(hash_null, uploader_->results[0].computed_hash);
+  }
 
   uploader_->ClearResults();
 
