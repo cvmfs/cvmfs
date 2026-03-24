@@ -54,11 +54,12 @@ type Image struct {
 	Repository   string
 	Tag          string
 	Digest       string
-	IsThin       bool
-	TagWildcard  bool
-	Manifest     *da.Manifest
-	OCIImage     *image.Image
-	ManifestList *da.ManifestList
+	IsThin           bool
+	TagWildcard      bool
+	Manifest         *da.Manifest
+	OCIImage         *image.Image
+	ManifestList     *da.ManifestList
+	rawManifestBytes []byte // cached raw wire bytes of the resolved manifest
 }
 
 type Credentials struct {
@@ -384,6 +385,7 @@ func (img *Image) fetchManifest() (*da.Manifest, error) {
 	}
 
 	img.Manifest = &manifest
+	img.rawManifestBytes = bytes
 	return &manifest, nil
 }
 
@@ -430,6 +432,7 @@ func (img *Image) fetchManifestList() (*da.Manifest, error) {
 	}
 
 	img.Manifest = &manifest
+	img.rawManifestBytes = bytes2
 	return &manifest, nil
 }
 
@@ -1349,6 +1352,31 @@ func getRegistry(url string) *RegistryConfig {
 		}
 	}
 	return nil
+}
+
+// GetRawManifestBytes returns the exact wire bytes of the image manifest as
+// served by the registry.  For multi-arch images the bytes belong to the
+// resolved single-architecture manifest (matching what GetManifest returns).
+// The bytes are cached after the first successful fetch so that repeated calls
+// do not hit the network.
+func (img *Image) GetRawManifestBytes() ([]byte, error) {
+	if _, err := img.GetManifest(); err != nil {
+		return nil, err
+	}
+	return img.rawManifestBytes, nil
+}
+
+// GetRawConfigBytes downloads and returns the raw config blob JSON for the
+// image (the object referenced by manifest.Config.Digest).
+func (img *Image) GetRawConfigBytes() ([]byte, error) {
+	manifest, err := img.GetManifest()
+	if err != nil {
+		return nil, err
+	}
+	configURL := fmt.Sprintf("%sblobs/%s", img.GetBaseUrl(), manifest.Config.Digest)
+	return makeGetRequest(configURL, map[string]string{
+		"Accept": "application/vnd.docker.container.image.v1+json, application/vnd.oci.image.config.v1+json",
+	})
 }
 
 func (i *Image) baseUrl() string {

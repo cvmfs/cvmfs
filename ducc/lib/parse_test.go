@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"reflect"
 	"testing"
 )
 
@@ -78,7 +79,7 @@ func TestParseImageTooManyColon(t *testing.T) {
 	}
 
 	emptyImage := Image{}
-	if image != emptyImage {
+	if !reflect.DeepEqual(image, emptyImage) {
 		t.Error("Trying to return an image on a wrong string")
 	}
 }

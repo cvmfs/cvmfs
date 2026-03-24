@@ -434,6 +434,35 @@ func ConvertWishFlat(wish WishFriendly, multiArch bool) error {
 	return firstError
 }
 
+// ConvertWishPodman publishes a podman additional image store entry for each
+// image in wish into /cvmfs/<repo>/podmanStore/ using a single CVMFS
+// transaction per image.  It requires that the flat image has already been
+// published (i.e. skipFlat was not set).
+func ConvertWishPodman(wish WishFriendly) error {
+	var firstError error
+	for _, inputImage := range wish.ExpandedTagImagesFlat {
+		manifestList, err := inputImage.GetManifestList()
+		if err != nil {
+			l.WithImageE(err, inputImage.GetSimpleName()).Error("Error getting manifest list for podman store")
+			if firstError == nil {
+				firstError = err
+			}
+			continue
+		}
+		for _, manifestEntry := range manifestList.Manifests {
+			inputImage.Manifest = &(manifestEntry.Manifest)
+			imageLogger := l.WithImage(inputImage.GetSimpleName())
+			if err := inputImage.PublishPodmanStoreWithLogger(imageLogger, wish.CvmfsRepo); err != nil {
+				imageLogger.WithField("error", err).Error("Error publishing podman store entry")
+				if firstError == nil {
+					firstError = err
+				}
+			}
+		}
+	}
+	return firstError
+}
+
 func ConvertWishDocker(wish WishFriendly) (err error) {
 	inputImage := wish.InputImage
 	if inputImage == nil {
@@ -496,40 +525,6 @@ func outputRepositoryForImport(outputImage Image) string {
 	return outputRepository.GetSimpleName()
 }
 
-func ConvertWishPodman(wish WishFriendly, convertAgain bool) (err error) {
-	var firstError error
-	for _, expandedImgTag := range wish.ExpandedTagImagesLayer {
-		imageLogger := l.WithImage(expandedImgTag.GetSimpleName())
-		manifest, err := expandedImgTag.GetManifest()
-		if err != nil {
-			return err
-		}
-		imageID := strings.Split(manifest.Config.Digest, ":")[1]
-
-		// check if image is already present in podman store
-		manifestPath := filepath.Join("/", "cvmfs", wish.CvmfsRepo, rootPath, imageMetadataDir, imageID, "manifest")
-		alreadyConverted := AlreadyConvertedWithLogger(imageLogger, manifestPath, manifest.Config.Digest)
-		if alreadyConverted == ConversionMatch {
-			if convertAgain == false {
-				imageLogger.Trace("Image already present in podman store, moving on")
-				continue
-			}
-		}
-
-		// convert for podman only after manifest is stored in .metadata
-		manifestPath = filepath.Join("/", "cvmfs", wish.CvmfsRepo, ".metadata", expandedImgTag.GetSimpleName(), "manifest.json")
-		if _, err := os.Stat(manifestPath); os.IsNotExist(err) {
-			imageLogger.Trace("Layers not downloaded yet, not converting for podman")
-			continue
-		}
-
-		err = expandedImgTag.CreatePodmanImageStoreWithLogger(imageLogger, wish.CvmfsRepo, constants.SubDirInsideRepo)
-		if err != nil && firstError == nil {
-			firstError = err
-		}
-	}
-	return firstError
-}
 
 func ConvertWish(wish WishFriendly, convertAgain, forceDownload, multiArch bool, maxConcurrentDownloads int) (summary ConversionSummary, err error) {
 	err = cvmfs.CreateCatalogIntoDir(wish.CvmfsRepo, constants.SubDirInsideRepo)

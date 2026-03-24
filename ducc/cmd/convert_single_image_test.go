@@ -12,7 +12,7 @@ func TestCheckConvertSingleImageCmdDockerhub(t *testing.T) {
 	var err error
 	cmd := rootCmd
 	cmd.SetArgs([]string{"convert-single-image",
-		"registry.hub.docker.com/library/alpine:latest", "-p", "-i", testutils.TestRepo})
+		"registry.hub.docker.com/library/alpine:latest", "-i", testutils.TestRepo})
 	err = cmd.Execute()
 	if err != nil {
 		t.Fatal(err)
@@ -26,7 +26,7 @@ func TestCheckConvertSingleImageLocal(t *testing.T) {
 	var err error
 	cmd := rootCmd
 	cmd.SetArgs([]string{"convert-single-image",
-		testutils.GetTestRegistryUrl() + "multi-arch-test:latest", "-p", "-i", testutils.TestRepo})
+		testutils.GetTestRegistryUrl() + "multi-arch-test:latest", "-i", testutils.TestRepo})
 	err = cmd.Execute()
 	if err != nil {
 		t.Fatal(err)
@@ -41,7 +41,7 @@ func TestCheckConvertSingleImageCmdDockerhubMultiArch(t *testing.T) {
 	cmd := rootCmd
 	cmd.SetArgs([]string{"convert-single-image", "-m",
 		"registry.hub.docker.com/library/alpine:latest",
-		"-p", "-i", testutils.TestRepo})
+		"-i", testutils.TestRepo})
 	err = cmd.Execute()
 	if err != nil {
 		t.Fatal(err)
@@ -56,7 +56,7 @@ func TestCheckConvertSingleImageLocalMultiArch(t *testing.T) {
 	cmd := rootCmd
 	cmd.SetArgs([]string{"convert-single-image", "-m",
 		testutils.GetTestRegistryUrl() + "multi-arch-test:latest",
-		"-p", "-i", testutils.TestRepo})
+		"-i", testutils.TestRepo})
 	err = cmd.Execute()
 	if err != nil {
 		t.Fatal(err)
@@ -85,7 +85,7 @@ func TestCheckConvertSingleImageCmdShouldFail2(t *testing.T) {
 	var err error
 	cmd := rootCmd
 	cmd.SetArgs([]string{"convert-single-image",
-		"registry.hub.docker.com/nonsenseurl/doesnotexist:latest", "-p", "-i", testutils.TestRepo})
+		"registry.hub.docker.com/nonsenseurl/doesnotexist:latest", "-i", testutils.TestRepo})
 	err = cmd.Execute()
 	if err == nil {
 		t.Fatal("That should have returned an error")

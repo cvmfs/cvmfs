@@ -23,9 +23,9 @@ var (
 
 func init() {
 	convertSingleImageCmd.Flags().BoolVarP(&skipFlat, "skip-flat", "s", false, "do not create a flat images (compatible with singularity)")
+	convertSingleImageCmd.Flags().BoolVarP(&skipPodman, "skip-podman", "p", false, "do not publish to the podman additional image store at podmanStore/")
 	convertSingleImageCmd.Flags().BoolVarP(&skipLayers, "skip-layers", "d", false, "[DEPRECATED] this option is no longer functional, layers will be unpacked regardless. Use `docker save` and `cvmfs_server ingest` if you only need the flat image.")
 	convertSingleImageCmd.Flags().BoolVarP(&skipThinImage, "skip-thin-image", "i", true, "do not create and push the docker thin image")
-	convertSingleImageCmd.Flags().BoolVarP(&skipPodman, "skip-podman", "p", true, "do not create podman image store")
 	convertSingleImageCmd.Flags().StringVarP(&username, "username", "u", "", "username to use when pushing thin image into the docker registry")
 	convertSingleImageCmd.Flags().StringVarP(&thinImageName, "thin-image-name", "", "", "name to use for the thin image to upload, if empty implies --skip-thin-image.")
 	convertSingleImageCmd.Flags().IntVarP(&attempts, "attempts", "r", 1, "number of time to try to unpack the image, default one")
@@ -48,7 +48,6 @@ var convertSingleImageCmd = &cobra.Command{
 		if skipLayers {
 			l.Log().Warn("--skip-layers is deprecated and no longer functional: layers will be unpacked regardless. If you only need the flat image, use `docker save` and `cvmfs_server ingest` instead.")
 			skipThinImage = true
-			skipPodman = true
 		}
 		if thinImageName == "" {
 			if !skipThinImage {
@@ -142,6 +141,11 @@ var convertSingleImageCmd = &cobra.Command{
 				if err != nil {
 					log.Error("Multiple Errors in converting singularity image, going on")
 					conversionErrors = append(conversionErrors, fmt.Sprintf("singularity: %s", err))
+				} else if !skipPodman {
+					if podmanErr := lib.ConvertWishPodman(wish); podmanErr != nil {
+						l.LogE(podmanErr).WithFields(fields).Error("Error publishing podman store, going on")
+						conversionErrors = append(conversionErrors, fmt.Sprintf("podman: %s", podmanErr))
+					}
 				}
 			}
 		}
@@ -164,23 +168,6 @@ var convertSingleImageCmd = &cobra.Command{
 			}
 		}
 
-		if !skipPodman {
-			for i := 0; i < attempts; i++ {
-				err = lib.ConvertWishPodman(wish, convertAgain)
-				log := l.LogE(err).WithFields(fields).
-					WithFields(log.Fields{"attempts number": i})
-				if err != nil {
-					log.Warning("Could not convert wish (podman), trying again")
-				} else {
-					log.Info("Successfully converted with (podman)")
-					break
-				}
-			}
-			if err != nil {
-				log.Error("Multiple Errors in converting wish (podman), going on")
-				conversionErrors = append(conversionErrors, fmt.Sprintf("podman: %s", err))
-			}
-		}
 		if len(conversionErrors) > 0 {
 			summary := fmt.Sprintf("%d conversion error(s) for %s:\n  %s", len(conversionErrors), wish.InputName, strings.Join(conversionErrors, "\n  "))
 			l.Log().Error(summary)
