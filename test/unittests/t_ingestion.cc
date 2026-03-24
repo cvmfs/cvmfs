@@ -111,6 +111,7 @@ class T_Ingestion : public ::testing::Test {
     EXPECT_EQ(0U, BlockItem::managed_bytes());
   }
   void ExerciseCompressionRoundtrip(zip::Algorithm alg);
+  void ExerciseDevNullCompression(zip::Algorithm alg);
 
   Tube<DummyItem> tube_;
   TubeConsumerGroup<DummyItem> task_group_;
@@ -507,7 +508,8 @@ TEST_F(T_Ingestion, TaskChunkCornerCases) {
 }
 
 
-TEST_F(T_Ingestion, TaskCompressNull) {
+void T_Ingestion::ExerciseDevNullCompression(zip::Algorithm alg)
+{
   Tube<BlockItem> tube_in;
   Tube<BlockItem> *tube_out = new Tube<BlockItem>();
   TubeGroup<BlockItem> tube_group_out;
@@ -527,12 +529,14 @@ TEST_F(T_Ingestion, TaskCompressNull) {
   b1->MakeStop();
   tube_in.EnqueueBack(b1);
 
-  compressor_ = zip::Compressor::Construct(zip::kDefault);
+  compressor_ = zip::Compressor::Construct(alg);
   zip::InputMem in(NULL, 0);
   cvmfs::MemSink zlib_null(0);
   const zip::StreamStates res = compressor_->Compress(&in, &zlib_null);
   ASSERT_EQ(res, zip::kStreamEnd);
-  ASSERT_GT(zlib_null.pos(), 0U);
+  if (alg != zip::Algorithm::kNoCompression) {
+    ASSERT_GT(zlib_null.pos(), 0U);
+  }
 
   BlockItem *item_data = tube_out->PopFront();
   EXPECT_EQ(BlockItem::kBlockData, item_data->type());
@@ -551,6 +555,12 @@ TEST_F(T_Ingestion, TaskCompressNull) {
   EXPECT_EQ(0U, tube_out->size());
 
   task_group.Terminate();
+}
+
+TEST_F(T_Ingestion, TaskCompressNull) {
+  ExerciseDevNullCompression(zip::Algorithm::kNoCompression);
+  ExerciseDevNullCompression(zip::Algorithm::kZlib);
+  ExerciseDevNullCompression(zip::Algorithm::kZstd);
 }
 
 
