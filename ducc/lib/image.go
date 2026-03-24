@@ -47,13 +47,13 @@ type ManifestRequest struct {
 }
 
 type Image struct {
-	Id           int
-	User         string
-	Scheme       string
-	Registry     string
-	Repository   string
-	Tag          string
-	Digest       string
+	Id               int
+	User             string
+	Scheme           string
+	Registry         string
+	Repository       string
+	Tag              string
+	Digest           string
 	IsThin           bool
 	TagWildcard      bool
 	Manifest         *da.Manifest

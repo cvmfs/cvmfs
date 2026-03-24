@@ -170,8 +170,8 @@ func createPodmanStore(imageRef, cvmfsRepo, storeDir string) error {
 		flatSize = 0
 	}
 	layerInfos := []lib.LayerInfo{{
-		ID:               layerID,
-		Created:          time.Now(),
+		ID:      layerID,
+		Created: time.Now(),
 		// UncompressedDigest must be non-empty or containers/image's getSize()
 		// will error with "size for layer is unknown".  For the synthetic flat
 		// layer there is no real uncompressed-tar digest, so we derive a stable
@@ -293,4 +293,3 @@ func writeFile(path string, data []byte) error {
 	}
 	return os.WriteFile(path, data, 0644)
 }
-

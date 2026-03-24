@@ -525,7 +525,6 @@ func outputRepositoryForImport(outputImage Image) string {
 	return outputRepository.GetSimpleName()
 }
 
-
 func ConvertWish(wish WishFriendly, convertAgain, forceDownload, multiArch bool, maxConcurrentDownloads int) (summary ConversionSummary, err error) {
 	err = cvmfs.CreateCatalogIntoDir(wish.CvmfsRepo, constants.SubDirInsideRepo)
 	if err != nil {
