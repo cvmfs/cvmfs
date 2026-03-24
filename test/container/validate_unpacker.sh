@@ -264,15 +264,17 @@ if [ "$PODMAN_AVAILABLE" -eq 1 ]; then
     # overriding storage.conf in a throwaway $HOME.
     PODMAN_HOME="$WORK_DIR/podman_home"
     mkdir -p "$PODMAN_HOME/.config/containers"
-    # Discover the real podman graphRoot and runroot so the override conf is
-    # otherwise identical to the system configuration.
-    GRAPH_ROOT=$(sudo podman info --format '{{.Store.GraphRoot}}' 2>/dev/null || echo /var/lib/containers/storage)
-    RUN_ROOT=$(sudo podman info --format '{{.Store.RunRoot}}' 2>/dev/null || echo /run/containers/storage)
+    # Use a fresh, isolated graphroot/runroot so we avoid the
+    # "database graph driver '' does not match overlay" mismatch that occurs
+    # when the system graphroot was previously initialised without a driver.
+    PODMAN_GRAPH_ROOT="$WORK_DIR/podman_graph"
+    PODMAN_RUN_ROOT="$WORK_DIR/podman_run"
+    mkdir -p "$PODMAN_GRAPH_ROOT" "$PODMAN_RUN_ROOT"
     cat > "$PODMAN_HOME/.config/containers/storage.conf" <<EOF
 [storage]
 driver = "overlay"
-graphroot = "$GRAPH_ROOT"
-runroot = "$RUN_ROOT"
+graphroot = "$PODMAN_GRAPH_ROOT"
+runroot = "$PODMAN_RUN_ROOT"
 [storage.options]
 additionalImageStores = ["$PODMAN_STORE"]
 [storage.options.overlay]
