@@ -866,7 +866,7 @@ TEST_F(T_Ingestion, TaskWriteLarge) {
 }
 
 
-TEST_F(T_Ingestion, PipelineNull) {
+void T_Ingestion::ExercisePipelineNull(zip::Algorithm alg) {
   upload::SpoolerDefinition spooler_definition = MockSpoolerDefinition();
   spooler_definition.compression_alg = zip::kNoCompression;
 
@@ -888,7 +888,7 @@ TEST_F(T_Ingestion, PipelineNull) {
 
   uploader_->ClearResults();
 
-  spooler_definition.compression_alg = zip::kDefault;
+  spooler_definition.compression_alg = alg;
   spooler_definition.hash_algorithm = shash::kShake128;
   UniquePtr<IngestionPipeline> pipeline_zlib(
       new IngestionPipeline(uploader_, spooler_definition));
@@ -900,7 +900,7 @@ TEST_F(T_Ingestion, PipelineNull) {
   EXPECT_EQ(1U, uploader_->results.size());
 
 
-  compressor_ = zip::Compressor::Construct(zip::kDefault);
+  compressor_ = zip::Compressor::Construct(alg);
   zip::InputMem in(NULL, 0);
   cvmfs::MemSink zlib_null(0);
   const zip::StreamStates res = compressor_->Compress(&in, &zlib_null);
@@ -910,6 +910,12 @@ TEST_F(T_Ingestion, PipelineNull) {
   shash::Any hash_compressed_null(spooler_definition.hash_algorithm);
   shash::HashMem(zlib_null.data(), zlib_null.pos(), &hash_compressed_null);
   EXPECT_EQ(hash_compressed_null, uploader_->results[0].computed_hash);
+}
+
+TEST_F(T_Ingestion, PipelineNull) {
+  ExercisePipelineNull(zip::Algorithm::kNoCompression);
+  ExercisePipelineNull(zip::Algorithm::kZlib);
+  ExercisePipelineNull(zip::Algorithm::kZstd);
 }
 
 
