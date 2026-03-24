@@ -76,7 +76,10 @@ jobs:
         run: |
           sudo make install
           cvmfs_ducc version || true
-      - name: Validate container unpacker
+      - name: Install podman
+        run: |
+          sudo apt-get install -y podman
+      - name: Validate container unpacker and podman store
         run: |
           cd test/container
           sudo ./validate_unpacker.sh -k -v -c https://registry.hub.docker.com/library/python:3.9

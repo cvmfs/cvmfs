@@ -1,32 +1,18 @@
-//This library creates a Podman image store.
-//Podman image store has the following directory structure:
-
-//	podmanStore
-//	+--	overlay
-//	|	+-- $(layerid)
-//	|	|	+-- diff dir
-//	|	|	+--	link file
-//	|	+-- l
-//	+-- overlay-images
-//	|	+-- $(imageid)
-//	|	|	+-- config file
-//	|	|	+-- manifest file
-//	|	+-- images.json
-//	|	+-- images.lock
-//	+-- overlay-layers
-//	|	+--	layers.json
-//	|	+-- layers.lock
-
-// For more information, have a look at this document:
-// https://docs.google.com/document/d/1uP_K6T5tB3qxbN4-S-tRdUkiFggv7Skw3MXZRgWYjS0/edit?usp=sharing
+// podman_store.go defines the metadata types and the single-transaction
+// function used to publish a podman additional image store into a CVMFS
+// repository under podmanStore/.
+//
+// The store uses one synthetic overlay layer whose diff/ symlink points to the
+// pre-merged flat image already present at .flat/<xx>/<digest>/ in the repo.
+// All files are written within a single CVMFS transaction.
 
 package lib
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -34,11 +20,10 @@ import (
 
 	cvmfs "github.com/cvmfs/ducc/cvmfs"
 	l "github.com/cvmfs/ducc/log"
-	notification "github.com/cvmfs/ducc/notification"
 	log "github.com/sirupsen/logrus"
 )
 
-// struct for entries in images.json
+// ImageInfo is a single entry in overlay-images/images.json.
 type ImageInfo struct {
 	ID      string    `json:"id,omitempty"`
 	Names   []string  `json:"names,omitempty"`
@@ -46,7 +31,7 @@ type ImageInfo struct {
 	Created time.Time `json:"created,omitempty"`
 }
 
-// struct for entries in layers.json
+// LayerInfo is a single entry in overlay-layers/layers.json.
 type LayerInfo struct {
 	ID                   string    `json:"id,omitempty"`
 	Parent               string    `json:"parent,omitempty"`
@@ -57,569 +42,240 @@ type LayerInfo struct {
 	UncompressedSize     int64     `json:"diff-size,omitempty"`
 }
 
-var (
-	//Podman Additional Image Store inside unpacked.cern.ch
-	rootPath = "podmanStore"
-	//rootfsDir contains the exploded rootfs of images.
-	rootfsDir = "overlay"
-	//imageMetadataDir contains the metadata, config and manifest file of images.
-	imageMetadataDir = "overlay-images"
-	//layerMetadataDir contains the metadata of layers
-	layerMetadataDir = "overlay-layers"
-)
+const podmanStoreRoot = "podmanStore"
 
-// creates layers.json file in podmanStore.
-func (img *Image) PublishLayerInfo(CVMFSRepo string, digestMap map[string]string) (err error) {
-	return img.PublishLayerInfoWithLogger(nil, CVMFSRepo, digestMap)
+// FlatLayerID returns a deterministic layer ID for the synthetic flat layer.
+// It is derived from the image config digest so it is stable across re-runs.
+func FlatLayerID(imageID string) string {
+	sum := sha256.Sum256([]byte("cvmfs-flat-layer:" + imageID))
+	return hex.EncodeToString(sum[:])
 }
 
-func (img *Image) PublishLayerInfoWithLogger(logger *log.Entry, CVMFSRepo string, digestMap map[string]string) (err error) {
-	logger = l.Ensure(logger)
-	manifest, err := img.GetManifest()
-	if err != nil {
-		logger.WithField("error", err).Warn("Error in getting the image manifest")
-		return
-	}
-	//create layers.json file
-	logger.WithFields(log.Fields{"action": "Ingesting layers.json in podman store"}).Trace(img.GetSimpleName())
-
-	layersdata := []LayerInfo{}
-	layerInfoPath := filepath.Join("/", "cvmfs", CVMFSRepo, rootPath, layerMetadataDir, "layers.json")
-	//check if layers.json already exist and append to data
-	if _, err := os.Stat(layerInfoPath); err == nil {
-		file, err := ioutil.ReadFile(layerInfoPath)
+// DirSize returns the total byte size of all regular files under root.
+// Symlinks are not followed.
+func DirSize(root string) (int64, error) {
+	var total int64
+	err := filepath.Walk(root, func(_ string, info os.FileInfo, err error) error {
 		if err != nil {
-			logger.WithField("error", err).Error("Error in reading layers.json file")
 			return err
 		}
-		json.Unmarshal(file, &layersdata)
-	}
-
-	storedlayersdata := []LayerInfo{}
-	for _, layer := range manifest.Layers {
-		if layer.MediaType == "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip" {
-			continue
+		if !info.IsDir() {
+			total += info.Size()
 		}
-		storedlayerdata := []LayerInfo{}
-		layerDigest := strings.Split(layer.Digest, ":")[1]
-		storedlayerinfopath := filepath.Join(cvmfs.LayerMetadataPath(CVMFSRepo, layerDigest), "layers.json")
-		if _, err := os.Stat(storedlayerinfopath); err == nil {
-			file, err := ioutil.ReadFile(storedlayerinfopath)
-			if err != nil {
-				logger.WithField("error", err).Error("Error in reading layers.json file")
-				return err
-			}
-			json.Unmarshal(file, &storedlayerdata)
-		}
-		storedlayersdata = append(storedlayersdata, storedlayerdata...)
-	}
-
-	// digestMap maps from compressed digest to uncompressed digest
-	for _, layerinfo := range storedlayersdata {
-		digestMap[layerinfo.CompressedDiffDigest] = layerinfo.ID
-	}
-
-	parentMap := make(map[string]string)
-	sizeMap := make(map[string]int)
-	lastLayer := ""
-	for _, layer := range manifest.Layers {
-		if layer.MediaType == "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip" {
-			continue
-		}
-		sizeMap[layer.Digest] = layer.Size
-		if lastLayer != "" {
-			parentMap[layer.Digest] = digestMap[lastLayer]
-		}
-		lastLayer = layer.Digest
-	}
-
-	for i := range storedlayersdata {
-		digest := storedlayersdata[i].CompressedDiffDigest
-		storedlayersdata[i].Parent = parentMap[digest]
-		storedlayersdata[i].CompressedSize = sizeMap[digest]
-	}
-
-	layersdata = append(layersdata, storedlayersdata...)
-	jsonLayerInfo, err := json.MarshalIndent(layersdata, "", " ")
-	if err != nil {
-		logger.WithField("error", err).Error("Error in marshaling json data for layers.json")
-		return err
-	}
-
-	err = cvmfs.WriteDataToCvmfsWithLogger(logger, CVMFSRepo, cvmfs.TrimCVMFSRepoPrefix(layerInfoPath), jsonLayerInfo)
-	if err != nil {
-		logger.WithField("error", err).Error("Error in writing layers.json file")
-		return err
-	}
-	return
+		return nil
+	})
+	return total, err
 }
 
-// create images.json file in podmanStore
-func (img *Image) PublishImageInfo(CVMFSRepo string, digestMap map[string]string) (err error) {
-	return img.PublishImageInfoWithLogger(nil, CVMFSRepo, digestMap)
+// PublishPodmanStore writes the podman additional image store entry for img
+// into /cvmfs/<repo>/podmanStore/ using a single CVMFS transaction.
+// It requires that the flat image has already been published to the repo.
+func (img *Image) PublishPodmanStore(CVMFSRepo string) error {
+	return img.PublishPodmanStoreWithLogger(nil, CVMFSRepo)
 }
 
-func (img *Image) PublishImageInfoWithLogger(logger *log.Entry, CVMFSRepo string, digestMap map[string]string) (err error) {
+func (img *Image) PublishPodmanStoreWithLogger(logger *log.Entry, CVMFSRepo string) error {
 	logger = l.Ensure(logger)
+
 	manifest, err := img.GetManifest()
 	if err != nil {
-		logger.WithField("error", err).Warn("Error in getting the image manifest")
-		return
+		return fmt.Errorf("fetching manifest: %w", err)
 	}
-	//create images.json file
-	logger.WithFields(log.Fields{"action": "Ingesting images.json in podman store"}).Trace(img.GetSimpleName())
-	imagedata := []ImageInfo{}
-	imageInfoPath := filepath.Join("/", "cvmfs", CVMFSRepo, rootPath, imageMetadataDir, "images.json")
 
-	//check if images.json already exist and append to data
-	if _, err := os.Stat(imageInfoPath); err == nil {
-		file, err := ioutil.ReadFile(imageInfoPath)
-		if err != nil {
-			logger.WithField("error", err).Error("Error in reading images.json file")
-			return err
+	imageID := strings.TrimPrefix(manifest.Config.Digest, "sha256:")
+	repoName, subDir := cvmfs.GetRepoAndSubdir(CVMFSRepo)
+	storeRoot := filepath.Join("/cvmfs", repoName, subDir, podmanStoreRoot)
+
+	// Idempotency check: skip if this imageID is already in images.json.
+	imagesJSONPath := filepath.Join(storeRoot, "overlay-images", "images.json")
+	existingImages := readImageInfos(imagesJSONPath)
+	for _, e := range existingImages {
+		if e.ID == imageID {
+			logger.WithField("imageID", imageID).Trace("Image already present in podman store, skipping")
+			return nil
 		}
-		json.Unmarshal(file, &imagedata)
 	}
 
-	// TODO(jblomer): fix me if top layer is foreign
-	topLayerDigest := manifest.Layers[len(manifest.Layers)-1].Digest
+	// Verify flat image is present in the repo.
+	flatRelPath := manifest.GetSingularityPath()
+	flatAbsPath := filepath.Join("/cvmfs", repoName, subDir, flatRelPath)
+	if _, err := os.Stat(flatAbsPath); err != nil {
+		return fmt.Errorf("flat image not found at %s (run convert without --skip-flat first): %w",
+			flatAbsPath, err)
+	}
 
-	id := strings.Split(manifest.Config.Digest, ":")[1]
-	topLayer := digestMap[topLayerDigest]
-	creationTime := time.Now()
-	imageinfo := &ImageInfo{
-		ID:      id,
+	layerID := FlatLayerID(imageID)
+
+	// Read existing layers.json before the transaction.
+	layersJSONPath := filepath.Join(storeRoot, "overlay-layers", "layers.json")
+	existingLayers := readLayerInfos(layersJSONPath)
+
+	// Compute flat-image size (used as diff-size in layers.json).
+	flatSize, err := DirSize(flatAbsPath)
+	if err != nil {
+		logger.WithField("error", err).Warn("Could not compute flat image size; diff-size will be 0")
+	}
+
+	// Read or generate the link ID (stable across re-runs of the same layer).
+	linkFilePath := filepath.Join(storeRoot, "overlay", layerID, "link")
+	linkID := readLinkIDFromFile(linkFilePath)
+	if linkID == "" {
+		linkID, err = GenerateID(26)
+		if err != nil {
+			return fmt.Errorf("generating link ID: %w", err)
+		}
+	}
+
+	// Fetch config and raw manifest bytes before the transaction.
+	rawManifest, err := img.GetRawManifestBytes()
+	if err != nil {
+		return fmt.Errorf("fetching raw manifest: %w", err)
+	}
+	rawConfig, err := img.GetRawConfigBytes()
+	if err != nil {
+		return fmt.Errorf("fetching config: %w", err)
+	}
+	configFilename, err := ConfigFileName(manifest.Config.Digest)
+	if err != nil {
+		return fmt.Errorf("computing config filename: %w", err)
+	}
+
+	// Build merged layers.json and images.json entries.
+	newLayer := LayerInfo{
+		ID:                 layerID,
+		Created:            time.Now(),
+		UncompressedDigest: "sha256:" + layerID,
+		UncompressedSize:   flatSize,
+	}
+	mergedLayers := append(existingLayers, newLayer)
+
+	newImage := ImageInfo{
+		ID:      imageID,
 		Names:   []string{img.GetSimpleName()},
-		Layer:   topLayer,
-		Created: creationTime,
+		Layer:   layerID,
+		Created: time.Now(),
 	}
+	mergedImages := append(existingImages, newImage)
 
-	imagedata = append(imagedata, *imageinfo)
-	imgInfo, err := json.MarshalIndent(imagedata, "", " ")
+	layersJSON, err := json.MarshalIndent(mergedLayers, "", " ")
 	if err != nil {
-		logger.WithField("error", err).Error("Error in marshaling json data for images.json")
-		return err
+		return fmt.Errorf("marshaling layers.json: %w", err)
 	}
-
-	err = cvmfs.WriteDataToCvmfsWithLogger(logger, CVMFSRepo, cvmfs.TrimCVMFSRepoPrefix(imageInfoPath), imgInfo)
+	imagesJSON, err := json.MarshalIndent(mergedImages, "", " ")
 	if err != nil {
-		logger.WithField("error", err).Error("Error in writing images.json")
-		return err
+		return fmt.Errorf("marshaling images.json: %w", err)
 	}
-	return nil
-}
 
-// Ingest the exploded rootfs in podman store.
-func (img *Image) LinkRootfsIntoPodmanStore(CVMFSRepo, subDirInsideRepo string, digestMap map[string]string) (err error) {
-	return img.LinkRootfsIntoPodmanStoreWithLogger(nil, CVMFSRepo, subDirInsideRepo, digestMap)
-}
-
-func (img *Image) LinkRootfsIntoPodmanStoreWithLogger(logger *log.Entry, CVMFSRepo, subDirInsideRepo string, digestMap map[string]string) (err error) {
-	logger = l.Ensure(logger)
-	logger.WithFields(log.Fields{"action": "Ingesting layer rootfs into podman store for the image"}).Trace(img.GetSimpleName())
-	manifest, err := img.GetManifest()
-	if err != nil {
-		logger.WithField("error", err).Warn("Error in getting the image manifest")
-		return err
-	}
-	// this is extremely bad, we are making one transaction for each layer
-	// all of them could be done in a single transaction
-	for _, layer := range manifest.Layers {
-		if layer.MediaType == "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip" {
-			continue
+	// Single CVMFS transaction: create all store files and symlinks at once.
+	return cvmfs.WithinTransactionWithLogger(logger, CVMFSRepo, func() error {
+		dirs := []string{
+			filepath.Join(storeRoot, "overlay", layerID),
+			filepath.Join(storeRoot, "overlay", "l"),
+			filepath.Join(storeRoot, "overlay-images", imageID),
+			filepath.Join(storeRoot, "overlay-layers"),
 		}
-		layerid := strings.Split(layer.Digest, ":")[1]
-		layerdir := digestMap[layer.Digest]
-
-		//symlinkPath will contain the rootfs of the corresponding layer in podman store.
-		symlinkPath := filepath.Join(rootPath, rootfsDir, layerdir, "diff")
-		targetPath := filepath.Join(subDirInsideRepo, layerid[:2], layerid, "layerfs")
-
-		if _, err := os.Stat(symlinkPath); os.IsNotExist(err) {
-			err = cvmfs.CreateSymlinkIntoCVMFSWithLogger(logger, CVMFSRepo, symlinkPath, targetPath)
-			if err != nil {
-				logger.WithField("error", err).Error("Error in creating the symlink for the diff dir")
-				return err
+		for _, d := range dirs {
+			if err := os.MkdirAll(d, 0755); err != nil {
+				return fmt.Errorf("creating %s: %w", d, err)
 			}
 		}
-	}
-	return nil
-}
 
-// Create the link dir and link file for exploded rootfs.
-func (img *Image) CreateLinkDir(CVMFSRepo, subDirInsideRepo string, digestMap, layerIdMap map[string]string) (err error) {
-	return img.CreateLinkDirWithLogger(nil, CVMFSRepo, subDirInsideRepo, digestMap, layerIdMap)
-}
-
-func (img *Image) CreateLinkDirWithLogger(logger *log.Entry, CVMFSRepo, subDirInsideRepo string, digestMap, layerIdMap map[string]string) (err error) {
-	logger = l.Ensure(logger)
-	logger.WithFields(log.Fields{"action": "Creating Link files for layer rootfs for the image"}).Trace(img.GetSimpleName())
-	manifest, err := img.GetManifest()
-	if err != nil {
-		logger.WithField("error", err).Warn("Error in getting the image manifest")
-		return err
-	}
-	// also here, we are making one transaction for each layer
-	for _, layer := range manifest.Layers {
-		if layer.MediaType == "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip" {
-			continue
+		// diff -> relative path from podmanStore/overlay/<layerID>/ to the flat image.
+		// e.g. "../../../.flat/a4/<digest>"
+		diffPath := filepath.Join(storeRoot, "overlay", layerID, "diff")
+		if _, err := os.Lstat(diffPath); os.IsNotExist(err) {
+			diffTarget := filepath.Join("..", "..", "..", flatRelPath)
+			if err := os.Symlink(diffTarget, diffPath); err != nil {
+				return fmt.Errorf("creating diff symlink: %w", err)
+			}
 		}
-		layerdir := digestMap[layer.Digest]
-		linkPath := filepath.Join(rootPath, rootfsDir, layerdir, "link")
-		if _, err := os.Stat(linkPath); os.IsNotExist(err) {
-			//generate the link id
-			lid, err := generateID(26)
-			if err != nil {
-				logger.WithField("error", err).Error("Error generating file name for Link dir")
-				return err
-			}
-			layerIdMap[layer.Digest] = filepath.Join("l", lid)
-			err = cvmfs.WriteDataToCvmfsWithLogger(logger, CVMFSRepo, linkPath, []byte(lid))
-			if err != nil {
-				logger.WithField("error", err).Error("Error in writing link id to podman store")
-				return err
-			}
 
-			//Create link dir
-			symlinkPath := filepath.Join(rootPath, rootfsDir, "l", lid)
-			targetPath := filepath.Join(rootPath, rootfsDir, layerdir, "diff")
-
-			err = cvmfs.CreateSymlinkIntoCVMFSWithLogger(logger, CVMFSRepo, symlinkPath, targetPath)
-			if err != nil {
-				logger.WithField("error", err).Error("Error in creating the symlink for the Link dir")
-				return err
+		// link file
+		if _, err := os.Lstat(linkFilePath); os.IsNotExist(err) {
+			if err := os.WriteFile(linkFilePath, []byte(linkID), 0644); err != nil {
+				return fmt.Errorf("writing link file: %w", err)
 			}
-		} else {
-			data, err := ioutil.ReadFile(linkPath)
-			if err != nil {
-				logger.WithField("error", err).Error("Error in reading link file")
-				return err
-			}
-			layerIdMap[layer.Digest] = string(data)
 		}
-	}
-	return nil
-}
 
-// Create the lower files for diff dirs to be used by podman.
-func (img *Image) CreateLowerFiles(CVMFSRepo string, digestMap, layerIdMap map[string]string) (err error) {
-	return img.CreateLowerFilesWithLogger(nil, CVMFSRepo, digestMap, layerIdMap)
-}
-
-func (img *Image) CreateLowerFilesWithLogger(logger *log.Entry, CVMFSRepo string, digestMap, layerIdMap map[string]string) (err error) {
-	logger = l.Ensure(logger)
-	logger.WithFields(log.Fields{"action": "Creating Lower files for diff dirs in podman store"}).Trace(img.GetSimpleName())
-	manifest, err := img.GetManifest()
-	if err != nil {
-		logger.WithField("error", err).Warn("Error in getting the image manifest")
-		return err
-	}
-
-	lastLowerData := ""
-	lastDigest := ""
-	// again, for each layer, one more transaction
-	for _, layer := range manifest.Layers {
-		if layer.MediaType == "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip" {
-			continue
+		// overlay/l/<linkID> -> ../<layerID>/diff
+		lSymPath := filepath.Join(storeRoot, "overlay", "l", linkID)
+		if _, err := os.Lstat(lSymPath); os.IsNotExist(err) {
+			if err := os.Symlink(filepath.Join("..", layerID, "diff"), lSymPath); err != nil {
+				return fmt.Errorf("creating l/%s symlink: %w", linkID, err)
+			}
 		}
-		if lastDigest != "" {
-			layerdir := digestMap[layer.Digest]
-			lowerPath := filepath.Join(rootPath, rootfsDir, layerdir, "lower")
-			if _, err := os.Stat(lowerPath); os.IsNotExist(err) {
-				lowerdata := layerIdMap[lastDigest]
-				if lastLowerData != "" {
-					lowerdata = lowerdata + ":" + lastLowerData
-				}
-				err = cvmfs.WriteDataToCvmfsWithLogger(logger, CVMFSRepo, lowerPath, []byte(lowerdata))
+
+		// layers.json (always rewritten to include the new entry)
+		if err := os.WriteFile(layersJSONPath, layersJSON, 0644); err != nil {
+			return fmt.Errorf("writing layers.json: %w", err)
+		}
+
+		// images.json (always rewritten)
+		if err := os.WriteFile(imagesJSONPath, imagesJSON, 0644); err != nil {
+			return fmt.Errorf("writing images.json: %w", err)
+		}
+
+		// overlay-images/<imageID>/manifest
+		manifestFilePath := filepath.Join(storeRoot, "overlay-images", imageID, "manifest")
+		if _, err := os.Lstat(manifestFilePath); os.IsNotExist(err) {
+			if err := os.WriteFile(manifestFilePath, rawManifest, 0644); err != nil {
+				return fmt.Errorf("writing manifest: %w", err)
+			}
+		}
+
+		// overlay-images/<imageID>/<configFilename>
+		configFilePath := filepath.Join(storeRoot, "overlay-images", imageID, configFilename)
+		if _, err := os.Lstat(configFilePath); os.IsNotExist(err) {
+			if err := os.WriteFile(configFilePath, rawConfig, 0644); err != nil {
+				return fmt.Errorf("writing config: %w", err)
+			}
+		}
+
+		// Empty lock files (required by containers/storage).
+		for _, lf := range []string{
+			filepath.Join(storeRoot, "overlay-images", "images.lock"),
+			filepath.Join(storeRoot, "overlay-layers", "layers.lock"),
+		} {
+			if _, err := os.Lstat(lf); os.IsNotExist(err) {
+				f, err := os.OpenFile(lf, os.O_CREATE|os.O_WRONLY, 0644)
 				if err != nil {
-					logger.WithField("error", err).Warn("Error in writing lower files")
-					return err
+					return fmt.Errorf("creating %s: %w", lf, err)
 				}
-				lastLowerData = lowerdata
-			} else {
-				data, err := ioutil.ReadFile(lowerPath)
-				if err != nil {
-					logger.WithField("error", err).Error("Error in reading lower file")
-					return err
-				}
-				lastLowerData = string(data)
+				f.Close()
 			}
 		}
-		lastDigest = layer.Digest
-	}
-	return nil
+
+		return nil
+	})
 }
 
-// Ingest the image config file in podman store.
-func (img *Image) CreateConfigFile(CVMFSRepo string) (err error) {
-	return img.CreateConfigFileWithLogger(nil, CVMFSRepo)
+// readImageInfos reads images.json from path, returning nil slice on any error.
+func readImageInfos(path string) []ImageInfo {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	var infos []ImageInfo
+	json.Unmarshal(data, &infos)
+	return infos
 }
 
-func (img *Image) CreateConfigFileWithLogger(logger *log.Entry, CVMFSRepo string) (err error) {
-	logger = l.Ensure(logger)
-	logger.WithFields(log.Fields{"action": "Creating config file for the image in podman store"}).Trace(img.GetSimpleName())
-	manifest, err := img.GetManifest()
+// readLayerInfos reads layers.json from path, returning nil slice on any error.
+func readLayerInfos(path string) []LayerInfo {
+	data, err := os.ReadFile(path)
 	if err != nil {
-		logger.WithField("error", err).Warn("Error in getting the image manifest")
-		return err
+		return nil
 	}
-	//generate config file path.
-	fname, err := generateConfigFileName(manifest.Config.Digest)
-	if err != nil {
-		logger.WithField("error", err).Warning("Error in generating config file name")
-		return err
-	}
-
-	imageID := strings.Split(manifest.Config.Digest, ":")[1]
-	configFilePath := filepath.Join(rootPath, imageMetadataDir, imageID, fname)
-	if _, err := os.Stat(configFilePath); os.IsNotExist(err) {
-		configUrl := fmt.Sprintf("%sblobs/%s", img.GetBaseUrl(), manifest.Config.Digest)
-
-		token, err := firstRequestForAuth(configUrl)
-		if err != nil {
-			logger.WithField("error", err).Warning("Unable to retrieve the token for downloading config file")
-			return err
-		}
-
-		client := &http.Client{}
-		req, err := http.NewRequest("GET", configUrl, nil)
-		if err != nil {
-			logger.WithField("error", err).Warning("Unable to create a request for getting config file.")
-			return err
-		}
-		req.Header.Set("Authorization", token)
-		req.Header.Set("Accept", "application/vnd.docker.distribution.manifest.v2+json")
-		req.Header.Set("Accept", "application/vnd.oci.image.manifest.v1+json")
-
-		resp, err := client.Do(req)
-		if err != nil {
-			logger.WithField("error", err).Warning("Unable to retrieve config file")
-			return err
-		}
-		defer resp.Body.Close()
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			logger.WithField("error", err).Warning("Error in reading the body from the configuration")
-			return err
-		}
-
-		err = cvmfs.WriteDataToCvmfsWithLogger(logger, CVMFSRepo, configFilePath, []byte(body))
-		if err != nil {
-			logger.WithField("error", err).Warning("Error in writing config file")
-			return err
-		}
-	}
-	return nil
+	var infos []LayerInfo
+	json.Unmarshal(data, &infos)
+	return infos
 }
 
-// Ingest the image manifest in podman store.
-func (img *Image) PublishImageManifest(CVMFSRepo string) (err error) {
-	return img.PublishImageManifestWithLogger(nil, CVMFSRepo)
-}
-
-func (img *Image) PublishImageManifestWithLogger(logger *log.Entry, CVMFSRepo string) (err error) {
-	logger = l.Ensure(logger)
-	logger.WithFields(log.Fields{"action": "Creating manifest file for the image in podman store"}).Trace(img.GetSimpleName())
-	manifest, err := img.GetManifest()
+// readLinkIDFromFile returns the link ID stored at path, or "" if absent.
+func readLinkIDFromFile(path string) string {
+	data, err := os.ReadFile(path)
 	if err != nil {
-		logger.WithField("error", err).Warn("Error in getting the image manifest")
-		return err
+		return ""
 	}
-	imageID := strings.Split(manifest.Config.Digest, ":")[1]
-
-	symlinkPath := filepath.Join(rootPath, imageMetadataDir, imageID, "manifest")
-	targetPath := filepath.Join(".metadata", img.Registry, img.Repository+img.GetReference(), "manifest.json")
-
-	err = cvmfs.CreateSymlinkIntoCVMFSWithLogger(logger, CVMFSRepo, symlinkPath, targetPath)
-	if err != nil {
-		logger.WithField("error", err).Error("Error in creating the symlink for manifest.json")
-		return err
-	}
-	return nil
-}
-
-// Create images.lock and layers.lock file to be used by podman.
-// Libpod expects these files to be present in its image stores.
-func (img *Image) CreateLockFiles(CVMFSRepo string) (err error) {
-	return img.CreateLockFilesWithLogger(nil, CVMFSRepo)
-}
-
-func (img *Image) CreateLockFilesWithLogger(logger *log.Entry, CVMFSRepo string) (err error) {
-	logger = l.Ensure(logger)
-	logger.WithFields(log.Fields{"action": "Creating lock file for the image"}).Trace(img.GetSimpleName())
-	layerlockpath := filepath.Join("/cvmfs", CVMFSRepo, rootPath, layerMetadataDir, "layers.lock")
-	imagelockpath := filepath.Join("/cvmfs", CVMFSRepo, rootPath, imageMetadataDir, "images.lock")
-	var paths []string
-	if _, err := os.Stat(layerlockpath); os.IsNotExist(err) {
-		paths = append(paths, layerlockpath)
-	}
-	if _, err := os.Stat(imagelockpath); os.IsNotExist(err) {
-		paths = append(paths, imagelockpath)
-	}
-	// two more transaction that could be one
-	for _, file := range paths {
-		if _, err := os.Stat(file); os.IsNotExist(err) {
-			tmpFile, err := ioutil.TempFile("", "lock")
-			if err != nil {
-				return err
-			}
-			if err := tmpFile.Close(); err != nil {
-				return err
-			}
-			err = cvmfs.PublishToCVMFSWithLogger(logger, CVMFSRepo, cvmfs.TrimCVMFSRepoPrefix(file), tmpFile.Name())
-			os.RemoveAll(tmpFile.Name())
-			if err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-// checks if older version of the image with same tag exists or not in the store.
-// If an older version is found, removes it from store and updates images.json file.
-// Note: The layers are not removed. Only the manifest, config file and images.json are updated.
-func (img *Image) CheckImageChanged(CVMFSRepo string) error {
-	return img.CheckImageChangedWithLogger(nil, CVMFSRepo)
-}
-
-func (img *Image) CheckImageChangedWithLogger(logger *log.Entry, CVMFSRepo string) error {
-	logger = l.Ensure(logger)
-	logger.WithFields(log.Fields{"action": "checking if old image version with same tag exists"}).Trace(img.GetSimpleName())
-	path := filepath.Join("/cvmfs", CVMFSRepo, rootPath, imageMetadataDir, "images.json")
-	if _, err := os.Stat(path); err == nil {
-		var imagesinfo []ImageInfo
-		newimagesinfo := []ImageInfo{}
-
-		file, err := ioutil.ReadFile(path)
-		if err != nil {
-			logger.WithField("error", err).Error("error in reading images.json file")
-			return err
-		}
-
-		json.Unmarshal(file, &imagesinfo)
-		for _, image := range imagesinfo {
-			present := false
-			for _, name := range image.Names {
-				// we have already checked if the same image is present in the podman store or not.
-				// hence if the we find another image with same name, it means its content (digest) has changed.
-				if name == img.GetSimpleName() {
-					logger.Info("older image version present, cleaning and ingesting newer version")
-					present = true
-					err := cvmfs.RemoveDirectoryWithLogger(logger, CVMFSRepo, rootPath, imageMetadataDir, image.ID)
-					if err != nil {
-						logger.WithField("error", err).Error("error while removing older image version from podman store")
-						return err
-					}
-					break
-				}
-			}
-			if !present {
-				newimagesinfo = append(newimagesinfo, image)
-			}
-		}
-		imgInfo, err := json.MarshalIndent(newimagesinfo, "", " ")
-		if err != nil {
-			logger.WithField("error", err).Error("Error in marshaling json data for images.json")
-			return err
-		}
-
-		err = cvmfs.WriteDataToCvmfsWithLogger(logger, CVMFSRepo, cvmfs.TrimCVMFSRepoPrefix(path), imgInfo)
-		if err != nil {
-			logger.WithField("error", err).Error("Error in writing images.json")
-			return err
-		}
-	}
-	return nil
-}
-
-// Ingest all the necessary files and dir in podmanStore dir.
-func (img *Image) CreatePodmanImageStore(CVMFSRepo, subDirInsideRepo string) (err error) {
-	return img.CreatePodmanImageStoreWithLogger(nil, CVMFSRepo, subDirInsideRepo)
-}
-
-func (img *Image) CreatePodmanImageStoreWithLogger(logger *log.Entry, CVMFSRepo, subDirInsideRepo string) (err error) {
-	logger = l.Ensure(logger)
-	// this code is extremely slow
-	// if opens and publish several transaction and I believe it is possible to do pretty much anything in a single transaction
-	// it should be rewritten.
-	n := notification.NewNotification(NotificationService).AddField("image", img.GetSimpleName())
-	n.Action("start_podman_ingestion").Send()
-	t := time.Now()
-	defer func() {
-		n.Elapsed(t).Action("end_podman_ingestion").Send()
-	}()
-
-	err = img.CheckImageChangedWithLogger(logger, CVMFSRepo)
-	if err != nil {
-		logger.WithField("error", err).Error("error while checking if older image version with same tag present in store")
-		return err
-	}
-
-	logger.WithFields(log.Fields{"action": "Ingest the image into podman store"}).Trace(img.GetSimpleName())
-	createCatalogIntoDirs := []string{rootPath, filepath.Join(rootPath, rootfsDir), filepath.Join(rootPath, imageMetadataDir), filepath.Join(rootPath, layerMetadataDir)}
-	for _, dir := range createCatalogIntoDirs {
-		err = cvmfs.CreateCatalogIntoDirWithLogger(logger, CVMFSRepo, dir)
-		if err != nil {
-			logger.WithField("error", err).WithFields(log.Fields{
-				"directory": dir}).Error(
-				"Impossible to create subcatalog in the directory.")
-		}
-	}
-
-	err = img.CreateConfigFileWithLogger(logger, CVMFSRepo)
-	if err != nil {
-		logger.WithField("error", err).Error("Unable to create config file in podman store")
-		return err
-	}
-
-	// digestMap[CompressedDigest] -> UncompressedDigest
-	// layerIdMap[CompressedDigest] -> RandomIdOfLayer
-	digestMap := make(map[string]string)
-	layerIdMap := make(map[string]string)
-
-	// no one read the layers.json file
-	err = img.PublishLayerInfoWithLogger(logger, CVMFSRepo, digestMap)
-	if err != nil {
-		logger.WithField("error", err).Error("Unable to create layers.json file in podman store")
-		return err
-	}
-
-	err = img.PublishImageInfoWithLogger(logger, CVMFSRepo, digestMap)
-	if err != nil {
-		logger.WithField("error", err).Error("Unable to create images.json file in podman store")
-		return err
-	}
-
-	err = img.LinkRootfsIntoPodmanStoreWithLogger(logger, CVMFSRepo, subDirInsideRepo, digestMap)
-	if err != nil {
-		logger.WithField("error", err).Error("Error ingesting rootfs into podman image store")
-		return err
-	}
-
-	err = img.CreateLinkDirWithLogger(logger, CVMFSRepo, subDirInsideRepo, digestMap, layerIdMap)
-	if err != nil {
-		logger.WithField("error", err).Error("Unable to create the link dir in podman store")
-		return err
-	}
-
-	err = img.CreateLowerFilesWithLogger(logger, CVMFSRepo, digestMap, layerIdMap)
-	if err != nil {
-		logger.WithField("error", err).Error("Unable to create the lower files in podman store")
-		return err
-	}
-
-	err = img.CreateLockFilesWithLogger(logger, CVMFSRepo)
-	if err != nil {
-		logger.WithField("error", err).Error("Unable to create lock files in podman store")
-		return err
-	}
-
-	err = img.PublishImageManifestWithLogger(logger, CVMFSRepo)
-	if err != nil {
-		logger.WithField("error", err).Error("Unable to create manifest file in podman store")
-		return err
-	}
-	logger.Trace("Image successfully ingested into podmanStore")
-	return nil
+	return strings.TrimSpace(string(data))
 }

@@ -28,7 +28,7 @@ var (
 )
 
 var (
-	convertAgain, overwriteLayer, skipLayers, skipFlat, skipThinImage, skipPodman, multiArch bool
+	convertAgain, overwriteLayer, skipLayers, skipFlat, skipPodman, skipThinImage, multiArch bool
 	maxConcurrentDownloads                                                                   int
 )
 
@@ -36,9 +36,9 @@ func init() {
 	convertCmd.Flags().BoolVarP(&overwriteLayer, "overwrite-layers", "f", false, "overwrite the layer if they are already inside the CVMFS repository")
 	convertCmd.Flags().BoolVarP(&convertAgain, "convert-again", "g", false, "convert again images that are already successfully converted")
 	convertCmd.Flags().BoolVarP(&skipFlat, "skip-flat", "s", false, "do not create a flat image (compatible with singularity)")
+	convertCmd.Flags().BoolVarP(&skipPodman, "skip-podman", "p", false, "do not publish to the podman additional image store at podmanStore/")
 	convertCmd.Flags().BoolVarP(&skipLayers, "skip-layers", "d", false, "[DEPRECATED] this option is no longer functional, layers will be unpacked regardless. Use `docker save` and `cvmfs_server ingest` if you only need the flat image.")
 	convertCmd.Flags().BoolVarP(&skipThinImage, "skip-thin-image", "i", false, "do not create and push the docker thin image")
-	convertCmd.Flags().BoolVarP(&skipPodman, "skip-podman", "p", false, "do not create podman image store")
 	convertCmd.Flags().BoolVarP(&multiArch, "multi-arch", "m", false, "convert all architectures for multi-arch images")
 	convertCmd.Flags().IntVar(&maxConcurrentDownloads, "max-concurrent-downloads", 0, "maximum number of layer downloads in parallel (0 means unlimited, env: DUCC_MAX_CONCURRENT_DOWNLOADS)")
 	rootCmd.AddCommand(convertCmd)
@@ -163,17 +163,6 @@ var convertCmd = &cobra.Command{
 					}
 				}
 			}
-			if !skipPodman {
-				err = lib.ConvertWishPodman(wish, convertAgain)
-				if err != nil {
-					if isIgnored {
-						l.LogE(err).WithFields(fields).Warning("Error in converting wish (podman), but image is in ignoreErrors list")
-					} else {
-						l.LogE(err).WithFields(fields).Error("Error in converting wish (podman), going on")
-						conversionErrors = append(conversionErrors, fmt.Sprintf("[%s] podman: %s", wish.InputName, err))
-					}
-				}
-			}
 			if !skipFlat {
 				if layerErr != nil {
 					l.LogE(layerErr).WithFields(fields).Warning("Skipping overlay: layer ingestion had errors")
@@ -185,6 +174,15 @@ var convertCmd = &cobra.Command{
 						} else {
 							l.LogE(err).WithFields(fields).Error("Error in converting wish (singularity), going on")
 							conversionErrors = append(conversionErrors, fmt.Sprintf("[%s] singularity: %s", wish.InputName, err))
+						}
+					} else if !skipPodman {
+						if podmanErr := lib.ConvertWishPodman(wish, multiArch); podmanErr != nil {
+							if isIgnored {
+								l.LogE(podmanErr).WithFields(fields).Warning("Error publishing podman store, but image is in ignoreErrors list")
+							} else {
+								l.LogE(podmanErr).WithFields(fields).Error("Error publishing podman store, going on")
+								conversionErrors = append(conversionErrors, fmt.Sprintf("[%s] podman: %s", wish.InputName, podmanErr))
+							}
 						}
 					}
 				}

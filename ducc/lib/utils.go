@@ -118,6 +118,12 @@ func (rh *ReadAndHash) Close() error {
 
 // generates the file name for link dir in podman store
 func generateID(l int) (string, error) {
+	return GenerateID(l)
+}
+
+// GenerateID generates a random base32-encoded identifier of length l.
+// It is used for link directory names in the podman overlay store.
+func GenerateID(l int) (string, error) {
 	randomid := make([]byte, 16)
 	n, err := io.ReadFull(rand.Reader, randomid)
 	if n != len(randomid) || err != nil {
@@ -129,6 +135,14 @@ func generateID(l int) (string, error) {
 
 // generates the file name for config file (compliant with libpod) in podman store.
 func generateConfigFileName(digest string) (fname string, err error) {
+	return ConfigFileName(digest)
+}
+
+// ConfigFileName returns the filename used to store an image config blob in
+// the podman overlay-images/<imageID>/ directory.  Containers/storage escapes
+// any character outside [.0-9a-z] by base64-encoding the whole key and
+// prepending "=", which is what this function replicates.
+func ConfigFileName(digest string) (fname string, err error) {
 	reader := strings.NewReader(digest)
 	for reader.Len() > 0 {
 		ch, size, err := reader.ReadRune()

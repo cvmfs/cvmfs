@@ -148,6 +148,8 @@ CVMFS_REPO="${2:-test-validate.cern.ch}"
 
 command -v cvmfs_ducc >/dev/null 2>&1 || die "cvmfs_ducc not found in PATH"
 command -v docker     >/dev/null 2>&1 || die "docker not found in PATH"
+PODMAN_AVAILABLE=0
+command -v podman >/dev/null 2>&1 && PODMAN_AVAILABLE=1
 
 trap cleanup EXIT HUP INT TERM
 
@@ -244,6 +246,69 @@ if [ "$COMPARE_CONTENT" -eq 1 ]; then
         log_info "Content comparison        : FAIL"
         [ "$VERBOSE" -eq 1 ] && head -80 "$SUMS_DIFF"
     fi
+fi
+
+# ── Step 4: validate podman additional image store ───────────────────────────
+
+if [ "$PODMAN_AVAILABLE" -eq 1 ]; then
+    log_info "=== Step 4: Validating podman additional image store ==="
+
+    PODMAN_STORE="$WORK_DIR/podmanstore"
+
+    log_info "Running: cvmfs_ducc create-podman-store $IMAGE_URL $CVMFS_REPO $PODMAN_STORE"
+    cvmfs_ducc create-podman-store "$IMAGE_URL" "$CVMFS_REPO" "$PODMAN_STORE" \
+        2>&1 | tee "$WORK_DIR/podman_store.log" \
+        || die "create-podman-store failed (see $WORK_DIR/podman_store.log)"
+
+    # Configure podman to use the new store for this test only, via an
+    # overriding storage.conf in a throwaway $HOME.
+    PODMAN_HOME="$WORK_DIR/podman_home"
+    mkdir -p "$PODMAN_HOME/.config/containers"
+    # Use a fresh, isolated graphroot/runroot so we avoid the
+    # "database graph driver '' does not match overlay" mismatch that occurs
+    # when the system graphroot was previously initialised without a driver.
+    PODMAN_GRAPH_ROOT="$WORK_DIR/podman_graph"
+    PODMAN_RUN_ROOT="$WORK_DIR/podman_run"
+    mkdir -p "$PODMAN_GRAPH_ROOT" "$PODMAN_RUN_ROOT"
+    cat > "$PODMAN_HOME/.config/containers/storage.conf" <<EOF
+[storage]
+driver = "overlay"
+graphroot = "$PODMAN_GRAPH_ROOT"
+runroot = "$PODMAN_RUN_ROOT"
+[storage.options]
+additionalImageStores = ["$PODMAN_STORE"]
+[storage.options.overlay]
+mountopt = "nodev"
+EOF
+
+    PODMAN_IMAGE_REF="${IMAGE_URL#*://}"
+    PODMAN_HOME="$PODMAN_HOME"
+
+    # Verify that the image is listed in the additional store (R/O: true)
+    PODMAN_IMAGES=$(sudo env HOME="$PODMAN_HOME" XDG_CONFIG_HOME="$PODMAN_HOME/.config" \
+        podman images --format '{{.Repository}}:{{.Tag}} RO={{.ReadOnly}}' 2>/dev/null || true)
+    log_dbg "Podman images: $PODMAN_IMAGES"
+    if ! echo "$PODMAN_IMAGES" | grep -q "RO=true"; then
+        HAS_DIFF=1
+        log_info "Podman store check           : FAIL (image not found as R/O in additional store)"
+        log_dbg "$PODMAN_IMAGES"
+    else
+        log_info "Podman store check           : PASS (image listed as R/O)"
+    fi
+
+    # Verify that a container can start from the additional store without pulling.
+    PODMAN_RUN_OUT=$(sudo env HOME="$PODMAN_HOME" XDG_CONFIG_HOME="$PODMAN_HOME/.config" \
+        podman run --rm --pull=never "$PODMAN_IMAGE_REF" echo "podman-store-ok" 2>&1 || true)
+    log_dbg "podman run output: $PODMAN_RUN_OUT"
+    if echo "$PODMAN_RUN_OUT" | grep -q "podman-store-ok"; then
+        log_info "Podman run from store        : PASS"
+    else
+        HAS_DIFF=1
+        log_info "Podman run from store        : FAIL"
+        log_dbg "$PODMAN_RUN_OUT"
+    fi
+else
+    log_info "=== Step 4: Skipping podman store validation (podman not available) ==="
 fi
 
 # ── Summary ──────────────────────────────────────────────────────────────────
