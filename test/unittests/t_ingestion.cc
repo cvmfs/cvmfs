@@ -112,6 +112,7 @@ class T_Ingestion : public ::testing::Test {
   }
   void ExerciseCompressionRoundtrip(zip::Algorithm alg);
   void ExerciseDevNullCompression(zip::Algorithm alg);
+  void ExercisePipelineNull(zip::Algorithm alg);
 
   Tube<DummyItem> tube_;
   TubeConsumerGroup<DummyItem> task_group_;
@@ -868,7 +869,7 @@ TEST_F(T_Ingestion, TaskWriteLarge) {
 
 void T_Ingestion::ExercisePipelineNull(zip::Algorithm alg) {
   upload::SpoolerDefinition spooler_definition = MockSpoolerDefinition();
-  spooler_definition.compression_alg = zip::kNoCompression;
+  spooler_definition.compression_alg = alg;
 
   UniquePtr<IngestionPipeline> pipeline_straight(
     new IngestionPipeline(uploader_, spooler_definition));
@@ -905,7 +906,9 @@ void T_Ingestion::ExercisePipelineNull(zip::Algorithm alg) {
   cvmfs::MemSink zlib_null(0);
   const zip::StreamStates res = compressor_->Compress(&in, &zlib_null);
   ASSERT_EQ(res, zip::kStreamEnd);
-  ASSERT_GT(zlib_null.pos(), 0U);
+  if (alg != zip::Algorithm::kNoCompression) {
+    ASSERT_GT(zlib_null.pos(), 0U);
+  }
 
   shash::Any hash_compressed_null(spooler_definition.hash_algorithm);
   shash::HashMem(zlib_null.data(), zlib_null.pos(), &hash_compressed_null);
