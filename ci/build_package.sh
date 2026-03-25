@@ -30,12 +30,16 @@ CVMFS_BUILD_LOCATION="$2"
 CVMFS_PACKAGE_NAME="$3"
 shift 3
 
-# If ci/build_install_builddeps.sh bootstrapped a custom cmake it will have
-# exported CVMFS_CMAKE_DIR (the directory containing the cmake binary).
-# Package build scripts that sanitise the environment (e.g. ci/cvmfs/deb.sh
-# via debuild) honour this variable to re-inject the path.  You can also set
-# it manually when calling this script:
-#   CVMFS_CMAKE_DIR=/path/to/externals_install/bin ci/build_package.sh ...
+# If ci/build_install_builddeps.sh bootstrapped custom tools it will have
+# exported CVMFS_CMAKE_DIR and CVMFS_GO_DIR (directories containing the
+# respective binaries).  Package build scripts that sanitise the environment
+# (e.g. ci/cvmfs/deb.sh via debuild) honour these variables to re-inject the
+# paths.  You can also set them manually when calling this script:
+#   CVMFS_CMAKE_DIR=/path/to/externals_install/bin \
+#   CVMFS_GO_DIR=/path/to/externals_install/go/bin \
+#   ci/build_package.sh ...
+# Alternatively, set CVMFS_EXTERNALS_PREFIX to the base directory used during
+# the bootstrap and both paths will be auto-detected from there.
 
 # build the invocation string and print it for debugging reasons
 args=""

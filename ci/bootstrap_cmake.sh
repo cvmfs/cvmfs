@@ -102,13 +102,12 @@ else
     fi
   fi
 
-  if [ -d "${REPO_ROOT}/externals_build" ] && [ -d "${REPO_ROOT}/externals_install" ]; then
-    EXTERNALS_INSTALL_LOCATION="${REPO_ROOT}/externals_install"
-  else
-    EXTERNALS_INSTALL_LOCATION="${REPO_ROOT}/externals_install.${ARCH}"
-    if [ -n "$DISTRO" ]; then
-      EXTERNALS_INSTALL_LOCATION="${EXTERNALS_INSTALL_LOCATION}.${DISTRO}"
-    fi
+  # CVMFS_EXTERNALS_PREFIX overrides the base directory; otherwise fall back to
+  # the repo root.  The install path is always the arch/distro-suffixed form.
+  _BASE="${CVMFS_EXTERNALS_PREFIX:-${REPO_ROOT}}"
+  EXTERNALS_INSTALL_LOCATION="${_BASE}/externals_install.${ARCH}"
+  if [ -n "$DISTRO" ]; then
+    EXTERNALS_INSTALL_LOCATION="${EXTERNALS_INSTALL_LOCATION}.${DISTRO}"
   fi
 fi
 
@@ -149,7 +148,8 @@ install_cmake_binary() {
 
   log "Extracting into ${EXTERNALS_INSTALL_LOCATION}..."
   # --exclude-subdir installs bin/, lib/, share/ directly under the prefix
-  "${installer}" --skip-license --prefix="${EXTERNALS_INSTALL_LOCATION}" --exclude-subdir
+  # Redirect to stderr so that only CVMFS_CMAKE_DIR= reaches stdout (for eval)
+  "${installer}" --skip-license --prefix="${EXTERNALS_INSTALL_LOCATION}" --exclude-subdir >&2
   rm -f "${installer}"
 }
 
@@ -175,13 +175,14 @@ build_cmake_from_source() {
 
   cd "${srcdir}"
   # Disable OpenSSL to avoid dependency issues; cmake can use its own curl/openssl
+  # Redirect to stderr so that only CVMFS_CMAKE_DIR= reaches stdout (for eval)
   ./bootstrap \
     --prefix="${EXTERNALS_INSTALL_LOCATION}" \
     --parallel="${jobs}" \
     -- -DCMAKE_USE_OPENSSL=OFF \
-    || die "cmake bootstrap script failed"
-  make -j"${jobs}" || die "cmake source build failed"
-  make install     || die "cmake install failed"
+    >&2 || die "cmake bootstrap script failed"
+  make -j"${jobs}" >&2 || die "cmake source build failed"
+  make install     >&2 || die "cmake install failed"
   cd - >/dev/null
   rm -rf "${build_dir}"
 }

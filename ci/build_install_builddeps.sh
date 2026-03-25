@@ -59,6 +59,29 @@ bootstrap_cmake_if_needed() {
   log "cmake bootstrapped at: ${CVMFS_CMAKE_DIR}/cmake"
 }
 
+bootstrap_golang_if_needed() {
+  local min_ver="1.24.0"
+  local current_ver=""
+  if check_available go; then
+    current_ver="$(go version 2>/dev/null \
+      | grep -oE 'go[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1 | sed 's/^go//' || true)"
+  fi
+  if [ -n "$current_ver" ] && cmake_version_ge "$current_ver" "$min_ver"; then
+    log "go ${current_ver} is sufficient (>= ${min_ver})"
+    return 0
+  fi
+  if [ -n "$current_ver" ]; then
+    log "go ${current_ver} < ${min_ver} — bootstrapping a newer go"
+  else
+    log "go not found — bootstrapping go"
+  fi
+  local go_dir_line
+  go_dir_line="$("${SCRIPT_DIR}/bootstrap_golang.sh")"
+  eval "$go_dir_line"
+  export CVMFS_GO_DIR
+  log "go bootstrapped at: ${CVMFS_GO_DIR}/go"
+}
+
 get_script_dir() { cd "$(dirname "$0")" && pwd; }
 
 ########################
@@ -197,12 +220,14 @@ list_deps_rpm() {
 ########################
 install_deps_deb() {
   [ -f "$DEB_CONTROL" ] || die "Debian control file not found at $DEB_CONTROL"
+
+  export DEBIAN_FRONTEND=noninteractive
   $SUDO apt-get -y update
   if ! check_available mk-build-deps || ! dpkg -s equivs >/dev/null 2>&1; then
     $SUDO apt-get -y install devscripts equivs
   fi
   # Use mk-build-deps to create and install the meta-package, then remove it
-  $SUDO DEBIAN_FRONTEND=noninteractive mk-build-deps -i -r "$DEB_CONTROL"
+  $SUDO mk-build-deps -t "apt-get -o Debug::pkgProblemResolver=yes --no-install-recommends -y" -i -r "$DEB_CONTROL"
 }
 
 install_deps_rhel() {
@@ -214,7 +239,7 @@ install_deps_rhel() {
   $SUDO dnf builddep -y "$RPM_SPEC" && return 0
   # Fallback: parse spec and install packages directly
   local pkgs
-  pkgs=$(list_deps_rpm "$RPM_SPEC" || true)
+  pkgs=$(list_deps_rpm "$RPM_SPEC" | grep -v '^[[:space:]]*#' | grep -v '^[[:space:]]*$' || true)
   [ -n "${pkgs:-}" ] || die "Could not determine RPM build dependencies"
   $SUDO dnf -y install $pkgs
 }
@@ -225,7 +250,7 @@ install_deps_suse() {
     $SUDO zypper -n install rpm-build
   fi
   local pkgs
-  pkgs=$(list_deps_rpm "$RPM_SPEC" || true)
+  pkgs=$(list_deps_rpm "$RPM_SPEC" | grep -v '^[[:space:]]*#' | grep -v '^[[:space:]]*$' || true)
   [ -n "${pkgs:-}" ] || die "Could not determine RPM build dependencies"
   $SUDO zypper -n install $pkgs
 }
@@ -257,6 +282,7 @@ case "$MODE" in
     fi
     log "Build dependencies installed successfully"
     bootstrap_cmake_if_needed
+    bootstrap_golang_if_needed
     ;;
   *) die "Unknown mode: $MODE";;
 esac
