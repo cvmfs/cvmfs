@@ -16,12 +16,12 @@ GuessDecompressor::GuessDecompressor(const zip::Algorithms& alg)
 }
 
 bool GuessDecompressor::WillHandle(const zip::Algorithms &alg) {
-  return true;
+  return alg == zip::Algorithm::kGuessDecompression;
 }
 
 
 Decompressor* GuessDecompressor::Clone() {
-  return new GuessDecompressor(zip::kNoCompression);
+  return new GuessDecompressor(zip::Algorithm::kGuessDecompression);
 }
 
 void GuessDecompressor::Guess(InputAbstract* input, cvmfs::Sink* output)

@@ -44,6 +44,7 @@ if (BUILD_LIBCVMFS_CACHE)
                   ${CVMFS_SOURCE_DIR}/compression/compressor_zstd.cc
                   ${CVMFS_SOURCE_DIR}/compression/decompressor.cc
                   ${CVMFS_SOURCE_DIR}/compression/decompressor_echo.cc
+                  ${CVMFS_SOURCE_DIR}/compression/decompressor_guess.cc
                   ${CVMFS_SOURCE_DIR}/compression/decompressor_zlib.cc
                   ${CVMFS_SOURCE_DIR}/compression/decompressor_zstd.cc
                   ${CVMFS_SOURCE_DIR}/compression/input_cache.cc
@@ -176,6 +177,7 @@ if (BUILD_SERVER)
        ${CVMFS_SOURCE_DIR}/compression/compressor_zstd.cc
        ${CVMFS_SOURCE_DIR}/compression/decompressor.cc
        ${CVMFS_SOURCE_DIR}/compression/decompressor_echo.cc
+       ${CVMFS_SOURCE_DIR}/compression/decompressor_guess.cc
        ${CVMFS_SOURCE_DIR}/compression/decompressor_zlib.cc
        ${CVMFS_SOURCE_DIR}/compression/decompressor_zstd.cc
        ${CVMFS_SOURCE_DIR}/compression/input_cache.cc
@@ -453,6 +455,7 @@ set(CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/compression/compressor_zstd.cc
   ${CVMFS_SOURCE_DIR}/compression/decompressor.cc
   ${CVMFS_SOURCE_DIR}/compression/decompressor_echo.cc
+  ${CVMFS_SOURCE_DIR}/compression/decompressor_guess.cc
   ${CVMFS_SOURCE_DIR}/compression/decompressor_zlib.cc
   ${CVMFS_SOURCE_DIR}/compression/decompressor_zstd.cc
   ${CVMFS_SOURCE_DIR}/compression/input_cache.cc
