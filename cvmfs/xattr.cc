@@ -65,9 +65,7 @@ XattrList *XattrList::CreateFromFile(const std::string &path) {
     // check if we need to allocate bigger buffer
     if ((sz_value < 0) && (errno == ERANGE)) {
       // query lgetxattr with size 0 to get proper buffer size
-      sz_value = platform_lgetxattr(path.c_str(), keys[i].c_str(), buffer, 0);
-      if (buffer != value_smallbuf)
-        free(buffer);
+      sz_value = platform_lgetxattr(path.c_str(), keys[i].c_str(), NULL, 0);
       sz_buffer = sz_value;
       buffer = reinterpret_cast<char *>(smalloc(sz_buffer));
       sz_value = platform_lgetxattr(path.c_str(), keys[i].c_str(), buffer,
