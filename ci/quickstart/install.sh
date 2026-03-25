@@ -348,5 +348,21 @@ esac
 if [ "$DRY_RUN" -eq 1 ]; then
   log "Dry-run completed successfully."
 else
-  log "CVMFS install flow completed. You mustnow add a suitable CVMFS_HTTP_PROXY to the config at /etc/cvmfs/default.local (Use CVMFS_HTTP_PROXY=DIRECT only for single workstations, for clusters always set up a dedicated proxy!). Then you can run ' cvmfs_config setup ' to setup and enable autofs, or mount repositories directly with ' sudo mkdir -p /cvmfs/cvmfs-config.cern.ch;  mount -t cvmfs cvmfs-config.cern.ch /cvmfs/cvmfs-config.cern.ch.   See $DOC_URL for more details."
+  log "CVMFS install flow completed.
+
+  Next steps:
+
+  1. Add a suitable CVMFS_HTTP_PROXY to /etc/cvmfs/default.local, e.g.:
+       CVMFS_HTTP_PROXY=DIRECT
+     (Use DIRECT only for single workstations - for clusters, set up a dedicated proxy!)
+
+  2. Run setup to enable autofs:
+       cvmfs_config setup
+       ls /cvmfs/cvmfs-config.cern.ch
+
+     Or mount a repository directly:
+       sudo mkdir -p /cvmfs/cvmfs-config.cern.ch
+       sudo mount -t cvmfs cvmfs-config.cern.ch /cvmfs/cvmfs-config.cern.ch
+
+  See $DOC_URL for more details."
 fi
