@@ -63,6 +63,7 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS)
        compression/compressor_zstd.cc
        compression/decompressor.cc
        compression/decompressor_echo.cc
+       compression/decompressor_guess.cc
        compression/decompressor_zlib.cc
        compression/decompressor_zstd.cc
        compression/input_cache.cc
@@ -154,6 +155,7 @@ if (BUILD_CVMFS)
                   compression/compressor_zstd.cc
                   compression/decompressor.cc
                   compression/decompressor_echo.cc
+                  compression/decompressor_guess.cc
                   compression/decompressor_zlib.cc
                   compression/decompressor_zstd.cc
                   compression/input_cache.cc
@@ -529,6 +531,7 @@ if (BUILD_LIBCVMFS_CACHE)
                   compression/compressor_zstd.cc
                   compression/decompressor.cc
                   compression/decompressor_echo.cc
+                  compression/decompressor_guess.cc
                   compression/decompressor_zlib.cc
                   compression/decompressor_zstd.cc
                   compression/input_cache.cc
@@ -622,6 +625,7 @@ if (BUILD_SERVER)
        compression/compressor_zstd.cc
        compression/decompressor.cc
        compression/decompressor_echo.cc
+       compression/decompressor_guess.cc
        compression/decompressor_zlib.cc
        compression/decompressor_zstd.cc
        compression/input_cache.cc
@@ -780,6 +784,7 @@ if (BUILD_SERVER)
        compression/compressor_zstd.cc
        compression/decompressor.cc
        compression/decompressor_echo.cc
+       compression/decompressor_guess.cc
        compression/decompressor_zlib.cc
        compression/decompressor_zstd.cc
        compression/input_cache.cc
@@ -904,6 +909,7 @@ if (BUILD_SERVER)
        compression/compressor_zstd.cc
        compression/decompressor.cc
        compression/decompressor_echo.cc
+       compression/decompressor_guess.cc
        compression/decompressor_zlib.cc
        compression/decompressor_zstd.cc
        compression/input_cache.cc
@@ -1098,6 +1104,7 @@ if(BUILD_RECEIVER)
        compression/compressor_zstd.cc
        compression/decompressor.cc
        compression/decompressor_echo.cc
+       compression/decompressor_guess.cc
        compression/decompressor_zlib.cc
        compression/decompressor_zstd.cc
        compression/input_cache.cc
@@ -1273,6 +1280,7 @@ if (BUILD_PRELOADER)
                   compression/compressor_zstd.cc
                   compression/decompressor.cc
                   compression/decompressor_echo.cc
+                  compression/decompressor_guess.cc
                   compression/decompressor_zlib.cc
                   compression/decompressor_zstd.cc
                   compression/input_cache.cc
