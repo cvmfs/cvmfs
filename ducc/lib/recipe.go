@@ -27,9 +27,21 @@ type IgnoreErrorsConfig struct {
 	IgnoreErrors []string `yaml:"ignoreErrors"`
 }
 
+// FailedWish carries the input image name and the error for a wish that could
+// not be created (e.g. because ExpandWildcard failed with a registry error).
+type FailedWish struct {
+	InputName string
+	Err       error
+}
+
 type Recipe struct {
 	Repo             string
 	Wishes           chan WishFriendly
+	// FailedWishes receives one entry for every input image whose wish could
+	// not be created (e.g. registry unreachable, auth failure).  Callers MUST
+	// drain this channel (concurrently with Wishes) to avoid deadlocking the
+	// worker goroutines when the buffer fills up.
+	FailedWishes     chan FailedWish
 	IgnoreErrorsList []string
 	OutputFormat     string
 }
@@ -68,6 +80,7 @@ func ParseYamlRecipeV1(data []byte) (Recipe, error) {
 	recipe := Recipe{}
 	recipe.Repo = recipeYamlV1.CVMFSRepo
 	recipe.Wishes = make(chan WishFriendly, 500)
+	recipe.FailedWishes = make(chan FailedWish, 500)
 	recipe.OutputFormat = recipeYamlV1.OutputFormat
 
 	// Load ignore errors list from recipe file
@@ -87,6 +100,7 @@ func ParseYamlRecipeV1(data []byte) (Recipe, error) {
 		go func() {
 			wg.Wait()
 			close(recipe.Wishes)
+			close(recipe.FailedWishes)
 		}()
 	}()
 	if err != nil {
@@ -113,7 +127,9 @@ func ParseYamlRecipeV1(data []byte) (Recipe, error) {
 				output := formatOutputImage(recipeYamlV1.OutputFormat, input)
 				wish, err := CreateWish(input, output, recipeYamlV1.CVMFSRepo, recipeYamlV1.User, recipeYamlV1.User)
 				if err != nil {
-					l.LogE(err).Warning("Error in creating the wish")
+					l.LogE(err).WithFields(log.Fields{"image": input.WholeName()}).
+						Warning("Error in creating the wish")
+					recipe.FailedWishes <- FailedWish{InputName: input.WholeName(), Err: err}
 				} else {
 					recipe.Wishes <- wish
 				}

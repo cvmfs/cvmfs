@@ -65,18 +65,20 @@ Two modes of operation:
 
 // expandWishlists collects the fully-expanded image sets from all wishlist
 // files, then either writes them as YAML to outputFile (when non-empty) or
-// prints them to stdout one per line.
+// prints them to stdout one per line.  Any images that failed to expand
+// (registry errors, auth failures, zero-tag wildcards) are logged as a
+// summary after the successful output so they are easy to spot.
 func expandWishlists(paths []string, outputFile string) error {
 	var allImages []*lib.Image
-	var expandErrors []string
+	var allFailures []string
 
 	for _, path := range paths {
-		images, errs, err := collectWishlistImages(path)
+		images, failures, err := collectWishlistImages(path)
 		if err != nil {
 			return err
 		}
 		allImages = append(allImages, images...)
-		expandErrors = append(expandErrors, errs...)
+		allFailures = append(allFailures, failures...)
 	}
 
 	if outputFile != "" {
@@ -89,16 +91,27 @@ func expandWishlists(paths []string, outputFile string) error {
 		}
 	}
 
-	if len(expandErrors) > 0 {
-		return fmt.Errorf("%d wish(es) failed to expand", len(expandErrors))
+	if len(allFailures) > 0 {
+		l.Log().WithFields(log.Fields{
+			"failed": len(allFailures),
+			"ok":     len(allImages),
+		}).Warning("Some images failed to expand")
+		for _, msg := range allFailures {
+			l.Log().WithField("image", msg).Warning("Failed to expand image")
+		}
+		return fmt.Errorf("%d image(s) failed to expand", len(allFailures))
 	}
 	return nil
 }
 
 // collectWishlistImages reads and expands a single wishlist file.  It returns
-// the concrete images, a list of non-fatal per-wish error messages, and a fatal
-// error if the file cannot be read or parsed at all.
-func collectWishlistImages(path string) (images []*lib.Image, expandErrors []string, err error) {
+// the concrete images, a list of per-wish failure messages (zero-tag expansions
+// and registry errors), and a fatal error if the file cannot be read or parsed.
+//
+// recipe.Wishes and recipe.FailedWishes are produced by the same worker pool,
+// so both channels must be drained concurrently to avoid deadlocking workers
+// when either buffer fills up.
+func collectWishlistImages(path string) (images []*lib.Image, failures []string, err error) {
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
 		return nil, nil, fmt.Errorf("cannot read wishlist file %q: %w", path, err)
@@ -109,19 +122,36 @@ func collectWishlistImages(path string) (images []*lib.Image, expandErrors []str
 		return nil, nil, fmt.Errorf("cannot parse wishlist file %q: %w", path, err)
 	}
 
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
+	// Drain FailedWishes in a separate goroutine so we never block workers
+	// that are trying to send on that channel while we consume recipe.Wishes.
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for failed := range recipe.FailedWishes {
+			msg := fmt.Sprintf("%s: %v", failed.InputName, failed.Err)
+			mu.Lock()
+			failures = append(failures, msg)
+			mu.Unlock()
+		}
+	}()
+
 	for wish := range recipe.Wishes {
 		if len(wish.ExpandedTagImagesLayer) == 0 {
-			msg := fmt.Sprintf("wish %q in %q expands to zero tags", wish.InputName, path)
-			l.Log().WithFields(log.Fields{
-				"input image": wish.InputName,
-				"file":        path,
-			}).Warning(msg)
-			expandErrors = append(expandErrors, msg)
+			mu.Lock()
+			failures = append(failures, fmt.Sprintf("%s: expands to zero tags", wish.InputName))
+			mu.Unlock()
 			continue
 		}
+		mu.Lock()
 		images = append(images, wish.ExpandedTagImagesLayer...)
+		mu.Unlock()
 	}
-	return images, expandErrors, nil
+
+	wg.Wait() // ensure FailedWishes goroutine has also finished
+	return images, failures, nil
 }
 
 // writeExpandedYAML writes the given images to path in the "images:" YAML

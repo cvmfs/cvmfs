@@ -125,6 +125,15 @@ var convertCmd = &cobra.Command{
 			l.Log().Info("Using default output image name $(scheme)://$(registry)/$(repository)_thin:$(tag)")
 		}
 
+		// Drain FailedWishes in the background so the worker goroutines inside
+		// ParseYamlRecipeV1 are never blocked on a full channel.
+		go func() {
+			for failed := range recipe.FailedWishes {
+				l.LogE(failed.Err).WithFields(log.Fields{"image": failed.InputName}).
+					Warning("Failed to expand image from recipe, skipping")
+			}
+		}()
+
 		var conversionErrors []string
 		totalSummary := lib.ConversionSummary{}
 		for wish := range recipe.Wishes {

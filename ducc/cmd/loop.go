@@ -74,6 +74,15 @@ var loopCmd = &cobra.Command{
 				l.LogE(err).Error("The repository does not exists.")
 				os.Exit(RepoNotExistsError)
 			}
+			// Drain FailedWishes in the background so the worker goroutines inside
+			// ParseYamlRecipeV1 are never blocked on a full channel.
+			go func() {
+				for failed := range recipe.FailedWishes {
+					l.LogE(failed.Err).WithFields(log.Fields{"image": failed.InputName}).
+						Warning("Failed to expand image from recipe, skipping")
+				}
+			}()
+
 			var conversionErrors []string
 			iterationSummary := lib.ConversionSummary{}
 			for wish := range recipe.Wishes {
