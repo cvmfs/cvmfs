@@ -20,8 +20,9 @@ import (
 const pruneImagesDefaultConfig = "ducc-prune.yaml"
 
 var (
-	pruneImagesDryRun bool
-	pruneImagesConfig string
+	pruneImagesDryRun      bool
+	pruneImagesConfig      string
+	pruneExpandedImageFiles []string
 )
 
 func init() {
@@ -30,62 +31,100 @@ func init() {
 	pruneImagesCmd.Flags().StringVar(&pruneImagesConfig, "config", "",
 		fmt.Sprintf("Path to a prune config file listing wishlist sources (default: %s in the current directory if present)",
 			pruneImagesDefaultConfig))
+	pruneImagesCmd.Flags().StringArrayVar(&pruneExpandedImageFiles, "expanded-images", nil,
+		"Path to a YAML file containing a pre-expanded list of desired images (no wildcard expansion is performed); "+
+			"may be specified multiple times")
 	rootCmd.AddCommand(pruneImagesCmd)
 }
 
 var pruneImagesCmd = &cobra.Command{
 	Use:   "prune-images <cvmfs-repo> [wishlist...]",
-	Short: "Delete images from CVMFS that are no longer available on the registry",
-	Long: `Reads one or more wishlist files, expands wildcard tags by querying the
-registry, and removes from the CVMFS repository any image that the wishlist
-covers but is no longer present on its source registry.
+	Short: "Delete images from CVMFS that are not in the desired image set",
+	Long: `Builds the complete desired set of images from one or more sources, then
+removes from the CVMFS repository every image that is present on disk but
+absent from that set.
 
-Wishlist sources are collected from two places (merged together):
-  1. Positional arguments on the command line
-  2. A prune config file (--config flag, or ducc-prune.yaml in the current directory)
+Two kinds of input are accepted and may be freely combined:
 
-The prune config file format (YAML):
+  Wishlist files (positional args, --config, or config file "wishlists:" key)
+    Standard ducc wishlist YAML files.  Wildcard tags are expanded by querying
+    the registry, so the full concrete tag list is resolved at prune time.
+
+  Pre-expanded image lists (--expanded-images flag or config "expanded_images:" key)
+    A YAML file with an "images:" list of fully-resolved image references
+    (no wildcards).  No registry queries are performed; the list is used as-is.
+    Format:
+      images:
+        - https://registry.hub.docker.com/library/ubuntu:22.04
+        - https://registry.hub.docker.com/library/ubuntu:20.04
+
+The prune config file (--config / ducc-prune.yaml) format (YAML):
 
   wishlists:
     - /path/to/local/wishlist.yaml
     - https://example.com/wishlist.yaml
     - git+https://github.com/org/repo.git//path/to/wishlist.yaml@main
+  expanded_images:
+    - /path/to/expanded_images.yaml
 
-Each wishlist source can be:
-  - A local file path
-  - An HTTP/HTTPS URL to a raw wishlist file
-  - A git repository URL in the form:
-      git+https://github.com/org/repo.git//path/to/wishlist.yaml
-      git+https://github.com/org/repo.git//path/to/wishlist.yaml@branch`,
+Each wishlist source can be a local path, an HTTP/HTTPS URL, or a git URL:
+  git+https://github.com/org/repo.git//path/to/wishlist.yaml[@branch]`,
 	Args: cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		CVMFSRepo := args[0]
 		wishlistSources := args[1:]
 
-		configSources, err := loadPruneConfig(pruneImagesConfig)
+		pruneConfig, err := loadPruneConfig(pruneImagesConfig)
 		if err != nil {
 			return err
 		}
-		wishlistSources = append(wishlistSources, configSources...)
+		wishlistSources = append(wishlistSources, pruneConfig.Wishlists...)
+		expandedImageFiles := append(pruneExpandedImageFiles, pruneConfig.ExpandedImages...)
 
-		if len(wishlistSources) == 0 {
-			return fmt.Errorf("no wishlist sources provided: supply them as arguments or in a config file")
+		if len(wishlistSources) == 0 && len(expandedImageFiles) == 0 {
+			return fmt.Errorf("no image sources provided: supply wishlist arguments, --expanded-images files, or a config file")
 		}
 
-		totalDeleted := 0
+		desiredImages := make(map[string]bool)
+
+		// Expand wildcard wishlists against the registry.
 		for _, source := range wishlistSources {
-			n, err := pruneFromWishlist(CVMFSRepo, source, pruneImagesDryRun)
+			images, err := expandWishlistToImages(source)
 			if err != nil {
 				l.LogE(err).WithFields(log.Fields{"source": source}).
-					Error("Error processing wishlist, continuing with others")
+					Error("Error expanding wishlist, continuing with others")
+				continue
 			}
-			totalDeleted += n
+			for _, img := range images {
+				desiredImages[img.GetSimpleName()] = true
+			}
+		}
+
+		// Load pre-expanded image lists directly (no registry queries).
+		for _, path := range expandedImageFiles {
+			images, err := loadExpandedImages(path)
+			if err != nil {
+				l.LogE(err).WithFields(log.Fields{"file": path}).
+					Error("Error loading expanded images file, continuing with others")
+				continue
+			}
+			for _, img := range images {
+				desiredImages[img.GetSimpleName()] = true
+			}
+		}
+
+		l.Log().WithFields(log.Fields{"desired_count": len(desiredImages)}).
+			Info("Built desired image set, pruning CVMFS")
+
+		deleted, err := lib.PruneImages(CVMFSRepo, desiredImages, pruneImagesDryRun)
+		if err != nil {
+			return err
 		}
 
 		if pruneImagesDryRun {
-			fmt.Printf("[dry-run] Would delete %d image(s) from CVMFS\n", totalDeleted)
+			fmt.Printf("[dry-run] Would delete %d image(s) from CVMFS\n", deleted)
 		} else {
-			fmt.Printf("Deleted %d image(s) from CVMFS\n", totalDeleted)
+			fmt.Printf("Deleted %d image(s) from CVMFS\n", deleted)
 		}
 		return nil
 	},
@@ -93,72 +132,100 @@ Each wishlist source can be:
 
 // PruneConfig is the schema for the ducc-prune.yaml config file.
 type PruneConfig struct {
-	Wishlists []string `yaml:"wishlists"`
+	Wishlists      []string `yaml:"wishlists"`
+	ExpandedImages []string `yaml:"expanded_images"`
 }
 
-// loadPruneConfig reads wishlist sources from the prune config file.
+// loadPruneConfig reads the prune config file and returns its contents.
 // If configPath is empty it looks for pruneImagesDefaultConfig in the current
-// directory; if that file is also absent it returns an empty list (not an error).
-func loadPruneConfig(configPath string) ([]string, error) {
+// directory; if that file is also absent it returns an empty struct (not an error).
+func loadPruneConfig(configPath string) (PruneConfig, error) {
 	if configPath == "" {
 		if _, err := os.Stat(pruneImagesDefaultConfig); os.IsNotExist(err) {
-			return nil, nil
+			return PruneConfig{}, nil
 		}
 		configPath = pruneImagesDefaultConfig
 	}
 
 	data, err := ioutil.ReadFile(configPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read prune config %q: %w", configPath, err)
+		return PruneConfig{}, fmt.Errorf("failed to read prune config %q: %w", configPath, err)
 	}
 
 	var cfg PruneConfig
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return nil, fmt.Errorf("failed to parse prune config %q: %w", configPath, err)
+		return PruneConfig{}, fmt.Errorf("failed to parse prune config %q: %w", configPath, err)
 	}
 
 	l.Log().WithFields(log.Fields{
-		"config":    configPath,
-		"wishlists": len(cfg.Wishlists),
-	}).Info("Loaded wishlist sources from prune config")
+		"config":         configPath,
+		"wishlists":      len(cfg.Wishlists),
+		"expanded_images": len(cfg.ExpandedImages),
+	}).Info("Loaded prune config")
 
-	return cfg.Wishlists, nil
+	return cfg, nil
 }
 
-func pruneFromWishlist(CVMFSRepo, source string, dryRun bool) (int, error) {
+// expandWishlistToImages loads a wishlist file, expands all wildcard tags
+// against the registry (via ParseYamlRecipeV1 / CreateWish), and returns the
+// full concrete set of images the wishlist resolves to.
+func expandWishlistToImages(source string) ([]*lib.Image, error) {
 	data, err := loadWishlist(source)
 	if err != nil {
-		return 0, fmt.Errorf("failed to load wishlist %q: %w", source, err)
+		return nil, fmt.Errorf("failed to load wishlist %q: %w", source, err)
 	}
 
-	images, err := parseWishlistInputs(data)
+	recipe, err := lib.ParseYamlRecipeV1(data)
 	if err != nil {
-		return 0, fmt.Errorf("failed to parse wishlist %q: %w", source, err)
+		return nil, fmt.Errorf("failed to parse wishlist %q: %w", source, err)
 	}
 
-	return lib.PruneImages(CVMFSRepo, images, dryRun)
+	var images []*lib.Image
+	for wish := range recipe.Wishes {
+		for _, img := range wish.ExpandedTagImagesLayer {
+			images = append(images, img)
+		}
+	}
+	return images, nil
 }
 
-// parseWishlistInputs reads the input image list from a wishlist YAML and
-// returns the parsed Image values. The cvmfs_repo and output_format fields
-// are intentionally ignored here since the repo is supplied on the command line.
-func parseWishlistInputs(data []byte) ([]lib.Image, error) {
-	var recipe struct {
-		Input []string `yaml:"input"`
-	}
-	if err := yaml.Unmarshal(data, &recipe); err != nil {
-		return nil, err
+// loadExpandedImages reads a pre-expanded image list from a YAML file and
+// returns the parsed images.  The file must have an "images:" key whose value
+// is a list of fully-resolved image references (no wildcard tags).  Any entry
+// that still contains a wildcard tag is logged as a warning and skipped.
+//
+// Example file:
+//
+//	images:
+//	  - https://registry.hub.docker.com/library/ubuntu:22.04
+//	  - https://registry.hub.docker.com/library/ubuntu:20.04
+func loadExpandedImages(path string) ([]*lib.Image, error) {
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read expanded images file %q: %w", path, err)
 	}
 
-	var images []lib.Image
-	for _, inputStr := range recipe.Input {
-		img, err := lib.ParseImage(inputStr)
+	var file struct {
+		Images []string `yaml:"images"`
+	}
+	if err := yaml.Unmarshal(data, &file); err != nil {
+		return nil, fmt.Errorf("failed to parse expanded images file %q: %w", path, err)
+	}
+
+	var images []*lib.Image
+	for _, ref := range file.Images {
+		img, err := lib.ParseImage(ref)
 		if err != nil {
-			l.LogE(err).WithFields(log.Fields{"image": inputStr}).
-				Warning("Failed to parse image from wishlist, skipping")
+			l.LogE(err).WithFields(log.Fields{"image": ref, "file": path}).
+				Warning("Failed to parse image reference, skipping")
 			continue
 		}
-		images = append(images, img)
+		if img.TagWildcard {
+			l.Log().WithFields(log.Fields{"image": ref, "file": path}).
+				Warning("Expanded images file contains a wildcard tag — skipping; use a wishlist source for wildcard expansion")
+			continue
+		}
+		images = append(images, &img)
 	}
 	return images, nil
 }

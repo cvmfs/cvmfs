@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 
 	cvmfs "github.com/cvmfs/ducc/cvmfs"
 	l "github.com/cvmfs/ducc/log"
@@ -161,6 +160,88 @@ func findMultiarchMetadataDirs(metadataBase string, img *Image) []string {
 	return result
 }
 
+// ListAllCVMFSImages returns all images currently stored under
+// /cvmfs/<CVMFSRepo>/.metadata by walking the registry/repository/tag
+// directory hierarchy.  The .multiarch sub-directory is skipped.
+func ListAllCVMFSImages(CVMFSRepo string) ([]*Image, error) {
+	metadataBase := filepath.Join("/", "cvmfs", CVMFSRepo, ".metadata")
+
+	registries, err := ioutil.ReadDir(metadataBase)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to read metadata directory %s: %w", metadataBase, err)
+	}
+
+	var images []*Image
+	for _, entry := range registries {
+		if !entry.IsDir() || entry.Name() == ".multiarch" {
+			continue
+		}
+		registry := entry.Name()
+		registryDir := filepath.Join(metadataBase, registry)
+		found, err := listImagesUnderDir(registryDir, registry, "")
+		if err != nil {
+			l.LogE(err).WithFields(log.Fields{"registry": registry}).
+				Warning("Error listing images for registry, skipping")
+			continue
+		}
+		images = append(images, found...)
+	}
+	return images, nil
+}
+
+// listImagesUnderDir recursively walks dir, collecting entries whose name
+// contains a colon (interpreted as "<repo-basename>:<tag>" image directories).
+// Entries without a colon are treated as repository path components and are
+// descended into, with their name appended to repoPrefix.
+func listImagesUnderDir(dir, registry, repoPrefix string) ([]*Image, error) {
+	entries, err := ioutil.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+
+	var images []*Image
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if idx := strings.Index(name, ":"); idx != -1 {
+			// "<basename>:<tag>" — this directory represents an image.
+			repoBasename := name[:idx]
+			tag := name[idx+1:]
+			repository := repoBasename
+			if repoPrefix != "" {
+				repository = repoPrefix + "/" + repoBasename
+			}
+			imageURL := fmt.Sprintf("https://%s/%s:%s", registry, repository, tag)
+			img, parseErr := ParseImage(imageURL)
+			if parseErr != nil {
+				l.LogE(parseErr).WithFields(log.Fields{"imageURL": imageURL}).
+					Warning("Failed to parse image URL from CVMFS metadata, skipping")
+				continue
+			}
+			images = append(images, &img)
+		} else {
+			// Intermediate repository path component — recurse.
+			newPrefix := name
+			if repoPrefix != "" {
+				newPrefix = repoPrefix + "/" + name
+			}
+			subImages, err := listImagesUnderDir(filepath.Join(dir, name), registry, newPrefix)
+			if err != nil {
+				l.LogE(err).WithFields(log.Fields{"dir": filepath.Join(dir, name)}).
+					Warning("Error walking metadata subdirectory, skipping")
+				continue
+			}
+			images = append(images, subImages...)
+		}
+	}
+	return images, nil
+}
+
 // FindCVMFSImagesMatchingPattern scans the .metadata directory and returns
 // images whose registry, repository and tag (matched against tagPattern glob)
 // correspond to an entry that has been converted into the CVMFS repository.
@@ -238,47 +319,30 @@ func (img *Image) ExistsOnRegistry() bool {
 	return resp.StatusCode >= 200 && resp.StatusCode < 300
 }
 
-// PruneImages checks each image in the provided list and deletes from CVMFSRepo
-// those that are no longer available on the registry. For wildcard-tagged images
-// the registry tag list is fetched and any CVMFS entries not in that list are
-// deleted. For fixed-tag images the tag is deleted if it no longer exists on the
-// registry. Returns the count of images deleted (or flagged in dry-run mode).
-func PruneImages(CVMFSRepo string, images []Image, dryRun bool) (int, error) {
-	deleted := 0
-	for i := range images {
-		n, err := pruneOneImage(CVMFSRepo, &images[i], dryRun)
-		if err != nil {
-			l.LogE(err).WithFields(log.Fields{"image": images[i].GetSimpleName()}).
-				Warning("Error pruning image, continuing")
-		}
-		deleted += n
-	}
-	return deleted, nil
-}
-
-// pruneOneImage determines which tags of img are no longer on the registry and
-// deletes them from CVMFS. Returns the number of tags deleted.
-func pruneOneImage(CVMFSRepo string, img *Image, dryRun bool) (int, error) {
-	currentTags, err := currentTagsOnRegistry(img)
+// PruneImages removes from the CVMFS repository all images whose simple name
+// (registry/repository:tag) is not present in desiredImages.  It lists every
+// image currently stored under /cvmfs/<CVMFSRepo> and calls
+// DeleteImageFromCVMFS for each one that is absent from the desired set.
+//
+// desiredImages must be the fully-expanded set of images derived from all
+// wishlists (i.e. wildcard patterns already resolved against the registry),
+// keyed by Image.GetSimpleName().
+func PruneImages(CVMFSRepo string, desiredImages map[string]bool, dryRun bool) (int, error) {
+	cvmfsImages, err := ListAllCVMFSImages(CVMFSRepo)
 	if err != nil {
-		return 0, fmt.Errorf("failed to query registry for %s: %w", img.GetSimpleName(), err)
-	}
-
-	cvmfsImages, err := FindCVMFSImagesMatchingPattern(CVMFSRepo, img.Registry, img.Repository, img.Tag)
-	if err != nil {
-		return 0, fmt.Errorf("failed to scan CVMFS for %s: %w", img.GetSimpleName(), err)
+		return 0, fmt.Errorf("failed to list images in CVMFS: %w", err)
 	}
 
 	deleted := 0
-	for _, cvmfsImg := range cvmfsImages {
-		if currentTags[cvmfsImg.Tag] {
+	for _, img := range cvmfsImages {
+		if desiredImages[img.GetSimpleName()] {
 			continue
 		}
-		l.Log().WithFields(log.Fields{"image": cvmfsImg.GetSimpleName()}).
-			Info("Image tag no longer available on registry, deleting from CVMFS")
-		d, err := DeleteImageFromCVMFS(CVMFSRepo, cvmfsImg, dryRun)
+		l.Log().WithFields(log.Fields{"image": img.GetSimpleName()}).
+			Info("Image not in expanded wishlist, deleting from CVMFS")
+		d, err := DeleteImageFromCVMFS(CVMFSRepo, img, dryRun)
 		if err != nil {
-			l.LogE(err).WithFields(log.Fields{"image": cvmfsImg.GetSimpleName()}).
+			l.LogE(err).WithFields(log.Fields{"image": img.GetSimpleName()}).
 				Warning("Error deleting image, continuing")
 		}
 		if d {
@@ -286,33 +350,4 @@ func pruneOneImage(CVMFSRepo string, img *Image, dryRun bool) (int, error) {
 		}
 	}
 	return deleted, nil
-}
-
-// currentTagsOnRegistry returns the set of tags currently available on the
-// registry for the given image. For wildcard tags the registry tag list is
-// fetched and filtered; for fixed tags the single tag is included if it exists.
-func currentTagsOnRegistry(img *Image) (map[string]bool, error) {
-	result := make(map[string]bool)
-
-	if img.TagWildcard {
-		r1, _, err := img.ExpandWildcard()
-		if err != nil {
-			return nil, err
-		}
-		var wg sync.WaitGroup
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for expanded := range r1 {
-				result[expanded.Tag] = true
-			}
-		}()
-		wg.Wait()
-	} else {
-		if img.ExistsOnRegistry() {
-			result[img.Tag] = true
-		}
-	}
-
-	return result, nil
 }
