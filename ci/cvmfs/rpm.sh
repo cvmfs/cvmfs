@@ -42,6 +42,40 @@ for d in $rpm_infra_dirs; do
   mkdir ${CVMFS_RESULT_LOCATION}/${d}
 done
 
+# Prepend bootstrapped cmake and go to PATH if available.
+# rpmbuild inherits PATH from the shell so we update it directly here,
+# unlike deb.sh which must use debuild's --prepend-path.
+_base="${CVMFS_EXTERNALS_PREFIX:-${CVMFS_SOURCE_LOCATION}}"
+_arch="$(uname -m)"
+_distro=""
+if [ -f /etc/os-release ]; then
+  # shellcheck disable=SC1091
+  . /etc/os-release 2>/dev/null || true
+  if [ -n "${PLATFORM_ID:-}" ]; then
+    _distro="${PLATFORM_ID#*:}"
+  else
+    _distro="$(echo "${ID:-}${VERSION_ID:-}" | tr -d '"')"
+  fi
+fi
+_install_dir="${_base}/externals_install.${_arch}"
+if [ -n "$_distro" ]; then
+  _install_dir="${_install_dir}.${_distro}"
+fi
+
+_cmake_dir="${CVMFS_CMAKE_DIR:-}"
+if [ -z "$_cmake_dir" ] && [ -x "${_install_dir}/bin/cmake" ]; then
+  _cmake_dir="${_install_dir}/bin"
+fi
+_go_dir="${CVMFS_GO_DIR:-}"
+if [ -z "$_go_dir" ] && [ -x "${_install_dir}/go/bin/go" ]; then
+  _go_dir="${_install_dir}/go/bin"
+fi
+
+_prepend="${_cmake_dir:+${_cmake_dir}:}${_go_dir}"
+if [ -n "$_prepend" ]; then
+  export PATH="${_prepend}:${PATH}"
+fi
+
 git_hash="$(get_cvmfs_git_revision $CVMFS_SOURCE_LOCATION)"
 tarball="cvmfs-${cvmfs_version}.tar.gz"
 echo "creating source tar ball '$tarball'..."
@@ -67,6 +101,7 @@ if [ $CVMFS_NIGHTLY_BUILD_NUMBER -gt 0 ]; then
 else
   echo "creating release: $cvmfs_version"
 fi
+
 
 default_arch=$(get_default_compiler_arch)
 echo "building ($default_arch)..."

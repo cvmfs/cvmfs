@@ -61,7 +61,11 @@ get_cvmfs_prerelease_from_cmake() {
 
 get_cvmfs_git_revision() {
   local source_directory="$1"
-  echo "$(cd $source_directory; git rev-parse HEAD | head -c16)"
+  if ! command -v git >/dev/null 2>&1; then
+    echo ""
+    return 0
+  fi
+  echo "$(cd $source_directory; git rev-parse HEAD 2>/dev/null | head -c16)"
 }
 
 get_repository_root() {

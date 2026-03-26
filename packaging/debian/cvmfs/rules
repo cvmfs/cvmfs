@@ -14,6 +14,16 @@ BUILD_LIBFUSE2 := 'no'
 
 CVMFS_BUILD_UNITTESTS ?= no
 
+# Detect Go once; gateway and snapshotter packages are only built when available.
+BUILD_GO := $(shell if go version >/dev/null 2>&1; then echo "yes"; else echo "no"; fi)
+ifeq ($(BUILD_GO),no)
+GO_SKIP := -Ncvmfs-gateway -Ncvmfs-snapshotter
+GO_INSTALL_DEPS :=
+else
+GO_SKIP :=
+GO_INSTALL_DEPS := debian/cvmfs-gateway.install debian/cvmfs-snapshotter.install
+endif
+
 # TODO:
 #  -> Support debian multiarch
 #       CMake's GNUInstallDirs supports multiarch beginning from CMake 2.8.8...
@@ -32,8 +42,8 @@ Makefile:
 		-DBUILD_RECEIVER=yes -DBUILD_RECEIVER_DEBUG=yes -DBUILD_SHRINKWRAP=yes \
 		-DBUILD_UNITTESTS=$(CVMFS_BUILD_UNITTESTS) -DINSTALL_UNITTESTS=no -DINSTALL_PUBLIC_KEYS=no \
 		-DBUILD_LIBCVMFS=yes -DBUILD_LIBCVMFS_CACHE=yes \
-		-DBUILD_GATEWAY=$(shell if go version >/dev/null 2>&1; then echo "yes"; else echo "no"; fi) \
-		-DBUILD_SNAPSHOTTER=$(shell if go version >/dev/null 2>&1; then echo "yes"; else echo "no"; fi) \
+		-DBUILD_GATEWAY=$(BUILD_GO) \
+		-DBUILD_SNAPSHOTTER=$(BUILD_GO) \
 		-DBUILD_LIBFUSE2=$(BUILD_LIBFUSE2) \
 		-DCMAKE_INSTALL_PREFIX:PATH=/usr \
 		.
@@ -65,7 +75,7 @@ debian/%.install: debian/%.install.in
   fi
 	sed "s/@CVMFS_VERSION@/$(shell dpkg-parsechangelog | sed -n -e 's/^Version: \([0-9]\.[0-9][0-9]\.[0-9][0-9]*\).*/\1/p')/g" $< | grep . > $@
 
-install: build debian/cvmfs-libs.install debian/cvmfs-dev.install debian/cvmfs.install debian/cvmfs-server.install debian/cvmfs-fuse3.install debian/cvmfs-gateway.install debian/cvmfs-snapshotter.install
+install: build debian/cvmfs-libs.install debian/cvmfs-dev.install debian/cvmfs.install debian/cvmfs-server.install debian/cvmfs-fuse3.install $(GO_INSTALL_DEPS)
 	dh_testdir
 	dh_testroot
 	dh_prep
@@ -79,7 +89,7 @@ install: build debian/cvmfs-libs.install debian/cvmfs-dev.install debian/cvmfs.i
 	rm -f ${CURDIR}/debian/tmp/etc/cvmfs/domain.d/*.conf
 	rm -f ${CURDIR}/debian/tmp/etc/cvmfs/default.d/*.conf
 	rm -f ${CURDIR}/debian/tmp/etc/cvmfs/serverorder.sh
-	dh_install --sourcedir=${CURDIR}/debian/tmp
+	dh_install --sourcedir=${CURDIR}/debian/tmp $(GO_SKIP)
 
 # Build architecture-independent files here.
 binary-indep: build install
@@ -111,9 +121,9 @@ binary-arch: build install
 	dh_installdeb
 #        dh_perl
 	dh_shlibdeps
-	dh_gencontrol
-	dh_md5sums
-	dh_builddeb
+	dh_gencontrol $(GO_SKIP)
+	dh_md5sums $(GO_SKIP)
+	dh_builddeb $(GO_SKIP)
 
 binary: binary-indep binary-arch
 .PHONY: build clean binary-indep binary-arch binary install

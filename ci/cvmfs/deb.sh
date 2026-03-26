@@ -93,7 +93,51 @@ DEBUILD_ARGS=""
 if [ x"$CVMFS_LINT_PKG" = x ]; then
   DEBUILD_ARGS="--no-lintian"
 fi
-DEB_BUILD_OPTIONS=parallel=$cpu_cores debuild ${DEBUILD_ARGS} --prepend-path=/usr/local/go/bin \
+# debuild sanitises PATH, so custom tools installed by bootstrap_cmake.sh /
+# bootstrap_golang.sh must be injected explicitly via --prepend-path.
+# Compute the externals install directory once; both cmake and go use it.
+# Mirror bootstrap_cmake.sh/bootstrap_golang.sh: prefer CVMFS_EXTERNALS_PREFIX,
+# fall back to the source tree root (which is their REPO_ROOT fallback).
+_base="${CVMFS_EXTERNALS_PREFIX:-${CVMFS_SOURCE_LOCATION}}"
+_arch="$(uname -m)"
+_distro=""
+if [ -f /etc/os-release ]; then
+  # shellcheck disable=SC1091
+  . /etc/os-release 2>/dev/null || true
+  if [ -n "${PLATFORM_ID:-}" ]; then
+    _distro="${PLATFORM_ID#*:}"
+  else
+    _distro="$(echo "${ID:-}${VERSION_ID:-}" | tr -d '"')"
+  fi
+fi
+_install_dir="${_base}/externals_install.${_arch}"
+if [ -n "$_distro" ]; then
+  _install_dir="${_install_dir}.${_distro}"
+fi
+
+# cmake: CVMFS_CMAKE_DIR (explicit) → auto-detected from prefix
+_cmake_dir="${CVMFS_CMAKE_DIR:-}"
+if [ -z "$_cmake_dir" ] && [ -x "${_install_dir}/bin/cmake" ]; then
+  _cmake_dir="${_install_dir}/bin"
+fi
+
+# go: CVMFS_GO_DIR (explicit) → auto-detected from prefix → /usr/local/go/bin (fallback)
+_go_dir="${CVMFS_GO_DIR:-}"
+if [ -z "$_go_dir" ] && [ -x "${_install_dir}/go/bin/go" ]; then
+  _go_dir="${_install_dir}/go/bin"
+fi
+if [ -z "$_go_dir" ]; then
+  _go_dir="/usr/local/go/bin"
+fi
+
+# Combine into one --prepend-path: debuild only honours the last occurrence.
+_prepend_path="${_go_dir}"
+if [ -n "$_cmake_dir" ]; then
+  _prepend_path="${_cmake_dir}:${_prepend_path}"
+fi
+
+DEB_BUILD_OPTIONS=parallel=$cpu_cores debuild ${DEBUILD_ARGS} \
+  --prepend-path="${_prepend_path}" \
   -e  CVMFS_EXTERNALS_PREFIX="${CVMFS_EXTERNALS_PREFIX}" \
   -e  CMAKE_CXX_COMPILER_LAUNCHER="${CMAKE_CXX_COMPILER_LAUNCHER}" \
   -e  GOPROXY="${GOPROXY}" \
