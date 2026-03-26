@@ -43,7 +43,7 @@ void GuessDecompressor::Guess(InputAbstract* input, cvmfs::Sink* output)
   if (data_len >= sizeof(zlib_sig) && !memcmp(data, zlib_sig, sizeof(zlib_sig))) {
     alg_ = zip::Algorithm::kZlib;
   } else if (data_len >= sizeof(zstd_sig) && !memcmp(data, zstd_sig, sizeof(zstd_sig))) {
-    alg_ = zip::Algorithm::kZlib;
+    alg_ = zip::Algorithm::kZstd;
   } else {
     alg_ = zip::Algorithm::kNoCompression;
   }
