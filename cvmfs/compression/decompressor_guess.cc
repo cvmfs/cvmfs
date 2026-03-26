@@ -26,6 +26,10 @@ Decompressor* GuessDecompressor::Clone() {
 
 void GuessDecompressor::Guess(InputAbstract* input, cvmfs::Sink* output)
 {
+  assert(is_fresh_);
+  if (input->chunk_size() == 0 && input->has_chunk_left()) {
+    input->NextChunk();
+  }
   const unsigned char * const data = input->chunk();
   const size_t data_len = input->chunk_size();
 
