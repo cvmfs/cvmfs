@@ -89,8 +89,12 @@ StreamStates ZlibDecompressor::DecompressStream(InputAbstract *input,
         is_healthy_ = false;
         return kStreamIOError;
       }
-      input->SetIdxInsideChunk(input->GetIdxInsideChunk() + written);
-    } while (stream_.avail_out == 0);
+      input->SetIdxInsideChunk(input->chunk_size() - stream_.avail_in);
+
+    } while (
+        //stream_.avail_out == 0 // output buffer is full
+        stream_.avail_in > 0 // input buffer has something to process
+        );
   } while (input->has_chunk_left());
 
   output->Flush();

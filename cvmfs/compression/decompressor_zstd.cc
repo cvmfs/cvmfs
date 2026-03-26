@@ -82,8 +82,10 @@ StreamStates ZstdDecompressor::DecompressStream(InputAbstract *input,
         is_healthy_ = false;
         return kStreamIOError;
       }
-      input->SetIdxInsideChunk(input->GetIdxInsideChunk() + written);
-    } while (inBuffer.pos < inBuffer.size);
+      input->SetIdxInsideChunk(input->chunk_size() - inBuffer.pos);
+    } while (
+        inBuffer.pos < inBuffer.size // input buffer has something to process
+        );
   } while (input->has_chunk_left());
 
   output->Flush();

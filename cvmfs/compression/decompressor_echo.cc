@@ -42,7 +42,7 @@ StreamStates EchoDecompressor::DecompressStream(InputAbstract *input,
       is_healthy_ = false;
       return kStreamIOError;
     }
-    input->SetIdxInsideChunk(/*current idx*/0 + written);
+    input->SetIdxInsideChunk(input->GetIdxInsideChunk() + written);
   } while (input->has_chunk_left());
 
   output->Flush();
