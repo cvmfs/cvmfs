@@ -78,7 +78,6 @@ StreamStates ZstdDecompressor::DecompressStream(InputAbstract *input,
       const int64_t written = output->Write(out, have);
 
       if ((written < 0) || written != static_cast<int64_t>(have)) {
-        ZSTD_freeDCtx(stream_);
         is_healthy_ = false;
         return kStreamIOError;
       }
