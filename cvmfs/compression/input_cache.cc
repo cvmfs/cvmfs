@@ -40,6 +40,7 @@ bool InputCache::NextChunk() {
   if (chunk_size_ < max_chunk_size_) {
     has_chunk_left_ = false;
   }
+  idx_inside_chunk_ = 0;
 
   return true;
 }

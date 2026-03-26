@@ -31,6 +31,9 @@ class InputPath : public InputAbstract {
   virtual size_t chunk_size() const { return input_file_->chunk_size(); }
   virtual unsigned char* chunk() const { return input_file_->chunk(); }
   virtual size_t bytes_read() const { return input_file_->bytes_read(); }
+  virtual bool HasInputLeftInChunk() const { return input_file_->HasInputLeftInChunk(); }
+  virtual void SetIdxInsideChunk(const size_t idx) { return input_file_->SetIdxInsideChunk(idx); }
+  virtual size_t GetIdxInsideChunk() const { return input_file_->GetIdxInsideChunk(); }
 
   std::string path() const {return path_; }
 

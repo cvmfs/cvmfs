@@ -99,8 +99,15 @@ class InputAbstract {
     assert(idx_inside_chunk_ <= chunk_size_);
     return idx_inside_chunk_ < chunk_size_;
   }
-  virtual void SetIdxInsideChunk(const size_t idx) { idx_inside_chunk_ = idx; }
-  virtual size_t GetIdxInsideChunk() const { return idx_inside_chunk_; }
+  virtual void SetIdxInsideChunk(const size_t idx) {
+    assert(idx_inside_chunk_ <= chunk_size_);
+    idx_inside_chunk_ = idx;
+    assert(idx_inside_chunk_ <= chunk_size_);
+  }
+  virtual size_t GetIdxInsideChunk() const {
+    assert(idx_inside_chunk_ <= chunk_size_);
+    return idx_inside_chunk_;
+  }
 
  protected:
   const bool is_owner_;  // Input class is owner of the data source

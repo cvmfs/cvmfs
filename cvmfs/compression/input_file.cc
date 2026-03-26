@@ -45,6 +45,7 @@ bool InputFile::NextChunk() {
   }
 
   bytes_read_ += chunk_size_;
+  idx_inside_chunk_ = 0;
 
   return true;
 }
