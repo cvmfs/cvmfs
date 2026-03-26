@@ -1,0 +1,97 @@
+#!/bin/bash
+
+cvmfs_test_name="Abort Transaction Under Disk Full Conditions"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+# Script to fill the disk by creating files until touch fails
+filldisk_script() {
+  cat << 'FILLDISK_EOF'
+#!/bin/bash
+
+TARGET_DIR="${1:-$PWD}"
+OUTPUT_DIR="${2:-$TARGET_DIR}"
+TEST_FILE="${TARGET_DIR%/}/tmp/.diskfull_test_$$"
+
+disk_has_space() {
+    touch "$TEST_FILE" 2>/dev/null && rm -f "$TEST_FILE"
+}
+
+new_output_file() {
+    echo "${OUTPUT_DIR%/}/fillfile_$(tr -dc 'a-f0-9' </dev/urandom | head -c 32)"
+}
+
+FREE=$(( $(stat -f --format="%f * %S" "$TARGET_DIR") ))
+OUTPUT_FILE=$(new_output_file)
+
+echo "Attempting initial fallocate of $FREE bytes into $OUTPUT_FILE..."
+fallocate -l "$FREE" "$OUTPUT_FILE" 2>/dev/null
+
+while disk_has_space; do
+    for SHRINK in 1048576 524288 262144 131072 65536 32768 16384 8192 4096 2048 1024 512 256 128 64 32 16 8 4 2 1; do
+        ATTEMPT=$(( FREE - SHRINK ))
+        [ "$ATTEMPT" -le 0 ] && continue
+        OUTPUT_FILE=$(new_output_file)
+        echo "Trying $ATTEMPT bytes into $OUTPUT_FILE (FREE - $SHRINK)..."
+        if fallocate -l "$ATTEMPT" "$OUTPUT_FILE" 2>/dev/null; then
+            echo "fallocate succeeded, re-checking disk full..."
+            break
+        fi
+    done
+
+    disk_has_space || break
+
+    echo "Disk not full yet, retrying with fresh FREE measurement..."
+    FREE=$(( $(stat -f --format="%f * %S" "$TARGET_DIR") ))
+    OUTPUT_FILE=$(new_output_file)
+    fallocate -l "$FREE" "$OUTPUT_FILE" 2>/dev/null
+done
+
+echo "Disk is full (touch test failed)."
+FILLDISK_EOF
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  cleanup() {
+    echo "cleanup: removing fill files"
+    rm -f "$repo_dir"/tmp/fillfile_* "$repo_dir"/tmp/.diskfull_test_* 2>/dev/null || true
+  }
+  trap cleanup EXIT INT TERM HUP
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "add filldisk script to the repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  filldisk_script > "$repo_dir/filldisk.sh"
+  chmod +x "$repo_dir/filldisk.sh"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "start a new transaction"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "run filldisk script to fill the disk"
+  local diskfill_log="${logfile%.log}.diskfill.log"
+  "$repo_dir/filldisk.sh" "$repo_dir" "$repo_dir/tmp" > "$diskfill_log" 2>&1
+
+  echo "change working directory out of /cvmfs"
+  cd /tmp
+
+  echo "try to abort the transaction"
+  abort_transaction $CVMFS_TEST_REPO
+  local abort_result=$?
+
+  # Free disk space before returning so the framework's cleanup can proceed.
+  cleanup
+
+  if [ $abort_result -ne 0 ]; then
+    echo "FAILED: Could not abort transaction under disk full conditions (exit code: $abort_result)"
+    return 100
+  fi
+
+  echo "SUCCESS: Transaction aborted successfully under disk full conditions"
+  return 0
+}
