@@ -51,14 +51,16 @@ StreamStates ZstdDecompressor::DecompressStream(InputAbstract *input,
   size_t z_ret;
 
   do {
-    assert(input->GetIdxInsideChunk() == 0); // otherwise need to add extra handling
     if (!input->HasInputLeftInChunk()) {
       if (!input->NextChunk()) {
         return kStreamIOError;
       }
     }
 
-    ZSTD_inBuffer inBuffer = {input->chunk(), input->chunk_size(), 0};
+    ZSTD_inBuffer inBuffer = {
+      input->chunk() + input->GetIdxInsideChunk(),
+      input->chunk_size() - input->GetIdxInsideChunk(),
+      0};
 
     // Run deflate() on input until output buffer has no space left
     do {
@@ -80,7 +82,7 @@ StreamStates ZstdDecompressor::DecompressStream(InputAbstract *input,
         is_healthy_ = false;
         return kStreamIOError;
       }
-      input->SetIdxInsideChunk(/*current idx*/0 + written);
+      input->SetIdxInsideChunk(input->GetIdxInsideChunk() + written);
     } while (inBuffer.pos < inBuffer.size);
   } while (input->has_chunk_left());
 
