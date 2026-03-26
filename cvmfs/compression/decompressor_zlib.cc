@@ -54,6 +54,7 @@ StreamStates ZlibDecompressor::DecompressStream(InputAbstract *input,
   int z_ret;
 
   do {
+    assert(input->GetIdxInsideChunk() == 0); // otherwise need to add extra handling
     if (!input->HasInputLeftInChunk()) {
       if (!input->NextChunk()) {
         return kStreamIOError;
@@ -89,6 +90,7 @@ StreamStates ZlibDecompressor::DecompressStream(InputAbstract *input,
         is_healthy_ = false;
         return kStreamIOError;
       }
+      input->SetIdxInsideChunk(/*current idx*/0 + written);
     } while (stream_.avail_out == 0);
   } while (input->has_chunk_left());
 
