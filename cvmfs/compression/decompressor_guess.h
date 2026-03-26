@@ -38,6 +38,7 @@ class GuessDecompressor: public Decompressor {
    */
   virtual bool Reset() {
     delete backend_;
+    backend_ = NULL;
     return true;
   }
   virtual Decompressor* Clone();
