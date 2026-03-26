@@ -10,7 +10,6 @@ namespace zip {
 
 GuessDecompressor::GuessDecompressor(const zip::Algorithms& alg)
     : Decompressor(alg),
-    is_fresh_(true),
     backend_(NULL)
 {
 }
@@ -26,7 +25,7 @@ Decompressor* GuessDecompressor::Clone() {
 
 void GuessDecompressor::Guess(InputAbstract* input, cvmfs::Sink* output)
 {
-  assert(is_fresh_);
+  assert(!backend_);
   if (input->chunk_size() == 0 && input->has_chunk_left()) {
     input->NextChunk();
   }
@@ -53,11 +52,8 @@ void GuessDecompressor::Guess(InputAbstract* input, cvmfs::Sink* output)
 
 StreamStates GuessDecompressor::DecompressStream(InputAbstract* input,
                                                  cvmfs::Sink* output) {
-  if (is_fresh_) {
-    assert(!backend_);
+  if (!backend_) {
     Guess(input, output);
-  } else {
-    assert(backend_);
   }
 
   const zip::StreamStates ret = backend_->DecompressStream(input, output);

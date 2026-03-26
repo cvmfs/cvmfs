@@ -37,7 +37,6 @@ class GuessDecompressor: public Decompressor {
    * Reset stream to perform decompression on a new, independent input
    */
   virtual bool Reset() {
-    is_fresh_ = true;
     delete backend_;
     return true;
   }
@@ -46,7 +45,6 @@ class GuessDecompressor: public Decompressor {
   static bool WillHandle(const zip::Algorithms &alg);
 
  private:
-  bool is_fresh_;
   Decompressor *backend_;
   zip::Algorithm alg_;
 
