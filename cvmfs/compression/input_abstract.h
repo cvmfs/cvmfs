@@ -6,6 +6,7 @@
 #define CVMFS_COMPRESSION_INPUT_ABSTRACT_H_
 
 #include <cstdio>
+#include <cassert>
 
 namespace zip {
 
@@ -91,7 +92,13 @@ class InputAbstract {
 
   // TODO TODO check if condition is correct or off-by-one error
   virtual bool HasInputLeftInChunk() const
-             { return idx_inside_chunk_ < chunk_size_ - 1 && chunk_size_ != 0; }
+  {
+    if (chunk_size_ == 0) {
+      return false;
+    }
+    assert(idx_inside_chunk_ <= chunk_size_);
+    return idx_inside_chunk_ < chunk_size_;
+  }
   virtual void SetIdxInsideChunk(const size_t idx) { idx_inside_chunk_ = idx; }
   virtual size_t GetIdxInsideChunk() const { return idx_inside_chunk_; }
 
