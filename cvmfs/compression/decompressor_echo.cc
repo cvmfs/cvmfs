@@ -28,8 +28,10 @@ StreamStates EchoDecompressor::DecompressStream(InputAbstract *input,
   }
 
   do {
-    if (!input->NextChunk()) {
-      return kStreamIOError;
+    if (!input->HasInputLeftInChunk()) {
+      if (!input->NextChunk()) {
+        return kStreamIOError;
+      }
     }
 
     const size_t have = input->chunk_size();

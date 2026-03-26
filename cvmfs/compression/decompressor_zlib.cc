@@ -54,8 +54,10 @@ StreamStates ZlibDecompressor::DecompressStream(InputAbstract *input,
   int z_ret;
 
   do {
-    if (!input->NextChunk()) {
-      return kStreamIOError;
+    if (!input->HasInputLeftInChunk()) {
+      if (!input->NextChunk()) {
+        return kStreamIOError;
+      }
     }
 
     stream_.avail_in = input->chunk_size();

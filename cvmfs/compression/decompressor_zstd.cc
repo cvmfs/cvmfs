@@ -51,8 +51,10 @@ StreamStates ZstdDecompressor::DecompressStream(InputAbstract *input,
   size_t z_ret;
 
   do {
-    if (!input->NextChunk()) {
-      return kStreamIOError;
+    if (!input->HasInputLeftInChunk()) {
+      if (!input->NextChunk()) {
+        return kStreamIOError;
+      }
     }
 
     ZSTD_inBuffer inBuffer = {input->chunk(), input->chunk_size(), 0};
