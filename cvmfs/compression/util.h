@@ -49,6 +49,10 @@ Algorithms ParseCompressionAlgorithm(const std::string &algorithm_option);
 
 std::string AlgorithmName(const zip::Algorithms alg);
 
+Algorithm DecompressionAlgFromEnv();
+
+Algorithm CompressionAlgFromEnv();
+
 }  // namespace zlib
 
 #endif  // CVMFS_COMPRESSION_UTIL_H_

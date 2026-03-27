@@ -55,5 +55,24 @@ std::string AlgorithmName(const zip::Algorithms alg) {
   return "unknown";
 }
 
+Algorithm DecompressionAlgFromEnv() {
+  const char *var = getenv("CVMFS_DECOMPRESSION_ALGORITHM");
+  if (!var || !var[0]) {
+    var = getenv("CVMFS_COMPRESSION_ALGORITHM");
+  }
+  if (!var || !var[0]) {
+    var = "default";
+  }
+  return zip::ParseCompressionAlgorithm(var);
+}
+
+Algorithm CompressionAlgFromEnv() {
+  const char *var = getenv("CVMFS_COMPRESSION_ALGORITHM");
+  if (!var || !var[0]) {
+    var = "default";
+  }
+  return zip::ParseCompressionAlgorithm(var);
+}
+
 }  // namespace zlib
 
