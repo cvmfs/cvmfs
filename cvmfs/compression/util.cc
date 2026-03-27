@@ -23,6 +23,10 @@ Algorithms ParseCompressionAlgorithm(const std::string &algorithm_option) {
     return kZstd;
   if (algorithm_option == "none")
     return kNoCompression;
+#ifdef CVMFS_GUESS_DECOMPRESSOR
+  if (algorithm_option == "guess")
+    return zip::Algorithm::kGuessDecompression;
+#endif
   PANIC(kLogStderr, "unknown compression algorithms: %s",
         algorithm_option.c_str());
 }
@@ -39,6 +43,11 @@ std::string AlgorithmName(const zip::Algorithms alg) {
     case kZstd:
       return "zstd";
       break;
+#ifdef CVMFS_GUESS_DECOMPRESSOR
+    case zip::Algorithm::kGuessDecompression:
+      return "guess";
+      break;
+#endif
     // Purposely did not add a 'default' statement here: this will
     // cause the compiler to generate a warning if a new algorithm
     // is added but this function is not updated.
