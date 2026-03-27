@@ -66,7 +66,8 @@ int CommandListReflog::Main(const ArgumentList &args) {
                                repo_url,
                                temp_directory,
                                download_manager(),
-                               signature_manager());
+                               signature_manager(),
+                               zip::DecompressionAlgFromEnv());
     if (reflog_hash.IsNull()) {
       manifest::Manifest *manifest;
       ObjectFetcherFailures::Failures failure;
@@ -82,7 +83,7 @@ int CommandListReflog::Main(const ArgumentList &args) {
     }
     success = Run(&object_fetcher, repo_name, output_path, reflog_hash);
   } else {
-    LocalObjectFetcher<> object_fetcher(repo_url, temp_directory);
+    LocalObjectFetcher<> object_fetcher(repo_url, temp_directory, zip::DecompressionAlgFromEnv());
     success = Run(&object_fetcher, repo_name, output_path, reflog_hash);
   }
 

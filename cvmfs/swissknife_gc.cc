@@ -102,7 +102,8 @@ int CommandGc::Main(const ArgumentList &args) {
                                repo_url,
                                temp_directory,
                                download_manager(),
-                               signature_manager());
+                               signature_manager(),
+                               zip::DecompressionAlgFromEnv());
 
   UniquePtr<manifest::Manifest> manifest;
   ObjectFetcher::Failures retval = object_fetcher.FetchManifest(&manifest);

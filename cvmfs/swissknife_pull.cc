@@ -592,8 +592,8 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   atomic_init64(&overall_new);
   atomic_init64(&chunk_queue);
 
-  decomp = zip::Decompressor::Construct(zip::kDefault);
-  comp = zip::Compressor::Construct(zip::kDefault);
+  decomp = zip::Decompressor::Construct(zip::DecompressionAlgFromEnv());
+  comp = zip::Compressor::Construct(zip::CompressionAlgFromEnv());
   copy = zip::Compressor::Construct(zip::kNoCompression);
 
   const bool     follow_redirects = false;
@@ -641,7 +641,8 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
                                *stratum0_url,
                                *temp_dir,
                                download_manager(),
-                               signature_manager());
+                               signature_manager(),
+                               zip::DecompressionAlgFromEnv());
 
   pthread_t *workers =
     reinterpret_cast<pthread_t *>(smalloc(sizeof(pthread_t) * num_parallel));
@@ -717,7 +718,8 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
                                             *stratum1_url,
                                             *temp_dir,
                                             download_manager(),
-                                            signature_manager());
+                                            signature_manager(),
+                                            zip::DecompressionAlgFromEnv());
 
       if (!reflog_hash.IsNull()) {
         reflog =

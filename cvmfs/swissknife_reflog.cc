@@ -92,7 +92,8 @@ int CommandReconstructReflog::Main(const ArgumentList &args) {
                                repo_url,
                                tmp_dir,
                                download_manager(),
-                               signature_manager());
+                               signature_manager(),
+                               zip::DecompressionAlgFromEnv());
 
   UniquePtr<manifest::Manifest> manifest;
   ObjectFetcher::Failures retval = object_fetcher.FetchManifest(&manifest);

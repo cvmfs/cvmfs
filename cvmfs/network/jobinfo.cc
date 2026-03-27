@@ -15,7 +15,7 @@ atomic_int64 JobInfo::next_uuid = 0;
 JobInfo::JobInfo(const std::string *u, const bool compressed, const bool ph,
          const shash::Any *h, cvmfs::Sink *s)
 {
-  Init(compressed ? zip::Algorithm::kGuessDecompression : zip::Algorithm::kNoCompression);
+  Init(compressed ? zip::DecompressionAlgFromEnv() : zip::Algorithm::kNoCompression);
 
   url_ = u;
   probe_hosts_ = ph;
@@ -24,10 +24,10 @@ JobInfo::JobInfo(const std::string *u, const bool compressed, const bool ph,
   sink_ = s;
 }
 
-JobInfo::JobInfo(const std::string *u, zip::Algorithm compression, const bool ph,
+JobInfo::JobInfo(const std::string *u, zip::Algorithm decompressor_alg, const bool ph,
          const shash::Any *h, cvmfs::Sink *s)
 {
-  Init(compression);
+  Init(decompressor_alg);
 
   url_ = u;
   probe_hosts_ = ph;

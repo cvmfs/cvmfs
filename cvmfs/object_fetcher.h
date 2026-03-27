@@ -350,11 +350,13 @@ class LocalObjectFetcher :
    * @param temp_dir   location to store decompressed tmp data
    */
   LocalObjectFetcher(const std::string &base_path,
-                     const std::string &temp_dir)
+                     const std::string &temp_dir,
+                     zip::Algorithm decomp_alg)
     : BaseTN(temp_dir)
     , base_path_(base_path) {
     copy_ = zip::Decompressor::Construct(zip::kNoCompression);
-    decomp_ = zip::Decompressor::Construct(zip::kDefault);
+
+    decomp_ = zip::Decompressor::Construct(decomp_alg);
   }
 
   using BaseTN::FetchManifest;  // un-hiding convenience overload
@@ -496,12 +498,15 @@ class HttpObjectFetcher :
                     const std::string           &repo_url,
                     const std::string           &temp_dir,
                     download::DownloadManager   *download_mgr,
-                    signature::SignatureManager *signature_mgr)
+                    signature::SignatureManager *signature_mgr,
+                    zip::Algorithm              decomp_alg)
     : BaseTN(temp_dir)
     , repo_url_(repo_url)
     , repo_name_(repo_name)
     , download_manager_(download_mgr)
-    , signature_manager_(signature_mgr) {}
+    , signature_manager_(signature_mgr)
+    , decomp_alg_(decomp_alg)
+  {}
 
  public:
   using BaseTN::FetchManifest;  // un-hiding convenience overload
@@ -667,6 +672,7 @@ class HttpObjectFetcher :
   const std::string            repo_name_;
   download::DownloadManager   *download_manager_;
   signature::SignatureManager *signature_manager_;
+  zip::Algorithm              decomp_alg_;
 };
 
 template <class CatalogT, class HistoryT, class ReflogT>

@@ -60,7 +60,8 @@ SigningTool::Result SigningTool::Run(
   // init the download helper
   ObjectFetcher object_fetcher(repo_name, repo_url, temp_dir,
                                server_tool_->download_manager(),
-                               server_tool_->signature_manager());
+                               server_tool_->signature_manager(),
+                               zip::DecompressionAlgFromEnv());
 
   // Load Manifest
   manifest = manifest::Manifest::LoadFile(manifest_path);

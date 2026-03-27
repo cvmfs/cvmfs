@@ -168,12 +168,13 @@ int CommandMigrate::Main(const ArgumentList &args) {
                           repo_url,
                           tmp_dir,
                           download_manager(),
-                          signature_manager());
+                          signature_manager(),
+                          zip::DecompressionAlgFromEnv());
 
     loading_successful = LoadCatalogs(manual_root_hash, &fetcher);
   } else {
     typedef LocalObjectFetcher<catalog::WritableCatalog> ObjectFetcher;
-    ObjectFetcher fetcher(repo_url, tmp_dir);
+    ObjectFetcher fetcher(repo_url, tmp_dir, zip::DecompressionAlgFromEnv());
     loading_successful = LoadCatalogs(manual_root_hash, &fetcher);
   }
   catalog_loading_stopwatch_.Stop();
