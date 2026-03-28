@@ -325,6 +325,9 @@ class AbstractCatalogManager : public SingleCopy {
                                    shash::Any *hash);
 
  protected:
+  zip::Algorithm decomp_alg_;
+  inline const zip::Algorithm GetDecompressionAlg() { return decomp_alg_; }
+
   /**
    * Load the catalog and return a file name and the catalog hash.
    *

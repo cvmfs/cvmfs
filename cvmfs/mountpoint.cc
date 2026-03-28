@@ -691,6 +691,21 @@ CacheManager *FileSystem::SetupExternalCacheMgr(const string &instance) {
   return cache_mgr;
 }
 
+const zip::Algorithm MountPoint::GetDecompressionAlg()
+{
+  zip::Algorithm decomp_alg;
+  {
+    std::string optarg;
+    if (options_mgr_->GetValue("CVMFS_DECOMPRESSION_ALGORITHM", &optarg)) {
+      decomp_alg = zip::ParseCompressionAlgorithm(optarg);
+    } else if (options_mgr_->GetValue("CVMFS_COMPRESSION_ALGORITHM", &optarg)) {
+      decomp_alg = zip::ParseCompressionAlgorithm(optarg);
+    } else {
+      decomp_alg = zip::Algorithm::kDefault;
+    }
+  }
+  return decomp_alg;
+}
 
 CacheManager *FileSystem::SetupPosixCacheMgr(const string &instance) {
   PosixCacheSettings settings = DeterminePosixCacheSettings(instance);
