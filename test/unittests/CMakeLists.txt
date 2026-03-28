@@ -412,6 +412,7 @@ set(CVMFS_UNITTEST_SOURCES
   t_reflog.cc
   t_repository_tag.cc
   t_relaxed_path_filter.cc
+  t_inclusion_spec.cc
   t_s3fanout.cc
   t_resolv_conf_event_handler.cc
   t_ring_buffer.cc
@@ -526,6 +527,7 @@ set(CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/options.cc
   ${CVMFS_SOURCE_DIR}/pack.cc
   ${CVMFS_SOURCE_DIR}/path_filters/dirtab.cc
+  ${CVMFS_SOURCE_DIR}/path_filters/inclusion_spec.cc
   ${CVMFS_SOURCE_DIR}/path_filters/relaxed_path_filter.cc
   ${CVMFS_SOURCE_DIR}/pathspec/pathspec.cc
   ${CVMFS_SOURCE_DIR}/pathspec/pathspec_pattern.cc
@@ -702,6 +704,7 @@ set(CVMFS_UNITTEST_MOCKFUSE_SOURCES
   ${CVMFS_SOURCE_DIR}/options.cc
   ${CVMFS_SOURCE_DIR}/pack.cc
   ${CVMFS_SOURCE_DIR}/path_filters/dirtab.cc
+  ${CVMFS_SOURCE_DIR}/path_filters/inclusion_spec.cc
   ${CVMFS_SOURCE_DIR}/path_filters/relaxed_path_filter.cc
   ${CVMFS_SOURCE_DIR}/pathspec/pathspec.cc
   ${CVMFS_SOURCE_DIR}/pathspec/pathspec_pattern.cc

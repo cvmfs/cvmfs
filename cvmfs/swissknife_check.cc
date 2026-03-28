@@ -44,7 +44,8 @@ static inline uint32_t hasher_any(const shash::Any &key) {
 namespace swissknife {
 
 CommandCheck::CommandCheck()
-    : check_chunks_(false), no_duplicates_map_(false), is_remote_(false) {
+    : check_chunks_(false), no_duplicates_map_(false), is_remote_(false),
+      inclusion_spec_(NULL) {
   const shash::Any hash_null;
   duplicates_map_.Init(16, hash_null, hasher_any);
 }
@@ -790,7 +791,8 @@ bool CommandCheck::InspectTree(const string &path,
                                const uint64_t catalog_size,
                                const bool is_nested_catalog,
                                const catalog::DirectoryEntry *transition_point,
-                               catalog::DeltaCounters *computed_counters) {
+                               catalog::DeltaCounters *computed_counters,
+                               bool *pruned_subtree) {
   LogCvmfs(kLogCvmfs, kLogStdout | kLogInform, "[inspecting catalog] %s at %s",
            catalog_hash.ToString().c_str(), path == "" ? "/" : path.c_str());
 
@@ -843,6 +845,13 @@ bool CommandCheck::InspectTree(const string &path,
       retval = false;
     }
   }
+
+  // Partial replication: excluded subtrees are not replicated at all (their
+  // catalogs are pruned during snapshot), so InspectTree is only ever reached
+  // for catalogs that are present.  Pruning of the recursion happens in the
+  // nested-catalog loop below; here we just track whether anything was pruned
+  // so the aggregate counter comparison can be relaxed accordingly.
+  bool local_pruned = false;
 
   // Traverse the catalog
   set<PathString> bind_mountpoints;
@@ -911,6 +920,19 @@ bool CommandCheck::InspectTree(const string &path,
                i->mountpoint.c_str());
       continue;
     }
+    // Partial replication: a subtree that contains no included path is pruned
+    // on the Stratum-1 (catalog + objects absent), so we must not descend into
+    // it.  Skipping recursion here also means the aggregate counters for this
+    // catalog will be lower than the stored ones; record that so the counter
+    // comparison can be relaxed below.
+    if (inclusion_spec_ != NULL
+        && inclusion_spec_->IsExcluded(i->mountpoint.ToString())) {
+      LogCvmfs(kLogCvmfs, kLogStdout,
+               "  Skipping pruned (excluded) subtree at %s",
+               i->mountpoint.c_str());
+      local_pruned = true;
+      continue;
+    }
     catalog::DirectoryEntry nested_transition_point;
     if (!catalog->LookupPath(i->mountpoint, &nested_transition_point)) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to lookup transition point %s",
@@ -919,23 +941,40 @@ bool CommandCheck::InspectTree(const string &path,
     } else {
       catalog::DeltaCounters nested_counters;
       const bool is_nested = true;
+      bool nested_pruned = false;
       if (!InspectTree(i->mountpoint.ToString(), i->hash, i->size, is_nested,
-                       &nested_transition_point, &nested_counters))
+                       &nested_transition_point, &nested_counters,
+                       &nested_pruned))
         retval = false;
+      if (nested_pruned)
+        local_pruned = true;
       nested_counters.PopulateToParent(computed_counters);
     }
   }
 
+  if (pruned_subtree != NULL && local_pruned)
+    *pruned_subtree = true;
+
   // Check statistics counters
   // Additionally account for root directory
   computed_counters->self.directories++;
-  catalog::Counters compare_counters;
-  compare_counters.ApplyDelta(*computed_counters);
-  const catalog::Counters stored_counters = catalog->GetCounters();
-  if (!CompareCounters(compare_counters, stored_counters)) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "statistics counter mismatch [%s]",
-             catalog_hash.ToString().c_str());
-    retval = false;
+  // Partial replication: when descendant subtrees have been pruned, the
+  // aggregate (subtree) counters stored in this catalog necessarily exceed
+  // what we could recompute, so the comparison would always fail.  Skip it for
+  // affected catalogs; self counters and structure are still fully verified.
+  if (local_pruned) {
+    LogCvmfs(kLogCvmfs, kLogStdout,
+             "  Skipping aggregate counter check at %s (pruned subtree)",
+             path == "" ? "/" : path.c_str());
+  } else {
+    catalog::Counters compare_counters;
+    compare_counters.ApplyDelta(*computed_counters);
+    const catalog::Counters stored_counters = catalog->GetCounters();
+    if (!CompareCounters(compare_counters, stored_counters)) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "statistics counter mismatch [%s]",
+               catalog_hash.ToString().c_str());
+      retval = false;
+    }
   }
 
   delete catalog;
@@ -973,6 +1012,19 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
     pubkey_path = JoinStrings(FindFilesBySuffix(pubkey_path, ".pub"), ":");
   if (args.find('N') != args.end())
     repo_name = *args.find('N')->second;
+
+  if (args.find('E') != args.end()) {
+    inclusion_spec_ =
+        catalog::InclusionSpec::Create(*args.find('E')->second);
+    if (inclusion_spec_ == NULL || !inclusion_spec_->IsValid()) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "Failed to parse inclusion spec from '%s'",
+               args.find('E')->second->c_str());
+      return 1;
+    }
+    LogCvmfs(kLogCvmfs, kLogStdout,
+             "Partial replication: will skip pruned (excluded) subtrees");
+  }
 
   repo_base_path_ = MakeCanonicalPath(*args.find('r')->second);
   if (args.find('s') != args.end())
@@ -1154,6 +1206,8 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
   }
 
   LogCvmfs(kLogCvmfs, kLogStdout, "no problems found");
+  delete inclusion_spec_;
+  inclusion_spec_ = NULL;
   return 0;
 }
 

@@ -174,6 +174,52 @@ int Fetcher::Fetch(const CacheManager::LabeledObject &object,
   tls->download_job.SetRangeSize(static_cast<int64_t>(object.label.size));
   download_mgr_->Fetch(&tls->download_job);
 
+  // Partial replica failover: if the primary returned an HTTP error (e.g. 404
+  // from a partial Stratum-1), retry the download using the fallback (full)
+  // download manager if one is configured.
+  if (tls->download_job.error_code() == download::kFailHostHttp
+      && fallback_download_mgr_ != NULL) {
+    LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
+             "partial replica: %s not available on primary, "
+             "retrying from full replica",
+             object.label.path.c_str());
+    // Abort the partial transaction and start a fresh one for the fallback.
+    cache_mgr_->AbortTxn(txn);
+    retval = cache_mgr_->StartTxn(object.id, object.label.size, txn);
+    if (retval >= 0) {
+      cache_mgr_->CtrlTxn(object.label, 0, txn);
+      TransactionSink fallback_sink(cache_mgr_, txn);
+      tls->download_job.SetSink(&fallback_sink);
+      fallback_download_mgr_->Fetch(&tls->download_job);
+      if (tls->download_job.error_code() == download::kFailOk) {
+        LogCvmfs(kLogCache, kLogDebug,
+                 "partial replica: fetched %s from full replica",
+                 object.label.path.c_str());
+        fd_return = cache_mgr_->OpenFromTxn(txn);
+        if (fd_return < 0) {
+          cache_mgr_->AbortTxn(txn);
+          SignalWaitingThreads(fd_return, object.id, tls);
+          return fd_return;
+        }
+        retval = cache_mgr_->CommitTxn(txn);
+        if (retval < 0) {
+          cache_mgr_->Close(fd_return);
+          SignalWaitingThreads(retval, object.id, tls);
+          return retval;
+        }
+        SignalWaitingThreads(fd_return, object.id, tls);
+        return fd_return;
+      }
+      // Fallback also failed; abort its transaction before the common error path.
+      cache_mgr_->AbortTxn(txn);
+    } else {
+      // Could not start a new transaction; propagate the error.
+      SignalWaitingThreads(retval, object.id, tls);
+      return retval;
+    }
+    // Fall through to common error logging below.
+  }
+
   if (tls->download_job.error_code() == download::kFailOk) {
     LogCvmfs(kLogCache, kLogDebug, "finished downloading of %s", url.c_str());
 
@@ -194,13 +240,17 @@ int Fetcher::Fetch(const CacheManager::LabeledObject &object,
     return fd_return;
   }
 
-  // Download failed
+  // Download failed (primary, and fallback if configured)
   LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
            "failed to fetch %s (hash: %s, error %d [%s])",
            object.label.path.c_str(), object.id.ToString().c_str(),
            tls->download_job.error_code(),
            download::Code2Ascii(tls->download_job.error_code()));
-  cache_mgr_->AbortTxn(txn);
+  // Txn may already be aborted in the fallback path; only abort if not.
+  if (fallback_download_mgr_ == NULL
+      || tls->download_job.error_code() != download::kFailHostHttp) {
+    cache_mgr_->AbortTxn(txn);
+  }
   backoff_throttle_->Throttle();
   SignalWaitingThreads(-EIO, object.id, tls);
   return -EIO;
@@ -215,6 +265,7 @@ Fetcher::Fetcher(CacheManager *cache_mgr,
     , lock_tls_blocks_(NULL)
     , cache_mgr_(cache_mgr)
     , download_mgr_(download_mgr)
+    , fallback_download_mgr_(NULL)
     , backoff_throttle_(backoff_throttle) {
   int retval;
   retval = pthread_key_create(&thread_local_storage_, TLSDestructor);

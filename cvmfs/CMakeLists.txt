@@ -84,6 +84,11 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS)
        network/sink_mem.cc
        network/sink_path.cc
        options.cc
+       path_filters/dirtab.cc
+       path_filters/inclusion_spec.cc
+       path_filters/relaxed_path_filter.cc
+       pathspec/pathspec.cc
+       pathspec/pathspec_pattern.cc
        quota.cc
        quota_posix.cc
        resolv_conf_event_handler.cc
@@ -639,6 +644,7 @@ if (BUILD_SERVER)
        pack.cc
        path_filters/dirtab.cc
        path_filters/relaxed_path_filter.cc
+       path_filters/inclusion_spec.cc
        pathspec/pathspec.cc
        pathspec/pathspec_pattern.cc
        reflog.cc
@@ -1235,6 +1241,7 @@ if (BUILD_PRELOADER)
                   pack.cc
                   path_filters/dirtab.cc
                   path_filters/relaxed_path_filter.cc
+                  path_filters/inclusion_spec.cc
                   pathspec/pathspec.cc
                   pathspec/pathspec_pattern.cc
                   preload.cc
