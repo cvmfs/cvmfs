@@ -73,6 +73,42 @@ cvmfs_server_connect_gw() {
     gateway_url="${gateway_url}/api/v1"
   fi
 
+  # Health check: verify the gateway is reachable
+  echo -n "Checking gateway connectivity at ${gateway_url}... "
+  local gw_host gw_port
+  gw_host=$(echo "$gateway_url" | sed -E 's|https?://([^:/]+).*|\1|')
+  gw_port=$(echo "$gateway_url" | sed -E 's|https?://[^:]+:([0-9]+).*|\1|')
+  [ x"$gw_port" = x"$gateway_url" ] && gw_port=80  # no port matched, default to 80
+
+  # First check if the host/port is reachable at the TCP level
+  if ! timeout 5 bash -c "echo >/dev/tcp/${gw_host}/${gw_port}" 2>/dev/null; then
+    die "fail!
+
+  Cannot connect to ${gw_host}:${gw_port}.
+  Possible causes:
+    - The gateway service is not running (check with: systemctl status cvmfs-gateway)
+    - A firewall is blocking port ${gw_port}
+    - The hostname '${gw_host}' does not resolve or is unreachable
+  "
+  fi
+
+  # Then check if the gateway API responds
+  local health_response
+  health_response=$(curl -sf --max-time 10 "${gateway_url}" 2>&1)
+  if [ $? -ne 0 ]; then
+    die "fail!
+
+  Host ${gw_host}:${gw_port} is reachable but the gateway API is not responding at:
+    ${gateway_url}
+  Possible causes:
+    - The gateway is listening on a different port (default: 4929)
+    - The API path is wrong (expected: /api/v1)
+    - The gateway service is starting up or in a bad state
+  Check the gateway with: curl ${gateway_url}
+  "
+  fi
+  echo "ok"
+
   # default stratum0 URL: derive from gateway URL
   if [ x"$stratum0" = x"" ]; then
     # Strip the port and API path from the gateway URL to build the stratum0 URL
