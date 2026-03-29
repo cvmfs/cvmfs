@@ -672,6 +672,8 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   if (args.find('Z') != args.end()) {
     params.compression_alg =
                         zip::ParseCompressionAlgorithm(*args.find('Z')->second);
+  } else {
+    params.compression_alg = zip::CompressionAlgFromEnv();
   }
 
   if (args.find('E') != args.end()) params.enforce_limits = true;
