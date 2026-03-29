@@ -32,6 +32,9 @@ type Config struct {
 	WorkDir string `mapstructure:"work_dir"`
 	// MockReceiver enables a mocked implementation of the receiver worker
 	MockReceiver bool `mapstructure:"mock_receiver"`
+	// EnableKeyEndpoint enables the /repos/:name/keys endpoint that allows
+	// publishers to fetch the repository public key and certificate
+	EnableKeyEndpoint bool `mapstructure:"enable_key_endpoint"`
 }
 
 // ReadConfig reads configuration files and commandline flags, and populates a Config object
@@ -49,6 +52,7 @@ func ReadConfig() (*Config, error) {
 	pflag.String("receiver_path", "/usr/bin/cvmfs_receiver", "the path of the cvmfs_receiver executable")
 	pflag.String("work_dir", "/var/lib/cvmfs-gateway", "the working directory for database files")
 	pflag.Bool("mock_receiver", false, "enable the mocked implementation of the receiver process (for testing)")
+	pflag.Bool("enable_key_endpoint", false, "enable the /repos/:name/keys endpoint for publisher key retrieval")
 	pflag.Parse()
 
 	viper.SetConfigFile(configFile)

@@ -1237,7 +1237,7 @@ cvmfs_server_update_geodb() {
 # @return   0 if the command was recognized
 is_subcommand() {
   local subcommand="$1"
-  local supported_commands="mkfs add-replica import publish rollback rmfs alterfs   \
+  local supported_commands="mkfs connect-gw add-replica import publish rollback rmfs alterfs   \
     resign list info tag list-tags lstags check transaction enter abort snapshot    \
     skeleton migrate list-catalogs diff checkout update-geodb gc catalog-chown      \
     eliminate-hardlinks eliminate-bulk-hashes fix-stats update-info update-repoinfo \
@@ -1295,6 +1295,16 @@ Supported Commands:
                   [-x proxy url]
                   <fully qualified repository name>
                   Creates a new repository with a given name
+  connect-gw      -u <gateway API url>
+                  [-w stratum0 url (default: derived from gateway url)]
+                  [-o owner (default: current user)]
+                  [-k path to keys (default: /etc/cvmfs/keys)]
+                  [-K fetch .pub and .crt from the gateway key endpoint]
+                  <fully qualified repository name>
+                  Connect to a gateway as a publisher. Requires the .gw key
+                  file in /etc/cvmfs/keys/ (or path given by -k). The .pub
+                  and .crt files can be fetched from the gateway with -K if
+                  the gateway has enable_key_endpoint enabled.
   add-replica     [-u stratum1 upstream storage] [-o owner] [-w stratum1 url]
                   [-a silence apache warning] [-z enable garbage collection]
                   [-n alias name] [-s S3 config file] [-p no apache config]

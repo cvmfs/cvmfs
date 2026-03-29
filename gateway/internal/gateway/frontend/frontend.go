@@ -10,8 +10,25 @@ import (
 	"github.com/julienschmidt/httprouter"
 )
 
+type frontendConfig struct {
+	enableKeyEndpoint bool
+}
+
+// FrontendOption configures optional frontend behaviour
+type FrontendOption func(*frontendConfig)
+
+// WithKeyEndpoint enables the /repos/:name/keys endpoint
+func WithKeyEndpoint(enable bool) FrontendOption {
+	return func(c *frontendConfig) { c.enableKeyEndpoint = enable }
+}
+
 // NewFrontend builds and configures a new HTTP server, but does not start it
-func NewFrontend(services be.ActionController, port int, timeout time.Duration) *http.Server {
+func NewFrontend(services be.ActionController, port int, timeout time.Duration, opts ...FrontendOption) *http.Server {
+	cfg := frontendConfig{}
+	for _, o := range opts {
+		o(&cfg)
+	}
+
 	router := httprouter.New()
 
 	// middleware which only tags requests for GET
@@ -54,6 +71,9 @@ func NewFrontend(services be.ActionController, port int, timeout time.Duration) 
 	router.POST(APIRoot+"/notifications/publish", tag(MakeNotificationsHandler(services)))
 	router.GET(APIRoot+"/notifications/subscribe", tag(MakeNotificationsHandler(services)))
 
+	// Repository keys (opt-in endpoint for publisher setup)
+	router.GET(APIRoot+"/repos/:name/keys", tag(MakeRepoKeysHandler(services, cfg.enableKeyEndpoint)))
+
 	// Admin routes
 	router.POST(APIRoot+"/repos/:name", amw(MakeAdminReposHandler(services)))
 	router.DELETE(APIRoot+"/leases-by-path/*path", amw(MakeAdminLeasesHandler(services)))
@@ -71,8 +91,8 @@ func NewFrontend(services be.ActionController, port int, timeout time.Duration) 
 }
 
 // Start HTTP frontend
-func Start(services *be.Services, port int, timeout time.Duration) error {
-	srv := NewFrontend(services, port, timeout)
+func Start(services *be.Services, port int, timeout time.Duration, opts ...FrontendOption) error {
+	srv := NewFrontend(services, port, timeout, opts...)
 	if err := srv.ListenAndServe(); err != nil {
 		return fmt.Errorf("could not run HTTP front-end: %w", err)
 	}
