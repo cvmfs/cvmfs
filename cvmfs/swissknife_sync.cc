@@ -194,7 +194,8 @@ int swissknife::CommandUpload::Main(const swissknife::ArgumentList &args) {
     }
   }
 
-  const upload::SpoolerDefinition sd(spooler_definition, hash_algorithm);
+  const upload::SpoolerDefinition sd(spooler_definition, hash_algorithm,
+                                     zip::CompressionAlgFromEnv());
   upload::Spooler *spooler = upload::Spooler::Construct(sd);
   assert(spooler);
   spooler->Upload(source, dest);
@@ -216,7 +217,8 @@ int swissknife::CommandPeek::Main(const swissknife::ArgumentList &args) {
   const string spooler_definition = *args.find('r')->second;
 
   // Hash doesn't matter
-  const upload::SpoolerDefinition sd(spooler_definition, shash::kAny);
+  const upload::SpoolerDefinition sd(spooler_definition, shash::kAny,
+                                     zip::CompressionAlgFromEnv());
   upload::Spooler *spooler = upload::Spooler::Construct(sd);
   assert(spooler);
   const bool success = spooler->Peek(file_to_peek);
@@ -244,7 +246,8 @@ int swissknife::CommandRemove::Main(const ArgumentList &args) {
   const string spooler_definition = *args.find('r')->second;
 
   // Hash doesn't matter
-  const upload::SpoolerDefinition sd(spooler_definition, shash::kAny);
+  const upload::SpoolerDefinition sd(spooler_definition, shash::kAny,
+                                     zip::CompressionAlgFromEnv());
   upload::Spooler *spooler = upload::Spooler::Construct(sd);
   assert(spooler);
   spooler->RemoveAsync(file_to_delete);
