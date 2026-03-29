@@ -4,8 +4,10 @@
 
 #include "commit_processor.h"
 
+#include <stdio.h>
 #include <time.h>
 
+#include <string>
 #include <vector>
 
 #include "catalog_diff_tool.h"
@@ -68,6 +70,60 @@ bool CreateNewTag(const RepositoryTag &repo_tag, const std::string &repo_name,
   if (ret) {
     LogCvmfs(kLogReceiver, kLogSyslogErr, "Error %d creating tag: %s", ret,
              repo_tag.name().c_str());
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Parse a human-readable date string (like "30 days ago") into a Unix
+ * timestamp using the system 'date' command.  Returns 0 on failure.
+ */
+time_t ParseDateToTimestamp(const std::string &date_string) {
+  // Try GNU date first, then BSD date as fallback
+  const std::string cmd =
+      "date --date '" + date_string + "' +%s 2>/dev/null || "
+      "date -jf '%Y-%m-%d' '" + date_string + "' +%s 2>/dev/null";
+  FILE *fp = popen(cmd.c_str(), "r");
+  if (fp == NULL) {
+    return 0;
+  }
+  char buffer[64];
+  if (fgets(buffer, sizeof(buffer), fp) == NULL) {
+    pclose(fp);
+    return 0;
+  }
+  pclose(fp);
+  return static_cast<time_t>(String2Int64(std::string(buffer)));
+}
+
+
+bool RemoveOldAutoTags(const std::string &repo_name,
+                       const receiver::Params &params,
+                       const std::string &temp_dir,
+                       const std::string &manifest_path,
+                       const std::string &public_key_path,
+                       const std::string &proxy,
+                       const time_t threshold_timestamp) {
+  swissknife::ArgumentList args;
+  args['r'].Reset(new std::string(params.spooler_configuration));
+  args['w'].Reset(new std::string(params.stratum0));
+  args['t'].Reset(new std::string(temp_dir));
+  args['m'].Reset(new std::string(manifest_path));
+  args['p'].Reset(new std::string(public_key_path));
+  args['f'].Reset(new std::string(repo_name));
+  args['e'].Reset(new std::string(params.hash_alg_str));
+  args['c'].Reset(new std::string(StringifyInt(threshold_timestamp)));
+  args['@'].Reset(new std::string(proxy));
+
+  const UniquePtr<swissknife::CommandEditTag> edit_cmd(
+      new swissknife::CommandEditTag());
+  const int ret = edit_cmd->Main(args);
+
+  if (ret) {
+    LogCvmfs(kLogReceiver, kLogSyslogErr,
+             "Error %d cleaning up old auto tags", ret);
     return false;
   }
 
@@ -214,6 +270,35 @@ CommitProcessor::Result CommitProcessor::Process(
     LogCvmfs(kLogReceiver, kLogSyslogErr, "Error creating tag: %s",
              final_tag.name().c_str());
     return kError;
+  }
+
+  // Remove outdated automatically created tags based on CVMFS_AUTO_TAG_TIMESPAN
+  // Publisher-provided value takes precedence over gateway config
+  std::string auto_tag_timespan = tag.auto_tag_timespan();
+  if (auto_tag_timespan.empty()) {
+    auto_tag_timespan = params.auto_tag_timespan;
+  }
+  if (!auto_tag_timespan.empty()) {
+    const time_t threshold = ParseDateToTimestamp(auto_tag_timespan);
+    if (threshold > 0) {
+      LogCvmfs(kLogReceiver, kLogSyslog,
+               "CommitProcessor - lease_path: %s, cleaning up auto tags "
+               "older than %ld (timespan: %s)",
+               lease_path.c_str(), static_cast<long>(threshold),
+               auto_tag_timespan.c_str());
+      if (!RemoveOldAutoTags(repo_name, params, temp_dir, new_manifest_path,
+                             public_key, params.proxy, threshold)) {
+        LogCvmfs(kLogReceiver, kLogSyslogErr,
+                 "CommitProcessor - warning: auto tag cleanup failed for %s",
+                 lease_path.c_str());
+        // Non-fatal: continue with signing even if cleanup fails
+      }
+    } else {
+      LogCvmfs(kLogReceiver, kLogSyslogErr,
+               "CommitProcessor - warning: could not parse "
+               "CVMFS_AUTO_TAG_TIMESPAN: '%s'",
+               auto_tag_timespan.c_str());
+    }
   }
 
   LogCvmfs(kLogReceiver, kLogSyslog,

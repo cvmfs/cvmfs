@@ -441,12 +441,14 @@ ParameterList CommandEditTag::GetParams() const {
   r.push_back(Parameter::Optional('P', "predecessor branch"));
   r.push_back(Parameter::Optional('h', "root hash of the new tag"));
   r.push_back(Parameter::Switch('x', "maintain undo tags"));
+  r.push_back(Parameter::Optional('c',
+    "cleanup auto tags older than this Unix timestamp"));
   return r;
 }
 
 int CommandEditTag::Main(const ArgumentList &args) {
   if ((args.find('d') == args.end()) && (args.find('a') == args.end())
-      && (args.find('x') == args.end())) {
+      && (args.find('x') == args.end()) && (args.find('c') == args.end())) {
     LogCvmfs(kLogCvmfs, kLogStderr, "nothing to do");
     return 1;
   }
@@ -472,10 +474,76 @@ int CommandEditTag::Main(const ArgumentList &args) {
       return retval;
   }
 
+  // Cleanup old auto-generated tags if -c is specified
+  if (args.find('c') != args.end()) {
+    retval = CleanupOldAutoTags(args, env.weak_ref());
+    if (retval != 0)
+      return retval;
+  }
+
   // finalize processing and upload new history database
   if (!CloseAndPublishHistory(env.weak_ref())) {
     return 1;
   }
+  return 0;
+}
+
+int CommandEditTag::CleanupOldAutoTags(const ArgumentList &args,
+                                       Environment *env) {
+  const time_t threshold = String2Int64(*args.find('c')->second);
+  if (threshold <= 0) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "invalid cleanup threshold timestamp");
+    return 1;
+  }
+
+  // List all tags
+  typedef std::vector<history::History::Tag> TagList;
+  TagList tags;
+  if (!env->history->List(&tags)) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to list tags for auto cleanup");
+    return 1;
+  }
+
+  // Filter for auto-generated tags (name starts with "generic-" or "generic_")
+  // that are older than the threshold
+  std::vector<std::string> condemned_tags;
+  for (TagList::const_iterator i = tags.begin(); i != tags.end(); ++i) {
+    if ((HasPrefix(i->name, "generic-", false) ||
+         HasPrefix(i->name, "generic_", false)) &&
+        i->timestamp < threshold) {
+      condemned_tags.push_back(i->name);
+    }
+  }
+
+  if (condemned_tags.empty()) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "no outdated auto tags to clean up");
+    return 0;
+  }
+
+  LogCvmfs(kLogCvmfs, kLogStdout, "cleaning up %lu outdated auto tags",
+           condemned_tags.size());
+
+  // Delete the old auto tags
+  env->history->BeginTransaction();
+  for (std::vector<std::string>::const_iterator i = condemned_tags.begin();
+       i != condemned_tags.end(); ++i) {
+    LogCvmfs(kLogCvmfs, kLogStdout, "removing auto tag '%s'", i->c_str());
+    if (!env->history->Remove(*i)) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "failed to remove auto tag '%s' from history", i->c_str());
+      return 1;
+    }
+  }
+  bool retval = env->history->PruneBranches();
+  if (!retval) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "failed to prune unused branches from history");
+    return 1;
+  }
+  env->history->CommitTransaction();
+  retval = env->history->Vacuum();
+  assert(retval);
+
   return 0;
 }
 

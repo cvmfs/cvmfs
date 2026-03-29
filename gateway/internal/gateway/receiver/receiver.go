@@ -228,12 +228,13 @@ func (r *CvmfsReceiver) Commit(leasePath, oldRootHash, newRootHash string, tag g
 		return 0, fmt.Errorf("could not obtain statistics counters: %w", err)
 	}
 	req := map[string]interface{}{
-		"lease_path":      leasePath,
-		"old_root_hash":   oldRootHash,
-		"new_root_hash":   newRootHash,
-		"tag_name":        tag.Name,
-		"tag_description": tag.Description,
-		"statistics":      stats,
+		"lease_path":        leasePath,
+		"old_root_hash":     oldRootHash,
+		"new_root_hash":     newRootHash,
+		"tag_name":          tag.Name,
+		"tag_description":   tag.Description,
+		"auto_tag_timespan": tag.AutoTagTimespan,
+		"statistics":        stats,
 	}
 	buf, err := json.Marshal(&req)
 	if err != nil {

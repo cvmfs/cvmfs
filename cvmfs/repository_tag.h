@@ -16,16 +16,21 @@ class RepositoryTag {
   void SetDescription(const std::string &description) {
     description_ = description;
   }
+  void SetAutoTagTimespan(const std::string &timespan) {
+    auto_tag_timespan_ = timespan;
+  }
 
   bool HasGenericName();
   void SetGenericName();
 
   std::string name() const { return name_; }
   std::string description() const { return description_; }
+  std::string auto_tag_timespan() const { return auto_tag_timespan_; }
 
  private:
   std::string name_;
   std::string description_;
+  std::string auto_tag_timespan_;
 };
 
 #endif  // CVMFS_REPOSITORY_TAG_H_

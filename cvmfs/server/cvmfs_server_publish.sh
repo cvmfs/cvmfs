@@ -217,6 +217,9 @@ cvmfs_server_publish() {
     # one containing the session token
     if [ x"$upstream_type" = xgw ]; then
       sync_command="$sync_command -H $gw_key_file -P ${spool_dir}/session_token"
+      if [ ! -z "$CVMFS_AUTO_TAG_TIMESPAN" ]; then
+        sync_command="$sync_command -C \"$CVMFS_AUTO_TAG_TIMESPAN\""
+      fi
     fi
     if [ "x$CVMFS_UNION_FS_TYPE" != "x" ]; then
       sync_command="$sync_command -f $CVMFS_UNION_FS_TYPE"

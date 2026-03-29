@@ -116,6 +116,7 @@ class CommandEditTag : public CommandTag {
  protected:
   int RemoveTags(const ArgumentList &args, Environment *env);
   int AddNewTag(const ArgumentList &args, Environment *env);
+  int CleanupOldAutoTags(const ArgumentList &args, Environment *env);
 
   shash::Any GetTagRootHash(Environment *env,
                             const std::string &root_hash_string) const;

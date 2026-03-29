@@ -295,6 +295,9 @@ bool SessionContext::Commit(const std::string &old_root_hash,
   //
   request_input.Add("tag_channel", 0);
   request_input.Add("tag_description", tag.description());
+  if (!tag.auto_tag_timespan().empty()) {
+    request_input.Add("auto_tag_timespan", tag.auto_tag_timespan());
+  }
   const std::string request = request_input.GenerateString();
   CurlBuffer buffer;
   return MakeEndRequest("POST", key_id_, secret_, session_token_, api_url_,
