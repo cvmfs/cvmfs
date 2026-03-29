@@ -71,8 +71,8 @@ func NewFrontend(services be.ActionController, port int, timeout time.Duration, 
 	router.POST(APIRoot+"/notifications/publish", tag(MakeNotificationsHandler(services)))
 	router.GET(APIRoot+"/notifications/subscribe", tag(MakeNotificationsHandler(services)))
 
-	// Repository keys (opt-in endpoint for publisher setup)
-	router.GET(APIRoot+"/repos/:name/keys", tag(MakeRepoKeysHandler(services, cfg.enableKeyEndpoint)))
+	// Repository keys (opt-in endpoint for publisher setup, HMAC-authenticated)
+	router.GET(APIRoot+"/repos/:name/keys", mw(MakeRepoKeysHandler(services, cfg.enableKeyEndpoint)))
 
 	// Admin routes
 	router.POST(APIRoot+"/repos/:name", amw(MakeAdminReposHandler(services)))

@@ -75,8 +75,27 @@ cvmfs_server_connect_gw() {
   # If -K is given, fetch keys from the gateway
   if [ $fetch_keys -eq 1 ]; then
     echo -n "Fetching repository keys from gateway... "
+
+    # Read the .gw key to compute the HMAC for authentication
+    cvmfs_sys_file_is_regular "$gw_key" || \
+      die "fail! Gateway key not found: $gw_key (needed for authentication)"
+    local gw_key_id
+    local gw_key_secret
+    gw_key_id=$(cat "$gw_key" | awk '{print $2}')
+    gw_key_secret=$(cat "$gw_key" | awk '{print $3}')
+    [ x"$gw_key_id" != x"" ] && [ x"$gw_key_secret" != x"" ] || \
+      die "fail! Could not parse gateway key file: $gw_key"
+
+    # Compute HMAC of the URL path using the gateway secret
+    local api_path="/api/v1/repos/${name}/keys"
+    local hmac_hash
+    hmac_hash=$(echo -n "$api_path" | openssl dgst -sha1 -hmac "$gw_key_secret" | awk '{print $NF}')
+    local hmac_b64
+    hmac_b64=$(echo -n "$hmac_hash" | base64)
+
     local keys_response
-    keys_response=$(curl -sf "${gateway_url}/repos/${name}/keys" 2>&1) || \
+    keys_response=$(curl -sf -H "Authorization: ${gw_key_id} ${hmac_b64}" \
+      "${gateway_url}/repos/${name}/keys" 2>&1) || \
       die "fail! Could not reach gateway key endpoint at ${gateway_url}/repos/${name}/keys
   Make sure the gateway has 'enable_key_endpoint: true' in its configuration."
 
