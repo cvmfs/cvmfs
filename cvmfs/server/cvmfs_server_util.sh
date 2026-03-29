@@ -1295,7 +1295,7 @@ Supported Commands:
                   [-x proxy url]
                   <fully qualified repository name>
                   Creates a new repository with a given name
-  connect-gw      -u <gateway API url>
+  connect-gw      -u <gateway hostname or API url>
                   [-w stratum0 url (default: derived from gateway url)]
                   [-o owner (default: current user)]
                   [-k path to keys (default: /etc/cvmfs/keys)]

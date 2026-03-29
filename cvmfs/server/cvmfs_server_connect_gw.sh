@@ -56,7 +56,22 @@ cvmfs_server_connect_gw() {
   is_root                    || die "Only root can connect to a gateway"
 
   # gateway URL is required
-  [ x"$gateway_url" != x"" ] || die "Please specify the gateway API URL with -u (e.g. http://gateway.cern.ch:4929/api/v1)"
+  [ x"$gateway_url" != x"" ] || die "Please specify the gateway with -u (e.g. -u gateway.cern.ch)"
+
+  # If the user passed just a hostname (no scheme, no port, no path), expand it
+  # to the full gateway API URL: http://<host>:4929/api/v1
+  if ! echo "$gateway_url" | grep -q '://'; then
+    gateway_url="http://${gateway_url}:4929/api/v1"
+  elif ! echo "$gateway_url" | grep -q '/api/'; then
+    # Has scheme but no API path — append default port and path if missing
+    # Strip trailing slash
+    gateway_url=$(echo "$gateway_url" | sed 's|/$||')
+    # Add port if missing
+    if ! echo "$gateway_url" | grep -qE ':[0-9]+$'; then
+      gateway_url="${gateway_url}:4929"
+    fi
+    gateway_url="${gateway_url}/api/v1"
+  fi
 
   # default stratum0 URL: derive from gateway URL
   if [ x"$stratum0" = x"" ]; then
