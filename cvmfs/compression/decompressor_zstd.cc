@@ -73,7 +73,7 @@ StreamStates ZstdDecompressor::DecompressStream(InputAbstract *input,
                                           "Error during zstd decompression: %s",
                                            ZSTD_getErrorName(z_ret));
         is_healthy_ = false;
-        return kStreamError;
+        return kStreamDataError;
       }
       const size_t have = outBuffer.pos;
       const int64_t written = output->Write(out, have);
