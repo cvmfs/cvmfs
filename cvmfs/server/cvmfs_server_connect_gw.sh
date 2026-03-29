@@ -87,13 +87,23 @@ cvmfs_server_connect_gw() {
     keys_import_location="/etc/cvmfs/keys"
   fi
 
-  # If -K is given, fetch keys from the gateway
-  if [ $fetch_keys -eq 1 ]; then
+  # Check that the .gw key exists (always required — it's the secret)
+  local gw_key="${keys_import_location}/${name}.gw"
+  local pub_key="${keys_import_location}/${name}.pub"
+  local crt_key="${keys_import_location}/${name}.crt"
+
+  cvmfs_sys_file_is_regular "$gw_key" || \
+    die "Gateway key not found: $gw_key
+  Copy the .gw file from the gateway machine, or place it in /etc/cvmfs/keys/"
+
+  # Auto-fetch .pub and .crt from the gateway if they are missing
+  # (also triggered explicitly with -K)
+  if [ $fetch_keys -eq 1 ] || \
+     ! cvmfs_sys_file_is_regular "$pub_key" || \
+     ! cvmfs_sys_file_is_regular "$crt_key"; then
     echo -n "Fetching repository keys from gateway... "
 
     # Read the .gw key to compute the HMAC for authentication
-    cvmfs_sys_file_is_regular "$gw_key" || \
-      die "fail! Gateway key not found: $gw_key (needed for authentication)"
     local gw_key_id
     local gw_key_secret
     gw_key_id=$(cat "$gw_key" | awk '{print $2}')
@@ -139,20 +149,13 @@ for ext in ('pub', 'crt'):
     echo "  -> ${keys_import_location}/${name}.crt"
   fi
 
-  # Check that the required key files exist
-  local gw_key="${keys_import_location}/${name}.gw"
-  local pub_key="${keys_import_location}/${name}.pub"
-  local crt_key="${keys_import_location}/${name}.crt"
-
-  cvmfs_sys_file_is_regular "$gw_key" || \
-    die "Gateway key not found: $gw_key
-  Copy the .gw file from the gateway machine, or place it in /etc/cvmfs/keys/"
+  # Final check that all key files are present
   cvmfs_sys_file_is_regular "$pub_key" || \
     die "Public key not found: $pub_key
-  Copy the .pub file from the gateway machine, use -K to fetch it, or place it in /etc/cvmfs/keys/"
+  Could not fetch from gateway. Copy the .pub file from the gateway machine manually."
   cvmfs_sys_file_is_regular "$crt_key" || \
     die "Certificate not found: $crt_key
-  Copy the .crt file from the gateway machine, use -K to fetch it, or place it in /etc/cvmfs/keys/"
+  Could not fetch from gateway. Copy the .crt file from the gateway machine manually."
 
   # Build the upstream string for gateway mode
   local upstream="gw,/srv/cvmfs/${name}/data/txn,${gateway_url}"
