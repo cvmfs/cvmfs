@@ -39,7 +39,7 @@ CatalogBalancer<CatalogMgrT>::MakeEmptyDirectoryEntryBase(
   shash::Any file_hash(algorithm);
 
   UniquePtr<zip::Compressor>
-                    compressor(zip::Compressor::Construct(zip::kDefault));
+                    compressor(zip::Compressor::Construct(zip::CompressionAlgFromEnv()));
 
   zip::InputMem in(NULL, 0);
   cvmfs::MemSink empty_compressed(0);

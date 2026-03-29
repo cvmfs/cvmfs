@@ -158,7 +158,7 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   shash::Any hash_catalog(hash_algorithm, shash::kSuffixCatalog);
 
   const UniquePtr<zip::Compressor>
-                      compress(zip::Compressor::Construct(zip::kDefault));
+                      compress(zip::Compressor::Construct(zip::CompressionAlgFromEnv()));
   zip::InputPath in_path(file_path);
   cvmfs::PathSink out_path(file_path_compressed);
   const zip::StreamStates retval = compress->Compress(&in_path, &out_path,
@@ -1478,7 +1478,7 @@ WritableCatalogManager::SnapshotCatalogsSerialized(
   const WritableCatalogList::const_iterator iend = catalogs_to_snapshot.end();
 
   const UniquePtr<zip::Compressor>
-                        compress(zip::Compressor::Construct(zip::kDefault));
+                        compress(zip::Compressor::Construct(zip::CompressionAlgFromEnv()));
   for (; i != iend; ++i) {
     FinalizeCatalog(*i, stop_for_tweaks);
 

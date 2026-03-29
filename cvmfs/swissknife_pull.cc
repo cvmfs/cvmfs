@@ -244,7 +244,7 @@ static void StoreBuffer(const unsigned char *buffer, const unsigned size,
   const zip::StreamStates retval = compress->Compress(&in_mem, &out_f);
   assert(retval == zip::kStreamEnd);
 
-  Store(tmp_file, dest_path, zip::kDefault);
+  Store(tmp_file, dest_path, zip::DecompressionAlgFromEnv());
 }
 
 static void StoreBuffer(const unsigned char *buffer, const unsigned size,
