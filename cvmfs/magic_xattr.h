@@ -445,6 +445,13 @@ class RevisionMagicXattr : public BaseMagicXattr {
   virtual void FinalizeValue();
 };
 
+class RevisionTimestampMagicXattr : public BaseMagicXattr {
+  uint64_t timestamp_;
+
+  virtual bool PrepareValueFenced();
+  virtual void FinalizeValue();
+};
+
 class RootHashMagicXattr : public BaseMagicXattr {
   shash::Any root_hash_;
 

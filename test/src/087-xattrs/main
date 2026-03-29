@@ -137,6 +137,19 @@ cvmfs_run_test() {
   [ "x$proxy_list" != "x" ] || return 21
   [ "x$proxy_list_external" != "x" ] || return 22
 
+  echo "*** Test 'revision' and 'revision_timestamp' magic extended attributes"
+  local revision=$(get_xattr revision /cvmfs/grid.cern.ch)
+  [ "x$revision" != "x" ] || return 23
+  # revision should be a positive integer
+  [ "$revision" -gt 0 ] 2>/dev/null || return 24
+
+  local revision_timestamp=$(get_xattr revision_timestamp /cvmfs/grid.cern.ch)
+  [ "x$revision_timestamp" != "x" ] || return 25
+  # timestamp should be a positive integer (Unix epoch seconds)
+  [ "$revision_timestamp" -gt 0 ] 2>/dev/null || return 26
+  # sanity check: timestamp should be after 2010-01-01 (1262304000)
+  [ "$revision_timestamp" -gt 1262304000 ] || return 27
+
   # check different access modes 
   echo "*** Check different access modes: human vs machine"
   runc_chunk_list_machine=$(get_xattr chunk_list~0 /cvmfs/grid.cern.ch/vc/containers/runc)
