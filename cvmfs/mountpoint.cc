@@ -1832,6 +1832,7 @@ bool MountPoint::FetchHistory(std::string *history_path) {
   CacheManager::Label label;
   label.flags = CacheManager::kLabelHistory;
   label.path = fqrn_;
+  label.zip_algorithm = GetDecompressionAlg();
   int fd = fetcher_->Fetch(CacheManager::LabeledObject(history_hash, label));
   if (fd < 0) {
     boot_error_ = "failed to download history: " + StringifyInt(-fd);
