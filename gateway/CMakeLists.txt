@@ -31,8 +31,22 @@ install (
   PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
 )
 
-install (
-  FILES         config/repo.json config/user.json
-  DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/gateway"
-  PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
-)
+# Install config files without overwriting existing ones.
+# Always ship .dist as a reference; only copy to the real name if absent.
+foreach(_conf repo.json user.json)
+  install(
+    FILES         "config/${_conf}"
+    DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/gateway"
+    PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+    RENAME        "${_conf}.dist"
+  )
+  install(CODE "
+    set(_dir \"\$ENV{DESTDIR}${SYSCONF_INSTALL_DIR}/cvmfs/gateway\")
+    if(NOT EXISTS \"\${_dir}/${_conf}\")
+      message(STATUS \"Installing default config: \${_dir}/${_conf}\")
+      execute_process(COMMAND \${CMAKE_COMMAND} -E copy \"\${_dir}/${_conf}.dist\" \"\${_dir}/${_conf}\")
+    else()
+      message(STATUS \"Preserving existing config: \${_dir}/${_conf}\")
+    endif()
+  ")
+endforeach()
