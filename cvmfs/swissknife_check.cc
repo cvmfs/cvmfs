@@ -55,7 +55,7 @@ CommandCheck::CommandCheck()
                             , is_remote_(false) {
   const shash::Any hash_null;
   duplicates_map_.Init(16, hash_null, hasher_any);
-  decomp_ = zip::Decompressor::Construct(zip::kDefault);
+  decomp_ = zip::Decompressor::Construct(zip::DecompressionAlgFromEnv());
   copy_ = zip::Compressor::Construct(zip::kNoCompression);
 }
 
