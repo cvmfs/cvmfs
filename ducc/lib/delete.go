@@ -319,10 +319,40 @@ func (img *Image) ExistsOnRegistry() bool {
 	return resp.StatusCode >= 200 && resp.StatusCode < 300
 }
 
+// collectImageDeletePaths returns all CVMFS paths that should be removed for
+// the given image (symlinks, manifest dirs, multiarch entries).  The returned
+// paths are relative to the repository root (i.e. stripped of the
+// /cvmfs/<repo> prefix) so they can be passed directly to
+// cvmfs_server ingest --fast-delete.
+func collectImageDeletePaths(CVMFSRepo string, img *Image) []string {
+	repoRoot := filepath.Join("/", "cvmfs", CVMFSRepo)
+	symlinkPath := filepath.Join(repoRoot, img.GetPublicSymlinkPath())
+	manifestDir := filepath.Join(repoRoot, ".metadata", img.GetSimpleName())
+	multiarchBase := filepath.Join(repoRoot, ".multiarch")
+	metadataBase := filepath.Join(repoRoot, ".metadata")
+
+	var paths []string
+
+	if _, err := os.Lstat(symlinkPath); err == nil {
+		paths = append(paths, strings.TrimPrefix(symlinkPath, repoRoot+"/"))
+	}
+	if _, err := os.Stat(manifestDir); err == nil {
+		paths = append(paths, strings.TrimPrefix(manifestDir, repoRoot+"/"))
+	}
+	for _, p := range findMultiarchImagePaths(multiarchBase, img) {
+		paths = append(paths, strings.TrimPrefix(p, repoRoot+"/"))
+	}
+	for _, p := range findMultiarchMetadataDirs(metadataBase, img) {
+		paths = append(paths, strings.TrimPrefix(p, repoRoot+"/"))
+	}
+	return paths
+}
+
 // PruneImages removes from the CVMFS repository all images whose simple name
 // (registry/repository:tag) is not present in desiredImages.  It lists every
-// image currently stored under /cvmfs/<CVMFSRepo> and calls
-// DeleteImageFromCVMFS for each one that is absent from the desired set.
+// image currently stored under /cvmfs/<CVMFSRepo>, collects all paths that
+// need to be removed, and deletes them in batches using
+// `cvmfs_server ingest --fast-delete`.
 //
 // desiredImages must be the fully-expanded set of images derived from all
 // wishlists (i.e. wildcard patterns already resolved against the registry),
@@ -333,21 +363,57 @@ func PruneImages(CVMFSRepo string, desiredImages map[string]bool, dryRun bool) (
 		return 0, fmt.Errorf("failed to list images in CVMFS: %w", err)
 	}
 
+	// Collect all paths to delete and count affected images.
+	var allPaths []string
 	deleted := 0
 	for _, img := range cvmfsImages {
 		if desiredImages[img.GetSimpleName()] {
 			continue
 		}
-		l.Log().WithFields(log.Fields{"image": img.GetSimpleName()}).
-			Info("Image not in expanded wishlist, deleting from CVMFS")
-		d, err := DeleteImageFromCVMFS(CVMFSRepo, img, dryRun)
-		if err != nil {
-			l.LogE(err).WithFields(log.Fields{"image": img.GetSimpleName()}).
-				Warning("Error deleting image, continuing")
+		paths := collectImageDeletePaths(CVMFSRepo, img)
+		if len(paths) == 0 {
+			l.Log().WithFields(log.Fields{"image": img.GetSimpleName()}).
+				Info("Image not found in CVMFS, nothing to delete")
+			continue
 		}
-		if d {
-			deleted++
+
+		l.Log().WithFields(log.Fields{"image": img.GetSimpleName(), "paths": len(paths)}).
+			Info("Image not in expanded wishlist, scheduling for deletion")
+
+		if dryRun {
+			for _, p := range paths {
+				fmt.Printf("[dry-run] Would fast-delete: %s\n", p)
+			}
+		}
+
+		allPaths = append(allPaths, paths...)
+		deleted++
+	}
+
+	if dryRun || len(allPaths) == 0 {
+		return deleted, nil
+	}
+
+	// Batch the paths into commands (up to 50 --fast-delete flags per
+	// invocation to avoid exceeding argument-length limits).
+	const pathsPerBatch = 50
+	for i := 0; i < len(allPaths); i += pathsPerBatch {
+		end := i + pathsPerBatch
+		if end > len(allPaths) {
+			end = len(allPaths)
+		}
+		batch := allPaths[i:end]
+
+		l.Log().WithFields(log.Fields{
+			"batch_size": len(batch),
+			"batch_start": i,
+			"total_paths": len(allPaths),
+		}).Info("Executing ingest --fast-delete batch")
+
+		if err := cvmfs.IngestFastDelete(CVMFSRepo, batch); err != nil {
+			return deleted, fmt.Errorf("ingest --fast-delete failed at batch starting at index %d: %w", i, err)
 		}
 	}
+
 	return deleted, nil
 }

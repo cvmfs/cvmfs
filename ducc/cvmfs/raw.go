@@ -250,3 +250,28 @@ func IngestDeleteWithLogger(logger *log.Entry, CVMFSRepo string, path string) er
 	defer unlock(CVMFSRepo)
 	return exec.ExecCommandWithLogger(ingestLogger, "cvmfs_server", "ingest", "--delete", path, repoName).Start()
 }
+
+// IngestFastDelete deletes one or more directory trees from a CVMFS repository
+// using `cvmfs_server ingest --fast-delete`.  Each path is relative to the
+// repository root (the subdir prefix is applied automatically).
+func IngestFastDelete(CVMFSRepo string, paths []string) error {
+	return IngestFastDeleteWithLogger(nil, CVMFSRepo, paths)
+}
+
+func IngestFastDeleteWithLogger(logger *log.Entry, CVMFSRepo string, paths []string) error {
+	if len(paths) == 0 {
+		return nil
+	}
+	logger = l.Ensure(logger)
+	ingestLogger := logger.WithFields(log.Fields{"repo": CVMFSRepo, "action": "ingest fast-delete", "count": len(paths)})
+	repoName, _ := GetRepoAndSubdir(CVMFSRepo)
+	cmd := []string{"cvmfs_server", "ingest"}
+	for _, p := range paths {
+		p = PrefixRepoSubdirOnce(CVMFSRepo, p)
+		cmd = append(cmd, "--fast-delete", p)
+	}
+	cmd = append(cmd, repoName)
+	getLock(CVMFSRepo)
+	defer unlock(CVMFSRepo)
+	return exec.ExecCommandWithLogger(ingestLogger, cmd...).Start()
+}
