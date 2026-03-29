@@ -1,0 +1,121 @@
+#!/bin/bash
+
+cvmfs_test_name="Ignore mount attempts for configured repositories"
+cvmfs_test_suites="quick"
+
+cleanup() {
+  echo "running cleanup()"
+  sudo umount /cvmfs/projects.cern.ch 2>/dev/null
+  if [ -f /etc/cvmfs/default.local.111bak ]; then
+    sudo cp /etc/cvmfs/default.local.111bak /etc/cvmfs/default.local
+    sudo rm -f /etc/cvmfs/default.local.111bak
+  fi
+  autofs_switch on
+}
+
+cvmfs_run_test() {
+  logfile=$1
+
+  local repo="atlas.cern.ch"
+  local ignored_repo="projects.cern.ch"
+
+  echo "*** backing up default.local"
+  if [ -f /etc/cvmfs/default.local ]; then
+    sudo cp /etc/cvmfs/default.local /etc/cvmfs/default.local.111bak
+  fi
+
+  trap cleanup EXIT HUP INT TERM || return 2
+
+  # =========================================================================
+  # Test 1: accessing an ignored repo via autofs fails silently
+  # =========================================================================
+
+  echo "*** setting up config with CVMFS_IGNORED_REPOS via cvmfs_mount"
+  cvmfs_mount ${repo} \
+    "CVMFS_IGNORED_REPOS=${ignored_repo},another.example.tld" \
+    || return 10
+
+  # Unmount everything so we can restart cleanly with autofs
+  echo "*** unmounting repos before switching to autofs"
+  sudo umount /cvmfs/${repo} 2>/dev/null
+  sudo umount /cvmfs/cvmfs-config.cern.ch 2>/dev/null
+
+  echo "*** switching on autofs"
+  autofs_switch on || return 11
+
+  to_syslog "CVMFS_TEST_111_SYSLOG_MARKER_1"
+
+  echo "*** accessing ignored repo ${ignored_repo} via autofs (should fail)"
+  local ls_output
+  ls_output=$(ls /cvmfs/${ignored_repo}/ 2>&1)
+  local ls_retval=$?
+  if [ $ls_retval -eq 0 ]; then
+    echo "ERROR: listing ignored repo ${ignored_repo} via autofs should have failed"
+    return 20
+  fi
+  echo "*** access to ignored repo correctly failed"
+
+  sleep 2
+  local syslog_noise
+  syslog_noise=$(cat_syslog | \
+    sed -n '/CVMFS_TEST_111_SYSLOG_MARKER_1/,$p' | \
+    grep -i "(${ignored_repo})" | \
+    grep -v "CVMFS_TEST_111_SYSLOG_MARKER" || true)
+  if [ "x${syslog_noise}" != "x" ]; then
+    echo "ERROR: found syslog entries for ignored repo (autofs test):"
+    echo "${syslog_noise}"
+    return 30
+  fi
+  echo "*** no syslog noise (autofs test), good"
+
+  # =========================================================================
+  # Test 2: non-ignored repo still works via autofs
+  # =========================================================================
+
+  echo "*** verifying non-ignored repo ${repo} works via autofs"
+  ls /cvmfs/${repo}/ > /dev/null 2>&1 || return 40
+  echo "*** non-ignored repo ${repo} is accessible via autofs, good"
+
+  # =========================================================================
+  # Test 3: spaces in the comma-separated list are handled
+  # =========================================================================
+
+  echo "*** unmounting repos for spaces test"
+  sudo umount /cvmfs/${repo} 2>/dev/null
+  sudo umount /cvmfs/cvmfs-config.cern.ch 2>/dev/null
+
+  echo "*** setting up config with spaces in ignore list"
+  cvmfs_mount ${repo} \
+    "CVMFS_IGNORED_REPOS= ${ignored_repo} , another.example.tld " \
+    || return 50
+
+  # Restart with autofs
+  sudo umount /cvmfs/${repo} 2>/dev/null
+  sudo umount /cvmfs/cvmfs-config.cern.ch 2>/dev/null
+  autofs_switch on || return 51
+
+  to_syslog "CVMFS_TEST_111_SYSLOG_MARKER_2"
+
+  echo "*** attempting to access ignored repo with spaces in list (should fail)"
+  ls_output=$(ls /cvmfs/${ignored_repo}/ 2>&1)
+  ls_retval=$?
+  if [ $ls_retval -eq 0 ]; then
+    echo "ERROR: access to ignored repo should have failed (spaces test)"
+    return 60
+  fi
+  echo "*** access correctly failed"
+
+  sleep 2
+  syslog_noise=$(cat_syslog | \
+    sed -n '/CVMFS_TEST_111_SYSLOG_MARKER_2/,$p' | \
+    grep -i "(${ignored_repo})" | \
+    grep -v "CVMFS_TEST_111_SYSLOG_MARKER" || true)
+  if [ "x${syslog_noise}" != "x" ]; then
+    echo "ERROR: found syslog entries for ignored repo (spaces test):"
+    echo "${syslog_noise}"
+    return 70
+  fi
+  echo "*** no syslog noise (spaces test), good"
+
+  return 0
+}

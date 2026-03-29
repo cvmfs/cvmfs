@@ -51,6 +51,7 @@ enum Failures {
   kFailWpad,
   kFailLockWorkspace,
   kFailRevisionBlacklisted,
+  kFailIgnoredMount,
 
   kFailNumEntries
 };
@@ -83,7 +84,8 @@ inline const char *Code2Ascii(const Failures error) {
   texts[23] = "proxy auto-discovery failed";
   texts[24] = "workspace already locked";
   texts[25] = "revision blacklisted";
-  texts[26] = "no text";
+  texts[26] = "mount attempt ignored";
+  texts[27] = "no text";
   return texts[error];
 }
 
