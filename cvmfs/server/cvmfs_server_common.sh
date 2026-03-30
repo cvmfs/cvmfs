@@ -1056,6 +1056,7 @@ CVMFS_NFILES=65536
 CVMFS_TALK_SOCKET=/var/spool/cvmfs/${name}/cvmfs_io
 CVMFS_TALK_OWNER=$cvmfs_user
 CVMFS_USE_SSL_SYSTEM_CA=true
+CVMFS_DECOMPRESSION_ALGORITHM=$compression_alg
 EOF
 
   if [ "x$X509_CERT_BUNDLE" != "x" ]; then
