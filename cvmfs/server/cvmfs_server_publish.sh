@@ -89,6 +89,7 @@ cvmfs_server_publish() {
     name=$(echo $name | cut -d'/' -f1)
 
     load_repo_config $name
+    export CVMFS_COMPRESSION_ALGORITHM CVMFS_DECOMPRESSION_ALGORITHM
     # We need the upstream type for configuring the health_check function
     upstream=$CVMFS_UPSTREAM_STORAGE
     upstream_type=$(get_upstream_type $upstream)
