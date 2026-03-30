@@ -171,6 +171,7 @@ load_repo_config() {
   else
     . /etc/cvmfs/repositories.d/${name}/replica.conf
   fi
+  export CVMFS_COMPRESSION_ALGORITHM CVMFS_DECOMPRESSION_ALGORITHM
 }
 
 
