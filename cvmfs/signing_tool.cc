@@ -78,7 +78,8 @@ SigningTool::Result SigningTool::Run(
 
   // Connect to the spooler
   const upload::SpoolerDefinition sd(spooler_definition,
-                                     manifest->GetHashAlgorithm());
+                                     manifest->GetHashAlgorithm(),
+                                     zip::CompressionAlgFromEnv());
   spooler = upload::Spooler::Construct(sd);
   if (!spooler.IsValid()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Failed to setup upload spooler");
