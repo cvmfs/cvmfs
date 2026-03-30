@@ -74,10 +74,4 @@ SpoolerDefinition::SpoolerDefinition(
   valid_ = true;
 }
 
-SpoolerDefinition SpoolerDefinition::Dup2DefaultCompression() const {
-  SpoolerDefinition result(*this);
-  result.compression_alg = zip::kDefault;
-  return result;
-}
-
 }  // namespace upload

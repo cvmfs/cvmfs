@@ -114,8 +114,9 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
   // from non-root (!= "/") paths
   params.base_directory = TrimString(params.base_directory, "/", kTrimAll);
 
-  upload::SpoolerDefinition spooler_definition_catalogs(
-      spooler_definition.Dup2DefaultCompression());
+  upload::SpoolerDefinition spooler_definition_catalogs(spooler_definition);
+  spooler_definition_catalogs.compression_alg = zip::CompressionAlgFromEnv();
+
 
   params.spooler = upload::Spooler::Construct(spooler_definition,
                                               &publish_statistics);

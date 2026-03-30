@@ -257,7 +257,8 @@ void Publisher::ConstructSpoolers() {
   if (spooler_files_ == NULL)
     throw EPublish("could not initialize file spooler");
 
-  upload::SpoolerDefinition sd_catalogs(sd.Dup2DefaultCompression());
+  upload::SpoolerDefinition sd_catalogs(sd);
+  sd_catalogs.compression_alg = zip::CompressionAlgFromEnv();
   spooler_catalogs_ =
     upload::Spooler::Construct(sd_catalogs, statistics_publish_.weak_ref());
   if (spooler_catalogs_ == NULL) {

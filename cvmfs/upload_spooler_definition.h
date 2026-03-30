@@ -48,13 +48,6 @@ struct SpoolerDefinition {
 
   bool IsValid() const { return valid_; }
 
-  /**
-   * Creates a new SpoolerDefinition based on an existing one.  The new spooler
-   * has compression set, which is required for catalogs and other meta-
-   * objects.
-   */
-  SpoolerDefinition Dup2DefaultCompression() const;
-
   DriverType driver_type;      //!< the type of the spooler driver
   std::string temporary_path;  //!< scratch space for the IngestionPipeline
 

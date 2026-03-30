@@ -763,8 +763,8 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   }
   spooler_definition.num_upload_tasks = params.num_upload_tasks;
 
-  upload::SpoolerDefinition spooler_definition_catalogs(
-      spooler_definition.Dup2DefaultCompression());
+  upload::SpoolerDefinition spooler_definition_catalogs(spooler_definition);
+  spooler_definition_catalogs.compression_alg = zip::CompressionAlgFromEnv();
 
   params.spooler = upload::Spooler::Construct(spooler_definition,
                                               &publish_statistics);
