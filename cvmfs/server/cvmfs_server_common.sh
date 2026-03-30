@@ -659,7 +659,9 @@ sign_manifest() {
   load_repo_config $name
   local user_shell="$(get_user_shell $name)"
 
-  local sign_command="$(__swissknife_cmd) sign \
+  local sign_command="
+    CVMFS_COMPRESSION_ALGORITHM=$CVMFS_COMPRESSION_ALGORITHM \
+    $(__swissknife_cmd) sign \
           -c /etc/cvmfs/keys/${name}.crt       \
           -k /etc/cvmfs/keys/${name}.key       \
           -n $name                             \
