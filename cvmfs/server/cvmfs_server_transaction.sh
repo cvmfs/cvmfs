@@ -7,5 +7,6 @@
 # Migrated to the new cvmfs_publish command
 
 cvmfs_server_transaction() {
+  export CVMFS_COMPRESSION_ALGORITHM CVMFS_DECOMPRESSION_ALGORITHM
   $(__publish_cmd dbg) transaction $@
 }
