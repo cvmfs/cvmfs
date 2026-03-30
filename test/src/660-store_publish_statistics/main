@@ -96,6 +96,10 @@ cvmfs_run_test() {
   local tar_file_path=$scratch_dir/tmp_dir/$CVMFS_TEST_660_TAR_FILE
   declare -A actual_values
 
+  # This test has pre-existing assertions of bytes-counting nature.
+  # Hence we fixate on the compression algorithm which was the default then.
+  export CVMFS_COMPRESSION_ALGORITHM=zlib
+
   echo "*** Create a fresh repository named $repo_name with user $CVMFS_TEST_USER"
   create_empty_repo $repo_name $CVMFS_TEST_USER || return $?
   CVMFS_TEST_660_REPO=$repo_name
