@@ -8,7 +8,8 @@
 
 cvmfs_server_transaction() {
   if [[ $# != 1 ]]; then
-    echo 'Usage: <toolname> <repo name>'
+    echo 'Usage: <toolname> <repo name>' >&2
+    echo "Got: $@" >&2
     return 1
   fi
   load_repo_config "$1"
