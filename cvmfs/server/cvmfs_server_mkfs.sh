@@ -95,7 +95,7 @@ cvmfs_server_mkfs() {
   local auto_tag_timespan=
   local unionfs
   local hash_algo
-  local compression_alg
+  local compression_alg=${CVMFS_COMPRESSION_ALGORITHM-}
   local garbage_collectable=false
   local s3_config=""
   local keys_import_location
@@ -182,7 +182,6 @@ cvmfs_server_mkfs() {
   # default values
   [ x"$unionfs"   = x"" ] && unionfs="$(get_available_union_fs)"
   [ x"$hash_algo" = x"" ] && hash_algo=sha1
-  [ x"$compression_alg" = x"" ] && compression_alg=default
 
   # upstream generation (defaults to local upstream)
   if [ x"$upstream" = x"" ]; then
