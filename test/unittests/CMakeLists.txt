@@ -391,6 +391,7 @@ set(CVMFS_UNITTEST_SOURCES
   t_malloc_arena.cc
   t_malloc_heap.cc
   t_manifest.cc
+  t_monitor_complex.cc
   t_mountpoint.cc
   t_namespace.cc
   t_notify_messages.cc

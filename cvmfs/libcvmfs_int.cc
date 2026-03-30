@@ -243,7 +243,7 @@ void LibContext::AppendStatToList(const cvmfs_stat_t st,
 int LibContext::GetAttr(const char *c_path, struct stat *info) {
   perf::Inc(file_system()->n_fs_stat());
   const ClientCtxGuard ctxg(geteuid(), getegid(), getpid(),
-                            &default_interrupt_cue_);
+                            &default_interrupt_cue_, "getattr");
 
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_getattr (stat) for path: %s", c_path);
 
@@ -280,7 +280,7 @@ void LibContext::CvmfsAttrFromDirent(const catalog::DirectoryEntry dirent,
 
 int LibContext::GetExtAttr(const char *c_path, struct cvmfs_attr *info) {
   const ClientCtxGuard ctxg(geteuid(), getegid(), getpid(),
-                            &default_interrupt_cue_);
+                            &default_interrupt_cue_, "getattr");
 
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_getattr (stat) for path: %s", c_path);
 
@@ -332,7 +332,7 @@ int LibContext::Readlink(const char *c_path, char *buf, size_t size) {
   perf::Inc(file_system()->n_fs_readlink());
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_readlink on path: %s", c_path);
   const ClientCtxGuard ctxg(geteuid(), getegid(), getpid(),
-                            &default_interrupt_cue_);
+                            &default_interrupt_cue_, "readlink");
 
   PathString p;
   p.Assign(c_path, strlen(c_path));
@@ -364,7 +364,7 @@ int LibContext::ListDirectory(const char *c_path,
                               bool self_reference) {
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_listdir on path: %s", c_path);
   const ClientCtxGuard ctxg(geteuid(), getegid(), getpid(),
-                            &default_interrupt_cue_);
+                            &default_interrupt_cue_, "listdir");
 
   if (c_path[0] == '/' && c_path[1] == '\0') {
     // root path is expected to be "", not "/"
@@ -419,7 +419,7 @@ int LibContext::ListDirectoryStat(const char *c_path,
                                   size_t *buflen) {
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_listdir_stat on path: %s", c_path);
   const ClientCtxGuard ctxg(geteuid(), getegid(), getpid(),
-                            &default_interrupt_cue_);
+                            &default_interrupt_cue_, "listdir_stat");
 
   if (c_path[0] == '/' && c_path[1] == '\0') {
     // root path is expected to be "", not "/"
@@ -458,7 +458,7 @@ int LibContext::ListDirectoryStat(const char *c_path,
 int LibContext::GetNestedCatalogAttr(const char *c_path,
                                      struct cvmfs_nc_attr *nc_attr) {
   const ClientCtxGuard ctxg(geteuid(), getegid(), getpid(),
-                            &default_interrupt_cue_);
+                            &default_interrupt_cue_, "stat_nc");
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_stat_nc (cvmfs_nc_attr) : %s", c_path);
 
   PathString p;
@@ -507,7 +507,7 @@ int LibContext::ListNestedCatalogs(const char *c_path,
                                    char ***buf,
                                    size_t *buflen) {
   const ClientCtxGuard ctxg(geteuid(), getegid(), getpid(),
-                            &default_interrupt_cue_);
+                            &default_interrupt_cue_, "list_nc");
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_list_nc on path: %s", c_path);
 
   if (c_path[0] == '/' && c_path[1] == '\0') {
@@ -541,7 +541,7 @@ int LibContext::ListNestedCatalogs(const char *c_path,
 int LibContext::Open(const char *c_path) {
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_open on path: %s", c_path);
   const ClientCtxGuard ctxg(geteuid(), getegid(), getpid(),
-                            &default_interrupt_cue_);
+                            &default_interrupt_cue_, "open");
 
   int fd = -1;
   catalog::DirectoryEntry dirent;
@@ -610,7 +610,7 @@ int LibContext::Open(const char *c_path) {
 int64_t LibContext::Pread(int fd, void *buf, uint64_t size, uint64_t off) {
   if (fd & kFdChunked) {
     const ClientCtxGuard ctxg(geteuid(), getegid(), getpid(),
-                              &default_interrupt_cue_);
+                              &default_interrupt_cue_, "pread");
     const int chunk_handle = fd & ~kFdChunked;
     SimpleChunkTables::OpenChunks
         open_chunks = mount_point_->simple_chunk_tables()->Get(chunk_handle);

@@ -177,6 +177,57 @@ string Watchdog::GenerateStackTrace(pid_t pid) {
 }
 
 
+void *Watchdog::MainHeartbeat(void *data) {
+  Watchdog *watchdog = static_cast<Watchdog *>(data);
+  LogCvmfs(kLogMonitor, kLogDebug, "starting heartbeat thread");
+  while (true) {
+    if (!watchdog->pipe_watchdog_->Write(ControlFlow::kHeartbeat)) break;
+    SafeSleepMs(kHeartbeatIntervalMs);
+  }
+  LogCvmfs(kLogMonitor, kLogDebug, "stopping heartbeat thread");
+  return NULL;
+}
+
+
+void Watchdog::CheckProgress() {
+  ClientCtx *ctx = ClientCtx::GetInstance();
+  pthread_mutex_t *lock = ctx->GetLockTlsBlocks();
+  const uint64_t now = platform_monotonic_time();
+
+  const MutexLockGuard lock_guard(lock);
+  const vector<ClientCtx::ThreadLocalStorage *> &blocks = ctx->GetTlsBlocks();
+  for (unsigned i = 0; i < blocks.size(); ++i) {
+    if (blocks[i]->is_set && blocks[i]->start_time > 0) {
+      const uint64_t age = now - blocks[i]->start_time;
+      if (age > kMaxOperationAgeS) {
+        LogCvmfs(kLogMonitor, kLogSyslogErr,
+                 "monitor: stuck operation detected: %s (age: %lu s, "
+                 "pid: %d, uid: %d)",
+                 blocks[i]->name.c_str(), (unsigned long)age,
+                 static_cast<int>(blocks[i]->pid),
+                 static_cast<int>(blocks[i]->uid));
+      }
+    }
+  }
+}
+
+
+void Watchdog::ReportStuckProcess() {
+  string msg = "watchdog: main process (PID " + StringifyInt(supervisee_pid_)
+               + ") is unresponsive\n";
+#ifdef __linux__
+  string path = "/proc/" + StringifyInt(supervisee_pid_) + "/stack";
+  string stack;
+  if (ReadFileToString(path, &stack)) {
+    msg += "Kernel stack of main thread:\n" + stack + "\n";
+  }
+  msg += "Check /proc/" + StringifyInt(supervisee_pid_)
+         + "/task/*/stack for other threads\n";
+#endif
+  LogEmergency(msg);
+}
+
+
 pid_t Watchdog::GetPid() {
   if (instance_ != NULL) {
     return instance_->watchdog_pid_;
@@ -398,6 +449,7 @@ void Watchdog::Fork(bool needs_read_environ) {
 
   pid_t pid;
   int statloc;
+  const pid_t main_pid = getpid();
   switch (pid = fork()) {
     case -1:
       PANIC(NULL);
@@ -407,6 +459,7 @@ void Watchdog::Fork(bool needs_read_environ) {
         case -1:
           _exit(1);
         case 0: {
+          supervisee_pid_ = main_pid;
           pipe_watchdog_->CloseWriteFd();
           Daemonize();
           if ((geteuid() != 0) && SetuidCapabilityPermitted()) {
@@ -578,8 +631,11 @@ void Watchdog::Spawn(const std::string &crash_dump_path) {
   old_signal_handlers_ = SetSignalHandlers(signal_handlers);
 
   pipe_terminate_ = new Pipe<kPipeThreadTerminator>();
-  const int retval = pthread_create(&thread_listener_, NULL,
-                                    MainWatchdogListener, this);
+  int retval = pthread_create(&thread_listener_, NULL,
+                              MainWatchdogListener, this);
+  assert(retval == 0);
+  retval = pthread_create(&thread_heartbeat_, NULL,
+                          MainHeartbeat, this);
   assert(retval == 0);
 
   if (spawned_) {
@@ -617,8 +673,14 @@ void *Watchdog::MainWatchdogListener(void *data) {
   watch_fds[1].events = POLLIN | POLLPRI;
   watch_fds[1].revents = 0;
   while (true) {
-    const int retval = poll(watch_fds, 2, -1);
+    const int retval = poll(watch_fds, 2, kProgressCheckIntervalMs);
     if (retval < 0) {
+      if (errno == EINTR) continue;
+      break;
+    }
+
+    if (retval == 0) {
+      watchdog->CheckProgress();
       continue;
     }
 
@@ -647,14 +709,34 @@ void *Watchdog::MainWatchdogListener(void *data) {
 
 void Watchdog::Supervise() {
   ControlFlow::Flags control_flow = ControlFlow::kUnknown;
+  struct pollfd watch_fd;
+  watch_fd.fd = pipe_watchdog_->GetReadFd();
 
-  if (!pipe_watchdog_->TryRead<ControlFlow::Flags>(&control_flow)) {
-    LogEmergency("watchdog: unexpected termination ("
-                 + StringifyInt(control_flow) + ")");
-    if (on_exit_)
-      on_exit_(true /* crashed */);
-  } else {
+  while (true) {
+    watch_fd.events = POLLIN | POLLPRI;
+    watch_fd.revents = 0;
+    const int retval = poll(&watch_fd, 1, kHeartbeatIntervalMs * 2);
+    if (retval < 0) {
+      if (errno == EINTR) continue;
+      LogEmergency("watchdog: poll failed (" + StringifyInt(errno) + ")");
+      break;
+    }
+    if (retval == 0) {
+      ReportStuckProcess();
+      continue;
+    }
+
+    if (!pipe_watchdog_->TryRead<ControlFlow::Flags>(&control_flow)) {
+      LogEmergency("watchdog: unexpected termination");
+      if (on_exit_)
+        on_exit_(true /* crashed */);
+      break;
+    }
+
     switch (control_flow) {
+      case ControlFlow::kHeartbeat:
+        continue;
+
       case ControlFlow::kProduceStacktrace:
         LogEmergency(ReportStacktrace());
         if (on_exit_)
@@ -733,6 +815,7 @@ Watchdog::~Watchdog() {
 
     // The watchdog listener thread exits on any message received
     pipe_terminate_->Write(ControlFlow::kQuit);
+    pthread_join(thread_heartbeat_, NULL);
     pthread_join(thread_listener_, NULL);
     pipe_terminate_->Close();
   }

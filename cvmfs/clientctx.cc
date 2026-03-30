@@ -3,6 +3,7 @@
  */
 
 #include "clientctx.h"
+#include "util/platform.h"
 
 #include <cassert>
 
@@ -46,7 +47,7 @@ ClientCtx *ClientCtx::GetInstance() {
   if (instance_ == NULL) {
     instance_ = new ClientCtx();
     const int retval = pthread_key_create(&instance_->thread_local_storage_,
-                                          TlsDestructor);
+                                           TlsDestructor);
     assert(retval == 0);
   }
 
@@ -81,12 +82,14 @@ bool ClientCtx::IsSet() {
 }
 
 
-void ClientCtx::Set(uid_t uid, gid_t gid, pid_t pid, InterruptCue *ic) {
+void ClientCtx::Set(uid_t uid, gid_t gid, pid_t pid, InterruptCue *ic,
+                    const std::string &name) {
   ThreadLocalStorage *tls = static_cast<ThreadLocalStorage *>(
       pthread_getspecific(thread_local_storage_));
 
   if (tls == NULL) {
-    tls = new ThreadLocalStorage(uid, gid, pid, ic);
+    tls = new ThreadLocalStorage(uid, gid, pid, ic, name);
+    tls->start_time = platform_monotonic_time();
     const int retval = pthread_setspecific(thread_local_storage_, tls);
     assert(retval == 0);
     const MutexLockGuard lock_guard(lock_tls_blocks_);
@@ -96,6 +99,8 @@ void ClientCtx::Set(uid_t uid, gid_t gid, pid_t pid, InterruptCue *ic) {
     tls->gid = gid;
     tls->pid = pid;
     tls->interrupt_cue = ic;
+    tls->name = name;
+    tls->start_time = platform_monotonic_time();
     tls->is_set = true;
   }
 }
@@ -129,5 +134,7 @@ void ClientCtx::Unset() {
     tls->gid = -1;
     tls->pid = -1;
     tls->interrupt_cue = NULL;
+    tls->name = "";
+    tls->start_time = 0;
   }
 }

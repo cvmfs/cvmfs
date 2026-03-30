@@ -114,3 +114,28 @@ TEST(T_ClientCtx, Guard) {
 
   ClientCtx::CleanupInstance();
 }
+
+TEST(T_ClientCtx, Monitoring) {
+  TestInterruptCue tic;
+  ClientCtx::GetInstance()->Set(1, 2, 3, &tic, "test_op");
+
+  pthread_mutex_t *lock = ClientCtx::GetInstance()->GetLockTlsBlocks();
+  int retval = pthread_mutex_lock(lock);
+  EXPECT_EQ(0, retval);
+  const std::vector<ClientCtx::ThreadLocalStorage *> &blocks =
+      ClientCtx::GetInstance()->GetTlsBlocks();
+  EXPECT_EQ(1U, blocks.size());
+  EXPECT_EQ("test_op", blocks[0]->name);
+  EXPECT_GT(blocks[0]->start_time, 0U);
+  pthread_mutex_unlock(lock);
+
+  ClientCtx::GetInstance()->Unset();
+  retval = pthread_mutex_lock(lock);
+  EXPECT_EQ(0, retval);
+  EXPECT_EQ(1U, blocks.size());
+  EXPECT_FALSE(blocks[0]->is_set);
+  EXPECT_EQ("", blocks[0]->name);
+  pthread_mutex_unlock(lock);
+
+  ClientCtx::CleanupInstance();
+}

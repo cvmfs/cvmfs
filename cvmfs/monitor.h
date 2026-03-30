@@ -95,6 +95,7 @@ class Watchdog : SingleCopy {
       kQuit,
       kQuitWithExit,
       kSupervise,
+      kHeartbeat,
       kUnknown,
     };
   };
@@ -110,10 +111,15 @@ class Watchdog : SingleCopy {
    */
   static const unsigned kMaxBacktrace = 64;
 
+  static const unsigned kHeartbeatIntervalMs = 5000;
+  static const unsigned kProgressCheckIntervalMs = 10000;
+  static const unsigned kMaxOperationAgeS = 300;
+
   static Watchdog *instance_;
   static Watchdog *Me() { return instance_; }
 
   static void *MainWatchdogListener(void *data);
+  static void *MainHeartbeat(void *data);
 
   static void ReportSignalAndContinue(int sig, siginfo_t *siginfo,
                                       void *context);
@@ -125,6 +131,8 @@ class Watchdog : SingleCopy {
   bool WaitForSupervisee();
   SigactionMap SetSignalHandlers(const SigactionMap &signal_handlers);
   void Supervise();
+  void CheckProgress();
+  void ReportStuckProcess();
   void LogEmergency(std::string msg);
   std::string ReportStacktrace();
   std::string GenerateStackTrace(pid_t pid);
@@ -135,12 +143,14 @@ class Watchdog : SingleCopy {
   std::string crash_dump_path_;
   std::string exe_path_;
   pid_t watchdog_pid_;
+  pid_t supervisee_pid_;
   UniquePtr<Pipe<kPipeWatchdog> > pipe_watchdog_;
   /// The supervisee makes sure its watchdog does not die
   UniquePtr<Pipe<kPipeWatchdogSupervisor> > pipe_listener_;
   /// Send the terminate signal to the listener
   UniquePtr<Pipe<kPipeThreadTerminator> > pipe_terminate_;
   pthread_t thread_listener_;
+  pthread_t thread_heartbeat_;
   FnOnExit on_exit_;
   platform_spinlock lock_handler_;
   stack_t sighandler_stack_;
