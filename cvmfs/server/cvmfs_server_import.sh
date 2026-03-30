@@ -313,6 +313,8 @@ cvmfs_server_import() {
     IMPORT_DESASTER_MANIFEST_BACKUP="${storage_location}/.cvmfspublished.bak"
     cp ${storage_location}/.cvmfspublished \
        $IMPORT_DESASTER_MANIFEST_BACKUP || die "fail! (cannot backup .cvmfspublished)"
+    CVMFS_COMPRESSION_ALGORITHM=$CVMFS_COMPRESSION_ALGORITHM \
+    CVMFS_DECOMPRESSION_ALGORITHM=$CVMFS_DECOMPRESSION_ALGORITHM \
     __swissknife migrate               \
       -v "2.0.x"                       \
       -r $storage_location             \

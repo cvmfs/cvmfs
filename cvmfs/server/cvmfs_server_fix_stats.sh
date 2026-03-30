@@ -51,7 +51,10 @@ cvmfs_server_fix_stats() {
     fi
   fi
 
-  local migrate_command="$(__swissknife_cmd dbg) migrate     \
+  local migrate_command="
+    CVMFS_COMPRESSION_ALGORITHM=$CVMFS_COMPRESSION_ALGORITHM \
+    CVMFS_DECOMPRESSION_ALGORITHM=$CVMFS_DECOMPRESSION_ALGORITHM \
+    $(__swissknife_cmd dbg) migrate                          \
                               -v 'stats'                     \
                               -r $CVMFS_STRATUM0             \
                               $(get_swissknife_proxy)        \
