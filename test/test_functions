@@ -910,6 +910,7 @@ import_repo() {
     echo "  UnionFS: $CVMFS_TEST_UNIONFS"
     unionfs=" -f $CVMFS_TEST_UNIONFS"
   fi
+  apache_switch on
   sudo -E cvmfs_server import -o $uid $unionfs $extra_options $repo || return 102
 }
 
