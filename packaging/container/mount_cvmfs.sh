@@ -55,6 +55,12 @@ done
 # "transport endpoint not connected" on /cvmfs/* directories
 trap cleanup SIGTERM SIGINT SIGQUIT SIGHUP
 
+# run cvmfs_fsck
+if [ "$CVMFS_CONTAINER_RUN_FSCK" == 'y' -o "$CVMFS_CONTAINER_RUN_FSCK" == 'Y' ]; then
+  echo "[INF] running cvmfs_fsck -p $CVMFS_CACHE_BASE/shared"
+  /usr/bin/cvmfs_fsck -p $CVMFS_CACHE_BASE/shared
+fi
+
 echo "[INF] mounting $(echo $CVMFS_REPOSITORIES | tr , ' ')"
 for r in $(echo $CVMFS_REPOSITORIES | tr , ' '); do
   mkdir -p /cvmfs/$r 2>/dev/null
