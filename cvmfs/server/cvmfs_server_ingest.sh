@@ -25,6 +25,7 @@ cvmfs_server_ingest() {
   local keep_ownership=false
   local create_catalog=false
   local fast_delete=false
+  local gc_db=""
 
   local force_native=0
   local force_external=0
@@ -77,6 +78,10 @@ cvmfs_server_ingest() {
           multiple_delete=1
         fi
         ;;
+      --gc-db )
+        gc_db=$2
+        fast_delete=true
+        ;;
     esac
     shift
   done
@@ -116,8 +121,8 @@ cvmfs_server_ingest() {
     die "Please provide a repository name, as positional argument or via an absolute path on /cvmfs given to -b"
   fi
 
-  if [ x"$tar_file" = "x" ] && [ x"$base_dir" = "x" ] && [ x"$to_delete" = "x" ] ; then
-    die "Please provide some parameters, use -t \$TAR_FILE to provide the tar to extract -b \$BASE_DIR to provide where to extract the tar and -d \$TO_DELETE to provide what to delete from the repository"
+  if [ x"$tar_file" = "x" ] && [ x"$base_dir" = "x" ] && [ x"$to_delete" = "x" ] && [ x"$gc_db" = "x" ] ; then
+    die "Please provide some parameters, use -t \$TAR_FILE to provide the tar to extract -b \$BASE_DIR to provide where to extract the tar, -d \$TO_DELETE to provide what to delete from the repository, or --gc-db \$DB_PATH to delete paths from a GC database"
   fi
 
   if [ x"$tar_file" = "x" ] && [ ! x"$base_dir" = "x" ]; then
@@ -342,6 +347,10 @@ cvmfs_server_ingest() {
 
   if [ "$fast_delete" = true ]; then
     ingest_command="$ingest_command -f"
+  fi
+
+  if [ ! x"$gc_db" = "x" ]; then
+    ingest_command="$ingest_command -Q $gc_db"
   fi
 
   if [ "x$CVMFS_PRINT_STATISTICS" = "xtrue" ]; then
