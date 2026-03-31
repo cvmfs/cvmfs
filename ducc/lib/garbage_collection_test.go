@@ -5,6 +5,22 @@ import (
 	"testing"
 )
 
+func TestConstructGCDBDeleteCommand(t *testing.T) {
+	cmd := ConstructGCDBDeleteCommand("/tmp/gc.db", "test.cern.ch")
+	expected := "cvmfs_server ingest --gc-db /tmp/gc.db test.cern.ch"
+	if strings.Join(cmd, " ") != expected {
+		t.Errorf("expected %q, got %q", expected, strings.Join(cmd, " "))
+	}
+}
+
+func TestConstructGCDBDeleteCommand_SubdirRepo(t *testing.T) {
+	cmd := ConstructGCDBDeleteCommand("/tmp/gc.db", "repo.cern.ch/subdir")
+	expected := "cvmfs_server ingest --gc-db /tmp/gc.db repo.cern.ch"
+	if strings.Join(cmd, " ") != expected {
+		t.Errorf("expected %q, got %q", expected, strings.Join(cmd, " "))
+	}
+}
+
 func TestConstructDeleteCommands(t *testing.T) {
 	paths := []string{"a/b"}
 	commands, _ := ConstructDeleteCommands(paths, 10, "test.cern.ch")

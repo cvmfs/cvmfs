@@ -7,10 +7,14 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#include <string>
+#include <vector>
+
 #include "catalog_virtual.h"
 #include "manifest.h"
 #include "statistics.h"
 #include "statistics_database.h"
+#include "swissknife_ingest_gc.h"
 #include "sync_mediator.h"
 #include "sync_union.h"
 #include "sync_union_tarball.h"
@@ -51,6 +55,30 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
   }
   if (args.find('D') != args.end()) {
     params.to_delete = *args.find('D')->second;
+  }
+
+  std::string gc_db_path;
+  if (args.find('Q') != args.end()) {
+    gc_db_path = *args.find('Q')->second;
+    std::vector<std::string> gc_paths;
+    if (!ReadGCDatabase(gc_db_path, &gc_paths)) {
+      PrintError("Swissknife Ingest: failed to read GC database");
+      return 1;
+    }
+    LogCvmfs(kLogCvmfs, kLogStdout,
+             "Swissknife Ingest: Read %lu paths from GC database %s",
+             gc_paths.size(), gc_db_path.c_str());
+    // Append GC paths to the existing to_delete string using /// delimiter
+    for (size_t i = 0; i < gc_paths.size(); ++i) {
+      if (!params.to_delete.empty()) {
+        params.to_delete += "///";
+      }
+      params.to_delete += gc_paths[i];
+    }
+    // GC database implies fast delete
+    if (!gc_paths.empty()) {
+      params.fast_delete = true;
+    }
   }
 
   if (args.find('O') != args.end()) {
@@ -266,6 +294,21 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
   if (!manifest->Export(params.manifest_path)) {
     PrintError("Swissknife Ingest: Failed to create new repository");
     return 6;
+  }
+
+  // Mark GC paths as deleted in the database after successful publication
+  if (!gc_db_path.empty()) {
+    if (MarkGCPathsDeleted(gc_db_path)) {
+      LogCvmfs(kLogCvmfs, kLogStdout,
+               "Swissknife Ingest: Marked GC paths as deleted in %s",
+               gc_db_path.c_str());
+    } else {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "Swissknife Ingest: WARNING - Failed to mark GC paths as "
+               "deleted in %s. Paths were removed from the repository but "
+               "the database was not updated.",
+               gc_db_path.c_str());
+    }
   }
 
   return 0;
