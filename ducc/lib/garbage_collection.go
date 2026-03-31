@@ -47,39 +47,47 @@ func FindAllUsedFlatImages(CVMFSRepo string) ([]string, error) {
 	root := filepath.Join("/", "cvmfs", CVMFSRepo)
 	root_components := strings.Split(root, string(os.PathSeparator))
 	result := make([]string, 0)
+
+	// collectSymlinkTargets is a walker that resolves symlinks and appends
+	// their real paths to result.
+	collectSymlinkTargets := func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			l.LogE(err).WithFields(log.Fields{"path": path}).Warning("Error in opening the path, moving on.")
+			return nil
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			realName, evalErr := filepath.EvalSymlinks(path)
+			if evalErr != nil {
+				return nil
+			}
+			result = append(result, realName)
+		}
+		return nil
+	}
+
+	// Walk the repo root, skipping hidden directories except .multiarch
 	walker := func(path string, info os.FileInfo, err error) error {
-		// some kind of error, we don't really care and we just move on.
 		if err != nil {
 			l.LogE(err).WithFields(log.Fields{"path": path}).Warning("Error in opening the path, moving on.")
 			return nil
 		}
 		components := strings.Split(path, string(os.PathSeparator))
-		// first root directory, not sure if this ever happen
 		if len(components) == len(root_components) {
 			return nil
 		}
-		// checking if we are in a hidden directory
-		// if we are, we skip it all
 		first_dir := components[len(root_components)]
 		if strings.HasPrefix(first_dir, ".") {
 			return filepath.SkipDir
 		}
-		// let's check if we have reach a symlink
-		// if we are in a symlink, we should capture
-		// the image digest
-		// we don't need to break the walk since Walk
-		// does not follow symlinks
-		if info.Mode()&os.ModeSymlink != 0 {
-			realName, _ := filepath.EvalSymlinks(path)
-			if err != nil {
-				return nil
-			}
-			result = append(result, realName)
-		}
-		// general case we keep iterating
-		return nil
+		return collectSymlinkTargets(path, info, err)
 	}
 	filepath.Walk(root, walker)
+
+	// Also walk .multiarch/ to pick up architecture-specific symlinks
+	// that reference flat images.
+	multiarchRoot := filepath.Join(root, ".multiarch")
+	filepath.Walk(multiarchRoot, collectSymlinkTargets)
+
 	return result, nil
 }
 
@@ -138,7 +146,6 @@ func FindAllLayers(CVMFSRepo string) ([]string, error) {
 }
 
 func FindAllUsedLayers(CVMFSRepo string) ([]string, error) {
-	root := filepath.Join("/", "cvmfs", CVMFSRepo, ".metadata")
 	result := make([]string, 0)
 	walker := func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -167,7 +174,11 @@ func FindAllUsedLayers(CVMFSRepo string) ([]string, error) {
 		}
 		return nil
 	}
-	filepath.Walk(root, walker)
+
+	// Walk .metadata for all image manifests (including .metadata/.multiarch/)
+	metadataRoot := filepath.Join("/", "cvmfs", CVMFSRepo, ".metadata")
+	filepath.Walk(metadataRoot, walker)
+
 	return result, nil
 }
 
