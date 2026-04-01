@@ -41,6 +41,7 @@ SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalog_manager,
     : catalog_manager_(catalog_manager)
     , union_engine_(NULL)
     , handle_hardlinks_(false)
+    , recursive_fast_delete_(false)
     , params_(params)
     , reporter_(new SyncDiffReporter(params_->print_changeset
                                          ? SyncDiffReporter::kPrintChanges
@@ -675,7 +676,11 @@ void SyncMediator::RemoveDirectoryRecursively(SharedPtr<SyncItem> entry,
   }
 
   // Normal path: delete a directory AFTER it was emptied here,
-  // because it would start up another recursion
+  // because it would start up another recursion.
+  // Propagate fast_delete so that any nested catalog transition points
+  // encountered during the traversal are still fast-deleted.
+  const bool prev_fast_delete = recursive_fast_delete_;
+  if (fast_delete) recursive_fast_delete_ = true;
 
   const bool recurse = false;
   FileSystemTraversal<SyncMediator> traversal(
@@ -688,6 +693,8 @@ void SyncMediator::RemoveDirectoryRecursively(SharedPtr<SyncItem> entry,
   traversal.fn_new_fifo = &SyncMediator::RemoveFifoCallback;
   traversal.fn_new_socket = &SyncMediator::RemoveSocketCallback;
   traversal.Recurse(entry->GetRdOnlyPath());
+
+  recursive_fast_delete_ = prev_fast_delete;
 
   // The given directory was emptied recursively and can now itself be deleted
   RemoveDirectory(entry);
@@ -741,7 +748,7 @@ void SyncMediator::RemoveDirectoryCallback(const std::string &parent_dir,
                                            const std::string &dir_name) {
   const SharedPtr<SyncItem> entry = CreateSyncItem(parent_dir, dir_name,
                                                    kItemDir);
-  RemoveDirectoryRecursively(entry);
+  RemoveDirectoryRecursively(entry, recursive_fast_delete_);
 }
 
 
