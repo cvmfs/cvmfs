@@ -1928,7 +1928,12 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   if (!magic_xattr.IsNull()) {
     attribute_result = magic_xattr->GetValue(attr_req_page, xattr_mode);
   } else {
-    if (!xattrs.Get(attr, &attribute_result.second)) {
+    /* security.selinux is excluded from catalog hashing and storage (see
+     * HashMeta). Synthesize a host-local default at query time rather than
+     * storing policy-dependent labels in the content-addressed catalog. */
+    if (strcmp(attr.c_str(), "security.selinux") == 0) {
+      attribute_result.second = "system_u:object_r:fusefs_t:s0";
+    } else if (!xattrs.Get(attr, &attribute_result.second)) {
       fuse_reply_err(req, ENOATTR);
       return;
     }
