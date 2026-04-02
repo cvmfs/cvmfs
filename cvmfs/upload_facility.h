@@ -419,7 +419,8 @@ class AbstractUploader
    * Used by concrete implementations when they use callbacks where it's not
    * already foreseen, e.g. S3Uploader::Peek().
    */
-  void IncJobsInFlight() { ++jobs_in_flight_; }
+  void IncJobsInFlight() const { ++jobs_in_flight_; }
+  void DecJobsInFlight() const { --jobs_in_flight_; }
 
  private:
   const SpoolerDefinition spooler_definition_;
