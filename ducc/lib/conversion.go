@@ -268,6 +268,41 @@ func ConvertWishFlat(wish WishFriendly, multiArch bool) error {
 			completeSingularityPriPath := filepath.Join("/", "cvmfs", wish.CvmfsRepo, singularityPrivatePath)
 			priDirInfo, errPri := os.Stat(completeSingularityPriPath)
 
+			// Validate the flat image: if the private path exists, check that
+			// it contains a .singularity.d directory.  Also check that the
+			// public symlink actually resolves (is not dangling).  If either
+			// check fails, delete the incomplete flat image with fast-delete
+			// and force a re-creation of the overlay.
+			if errPri == nil {
+				singDirPath := filepath.Join(completeSingularityPriPath, ".singularity.d")
+				if _, errSingDir := os.Stat(singDirPath); errSingDir != nil {
+					imageLogger.WithFields(log.Fields{
+						"flat path":       completeSingularityPriPath,
+						"singularity dir": singDirPath,
+					}).Warn("Flat image exists but is incomplete (missing .singularity.d), deleting and re-creating")
+					if delErr := cvmfs.IngestFastDeleteWithLogger(imageLogger, wish.CvmfsRepo, singularityPrivatePath); delErr != nil {
+						imageLogger.WithField("error", delErr).Error("Error deleting incomplete flat image")
+						if firstError == nil {
+							firstError = delErr
+						}
+						continue
+					}
+					// Reset stat results so we fall through to the overlay creation below
+					errPri = fmt.Errorf("flat image deleted (was incomplete)")
+					priDirInfo = nil
+				}
+			}
+			// Check for a dangling public symlink (Lstat succeeds but Stat failed)
+			if errPub != nil && !os.IsNotExist(errPub) {
+				// Stat failed for a reason other than not-exist; could be a dangling symlink
+				if _, errLstat := os.Lstat(completePubSymPath); errLstat == nil {
+					imageLogger.WithField("symlink", completePubSymPath).
+						Warn("Public symlink is dangling, will re-create flat image")
+					// The flat image is already gone (errPri would be non-nil too),
+					// so we just fall through to the overlay path.
+				}
+			}
+
 			imageLogger.WithFields(log.Fields{
 				"public path":            completePubSymPath,
 				"err stats pubblic path": errPub,
