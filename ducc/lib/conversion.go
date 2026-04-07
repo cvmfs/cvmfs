@@ -270,7 +270,7 @@ func ConvertWishFlat(wish WishFriendly, multiArch bool) error {
 
 			imageLogger.WithFields(log.Fields{
 				"public path":            completePubSymPath,
-				"err stats pubblic path": errPub,
+				"err stats public path": errPub,
 				"private path":           completeSingularityPriPath,
 				"err stats private path": errPri,
 			}).Trace("Checking if images links are up to date")
