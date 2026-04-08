@@ -308,8 +308,26 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepReflog() {
     }
   }
   unreferenced_trees_ = to_sweep.size();
-  bool success = traversal_.TraverseList(to_sweep,
-                                         CatalogTraversalT::kDepthFirst);
+  // Publish all hash_filter_ writes from the (serial) mark phase before
+  // sweep workers begin reading it.  The matching acquire is provided by
+  // the parallel traversal's task-queue mutex: each worker's lock-acquire
+  // when it dequeues a sweep task synchronizes-with the producer's
+  // lock-release after this fence, so all hash_filter_ writes are visible
+  // before SweepDataObjects runs.  Made explicit for weakly-ordered
+  // architectures (e.g. ARM).
+  __atomic_thread_fence(__ATOMIC_RELEASE);
+  bool success;
+  {
+    struct SerializeCallbacksGuard {
+      CatalogTraversalT &traversal;
+      explicit SerializeCallbacksGuard(CatalogTraversalT &t) : traversal(t) {
+        traversal.SetSerializeCallbacks(false);
+      }
+      ~SerializeCallbacksGuard() { traversal.SetSerializeCallbacks(true); }
+    } guard(traversal_);
+    success = traversal_.TraverseList(to_sweep,
+                                      CatalogTraversalT::kDepthFirst);
+  }
   traversal_.UnregisterListener(callback);
 
   i = to_sweep.begin();
