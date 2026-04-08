@@ -111,6 +111,16 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
   }
 
   /**
+   * Controls whether the callback mutex serializes NotifyListeners() calls.
+   * The default (constructed from Parameters::serialize_callbacks) is true;
+   * callers whose registered listeners are thread-safe can flip it to false
+   * at runtime to let multiple workers run their callbacks concurrently.
+   */
+  void SetSerializeCallbacks(bool serialize) {
+    serialize_callbacks_ = serialize;
+  }
+
+  /**
    * Start the traversal process from a list of root catalogs. Same as
    * TraverseRevision function, TraverseList does not traverse into predecessor
    * catalog revisions and ignores TraversalParameter settings.
