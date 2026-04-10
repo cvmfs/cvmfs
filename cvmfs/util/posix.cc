@@ -1852,10 +1852,10 @@ struct ForkFailures {  // TODO(rmeusel): C++11 (type safe enum)
  *  Loop through all possible FDs and close them.
  */
 static bool CloseAllFildesUntilMaxFD(const std::set<int> &preserve_fildes,
-                                     int max_fd) {
-  for (int fd = 0; fd < max_fd; fd++) {
-    if (preserve_fildes.count(fd) == 0) {
-      close(fd);
+                                     long max_fd) {  // NOLINT(runtime/int)
+  for (long fd = 0; fd < max_fd; fd++) {  // NOLINT(runtime/int)
+    if (preserve_fildes.count(static_cast<int>(fd)) == 0) {
+      close(static_cast<int>(fd));
     }
   }
 
@@ -1863,12 +1863,13 @@ static bool CloseAllFildesUntilMaxFD(const std::set<int> &preserve_fildes,
 }
 
 /**
- * Loop through /proc/self/fd and close the listed FDs.
- * Not used on macOS.
+ * Enumerate currently open file descriptors via a procfs-like directory
+ * (/proc/self/fd on Linux, /dev/fd on macOS) and close the ones not in
+ * preserve_fildes.
  */
-#ifndef __APPLE__
-static bool CloseAllFildesInProcSelfFd(const std::set<int> &preserve_fildes) {
-  DIR *dirp = opendir("/proc/self/fd");
+static bool CloseAllFildesInFdDir(const char *fd_dir,
+                                  const std::set<int> &preserve_fildes) {
+  DIR *dirp = opendir(fd_dir);
   if (!dirp)
     return false;
 
@@ -1895,29 +1896,29 @@ static bool CloseAllFildesInProcSelfFd(const std::set<int> &preserve_fildes) {
 
   return true;
 }
-#endif
 
 /**
  * Closes all file descriptors except the ones in preserve_fildes.
  * To be used after fork but before exec.
  */
 bool CloseAllFildes(const std::set<int> &preserve_fildes) {
-  const int max_fd = static_cast<int>(sysconf(_SC_OPEN_MAX));
+  const long max_fd = sysconf(_SC_OPEN_MAX);  // NOLINT(runtime/int)
   if (max_fd < 0) {
     return false;
   }
 
-#ifdef __APPLE__
-  return CloseAllFildesUntilMaxFD(preserve_fildes, max_fd);
-#else   // ifdef __APPLE__
+  // When RLIMIT_NOFILE is unbounded (sysconf returns LONG_MAX) or simply very
+  // large, iterating [0, max_fd) is impractical.  Enumerate the actually open
+  // fds via the kernel's fd directory instead.
   if (max_fd > 100000) {
-    // CloseAllFildesUntilMaxFD is inefficient with very large max_fd.
-    // Looping through /proc/self/fd performs better.
-    return CloseAllFildesInProcSelfFd(preserve_fildes);
+#ifdef __APPLE__
+    return CloseAllFildesInFdDir("/dev/fd", preserve_fildes);
+#else
+    return CloseAllFildesInFdDir("/proc/self/fd", preserve_fildes);
+#endif
   }
 
   return CloseAllFildesUntilMaxFD(preserve_fildes, max_fd);
-#endif  // #ifdef __APPLE__
 }
 
 /**
