@@ -291,7 +291,7 @@ func keyImporter(ks KeySpec) (string, string, string, bool, error) {
 	case "file":
 		id, sec, err := gw.LoadKey(ks.FileName)
 		if err != nil {
-			return "", "", "", false, fmt.Errorf("could not import key from file")
+			return "", "", "", false, fmt.Errorf("could not import key from file %s: %w", ks.FileName, err)
 		}
 		return id, sec, ks.Path, ks.Admin, nil
 	default:

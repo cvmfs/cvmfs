@@ -45,6 +45,10 @@ cvmfs_server_list() {
       transaction_info=" - in transaction"
     fi
 
+    # get the storage type of the repository
+    local storage_type=""
+    storage_type=$(get_upstream_type $CVMFS_UPSTREAM_STORAGE)
+
     # check if the repository whitelist is accessible and expired
     local whitelist_info=""
     if is_stratum0 $name; then
@@ -58,8 +62,17 @@ cvmfs_server_list() {
     fi
 
     # check if the repository is healthy
+    # For gateway publishers (gw upstream) or mountless gateway backends
+    # (no rdonly/union mounts), skip the health check — the local mount is
+    # expected to be out of date or absent entirely.
     local health_info=""
-    if ! health_check -q $name; then
+    if [ x"$storage_type" = x"gw" ]; then
+      health_info=""
+    elif is_stratum0 $name && \
+         ! is_mounted "${CVMFS_SPOOL_DIR}/rdonly" && \
+         ! is_mounted "/cvmfs/$name"; then
+      health_info=" - gw/mountless"
+    elif ! health_check -q $name; then
       health_info=" - unhealthy"
     fi
 
@@ -70,10 +83,6 @@ cvmfs_server_list() {
       local branch_name=$(get_checked_out_branch $name)
       checkout_info=" [checked out tag '$tag_name' on branch '$branch_name']"
     fi
-
-    # get the storage type of the repository
-    local storage_type=""
-    storage_type=$(get_upstream_type $CVMFS_UPSTREAM_STORAGE)
 
     # print out repository information list
     echo "$name ($CVMFS_REPOSITORY_TYPE / $storage_type$transaction_info$whitelist_info$health_info$checkout_info) $stratum1_info $version_info"

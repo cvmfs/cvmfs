@@ -31,8 +31,9 @@ install (
   PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
 )
 
-install (
-  FILES         config/repo.json config/user.json
-  DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/gateway"
-  PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+# Install config files.
+install(
+  FILES config/repo.json config/user.json
+  DESTINATION "${SYSCONF_INSTALL_DIR}/cvmfs/gateway"
+  PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
 )

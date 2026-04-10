@@ -83,6 +83,126 @@ cvmfs_server_alterfs() {
 
 ################################################################################
 
+# Publish the repository public key and a client mount helper script to the
+# HTTP-served storage area.  This is a convenience/dev feature triggered by the
+# undocumented -D flag.
+_mkfs_publish_client_setup() {
+  local name=$1
+  local upstream=$2
+  local stratum0=$3
+
+  local pub_key="/etc/cvmfs/keys/${name}.pub"
+  if ! cvmfs_sys_file_is_regular "$pub_key"; then
+    echo "Warning: public key $pub_key not found, skipping client setup publish"
+    return
+  fi
+
+  # Determine the public server URL that clients should use.  If stratum0 still
+  # points to localhost, try to replace it with the machine's hostname.
+  local server_url="$stratum0"
+  if echo "$server_url" | grep -q "://localhost"; then
+    local fqdn
+    fqdn=$(hostname -f 2>/dev/null || hostname 2>/dev/null || echo "localhost")
+    server_url=$(echo "$server_url" | sed "s|://localhost|://${fqdn}|")
+  fi
+
+  # Generate the mount helper script
+  local mount_script_content
+  mount_script_content=$(cat <<MOUNT_SCRIPT_EOF
+#!/bin/sh
+# Auto-generated client setup script for CernVM-FS repository ${name}
+# Usage:  curl <server>/${name}/mount-${name}.sh | sh
+#
+# This script must be run as root.
+
+set -e
+
+REPO="${name}"
+SERVER_URL="${server_url}"
+PUB_KEY_URL="\${SERVER_URL}/${name}.pub"
+KEY_DIR="/etc/cvmfs/keys"
+
+echo "Setting up CernVM-FS client for \${REPO} ..."
+
+# Ensure cvmfs client is installed
+if ! command -v cvmfs2 >/dev/null 2>&1 && ! command -v mount.cvmfs >/dev/null 2>&1; then
+  echo "Error: CernVM-FS client (cvmfs2) is not installed." >&2
+  echo "Install it first, e.g.:  yum install cvmfs  or  apt-get install cvmfs" >&2
+  exit 1
+fi
+
+# Download the public key
+mkdir -p "\${KEY_DIR}"
+echo "Downloading public key from \${PUB_KEY_URL} ..."
+curl -fsSL "\${PUB_KEY_URL}" -o "\${KEY_DIR}/\${REPO}.pub"
+echo "  -> \${KEY_DIR}/\${REPO}.pub"
+
+# Write per-repository client configuration
+REPO_CONF_DIR="/etc/cvmfs/config.d"
+mkdir -p "\${REPO_CONF_DIR}"
+cat > "\${REPO_CONF_DIR}/\${REPO}.conf" <<CONF_EOF
+CVMFS_SERVER_URL=\${SERVER_URL}
+CVMFS_PUBLIC_KEY=\${KEY_DIR}/\${REPO}.pub
+CONF_EOF
+echo "  -> \${REPO_CONF_DIR}/\${REPO}.conf"
+
+# Ensure default.local exists with at least a proxy setting
+if [ ! -f /etc/cvmfs/default.local ]; then
+  cat > /etc/cvmfs/default.local <<DEFAULT_EOF
+CVMFS_HTTP_PROXY=DIRECT
+DEFAULT_EOF
+  echo "  -> created /etc/cvmfs/default.local (proxy=DIRECT)"
+fi
+
+# Create mountpoint and mount
+mkdir -p "/cvmfs/\${REPO}"
+echo "Mounting \${REPO} ..."
+mount -t cvmfs "\${REPO}" "/cvmfs/\${REPO}"
+echo "Done.  Repository is available at /cvmfs/\${REPO}"
+MOUNT_SCRIPT_EOF
+)
+
+  if is_local_upstream $upstream; then
+    local storage_dir="${DEFAULT_LOCAL_STORAGE}/${name}"
+    echo -n "Publishing public key to ${storage_dir}/ ... "
+    cp "$pub_key" "${storage_dir}/${name}.pub" || { echo "fail"; return; }
+    echo "done"
+
+    echo -n "Publishing client mount script to ${storage_dir}/mount-${name}.sh ... "
+    echo "$mount_script_content" > "${storage_dir}/mount-${name}.sh"
+    chmod 0644 "${storage_dir}/mount-${name}.sh"
+    echo "done"
+
+    echo "\
+Client setup published.  On a client machine, run:
+  curl ${server_url}/mount-${name}.sh | sudo sh"
+  elif is_s3_upstream $upstream; then
+    local temp_dir="${CVMFS_SPOOL_DIR}/tmp"
+
+    echo -n "Publishing public key to upstream storage ... "
+    cp "$pub_key" "${temp_dir}/${name}.pub"
+    __swissknife upload -i "${temp_dir}/${name}.pub" -o "${name}.pub" \
+      -r $CVMFS_UPSTREAM_STORAGE > /dev/null || { echo "fail"; return; }
+    rm -f "${temp_dir}/${name}.pub"
+    echo "done"
+
+    echo -n "Publishing client mount script to upstream storage ... "
+    echo "$mount_script_content" > "${temp_dir}/mount-${name}.sh"
+    __swissknife upload -i "${temp_dir}/mount-${name}.sh" -o "mount-${name}.sh" \
+      -r $CVMFS_UPSTREAM_STORAGE > /dev/null || { echo "fail"; return; }
+    rm -f "${temp_dir}/mount-${name}.sh"
+    echo "done"
+
+    echo "\
+Client setup published.  On a client machine, run:
+  curl ${server_url}/mount-${name}.sh | sudo sh"
+  else
+    echo "Warning: client setup publish not supported for upstream type '$(get_upstream_type $upstream)'"
+  fi
+}
+
+################################################################################
+
 
 cvmfs_server_mkfs() {
   local name
@@ -102,6 +222,8 @@ cvmfs_server_mkfs() {
   local external_data=false
   local require_masterkeycard=0
   local ignore_manifest_overwrite=0
+  local no_publisher=0
+  local publish_client_setup=0
 
   local configure_apache=1
   local voms_authz=""
@@ -109,8 +231,14 @@ cvmfs_server_mkfs() {
 
   # parameter handling
   OPTIND=1
-  while getopts "Xw:u:o:mf:vgG:a:zs:k:pRV:Z:x:I" option; do
+  while getopts "PXw:u:o:mf:vgG:a:zs:k:pRV:Z:x:ID" option; do
     case $option in
+      D)
+        publish_client_setup=1
+      ;;
+      P)
+        no_publisher=1
+      ;;
       X)
         external_data=true
       ;;
@@ -208,6 +336,9 @@ cvmfs_server_mkfs() {
 
   # sanity checks
   local upstream_type=$(get_upstream_type $upstream)
+  if [ $no_publisher -eq 1 ] && [ x"$upstream_type" = xgw ]; then
+    die "No-publisher bootstrap expects direct repository storage for the initial mkfs step. Create the backend repository first and switch to a gw,... upstream afterwards."
+  fi
   check_repository_existence $name  && die "The repository $name already exists"
   # if upstream is a gateway, we expect the repository to not be empty.
   if [ x"$upstream_type" != xgw ]; then
@@ -370,17 +501,25 @@ cvmfs_server_mkfs() {
   fi
   echo "done"
 
-  echo -n "Mounting CernVM-FS Storage... "
-  setup_and_mount_new_repository $name || die "fail"
-  echo "done"
+  if [ $no_publisher -eq 1 ]; then
+    echo -n "Configuring CernVM-FS Mount Points... "
+    setup_new_repository_mountpoints $name || die "fail"
+    echo "done"
+  else
+    echo -n "Mounting CernVM-FS Storage... "
+    setup_and_mount_new_repository $name || die "fail"
+    echo "done"
+  fi
 
   if [ $replicable -eq 1 ]; then
     cvmfs_server_alterfs -m on $name
   fi
 
-  health_check $name || die "fail! (health check after mount)"
+  if [ $no_publisher -eq 0 ]; then
+    health_check $name || die "fail! (health check after mount)"
+  fi
 
-  if [ x"$upstream_type" != xgw -a "x$voms_authz" = "x" ]; then
+  if [ $no_publisher -eq 0 ] && [ x"$upstream_type" != xgw -a "x$voms_authz" = "x" ]; then
       echo -n "Initial commit... "
       cvmfs_server_transaction $name > /dev/null || die "fail (transaction)"
       echo "New CernVM-FS repository for $name" > /cvmfs/${name}/new_repository
@@ -400,6 +539,10 @@ cvmfs_server_mkfs() {
   syncfs
 
   print_new_repository_notice $name $cvmfs_user $require_masterkeycard
+
+  if [ $publish_client_setup -eq 1 ]; then
+    _mkfs_publish_client_setup $name $upstream $stratum0
+  fi
 }
 
 
