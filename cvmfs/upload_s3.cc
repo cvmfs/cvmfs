@@ -326,10 +326,6 @@ void *S3Uploader::MainCollectResults(void *data) {
           failed_keys.insert(error_keys[i]);
         }
       }
-      // Log per-key errors if any
-      if (!failed_keys.empty() || info->error_code != s3fanout::kFailOk) {
-        atomic_inc32(&uploader->io_errors_);
-      }
       // Decrement jobs_in_flight_ once for the entire batch.
       uploader->Respond(NULL, UploaderResults(UploaderResults::kRemove,
                         (info->error_code != s3fanout::kFailOk) ? 99 : 0));
