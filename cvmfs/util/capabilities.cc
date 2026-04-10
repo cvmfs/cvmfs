@@ -36,9 +36,14 @@ gid_t old_gid;
 bool ObtainCapability(const cap_value_t,
                       const char *,
                       const bool avoid_mutexes = false) {
-  // there are no individual capabilities on OSX so switch back to root
-  old_uid = geteuid();
-  old_gid = getegid();
+  // there are no individual capabilities on OSX so switch to root.
+  // Only save uid/gid before the first elevation; subsequent calls while
+  // already root would overwrite them with 0 and the Drop would never
+  // restore to the original non-root credentials.
+  if (geteuid() != 0) {
+    old_uid = geteuid();
+    old_gid = getegid();
+  }
   return (SwitchCredentials(0, getgid(), true, avoid_mutexes));
 }
 
