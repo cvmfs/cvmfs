@@ -592,10 +592,10 @@ func removeHashMarkerIfPresent(digest string) string {
 // order (base layer first). The destPath is the path inside the CVMFS repository
 // where the merged result will be placed (without the /cvmfs/$REPO prefix).
 func Overlay(CVMFSRepo string, layerPaths []string, destPath string) error {
-	return OverlayWithLogger(nil, CVMFSRepo, layerPaths, destPath)
+	return OverlayWithLogger(nil, CVMFSRepo, layerPaths, destPath, "", false)
 }
 
-func OverlayWithLogger(logger *log.Entry, CVMFSRepo string, layerPaths []string, destPath string) error {
+func OverlayWithLogger(logger *log.Entry, CVMFSRepo string, layerPaths []string, destPath string, ociConfigPath string, skipSingularity bool) error {
 	logger = l.Ensure(logger)
 	if len(layerPaths) == 0 {
 		return fmt.Errorf("no layer paths provided for overlay")
@@ -619,8 +619,16 @@ func OverlayWithLogger(logger *log.Entry, CVMFSRepo string, layerPaths []string,
 
 	args := []string{"cvmfs_server", "overlay",
 		"-l", layers,
-		"-d", destPath,
-		CVMFSRepo}
+		"-d", destPath}
+
+	if ociConfigPath != "" {
+		args = append(args, "-c", ociConfigPath)
+	}
+	if skipSingularity {
+		args = append(args, "-S")
+	}
+
+	args = append(args, CVMFSRepo)
 
 	err := exec.ExecCommandWithLogger(llog(logger), args...).Start()
 	if err != nil {

@@ -10,6 +10,7 @@
 
 #include "swissknife_overlay.h"
 
+#include <fcntl.h>
 #include <inttypes.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -18,6 +19,7 @@
 #include <cassert>
 #include <ctime>
 #include <map>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -28,6 +30,8 @@
 #include "compression/compression.h"
 #include "crypto/hash.h"
 #include "directory_entry.h"
+#include "ingestion/ingestion_source.h"
+#include "json_document.h"
 #include "manifest.h"
 #include "network/download.h"
 #include "network/sink_path.h"
@@ -36,6 +40,7 @@
 #include "statistics.h"
 #include "upload.h"
 #include "upload_spooler_definition.h"
+#include "upload_spooler_result.h"
 #include "util/logging.h"
 #include "util/pointer.h"
 #include "util/posix.h"
@@ -67,6 +72,11 @@ ParameterList CommandOverlay::GetParams() const {
                "(default: zlib)"));
   r.push_back(Parameter::Optional('@', "proxy URL"));
   r.push_back(Parameter::Switch('L', "follow HTTP redirects"));
+  r.push_back(Parameter::Optional('c', "OCI image config JSON file path "
+               "(when provided, Singularity .singularity.d dotfiles are "
+               "injected into the merged overlay)"));
+  r.push_back(Parameter::Switch('S', "skip Singularity dotfile injection "
+               "even when an OCI config is provided"));
   return r;
 }
 
@@ -288,6 +298,570 @@ void CommandOverlay::MergeLayer(
   }
 }
 
+
+// ---------------------------------------------------------------------------
+// Singularity dotfile generation
+// ---------------------------------------------------------------------------
+
+// Static file contents for /.singularity.d — these mirror the Go
+// constants in singularity/dotfiles.go (originally from Sylabs/Singularity).
+
+static const char *const kSingExec =
+    "#!/bin/sh\n"
+    "for script in /.singularity.d/env/*.sh; do\n"
+    "    if [ -f \"$script\" ]; then\n"
+    "        . \"$script\"\n"
+    "    fi\n"
+    "done\n"
+    "exec \"$@\"\n";
+
+static const char *const kSingRun =
+    "#!/bin/sh\n"
+    "for script in /.singularity.d/env/*.sh; do\n"
+    "    if [ -f \"$script\" ]; then\n"
+    "        . \"$script\"\n"
+    "    fi\n"
+    "done\n"
+    "if test -n \"${SINGULARITY_APPNAME:-}\"; then\n"
+    "    if test -x \"/scif/apps/${SINGULARITY_APPNAME:-}/scif/runscript\"; then\n"
+    "        exec \"/scif/apps/${SINGULARITY_APPNAME:-}/scif/runscript\" \"$@\"\n"
+    "    else\n"
+    "        echo \"No Singularity runscript for contained app: ${SINGULARITY_APPNAME:-}\"\n"
+    "        exit 1\n"
+    "    fi\n"
+    "elif test -x \"/.singularity.d/runscript\"; then\n"
+    "    exec \"/.singularity.d/runscript\" \"$@\"\n"
+    "else\n"
+    "    echo \"No Singularity runscript found, executing /bin/sh\"\n"
+    "    exec /bin/sh \"$@\"\n"
+    "fi\n";
+
+static const char *const kSingShell =
+    "#!/bin/sh\n"
+    "for script in /.singularity.d/env/*.sh; do\n"
+    "    if [ -f \"$script\" ]; then\n"
+    "        . \"$script\"\n"
+    "    fi\n"
+    "done\n"
+    "if test -n \"$SINGULARITY_SHELL\" -a -x \"$SINGULARITY_SHELL\"; then\n"
+    "    exec $SINGULARITY_SHELL \"$@\"\n"
+    "    echo \"ERROR: Failed running shell as defined by '\\$SINGULARITY_SHELL'\" 1>&2\n"
+    "    exit 1\n"
+    "elif test -x /bin/bash; then\n"
+    "    SHELL=/bin/bash\n"
+    "    PS1=\"Singularity $SINGULARITY_NAME:\\w> \"\n"
+    "    export SHELL PS1\n"
+    "    exec /bin/bash --norc \"$@\"\n"
+    "elif test -x /bin/sh; then\n"
+    "    SHELL=/bin/sh\n"
+    "    export SHELL\n"
+    "    exec /bin/sh \"$@\"\n"
+    "else\n"
+    "    echo \"ERROR: /bin/sh does not exist in container\" 1>&2\n"
+    "fi\n"
+    "exit 1\n";
+
+static const char *const kSingStart =
+    "#!/bin/sh\n"
+    "# if we are here start notify PID 1 to continue\n"
+    "# DON'T REMOVE\n"
+    "kill -CONT 1\n"
+    "for script in /.singularity.d/env/*.sh; do\n"
+    "    if [ -f \"$script\" ]; then\n"
+    "        . \"$script\"\n"
+    "    fi\n"
+    "done\n"
+    "if test -x \"/.singularity.d/startscript\"; then\n"
+    "    exec \"/.singularity.d/startscript\"\n"
+    "fi\n";
+
+static const char *const kSingTest =
+    "#!/bin/sh\n"
+    "for script in /.singularity.d/env/*.sh; do\n"
+    "    if [ -f \"$script\" ]; then\n"
+    "        . \"$script\"\n"
+    "    fi\n"
+    "done\n"
+    "if test -n \"${SINGULARITY_APPNAME:-}\"; then\n"
+    "    if test -x \"/scif/apps/${SINGULARITY_APPNAME:-}/scif/test\"; then\n"
+    "        exec \"/scif/apps/${SINGULARITY_APPNAME:-}/scif/test\" \"$@\"\n"
+    "    else\n"
+    "        echo \"No tests for contained app: ${SINGULARITY_APPNAME:-}\"\n"
+    "        exit 1\n"
+    "    fi\n"
+    "elif test -x \"/.singularity.d/test\"; then\n"
+    "    exec \"/.singularity.d/test\" \"$@\"\n"
+    "else\n"
+    "    echo \"No test found in container, executing /bin/sh -c true\"\n"
+    "    exec /bin/sh -c true\n"
+    "fi\n";
+
+static const char *const kSingEnv01Base =
+    "#!/bin/sh\n"
+    "# \n"
+    "# Copyright (c) 2017, SingularityWare, LLC. All rights reserved.\n"
+    "# Copyright (c) 2015-2017, Gregory M. Kurtzer. All rights reserved.\n"
+    "# \n"
+    "# Copyright (c) 2016-2017, The Regents of the University of California,\n"
+    "# through Lawrence Berkeley National Laboratory (subject to receipt of any\n"
+    "# required approvals from the U.S. Dept. of Energy).  All rights reserved.\n"
+    "# \n";
+
+static const char *const kSingEnv90 =
+    "#!/bin/sh\n"
+    "# Custom environment shell code should follow\n";
+
+static const char *const kSingEnv95Apps =
+    "#!/bin/sh\n"
+    "#\n"
+    "# Copyright (c) 2017, SingularityWare, LLC. All rights reserved.\n"
+    "#\n"
+    "if test -n \"${SINGULARITY_APPNAME:-}\"; then\n"
+    "    # The active app should be exported\n"
+    "    export SINGULARITY_APPNAME\n"
+    "    if test -d \"/scif/apps/${SINGULARITY_APPNAME:-}/\"; then\n"
+    "        SCIF_APPS=\"/scif/apps\"\n"
+    "        SCIF_APPROOT=\"/scif/apps/${SINGULARITY_APPNAME:-}\"\n"
+    "        export SCIF_APPROOT SCIF_APPS\n"
+    "        PATH=\"/scif/apps/${SINGULARITY_APPNAME:-}:$PATH\"\n"
+    "        if test -d \"/scif/apps/${SINGULARITY_APPNAME:-}/bin\"; then\n"
+    "            PATH=\"/scif/apps/${SINGULARITY_APPNAME:-}/bin:$PATH\"\n"
+    "        fi\n"
+    "        if test -d \"/scif/apps/${SINGULARITY_APPNAME:-}/lib\"; then\n"
+    "            LD_LIBRARY_PATH=\"/scif/apps/${SINGULARITY_APPNAME:-}/lib:$LD_LIBRARY_PATH\"\n"
+    "            export LD_LIBRARY_PATH\n"
+    "        fi\n"
+    "        if [ -f \"/scif/apps/${SINGULARITY_APPNAME:-}/scif/env/01-base.sh\" ]; then\n"
+    "            . \"/scif/apps/${SINGULARITY_APPNAME:-}/scif/env/01-base.sh\"\n"
+    "        fi\n"
+    "        if [ -f \"/scif/apps/${SINGULARITY_APPNAME:-}/scif/env/90-environment.sh\" ]; then\n"
+    "            . \"/scif/apps/${SINGULARITY_APPNAME:-}/scif/env/90-environment.sh\"\n"
+    "        fi\n"
+    "        export PATH\n"
+    "    else\n"
+    "        echo \"Could not locate the container application: ${SINGULARITY_APPNAME}\"\n"
+    "        exit 1\n"
+    "    fi\n"
+    "fi\n";
+
+static const char *const kSingEnv99Base =
+    "#!/bin/sh\n"
+    "# \n"
+    "# Copyright (c) 2017, SingularityWare, LLC. All rights reserved.\n"
+    "# Copyright (c) 2015-2017, Gregory M. Kurtzer. All rights reserved.\n"
+    "# \n"
+    "if [ -z \"$LD_LIBRARY_PATH\" ]; then\n"
+    "    LD_LIBRARY_PATH=\"/.singularity.d/libs\"\n"
+    "else\n"
+    "    LD_LIBRARY_PATH=\"$LD_LIBRARY_PATH:/.singularity.d/libs\"\n"
+    "fi\n"
+    "PS1=\"Singularity> \"\n"
+    "export LD_LIBRARY_PATH PS1\n";
+
+static const char *const kSingEnv99Runtimevars =
+    "#!/bin/sh\n"
+    "if [ -n \"${SING_USER_DEFINED_PREPEND_PATH:-}\" ]; then\n"
+    "\tPATH=\"${SING_USER_DEFINED_PREPEND_PATH}:${PATH}\"\n"
+    "fi\n"
+    "if [ -n \"${SING_USER_DEFINED_APPEND_PATH:-}\" ]; then\n"
+    "\tPATH=\"${PATH}:${SING_USER_DEFINED_APPEND_PATH}\"\n"
+    "fi\n"
+    "if [ -n \"${SING_USER_DEFINED_PATH:-}\" ]; then\n"
+    "\tPATH=\"${SING_USER_DEFINED_PATH}\"\n"
+    "fi\n"
+    "unset SING_USER_DEFINED_PREPEND_PATH \\\n"
+    "\t  SING_USER_DEFINED_APPEND_PATH \\\n"
+    "\t  SING_USER_DEFINED_PATH\n"
+    "export PATH\n";
+
+static const char *const kSingStartscript =
+    "#!/bin/sh\n";
+
+
+string CommandOverlay::ShellEscape(const string &s) {
+  string escaped = ReplaceAll(s, "\\", "\\\\");
+  escaped = ReplaceAll(escaped, "\"", "\\\"");
+  escaped = ReplaceAll(escaped, "`", "\\`");
+  escaped = ReplaceAll(escaped, "$", "\\$");
+  return escaped;
+}
+
+
+string CommandOverlay::ArgsQuoted(const vector<string> &args) {
+  string quoted;
+  for (size_t i = 0; i < args.size(); ++i) {
+    if (i > 0) quoted += " ";
+    quoted += "\"" + ShellEscape(args[i]) + "\"";
+  }
+  return quoted;
+}
+
+
+string CommandOverlay::GenerateRunscript(
+    const vector<string> &entrypoint,
+    const vector<string> &cmd) {
+  string script = "#!/bin/sh\n";
+  if (!entrypoint.empty()) {
+    script += "OCI_ENTRYPOINT='" + ArgsQuoted(entrypoint) + "'\n";
+  } else {
+    script += "OCI_ENTRYPOINT=''\n";
+  }
+  if (!cmd.empty()) {
+    script += "OCI_CMD='" + ArgsQuoted(cmd) + "'\n";
+  } else {
+    script += "OCI_CMD=''\n";
+  }
+  script +=
+    "CMDLINE_ARGS=\"\"\n"
+    "# prepare command line arguments for evaluation\n"
+    "for arg in \"$@\"; do\n"
+    "    CMDLINE_ARGS=\"${CMDLINE_ARGS} \\\"$arg\\\"\"\n"
+    "done\n"
+    "# ENTRYPOINT only - run entrypoint plus args\n"
+    "if [ -z \"$OCI_CMD\" ] && [ -n \"$OCI_ENTRYPOINT\" ]; then\n"
+    "    if [ $# -gt 0 ]; then\n"
+    "        SINGULARITY_OCI_RUN=\"${OCI_ENTRYPOINT} ${CMDLINE_ARGS}\"\n"
+    "    else\n"
+    "        SINGULARITY_OCI_RUN=\"${OCI_ENTRYPOINT}\"\n"
+    "    fi\n"
+    "fi\n"
+    "# CMD only - run CMD or override with args\n"
+    "if [ -n \"$OCI_CMD\" ] && [ -z \"$OCI_ENTRYPOINT\" ]; then\n"
+    "    if [ $# -gt 0 ]; then\n"
+    "        SINGULARITY_OCI_RUN=\"${CMDLINE_ARGS}\"\n"
+    "    else\n"
+    "        SINGULARITY_OCI_RUN=\"${OCI_CMD}\"\n"
+    "    fi\n"
+    "fi\n"
+    "# ENTRYPOINT and CMD - run ENTRYPOINT with CMD as default args\n"
+    "# override with user provided args\n"
+    "if [ $# -gt 0 ]; then\n"
+    "    SINGULARITY_OCI_RUN=\"${OCI_ENTRYPOINT} ${CMDLINE_ARGS}\"\n"
+    "else\n"
+    "    SINGULARITY_OCI_RUN=\"${OCI_ENTRYPOINT} ${OCI_CMD}\"\n"
+    "fi\n"
+    "# Evaluate shell expressions first and set arguments accordingly,\n"
+    "# then execute final command as first container process\n"
+    "eval \"set ${SINGULARITY_OCI_RUN}\"\n"
+    "exec \"$@\"\n";
+  return script;
+}
+
+
+string CommandOverlay::GenerateEnvScript(const vector<string> &env) {
+  string script = "#!/bin/sh\n";
+  for (size_t i = 0; i < env.size(); ++i) {
+    const string &element = env[i];
+    const size_t eq = element.find('=');
+    if (eq == string::npos) {
+      // No '=' — just export empty default
+      script += "export " + element + "=\"${" + element + ":-}\"\n";
+    } else {
+      const string key = element.substr(0, eq);
+      const string val = element.substr(eq + 1);
+      if (key == "PATH") {
+        script += "export PATH=\"" + ShellEscape(val) + "\"\n";
+      } else {
+        script += "export " + key + "=\"${" + key + ":-\""
+                + ShellEscape(val) + "\"}\"\n";
+      }
+    }
+  }
+  return script;
+}
+
+
+OverlayEntry CommandOverlay::MakeDirEntry(const string &path,
+                                          const string &parent) {
+  OverlayEntry oe;
+  oe.path = path;
+  oe.parent = parent;
+  oe.is_whiteout = false;
+  oe.is_opaque_dir = false;
+  oe.entry.name_ = NameString(GetFileName(path));
+  oe.entry.mode_ = S_IFDIR | 0755;
+  oe.entry.uid_ = 0;
+  oe.entry.gid_ = 0;
+  oe.entry.size_ = 4096;
+  oe.entry.mtime_ = time(NULL);
+  oe.entry.linkcount_ = 2;
+  return oe;
+}
+
+
+/**
+ * Helper class to collect spooler results for singularity dotfiles.
+ * Registered as a listener on the spooler, it stores the content hash
+ * for each processed file keyed by path.
+ */
+class SingularitySpoolerSink {
+ public:
+  void OnFileProcessed(const upload::SpoolerResult &result) {
+    hashes_[result.local_path] = result.content_hash;
+  }
+
+  bool GetHash(const string &path, shash::Any *hash) const {
+    map<string, shash::Any>::const_iterator it = hashes_.find(path);
+    if (it == hashes_.end()) return false;
+    *hash = it->second;
+    return true;
+  }
+
+ private:
+  map<string, shash::Any> hashes_;
+};
+
+
+OverlayEntry CommandOverlay::MakeFileEntry(const string &path,
+                                           const string &parent,
+                                           const string &content,
+                                           upload::Spooler *spooler) {
+  // Process the content through the spooler to get a content hash.
+  // We use a StringIngestionSource so no temp file is needed.
+  // The spooler is used in a synchronous fashion: process one file,
+  // wait, then read the result via a temporary listener.
+  SingularitySpoolerSink sink;
+  typename upload::Spooler::CallbackPtr cb = spooler->RegisterListener(
+      &SingularitySpoolerSink::OnFileProcessed, &sink);
+
+  spooler->Process(
+      new StringIngestionSource(content, path),
+      false /* no chunking */);
+  spooler->WaitForUpload();
+  spooler->UnregisterListener(cb);
+
+  shash::Any content_hash;
+  if (!sink.GetHash(path, &content_hash)) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "Failed to get content hash for singularity file %s",
+             path.c_str());
+  }
+
+  OverlayEntry oe;
+  oe.path = path;
+  oe.parent = parent;
+  oe.is_whiteout = false;
+  oe.is_opaque_dir = false;
+  oe.entry.name_ = NameString(GetFileName(path));
+  oe.entry.mode_ = S_IFREG | 0755;
+  oe.entry.uid_ = 0;
+  oe.entry.gid_ = 0;
+  oe.entry.size_ = content.size();
+  oe.entry.mtime_ = time(NULL);
+  oe.entry.linkcount_ = 1;
+  oe.entry.checksum_ = content_hash;
+  return oe;
+}
+
+
+OverlayEntry CommandOverlay::MakeSymlinkEntry(const string &path,
+                                              const string &parent,
+                                              const string &target) {
+  OverlayEntry oe;
+  oe.path = path;
+  oe.parent = parent;
+  oe.is_whiteout = false;
+  oe.is_opaque_dir = false;
+  oe.entry.name_ = NameString(GetFileName(path));
+  oe.entry.mode_ = S_IFLNK | 0777;
+  oe.entry.uid_ = 0;
+  oe.entry.gid_ = 0;
+  oe.entry.size_ = target.size();
+  oe.entry.mtime_ = time(NULL);
+  oe.entry.linkcount_ = 1;
+  oe.entry.symlink_ = LinkString(target);
+  return oe;
+}
+
+
+bool CommandOverlay::InjectSingularityDotfiles(
+    const string &oci_config_path,
+    upload::Spooler *spooler,
+    map<string, OverlayEntry> *merged) {
+  // ---------------------------------------------------------------
+  // 1.  Parse the OCI image config JSON
+  // ---------------------------------------------------------------
+  int fd = open(oci_config_path.c_str(), O_RDONLY);
+  if (fd < 0) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "Failed to open OCI config file %s", oci_config_path.c_str());
+    return false;
+  }
+  string config_json;
+  if (!SafeReadToString(fd, &config_json)) {
+    close(fd);
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "Failed to read OCI config from %s", oci_config_path.c_str());
+    return false;
+  }
+  close(fd);
+
+  UniquePtr<JsonDocument> json(JsonDocument::Create(config_json));
+  if (!json.IsValid()) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "Failed to parse OCI config JSON from %s",
+             oci_config_path.c_str());
+    return false;
+  }
+
+  // Extract config.Env, config.Entrypoint, config.Cmd
+  vector<string> entrypoint;
+  vector<string> cmd;
+  vector<string> env;
+
+  const JSON *config_obj =
+      JsonDocument::SearchInObject(json->root(), "config", JSON_OBJECT);
+  if (config_obj != NULL) {
+    const JSON *ep_arr =
+        JsonDocument::SearchInObject(config_obj, "Entrypoint", JSON_ARRAY);
+    if (ep_arr != NULL) {
+      for (JSON::const_iterator it = ep_arr->begin();
+           it != ep_arr->end(); ++it) {
+        if (it->is_string()) entrypoint.push_back(it->get<string>());
+      }
+    }
+    const JSON *cmd_arr =
+        JsonDocument::SearchInObject(config_obj, "Cmd", JSON_ARRAY);
+    if (cmd_arr != NULL) {
+      for (JSON::const_iterator it = cmd_arr->begin();
+           it != cmd_arr->end(); ++it) {
+        if (it->is_string()) cmd.push_back(it->get<string>());
+      }
+    }
+    const JSON *env_arr =
+        JsonDocument::SearchInObject(config_obj, "Env", JSON_ARRAY);
+    if (env_arr != NULL) {
+      for (JSON::const_iterator it = env_arr->begin();
+           it != env_arr->end(); ++it) {
+        if (it->is_string()) env.push_back(it->get<string>());
+      }
+    }
+  }
+
+  LogCvmfs(kLogCvmfs, kLogStdout,
+           "Injecting Singularity dotfiles (Entrypoint: %zu, Cmd: %zu, "
+           "Env: %zu entries)",
+           entrypoint.size(), cmd.size(), env.size());
+
+  // ---------------------------------------------------------------
+  // 2.  Create directory entries
+  // ---------------------------------------------------------------
+  (*merged)[".singularity.d"] =
+      MakeDirEntry(".singularity.d", "");
+  (*merged)[".singularity.d/libs"] =
+      MakeDirEntry(".singularity.d/libs", ".singularity.d");
+  (*merged)[".singularity.d/actions"] =
+      MakeDirEntry(".singularity.d/actions", ".singularity.d");
+  (*merged)[".singularity.d/env"] =
+      MakeDirEntry(".singularity.d/env", ".singularity.d");
+
+  // Also create common FHS directories if missing
+  const char *fhs_dirs[] = {
+      "dev", "proc", "root", "var", "var/tmp", "tmp", "etc", "sys", "home",
+      NULL};
+  for (int i = 0; fhs_dirs[i] != NULL; ++i) {
+    const string d = fhs_dirs[i];
+    if (merged->find(d) == merged->end()) {
+      const string par = (d.find('/') != string::npos)
+                             ? GetParentPath(d)
+                             : "";
+      (*merged)[d] = MakeDirEntry(d, par);
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // 3.  Create file entries (content is uploaded via spooler)
+  // ---------------------------------------------------------------
+  // Action scripts
+  (*merged)[".singularity.d/actions/exec"] =
+      MakeFileEntry(".singularity.d/actions/exec",
+                    ".singularity.d/actions", kSingExec, spooler);
+  (*merged)[".singularity.d/actions/run"] =
+      MakeFileEntry(".singularity.d/actions/run",
+                    ".singularity.d/actions", kSingRun, spooler);
+  (*merged)[".singularity.d/actions/shell"] =
+      MakeFileEntry(".singularity.d/actions/shell",
+                    ".singularity.d/actions", kSingShell, spooler);
+  (*merged)[".singularity.d/actions/start"] =
+      MakeFileEntry(".singularity.d/actions/start",
+                    ".singularity.d/actions", kSingStart, spooler);
+  (*merged)[".singularity.d/actions/test"] =
+      MakeFileEntry(".singularity.d/actions/test",
+                    ".singularity.d/actions", kSingTest, spooler);
+
+  // Environment scripts
+  (*merged)[".singularity.d/env/01-base.sh"] =
+      MakeFileEntry(".singularity.d/env/01-base.sh",
+                    ".singularity.d/env", kSingEnv01Base, spooler);
+  (*merged)[".singularity.d/env/90-environment.sh"] =
+      MakeFileEntry(".singularity.d/env/90-environment.sh",
+                    ".singularity.d/env", kSingEnv90, spooler);
+  (*merged)[".singularity.d/env/91-environment.sh"] =
+      MakeFileEntry(".singularity.d/env/91-environment.sh",
+                    ".singularity.d/env", kSingEnv90, spooler);
+  (*merged)[".singularity.d/env/95-apps.sh"] =
+      MakeFileEntry(".singularity.d/env/95-apps.sh",
+                    ".singularity.d/env", kSingEnv95Apps, spooler);
+  (*merged)[".singularity.d/env/99-base.sh"] =
+      MakeFileEntry(".singularity.d/env/99-base.sh",
+                    ".singularity.d/env", kSingEnv99Base, spooler);
+  (*merged)[".singularity.d/env/99-runtimevars.sh"] =
+      MakeFileEntry(".singularity.d/env/99-runtimevars.sh",
+                    ".singularity.d/env", kSingEnv99Runtimevars, spooler);
+
+  // OCI-config-dependent files
+  const string runscript = GenerateRunscript(entrypoint, cmd);
+  (*merged)[".singularity.d/runscript"] =
+      MakeFileEntry(".singularity.d/runscript",
+                    ".singularity.d", runscript, spooler);
+  (*merged)[".singularity.d/startscript"] =
+      MakeFileEntry(".singularity.d/startscript",
+                    ".singularity.d", kSingStartscript, spooler);
+
+  const string env_script = GenerateEnvScript(env);
+  (*merged)[".singularity.d/env/10-docker2singularity.sh"] =
+      MakeFileEntry(".singularity.d/env/10-docker2singularity.sh",
+                    ".singularity.d/env", env_script, spooler);
+
+  // ---------------------------------------------------------------
+  // 4.  Create symlinks
+  // ---------------------------------------------------------------
+  // Only create if not already present from a layer
+  if (merged->find("singularity") == merged->end()) {
+    (*merged)["singularity"] =
+        MakeSymlinkEntry("singularity", "",
+                         ".singularity.d/runscript");
+  }
+  if (merged->find(".run") == merged->end()) {
+    (*merged)[".run"] =
+        MakeSymlinkEntry(".run", "",
+                         ".singularity.d/actions/run");
+  }
+  if (merged->find(".shell") == merged->end()) {
+    (*merged)[".shell"] =
+        MakeSymlinkEntry(".shell", "",
+                         ".singularity.d/actions/shell");
+  }
+  if (merged->find(".exec") == merged->end()) {
+    (*merged)[".exec"] =
+        MakeSymlinkEntry(".exec", "",
+                         ".singularity.d/actions/exec");
+  }
+  if (merged->find(".test") == merged->end()) {
+    (*merged)[".test"] =
+        MakeSymlinkEntry(".test", "",
+                         ".singularity.d/actions/test");
+  }
+  if (merged->find("environment") == merged->end()) {
+    (*merged)["environment"] =
+        MakeSymlinkEntry("environment", "",
+                         ".singularity.d/env/90-environment.sh");
+  }
+
+  LogCvmfs(kLogCvmfs, kLogStdout,
+           "Injected Singularity dotfiles into merged overlay");
+  return true;
+}
 
 
 bool CommandOverlay::PublishMergedEntries(
@@ -552,6 +1126,10 @@ int CommandOverlay::Main(const ArgumentList &args) {
         *args.find('Z')->second);
   }
 
+  const string oci_config_path =
+      (args.count('c') > 0) ? *args.find('c')->second : "";
+  const bool skip_singularity = (args.count('S') > 0);
+
   // Parse comma-separated layer paths
   const vector<string> layers = SplitString(layers_str, ',');
   if (layers.empty()) {
@@ -715,6 +1293,15 @@ int CommandOverlay::Main(const ArgumentList &args) {
   }
 
   delete root_catalog;
+
+  // Inject Singularity dotfiles if requested
+  if (!oci_config_path.empty() && !skip_singularity) {
+    if (!InjectSingularityDotfiles(oci_config_path,
+                                   spooler_files.weak_ref(), &merged)) {
+      PrintError("Failed to inject Singularity dotfiles");
+      return 4;
+    }
+  }
 
   // Set up WritableCatalogManager and publish merged entries
   LogCvmfs(kLogCvmfs, kLogStdout,
