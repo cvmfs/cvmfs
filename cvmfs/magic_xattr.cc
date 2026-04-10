@@ -50,6 +50,7 @@ MagicXattrManager::MagicXattrManager(
   Register("user.repo_counters", new RepoCountersMagicXattr());
   Register("user.repo_metainfo", new RepoMetainfoMagicXattr());
   Register("user.revision", new RevisionMagicXattr());
+  Register("user.revision_timestamp", new RevisionTimestampMagicXattr());
   Register("user.root_hash", new RootHashMagicXattr());
   Register("user.rx", new RxMagicXattr());
   Register("user.speed", new SpeedMagicXattr());
@@ -716,6 +717,15 @@ bool RevisionMagicXattr::PrepareValueFenced() {
 
 void RevisionMagicXattr::FinalizeValue() {
   result_pages_.push_back(StringifyUint(revision_));
+}
+
+bool RevisionTimestampMagicXattr::PrepareValueFenced() {
+  timestamp_ = xattr_mgr_->mount_point()->catalog_mgr()->GetTimestamp();
+  return true;
+}
+
+void RevisionTimestampMagicXattr::FinalizeValue() {
+  result_pages_.push_back(StringifyUint(timestamp_));
 }
 
 bool RootHashMagicXattr::PrepareValueFenced() {
