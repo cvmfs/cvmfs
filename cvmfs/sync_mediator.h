@@ -275,6 +275,14 @@ class SyncMediator : public virtual AbstractSyncMediator {
   bool handle_hardlinks_;
 
   /**
+   * When fast_delete is requested but the target path is not a nested catalog
+   * transition point, we fall back to filesystem traversal.  This flag ensures
+   * that any nested catalog transition points encountered during the traversal
+   * are still fast-deleted instead of being recursively traversed.
+   */
+  bool recursive_fast_delete_;
+
+  /**
    * Hardlinks are supported as long as they all reside in the same directory.
    * If a recursion enters a directory, we push an empty HardlinkGroupMap to
    * keep track of the hardlinks of this directory.
