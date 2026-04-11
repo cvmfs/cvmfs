@@ -19,6 +19,7 @@
 #include "sync_mediator.h"
 #include "sync_union.h"
 #include "sync_union_tarball.h"
+#include "upload_gateway_s3.h"
 #include "util/capabilities.h"
 #include "util/logging.h"
 #include "util/posix.h"
@@ -164,10 +165,46 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
   const upload::SpoolerDefinition spooler_definition_catalogs(
       spooler_definition.Dup2DefaultCompression());
 
-  params.spooler = upload::Spooler::Construct(spooler_definition,
-                                              &publish_statistics);
+  // Check for direct-to-S3 upload mode (prototype)
+  std::string s3_config_path;
+  if (args.find('3') != args.end()) {
+    s3_config_path = *args.find('3')->second;
+  }
+
+  const bool use_s3_direct = !s3_config_path.empty();
+  if (use_s3_direct
+      && spooler_definition.driver_type != upload::SpoolerDefinition::Gateway) {
+    // Do not silently fall back to the plain uploader: the caller asked for
+    // direct-to-S3 and would otherwise not notice that it did not happen.
+    PrintError("Direct-to-S3 upload (-3) requires a gateway spooler");
+    return 3;
+  }
+
+  if (use_s3_direct) {
+    // Direct-to-S3 mode: data chunks go to S3, catalogs through gateway
+    LogCvmfs(kLogCvmfs, kLogStdout,
+             "Swissknife Ingest: Using direct-to-S3 upload mode");
+
+    upload::GatewayS3Uploader *gw_s3 = new upload::GatewayS3Uploader(
+        spooler_definition, s3_config_path, params.repo_name);
+    if (!gw_s3->Initialize()) {
+      PrintError("Failed to initialize GatewayS3 uploader");
+      delete gw_s3;
+      return 3;
+    }
+    params.spooler = upload::Spooler::Construct(
+        spooler_definition, gw_s3, &publish_statistics);
+  } else {
+    params.spooler = upload::Spooler::Construct(
+        spooler_definition, &publish_statistics);
+  }
   if (NULL == params.spooler)
     return 3;
+
+  // The catalog spooler stays a plain gateway spooler in both modes: everything
+  // it uploads is metadata that has to go through the gateway anyway, so an
+  // S3-aware uploader here would only add a second fanout manager and collector
+  // thread that never route anything to S3.
   const std::unique_ptr<upload::Spooler> spooler_catalogs(
       upload::Spooler::Construct(spooler_definition_catalogs,
                                  &publish_statistics));

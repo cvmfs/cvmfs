@@ -72,6 +72,7 @@ set (CVMFS_UBENCHMARKS_SOURCES
   ${CVMFS_SOURCE_DIR}/upload_facility.cc
   ${CVMFS_SOURCE_DIR}/upload_local.cc
   ${CVMFS_SOURCE_DIR}/upload_gateway.cc
+  ${CVMFS_SOURCE_DIR}/upload_gateway_s3.cc
   ${CVMFS_SOURCE_DIR}/upload_s3.cc
   ${CVMFS_SOURCE_DIR}/upload_spooler_definition.cc
   ${CVMFS_SOURCE_DIR}/sanitizer.cc

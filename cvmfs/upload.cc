@@ -21,6 +21,24 @@ Spooler *Spooler::Construct(const SpoolerDefinition &spooler_definition,
   return result;
 }
 
+Spooler *Spooler::Construct(const SpoolerDefinition &spooler_definition,
+                            AbstractUploader *uploader,
+                            perf::StatisticsTemplate *statistics) {
+  Spooler *result = new Spooler(spooler_definition);
+  // Inject the pre-built uploader
+  result->uploader_ = uploader;
+  if (statistics != NULL) {
+    result->uploader_->InitCounters(statistics);
+  }
+  // configure the file processor context
+  result->ingestion_pipeline_ =
+      new IngestionPipeline(result->uploader_.weak_ref(), spooler_definition);
+  result->ingestion_pipeline_->RegisterListener(
+      &Spooler::ProcessingCallback, result);
+  result->ingestion_pipeline_->Spawn();
+  return result;
+}
+
 Spooler::Spooler(const SpoolerDefinition &spooler_definition)
     : spooler_definition_(spooler_definition) { }
 
