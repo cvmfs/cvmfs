@@ -101,6 +101,10 @@ create_and_run_vm() {
         sudo mount -t tmpfs -o size=512M cvmfs_root /cvmfs
         sudo mount /dev/vda /var/lib/cvmfs
 
+        echo '=== VM System Info ==='
+        uname -a
+        echo '======================'
+
         # 10.0.2.2 is the host gateway in QEMU SLIRP mode;
         # DIRECT avoids needing squid on the host
         export CVMFS_TEST_PROXY=DIRECT
