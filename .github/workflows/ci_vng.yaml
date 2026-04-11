@@ -3,6 +3,7 @@ on:
   pull_request:
     branches: [devel]
   push:
+    branches: [ci/vng-testing]
   workflow_dispatch:
     inputs:
       inputTestCases:
@@ -61,7 +62,8 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y virtme-ng
+          sudo apt-get install -y qemu-system-x86
+          pip install virtme-ng
       
       - name: Check for builddep package
         id: cvmfs-builddep-check
