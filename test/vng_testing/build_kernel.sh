@@ -17,41 +17,6 @@ fi
 
 SCRIPT_DIR=$(realpath "$(dirname "$0")")
 
-# Function to enable or disable config options
-# This function uses the `scripts/config` utility from the kernel source
-configure_kernel() {
-    echo "Configuring kernel options..."
-
-    vng --kconfig
-    CONFIG_FILE="$SCRIPT_DIR/configs/kernel_config.conf"
-    if [ ! -f "$CONFIG_FILE" ]; then
-        echo "Error: Config file '$CONFIG_FILE' does not exist."
-        exit 1
-    fi
-
-    awk -F '=' '
-        # Skip comments and empty lines
-        /^[[:space:]]*#/ { next }
-        /^[[:space:]]*$/ { next }
-
-        # Split the line by '=' and assign to CONFIG_OPTION and CONFIG_VALUE
-        { 
-            CONFIG_OPTION = $1
-            CONFIG_VALUE = $2
-            # Enable or disable based on the value (y/n)
-            if (CONFIG_VALUE == "y") {
-                print "Enabling " CONFIG_OPTION
-                system("'"$LINUX_SRC_PATH"'/scripts/config --enable " CONFIG_OPTION)
-            } else if (CONFIG_VALUE == "n") {
-                print "Disabling " CONFIG_OPTION
-                system("'"$LINUX_SRC_PATH"'/scripts/config --disable " CONFIG_OPTION)
-            } else {
-                print "Invalid value for " CONFIG_OPTION ": " CONFIG_VALUE
-            }
-        }
-    ' "$CONFIG_FILE"
-}
-
 # Set the Linux source directory
 LINUX_SRC_PATH="$1"
 if [ ! -d "$LINUX_SRC_PATH" ]; then
@@ -74,16 +39,17 @@ else
 fi
 git checkout "$GIT_TAG_COMMIT" || { echo "Error: Git checkout failed"; exit 1; }
 
-# Call the function to configure the kernel
-configure_kernel
-
-# Build the kernel (bzImage)
-echo "Building the kernel (bzImage)..."
-# Older kernels (< 5.18) fail to build objtool/host tools with newer GCC
-# due to -Werror on use-after-free false positives.  Suppress the error.
-make -j"$(nproc)" bzImage \
-    KCFLAGS="-Wno-error=use-after-free" \
-    HOSTCFLAGS="-O2 -Wno-error=use-after-free" \
+# Build the kernel using vng --build.  It generates a minimal .config
+# automatically (via vng --kconfig) and compiles bzImage.
+# WERROR=0 is needed because older kernels (< 5.18) trigger false-positive
+# -Werror=use-after-free in objtool/libsubcmd when built with GCC >= 12.
+echo "Building the kernel with vng --build..."
+CONFIG_FILE="$SCRIPT_DIR/configs/kernel_config.conf"
+VNG_CONFIG_ARGS=""
+if [ -f "$CONFIG_FILE" ]; then
+    VNG_CONFIG_ARGS="--config $CONFIG_FILE"
+fi
+WERROR=0 vng --build $VNG_CONFIG_ARGS \
     || { echo "Error: Kernel build failed."; exit 1; }
 
 # Create the directory for storing the kernel.
