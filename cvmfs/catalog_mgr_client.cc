@@ -383,6 +383,7 @@ void ClientCatalogManager::StageNestedCatalogByHash(
   CacheManager::Label label;
   label.path = GetCatalogDescription(mountpoint, hash);
   label.flags = CacheManager::kLabelCatalog;
+  label.zip_algorithm = decomp_alg_;
   int fd = fetcher_->Fetch(CacheManager::LabeledObject(hash, label));
   if (fd >= 0)
     fetcher_->cache_mgr()->Close(fd);
