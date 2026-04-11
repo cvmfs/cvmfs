@@ -696,9 +696,9 @@ const zip::Algorithm MountPoint::GetDecompressionAlg()
   zip::Algorithm decomp_alg;
   {
     std::string optarg;
-    if (options_mgr_->GetValue("CVMFS_DECOMPRESSION_ALGORITHM", &optarg)) {
+    if (options_mgr_->GetValue("CVMFS_DECOMPRESSION_ALGORITHM", &optarg) && !optarg.empty()) {
       decomp_alg = zip::ParseCompressionAlgorithm(optarg);
-    } else if (options_mgr_->GetValue("CVMFS_COMPRESSION_ALGORITHM", &optarg)) {
+    } else if (options_mgr_->GetValue("CVMFS_COMPRESSION_ALGORITHM", &optarg) && !optarg.empty()) {
       decomp_alg = zip::ParseCompressionAlgorithm(optarg);
     } else {
       decomp_alg = zip::Algorithm::kDefault;
@@ -715,9 +715,9 @@ CacheManager *FileSystem::SetupPosixCacheMgr(const string &instance) {
   zip::Algorithm decomp_alg;
   {
     std::string optarg;
-    if (options_mgr_->GetValue("CVMFS_DECOMPRESSION_ALGORITHM", &optarg)) {
+    if (options_mgr_->GetValue("CVMFS_DECOMPRESSION_ALGORITHM", &optarg) && !optarg.empty()) {
       decomp_alg = zip::ParseCompressionAlgorithm(optarg);
-    } else if (options_mgr_->GetValue("CVMFS_COMPRESSION_ALGORITHM", &optarg)) {
+    } else if (options_mgr_->GetValue("CVMFS_COMPRESSION_ALGORITHM", &optarg) && !optarg.empty()) {
       decomp_alg = zip::ParseCompressionAlgorithm(optarg);
     } else {
       decomp_alg = zip::Algorithm::kDefault;
