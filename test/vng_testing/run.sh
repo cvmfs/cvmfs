@@ -93,6 +93,36 @@ create_and_run_vm() {
         quoted_args+="$(printf " %q" "$arg")"
     done
 
+    # Write the guest script to a file instead of passing it inline via
+    # --exec.  The --exec payload is base64-encoded onto the kernel command
+    # line, which is limited to 2048 bytes on x86 (COMMAND_LINE_SIZE).
+    # With many test exclusions the encoded script exceeds that limit,
+    # truncating the trailing init= argument and causing a kernel panic.
+    # The host filesystem is mounted inside the VM via 9p, so the script
+    # file is directly accessible.
+    local guest_script
+    guest_script=$(mktemp "$SCRIPT_DIR/guest-script.XXXXXX.sh")
+    chmod +x "$guest_script"
+    cat > "$guest_script" <<GUEST_EOF
+#!/bin/bash
+# VM-specific mounts: / is read-only in virtme, so use tmpfs for /cvmfs
+sudo mount -t tmpfs -o size=512M cvmfs_root /cvmfs
+sudo mount /dev/vda /var/lib/cvmfs
+
+echo '=== VM System Info ==='
+uname -a
+echo '======================'
+
+# 10.0.2.2 is the host gateway in QEMU SLIRP mode;
+# DIRECT avoids needing squid on the host
+export CVMFS_TEST_PROXY=DIRECT
+# Skip autofs/systemd checks — the VM has no init system
+export CVMFS_TEST_DOCKER=yes
+
+cd $TEST_DIR && ./run.sh$quoted_args
+GUEST_EOF
+    trap "rm -f '$guest_script'" EXIT
+
     echo "virtme-ng version: $(vng --version 2>&1)"
     echo "Booting VM with kernel: $kernel_version"
     echo "KVM available: $([ -w /dev/kvm ] && echo yes || echo no)"
@@ -104,23 +134,7 @@ create_and_run_vm() {
     --network user \
     --user "$(whoami)" \
     --verbose \
-    --exec "
-        # VM-specific mounts: / is read-only in virtme, so use tmpfs for /cvmfs
-        sudo mount -t tmpfs -o size=512M cvmfs_root /cvmfs
-        sudo mount /dev/vda /var/lib/cvmfs
-
-        echo '=== VM System Info ==='
-        uname -a
-        echo '======================'
-
-        # 10.0.2.2 is the host gateway in QEMU SLIRP mode;
-        # DIRECT avoids needing squid on the host
-        export CVMFS_TEST_PROXY=DIRECT
-        # Skip autofs/systemd checks — the VM has no init system
-        export CVMFS_TEST_DOCKER=yes
-
-        cd $TEST_DIR && ./run.sh$quoted_args
-    "
+    --exec "$guest_script"
 }
 
 # Fetch kernels
