@@ -80,6 +80,10 @@ void SettingsTransaction::SetHashAlgorithm(const std::string &algorithm) {
 
 void SettingsTransaction::SetCompressionAlgorithm(const std::string &algorithm)
 {
+  if (algorithm.empty()) {
+    compression_algorithm_ = zip::Algorithm::kDefault;
+    return;
+  }
   compression_algorithm_ = zip::ParseCompressionAlgorithm(algorithm);
 }
 
