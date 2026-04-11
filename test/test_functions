@@ -800,9 +800,13 @@ create_repo() {
   local s3_config=""
   local stratum0=""
   local unionfs=""
+  local ignore_manifest=""
   if [ x"$CVMFS_TEST_S3_CONFIG" != x"" ]; then
     echo "  S3 Config: $CVMFS_TEST_S3_CONFIG"
     s3_config=" -s $CVMFS_TEST_S3_CONFIG"
+    # For remote S3 backends (e.g. Garage), stale manifests cannot be removed
+    # via the filesystem.  Use -I to force mkfs past an existing manifest.
+    ignore_manifest=" -I"
   fi
   if [ x"$CVMFS_TEST_HTTP_BASE" != x"" ]; then
     echo "  Stratum0: $CVMFS_TEST_HTTP_BASE"
@@ -817,6 +821,7 @@ create_repo() {
                             $s3_config                \
                             $stratum0                 \
                             $unionfs                  \
+                            $ignore_manifest          \
                             "$@" $repo || return 102
 
   local client_conf="/etc/cvmfs/repositories.d/${repo}/client.conf"

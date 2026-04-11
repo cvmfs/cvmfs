@@ -1,0 +1,101 @@
+# docker-compose.yml – CernVM-FS S3 integration test stack
+#
+# Self-contained stack for running the server integration test suite against
+# an S3 backend (Garage).  Replaces the manual network-stitching that the CI
+# workflow previously did between the cvmfs-dev and publish-mountless stacks.
+#
+# Services
+# --------
+#   cvmfs-dev    – build/test container (privileged, systemd)
+#   garage       – Garage S3-compatible object storage (v2)
+#   garage-setup – one-shot init: layout, key, bucket, website access
+#
+# Usage
+# -----
+#   docker compose up --build -d
+#   docker compose exec -u sftnight cvmfs-dev bash -c '...'
+#   docker compose down -v --remove-orphans
+
+name: cvmfs-s3-integration
+
+# ---------------------------------------------------------------------------
+# Shared S3 credentials
+# ---------------------------------------------------------------------------
+x-s3-env: &s3-env
+    S3_ACCESS_KEY: GK00c4f5e0a1b2c3d4e5f60011
+    S3_SECRET_KEY: 00c4f5e0a1b2c3d4e5f6001100c4f5e0a1b2c3d4e5f6001100c4f5e0a1b2c3d4
+    S3_BUCKET: cvmfs
+
+services:
+
+    # -----------------------------------------------------------------------
+    # cvmfs-dev – builds CVMFS from source and runs integration tests
+    # -----------------------------------------------------------------------
+    cvmfs-dev:
+        image: ghcr.io/cvmfs/cvmfs-dev:latest
+        container_name: cvmfs-dev
+        hostname: cvmfs-dev
+        privileged: true
+        cgroup: host
+        build:
+            context: ../../../..
+            dockerfile: test/common/container/Dockerfile-dev
+        volumes:
+            - /sys/fs/cgroup:/sys/fs/cgroup
+            - var_spool_cvmfs:/var/spool/cvmfs
+            - ../../../../:/home/sftnight/cvmfs
+        depends_on:
+            garage-setup:
+                condition: service_completed_successfully
+
+    # -----------------------------------------------------------------------
+    # Garage – S3-compatible object storage (v2)
+    # -----------------------------------------------------------------------
+    garage:
+        image: docker.io/dxflrs/garage:v2.2.0
+        container_name: cvmfs-garage
+        hostname: cvmfs-garage
+        networks:
+            default:
+                aliases:
+                    - cvmfs.web.garage.internal
+        volumes:
+            - ../publish-mountless/config/garage.toml:/etc/garage.toml:ro
+            - garage-meta:/var/lib/garage/meta
+            - garage-data:/var/lib/garage/data
+        healthcheck:
+            test: ["CMD", "/garage", "node", "id"]
+            interval: 3s
+            timeout: 5s
+            retries: 10
+
+    # -----------------------------------------------------------------------
+    # Garage setup – runs once after Garage is healthy
+    # -----------------------------------------------------------------------
+    garage-setup:
+        image: alpine:3
+        container_name: cvmfs-garage-setup
+        depends_on:
+            garage:
+                condition: service_healthy
+        environment:
+            GARAGE_ADMIN_URL: http://cvmfs-garage:3903
+            GARAGE_ADMIN_TOKEN: garage-admin-token
+            SETUP_GARAGE_DEBUG: "1"
+            <<: *s3-env
+        volumes:
+            - ../publish-mountless/scripts/setup_garage.sh:/setup_garage.sh:ro
+        entrypoint: ["/bin/sh", "-c"]
+        command:
+            - |
+              set -e
+              echo '[garage-setup] Installing curl and jq ...'
+              apk add --no-cache curl jq
+              echo '[garage-setup] Running setup_garage.sh ...'
+              sh /setup_garage.sh
+        restart: "no"
+
+volumes:
+    var_spool_cvmfs:
+    garage-meta:
+    garage-data:
