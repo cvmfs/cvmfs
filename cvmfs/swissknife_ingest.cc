@@ -19,6 +19,7 @@
 #include "sync_mediator.h"
 #include "sync_union.h"
 #include "sync_union_tarball.h"
+#include "upload_gateway_s3.h"
 #include "util/capabilities.h"
 #include "util/logging.h"
 #include "util/posix.h"
@@ -164,14 +165,53 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
   const upload::SpoolerDefinition spooler_definition_catalogs(
       spooler_definition.Dup2DefaultCompression());
 
-  params.spooler = upload::Spooler::Construct(spooler_definition,
-                                              &publish_statistics);
+  // Check for direct-to-S3 upload mode (prototype)
+  std::string s3_config_path;
+  if (args.find('3') != args.end()) {
+    s3_config_path = *args.find('3')->second;
+  }
+
+  const bool use_s3_direct = !s3_config_path.empty()
+                             && spooler_definition.driver_type
+                                    == upload::SpoolerDefinition::Gateway;
+
+  if (use_s3_direct) {
+    // Direct-to-S3 mode: data chunks go to S3, catalogs through gateway
+    LogCvmfs(kLogCvmfs, kLogStdout,
+             "Swissknife Ingest: Using direct-to-S3 upload mode");
+
+    upload::GatewayS3Uploader *gw_s3 = new upload::GatewayS3Uploader(
+        spooler_definition, s3_config_path, params.repo_name);
+    if (!gw_s3->Initialize()) {
+      PrintError("Failed to initialize GatewayS3 uploader");
+      delete gw_s3;
+      return 3;
+    }
+    params.spooler = upload::Spooler::Construct(spooler_definition, gw_s3,
+                                                &publish_statistics);
+  } else {
+    params.spooler = upload::Spooler::Construct(spooler_definition,
+                                                &publish_statistics);
+  }
   if (NULL == params.spooler)
     return 3;
-  const std::unique_ptr<upload::Spooler> spooler_catalogs(
-      upload::Spooler::Construct(spooler_definition_catalogs,
-                                 &publish_statistics));
-  if (spooler_catalogs.get() == nullptr)
+  upload::Spooler *spooler_catalogs_ptr = NULL;
+  if (use_s3_direct) {
+    upload::GatewayS3Uploader *gw_s3_cat = new upload::GatewayS3Uploader(
+        spooler_definition_catalogs, s3_config_path, params.repo_name);
+    if (!gw_s3_cat->Initialize()) {
+      PrintError("Failed to initialize GatewayS3 catalog uploader");
+      delete gw_s3_cat;
+      return 3;
+    }
+    spooler_catalogs_ptr = upload::Spooler::Construct(
+        spooler_definition_catalogs, gw_s3_cat, &publish_statistics);
+  } else {
+    spooler_catalogs_ptr = upload::Spooler::Construct(
+        spooler_definition_catalogs, &publish_statistics);
+  }
+  const std::unique_ptr<upload::Spooler> spooler_catalogs(spooler_catalogs_ptr);
+  if (!spooler_catalogs)
     return 3;
 
   const bool follow_redirects = (args.count('L') > 0);

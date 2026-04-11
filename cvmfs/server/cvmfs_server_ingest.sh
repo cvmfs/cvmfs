@@ -533,6 +533,16 @@ cvmfs_server_ingest() {
     ingest_command="$ingest_command -H $gw_key_file -P ${spool_dir}/session_token"
   fi
 
+  # Direct-to-S3 upload: if the publisher has S3 credentials and we are in
+  # mountless gateway mode, pass the S3 config so data chunks bypass the
+  # gateway.  The S3 config file is expected at the conventional path
+  # /etc/cvmfs/<repo>.s3.conf (same format as the native S3 backend).
+  local s3_direct_config="/etc/cvmfs/${name}.s3.conf"
+  if [ $mountless_gateway_ingest -eq 1 ] && [ -f "$s3_direct_config" ]; then
+    ingest_command="$ingest_command -3 $s3_direct_config"
+    echo "Info: using direct-to-S3 upload for data objects ($s3_direct_config)"
+  fi
+
 
   # ---> do it! (from here on we are changing things)
   publish_before_hook $name

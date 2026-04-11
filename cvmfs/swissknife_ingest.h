@@ -56,6 +56,8 @@ class Ingest : public Command {
         'Q', "GC SQLite database: read pending paths and delete them"));
     r.push_back(Parameter::Optional(
         'X', "GC database batch size (rows per invocation, 0 = all)"));
+    r.push_back(Parameter::Optional(
+        '3', "S3 config file for direct-to-S3 data upload (gateway mode)"));
 
     return r;
   }
