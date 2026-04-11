@@ -79,7 +79,12 @@ configure_kernel
 
 # Build the kernel (bzImage)
 echo "Building the kernel (bzImage)..."
-make -j"$(nproc)" bzImage || { echo "Error: Kernel build failed."; exit 1; }
+# Older kernels (< 5.18) fail to build objtool/host tools with newer GCC
+# due to -Werror on use-after-free false positives.  Suppress the error.
+make -j"$(nproc)" bzImage \
+    KCFLAGS="-Wno-error=use-after-free" \
+    HOSTCFLAGS="-O2 -Wno-error=use-after-free" \
+    || { echo "Error: Kernel build failed."; exit 1; }
 
 # Create the directory for storing the kernel.
 # Use the git tag/commit as the directory name when provided, otherwise fall
