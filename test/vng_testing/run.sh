@@ -95,6 +95,7 @@ create_and_run_vm() {
     vng \
     --run "$bzImage" \
     --force-9p \
+    --force-initramfs \
     --disk "$DISK_PATH" \
     --network user \
     --user "$(whoami)" \
