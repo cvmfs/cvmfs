@@ -30,9 +30,9 @@ cvmfs_run_test() {
   # Test 1: accessing an ignored repo via autofs fails silently
   # =========================================================================
 
-  echo "*** setting up config with CVMFS_IGNORED_REPOS via cvmfs_mount"
+  echo "*** setting up config with CVMFS_REPOSITORIES_NOMOUNT via cvmfs_mount"
   cvmfs_mount ${repo} \
-    "CVMFS_IGNORED_REPOS=${ignored_repo},another.example.tld" \
+    "CVMFS_REPOSITORIES_NOMOUNT=${ignored_repo},another.example.tld" \
     || return 10
 
   # Unmount everything so we can restart cleanly with autofs
@@ -86,7 +86,7 @@ cvmfs_run_test() {
 
   echo "*** setting up config with spaces in ignore list"
   cvmfs_mount ${repo} \
-    "CVMFS_IGNORED_REPOS= ${ignored_repo} , another.example.tld " \
+    "CVMFS_REPOSITORIES_NOMOUNT= ${ignored_repo} , another.example.tld " \
     || return 50
 
   # Restart with autofs
