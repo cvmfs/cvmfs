@@ -199,7 +199,7 @@ cvmfs_server_publish() {
         -w $stratum0                                   \
         -o $manifest                                   \
         -e $hash_algorithm                             \
-        -Z $compression_alg                            \
+        -Z ${compression_alg:-default}                 \
         -N $name                                       \
         -K $CVMFS_PUBLIC_KEY                           \
         $(get_follow_http_redirects_flag)              \
