@@ -2,8 +2,10 @@
 set -e
 
 usage() {
-    echo "Usage: $0 <linux-source-path>"
+    echo "Usage: $0 <linux-source-path> [<git-tag-or-commit>]"
     echo "    <linux-source-path> - Path to the Linux kernel source directory."
+    echo "    <git-tag-or-commit> - Optional git tag or commit to checkout (e.g., v5.12)."
+    echo "                          If omitted, you will be prompted interactively."
     echo "    The script will build the bzImage and place it in kernel/vx.xx/ directory."
     echo "    It also provides options to add/remove kernel config options and select a git tag or commit."
     exit 0
@@ -63,9 +65,13 @@ if [ ! -d ".git" ]; then
     exit 1
 fi
 
-# Prompt for a tag or commit hash
-echo "Enter the git tag or commit hash to checkout (e.g., v5.10 or a commit hash):"
-read -r GIT_TAG_COMMIT
+# Accept tag from argument or prompt interactively
+if [ -n "${2:-}" ]; then
+    GIT_TAG_COMMIT="$2"
+else
+    echo "Enter the git tag or commit hash to checkout (e.g., v5.10 or a commit hash):"
+    read -r GIT_TAG_COMMIT
+fi
 git checkout "$GIT_TAG_COMMIT" || { echo "Error: Git checkout failed"; exit 1; }
 
 # Call the function to configure the kernel
@@ -75,8 +81,10 @@ configure_kernel
 echo "Building the kernel (bzImage)..."
 make -j"$(nproc)" bzImage || { echo "Error: Kernel build failed."; exit 1; }
 
-# Create the directory for storing the kernel
-KERNEL_VERSION=$(make kernelversion)
+# Create the directory for storing the kernel.
+# Use the git tag/commit as the directory name when provided, otherwise fall
+# back to the version reported by the kernel Makefile.
+KERNEL_VERSION="${GIT_TAG_COMMIT:-$(make kernelversion)}"
 DEST_DIR="$SCRIPT_DIR/kernel/$KERNEL_VERSION"
 
 # Ensure the target directory exists

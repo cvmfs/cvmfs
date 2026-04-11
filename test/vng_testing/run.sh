@@ -57,6 +57,10 @@ setup() {
 }
 
 fetch_kernel() {
+    if [ -f "$KERNEL_DIR/$KERNEL_VERSION/bzImage" ]; then
+        echo "Kernel $KERNEL_VERSION already present at $KERNEL_DIR/$KERNEL_VERSION/bzImage, skipping fetch."
+        return 0
+    fi
     echo "Fetching kernel $KERNEL_VERSION from $KERNEL_BASE_URL ..."
     [ -d "$KERNEL_DIR/$KERNEL_VERSION" ] || mkdir -p "$KERNEL_DIR/$KERNEL_VERSION"
     if ! wget --quiet -O "$KERNEL_DIR/$KERNEL_VERSION/bzImage" "$KERNEL_BASE_URL/$KERNEL_VERSION/bzImage"; then
