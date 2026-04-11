@@ -337,7 +337,7 @@ cvmfs_server_mkfs() {
   # sanity checks
   local upstream_type=$(get_upstream_type $upstream)
   if [ $no_publisher -eq 1 ] && [ x"$upstream_type" = xgw ]; then
-    die "No-publisher bootstrap expects direct repository storage for the initial mkfs step. Create the backend repository first and switch to a gw,... upstream afterwards."
+    echo "Note: mountless publisher setup — FUSE mount will be skipped. Use cvmfs_server ingest for mountless gateway publishing."
   fi
   check_repository_existence $name  && die "The repository $name already exists"
   # if upstream is a gateway, we expect the repository to not be empty.

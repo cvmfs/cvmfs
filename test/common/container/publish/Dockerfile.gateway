@@ -1,0 +1,101 @@
+# Dockerfile.gateway – CernVM-FS gateway + receiver
+#
+# The gateway (Go) process manages publish leases and spawns cvmfs_receiver
+# (C++) as a child process over a pair of pipes.  Both binaries must therefore
+# live in the same container.
+#
+# Build context: repository root  (same as Dockerfile-dev)
+#   docker build -f test/common/container/publish/Dockerfile.gateway \
+#                -t cvmfs-gateway:latest .
+
+# ---------------------------------------------------------------------------
+# Stage 1 – build all cvmfs RPMs from the local source tree
+# ---------------------------------------------------------------------------
+FROM gitlab-registry.cern.ch/cernvm/build-images/centos_x86_64:9 AS builder
+
+USER root
+# Workaround for sudo issue after build-image upgrade
+# (similar to https://github.com/apptainer/apptainer/issues/2756)
+RUN chmod 0400 /etc/shadow
+
+RUN dnf install -y rpm-build
+RUN echo '%sftnight ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+
+USER sftnight
+RUN mkdir -p /home/sftnight/buildpackage /home/sftnight/cvmfs
+
+COPY . /home/sftnight/cvmfs
+# Build the main cvmfs package set (includes cvmfs-server, cvmfs-gateway,
+# cvmfs-libs sub-packages from packaging/rpm/cvmfs-universal.spec)
+RUN cd /home/sftnight/cvmfs && \
+    ./ci/build_package.sh $PWD $PWD/../buildpackage/ cvmfs
+
+# ---------------------------------------------------------------------------
+# Stage 2 – minimal runtime image: gateway + receiver only
+# ---------------------------------------------------------------------------
+FROM almalinux:9
+
+USER root
+# Same shadow workaround as builder stage
+RUN chmod 0400 /etc/shadow
+
+# Copy all built RPMs from the builder
+COPY --from=builder /home/sftnight/buildpackage/RPMS/x86_64/ /tmp/rpms/
+
+# Install only the sub-packages needed to run gateway + receiver:
+#   cvmfs-libs    – shared libraries used by both binaries
+#   cvmfs-[0-9]*  – the CVMFS client (provides /usr/bin/cvmfs2, required by
+#                   `cvmfs_server mkfs` health-check and fuse mount)
+#   cvmfs-server  – provides /usr/bin/cvmfs_receiver (and cvmfs_swissknife)
+#   cvmfs-gateway – provides /usr/bin/cvmfs_gateway
+# Pattern cvmfs-[0-9]* matches the version-numbered main package only
+# (not cvmfs-libs, cvmfs-server, cvmfs-gateway, …).
+# Dependencies satisfied automatically by dnf (attr, fuse3, openssl, …).
+# psmisc provides `killall` used by the gateway service unit on stop.
+RUN dnf install -y \
+        /tmp/rpms/cvmfs-libs-*.rpm \
+        /tmp/rpms/cvmfs-[0-9]*.rpm \
+        /tmp/rpms/cvmfs-server-*.rpm \
+        /tmp/rpms/cvmfs-gateway-*.rpm \
+    && dnf install -y \
+        attr \
+        fuse \
+        fuse3 \
+        jq \
+        psmisc \
+    && dnf clean all \
+    && rm -rf /tmp/rpms
+
+# ---------------------------------------------------------------------------
+# Runtime directories / volume mount points
+# ---------------------------------------------------------------------------
+# /etc/cvmfs/repositories.d/  – per-repo server config (created by cvmfs_server mkfs)
+# /etc/cvmfs/keys/            – repository signing & gateway keys
+# /var/spool/cvmfs/           – per-repo spool / transaction scratch space
+# /var/lib/cvmfs-gateway/     – gateway work dir (lease database, …)
+# /etc/cvmfs/gateway/         – gateway config (user.json, repo.json) – usually bind-mounted
+RUN mkdir -p \
+        /etc/cvmfs/repositories.d \
+        /etc/cvmfs/keys \
+        /etc/cvmfs/gateway \
+        /var/spool/cvmfs \
+        /var/lib/cvmfs-gateway \
+        /var/log/cvmfs_receiver \
+        /scripts
+
+VOLUME [ \
+    "/etc/cvmfs/repositories.d", \
+    "/etc/cvmfs/keys", \
+    "/var/spool/cvmfs", \
+    "/var/lib/cvmfs-gateway" \
+]
+
+# Gateway API port (default 4929) and HTTP port forwarded to Apache
+EXPOSE 4929
+
+# Copy entrypoint (sets up repo on first start, then runs cvmfs_gateway)
+COPY test/common/container/publish/scripts/entrypoint-gateway.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]
+

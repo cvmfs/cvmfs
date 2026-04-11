@@ -1,0 +1,146 @@
+# Dockerfile.gateway – CernVM-FS gateway + receiver (mountless / unprivileged)
+#
+# The gateway (Go) process manages publish leases and spawns cvmfs_receiver
+# (C++) as a child process over a pair of pipes.  Both binaries must therefore
+# live in the same container.
+#
+# This image is designed to run WITHOUT privileged mode or systemd.
+# The gateway uses mountless mode (mkfs -P -D): no FUSE mount, no overlayfs.
+# Publishing is done from a separate publisher container via connect-gw -P.
+#
+# Build context: repository root  (same as Dockerfile-dev)
+#   docker build -f test/common/container/publish-mountless/Dockerfile.gateway \
+#                -t cvmfs-gateway-mountless:latest .
+
+# ---------------------------------------------------------------------------
+# Stage go-gateway – build the Go gateway binary
+#
+# This stage depends only on gateway/ Go sources. It is completely independent
+# of the C++ build, so BuildKit caches it across C++ changes (and vice-versa).
+# ---------------------------------------------------------------------------
+FROM golang:1.24 AS go-gateway
+
+WORKDIR /src/gateway
+
+# Fetch module dependencies first – this layer is re-used as long as
+# go.mod / go.sum are unchanged, even if other source files change.
+COPY gateway/go.mod gateway/go.sum ./
+RUN go mod download
+
+COPY gateway/ ./
+
+ARG CVMFS_VERSION=2.14.0
+RUN go build \
+      -o /out/cvmfs_gateway \
+      -ldflags="-X main.Version=${CVMFS_VERSION}" \
+      .
+
+# ---------------------------------------------------------------------------
+# Stage 1 – build cvmfs RPMs from the local source tree (C++ only)
+#
+# BUILD_GATEWAY is left at its spec-file default (no), so the Go binary is
+# not rebuilt here; it is taken from the go-gateway stage above instead.
+# ---------------------------------------------------------------------------
+FROM almalinux:9 AS builder
+
+USER root
+# Workaround for sudo issue after build-image upgrade
+# (similar to https://github.com/apptainer/apptainer/issues/2756)
+RUN chmod 0400 /etc/shadow
+
+ENV CVMFS_EXTERNALS_PREFIX=$HOME/.cache/cvmfs_externals_install
+ENV CMAKE_CXX_COMPILER_LAUNCHER=ccache
+
+# Install build dependencies
+RUN dnf -y install dnf-utils && dnf config-manager --set-enabled crb && dnf install -y epel-release && dnf -y install ccache && dnf clean all
+
+RUN mkdir -p /home/sftnight/buildpackage /home/sftnight/buildpackage_config /home/sftnight/cvmfs /tmp/packaging/rpm/ /tmp/ci
+
+COPY ./ci/build_install_builddeps.sh /tmp/ci
+COPY ./packaging/rpm/cvmfs-universal.spec /tmp/packaging/rpm
+RUN --mount=type=cache,target=/var/cache/dnf \
+    cd /tmp/ && ./ci/build_install_builddeps.sh --install
+
+RUN --mount=type=bind,source=.,target=/home/sftnight/cvmfs \
+    cd /home/sftnight/cvmfs && ./ci/build_package.sh /home/sftnight/cvmfs /home/sftnight/buildpackage_config/ cvmfs-config
+
+RUN --mount=type=bind,source=.,target=/home/sftnight/cvmfs \
+    --mount=type=cache,target=/root/.cache/ccache \
+    --mount=type=cache,target=/root/.cache/cvmfs_externals_install \
+    cd /home/sftnight/cvmfs && ./ci/build_package.sh /home/sftnight/cvmfs /home/sftnight/buildpackage/ cvmfs
+
+# ---------------------------------------------------------------------------
+# Stage 2 – minimal runtime image: gateway + receiver only (mountless)
+# ---------------------------------------------------------------------------
+FROM almalinux:9
+
+USER root
+# Same shadow workaround as builder stage
+RUN chmod 0400 /etc/shadow
+
+# Copy all built RPMs from the builder
+COPY --from=builder /home/sftnight/buildpackage/RPMS/x86_64/ /tmp/rpms/
+COPY --from=builder /home/sftnight/buildpackage_config/RPMS/noarch/ /tmp/rpms_config/
+
+# Install only the sub-packages needed to run gateway + receiver + publisher:
+#   cvmfs-config  – default configuration
+#   cvmfs-libs    – shared libraries used by both binaries
+#   cvmfs-[0-9]*  – the CVMFS client (provides /usr/bin/cvmfs2, needed by
+#                   `cvmfs_server mkfs` sanity checks even in mountless mode)
+#   cvmfs-server  – provides /usr/bin/cvmfs_receiver (and cvmfs_swissknife)
+# No FUSE packages needed – mountless mode never mounts anything.
+# psmisc provides `killall` used by the gateway service unit on stop.
+# cvmfs_gateway is copied separately from the go-gateway stage (see below).
+RUN dnf install -y --allowerasing \
+        /tmp/rpms_config/*.rpm \
+        /tmp/rpms/*.rpm \
+    && dnf install -y --allowerasing \
+        attr \
+        curl \
+        jq \
+        openssl \
+        psmisc \
+    && dnf clean all \
+    && rm -rf /tmp/rpms /tmp/rpms_config
+
+# Install the gateway binary built in the Go stage.
+# Using COPY instead of the cvmfs-gateway RPM keeps the Go and C++ build
+# layers independent (changing gateway Go source only re-runs go-gateway,
+# and changing C++ source only re-runs the builder stage).
+COPY --from=go-gateway /out/cvmfs_gateway /usr/bin/cvmfs_gateway
+# Default gateway config files (equivalent to what the cvmfs-gateway RPM installs)
+COPY gateway/config/repo.json gateway/config/user.json /etc/cvmfs/gateway/
+
+# Pre-set capabilities on cvmfs_swissknife so that mkfs -P does not need
+# privileged mode at runtime.
+RUN setcap cap_dac_read_search,cap_sys_admin+p /usr/bin/cvmfs_swissknife 2>/dev/null || true && \
+    setcap cap_dac_read_search,cap_sys_admin+p /usr/bin/cvmfs_publish    2>/dev/null || true
+
+# ---------------------------------------------------------------------------
+# Runtime directories / volume mount points
+# ---------------------------------------------------------------------------
+RUN mkdir -p \
+        /etc/cvmfs/repositories.d \
+        /etc/cvmfs/keys \
+        /etc/cvmfs/gateway \
+        /var/spool/cvmfs \
+        /var/lib/cvmfs-gateway \
+        /var/log/cvmfs_receiver \
+        /scripts
+
+VOLUME [ \
+    "/etc/cvmfs/repositories.d", \
+    "/etc/cvmfs/keys", \
+    "/var/spool/cvmfs", \
+    "/var/lib/cvmfs-gateway" \
+]
+
+# Gateway API port (default 4929)
+EXPOSE 4929
+
+# Copy entrypoint (sets up repo on first start, then runs cvmfs_gateway)
+COPY test/common/container/publish-mountless/scripts/entrypoint-gateway.sh /entrypoint.sh
+COPY test/common/container/publish-mountless/scripts/entrypoint-publisher.sh /entrypoint-publisher.sh
+RUN chmod +x /entrypoint.sh /entrypoint-publisher.sh
+
+ENTRYPOINT ["/entrypoint.sh"]

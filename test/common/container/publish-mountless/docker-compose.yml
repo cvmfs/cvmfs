@@ -1,0 +1,172 @@
+# docker-compose.yml – CernVM-FS mountless publishing stack
+#
+# This stack runs entirely WITHOUT privileged mode or systemd.  The gateway
+# container uses mountless mode (mkfs -P -D): no FUSE mount, no overlayfs.
+# A separate publisher container connects via connect-gw -P and publishes
+# content via `cvmfs_server ingest` in mountless mode.
+#
+# Services
+# --------
+#   garage        – Garage S3-compatible object storage (v2)
+#   garage-setup  – one-shot init container: layout, key, bucket creation
+#   gateway       – cvmfs_gateway + cvmfs_receiver (mountless, unprivileged)
+#   publisher     – mountless publisher (connect-gw -P), runs ingest commands
+#
+# CVMFS clients read repository data directly from Garage's built-in web
+# endpoint (s3_web, port 3902).  The Docker network alias
+# "cvmfs.web.garage.internal" resolves to the Garage container and lets
+# Garage identify the correct bucket from the Host header.
+#
+# Typical workflow
+# ----------------
+#   docker compose build
+#   docker compose up -d
+#   # Wait for "publisher" to log "Publisher ready"
+#   # Ingest content from the publisher container:
+#   docker compose exec publisher cvmfs_server ingest \
+#       --tar_file /path/to/content.tar --base_dir / test.repo.org
+#
+# Credentials
+# -----------
+#   S3_ACCESS_KEY / S3_SECRET_KEY must match between garage-setup and gateway.
+#   GW_KEY_ID / GW_KEY_SECRET must match between gateway and publisher.
+#   The defaults below are suitable for local dev/test only.
+
+name: cvmfs-publish-mountless
+
+# ---------------------------------------------------------------------------
+# Shared environment for S3 credentials (keeps them in one place)
+# ---------------------------------------------------------------------------
+x-s3-env: &s3-env
+    S3_ACCESS_KEY: GK00c4f5e0a1b2c3d4e5f60011
+    S3_SECRET_KEY: 00c4f5e0a1b2c3d4e5f6001100c4f5e0a1b2c3d4e5f6001100c4f5e0a1b2c3d4
+    S3_BUCKET: cvmfs
+
+# ---------------------------------------------------------------------------
+# Shared environment for gateway key (keeps them in one place)
+# ---------------------------------------------------------------------------
+x-gw-key-env: &gw-key-env
+    GW_KEY_ID: mykey
+    GW_KEY_SECRET: mysecret
+
+services:
+
+    # -----------------------------------------------------------------------
+    # Garage – S3-compatible object storage (v2)
+    #
+    # The web endpoint (port 3902) serves bucket content over plain HTTP,
+    # using virtual-hosted-style bucket addressing via the Host header.
+    # The network alias "cvmfs.web.garage.internal" lets other containers
+    # (and Garage itself) resolve the <bucket>.web.garage.localhost pattern
+    # to this container.
+    # -----------------------------------------------------------------------
+    garage:
+        image: docker.io/dxflrs/garage:v2.2.0
+        container_name: cvmfs-garage
+        hostname: cvmfs-garage
+        networks:
+            default:
+                aliases:
+                    - cvmfs.web.garage.internal
+        volumes:
+            - ./config/garage.toml:/etc/garage.toml:ro
+            - garage-meta:/var/lib/garage/meta
+            - garage-data:/var/lib/garage/data
+        ports:
+            - "3900:3900"   # S3 API
+            - "3901:3901"   # RPC
+            - "3902:3902"   # Web / website access (anonymous reads)
+            - "3903:3903"   # Admin API
+        healthcheck:
+            test: ["CMD", "/garage", "node", "id"]
+            interval: 3s
+            timeout: 5s
+            retries: 10
+
+    # -----------------------------------------------------------------------
+    # Garage setup – runs once after Garage is healthy
+    # -----------------------------------------------------------------------
+    garage-setup:
+        image: alpine:3
+        container_name: cvmfs-garage-setup
+        depends_on:
+            - garage
+        environment:
+            GARAGE_ADMIN_URL: http://cvmfs-garage:3903
+            GARAGE_ADMIN_TOKEN: garage-admin-token
+            SETUP_GARAGE_DEBUG: "1"
+            <<: *s3-env
+        volumes:
+            - ./scripts/setup_garage.sh:/setup_garage.sh:ro
+        entrypoint: ["/bin/sh", "-c"]
+        command:
+            - |
+              set -e
+              echo '[garage-setup] Installing curl and jq ...'
+              apk add --no-cache curl jq
+              echo '[garage-setup] Running setup_garage.sh ...'
+              sh /setup_garage.sh
+        restart: "no"
+
+    # -----------------------------------------------------------------------
+    # Gateway + Receiver (mountless – no FUSE, no privileged)
+    # -----------------------------------------------------------------------
+    gateway:
+        build:
+            context: ../../../..
+            dockerfile: test/common/container/publish-mountless/Dockerfile.gateway
+        image: cvmfs-gateway-mountless:latest
+        container_name: cvmfs-gateway
+        hostname: cvmfs-gateway
+        depends_on:
+            - garage
+        # No privileged mode needed: mkfs -P skips the FUSE/overlayfs mount.
+        # Capabilities are pre-set on binaries at image build time.
+        environment:
+            REPO_NAME: test.repo.org
+            REPO_OWNER: root
+            GARAGE_HOST: cvmfs-garage
+            GARAGE_S3_PORT: "3900"
+            # Stratum-0 URL points directly at Garage's web endpoint.
+            # The hostname must match <bucket>.web.garage.localhost so that
+            # Garage can map the Host header to the correct S3 bucket.
+            STRATUM0_URL: http://cvmfs.web.garage.internal:3902
+            <<: [*gw-key-env, *s3-env]
+        volumes:
+            - ./config/user.json:/etc/cvmfs/gateway/user.json:ro
+            - ./config/repo.json:/etc/cvmfs/gateway/repo.json:ro
+            - etc-cvmfs-repos:/etc/cvmfs/repositories.d
+            - etc-cvmfs-keys:/etc/cvmfs/keys
+            - var-spool-cvmfs:/var/spool/cvmfs
+            - var-lib-gateway:/var/lib/cvmfs-gateway
+        ports:
+            - "4929:4929"   # Gateway lease API
+
+    # -----------------------------------------------------------------------
+    # Publisher (mountless – connect-gw -P, runs ingest commands)
+    # -----------------------------------------------------------------------
+    publisher:
+        image: cvmfs-gateway-mountless:latest
+        container_name: cvmfs-publisher
+        hostname: cvmfs-publisher
+        depends_on:
+            - gateway
+        entrypoint: ["/entrypoint-publisher.sh"]
+        environment:
+            REPO_NAME: test.repo.org
+            REPO_OWNER: root
+            GW_HOST: cvmfs-gateway
+            GW_PORT: "4929"
+            STRATUM0_URL: http://cvmfs.web.garage.internal:3902
+            <<: *gw-key-env
+        volumes:
+            - publisher-spool:/var/spool/cvmfs
+
+volumes:
+    garage-meta:
+    garage-data:
+    etc-cvmfs-repos:
+    etc-cvmfs-keys:
+    var-spool-cvmfs:
+    var-lib-gateway:
+    publisher-spool:
