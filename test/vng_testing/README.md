@@ -11,17 +11,12 @@ vng_testing/
 ├── build_kernel.sh         # Script to build custom kernels
 ├── cvmfs.img               # Virtual disk image used for mounting into the guest
 ├── README.md
-├── run.sh                  # Main script to orchestrate test execution
-├── test_functions          # Shared functions for test scripts
+├── run.sh                  # Boots VM and runs test/run.sh inside it
 ├── configs/
 │   └── kernel_config.conf  # Custom kernel build configuration
-├── guest/
-│   └── run_tests.sh        # Script executed inside the guest VM to run tests
 ├── kernel/                 # Holds bzImages for kernels
 │   ├── v5.11/
 │   │   └── bzImage         # Example Kernel image version 5.11
-├── results/
-│   └── test_failures.log   # Log file for failed test cases
 └── tests/                  # Tests are here
 ```
 
@@ -31,16 +26,12 @@ vng_testing/
    Use `build_kernel.sh` to build custom kernels with additional config options as specified in `configs/kernel_config.conf`. Kernels will be fetched from `KERNEL_BASE_URL` and will be kept under `kernel/vX.YZ`.
 
 2. **Test Orchestration:**
-   The `run.sh` script launches a virtual machine via virtme-ng, boots it with the selected kernel, and mounts the `cvmfs.img` filesystem. It then triggers `guest/run_tests.sh` inside the VM.
+   The `run.sh` script launches a virtual machine via virtme-ng, boots it with the selected kernel, and mounts the `cvmfs.img` filesystem. Inside the VM it performs guest-specific setup (mounting tmpfs for `/cvmfs`, mounting the cache disk) and then delegates to `test/run.sh` — the standard integration test runner — with all arguments forwarded.
 
 3. **Test Discovery and Execution:**
-   `guest/run_tests.sh` automatically discovers and executes each test suite under `../src/`. Each test is organized in its own directory with a `main` script or binary. Additional files (e.g., C sources) may be included as needed.
+   `test/run.sh` discovers and executes each test suite under `src/`. Each test is organized in its own directory with a `main` script or binary. The full test runner provides timeouts, xUnit output, colored status, and environment setup/cleanup.
 
-4. **Result Collection:**
-   Test failures and relevant logs are collected in `results/test_failures.log` for analysis.
-   Full test logs are collected in `results/test_run.log`
-
-5. **Extensibility:**
+4. **Extensibility:**
    New tests can be added by creating a new subdirectory under `tests/` with a `main` executable or script and can later be merged in `../src` after a successful run.
 
 ## Dependencies
@@ -66,13 +57,16 @@ DISK_SIZE="" default: 5G
    ./build_kernel.sh <linux-source-path>
    ```
 
-2. **Run All Tests:**
+2. **Run All Tests (default suite):**
    ```sh
    ./run.sh
    ```
 
-3. **Review Test Results:**
-   - Check `results/test_failures.log` for details on any failed tests.
+3. **Run with specific suite/exclusions:**
+   ```sh
+   ./run.sh -- -s quick -x src/095-fuser -- src/00* src/01*
+   ```
+   All arguments after `--` are forwarded directly to `test/run.sh`.
 
 4. **Add or Modify Tests:**
    - Create a new directory under `tests/` and add a `main` script or executable.

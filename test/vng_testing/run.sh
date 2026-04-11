@@ -2,29 +2,35 @@
 set -e
 
 usage() {
-    echo "Usage: $0 "
-    echo "    [--help] [-s <labels>] [-x <exclusions> --] [(optional) <test_list> (default: ../src/*)]"
-    echo "    The script will run tests from user given directory (default: ../src) using kernels from kernel/ directory."
+    echo "Usage: $0 [--help] [-- <run.sh args>]"
+    echo "    Boots a virtme-ng VM and runs test/run.sh inside it."
+    echo "    All arguments after '--' are forwarded to test/run.sh."
+    echo ""
+    echo "    Example: $0 -- -s quick -x src/095-fuser -- src/00* src/01*"
     exit 0
 }
 
-if [ $1 == "--help" ]; then
-    shift
+if [ "${1:-}" = "--help" ]; then
     usage
 fi
 
 KERNEL_VERSION="v5.12"
 SCRIPT_DIR=$(realpath "$(dirname "$0")")
+TEST_DIR=$(realpath "$SCRIPT_DIR/..")
 KERNEL_DIR="$SCRIPT_DIR/kernel"
 KERNEL_BASE_URL=${KERNEL_BASE_URL:="https://ecsft.cern.ch/dist/cvmfs/caches/kernel/"}
 # This disk serves as cvmfs cache
-DISK_PATH="${DISK_PATH:-./cvmfs.img}"
+DISK_PATH="${DISK_PATH:-$SCRIPT_DIR/cvmfs.img}"
 DISK_SIZE="${DISK_SIZE:-5}"
 
-# All arguments after run.sh are captured here
-EXTRA_ARGS=()
+# All arguments after '--' are forwarded to test/run.sh
+RUN_SH_ARGS=()
 while [[ $# -gt 0 ]]; do
-  EXTRA_ARGS+=("$1")
+  if [ "$1" = "--" ]; then
+    shift
+    RUN_SH_ARGS=("$@")
+    break
+  fi
   shift
 done
 
@@ -35,7 +41,7 @@ if [ ! -d "$KERNEL_DIR" ]; then
 fi
 
 setup() {
-    mkdir -p results
+    mkdir -p "$SCRIPT_DIR/results"
 
     # create cvmfs_cache.img if not already present
     if [ -f "$DISK_PATH" ]; then
@@ -76,18 +82,32 @@ create_and_run_vm() {
     local bzImage="$1"
     local kernel_version="$2"
     shift 2
-    local escaped_args=$(printf "'%q' " "${EXTRA_ARGS[@]}")
+
+    # Build a properly quoted argument string for run.sh
+    local quoted_args=""
+    for arg in "${RUN_SH_ARGS[@]}"; do
+        quoted_args+="$(printf " %q" "$arg")"
+    done
 
     echo "Booting VM with kernel: $kernel_version"
     vng \
     --run "$bzImage" \
     --force-9p \
-    --rwdir=results \
     --disk "$DISK_PATH" \
     --network user \
-    --user $(whoami) \
+    --user "$(whoami)" \
     --exec "
-        bash -c './guest/run_tests.sh $kernel_version $escaped_args'
+        # VM-specific mounts: / is read-only in virtme, so use tmpfs for /cvmfs
+        sudo mount -t tmpfs -o size=512M cvmfs_root /cvmfs
+        sudo mount /dev/vda /var/lib/cvmfs
+
+        # 10.0.2.2 is the host gateway in QEMU SLIRP mode;
+        # DIRECT avoids needing squid on the host
+        export CVMFS_TEST_PROXY=DIRECT
+        # Skip autofs/systemd checks — the VM has no init system
+        export CVMFS_TEST_DOCKER=yes
+
+        cd $TEST_DIR && ./run.sh$quoted_args
     "
 }
 
