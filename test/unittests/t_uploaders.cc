@@ -654,6 +654,77 @@ TYPED_TEST(T_Uploaders, RemoveFromStorage) {
 }
 
 
+//------------------------------------------------------------------------------
+
+
+namespace {
+struct BatchedRemoveCtx {
+  AbstractUploader *uploader;
+  unsigned num_keys;
+  atomic_int32 done;
+};
+
+static void *BatchedRemoveWorker(void *arg) {
+  BatchedRemoveCtx *ctx = static_cast<BatchedRemoveCtx *>(arg);
+  for (unsigned i = 0; i < ctx->num_keys; ++i) {
+    ctx->uploader->RemoveAsync("regression_" + StringifyInt(i));
+  }
+  ctx->uploader->WaitForUpload();
+  atomic_inc32(&ctx->done);
+  return NULL;
+}
+}  // namespace
+
+
+// Regression test for the S3 batched-delete deadlock.
+//
+// With batched deletes enabled, the base-class RemoveAsync() increments
+// jobs_in_flight_ for every key while the batch only flushes every
+// kMaxBatchDeleteSize (1000) keys.  jobs_in_flight_ is capped at
+// number_of_concurrent_uploads (default 512) and saturates long before the
+// batch is full, blocking the next RemoveAsync() forever.
+//
+// Enqueuing > 512 but < kMaxBatchDeleteSize keys triggers the deadlock.  The
+// loop runs in a worker thread so the main thread can bail out after a
+// generous timeout if the bug is present.
+TYPED_TEST(T_Uploaders, BatchedRemoveNoDeadlockSlow) {
+  if (!TestFixture::IsS3()) {
+    SUCCEED();
+    return;
+  }
+
+  const unsigned kNumKeys = 600;
+  const unsigned kTimeoutMs = 30000;
+
+  BatchedRemoveCtx ctx;
+  ctx.uploader = this->uploader_;
+  ctx.num_keys = kNumKeys;
+  atomic_init32(&ctx.done);
+
+  pthread_t worker;
+  ASSERT_EQ(0, pthread_create(&worker, NULL, BatchedRemoveWorker, &ctx));
+
+  unsigned elapsed_ms = 0;
+  while (!atomic_read32(&ctx.done) && elapsed_ms < kTimeoutMs) {
+    SafeSleepMs(100);
+    elapsed_ms += 100;
+  }
+
+  if (!atomic_read32(&ctx.done)) {
+    // Worker is stuck inside RemoveAsync's ++jobs_in_flight_.  The uploader
+    // state is unsafe to touch, so report the failure and abort the process
+    // rather than risk UB at tear-down or corrupting later tests.
+    ADD_FAILURE() << "RemoveAsync/WaitForUpload deadlocked with " << kNumKeys
+                  << " batched deletes";
+    fflush(stdout);
+    fflush(stderr);
+    _exit(1);
+  }
+  pthread_join(worker, NULL);
+  EXPECT_EQ(0U, this->uploader_->GetNumberOfErrors());
+}
+
+
 //
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 //

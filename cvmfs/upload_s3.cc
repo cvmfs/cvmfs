@@ -326,17 +326,9 @@ void *S3Uploader::MainCollectResults(void *data) {
           failed_keys.insert(error_keys[i]);
         }
       }
-      // Decrement jobs_in_flight_ once per key in the batch.
-      // Report per-key error code so callers can distinguish failures.
-      const unsigned batch_size = info->multi_delete_keys.size();
-      const int batch_error = (info->error_code != s3fanout::kFailOk) ? 99 : 0;
-      for (unsigned i = 0; i < batch_size; ++i) {
-        const int key_error = batch_error
-            ? batch_error
-            : (failed_keys.count(info->multi_delete_keys[i]) ? 99 : 0);
-        uploader->Respond(NULL, UploaderResults(UploaderResults::kRemove,
-                                                key_error));
-      }
+      // Decrement jobs_in_flight_ once for the entire batch.
+      uploader->Respond(NULL, UploaderResults(UploaderResults::kRemove,
+                        (info->error_code != s3fanout::kFailOk) ? 99 : 0));
     } else if (info->request == s3fanout::JobInfo::kReqDelete) {
       uploader->Respond(NULL, UploaderResults());
     } else if (info->request == s3fanout::JobInfo::kReqHeadOnly) {
@@ -513,7 +505,16 @@ void S3Uploader::DoRemoveAsync(const std::string &file_to_delete) {
     return;
   }
 
-  // Batch delete: collect keys and flush when batch is full
+  // Batch delete: collect keys and flush when the S3 batch limit is reached.
+  //
+  // The caller (RemoveAsync) already incremented jobs_in_flight_ for this key.
+  // We undo that immediately: for batched deletes, jobs_in_flight_ is managed
+  // per-batch rather than per-key.  FlushDeleteBatch() increments once when
+  // the batch is dispatched, and MainCollectResults decrements once when the
+  // batch response arrives.  This avoids a deadlock where jobs_in_flight_
+  // saturates (e.g. at 512) before the batch threshold (1000) is reached,
+  // blocking forever on a flush that never happens.
+  DecJobsInFlight();
   const MutexLockGuard guard(delete_batch_mutex_);
   pending_deletes_.push_back(mangled_path);
   if (pending_deletes_.size() >= kMaxBatchDeleteSize) {
@@ -542,8 +543,9 @@ void S3Uploader::FlushDeleteBatch() const {
   info->request = s3fanout::JobInfo::kReqDeleteMulti;
   info->multi_delete_keys.swap(pending_deletes_);
 
-  // Each key was already counted in jobs_in_flight_ by DoRemoveAsync().
-  // MainCollectResults will call Respond() once per key to balance them.
+  // Track this batch as a single job in flight.  MainCollectResults will
+  // call Respond() exactly once for kReqDeleteMulti to balance it.
+  IncJobsInFlight();
   s3fanout_mgr_->PushNewJob(info);
 }
 
