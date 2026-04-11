@@ -551,7 +551,8 @@ cvmfs_mount() {
   if running_on_osx; then
     cvmfs_mount_direct $repositories
   fi
-  if [ "x$cvmfs_test_autofs_on_startup" = "xfalse" ]; then
+  if [ "x$cvmfs_test_autofs_on_startup" = "xfalse" ] || \
+     [ "x$CVMFS_TEST_DOCKER" = "xyes" ]; then
     cvmfs_mount_direct $repositories
   fi
 
