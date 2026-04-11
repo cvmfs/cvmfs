@@ -89,13 +89,16 @@ create_and_run_vm() {
         quoted_args+="$(printf " %q" "$arg")"
     done
 
+    echo "virtme-ng version: $(vng --version 2>&1)"
     echo "Booting VM with kernel: $kernel_version"
+    echo "KVM available: $([ -w /dev/kvm ] && echo yes || echo no)"
     vng \
     --run "$bzImage" \
     --force-9p \
     --disk "$DISK_PATH" \
     --network user \
     --user "$(whoami)" \
+    --verbose \
     --exec "
         # VM-specific mounts: / is read-only in virtme, so use tmpfs for /cvmfs
         sudo mount -t tmpfs -o size=512M cvmfs_root /cvmfs

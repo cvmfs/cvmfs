@@ -53,6 +53,11 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
+      - name: Verify KVM
+        run: |
+          ls -la /dev/kvm
+          [ -w /dev/kvm ] || { echo "ERROR: /dev/kvm not writable"; exit 1; }
+
       - name: Install dependencies
         run: |
           sudo apt-get update
