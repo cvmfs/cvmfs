@@ -1,0 +1,13 @@
+#!/bin/bash
+
+cvmfs_test_name="Dummy test"
+cvmfs_test_suites="quick dummy"
+
+cvmfs_run_test() {
+  logfile=$1
+
+  echo "Dummy test" || return 1
+
+  return 0
+}
+
