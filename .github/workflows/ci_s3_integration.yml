@@ -101,22 +101,27 @@ jobs:
                         src/629-reflogrecreation                              \
                         src/630-publish_with_local_cache                      \
                         src/634-reflogchecksum                                \
+                        src/638-virtualdir                                    \
+                        src/643-masterkeycard                                 \
                         src/647-bearercvmfs                                   \
+                        src/661-garbage_collector_statistics                  \
                         src/670-listreflog                                     \
                         src/672-publish_stats_hardlinks                       \
                         src/673-acl                                           \
+                        src/675-statsupload                                   \
                         src/682-enter                                         \
                         src/684-https_s3                                      \
                         src/686-azureblob_s3                                  \
                         src/687-import_s3                                     \
                         src/691-metalink                                      \
                         src/692-https_azureblob_s3                            \
+                        src/693-resetafter                                    \
+                        src/699-servermount                                   \
                         src/702-symlink_caching                               \
                         src/811-commit-gateway                                \
                         --                                                    \
                         src/5*                                                \
-                        src/6*                                                \
-                        src/8*
+                        src/6* 
           '
 
       - name: Archive logs
