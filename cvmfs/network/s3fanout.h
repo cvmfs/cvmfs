@@ -270,6 +270,10 @@ class S3FanoutManager : SingleCopy {
     if (config_.dns_buckets) {
       return config_.protocol + "://" + complete_hostname_ + "/" + objkey;
     } else {
+      if (objkey.empty()) {
+        return config_.protocol + "://" + complete_hostname_ + "/"
+               + config_.bucket;
+      }
       return config_.protocol + "://" + complete_hostname_ + "/"
              + config_.bucket + "/" + objkey;
     }
