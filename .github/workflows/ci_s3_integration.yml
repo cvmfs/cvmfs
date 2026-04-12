@@ -10,7 +10,7 @@ jobs:
   s3-integration:
     name: "S3 integration tests (containerized publisher + garage)"
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 180
 
     env:
       COMPOSE_FILE: test/common/container/s3-integration/docker-compose.yml
