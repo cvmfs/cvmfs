@@ -1,0 +1,42 @@
+#!/bin/bash
+cvmfs_test_name="Creating and using repository should work with every compression algorithm"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+ALG_SET=(unset default zlib zstd none)
+
+do_alg() {
+  alg_spec=$1
+
+  repo_name=$alg_spec.compression.repo
+  MKFS_COMPRESSION_OPTS=()
+  if [[ "$alg_spec" != unset ]]; then
+    alg=$alg_spec
+    export CVMFS_COMPRESSION_ALGORITHM=$alg_spec # mkfs should propagate it into configs and we shouldn't need to export env var
+    MKFS_COMPRESSION_OPTS+=(-Z $alg)
+  else
+    alg=''
+    # CVMFS_COMPRESSION_ALGORITHM env var left unset (undeclared)
+  fi
+  [[ -v CVMFS_TEST_USER ]]
+  #sudo cvmfs_server mkfs -o "$CVMFS_TEST_USER" "${MKFS_COMPRESSION_OPTS[@]}" $repo_name || return 1 # apache etc
+  create_empty_repo $repo_name "$CVMFS_TEST_USER" NO "${MKFS_COMPRESSION_OPTS[@]}" || return 1
+
+  echo "check catalog and data integrity"
+  check_repository $repo_name -i  || return 2
+
+  start_transaction $repo_name || return 3
+  mkdir /cvmfs/$repo_name/subdir
+  echo -n hello | tee /cvmfs/$repo_name/subdir/hello.txt || return 4
+  publish_repo $repo_name || return 5
+  [[ "$(cat /cvmfs/$repo_name/subdir/hello.txt)" == "hello" ]] || return 6
+}
+
+cvmfs_run_test() {
+  logfile=$1
+
+  for alg in ${ALG_SET[@]}; do
+    do_alg "$alg" || return $?
+  done
+  return 0
+}
