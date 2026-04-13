@@ -554,6 +554,12 @@ cvmfs_server_ingest() {
       # TODO(jpriessn): implement publication counters upload to gateway
       if [ $mountless_gateway_ingest -ne 1 ]; then
         close_transaction  $name $use_fd_fallback
+      else
+        # close_transaction is skipped for mountless ingest (no FUSE overlay),
+        # but the session_token file created by the lease acquire must still
+        # be removed — the gateway committed and deleted it server-side via
+        # FinalizeSession(true), so only the local file remains.
+        rm -f "${spool_dir}/session_token"
       fi
       # For mountless gateway ingest the gateway lease was already committed
       # (and deleted server-side) by cvmfs_swissknife ingest via
