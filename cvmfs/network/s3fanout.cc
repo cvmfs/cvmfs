@@ -47,7 +47,7 @@ static string XmlEscape(const string &input) {
  * Uses Quiet mode so the response only contains errors, not successes.
  */
 string ComposeDeleteMultiXml(const vector<string> &keys) {
-  string xml = "<Delete><Quiet>true</Quiet>";
+  string xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Delete><Quiet>true</Quiet>";
   // ~70 bytes per <Object><Key>...</Key></Object> entry
   xml.reserve(xml.size() + keys.size() * 70 + 10);
   for (unsigned i = 0; i < keys.size(); ++i) {
