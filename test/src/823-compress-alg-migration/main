@@ -1,0 +1,131 @@
+#!/bin/bash
+cvmfs_test_name="Creating and using repository should work with every compression algorithm"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+ALG_SET=(unset default zlib zstd none)
+
+do_alg() {
+  alg_spec=$1
+
+  repo_name=$alg_spec.compression.repo
+  MKFS_COMPRESSION_OPTS=()
+  if [[ "$alg_spec" != unset ]]; then
+    alg=$alg_spec
+    #export CVMFS_COMPRESSION_ALGORITHM=$alg_spec # mkfs should propagate it into configs and we shouldn't need to export env var
+    MKFS_COMPRESSION_OPTS+=(-Z $alg)
+  else
+    alg=''
+    # CVMFS_COMPRESSION_ALGORITHM env var left unset (undeclared)
+  fi
+  [[ -v CVMFS_TEST_USER ]]
+  #sudo cvmfs_server mkfs -o "$CVMFS_TEST_USER" "${MKFS_COMPRESSION_OPTS[@]}" $repo_name || return 1 # apache etc
+  create_empty_repo $repo_name "$CVMFS_TEST_USER" NO "${MKFS_COMPRESSION_OPTS[@]}" || return 1
+  echo CVMFS_DEBUGLOG=/tmp/$repo_name.debug.log | sudo tee -a /etc/cvmfs/repositories.d/"$repo_name"/client.conf
+  sudo sed -i /etc/fstab -e "s/fsname=$repo_name,/&debug,/"
+  echo CVMFS_SHARED_CACHE=no                    | sudo tee -a /etc/cvmfs/repositories.d/"$repo_name"/client.conf
+
+  echo "check catalog and data integrity"
+  check_repository $repo_name -i  || return 2
+
+  #cvmfs_umount "$repo_name"
+  #cvmfs_mount "$repo_name"
+
+  # It's easier to incrementally change settings and accrue uncompressed local cache.
+  # This drops the cache, for the ultimate test of data accessibility:
+  #sudo cvmfs_config umount "$repo_name"
+  sudo umount /cvmfs/"$repo_name"
+  sudo umount /var/spool/cvmfs/"$repo_name"/rdonly
+  sudo rm -rf /var/spool/cvmfs/"$repo_name"/cache/"$repo_name"
+  #sudo cvmfs_server mount "$repo_name" || return 2
+  sudo mount /var/spool/cvmfs/"$repo_name"/rdonly || return 2
+  sudo mount /cvmfs/"$repo_name"
+
+  start_transaction $repo_name || return 3
+  mkdir /cvmfs/$repo_name/subdir
+  echo -n hello | tee /cvmfs/$repo_name/subdir/hello.txt || return 4
+  publish_repo $repo_name || return 5
+  find /cvmfs/$repo_name
+  ls -lR /cvmfs/$repo_name
+  [[ "$(cat /cvmfs/$repo_name/subdir/hello.txt)" == "hello" ]] || return 6
+
+  # It's easier to incrementally change settings and accrue uncompressed local cache.
+  # This drops the cache, for the ultimate test of data accessibility:
+  sudo umount /cvmfs/"$repo_name"
+  sudo umount /var/spool/cvmfs/"$repo_name"/rdonly
+  sudo rm -rf /var/spool/cvmfs/"$repo_name"/cache/"$repo_name"
+  sudo mount /var/spool/cvmfs/"$repo_name"/rdonly || return 7
+  sudo mount /cvmfs/"$repo_name"
+
+  [[ "$(cat /cvmfs/$repo_name/subdir/hello.txt)" == "hello" ]] || return 7
+
+  # remove CVMFS_DECOMPRESSION_ALGORITHM in client.conf and see if it reads repo correctly using catalog metadata
+  sudo umount /cvmfs/"$repo_name"
+  sudo umount /var/spool/cvmfs/"$repo_name"/rdonly
+  sudo sed -i /etc/cvmfs/repositories.d/"$repo_name"/client.conf -e "/CVMFS_DECOMPRESSION_ALGORITHM=/d" || return 11
+  # TODO explicit guess option should not be necessary
+  echo CVMFS_DECOMPRESSION_ALGORITHM=guess | sudo tee -a /etc/cvmfs/repositories.d/"$repo_name"/client.conf
+
+  sudo mount /var/spool/cvmfs/"$repo_name"/rdonly || return 12
+  sudo mount /cvmfs/"$repo_name"
+
+  find /cvmfs/$repo_name
+  ls -lR /cvmfs/$repo_name
+  [[ "$(cat /cvmfs/$repo_name/subdir/hello.txt)" == "hello" ]] || return 16
+
+  # alg mixing:
+  # set CVMFS_COMPRESSION_ALGORITHM in server.conf to sth else
+  # add and change files as part of publish process
+  # access all files
+  # in principle this necessarily ends up with not needing CVMFS_DECOMPRESSION_ALGORITHM setting and always consulting the catalogs
+  for alg_new_spec in ${ALG_SET[@]}; do
+
+    sudo umount /cvmfs/"$repo_name"
+    sudo umount /var/spool/cvmfs/"$repo_name"/rdonly
+
+    sudo sed -i /etc/cvmfs/repositories.d/"$repo_name"/server.conf -e "/CVMFS_COMPRESSION_ALGORITHM=/d"
+    sudo sed -i /etc/cvmfs/repositories.d/"$repo_name"/client.conf -e "/CVMFS_DECOMPRESSION_ALGORITHM=/d"
+    # try without:
+    # we might make this implicit for the root catalog...
+    echo CVMFS_DECOMPRESSION_ALGORITHM=guess | sudo tee -a /etc/cvmfs/repositories.d/"$repo_name"/client.conf
+    if [[ "$alg_new_spec" == unset ]]; then
+      new_alg=''
+      # CVMFS_COMPRESSION_ALGORITHM env var left unset (undeclared)
+    else
+      new_alg=$alg_new_spec
+      echo CVMFS_COMPRESSION_ALGORITHM=$new_alg | sudo tee -a /etc/cvmfs/repositories.d/"$repo_name"/server.conf
+    fi
+
+    sudo mount /var/spool/cvmfs/"$repo_name"/rdonly || return 99
+    sudo mount /cvmfs/"$repo_name"
+
+    [[ "$(cat /cvmfs/$repo_name/subdir/hello.txt)" == "hello" ]] || return 100
+    check_repository $repo_name -i  || return 101
+
+    start_transaction $repo_name || return 102
+    mkdir /cvmfs/$repo_name/subdir_newalg."$alg_new_spec"
+    echo -n "hello from $alg_new_spec" | tee /cvmfs/$repo_name/subdir_newalg."$alg_new_spec"/hello."$alg_new_spec".txt || return 103
+    publish_repo $repo_name || return 104
+
+    # It's easier to incrementally change settings and accrue uncompressed local cache.
+    # This drops the cache, for the ultimate test of data accessibility:
+    sudo umount /cvmfs/"$repo_name"
+    sudo umount /var/spool/cvmfs/"$repo_name"/rdonly
+    sudo rm -rf /var/spool/cvmfs/"$repo_name"/cache/"$repo_name"
+    sudo mount /var/spool/cvmfs/"$repo_name"/rdonly || return 99
+    sudo mount /cvmfs/"$repo_name"
+
+    [[ "$(cat /cvmfs/$repo_name/subdir_newalg."$alg_new_spec"/hello."$alg_new_spec".txt)" == "hello from $alg_new_spec" ]] || return 105
+    head /cvmfs/$repo_name/subdir*/hello*.txt || return 106
+  done
+}
+
+cvmfs_run_test() {
+  logfile=$1
+
+  for alg in ${ALG_SET[@]}; do
+    do_alg "$alg" || return $?
+
+  done
+  return 0
+}
