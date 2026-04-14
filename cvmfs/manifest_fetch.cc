@@ -46,8 +46,6 @@ static Failures DoVerify(unsigned char *manifest_data, size_t manifest_size,
   string certificate_url = base_url + "/";  // rest is in manifest
   shash::Any certificate_hash;
   cvmfs::MemSink certificate_memsink;
-  download::JobInfo download_certificate(&certificate_url, true, probe_hosts,
-                                       &certificate_hash, &certificate_memsink);
 
   // Load Manifest
   ensemble->raw_manifest_buf = manifest_data;
@@ -84,6 +82,20 @@ static Failures DoVerify(unsigned char *manifest_data, size_t manifest_size,
   ensemble->FetchCertificate(certificate_hash);
   if (!ensemble->cert_buf) {
     certificate_url += ensemble->manifest->MakeCertificatePath();
+
+    // We know the certificate is PEM-formatted, always starting with
+    // -----BEGIN CERTIFICATE-----. Definitely not an arbitrary binary, so
+    // kGuessCompression is completely reliable in this case.
+    zip::DecompressionAlg decomp_alg;
+#ifdef CVMFS_GUESS_DECOMPRESSOR
+    decomp_alg = zip::DecompressionAlg::kGuessDecompression;
+#else
+    // In future, we might have a manifest field for certificate decomp_alg
+    decomp_alg = zip::DecompressionAlgFromEnv();
+#endif
+    download::JobInfo download_certificate(&certificate_url, decomp_alg,
+                                           probe_hosts, &certificate_hash,
+                                           &certificate_memsink);
     retval_dl = download_manager->Fetch(&download_certificate);
     if (retval_dl != download::kFailOk) {
       result = kFailLoad;
