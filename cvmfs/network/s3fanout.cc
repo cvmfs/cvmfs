@@ -47,12 +47,11 @@ static string XmlEscape(const string &input) {
  * Uses Quiet mode so the response only contains errors, not successes.
  */
 string ComposeDeleteMultiXml(const vector<string> &keys) {
-  string xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-               "<Delete><Quiet>true</Quiet>\n";
+  string xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Delete><Quiet>true</Quiet>";
   // ~70 bytes per <Object><Key>...</Key></Object> entry
   xml.reserve(xml.size() + keys.size() * 70 + 10);
   for (unsigned i = 0; i < keys.size(); ++i) {
-    xml += "<Object><Key>" + XmlEscape(keys[i]) + "</Key></Object>\n";
+    xml += "<Object><Key>" + XmlEscape(keys[i]) + "</Key></Object>";
   }
   xml += "</Delete>";
   return xml;
@@ -606,15 +605,20 @@ bool S3FanoutManager::MkV2Authz(const JobInfo &info,
   string to_sign = request + "\n" + payload_hash + "\n" + content_type + "\n"
                    + timestamp + "\n";
   if (config_.x_amz_acl != "") {
-    to_sign += "x-amz-acl:" + config_.x_amz_acl + "\n" +  // default ACL
-               "/" + config_.bucket + "/" + info.object_key;
+    if (info.object_key.empty()) {
+      to_sign += "x-amz-acl:" + config_.x_amz_acl + "\n" +  // default ACL
+                 "/" + config_.bucket;
+    } else {
+      to_sign += "x-amz-acl:" + config_.x_amz_acl + "\n" +  // default ACL
+                 "/" + config_.bucket + "/" + info.object_key;
+    }
   }
   // S3 V2 requires subresources to be included in the string to sign.
   // For kReqDeleteMulti, object_key is intentionally empty: the canonical
-  // resource becomes "/<bucket>/?delete", matching the POST URL.
+  // resource becomes "/<bucket>?delete", matching the POST URL.
   if (info.request == JobInfo::kReqDeleteMulti) {
     if (config_.x_amz_acl == "")
-      to_sign += "/" + config_.bucket + "/" + info.object_key;
+      to_sign += "/" + config_.bucket;
     to_sign += "?delete";
   }
   LogCvmfs(kLogS3Fanout, kLogDebug, "%s string to sign for: %s",
@@ -727,9 +731,14 @@ bool S3FanoutManager::MkV4Authz(const JobInfo &info,
                        + "x-amz-date:" + timestamp + "\n";
 
   const string scope = date + "/" + config_.region + "/s3/aws4_request";
-  const string uri = config_.dns_buckets ? (string("/") + info.object_key)
-                                         : (string("/") + config_.bucket + "/"
-                                            + info.object_key);
+  string uri;
+  if (config_.dns_buckets) {
+    uri = string("/") + info.object_key;
+  } else if (info.object_key.empty()) {
+    uri = string("/") + config_.bucket;
+  } else {
+    uri = string("/") + config_.bucket + "/" + info.object_key;
+  }
 
   // V4 canonical query string: empty for most requests, "delete=" for
   // multi-object delete (the S3 ?delete parameter has no value)

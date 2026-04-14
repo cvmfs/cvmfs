@@ -1,0 +1,155 @@
+name: CI_s3_integration
+
+on:
+  push:
+    branches: ['devel', 'cvmfs*']
+  pull_request:
+    branches: ['devel', 'cvmfs*']
+
+jobs:
+  s3-integration:
+    name: "S3 integration tests (containerized publisher + garage)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+
+    env:
+      COMPOSE_FILE: test/common/container/s3-integration/docker-compose.yml
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build and start stack
+        run: |
+          docker compose up --build -d
+
+      - name: Setup CVMFS
+        run: |
+          docker compose exec -u sftnight -T cvmfs-dev bash -c \
+            "sudo cvmfs_config setup"
+
+      - name: Create S3 config inside cvmfs-dev
+        run: |
+          docker compose exec -T cvmfs-dev bash -c 'sudo mkdir -p /etc/cvmfs'
+          printf '%s\n' \
+            'CVMFS_S3_HOST=cvmfs-garage:3900' \
+            'CVMFS_S3_ACCESS_KEY=GK00c4f5e0a1b2c3d4e5f60011' \
+            'CVMFS_S3_SECRET_KEY=00c4f5e0a1b2c3d4e5f6001100c4f5e0a1b2c3d4e5f6001100c4f5e0a1b2c3d4' \
+            'CVMFS_S3_BUCKETS_PER_ACCOUNT=1' \
+            'CVMFS_S3_DNS_BUCKETS=false' \
+            'CVMFS_S3_MAX_NUMBER_OF_PARALLEL_CONNECTIONS=10' \
+            'CVMFS_S3_BUCKET=cvmfs' \
+            'CVMFS_S3_FLAVOR=awsv4' \
+            'CVMFS_S3_REGION=garage' \
+            | docker compose exec -T cvmfs-dev bash -c \
+                'sudo tee /etc/cvmfs/test_s3.conf > /dev/null'
+
+      - name: Run S3 integration tests
+        run: |
+          docker compose exec -u sftnight -T cvmfs-dev bash -c '
+            cd /home/sftnight/cvmfs/test
+            CVMFS_TEST_S3_CONFIG=/etc/cvmfs/test_s3.conf                      \
+            CVMFS_TEST_HTTP_BASE=http://cvmfs.web.garage.internal:3902        \
+            CVMFS_TEST_S3_STORAGE=/tmp/unused-garage-storage                  \
+            CVMFS_TEST_CLASS_NAME=S3ServerIntegrationTests                    \
+            ./run.sh /tmp/cvmfs-s3-test.log                                   \
+                     -o /tmp/cvmfs-s3-test.log.xunit.xml                      \
+                     -x src/514-changechunkedfile                             \
+                        src/518-hardlinkstresstest                            \
+                        src/519-importlegacyrepo                              \
+                        src/522-missingchunkfailover                          \
+                        src/523-corruptchunkfailover                          \
+                        src/524-corruptmanifestfailover                       \
+                        src/525-bigrepo                                       \
+                        src/528-recreatespoolarea                             \
+                        src/530-recreatespoolarea_defaultkey                  \
+                        src/533-volatilecacheset                              \
+                        src/537-symlinkedbackend                              \
+                        src/538-symlinkedstratum1backend                      \
+                        src/539-symlinkedvarspoolcvmfs                        \
+                        src/542-storagescrubbing                              \
+                        src/543-storagescrubbing_scriptable                   \
+                        src/550-livemigration                                 \
+                        src/563-garbagecollectlegacy                          \
+                        src/568-migratecorruptrepo                            \
+                        src/571-localbackendumask                             \
+                        src/572-proxyfailover                                 \
+                        src/582-autorepairmountpoints                        \
+                        src/583-httpredirects                                 \
+                        src/584-interleavingsnapshot                          \
+                        src/585-xattrs                                        \
+                        src/591-importrepo                                    \
+                        src/593-nestedwhiteout                                \
+                        src/594-backendoverwrite                              \
+                        src/595-geoipdbupdate                                 \
+                        src/598-partialpreload                                \
+                        src/599-removehardlinks                               \
+                        src/600-securecvmfs                                   \
+                        src/602-libcvmfs                                      \
+                        src/605-resurrectancientcatalog                       \
+                        src/607-noapache                                      \
+                        src/608-infofile                                      \
+                        src/609-metainfofile                                  \
+                        src/610-altpath                                       \
+                        src/614-geoservice                                    \
+                        src/615-externaldata                                  \
+                        src/616-blacklistconfigrepo                           \
+                        src/620-pullmixedrepo                                 \
+                        src/622-gracefulrmfs                                  \
+                        src/626-cacheexpiry                                   \
+                        src/628-pythonwrappedcvmfsserver                      \
+                        src/629-reflogrecreation                              \
+                        src/630-publish_with_local_cache                      \
+                        src/634-reflogchecksum                                \
+                        src/638-virtualdir                                    \
+                        src/643-masterkeycard                                 \
+                        src/647-bearercvmfs                                   \
+                        src/661-garbage_collector_statistics                  \
+                        src/670-listreflog                                     \
+                        src/672-publish_stats_hardlinks                       \
+                        src/673-acl                                           \
+                        src/675-statsupload                                   \
+                        src/682-enter                                         \
+                        src/684-https_s3                                      \
+                        src/686-azureblob_s3                                  \
+                        src/687-import_s3                                     \
+                        src/691-metalink                                      \
+                        src/692-https_azureblob_s3                            \
+                        src/693-resetafter                                    \
+                        src/699-servermount                                   \
+                        src/702-symlink_caching                               \
+                        src/811-commit-gateway                                \
+                        --                                                    \
+                        src/5*                                                \
+                        src/6* 
+          '
+
+      - name: Archive logs
+        if: ${{ always() }}
+        run: |
+          docker cp cvmfs-dev:/tmp/cvmfs-s3-test.log /tmp/cvmfs-s3-test.log || true
+
+      - name: Upload logs as artifact
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: S3 integration test logs
+          if-no-files-found: warn
+          path: /tmp/cvmfs-s3-test.log
+
+      - name: Collect logs on failure
+        if: failure()
+        run: |
+          echo "=== docker compose ps ==="
+          docker compose ps -a
+          echo ""
+          echo "=== garage logs ==="
+          docker compose logs garage 2>&1 | tail -50
+          echo ""
+          echo "=== garage-setup logs ==="
+          docker compose logs garage-setup 2>&1 | tail -50
+
+      - name: Tear down
+        if: always()
+        run: |
+          docker compose down -v --remove-orphans || true

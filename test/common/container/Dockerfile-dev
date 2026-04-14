@@ -45,6 +45,7 @@ RUN chmod 0400 /etc/shadow
 RUN dnf install -y \
     attr \
     autofs \
+    bc \
     bind-utils \
     e2fsprogs \
     fuse \

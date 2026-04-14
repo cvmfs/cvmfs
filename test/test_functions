@@ -803,6 +803,10 @@ create_repo() {
   local s3_config=""
   local stratum0=""
   local unionfs=""
+  # Always ignore stale manifests: when has_repo() returns false but a prior
+  # test run left data behind (e.g. config dir removed but /srv/cvmfs still
+  # present), mkfs would otherwise refuse to proceed.
+  local ignore_manifest=" -I"
   if [ x"$CVMFS_TEST_S3_CONFIG" != x"" ]; then
     echo "  S3 Config: $CVMFS_TEST_S3_CONFIG"
     s3_config=" -s $CVMFS_TEST_S3_CONFIG"
@@ -820,6 +824,7 @@ create_repo() {
                             $s3_config                \
                             $stratum0                 \
                             $unionfs                  \
+                            $ignore_manifest          \
                             "$@" $repo || return 102
 
   local client_conf="/etc/cvmfs/repositories.d/${repo}/client.conf"

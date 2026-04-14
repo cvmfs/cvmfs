@@ -20,10 +20,11 @@ cvmfs_server_connect_gw() {
   local keys_import_location
   local stratum0
   local fetch_keys=0
+  local no_publisher=0
 
   # parameter handling
   OPTIND=1
-  while getopts "u:o:k:w:K" option; do
+  while getopts "u:o:k:w:KP" option; do
     case $option in
       u)
         gateway_url=$OPTARG
@@ -39,6 +40,9 @@ cvmfs_server_connect_gw() {
       ;;
       K)
         fetch_keys=1
+      ;;
+      P)
+        no_publisher=1
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -207,10 +211,18 @@ for ext in ('pub', 'crt'):
   echo "  Upstream:     $upstream"
   echo "  Keys:         $keys_import_location"
   echo "  Owner:        $owner"
+  if [ $no_publisher -eq 1 ]; then
+    echo "  Mountless:    yes (no FUSE mount, for use with mountless ingest)"
+  fi
   echo
 
   # Delegate to mkfs with the right parameters
-  cvmfs_server_mkfs -w "$stratum0" \
+  local mkfs_flags=""
+  if [ $no_publisher -eq 1 ]; then
+    mkfs_flags="-P"
+  fi
+  cvmfs_server_mkfs $mkfs_flags \
+                    -w "$stratum0" \
                     -u "$upstream" \
                     -k "$keys_import_location" \
                     -o "$owner" \

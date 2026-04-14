@@ -1,0 +1,143 @@
+# docker-compose.yml – CernVM-FS publishing stack (Gateway + Receiver + S3)
+#
+# Services
+# --------
+#   garage        – Garage S3-compatible object storage (replaces MinIO)
+#   garage-setup  – one-shot init container: layout, key, bucket creation
+#   gateway       – cvmfs_gateway + cvmfs_receiver (spawned as child process)
+#   apache        – httpd fronting /cvmfs/<repo> via ProxyPass to Garage
+#
+# Typical workflow
+# ----------------
+#   docker compose build
+#   docker compose up -d
+#   # Wait for "gateway" to log "Starting cvmfs_gateway …"
+#   # Then on a publisher host (or in a separate container):
+#   #   cvmfs_server mkfs -w http://cvmfs-apache/cvmfs \
+#   #                     -u gw,/srv/cvmfs/test.repo.org/data/txn,http://cvmfs-gateway:4929/api/v1 \
+#   #                     -k /etc/cvmfs/keys -o $(whoami) test.repo.org
+#
+# Credentials
+# -----------
+#   S3_ACCESS_KEY / S3_SECRET_KEY must match between garage-setup and gateway.
+#   The defaults below are suitable for local dev/test only.
+
+name: cvmfs-publish
+
+# ---------------------------------------------------------------------------
+# Shared environment for S3 credentials (keeps them in one place)
+# ---------------------------------------------------------------------------
+x-s3-env: &s3-env
+    S3_ACCESS_KEY: GKcvmfsaccesskey00000001
+    S3_SECRET_KEY: cvmfs_secret_key_placeholder_32chars
+    S3_BUCKET: cvmfs
+
+services:
+
+    # -----------------------------------------------------------------------
+    # Garage – S3-compatible object storage
+    # -----------------------------------------------------------------------
+    garage:
+        image: dxfleurs/garage:v1.0.1
+        container_name: cvmfs-garage
+        hostname: cvmfs-garage
+        volumes:
+            - ./config/garage.toml:/etc/garage.toml:ro
+            - garage-meta:/var/lib/garage/meta
+            - garage-data:/var/lib/garage/data
+        ports:
+            - "3900:3900"   # S3 API
+            - "3902:3902"   # Web / website access
+            - "3903:3903"   # Admin API
+        healthcheck:
+            # `garage health` exits 0 when the daemon is up and the cluster is
+            # healthy; it uses the RPC port (3901) and requires no extra tools.
+            test: ["CMD", "garage", "health"]
+            interval: 3s
+            timeout: 5s
+            retries: 10
+
+    # -----------------------------------------------------------------------
+    # Garage setup – runs once after Garage is healthy
+    # -----------------------------------------------------------------------
+    garage-setup:
+        image: alpine:3
+        container_name: cvmfs-garage-setup
+        depends_on:
+            garage:
+                condition: service_healthy
+        environment:
+            GARAGE_ADMIN_URL: http://cvmfs-garage:3903
+            GARAGE_ADMIN_TOKEN: garage-admin-token
+            <<: *s3-env
+        volumes:
+            - ./scripts/setup_garage.sh:/setup_garage.sh:ro
+        entrypoint: ["/bin/sh", "-c"]
+        command:
+            - |
+              apk add --no-cache curl > /dev/null 2>&1
+              sh /setup_garage.sh
+        restart: "no"
+
+    # -----------------------------------------------------------------------
+    # Gateway + Receiver
+    # -----------------------------------------------------------------------
+    gateway:
+        build:
+            context: ../../../..
+            dockerfile: test/common/container/publish/Dockerfile.gateway
+        image: cvmfs-gateway:latest
+        container_name: cvmfs-gateway
+        hostname: cvmfs-gateway
+        depends_on:
+            garage-setup:
+                condition: service_completed_successfully
+        privileged: true   # required for overlayfs + FUSE mounts during mkfs
+        environment:
+            REPO_NAME: test.repo.org
+            REPO_OWNER: root
+            GARAGE_HOST: cvmfs-garage
+            GARAGE_S3_PORT: "3900"
+            STRATUM0_URL: http://cvmfs-apache
+            GW_KEY_ID: mykey
+            GW_KEY_SECRET: mysecret
+            <<: *s3-env
+        volumes:
+            - ./config/user.json:/etc/cvmfs/gateway/user.json:ro
+            - ./config/repo.json:/etc/cvmfs/gateway/repo.json:ro
+            - etc-cvmfs-repos:/etc/cvmfs/repositories.d
+            - etc-cvmfs-keys:/etc/cvmfs/keys
+            - var-spool-cvmfs:/var/spool/cvmfs
+            - var-lib-gateway:/var/lib/cvmfs-gateway
+            - apache-conf:/apache-conf
+        ports:
+            - "4929:4929"   # Gateway lease API
+
+    # -----------------------------------------------------------------------
+    # Apache – HTTP frontend for CVMFS clients
+    # -----------------------------------------------------------------------
+    apache:
+        build:
+            context: ../../../..
+            dockerfile: test/common/container/publish/Dockerfile.apache
+        image: cvmfs-apache:latest
+        container_name: cvmfs-apache
+        hostname: cvmfs-apache
+        depends_on:
+            - gateway
+        environment:
+            APACHE_CONF_DIR: /apache-conf
+        volumes:
+            - apache-conf:/apache-conf:ro
+        ports:
+            - "80:80"
+
+volumes:
+    garage-meta:
+    garage-data:
+    etc-cvmfs-repos:
+    etc-cvmfs-keys:
+    var-spool-cvmfs:
+    var-lib-gateway:
+    apache-conf:
+

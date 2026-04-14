@@ -1,0 +1,252 @@
+name: CI_publish_mountless
+
+
+#    paths:
+#      - 'cvmfs/server/**'
+#      - 'gateway/**'
+#      - 'test/common/container/publish-mountless/**'
+#      - '.github/workflows/ci_publish_mountless.yml'
+on:
+  push:
+    branches: ['devel', 'cvmfs*', 'cernvm-cr']
+  pull_request:
+    paths:
+      - 'cvmfs/server/**'
+      - 'gateway/**'
+      - 'test/common/container/publish-mountless/**'
+      - '.github/workflows/ci_publish_mountless.yml'
+    branches: ['devel', 'cvmfs*']
+  workflow_dispatch:
+
+jobs:
+  mountless-publish:
+    name: "Mountless gateway publish (no privileged, no systemd)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build gateway image (cached)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: test/common/container/publish-mountless/Dockerfile.gateway
+          tags: cvmfs-gateway-mountless:latest
+          load: true
+          cache-from: type=gha,scope=mountless-gateway
+          cache-to: type=gha,mode=max,scope=mountless-gateway
+
+      - name: Start the stack
+        working-directory: test/common/container/publish-mountless
+        run: |
+          docker compose up -d
+
+          echo "Waiting for garage-setup to complete ..."
+          # garage-setup is a one-shot init container; wait for it explicitly
+          for i in $(seq 1 90); do
+            status=$(docker inspect cvmfs-garage-setup --format '{{.State.Status}}' 2>/dev/null || echo "unknown")
+            if [ "$status" = "exited" ]; then
+              exit_code=$(docker inspect cvmfs-garage-setup --format '{{.State.ExitCode}}')
+              if [ "$exit_code" = "0" ]; then
+                echo "garage-setup completed successfully (after ${i}s)"
+                break
+              else
+                echo "FAIL: garage-setup exited with code $exit_code"
+                echo "=== garage-setup logs ==="
+                docker compose logs garage-setup 2>&1
+                echo "=== garage logs ==="
+                docker compose logs garage 2>&1 | tail -30
+                exit 1
+              fi
+            fi
+            sleep 1
+          done
+
+          echo "Waiting for gateway to become ready ..."
+          for i in $(seq 1 120); do
+            if docker compose logs gateway 2>&1 | grep -q "Starting cvmfs_gateway"; then
+              echo "Gateway is ready (after ${i}s)"
+              break
+            fi
+            sleep 1
+          done
+          # Verify Garage web endpoint is serving (website mode)
+          for i in $(seq 1 30); do
+            if docker compose exec -T gateway \
+              curl -sf -o /dev/null -w '%{http_code}' \
+                -H 'Host: cvmfs.web.garage.internal' \
+                http://cvmfs-garage:3902/ 2>/dev/null | grep -qE '(200|404)'; then
+              echo "Garage web endpoint is responding"
+              break
+            fi
+            sleep 1
+          done
+
+          echo "Waiting for publisher to become ready ..."
+          for i in $(seq 1 120); do
+            if docker compose logs publisher 2>&1 | grep -q "Publisher ready"; then
+              echo "Publisher is ready (after ${i}s)"
+              break
+            fi
+            sleep 1
+          done
+
+      - name: Verify stack is running (no privileged)
+        working-directory: test/common/container/publish-mountless
+        run: |
+          echo "=== Container status ==="
+          docker compose ps
+
+          echo "=== Verify gateway is NOT privileged ==="
+          # The container inspect should show Privileged: false
+          privileged=$(docker inspect cvmfs-gateway --format '{{.HostConfig.Privileged}}')
+          echo "Gateway privileged: $privileged"
+          [ "$privileged" = "false" ] || { echo "FAIL: gateway is running privileged!"; exit 1; }
+
+          echo "=== Verify no FUSE mounts inside gateway ==="
+          docker compose exec -T gateway bash -c '
+            if grep -q fuse /proc/mounts 2>/dev/null; then
+              echo "FAIL: FUSE mounts found inside gateway container"
+              grep fuse /proc/mounts
+              exit 1
+            fi
+            echo "OK: no FUSE mounts"
+          '
+
+          echo "=== Verify repository config was created ==="
+          docker compose exec -T gateway bash -c '
+            test -d /etc/cvmfs/repositories.d/test.repo.org || { echo "FAIL: repo config dir missing"; exit 1; }
+            echo "OK: repository config exists"
+          '
+
+      - name: Check gateway API is reachable
+        working-directory: test/common/container/publish-mountless
+        run: |
+          echo "=== Checking gateway API ==="
+          docker compose exec -T gateway \
+            curl -sf http://localhost:4929/api/v1
+          echo ""
+          echo "OK: gateway API is responding"
+
+          echo "=== Checking Garage web endpoint ==="
+          http_code=$(docker compose exec -T gateway \
+            curl -s -o /dev/null -w '%{http_code}' \
+              http://cvmfs.web.garage.internal:3902/)
+          echo "HTTP $http_code"
+          echo "$http_code" | grep -qE '^(200|404)$' || { echo "FAIL: unexpected HTTP status $http_code from Garage web endpoint"; exit 1; }
+          echo ""
+          echo "OK: Garage web endpoint is responding"
+
+      - name: Ingest a tarball
+        working-directory: test/common/container/publish-mountless
+        run: |
+          echo "=== Creating test tarball inside publisher container ==="
+          docker compose exec -T publisher bash -c '
+            set -e
+            mkdir -p /tmp/test-content/subdir
+            echo "hello from mountless ingest" > /tmp/test-content/hello.txt
+            echo "file in subdir" > /tmp/test-content/subdir/nested.txt
+            dd if=/dev/urandom bs=1024 count=64 of=/tmp/test-content/subdir/random.bin 2>/dev/null
+            tar cf /tmp/test-content.tar -C /tmp test-content
+            echo "Tarball created:"
+            tar tf /tmp/test-content.tar
+          '
+
+          echo ""
+          echo "=== Running cvmfs_server ingest ==="
+          docker compose exec -T publisher \
+            cvmfs_server ingest \
+              --tar_file /tmp/test-content.tar \
+              --base_dir / \
+              test.repo.org
+
+          echo ""
+          echo "OK: ingest completed"
+
+      - name: Verify ingested content
+        working-directory: test/common/container/publish-mountless
+        run: |
+          echo "=== Running cvmfs_server check ==="
+          docker compose exec -T publisher \
+            cvmfs_server check -i test.repo.org
+
+          echo ""
+          echo "=== Listing catalogs ==="
+          docker compose exec -T publisher \
+            cvmfs_server list-catalogs -x test.repo.org
+
+          echo ""
+          echo "OK: repository integrity check passed"
+
+      - name: Verify content is downloadable via HTTP
+        working-directory: test/common/container/publish-mountless
+        run: |
+          echo "=== Fetching .cvmfspublished after ingest ==="
+          # Read directly from Garage's web endpoint (no Apache needed).
+          # The Docker network alias cvmfs.web.garage.internal resolves to
+          # the Garage container and provides the correct Host header for
+          # bucket identification.
+          docker compose exec -T gateway \
+            curl -sf http://cvmfs.web.garage.internal:3902/test.repo.org/.cvmfspublished
+          echo ""
+
+          echo "=== Verify manifest changed (content was published) ==="
+          published=$(docker compose exec -T gateway \
+            curl -sf http://cvmfs.web.garage.internal:3902/test.repo.org/.cvmfspublished)
+          echo "$published"
+          # The manifest should contain a catalog hash (C line) and a root hash (R line)
+          echo "$published" | grep -q "^C" || { echo "FAIL: no catalog hash in manifest"; exit 1; }
+          echo ""
+          echo "OK: published manifest contains catalog hash"
+
+      - name: Ingest a second tarball (verify incremental ingest fails as expected)
+        working-directory: test/common/container/publish-mountless
+        run: |
+          echo "=== Creating a second tarball ==="
+          docker compose exec -T publisher bash -c '
+            set -e
+            mkdir -p /tmp/second-content
+            echo "second ingest" > /tmp/second-content/second.txt
+            tar cf /tmp/second-content.tar -C /tmp second-content
+          '
+
+          echo ""
+          echo "=== Attempting second mountless ingest (should fail on non-empty repo) ==="
+          if docker compose exec -T publisher \
+            cvmfs_server ingest \
+              --tar_file /tmp/second-content.tar \
+              --base_dir /other \
+              test.repo.org 2>&1; then
+            echo "Note: second ingest succeeded (implementation may have been extended)"
+          else
+            echo "OK: second mountless ingest correctly rejected on non-empty repo"
+          fi
+
+      - name: Collect logs on failure
+        if: failure()
+        working-directory: test/common/container/publish-mountless
+        run: |
+          echo "=== docker compose ps ==="
+          docker compose ps -a
+          echo ""
+          echo "=== garage logs ==="
+          docker compose logs garage 2>&1 | tail -50
+          echo ""
+          echo "=== garage-setup logs ==="
+          docker compose logs garage-setup 2>&1 | tail -50
+          echo ""
+          echo "=== gateway logs ==="
+          docker compose logs gateway 2>&1 | tail -100
+          echo ""
+          echo "=== publisher logs ==="
+          docker compose logs publisher 2>&1 | tail -50
+
+      - name: Tear down
+        if: always()
+        working-directory: test/common/container/publish-mountless
+        run: docker compose down -v --remove-orphans

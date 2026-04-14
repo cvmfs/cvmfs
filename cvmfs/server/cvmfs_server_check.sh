@@ -28,7 +28,20 @@ __do_check() {
 
   # more sanity checks
   is_owner_or_root $name || die "Permission denied: Repository $name is owned by $CVMFS_USER"
-  health_check -r $name
+  # Skip FUSE mount health check for mountless gateway publishers.
+  # In mountless mode the rdonly and rw FUSE mounts are intentionally absent;
+  # health_check -r would attempt to mount them (via cvmfs_suid_helper), which
+  # fails in an unprivileged/no-systemd container.  The catalog integrity check
+  # below reads directly from the HTTP Stratum0 URL and works without FUSE.
+  local _hc_upstream_type
+  _hc_upstream_type=$(get_upstream_type "$CVMFS_UPSTREAM_STORAGE")
+  if [ "x$_hc_upstream_type" = xgw ] && \
+     ! is_mounted "${CVMFS_SPOOL_DIR}/rdonly" && \
+     ! is_mounted "/cvmfs/$name"; then
+    echo "Note: mountless gateway publisher detected – skipping FUSE mount health check."
+  else
+    health_check -r $name
+  fi
 
   # check if repository is compatible to the installed CernVM-FS version
   check_repository_compatibility $name

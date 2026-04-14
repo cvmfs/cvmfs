@@ -1300,11 +1300,16 @@ Supported Commands:
                   [-o owner (default: current user)]
                   [-k path to keys (default: /etc/cvmfs/keys)]
                   [-K fetch .pub and .crt from the gateway key endpoint]
+                  [-P mountless setup (no FUSE mount, for use with ingest)]
                   <fully qualified repository name>
                   Connect to a gateway as a publisher. Requires the .gw key
                   file in /etc/cvmfs/keys/ (or path given by -k). The .pub
                   and .crt files can be fetched from the gateway with -K if
                   the gateway has enable_key_endpoint enabled.
+                  Use -P for a mountless setup: the publisher is configured
+                  without mounting the repository via FUSE. This is intended
+                  for use with cvmfs_server ingest, which supports mountless
+                  gateway publishing.
   add-replica     [-u stratum1 upstream storage] [-o owner] [-w stratum1 url]
                   [-a silence apache warning] [-z enable garbage collection]
                   [-n alias name] [-s S3 config file] [-p no apache config]

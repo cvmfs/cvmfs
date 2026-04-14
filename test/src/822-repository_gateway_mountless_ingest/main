@@ -1,0 +1,66 @@
+#!/bin/bash
+cvmfs_test_name="Mountless repository gateway ingest"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+
+produce_tarball() {
+  local tarball_name=$1
+
+  mkdir tarball_foo || return 1
+  mkdir -p tarball_foo/a/b/c || return 1
+
+  dd bs=1024 count=2 2>/dev/null </dev/urandom > tarball_foo/a/1.txt || return 2
+  dd bs=1024 count=2 2>/dev/null </dev/urandom > tarball_foo/a/2.txt || return 2
+  touch tarball_foo/a/.cvmfscatalog || return 3
+  touch tarball_foo/empty_file.txt || return 4
+
+  tar -cf "$tarball_name" tarball_foo || return 5
+  rm -rf tarball_foo || return 6
+}
+
+
+cvmfs_run_test() {
+  local repo="test.repo.org"
+  local tarfile="$(pwd)/tarball.tar"
+
+  set_up_repository_gateway -P || return 1
+  load_repo_config "$repo" || return 2
+
+  echo "*** check bootstrap leaves the repository unmounted"
+  cat /proc/mounts | grep -e " /cvmfs/${repo} " && return 3
+  cat /proc/mounts | grep -e " ${CVMFS_SPOOL_DIR}/rdonly " && return 4
+
+  produce_tarball "$tarfile" || return 10
+
+  echo "*** ingest tarball without a publisher mount"
+  cvmfs_server ingest --tar_file "$tarfile" --base_dir foo "$repo" || return 20
+
+  echo "*** mountless ingest should not remount the publisher view"
+  cat /proc/mounts | grep -e " /cvmfs/${repo} " && return 21
+  cat /proc/mounts | grep -e " ${CVMFS_SPOOL_DIR}/rdonly " && return 22
+  [ ! -f ${CVMFS_SPOOL_DIR}/session_token ] || return 23
+
+  echo "*** a second unmounted ingest should fail once published content exists"
+  local second_output
+  second_output=$(cvmfs_server ingest --tar_file "$tarfile" --base_dir bar "$repo" 2>&1)
+  [ $? -ne 0 ] || return 24
+  echo "$second_output" | grep -q "Mountless gateway ingest currently only supports empty gateway repositories" || return 25
+  [ ! -f ${CVMFS_SPOOL_DIR}/session_token ] || return 26
+
+
+  echo "*** verify published ingest artifacts without remounting the publisher view"
+  cvmfs_server list-catalogs -x "$repo" | grep -q "foo/tarball_foo/a" || return 31
+
+  echo "*** verify file content was actually ingested"
+  local content_size
+  content_size=$(cvmfs_swissknife info -r "${CVMFS_STRATUM0}" \
+    -n "$repo" -k /etc/cvmfs/keys/${repo}.pub -e 2>/dev/null \
+    | grep -c 'regular') || true
+  [ "$content_size" -gt 0 ] 2>/dev/null || return 32
+
+  cvmfs_server check -i "$repo" || return 40
+  check_repo_integrity "$repo" || return 41
+
+  return 0
+}
