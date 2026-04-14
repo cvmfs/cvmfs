@@ -436,6 +436,18 @@ int main(int argc, char **argv) {
     (void) SwitchCredentials(pw->pw_uid, pw->pw_gid, true);
   }
 
+  // Check mount options for config= parameter (used by server fstab entries)
+  // These config files will be parsed after defaults to override settings
+  string config_files_opt;
+  for (unsigned i = 0; i < mount_options.size(); ++i) {
+    vector<string> tokens = SplitString(mount_options[i], ',');
+    for (unsigned j = 0; j < tokens.size(); ++j) {
+      if (HasPrefix(tokens[j], "config=", false)) {
+        config_files_opt = tokens[j].substr(7);
+      }
+    }
+  }
+
   options_manager_.ParseDefault("");
   const string fqrn = MkFqrn(device);
   // Bail in case we could not form a Fqrn
@@ -447,6 +459,15 @@ int main(int argc, char **argv) {
   options_manager_.SwitchTemplateManager(
       new DefaultOptionsTemplateManager(fqrn));
   options_manager_.ParseDefault(fqrn);
+
+  // Parse additional config files specified via config= mount option
+  // (e.g. server-side client.conf). These override the defaults.
+  if (!config_files_opt.empty()) {
+    vector<string> cf = SplitString(config_files_opt, ':');
+    for (unsigned i = 0; i < cf.size(); ++i) {
+      options_manager_.ParsePath(cf[i], false);
+    }
+  }
 
   if (pw != NULL) {
     (void) SwitchCredentials(0, 0, true);
@@ -637,7 +658,7 @@ int main(int argc, char **argv) {
 #endif
 
   AddMountOption("system_mount", &mount_options);
-  AddMountOption("fsname=cvmfs2", &mount_options);
+  AddMountOption("fsname=" + fqrn, &mount_options);
   AddMountOption("allow_other", &mount_options);
   AddMountOption("grab_mountpoint", &mount_options);
   AddMountOption("uid=" + StringifyInt(uid_cvmfs), &mount_options);

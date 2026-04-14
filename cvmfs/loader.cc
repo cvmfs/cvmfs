@@ -852,6 +852,18 @@ int FuseMain(int argc, char *argv[]) {
     }
   }
 
+  // Set fsname to repository FQRN for identifiability in mount output.
+  // mount.cvmfs passes fsname=<fqrn> already; for direct invocations
+  // or mounts via mount.fuse that don't set fsname, add it here.
+  if (!MatchFuseOption(mount_options, "fsname=")) {
+    fuse_opt_add_arg(mount_options,
+                     ("-ofsname=" + *repository_name_).c_str());
+  }
+  // Set subtype so mount output shows "fuse.cvmfs2" as the type
+  if (!MatchFuseOption(mount_options, "subtype=")) {
+    fuse_opt_add_arg(mount_options, "-osubtype=cvmfs2");
+  }
+
   if (!premounted_ && !DirectoryExists(*mount_point_)) {
     LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
              "Mount point %s does not exist", mount_point_->c_str());
@@ -1099,10 +1111,11 @@ int FuseMain(int argc, char *argv[]) {
     if (MatchFuseOption(mount_options, "ro")) {
       flags |= MS_RDONLY;
     }
-    if (mount("cvmfs2", mount_point_->c_str(), "fuse", flags, opts) == -1) {
+    if (mount(repository_name_->c_str(), mount_point_->c_str(),
+              "fuse.cvmfs2", flags, opts) == -1) {
       LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
-               "Failed to mount -t fuse -o %s cvmfs2 %s (%d)", opts,
-               mount_point_->c_str(), errno);
+               "Failed to mount -t fuse.cvmfs2 -o %s %s %s (%d)", opts,
+               repository_name_->c_str(), mount_point_->c_str(), errno);
       return kFailPermission;
     }
 

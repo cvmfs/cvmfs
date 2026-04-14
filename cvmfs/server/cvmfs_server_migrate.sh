@@ -548,6 +548,36 @@ _migrate_143() {
 }
 
 
+_migrate_144() {
+  local name=$1
+  local destination_version="144"
+  local server_conf="/etc/cvmfs/repositories.d/${name}/server.conf"
+
+  load_repo_config $name
+  echo "Migrating repository '$name' from layout revision $(mangle_version_string $CVMFS_CREATOR_VERSION) to revision $(mangle_version_string $destination_version)"
+
+  echo "--> adjusting /etc/fstab (use type cvmfs instead of fuse)"
+  # Replace old-style fstab entries:
+  #   cvmfs2#name ... fuse allow_other,fsname=name,config=... -> name ... cvmfs allow_other,config=...
+  # Also handle entries already migrated to fuse.cvmfs2 by PR #3903
+  sed -i -e "s|^cvmfs2#\(${name}\) \(.*\) fuse \(.*\)fsname=${name},\(.*# added by CernVM-FS for ${name}\)|\1 \2 cvmfs \3\4|" /etc/fstab
+  sed -i -e "s|^\(${name}\) \(.*\) fuse\.cvmfs2 \(.*\)fsname=${name},\(.*# added by CernVM-FS for ${name}\)|\1 \2 cvmfs \3\4|" /etc/fstab
+
+  # Make sure the systemd mount unit exists
+  if is_systemd; then
+    /usr/lib/systemd/system-generators/systemd-fstab-generator \
+      /run/systemd/generator '' '' 2>/dev/null || true
+    systemctl daemon-reload
+  fi
+
+  echo "--> updating server.conf"
+  sed -i -e "s/^\(CVMFS_CREATOR_VERSION\)=.*/\1=$destination_version/" $server_conf
+
+  # update repository information
+  load_repo_config $name
+}
+
+
 cvmfs_server_migrate() {
   local names
   local retcode=0
@@ -688,6 +718,11 @@ cvmfs_server_migrate() {
 
     if [ "$creator" -lt 143 ] && is_stratum0 $name; then
       _migrate_143 $name
+      creator="$(repository_creator_version $name)"
+    fi
+
+    if [ "$creator" -lt 144 ]; then
+      _migrate_144 $name
       creator="$(repository_creator_version $name)"
     fi
 
