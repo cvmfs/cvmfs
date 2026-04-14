@@ -218,11 +218,30 @@ docker compose exec publisher \
 
 ### Reading the repository
 
-CVMFS clients can read the repository directly from Garage's web endpoint
-on port 3902.  Configure the client with:
+The gateway container runs `cvmfs_server mkfs -P -D`; the `-D` flag
+publishes a self-contained client setup script to the storage backend.
+On any machine with the CVMFS client installed, a single `curl | sh`
+downloads the repository's public key, writes the client configuration,
+and mounts the repository:
+
+```bash
+curl http://<DOCKER_HOST>:3902/mount-test.repo.org.sh | sudo sh
+# -> Repository is available at /cvmfs/test.repo.org
+```
+
+The script configures `CVMFS_SERVER_URL` and `CVMFS_PUBLIC_KEY`
+automatically.
+
+Alternatively, configure the client manually:
 
 ```ini
-CVMFS_SERVER_URL=http://<DOCKER_HOST>:3902/cvmfs/test.repo.org
+# /etc/cvmfs/config.d/test.repo.org.conf
+CVMFS_SERVER_URL=http://<DOCKER_HOST>:3902
+CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/test.repo.org.pub
+```
+
+```ini
+# /etc/cvmfs/default.local (if not already present)
 CVMFS_HTTP_PROXY=DIRECT
 ```
 
