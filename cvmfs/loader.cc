@@ -768,6 +768,23 @@ int FuseMain(int argc, char *argv[]) {
     premount_fuse_ = false;
   }
 
+  if (options_manager->GetValue("CVMFS_REPOSITORIES_NOMOUNT", &parameter)
+      && !parameter.empty()) {
+    const vector<string> ignored_repos = SplitString(parameter, ',');
+    for (unsigned i = 0, s = ignored_repos.size(); i < s; ++i) {
+      if (Trim(ignored_repos[i]) == *repository_name_) {
+        LogCvmfs(kLogCvmfs, kLogStdout,
+                 "CernVM-FS: mount attempt for %s ignored "
+                 "(listed in CVMFS_REPOSITORIES_NOMOUNT)",
+                 repository_name_->c_str());
+        delete options_manager;
+        fuse_opt_free_args(mount_options);
+        delete mount_options;
+        return kFailIgnoredMount;
+      }
+    }
+  }
+
 #ifdef __APPLE__
   string volname = "-ovolname=" + *repository_name_;
   fuse_opt_add_arg(mount_options, volname.c_str());
