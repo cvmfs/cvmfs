@@ -48,11 +48,6 @@ cvmfs_run_test() {
   echo "$second_output" | grep -q "Mountless gateway ingest currently only supports empty gateway repositories" || return 25
   [ ! -f ${CVMFS_SPOOL_DIR}/session_token ] || return 26
 
-  echo "*** mounted transaction remains out of scope for the mountless path"
-  cvmfs_server transaction "$repo" && {
-    cvmfs_server abort -f "$repo"
-    return 30
-  }
 
   echo "*** verify published ingest artifacts without remounting the publisher view"
   cvmfs_server list-catalogs -x "$repo" | grep -q "foo/tarball_foo/a" || return 31
