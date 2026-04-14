@@ -40,6 +40,7 @@ enum Algorithm {
 #endif
 };
 typedef Algorithm Algorithms;
+typedef Algorithm DecompressionAlg;
 
 /**
  * Aborts if string doesn't match any of the algorithms.
