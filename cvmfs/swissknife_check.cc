@@ -675,14 +675,14 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
   return retval;
 }
 
-
-string CommandCheck::DownloadPiece(const shash::Any catalog_hash) {
+string CommandCheck::DownloadPiece(const shash::Any catalog_hash,
+                                   zip::DecompressionAlg decomp_alg) {
   string source = "data/" + catalog_hash.MakePath();
   const string dest = temp_directory_ + "/" + catalog_hash.ToString();
   const string url = repo_base_path_ + "/" + source;
 
   cvmfs::PathSink pathsink(dest);
-  download::JobInfo download_catalog(&url, true, false, &catalog_hash,
+  download::JobInfo download_catalog(&url, decomp_alg, false, &catalog_hash,
                                      &pathsink);
   download::Failures retval = download_manager()->Fetch(&download_catalog);
   if (retval != download::kFailOk) {
@@ -693,7 +693,6 @@ string CommandCheck::DownloadPiece(const shash::Any catalog_hash) {
 
   return dest;
 }
-
 
 string CommandCheck::DecompressPiece(const shash::Any catalog_hash) {
   string source = "data/" + catalog_hash.MakePath();
@@ -707,15 +706,15 @@ string CommandCheck::DecompressPiece(const shash::Any catalog_hash) {
   return dest;
 }
 
-
-catalog::Catalog* CommandCheck::FetchCatalog(const string      &path,
-                                             const shash::Any  &catalog_hash,
-                                             const uint64_t     catalog_size) {
+catalog::Catalog* CommandCheck::FetchCatalog(const string& path,
+                                             const shash::Any& catalog_hash,
+                                             const uint64_t catalog_size,
+                                             zip::DecompressionAlg decomp_alg) {
   string tmp_file;
   if (!is_remote_)
     tmp_file = DecompressPiece(catalog_hash);
   else
-    tmp_file = DownloadPiece(catalog_hash);
+    tmp_file = DownloadPiece(catalog_hash, decomp_alg);
 
   if (tmp_file == "") {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to load catalog %s",
@@ -740,11 +739,11 @@ catalog::Catalog* CommandCheck::FetchCatalog(const string      &path,
   return catalog;
 }
 
-
-bool CommandCheck::FindSubtreeRootCatalog(const string &subtree_path,
-                                          shash::Any   *root_hash,
-                                          uint64_t     *root_size) {
-  catalog::Catalog *current_catalog = FetchCatalog("", *root_hash);
+bool CommandCheck::FindSubtreeRootCatalog(const string& subtree_path,
+                                          shash::Any* root_hash,
+                                          uint64_t* root_size,
+                                          zip::DecompressionAlg decomp_alg) {
+  catalog::Catalog* current_catalog = FetchCatalog("", *root_hash, 0, decomp_alg);
   if (current_catalog == NULL) {
     return false;
   }
@@ -768,7 +767,7 @@ bool CommandCheck::FindSubtreeRootCatalog(const string &subtree_path,
       delete current_catalog;
 
       if (current_path.length() < subtree_path.length()) {
-        current_catalog = FetchCatalog(current_path, *root_hash);
+        current_catalog = FetchCatalog(current_path, *root_hash, 0, decomp_alg);
         if (current_catalog == NULL) {
           break;
         }
@@ -780,7 +779,6 @@ bool CommandCheck::FindSubtreeRootCatalog(const string &subtree_path,
   return false;
 }
 
-
 /**
  * Recursion on nested catalog level.  No ownership of computed_counters.
  */
@@ -789,14 +787,16 @@ bool CommandCheck::InspectTree(const string                  &path,
                                const uint64_t                 catalog_size,
                                const bool                     is_nested_catalog,
                                const catalog::DirectoryEntry *transition_point,
-                               catalog::DeltaCounters        *computed_counters)
+                               catalog::DeltaCounters        *computed_counters,
+                               zip::DecompressionAlg decomp_alg)
 {
   LogCvmfs(kLogCvmfs, kLogStdout | kLogInform, "[inspecting catalog] %s at %s",
            catalog_hash.ToString().c_str(), path == "" ? "/" : path.c_str());
 
   const catalog::Catalog *catalog = FetchCatalog(path,
                                                  catalog_hash,
-                                                 catalog_size);
+                                                 catalog_size,
+                                                 decomp_alg);
   if (catalog == NULL) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to open catalog %s",
              catalog_hash.ToString().c_str());
@@ -917,7 +917,7 @@ bool CommandCheck::InspectTree(const string                  &path,
       catalog::DeltaCounters nested_counters;
       const bool is_nested = true;
       if (!InspectTree(i->mountpoint.ToString(), i->hash, i->size, is_nested,
-                       &nested_transition_point, &nested_counters))
+                       &nested_transition_point, &nested_counters, decomp_alg))
         retval = false;
       nested_counters.PopulateToParent(computed_counters);
     }
@@ -977,6 +977,26 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
   if (args.find('R') != args.end())
     reflog_chksum_path = *args.find('R')->second;
 
+  // For manifest fields, we can make reasonable assumptions about content
+  // structure, and thus about reliability of autodetecting the decompression
+  // algorithm.
+  //
+  // We know the certificate is PEM-formatted, always starting with
+  // -----BEGIN CERTIFICATE-----. Definitely not an arbitrary binary, so
+  // kGuessCompression is completely reliable in this case.
+  //
+  // Metadata is JSON, also unambiguous for plain vs zlib vs zstd.
+  //
+  // "SQLite format 3" is literally the beginning of files which are.
+  // This applies to history (H).
+  zip::DecompressionAlg decomp_alg;
+#ifdef CVMFS_GUESS_DECOMPRESSOR
+  decomp_alg = zip::DecompressionAlg::kGuessDecompression;
+#else
+  // In future, we might have a manifest field for certificate decomp_alg
+  decomp_alg = zip::DecompressionAlgFromEnv();
+#endif
+
   // Repository can be HTTP address or on local file system
   is_remote_ = IsHttpUrl(repo_base_path_);
 
@@ -1025,7 +1045,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
     if (!is_remote_)
       tmp_file = DecompressPiece(manifest->meta_info());
     else
-      tmp_file = DownloadPiece(manifest->meta_info());
+      tmp_file = DownloadPiece(manifest->meta_info(), decomp_alg);
     if (tmp_file == "") {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to load repository metainfo %s",
                manifest->meta_info().ToString().c_str());
@@ -1076,7 +1096,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
     if (!is_remote_)
       tmp_file = DecompressPiece(manifest->history());
     else
-      tmp_file = DownloadPiece(manifest->history());
+      tmp_file = DownloadPiece(manifest->history(), decomp_alg);
     if (tmp_file == "") {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to load history database %s",
                manifest->history().ToString().c_str());
@@ -1129,7 +1149,8 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
   const bool is_nested_catalog = (!subtree_path.empty());
   if (is_nested_catalog && !FindSubtreeRootCatalog( subtree_path,
                                                    &root_hash,
-                                                   &root_size)) {
+                                                   &root_size,
+                                                   decomp_alg)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "cannot find nested catalog at %s",
              subtree_path.c_str());
     return 1;
@@ -1142,7 +1163,8 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
                            root_size,
                            is_nested_catalog,
                            NULL,
-                           &computed_counters) && successful;
+                           &computed_counters,
+                           decomp_alg) && successful;
 
   if (!successful) {
     LogCvmfs(kLogCvmfs, kLogStderr, "CATALOG PROBLEMS OR OTHER ERRORS FOUND");
