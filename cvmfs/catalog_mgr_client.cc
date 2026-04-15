@@ -353,7 +353,16 @@ LoadReturn ClientCatalogManager::FetchCatalogByHash(
   CacheManager::Label label;
   label.path = name;
   label.flags = CacheManager::kLabelCatalog;
-  label.zip_algorithm = decomp_alg_;
+  // Catalogs are SQLite so decompression algorithm can be guessed among zlib,
+  // zstd, none.
+  // But in future we may have an explicit metadata.
+  zip::DecompressionAlg decomp_alg;
+#ifdef CVMFS_GUESS_DECOMPRESSOR
+  decomp_alg = zip::DecompressionAlg::kGuessDecompression;
+#else
+  decomp_alg = zip::DecompressionAlgFromEnv();
+#endif
+  label.zip_algorithm = decomp_alg;
 
   int fd = fetcher_->Fetch(CacheManager::LabeledObject(hash, label),
                            alt_root_catalog_path);
@@ -383,7 +392,16 @@ void ClientCatalogManager::StageNestedCatalogByHash(
   CacheManager::Label label;
   label.path = GetCatalogDescription(mountpoint, hash);
   label.flags = CacheManager::kLabelCatalog;
-  label.zip_algorithm = decomp_alg_;
+  // Catalogs are SQLite so decompression algorithm can be guessed among zlib,
+  // zstd, none.
+  // But in future we may have an explicit metadata.
+  zip::DecompressionAlg decomp_alg;
+#ifdef CVMFS_GUESS_DECOMPRESSOR
+  decomp_alg = zip::DecompressionAlg::kGuessDecompression;
+#else
+  decomp_alg = zip::DecompressionAlgFromEnv();
+#endif
+  label.zip_algorithm = decomp_alg;
   int fd = fetcher_->Fetch(CacheManager::LabeledObject(hash, label));
   if (fd >= 0)
     fetcher_->cache_mgr()->Close(fd);
@@ -452,7 +470,17 @@ void CachedManifestEnsemble::FetchCertificate(const shash::Any &hash) {
   CacheManager::Label label;
   label.flags |= CacheManager::kLabelCertificate;
   label.path = catalog_mgr_->repo_name();
-  label.zip_algorithm = catalog_mgr_->GetDecompressionAlg();
+
+  // Certificates are PEM-formatted so decompression algorithm can be guessed
+  // among zlib, zstd, none.
+  // But in future we may have an explicit metadata.
+  zip::DecompressionAlg decomp_alg;
+#ifdef CVMFS_GUESS_DECOMPRESSOR
+  decomp_alg = zip::DecompressionAlg::kGuessDecompression;
+#else
+  decomp_alg = zip::DecompressionAlgFromEnv();
+#endif
+  label.zip_algorithm = decomp_alg;
   // (gdb) bt
   // #0  CacheManager::Label::Label (this=0x7fffffffc4e0) at /usr/local/src/cvmfs/cvmfs/cache.h:96
   // #1  0x00007ffff7485567 in catalog::CachedManifestEnsemble::FetchCertificate (this=0x4a4270, hash=...) at /usr/local/src/cvmfs/cvmfs/catalog_mgr_client.cc:448

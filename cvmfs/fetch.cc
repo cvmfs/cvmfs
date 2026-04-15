@@ -67,7 +67,6 @@ Fetcher::ThreadLocalStorage *Fetcher::GetTls() {
   tls->fetcher = this;
   MakePipe(tls->pipe_wait);
 
-  tls->download_job.SetDecompressor(zip::DecompressionAlgFromEnv());
   tls->download_job.SetProbeHosts(true);
   int retval = pthread_setspecific(thread_local_storage_, tls);
   assert(retval == 0);
