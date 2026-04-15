@@ -136,7 +136,17 @@ LoadReturn SimpleCatalogManager::LoadCatalogByHash(
   ctlg_context->SetSqlitePath(tmp_path);
 
   cvmfs::FileSink filesink(fcatalog);
-  download::JobInfo download_catalog(&url, true, false,
+  // Catalogs are SQLite so decompression algorithm can be guessed among zlib,
+  // zstd, none.
+  // But in future we may have an explicit metadata.
+  zip::DecompressionAlg decomp_alg;
+#ifdef CVMFS_GUESS_DECOMPRESSOR
+  decomp_alg = zip::DecompressionAlg::kGuessDecompression;
+#else
+  decomp_alg = zip::DecompressionAlgFromEnv();
+#endif
+
+  download::JobInfo download_catalog(&url, decomp_alg, false,
                                     &effective_hash, &filesink);
   const download::Failures retval = download_manager_->Fetch(&download_catalog);
   fclose(fcatalog);

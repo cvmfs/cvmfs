@@ -121,8 +121,10 @@ class JobInfo {
   /**
    * Sink version: downloads entire data chunk where URL u points to
    */
+#if 0
   JobInfo(const std::string *u, const bool compressed, const bool ph,
           const shash::Any *h, cvmfs::Sink *s);
+#endif
 
   JobInfo(const std::string *u, zip::Algorithm compression, const bool ph,
           const shash::Any *h, cvmfs::Sink *s);

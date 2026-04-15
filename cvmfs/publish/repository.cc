@@ -133,6 +133,26 @@ catalog::SimpleCatalogManager *Repository::GetSimpleCatalogManager() {
 void Repository::DownloadRootObjects(
   const std::string &url, const std::string &fqrn, const std::string &tmp_dir)
 {
+  // For manifest fields, we can make reasonable assumptions about content
+  // structure, and thus about reliability of autodetecting the decompression
+  // algorithm.
+  //
+  // We know the certificate is PEM-formatted, always starting with
+  // -----BEGIN CERTIFICATE-----. Definitely not an arbitrary binary, so
+  // kGuessCompression is completely reliable in this case.
+  //
+  // Metadata is JSON, also unambiguous for plain vs zlib vs zstd.
+  //
+  // "SQLite format 3" is literally the beginning of files which are.
+  // This applies to history (H).
+  zip::DecompressionAlg decomp_alg;
+#ifdef CVMFS_GUESS_DECOMPRESSOR
+  decomp_alg = zip::DecompressionAlg::kGuessDecompression;
+#else
+  // In future, we might have a manifest field for certificate decomp_alg
+  decomp_alg = zip::DecompressionAlgFromEnv();
+#endif
+
   delete whitelist_;
   whitelist_ = new whitelist::Whitelist(fqrn, download_mgr_, signature_mgr_);
   whitelist::Failures rv_whitelist = whitelist_->LoadUrl(url);
@@ -158,7 +178,7 @@ void Repository::DownloadRootObjects(
   // TODO(jblomer): verify reflog hash
   // shash::Any reflog_hash(manifest_->GetHashAlgorithm());
   cvmfs::FileSink filesink(reflog_fd);
-  download::JobInfo download_reflog(&reflog_url, false /* compressed */,
+  download::JobInfo download_reflog(&reflog_url, decomp_alg,
                                     false /* probe hosts */, NULL, &filesink);
   download::Failures rv_dl = download_mgr_->Fetch(&download_reflog);
   fclose(reflog_fd);
@@ -182,7 +202,7 @@ void Repository::DownloadRootObjects(
     std::string tags_url = url + "/data/" + manifest_->history().MakePath();
     shash::Any tags_hash(manifest_->history());
     cvmfs::FileSink filesink(tags_fd);
-    download::JobInfo download_tags(&tags_url, true /* compressed */,
+    download::JobInfo download_tags(&tags_url, decomp_alg,
                                     true /* probe hosts */, &tags_hash,
                                     &filesink);
     rv_dl = download_mgr_->Fetch(&download_tags);
@@ -203,7 +223,7 @@ void Repository::DownloadRootObjects(
     shash::Any info_hash(manifest_->meta_info());
     std::string info_url = url + "/data/" + info_hash.MakePath();
     cvmfs::MemSink metainfo_memsink;
-    download::JobInfo download_info(&info_url, true /* compressed */,
+    download::JobInfo download_info(&info_url, decomp_alg,
                                     true /* probe_hosts */, &info_hash,
                                     &metainfo_memsink);
     download::Failures rv_info = download_mgr_->Fetch(&download_info);

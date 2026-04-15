@@ -128,8 +128,8 @@ TEST_F(T_Download, LocalFile) {
   string src_url = "file://" + src_path;
 
   cvmfs::FileSink filesink(fdest, true);
-  JobInfo info(&src_url, false /* compressed */, false /* probe hosts */,
-               NULL, &filesink);
+  JobInfo info(&src_url, zip::DecompressionAlg::kNoCompression,
+               false /* probe hosts */, NULL, &filesink);
   download_mgr.Fetch(&info);
   EXPECT_EQ(info.error_code(), kFailOk);
 }
@@ -146,8 +146,8 @@ TEST_F(T_Download, RemoteFile) {
   string src_url = "http://127.0.0.1:8082/" + GetFileName(src_path);
 
   cvmfs::FileSink filesink(fdest);
-  JobInfo info(&src_url, false /* compressed */, false /* probe hosts */,
-               NULL, &filesink);
+  JobInfo info(&src_url, zip::DecompressionAlg::kNoCompression,
+               false /* probe hosts */, NULL, &filesink);
   download_mgr.Fetch(&info);
   EXPECT_EQ(file_server.num_processed_requests(), 1);
   EXPECT_EQ(info.error_code(), kFailOk);
@@ -168,8 +168,8 @@ TEST_F(T_Download, Clone) {
 
   string url = "file://" + dest_path;
   cvmfs::MemSink memsink;
-  JobInfo info(&url, false /* compressed */, false /* probe hosts */,
-                   NULL, &memsink);
+  JobInfo info(&url, zip::DecompressionAlg::kNoCompression,
+               false /* probe hosts */, NULL, &memsink);
   download_mgr_cloned->Fetch(&info);
   ASSERT_EQ(info.error_code(), kFailOk);
   ASSERT_EQ(memsink.pos(), 1U);
@@ -199,10 +199,10 @@ TEST_F(T_Download, Multiple) {
     perf::StatisticsTemplate("second", &statistics));
 
   cvmfs::FileSink filesink(fdest);
-  JobInfo info(&src_url, false /* compressed */, false /* probe hosts */,
-               NULL, &filesink);
-  JobInfo info2(&src_url, false /* compressed */, false /* probe hosts */,
-                NULL, &filesink);
+  JobInfo info(&src_url, zip::DecompressionAlg::kNoCompression,
+               false /* probe hosts */, NULL, &filesink);
+  JobInfo info2(&src_url, zip::DecompressionAlg::kNoCompression,
+                false /* probe hosts */, NULL, &filesink);
   download_mgr.Fetch(&info);
   second_mgr.Fetch(&info2);
   EXPECT_EQ(info.error_code(), kFailOk);
@@ -219,8 +219,8 @@ TEST_F(T_Download, RemoteFile2Mem) {
 
   string url = "http://127.0.0.1:8082/" + GetFileName(src_path);
   cvmfs::MemSink memsink;
-  JobInfo info(&url, false /* compressed */, false /* probe hosts */, NULL,
-               &memsink);
+  JobInfo info(&url, zip::DecompressionAlg::kNoCompression,
+               false /* probe hosts */, NULL, &memsink);
   download_mgr.Fetch(&info);
   ASSERT_EQ(file_server.num_processed_requests(), 1);
   ASSERT_EQ(info.error_code(), kFailOk);
@@ -240,8 +240,8 @@ TEST_F(T_Download, RemoteFileRedirect) {
 
   download_mgr.EnableRedirects();
   cvmfs::MemSink memsink;
-  JobInfo info(&url, false /* compressed */, false /* probe hosts */, NULL,
-               &memsink);
+  JobInfo info(&url, zip::DecompressionAlg::kNoCompression,
+               false /* probe hosts */, NULL, &memsink);
   download_mgr.Fetch(&info);
   ASSERT_EQ(file_server.num_processed_requests(), 1);
   ASSERT_EQ(redirect_server.num_processed_requests(), 1);
@@ -261,8 +261,8 @@ TEST_F(T_Download, RemoteFileSimpleProxy) {
                              DownloadManager::kSetProxyRegular);
   string url = "http://127.0.0.1:8082/" + GetFileName(src_path);
   cvmfs::MemSink memsink;
-  JobInfo info(&url, false /* compressed */, false /* probe hosts */, NULL,
-               &memsink);
+  JobInfo info(&url, zip::DecompressionAlg::kNoCompression,
+               false /* probe hosts */, NULL, &memsink);
   download_mgr.Fetch(&info);
   ASSERT_EQ(proxy_server.num_processed_requests(), 1);
   ASSERT_EQ(file_server.num_processed_requests(), 1);
@@ -284,8 +284,8 @@ TEST_F(T_Download, RemoteFileProxyRedirect) {
   download_mgr.EnableRedirects();
   string url = "http://127.0.0.1:8083/" + GetFileName(src_path);
   cvmfs::MemSink memsink;
-  JobInfo info(&url, false /* compressed */, false /* probe hosts */, NULL,
-               &memsink);
+  JobInfo info(&url, zip::DecompressionAlg::kNoCompression,
+               false /* probe hosts */, NULL, &memsink);
   download_mgr.Fetch(&info);
   ASSERT_EQ(proxy_server.num_processed_requests(), 2);
   ASSERT_EQ(redirect_server.num_processed_requests(), 1);
@@ -302,8 +302,8 @@ TEST_F(T_Download, LocalFile2Mem) {
 
   string url = "file://" + GetAbsolutePath(src_path);
   cvmfs::MemSink memsink;
-  JobInfo info(&url, false /* compressed */, false /* probe hosts */, NULL,
-               &memsink);
+  JobInfo info(&url, zip::DecompressionAlg::kNoCompression,
+               false /* probe hosts */, NULL, &memsink);
   download_mgr.Fetch(&info);
   ASSERT_EQ(info.error_code(), kFailOk);
   ASSERT_EQ(memsink.pos(), src_content.length());
@@ -318,8 +318,8 @@ TEST_F(T_Download, RemoteFileSwitchHosts) {
   download_mgr.SetHostChain("http://127.0.0.1:8083;http://127.0.0.1:8082");
   string url = "/" + GetFileName(src_path);
   cvmfs::MemSink memsink;
-  JobInfo info(&url, false /* compressed */, true /* probe hosts */, NULL,
-               &memsink);
+  JobInfo info(&url, zip::DecompressionAlg::kNoCompression,
+               true /* probe hosts */, NULL, &memsink);
   download_mgr.Fetch(&info);
   ASSERT_EQ(file_server.num_processed_requests(), 1);
   ASSERT_EQ(info.num_used_hosts(), 2);
@@ -336,8 +336,8 @@ TEST_F(T_Download, CancelRequest) {
   download_mgr.SetHostChain("http://127.0.0.1:8083;http://127.0.0.1:8082");
   string url = "/" + GetFileName(src_path);
   cvmfs::MemSink memsink;
-  JobInfo info(&url, false /* compressed */, true /* probe hosts */, NULL,
-               &memsink);
+  JobInfo info(&url, zip::DecompressionAlg::kNoCompression,
+               true /* probe hosts */, NULL, &memsink);
   TestInterruptCue tci;
   info.SetInterruptCue(&tci);
   download_mgr.Fetch(&info);
@@ -357,8 +357,8 @@ TEST_F(T_Download, RemoteFileSwitchHostsAfterRedirect) {
   download_mgr.SetHostChain("http://127.0.0.1:8083;http://127.0.0.1:8082");
   string url = "/" + GetFileName(src_path);
   cvmfs::MemSink memsink;
-  JobInfo info(&url, false /* compressed */, true /* probe hosts */, NULL,
-               &memsink);
+  JobInfo info(&url, zip::DecompressionAlg::kNoCompression,
+               true /* probe hosts */, NULL, &memsink);
   download_mgr.Fetch(&info);
   ASSERT_EQ(info.num_used_hosts(), 2);
   ASSERT_EQ(info.error_code(), kFailOk);
@@ -380,8 +380,8 @@ TEST_F(T_Download, RemoteFileSwitchProxies) {
 
   string src_url = "http://127.0.0.1:8082/" + GetFileName(src_path);
   cvmfs::MemSink memsink;
-  JobInfo info(&src_url, false /* compressed */, false /* probe hosts */, NULL,
-           &memsink);
+  JobInfo info(&src_url, zip::DecompressionAlg::kNoCompression,
+               false /* probe hosts */, NULL, &memsink);
   download_mgr.Fetch(&info);
   ASSERT_EQ(file_server.num_processed_requests(), 1);
   ASSERT_EQ(proxy_server.num_processed_requests(), 1);
@@ -398,8 +398,8 @@ TEST_F(T_Download, RemoteFileEmpty) {
 
   string src_url = "http://127.0.0.1:8082/" + GetFileName(src_path);
   cvmfs::MemSink memsink;
-  JobInfo info(&src_url, false /* compressed */, false /* probe hosts */, NULL,
-           &memsink);
+  JobInfo info(&src_url, zip::DecompressionAlg::kNoCompression,
+               false /* probe hosts */, NULL, &memsink);
   download_mgr.Fetch(&info);
   ASSERT_EQ(file_server.num_processed_requests(), 1);
   ASSERT_EQ(info.error_code(), kFailOk);
@@ -417,8 +417,8 @@ TEST_F(T_Download, LocalFile2Sink) {
 
   TestSink test_sink;
   string url = "file://" + dest_path;
-  JobInfo info(&url, false /* compressed */, false /* probe hosts */,
-               NULL /* expected hash */, &test_sink);
+  JobInfo info(&url, zip::DecompressionAlg::kNoCompression,
+               false /* probe hosts */, NULL /* expected hash */, &test_sink);
   download_mgr.Fetch(&info);
   EXPECT_EQ(info.error_code(), kFailOk);
   EXPECT_EQ(1, pread(test_sink.fd, &buf, 1, 0));
@@ -434,15 +434,18 @@ TEST_F(T_Download, LocalFile2Sink) {
     rnd_buf[i] = prng.Next(2147483647);
   shash::Any checksum(shash::kMd5);
 
+  zip::Algorithm comp_alg = zip::Algorithm::kDefault;
+  zip::DecompressionAlg decomp_alg = comp_alg;
+
   const UniquePtr<zip::Compressor>
-                        compress(zip::Compressor::Construct(zip::kDefault));
+                        compress(zip::Compressor::Construct(comp_alg));
   zip::InputMem in_mem(reinterpret_cast<unsigned char*>(rnd_buf), size);
   cvmfs::FileSink out_f(fdest, true);
 
   EXPECT_EQ(compress->Compress(&in_mem, &out_f, &checksum), zip::kStreamEnd);
 
   TestSink test_sink2;
-  JobInfo info2(&url, true /* compressed */, false /* probe hosts */,
+  JobInfo info2(&url, decomp_alg, false /* probe hosts */,
                 &checksum /* expected hash */, &test_sink2);
   download_mgr.Fetch(&info2);
   EXPECT_EQ(info2.error_code(), kFailOk);

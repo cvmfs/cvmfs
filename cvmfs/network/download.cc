@@ -2237,7 +2237,8 @@ void DownloadManager::ProbeHosts() {
   string url;
 
   cvmfs::MemSink memsink;
-  JobInfo info(&url, false, false, NULL, &memsink);
+  JobInfo info(&url, zip::DecompressionAlg::kNoCompression, false, NULL,
+               &memsink);
   for (retries = 0; retries < 2; ++retries) {
     for (i = 0; i < host_chain.size(); ++i) {
       url = host_chain[i] + "/.cvmfspublished";
@@ -2316,7 +2317,8 @@ bool DownloadManager::GeoSortServers(std::vector<std::string> *servers,
              "(manager '%s') requesting ordered server list from %s",
              name_.c_str(), url.c_str());
     cvmfs::MemSink memsink;
-    JobInfo info(&url, false, false, NULL, &memsink);
+    JobInfo info(&url, zip::DecompressionAlg::kNoCompression, false, NULL,
+                 &memsink);
     Failures result = Fetch(&info);
     if (result == kFailOk) {
       string order(reinterpret_cast<char*>(memsink.data()), memsink.pos());

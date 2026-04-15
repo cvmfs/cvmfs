@@ -192,7 +192,8 @@ string CommandCheck::FetchPath(const string &path) {
   const string url = repo_base_path_ + "/" + path;
   if (is_remote_) {
     cvmfs::FileSink filesink(f);
-    download::JobInfo download_job(&url, false, false, NULL, &filesink);
+    download::JobInfo download_job(&url, zip::DecompressionAlg::kNoCompression,
+                                   false, NULL, &filesink);
     download::Failures retval = download_manager()->Fetch(&download_job);
     if (retval != download::kFailOk) {
       PANIC(kLogStderr, "failed to read %s", url.c_str());

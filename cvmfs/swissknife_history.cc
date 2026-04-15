@@ -333,14 +333,16 @@ bool CommandTag::UpdateUndoTags(
 
 bool CommandTag::FetchObject(const std::string &repository_url,
                              const shash::Any &object_hash,
-                             const std::string &destination_path) const {
+                             const std::string &destination_path,
+                             zip::DecompressionAlg decomp_alg) const {
   assert(!object_hash.IsNull());
 
   download::Failures dl_retval;
   const std::string url = repository_url + "/data/" + object_hash.MakePath();
 
   cvmfs::PathSink pathsink(destination_path);
-  download::JobInfo download_object(&url, true, false, &object_hash, &pathsink);
+  download::JobInfo download_object(&url, decomp_alg, false, &object_hash,
+                                    &pathsink);
   dl_retval = download_manager()->Fetch(&download_object);
 
   if (dl_retval != download::kFailOk) {
@@ -368,7 +370,16 @@ history::History *CommandTag::GetHistory(const manifest::Manifest *manifest,
       return NULL;
     }
   } else {
-    if (!FetchObject(repository_url, history_hash, history_path)) {
+    // History is SQLite database so compression format is reliably guessable.
+    // In future, we might have explicit metadata for decomp_alg
+    zip::DecompressionAlg decomp_alg;
+#ifdef CVMFS_GUESS_DECOMPRESSOR
+    decomp_alg = zip::DecompressionAlg::kGuessDecompression;
+#else
+    decomp_alg = zip::DecompressionAlgFromEnv();
+#endif
+
+    if (!FetchObject(repository_url, history_hash, history_path, decomp_alg)) {
       return NULL;
     }
 
@@ -392,7 +403,17 @@ catalog::Catalog *CommandTag::GetCatalog(const std::string &repository_url,
                                          const std::string catalog_path,
                                          const bool read_write) const {
   assert(shash::kSuffixCatalog == catalog_hash.suffix);
-  if (!FetchObject(repository_url, catalog_hash, catalog_path)) {
+
+  // Catalogs are SQLite databases so compression format is reliably guessable.
+  // In future, we might have explicit metadata for decomp_alg
+  zip::DecompressionAlg decomp_alg;
+#ifdef CVMFS_GUESS_DECOMPRESSOR
+  decomp_alg = zip::DecompressionAlg::kGuessDecompression;
+#else
+  decomp_alg = zip::DecompressionAlgFromEnv();
+#endif
+
+  if (!FetchObject(repository_url, catalog_hash, catalog_path, decomp_alg)) {
     return NULL;
   }
 

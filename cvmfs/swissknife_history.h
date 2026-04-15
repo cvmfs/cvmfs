@@ -75,7 +75,8 @@ class CommandTag : public Command {
   // TODO(jblomer): replace by swissknife::Assistant
   bool FetchObject(const std::string    &repository_url,
                    const shash::Any     &object_hash,
-                   const std::string    &destination_path) const;
+                   const std::string    &destination_path,
+                   zip::DecompressionAlg decomp_alg) const;
   history::History* GetHistory(const manifest::Manifest  *manifest,
                                const std::string         &repository_url,
                                const std::string         &history_path,

@@ -30,7 +30,17 @@ catalog::Catalog *Assistant::GetCatalog(
   string local_path = CreateTempPath(tmp_dir_ + "/catalog", 0600);
   assert(!local_path.empty());
 
-  if (!FetchObject(catalog_hash, local_path)) {
+  // Catalogs are SQLite so decompression algorithm can be guessed among zlib,
+  // zstd, none.
+  // But in future we may have an explicit metadata.
+  zip::DecompressionAlg decomp_alg;
+#ifdef CVMFS_GUESS_DECOMPRESSOR
+  decomp_alg = zip::DecompressionAlg::kGuessDecompression;
+#else
+  decomp_alg = zip::DecompressionAlgFromEnv();
+#endif
+
+  if (!FetchObject(catalog_hash, local_path, decomp_alg)) {
     return NULL;
   }
 
@@ -73,7 +83,17 @@ history::History *Assistant::GetHistory(OpenMode open_mode) {
     return history;
   }
 
-  if (!FetchObject(history_hash, local_path))
+  // History databases are SQLite so decompression algorithm can be guessed
+  // among zlib, zstd, none.
+  // But in future we may have an explicit metadata.
+  zip::DecompressionAlg decomp_alg;
+#ifdef CVMFS_GUESS_DECOMPRESSOR
+  decomp_alg = zip::DecompressionAlg::kGuessDecompression;
+#else
+  decomp_alg = zip::DecompressionAlgFromEnv();
+#endif
+
+  if (!FetchObject(history_hash, local_path, decomp_alg))
     return NULL;
 
   switch (open_mode) {
@@ -98,15 +118,15 @@ history::History *Assistant::GetHistory(OpenMode open_mode) {
   return history;
 }
 
-
-bool Assistant::FetchObject(const shash::Any &id, const string &local_path) {
+bool Assistant::FetchObject(const shash::Any& id, const string& local_path,
+                            zip::DecompressionAlg decomp_alg) {
   assert(!id.IsNull());
 
   download::Failures dl_retval;
   const std::string url = repository_url_ + "/data/" + id.MakePath();
 
   cvmfs::PathSink pathsink(local_path);
-  download::JobInfo download_info(&url, true, false, &id, &pathsink);
+  download::JobInfo download_info(&url, decomp_alg, false, &id, &pathsink);
   dl_retval = download_mgr_->Fetch(&download_info);
 
   if (dl_retval != download::kFailOk) {

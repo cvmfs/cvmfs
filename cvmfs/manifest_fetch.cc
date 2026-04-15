@@ -183,8 +183,9 @@ static Failures DoFetch(const std::string &base_url,
   download::Failures retval_dl;
   const string manifest_url = base_url + string("/.cvmfspublished");
   cvmfs::MemSink manifest_memsink;
-  download::JobInfo download_manifest(&manifest_url, false, probe_hosts, NULL,
-                                      &manifest_memsink);
+  download::JobInfo download_manifest(&manifest_url,
+                                      zip::DecompressionAlg::kNoCompression,
+                                      probe_hosts, NULL, &manifest_memsink);
 
   retval_dl = download_manager->Fetch(&download_manifest);
   if (retval_dl != download::kFailOk) {

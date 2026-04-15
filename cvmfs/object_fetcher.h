@@ -130,9 +130,20 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
     assert(history_hash.suffix == shash::kSuffixHistory ||
            history_hash.IsNull());
 
+    // History is a SQLite database, has clear signature at the beginning and
+    // so decompression algorithm can be reliably guessed among zlib, zstd and
+    // none.
+    // But in future we may have explicit metafata for that.
+    zip::DecompressionAlg decomp_alg;
+#ifdef CVMFS_GUESS_DECOMPRESSOR
+    decomp_alg = zip::DecompressionAlg::kGuessDecompression;
+#else
+    decomp_alg = zip::DecompressionAlgFromEnv();
+#endif
+
     // download the history hash
     std::string path;
-    const Failures retval = Fetch(effective_history_hash, &path);
+    const Failures retval = Fetch(effective_history_hash, &path, decomp_alg);
     if (retval != kFailOk) {
       return retval;
     }
@@ -167,7 +178,19 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
     assert(catalog_hash.suffix == shash::kSuffixCatalog);
 
     std::string path;
-    const Failures retval = Fetch(catalog_hash, &path);
+
+    // Catalog is a SQLite database, has clear signature at the beginning and
+    // so decompression algorithm can be reliably guessed among zlib, zstd and
+    // none.
+    // But in future we may have explicit metafata for that.
+    zip::DecompressionAlg decomp_alg;
+#ifdef CVMFS_GUESS_DECOMPRESSOR
+    decomp_alg = zip::DecompressionAlg::kGuessDecompression;
+#else
+    decomp_alg = zip::DecompressionAlgFromEnv();
+#endif
+
+    const Failures retval = Fetch(catalog_hash, &path, decomp_alg);
     if (retval != kFailOk) {
       return retval;
     }
@@ -190,9 +213,10 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
     assert(reflog_hash.suffix == shash::kSuffixNone);
 
     std::string tmp_path;
-    const bool decompress = false;
     const bool nocache = true;
-    Failures failure = Fetch(kReflogFilename, decompress, nocache, &tmp_path);
+    Failures failure =
+        Fetch(kReflogFilename, zip::DecompressionAlg::kNoCompression, nocache,
+              &tmp_path);
     if (failure != kFailOk) {
       return failure;
     }
@@ -279,16 +303,23 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
    * @param file_path    temporary file path to store the download result
    * @return             failure code (if not kFailOk, file_path is invalid)
    */
+#if 0
   Failures Fetch(const shash::Any &object_hash, std::string *file_path) {
     return static_cast<DerivedT*>(this)->Fetch(object_hash, file_path);
   }
+#endif
+  Failures Fetch(const shash::Any& object_hash, std::string* file_path,
+                 zip::DecompressionAlg decomp_alg) {
+    return static_cast<DerivedT*>(this)->Fetch(object_hash, file_path,
+                                               decomp_alg);
+  }
 
-  Failures Fetch(const std::string &relative_path,
-                 const bool         decompress,
-                 const bool         nocache,
-                       std::string *file_path) {
+  Failures Fetch(const std::string& relative_path,
+                 zip::DecompressionAlg decomp_alg,
+                 const bool nocache,
+                 std::string* file_path) {
     return static_cast<DerivedT*>(this)->Fetch(relative_path,
-                                               decompress,
+                                               decomp_alg,
                                                nocache,
                                                file_path);
   }
@@ -354,9 +385,7 @@ class LocalObjectFetcher :
                      zip::Algorithm decomp_alg)
     : BaseTN(temp_dir)
     , base_path_(base_path) {
-    copy_ = zip::Decompressor::Construct(zip::kNoCompression);
-
-    decomp_ = zip::Decompressor::Construct(decomp_alg);
+    decomp_alg_ = decomp_alg;
   }
 
   using BaseTN::FetchManifest;  // un-hiding convenience overload
@@ -375,19 +404,22 @@ class LocalObjectFetcher :
     return "file://" + BuildPath(BuildRelativePath(hash));
   }
 
-  Failures Fetch(const shash::Any &object_hash, std::string *file_path) {
+  Failures Fetch(const shash::Any& object_hash, std::string* file_path) {
+    return Fetch(object_hash, file_path, decomp_alg_);
+  }
+
+  Failures Fetch(const shash::Any& object_hash, std::string* file_path,
+                 zip::DecompressionAlg decomp_alg) {
     assert(file_path != NULL);
     file_path->clear();
 
     const std::string relative_path = BuildRelativePath(object_hash);
-    const bool        decompress    = true;
     const bool        nocache       = false;
-    return Fetch(relative_path, decompress, nocache, file_path);
+    return Fetch(relative_path, decomp_alg, nocache, file_path);
   }
 
-
   Failures Fetch(const std::string &relative_path,
-                 const bool         decompress,
+                 zip::DecompressionAlg decomp_alg,
                  const bool         /* nocache */,
                        std::string *file_path) {
     assert(file_path != NULL);
@@ -415,13 +447,8 @@ class LocalObjectFetcher :
     // decompress or copy the requested object file
     zip::InputPath in_path(source);
     cvmfs::FileSink out_file(f, true);
-    zip::Decompressor *decomp;
-
-    if (decompress) {
-      decomp = decomp_.weak_ref();
-    } else {
-      decomp = copy_.weak_ref();
-    }
+    UniquePtr<zip::Decompressor> decomp;
+    decomp = zip::Decompressor::Construct(decomp_alg);
 
     const bool success = (decomp->DecompressStream(&in_path, &out_file)
                                                             == zip::kStreamEnd);
@@ -451,8 +478,7 @@ class LocalObjectFetcher :
 
  private:
   const std::string base_path_;
-  UniquePtr<zip::Decompressor> copy_;
-  UniquePtr<zip::Decompressor> decomp_;
+  zip::DecompressionAlg decomp_alg_;
 };
 
 template <class CatalogT, class HistoryT, class ReflogT>
@@ -558,22 +584,33 @@ class HttpObjectFetcher :
     return BuildUrl(BuildRelativeUrl(hash));
   }
 
+#if 0
   Failures Fetch(const shash::Any &object_hash, std::string *object_file) {
     assert(object_file != NULL);
     assert(!object_hash.IsNull());
 
-    const bool decompress = true;
+    zip::DecompressionAlg decomp_alg = FIXME;
     const bool nocache = false;
     const std::string url = BuildRelativeUrl(object_hash);
-    return Download(url, decompress, nocache, &object_hash, object_file);
+    return Download(url, decomp_alg, nocache, &object_hash, object_file);
+  }
+#endif
+  Failures Fetch(const shash::Any& object_hash, std::string* object_file,
+                 zip::DecompressionAlg decomp_alg) {
+    assert(object_file != NULL);
+    assert(!object_hash.IsNull());
+
+    const bool nocache = false;
+    const std::string url = BuildRelativeUrl(object_hash);
+    return Download(url, decomp_alg, nocache, &object_hash, object_file);
   }
 
   Failures Fetch(const std::string &relative_path,
-                 const bool         decompress,
+                 zip::DecompressionAlg decomp_alg,
                  const bool         nocache,
                        std::string *file_path) {
     const shash::Any *expected_hash = NULL;
-    return Download(relative_path, decompress, nocache, expected_hash,
+    return Download(relative_path, decomp_alg, nocache, expected_hash,
                     file_path);
   }
 
@@ -587,7 +624,7 @@ class HttpObjectFetcher :
   }
 
   Failures Download(const std::string &relative_path,
-                    const bool         decompress,
+                    zip::DecompressionAlg decomp_alg,
                     const bool         nocache,
                     const shash::Any  *expected_hash,
                           std::string *file_path) {
@@ -608,7 +645,7 @@ class HttpObjectFetcher :
     const std::string url = BuildUrl(relative_path);
     const bool probe_hosts = false;
     cvmfs::FileSink filesink(f);
-    download::JobInfo download_job(&url, decompress, probe_hosts, expected_hash,
+    download::JobInfo download_job(&url, decomp_alg, probe_hosts, expected_hash,
                                    &filesink);
     download_job.SetForceNocache(nocache);
     download::Failures retval = download_manager_->Fetch(&download_job);

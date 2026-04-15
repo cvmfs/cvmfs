@@ -287,8 +287,9 @@ static void *MainWorker(void *data) {
                                     &tmp_file);
       string url_chunk = *stratum0_url + "/data/" + chunk_hash.MakePath();
       cvmfs::FileSink filesink(fchunk);
-      download::JobInfo download_chunk(&url_chunk, false, false,
-                                       &chunk_hash, &filesink);
+      download::JobInfo download_chunk(&url_chunk,
+                                       zip::DecompressionAlg::kNoCompression,
+                                       false, &chunk_hash, &filesink);
 
       const download::Failures download_result =
                                        download_manager->Fetch(&download_chunk);
@@ -408,8 +409,9 @@ bool CommandPull::Pull(const shash::Any   &catalog_hash,
   }
   const string url_catalog = *stratum0_url + "/data/" + catalog_hash.MakePath();
   cvmfs::FileSink filesink(fcatalog_vanilla);
-  download::JobInfo download_catalog(&url_catalog, false, false,
-                                     &catalog_hash, &filesink);
+  download::JobInfo download_catalog(&url_catalog,
+                                     zip::DecompressionAlg::kNoCompression,
+                                     false, &catalog_hash, &filesink);
   dl_retval = download_manager()->Fetch(&download_catalog);
   fclose(fcatalog_vanilla);
   if (dl_retval != download::kFailOk) {
@@ -582,6 +584,26 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   typedef std::vector<history::History::Tag> TagVector;
   TagVector historic_tags;
 
+  // For manifest fields, we can make reasonable assumptions about content
+  // structure, and thus about reliability of autodetecting the decompression
+  // algorithm.
+  //
+  // We know the certificate is PEM-formatted, always starting with
+  // -----BEGIN CERTIFICATE-----. Definitely not an arbitrary binary, so
+  // kGuessCompression is completely reliable in this case.
+  //
+  // Metadata is JSON, also unambiguous for plain vs zlib vs zstd.
+  //
+  // "SQLite format 3" is literally the beginning of files which are.
+  // This applies to history (H) and catalog (C).
+  zip::DecompressionAlg decomp_alg;
+#ifdef CVMFS_GUESS_DECOMPRESSOR
+  decomp_alg = zip::DecompressionAlg::kGuessDecompression;
+#else
+  // In future, we might have a manifest field for certificate decomp_alg
+  decomp_alg = zip::DecompressionAlgFromEnv();
+#endif
+
   LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: replicating from %s",
            stratum0_url->c_str());
 
@@ -678,8 +700,8 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     meta_info_hash = ensemble.manifest->meta_info();
     const string url = *stratum0_url + "/data/" + meta_info_hash.MakePath();
     cvmfs::MemSink metainfo_memsink;
-    download::JobInfo download_metainfo(&url, true, false, &meta_info_hash,
-                                        &metainfo_memsink);
+    download::JobInfo download_metainfo(&url, decomp_alg, false,
+                                        &meta_info_hash, &metainfo_memsink);
     dl_retval = download_manager()->Fetch(&download_metainfo);
     if (dl_retval != download::kFailOk) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to fetch meta info (%d - %s)",
@@ -753,8 +775,9 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     const string history_path = *temp_dir + "/" + history_hash.ToString();
 
     cvmfs::PathSink pathsink(history_path);
-    download::JobInfo download_history(&history_url, false, false,
-                                       &history_hash, &pathsink);
+    download::JobInfo download_history(&history_url,
+                                       zip::DecompressionAlg::kNoCompression,
+                                       false, &history_hash, &pathsink);
     dl_retval = download_manager()->Fetch(&download_history);
     if (dl_retval != download::kFailOk) {
       ReportDownloadError(download_history);

@@ -174,8 +174,9 @@ string AutoProxy(DownloadManager *download_manager) {
     LogCvmfs(kLogDownload, kLogDebug, "looking for proxy config at %s",
              pac_paths[i].c_str());
     cvmfs::MemSink pac_memsink;
-    download::JobInfo download_pac(&pac_paths[i], false, false, NULL,
-                                   &pac_memsink);
+    download::JobInfo download_pac(&pac_paths[i],
+                                   zip::DecompressionAlg::kNoCompression, false,
+                                   NULL, &pac_memsink);
     int retval = download_manager->Fetch(&download_pac);
     if (retval == download::kFailOk) {
       string proxies;
