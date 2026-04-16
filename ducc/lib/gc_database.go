@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	_ "modernc.org/sqlite"
 	"golang.org/x/sys/unix"
+	_ "modernc.org/sqlite"
 )
 
 // GCDatabase wraps an SQLite database that stores paths marked for deletion
