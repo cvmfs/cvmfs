@@ -13,6 +13,7 @@
 
 #include "duplex_sqlite3.h"
 #include "util/posix.h"
+#include "util/string.h"
 
 // Declarations of the static functions under test.  They live in
 // swissknife_ingest.cc – we re-declare them here so we can link against them
