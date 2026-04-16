@@ -97,23 +97,49 @@ if [ "$1" == "ingest" ]; then
   fi
 fi
 
-# cvmfs_server overlay -l <layers> -d <dest> <repo>
-# Mock: just create the destination directory
+# cvmfs_server overlay -l <layers> -d <dest> [-c <oci_config>] [-S] <repo>
+# Mock: just create the destination directory and optionally singularity dotfiles
 if [ "$1" == "overlay" ]; then
   shift
   layers=""
   dest=""
+  oci_config=""
+  skip_singularity=0
+  repo=""
   while [ $# -gt 0 ]; do
     case "$1" in
       -l) layers="$2"; shift 2 ;;
       -d) dest="$2"; shift 2 ;;
+      -c) oci_config="$2"; shift 2 ;;
+      -S) skip_singularity=1; shift ;;
       *)  repo="$1"; shift ;;
     esac
   done
-  echo "overlay: layers=$layers dest=$dest repo=$repo"
+  echo "overlay: layers=$layers dest=$dest repo=$repo oci_config=$oci_config skip_singularity=$skip_singularity"
   mkdir -p "$CVMFS_TEST_REPO/$dest"
   # Write a marker file so tests can verify the overlay was called
   echo "layers=$layers" > "$CVMFS_TEST_REPO/$dest/.overlay_marker"
+  # If OCI config is provided and singularity is not skipped, create dotfiles
+  if [ -n "$oci_config" ] && [ $skip_singularity -eq 0 ]; then
+    mkdir -p "$CVMFS_TEST_REPO/$dest/.singularity.d/libs"
+    mkdir -p "$CVMFS_TEST_REPO/$dest/.singularity.d/actions"
+    mkdir -p "$CVMFS_TEST_REPO/$dest/.singularity.d/env"
+    echo '#!/bin/sh' > "$CVMFS_TEST_REPO/$dest/.singularity.d/runscript"
+    echo '#!/bin/sh' > "$CVMFS_TEST_REPO/$dest/.singularity.d/startscript"
+    echo '#!/bin/sh' > "$CVMFS_TEST_REPO/$dest/.singularity.d/actions/exec"
+    echo '#!/bin/sh' > "$CVMFS_TEST_REPO/$dest/.singularity.d/actions/run"
+    echo '#!/bin/sh' > "$CVMFS_TEST_REPO/$dest/.singularity.d/actions/shell"
+    echo '#!/bin/sh' > "$CVMFS_TEST_REPO/$dest/.singularity.d/actions/start"
+    echo '#!/bin/sh' > "$CVMFS_TEST_REPO/$dest/.singularity.d/actions/test"
+    echo '#!/bin/sh' > "$CVMFS_TEST_REPO/$dest/.singularity.d/env/01-base.sh"
+    echo '#!/bin/sh' > "$CVMFS_TEST_REPO/$dest/.singularity.d/env/10-docker2singularity.sh"
+    echo '#!/bin/sh' > "$CVMFS_TEST_REPO/$dest/.singularity.d/env/90-environment.sh"
+    echo '#!/bin/sh' > "$CVMFS_TEST_REPO/$dest/.singularity.d/env/91-environment.sh"
+    echo '#!/bin/sh' > "$CVMFS_TEST_REPO/$dest/.singularity.d/env/95-apps.sh"
+    echo '#!/bin/sh' > "$CVMFS_TEST_REPO/$dest/.singularity.d/env/99-base.sh"
+    echo '#!/bin/sh' > "$CVMFS_TEST_REPO/$dest/.singularity.d/env/99-runtimevars.sh"
+    echo "oci_config=$oci_config" >> "$CVMFS_TEST_REPO/$dest/.overlay_marker"
+  fi
 fi
 
 # cvmfs_server ingest --catalog -t - -b <dir> <repo>

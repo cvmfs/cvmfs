@@ -250,3 +250,17 @@ func IngestDeleteWithLogger(logger *log.Entry, CVMFSRepo string, path string) er
 	defer unlock(CVMFSRepo)
 	return exec.ExecCommandWithLogger(ingestLogger, "cvmfs_server", "ingest", "--delete", path, repoName).Start()
 }
+
+func IngestFastDelete(CVMFSRepo string, path string) error {
+	return IngestFastDeleteWithLogger(nil, CVMFSRepo, path)
+}
+
+func IngestFastDeleteWithLogger(logger *log.Entry, CVMFSRepo string, path string) error {
+	logger = l.Ensure(logger)
+	ingestLogger := logger.WithFields(log.Fields{"repo": CVMFSRepo, "action": "ingest fast-delete", "path": path})
+	repoName, _ := GetRepoAndSubdir(CVMFSRepo)
+	path = PrefixRepoSubdirOnce(CVMFSRepo, path)
+	getLock(CVMFSRepo)
+	defer unlock(CVMFSRepo)
+	return exec.ExecCommandWithLogger(ingestLogger, "cvmfs_server", "ingest", "--fast-delete", path, repoName).Start()
+}

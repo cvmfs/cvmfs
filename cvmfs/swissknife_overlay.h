@@ -25,6 +25,7 @@
 #include "directory_entry.h"
 #include "shortstring.h"
 #include "swissknife.h"
+#include "upload.h"
 #include "xattr.h"
 
 namespace swissknife {
@@ -130,6 +131,69 @@ class CommandOverlay : public Command {
       catalog::Catalog *root_catalog,
       const std::string &layer_path,
       std::vector<catalog::Catalog *> *loaded_catalogs);
+
+  /**
+   * Parse an OCI image config JSON file and inject Singularity
+   * compatibility dotfiles (.singularity.d/) into the merged overlay
+   * entries.  The generated files include the base environment,
+   * action scripts, runscript (from Entrypoint/Cmd) and environment
+   * variables (from Env).
+   *
+   * File content is uploaded through the spooler so that content hashes
+   * are available for the catalog entries.
+   *
+   * Returns false on error.
+   */
+  bool InjectSingularityDotfiles(
+      const std::string &oci_config_path,
+      upload::Spooler *spooler,
+      std::map<std::string, OverlayEntry> *merged);
+
+  /**
+   * Helper: create an OverlayEntry for a directory.
+   */
+  static OverlayEntry MakeDirEntry(const std::string &path,
+                                   const std::string &parent);
+
+  /**
+   * Helper: create an OverlayEntry for a regular file, uploading
+   * its content through the spooler and blocking until the content
+   * hash is available.
+   */
+  static OverlayEntry MakeFileEntry(const std::string &path,
+                                    const std::string &parent,
+                                    const std::string &content,
+                                    upload::Spooler *spooler);
+
+  /**
+   * Helper: create an OverlayEntry for a symlink.
+   */
+  static OverlayEntry MakeSymlinkEntry(const std::string &path,
+                                       const std::string &parent,
+                                       const std::string &target);
+
+  /**
+   * Shell-escape a string (escape backslash, double-quote, backtick, $).
+   */
+  static std::string ShellEscape(const std::string &s);
+
+  /**
+   * Quote a list of shell args.
+   */
+  static std::string ArgsQuoted(const std::vector<std::string> &args);
+
+  /**
+   * Generate the content of the runscript from OCI Entrypoint and Cmd.
+   */
+  static std::string GenerateRunscript(
+      const std::vector<std::string> &entrypoint,
+      const std::vector<std::string> &cmd);
+
+  /**
+   * Generate the content of env/10-docker2singularity.sh from OCI Env.
+   */
+  static std::string GenerateEnvScript(
+      const std::vector<std::string> &env);
 };
 
 }  // namespace swissknife

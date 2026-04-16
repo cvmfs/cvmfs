@@ -1297,11 +1297,14 @@ func (ld *LayerDownloader) DownloadAndIngestWithLogger(logger *log.Entry, CVMFSR
 // CreateFlatOverlay uses cvmfs_server overlay to merge all image layers into a
 // flat filesystem. It returns the singularity path (relative to /cvmfs/$REPO)
 // where the merged image is placed.
-func (img *Image) CreateFlatOverlay(CVMFSRepo string) (singularityPath string, err error) {
-	return img.CreateFlatOverlayWithLogger(nil, CVMFSRepo)
+// When ociConfigPath is non-empty, it is passed to the overlay command so that
+// Singularity .singularity.d dotfiles are created atomically as part of the
+// same transaction.
+func (img *Image) CreateFlatOverlay(CVMFSRepo string, ociConfigPath string) (singularityPath string, err error) {
+	return img.CreateFlatOverlayWithLogger(nil, CVMFSRepo, ociConfigPath, false)
 }
 
-func (img *Image) CreateFlatOverlayWithLogger(logger *log.Entry, CVMFSRepo string) (singularityPath string, err error) {
+func (img *Image) CreateFlatOverlayWithLogger(logger *log.Entry, CVMFSRepo string, ociConfigPath string, skipSingularity bool) (singularityPath string, err error) {
 	logger = l.Ensure(logger)
 	manifest, err := img.GetManifest()
 	if err != nil {
@@ -1331,7 +1334,7 @@ func (img *Image) CreateFlatOverlayWithLogger(logger *log.Entry, CVMFSRepo strin
 	t := time.Now()
 	n.AddField("action", "start_overlay_merge").Send()
 
-	err = cvmfs.OverlayWithLogger(logger, CVMFSRepo, layerPaths, singularityPath)
+	err = cvmfs.OverlayWithLogger(logger, CVMFSRepo, layerPaths, singularityPath, ociConfigPath, skipSingularity)
 
 	n.Elapsed(t).
 		AddField("action", "end_overlay_merge").

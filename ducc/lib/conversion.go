@@ -19,7 +19,6 @@ import (
 	da "github.com/cvmfs/ducc/docker-api"
 	l "github.com/cvmfs/ducc/log"
 	notification "github.com/cvmfs/ducc/notification"
-	singularity "github.com/cvmfs/ducc/singularity"
 	temp "github.com/cvmfs/ducc/temp"
 
 	dockerImage "github.com/docker/docker/api/types/image"
@@ -268,6 +267,41 @@ func ConvertWishFlat(wish WishFriendly, multiArch bool) error {
 			completeSingularityPriPath := filepath.Join("/", "cvmfs", wish.CvmfsRepo, singularityPrivatePath)
 			priDirInfo, errPri := os.Stat(completeSingularityPriPath)
 
+			// Validate the flat image: if the private path exists, check that
+			// it contains a .singularity.d directory.  Also check that the
+			// public symlink actually resolves (is not dangling).  If either
+			// check fails, delete the incomplete flat image with fast-delete
+			// and force a re-creation of the overlay.
+			if errPri == nil {
+				singDirPath := filepath.Join(completeSingularityPriPath, ".singularity.d")
+				if _, errSingDir := os.Stat(singDirPath); errSingDir != nil {
+					imageLogger.WithFields(log.Fields{
+						"flat path":       completeSingularityPriPath,
+						"singularity dir": singDirPath,
+					}).Warn("Flat image exists but is incomplete (missing .singularity.d), deleting and re-creating")
+					if delErr := cvmfs.IngestFastDeleteWithLogger(imageLogger, wish.CvmfsRepo, singularityPrivatePath); delErr != nil {
+						imageLogger.WithField("error", delErr).Error("Error deleting incomplete flat image")
+						if firstError == nil {
+							firstError = delErr
+						}
+						continue
+					}
+					// Reset stat results so we fall through to the overlay creation below
+					errPri = fmt.Errorf("flat image deleted (was incomplete)")
+					priDirInfo = nil
+				}
+			}
+			// Check for a dangling public symlink (Lstat succeeds but Stat failed)
+			if errPub != nil && !os.IsNotExist(errPub) {
+				// Stat failed for a reason other than not-exist; could be a dangling symlink
+				if _, errLstat := os.Lstat(completePubSymPath); errLstat == nil {
+					imageLogger.WithField("symlink", completePubSymPath).
+						Warn("Public symlink is dangling, will re-create flat image")
+					// The flat image is already gone (errPri would be non-nil too),
+					// so we just fall through to the overlay path.
+				}
+			}
+
 			imageLogger.WithFields(log.Fields{
 				"public path":            completePubSymPath,
 				"err stats public path":  errPub,
@@ -335,49 +369,49 @@ func ConvertWishFlat(wish WishFriendly, multiArch bool) error {
 			i.Action("start_flat_overlay_conversion").Send()
 			i = i.Action("end_flat_overlay_conversion")
 
-			// Use cvmfs_server overlay to merge layers into a flat image
-			_, err = inputImage.CreateFlatOverlayWithLogger(imageLogger, wish.CvmfsRepo)
+			// Download the OCI config JSON and write it to a temp file
+			// so that the overlay command can inject Singularity dotfiles
+			// atomically in the same transaction.
+			ociConfigBytes, err := inputImage.GetRawConfigBytes()
+			if err != nil {
+				if firstError == nil {
+					firstError = err
+				}
+				l.LogE(err).Error("Error in getting the OCI image config")
+				i.Error(err).Elapsed(t1).Send()
+				continue
+			}
+			ociConfigFile, err := os.CreateTemp("", "ducc-oci-config-*.json")
+			if err != nil {
+				if firstError == nil {
+					firstError = err
+				}
+				l.LogE(err).Error("Error creating temp file for OCI config")
+				i.Error(err).Elapsed(t1).Send()
+				continue
+			}
+			_, err = ociConfigFile.Write(ociConfigBytes)
+			ociConfigFile.Close()
+			if err != nil {
+				os.Remove(ociConfigFile.Name())
+				if firstError == nil {
+					firstError = err
+				}
+				l.LogE(err).Error("Error writing OCI config temp file")
+				i.Error(err).Elapsed(t1).Send()
+				continue
+			}
+			defer os.Remove(ociConfigFile.Name())
+
+			// Use cvmfs_server overlay to merge layers into a flat image.
+			// The OCI config is passed so that Singularity dotfiles are
+			// created in the same atomic transaction as the overlay itself.
+			_, err = inputImage.CreateFlatOverlayWithLogger(imageLogger, wish.CvmfsRepo, ociConfigFile.Name(), false)
 			if err != nil {
 				if firstError == nil {
 					firstError = err
 				}
 				imageLogger.WithField("error", err).Error("Error in creating the flat overlay")
-				i.Error(err).Elapsed(t1).Send()
-				continue
-			}
-
-			ociImage, err := inputImage.GetOCIImage()
-			if err != nil {
-				if firstError == nil {
-					firstError = err
-				}
-				l.LogE(err).Error("Error in getting the OCI image configuration")
-				i.Error(err).Elapsed(t1).Send()
-				continue
-			}
-			// we create the singularity dotfiles inside the flat overlay result
-			err = cvmfs.WithinTransaction(wish.CvmfsRepo,
-				func() error {
-					if err := singularity.MakeBaseEnv(completeSingularityPriPath); err != nil {
-						imageLogger.WithField("error", err).Error("Error in creating the base singularity environment")
-						return err
-					}
-					if err := singularity.InsertRunScript(completeSingularityPriPath, ociImage); err != nil {
-						imageLogger.WithField("error", err).Error("Error in inserting the singularity runscript")
-						return err
-					}
-					if err := singularity.InsertEnv(completeSingularityPriPath, ociImage); err != nil {
-						imageLogger.WithField("error", err).Error("Error in inserting the singularity environment")
-						return err
-					}
-					return nil
-				})
-
-			if err != nil {
-				if firstError == nil {
-					firstError = err
-				}
-				imageLogger.WithField("error", err).Error("Error in creating the dotfile inside the flat directory")
 				i.Error(err).Elapsed(t1).Send()
 				continue
 			}
