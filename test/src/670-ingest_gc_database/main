@@ -64,7 +64,7 @@ cvmfs_run_test() {
   local gc_db=$scratch_dir/gc_test.db
 
   echo "*** Creating a fresh repository in $CVMFS_TEST_REPO"
-  create_empty_repo $CVMFS_TEST_REPO || return $?
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
 
   echo "*** Producing seed tarball"
   produce_tarball $tarfile || return 2
