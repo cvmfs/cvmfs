@@ -1,0 +1,136 @@
+name: Setup Squid proxy
+description: Install, configure, and start a local Squid proxy on GitHub Actions runners.
+
+inputs:
+  port:
+    description: Local TCP port exposed by the Squid proxy.
+    required: false
+    default: '3128'
+  config-path:
+    description: Path to the Squid configuration file.
+    required: false
+    default: /etc/squid/squid.conf
+  system-cache-dir:
+    description: System cache directory used by Squid.
+    required: false
+    default: /var/cache/squid
+  system-log-dir:
+    description: System log directory used by Squid.
+    required: false
+    default: /var/log/squid
+  restore-cache-dir:
+    description: Runner cache directory restored into the Squid cache before startup.
+    required: false
+    default: '$HOME/.cache/squid-cache'
+  restore-log-dir:
+    description: Runner cache directory restored into the Squid log directory before startup.
+    required: false
+    default: '$HOME/.cache/squid-logs'
+
+outputs:
+  proxy-url:
+    description: Local proxy URL exposed by this action.
+    value: ${{ steps.proxy-metadata.outputs.proxy-url }}
+
+runs:
+  using: composite
+  steps:
+    - id: proxy-metadata
+      shell: bash
+      run: |
+        echo "proxy-url=http://localhost:${{ inputs.port }}" >> "$GITHUB_OUTPUT"
+
+    - name: Create Squid cache directories
+      shell: bash
+      run: |
+        sudo mkdir -p "${{ inputs.system-cache-dir }}"
+        sudo mkdir -p "${{ inputs.system-log-dir }}"
+        sudo mkdir -p "$(dirname "${{ inputs.config-path }}")"
+
+        if [ -d "${{ inputs.restore-cache-dir }}" ] && [ "$(ls -A "${{ inputs.restore-cache-dir }}")" ]; then
+          echo " Restoring squid cache"
+          sudo mv "${{ inputs.restore-cache-dir }}"/* "${{ inputs.system-cache-dir }}/" 2>/dev/null || true
+        fi
+
+        if [ -d "${{ inputs.restore-log-dir }}" ] && [ "$(ls -A "${{ inputs.restore-log-dir }}")" ]; then
+          sudo mv "${{ inputs.restore-log-dir }}"/* "${{ inputs.system-log-dir }}/" 2>/dev/null || true
+        fi
+
+        sudo chown -R proxy:proxy "${{ inputs.system-cache-dir }}"
+        sudo chown -R proxy:proxy "${{ inputs.system-log-dir }}"
+        sudo chmod -R 755 "${{ inputs.system-cache-dir }}"
+
+    - name: Install Squid
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y squid squidclient
+
+    - name: Configure Squid
+      shell: bash
+      run: |
+        sudo tee "${{ inputs.config-path }}" > /dev/null <<EOF
+        # Cache configuration
+        cache_dir ufs ${{ inputs.system-cache-dir }} 2000 16 256
+        cache_mem 256 MB
+        maximum_object_size 100 MB
+        maximum_object_size_in_memory 512 KB
+
+        # Access control
+        acl localnet src 10.0.0.0/8
+        acl localnet src 172.16.0.0/12
+        acl localnet src 192.168.0.0/16
+        acl localnet src fc00::/7
+        acl localnet src fe80::/10
+
+        acl SSL_ports port 443
+        acl Safe_ports port 80
+        acl Safe_ports port 21
+        acl Safe_ports port 443
+        acl Safe_ports port 70
+        acl Safe_ports port 210
+        acl Safe_ports port 1025-65535
+        acl Safe_ports port 280
+        acl Safe_ports port 488
+        acl Safe_ports port 591
+        acl Safe_ports port 777
+        acl CONNECT method CONNECT
+
+        # Access rules
+        http_access deny !Safe_ports
+        http_access deny CONNECT !SSL_ports
+        http_access allow localnet
+        http_access allow localhost
+        http_access deny all
+
+        # Network configuration
+        http_port ${{ inputs.port }}
+
+        # Logging
+        access_log ${{ inputs.system-log-dir }}/access.log
+        cache_log ${{ inputs.system-log-dir }}/cache.log
+
+        # Cache behavior
+         refresh_pattern . 1440 50% 10080 ignore-no-cache ignore-private override-expire ignore-reload
+
+        EOF
+
+    - name: Initialize and start Squid
+      shell: bash
+      run: |
+        sudo chown -R proxy:proxy "${{ inputs.system-cache-dir }}"
+        sudo chown -R proxy:proxy "${{ inputs.system-log-dir }}"
+        sudo chmod -R 755 "${{ inputs.system-cache-dir }}"
+
+        sudo systemctl stop squid
+        sudo systemctl disable squid
+        sudo rm -f /run/squid.pid /var/run/squid.pid
+        sudo pkill -f squid || true
+        sleep 2
+
+        if [ ! -d "${{ inputs.system-cache-dir }}/00" ]; then
+          sudo -u proxy squid -z -f "${{ inputs.config-path }}"
+        fi
+
+        sudo systemctl start squid
+        sudo systemctl enable squid
