@@ -601,7 +601,7 @@ class SingularitySpoolerSink {
   }
 
   bool GetHash(const string &path, shash::Any *hash) const {
-    map<string, shash::Any>::const_iterator it = hashes_.find(path);
+    const map<string, shash::Any>::const_iterator it = hashes_.find(path);
     if (it == hashes_.end()) return false;
     *hash = it->second;
     return true;
@@ -681,7 +681,7 @@ bool CommandOverlay::InjectSingularityDotfiles(
   // ---------------------------------------------------------------
   // 1.  Parse the OCI image config JSON
   // ---------------------------------------------------------------
-  int fd = open(oci_config_path.c_str(), O_RDONLY);
+  const int fd = open(oci_config_path.c_str(), O_RDONLY);
   if (fd < 0) {
     LogCvmfs(kLogCvmfs, kLogStderr,
              "Failed to open OCI config file %s", oci_config_path.c_str());
@@ -696,7 +696,7 @@ bool CommandOverlay::InjectSingularityDotfiles(
   }
   close(fd);
 
-  UniquePtr<JsonDocument> json(JsonDocument::Create(config_json));
+  const UniquePtr<JsonDocument> json(JsonDocument::Create(config_json));
   if (!json.IsValid()) {
     LogCvmfs(kLogCvmfs, kLogStderr,
              "Failed to parse OCI config JSON from %s",
