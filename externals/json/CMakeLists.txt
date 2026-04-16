@@ -9,7 +9,7 @@ set(JSON_HASH "MD5=c2528c3e04faccaaee44f1f8f3d30d99")
 setup_external_build_mode(json)
 
 FetchContent_Declare(
-  json
+  nlohmann_json
   URL "${JSON_URL}" "${JSON_URL_MIRROR}"
   URL_HASH "${JSON_HASH}"
   DOWNLOAD_DIR ${EXTERNALS_LIB_LOCATION}/download
@@ -18,10 +18,10 @@ FetchContent_Declare(
   FIND_PACKAGE_ARGS
 )
 
-FetchContent_MakeAvailable(json)
+FetchContent_MakeAvailable(nlohmann_json)
 unset(FETCHCONTENT_TRY_FIND_PACKAGE_MODE)
 
-if(json_FOUND)
+if(nlohmann_json_FOUND)
   message(STATUS "Found json target")
   set_target_properties(nlohmann_json::nlohmann_json PROPERTIES IMPORTED_GLOBAL TRUE)
 else()
