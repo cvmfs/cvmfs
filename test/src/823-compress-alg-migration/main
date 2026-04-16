@@ -5,6 +5,8 @@ cvmfs_test_suites="quick"
 
 ALG_SET=(unset default zlib zstd none)
 
+default_alg_actual=$(cvmfs_swissknife -h | grep -o 'compression algorithm [(]default: [^)]*[)]' | sed -e 's/compression algorithm (default: //' -e 's/)//')
+
 do_alg() {
   alg_spec=$1
 
@@ -73,6 +75,19 @@ do_alg() {
   find /cvmfs/$repo_name
   ls -lR /cvmfs/$repo_name
   [[ "$(cat /cvmfs/$repo_name/subdir/hello.txt)" == "hello" ]] || return 16
+  local xattr_value=$(attr -q -g compression /var/spool/cvmfs/$repo_name/rdonly/subdir/hello.txt)
+  case "$alg_spec" in
+    zlib|zstd|none)
+      if [[ "$xattr_value" != "$alg_spec" ]]; then return 17; fi
+      ;;
+    unset|default)
+      if [[ "$xattr_value" != "$default_alg_actual" ]]; then return 17; fi
+      ;;
+    *)
+      echo "Unknown alg_spec"
+      return 17
+      ;;
+  esac
 
   # alg mixing:
   # set CVMFS_COMPRESSION_ALGORITHM in server.conf to sth else
@@ -103,6 +118,19 @@ do_alg() {
     mkdir /cvmfs/$repo_name/subdir_newalg."$alg_new_spec"
     echo -n "hello from $alg_new_spec" | tee /cvmfs/$repo_name/subdir_newalg."$alg_new_spec"/hello."$alg_new_spec".txt || return 103
     publish_repo $repo_name || return 104
+    xattr_value=$(attr -q -g compression /var/spool/cvmfs/$repo_name/rdonly/subdir_newalg."$alg_new_spec"/hello."$alg_new_spec".txt)
+    case "$alg_new_spec" in
+      zlib|zstd|none)
+        if [[ "$xattr_value" != "$alg_new_spec" ]]; then return 104; fi
+        ;;
+      unset|default)
+        if [[ "$xattr_value" != "$default_alg_actual" ]]; then return 104; fi
+        ;;
+      *)
+        echo "Unknown alg_new_spec"
+        return 104
+        ;;
+    esac
 
     # It's not an ultimate check of correctness if we just incrementally change settings and accrue uncompressed local cache.
     # This drops the cache, for the ultimate test of data accessibility:
