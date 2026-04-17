@@ -19,6 +19,7 @@ PROFILE_EXCLUSIONS="\
   src/035-unpinumount \
   src/041-rocache \
   src/042-cleanuppipes \
+  src/059-fallbackproxy \
   src/081-shrinkwrap \
   src/082-shrinkwrap-cms \
   src/084-premounted \

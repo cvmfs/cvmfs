@@ -209,16 +209,16 @@ fi
 
 testsuite="$@"
 if [ -z "$testsuite" ]; then
-  if [ "$suite_option_provided" -eq 0 ]; then
-    if [ -z "$labels" ]; then
-      labels="quick"
-      default_suite_used=1
-    fi
-    if [ -n "$PROFILE_TESTSUITE" ]; then
-      testsuite="$PROFILE_TESTSUITE"
-    else
-      testsuite="src/0* src/1* src/5* src/6*"
-    fi
+  if [ "$suite_option_provided" -eq 0 ] && [ -z "$labels" ]; then
+    labels="quick"
+    default_suite_used=1
+  fi
+
+  if [ -n "$PROFILE_TESTSUITE" ]; then
+    testsuite="$PROFILE_TESTSUITE"
+    default_testsuite_used=1
+  elif [ "$suite_option_provided" -eq 0 ]; then
+    testsuite="src/0* src/1* src/5* src/6*"
     default_testsuite_used=1
   else
     testsuite=$(find src -mindepth 1 -maxdepth 1 -type d | sort)
