@@ -509,6 +509,9 @@ cvmfs_server_ingest() {
 
   if [ ! x"$gc_db" = "x" ]; then
     ingest_command="$ingest_command -Q $gc_db"
+    # Batch size from the repository's server.conf (loaded via
+    # load_repo_config).  Default 1000; 0 means "read all in one batch".
+    ingest_command="$ingest_command -X ${CVMFS_GC_DB_BATCH_SIZE:-1000}"
   fi
 
   if [ "x$CVMFS_PRINT_STATISTICS" = "xtrue" ]; then
@@ -677,4 +680,18 @@ cvmfs_server_ingest() {
   publish_after_hook $name
   publish_succeeded  $name
 
+  # If --gc-db was used and the swissknife only consumed one batch, any
+  # remaining rows need another transaction.  Tail-recurse until the DB is
+  # drained.  CVMFS_GC_DB_BATCH_SIZE=0 reads all rows at once, so there is
+  # nothing left to do.
+  if [ ! x"$gc_db" = "x" ]; then
+    local _remaining
+    _remaining=$(sqlite3 "$gc_db" \
+      "SELECT COUNT(*) FROM gc_paths WHERE deleted = 0;" 2>/dev/null) \
+      || _remaining=0
+    if [ "${_remaining:-0}" -gt 0 ]; then
+      echo "Info: ${_remaining} paths still pending in $gc_db, running next batch"
+      cvmfs_server_ingest --gc-db "$gc_db" "$name" || return $?
+    fi
+  fi
 }
