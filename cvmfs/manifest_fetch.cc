@@ -16,6 +16,7 @@
 #include "network/download.h"
 #include "util/smalloc.h"
 #include "whitelist.h"
+#include "compression/decompressor_guess.h"
 
 using namespace std;  // NOLINT
 
@@ -83,17 +84,7 @@ static Failures DoVerify(unsigned char *manifest_data, size_t manifest_size,
   if (!ensemble->cert_buf) {
     certificate_url += ensemble->manifest->MakeCertificatePath();
 
-    // We know the certificate is PEM-formatted, always starting with
-    // -----BEGIN CERTIFICATE-----. Definitely not an arbitrary binary, so
-    // kGuessCompression is completely reliable in this case.
-    zip::DecompressionAlg decomp_alg;
-#ifdef CVMFS_GUESS_DECOMPRESSOR
-    decomp_alg = zip::DecompressionAlg::kGuessDecompression;
-#else
-    // In future, we might have a manifest field for certificate decomp_alg
-    decomp_alg = zip::DecompressionAlgFromEnv();
-#endif
-    download::JobInfo download_certificate(&certificate_url, decomp_alg,
+    download::JobInfo download_certificate(&certificate_url, new zip::GuessDecompressor(zip::ExpectedContentFormat::kPEM),
                                            probe_hosts, &certificate_hash,
                                            &certificate_memsink);
     retval_dl = download_manager->Fetch(&download_certificate);

@@ -26,9 +26,7 @@ enum Algorithm {
   kZlib = 0,
   kNoCompression,
   kZstd,
-#ifdef CVMFS_GUESS_DECOMPRESSOR
   kGuessDecompression = 1000, // for internal transient indication only
-#endif
 #if defined(CVMFS_COMPRESSION_DEFAULT_ZSTD)
   kDefault = kZstd,
 #elif defined(CVMFS_COMPRESSION_DEFAULT_ZLIB)

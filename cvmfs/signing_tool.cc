@@ -6,6 +6,7 @@
 
 #include <string>
 
+#include "compression/decompressor_guess.h"
 #include "manifest.h"
 #include "object_fetcher.h"
 #include "reflog.h"
@@ -57,11 +58,10 @@ SigningTool::Result SigningTool::Run(
     return kInitError;
   }
 
-  // init the download helper
+  // init the download helper for reflog
   ObjectFetcher object_fetcher(repo_name, repo_url, temp_dir,
                                server_tool_->download_manager(),
-                               server_tool_->signature_manager(),
-                               zip::DecompressionAlgFromEnv());
+                               server_tool_->signature_manager());
 
   // Load Manifest
   manifest = manifest::Manifest::LoadFile(manifest_path);

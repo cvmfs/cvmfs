@@ -165,7 +165,7 @@ int Fetcher::Fetch(
              tls->download_job.GetPidPtr(),
              tls->download_job.GetInterruptCuePtr());
   }
-  tls->download_job.SetDecompressor(object.label.zip_algorithm);
+  tls->download_job.SetDecompressor(object.label);
   tls->download_job.SetRangeOffset(object.label.range_offset);
   tls->download_job.SetRangeSize(static_cast<int64_t>(object.label.size));
   download_mgr_->Fetch(&tls->download_job);

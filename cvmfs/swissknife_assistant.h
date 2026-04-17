@@ -9,6 +9,7 @@
 
 #include "crypto/hash.h"
 #include "compression/util.h"
+#include "compression/decompressor.h"
 
 namespace catalog {
 class Catalog;
@@ -54,7 +55,7 @@ class Assistant {
 
  private:
   bool FetchObject(const shash::Any& id, const std::string& local_path,
-                   zip::DecompressionAlg decomp_alg);
+                   zip::Decompressor* decomp);
 
   download::DownloadManager *download_mgr_;
   manifest::Manifest *manifest_;

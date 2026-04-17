@@ -58,11 +58,6 @@ if (BUILD_ALL)
   endif (!MACOSX)
 endif (BUILD_ALL)
 
-option (DECOMPRESSION_GUESS     "Enable 'guess' decompression algorithm option"                    ON)
-if (DECOMPRESSION_GUESS)
-  add_definitions(-DCVMFS_GUESS_DECOMPRESSOR)
-endif (DECOMPRESSION_GUESS)
-
 list(APPEND COMPRESSION_OPTIONS zlib zstd none)
 set(COMPRESSION_DEFAULT_IF_UNSET "zlib" CACHE STRING "Assumed value for default `compression" FORCE)
 set(COMPRESSION_DEFAULT "${COMPRESSION_DEFAULT_IF_UNSET}" CACHE STRING "Which compression to use by default. Valid values: ${COMPRESSION_OPTIONS}. If unset, assumed ${COMPRESSION_DEFAULT_IF_UNSET}")

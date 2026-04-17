@@ -356,13 +356,7 @@ LoadReturn ClientCatalogManager::FetchCatalogByHash(
   // Catalogs are SQLite so decompression algorithm can be guessed among zlib,
   // zstd, none.
   // But in future we may have an explicit metadata.
-  zip::DecompressionAlg decomp_alg;
-#ifdef CVMFS_GUESS_DECOMPRESSOR
-  decomp_alg = zip::DecompressionAlg::kGuessDecompression;
-#else
-  decomp_alg = zip::DecompressionAlgFromEnv();
-#endif
-  label.zip_algorithm = decomp_alg;
+  label.zip_algorithm = zip::DecompressionAlg::kGuessDecompression;
 
   int fd = fetcher_->Fetch(CacheManager::LabeledObject(hash, label),
                            alt_root_catalog_path);
@@ -395,13 +389,7 @@ void ClientCatalogManager::StageNestedCatalogByHash(
   // Catalogs are SQLite so decompression algorithm can be guessed among zlib,
   // zstd, none.
   // But in future we may have an explicit metadata.
-  zip::DecompressionAlg decomp_alg;
-#ifdef CVMFS_GUESS_DECOMPRESSOR
-  decomp_alg = zip::DecompressionAlg::kGuessDecompression;
-#else
-  decomp_alg = zip::DecompressionAlgFromEnv();
-#endif
-  label.zip_algorithm = decomp_alg;
+  label.zip_algorithm = zip::DecompressionAlg::kGuessDecompression;
   int fd = fetcher_->Fetch(CacheManager::LabeledObject(hash, label));
   if (fd >= 0)
     fetcher_->cache_mgr()->Close(fd);
@@ -474,31 +462,7 @@ void CachedManifestEnsemble::FetchCertificate(const shash::Any &hash) {
   // Certificates are PEM-formatted so decompression algorithm can be guessed
   // among zlib, zstd, none.
   // But in future we may have an explicit metadata.
-  zip::DecompressionAlg decomp_alg;
-#ifdef CVMFS_GUESS_DECOMPRESSOR
-  decomp_alg = zip::DecompressionAlg::kGuessDecompression;
-#else
-  decomp_alg = zip::DecompressionAlgFromEnv();
-#endif
-  label.zip_algorithm = decomp_alg;
-  // (gdb) bt
-  // #0  CacheManager::Label::Label (this=0x7fffffffc4e0) at /usr/local/src/cvmfs/cvmfs/cache.h:96
-  // #1  0x00007ffff7485567 in catalog::CachedManifestEnsemble::FetchCertificate (this=0x4a4270, hash=...) at /usr/local/src/cvmfs/cvmfs/catalog_mgr_client.cc:448
-  // #2  0x00007ffff74f18e8 in manifest::DoVerify (
-  //     manifest_data=0x531250 "Cbd564258b410d674cbe2376074381e0e1aa703a1\nB3072000\nRd41d8cd98f00b204e9800998ecf8427e\nD240\nS157771\nGno\nAno\nNatlas.cern.ch\nX0b457ac12225018e0a15330364c20529e15012ab\nH1e27bbbaf3d183ecb5bfa36cd2b05f4d65e1dfef\nT1774639934\nMb658a4a7ee87d621255cc9631d59a09c550a2606\nY34edaa5f1b4292e63ec445b2b9a81f77983c0cfc\n--\n32154902e73ef28e5f1802e0034df979887f55cd\n`l9\252\345h@\230\373\033\233\311^\336\356\031\211\004\233\253(T\2463\365\001\211\260g\2620\322\354\340)\2116\n`\031\354\021\230\232xJ\3654\021E\250[\bm\257\0024ARk\315\326\346\031", manifest_size=601, base_url="", repository_name="atlas.cern.ch",
-  //     minimum_timestamp=0, base_catalog=0x7fffffffcf50, signature_manager=0x4a1c40, download_manager=0x4b0db0, ensemble=0x4a4270) at /usr/local/src/cvmfs/cvmfs/manifest_fetch.cc:84
-  // #3  0x00007ffff74f1378 in manifest::DoFetch (base_url="", repository_name="atlas.cern.ch", minimum_timestamp=0, base_catalog=0x7fffffffcf50, signature_manager=0x4a1c40, download_manager=0x4b0db0,
-  //     ensemble=0x4a4270) at /usr/local/src/cvmfs/cvmfs/manifest_fetch.cc:186
-  // #4  0x00007ffff74f1049 in manifest::Fetch (base_url="", repository_name="atlas.cern.ch", minimum_timestamp=0, base_catalog=0x7fffffffcf50, signature_manager=0x4a1c40, download_manager=0x4b0db0, ensemble=0x4a4270)
-  //     at /usr/local/src/cvmfs/cvmfs/manifest_fetch.cc:201
-  // #5  0x00007ffff7483daf in catalog::ClientCatalogManager::GetNewRootCatalogContext (this=0x503480, result=0x7fffffffd260) at /usr/local/src/cvmfs/cvmfs/catalog_mgr_client.cc:216
-  // #6  0x00007ffff7485f4a in catalog::AbstractCatalogManager<catalog::Catalog>::MountCatalog (this=0x503480, mountpoint=..., hash=..., parent_catalog=0x0) at /usr/local/src/cvmfs/cvmfs/catalog_mgr_impl.h:970
-  // #7  0x00007ffff74869c9 in catalog::AbstractCatalogManager<catalog::Catalog>::Init (this=0x503480) at /usr/local/src/cvmfs/cvmfs/catalog_mgr_impl.h:102
-  // #8  0x00007ffff75091bb in MountPoint::CreateCatalogManager (this=0x43c160) at /usr/local/src/cvmfs/cvmfs/mountpoint.cc:1373
-  // #9  0x00007ffff7504c38 in MountPoint::Create (fqrn="atlas.cern.ch", file_system=0x437be0, options_mgr=0x42b900) at /usr/local/src/cvmfs/cvmfs/mountpoint.cc:1318
-  // #10 0x00007ffff758b70a in Init (loader_exports=0x430ea0) at /usr/local/src/cvmfs/cvmfs/cvmfs.cc:2350
-  // #11 0x00007ffff79dda2e in FuseMain (argc=<optimized out>, argv=0x7fffffffe378) at /usr/local/src/cvmfs/cvmfs/loader.cc:983
-  // #12 0x0000000000401b54 in main (argc=8, argv=0x7fffffffe378) at /usr/local/src/cvmfs/cvmfs/fuse_main.cc:144
+  label.zip_algorithm = zip::DecompressionAlg::kGuessDecompression;
 
   uint64_t size;
   bool retval = cache_mgr_->Open2Mem(CacheManager::LabeledObject(hash, label),

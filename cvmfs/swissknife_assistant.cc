@@ -11,6 +11,7 @@
 
 #include "catalog.h"
 #include "catalog_rw.h"
+#include "compression/decompressor_guess.h"
 #include "history.h"
 #include "history_sqlite.h"
 #include "manifest.h"
@@ -30,17 +31,9 @@ catalog::Catalog *Assistant::GetCatalog(
   string local_path = CreateTempPath(tmp_dir_ + "/catalog", 0600);
   assert(!local_path.empty());
 
-  // Catalogs are SQLite so decompression algorithm can be guessed among zlib,
-  // zstd, none.
-  // But in future we may have an explicit metadata.
-  zip::DecompressionAlg decomp_alg;
-#ifdef CVMFS_GUESS_DECOMPRESSOR
-  decomp_alg = zip::DecompressionAlg::kGuessDecompression;
-#else
-  decomp_alg = zip::DecompressionAlgFromEnv();
-#endif
-
-  if (!FetchObject(catalog_hash, local_path, decomp_alg)) {
+  if (!FetchObject(
+          catalog_hash, local_path,
+          new zip::GuessDecompressor(zip::ExpectedContentFormat::kSQLite3))) {
     return NULL;
   }
 
@@ -83,17 +76,9 @@ history::History *Assistant::GetHistory(OpenMode open_mode) {
     return history;
   }
 
-  // History databases are SQLite so decompression algorithm can be guessed
-  // among zlib, zstd, none.
-  // But in future we may have an explicit metadata.
-  zip::DecompressionAlg decomp_alg;
-#ifdef CVMFS_GUESS_DECOMPRESSOR
-  decomp_alg = zip::DecompressionAlg::kGuessDecompression;
-#else
-  decomp_alg = zip::DecompressionAlgFromEnv();
-#endif
-
-  if (!FetchObject(history_hash, local_path, decomp_alg))
+  if (!FetchObject(
+          history_hash, local_path,
+          new zip::GuessDecompressor(zip::ExpectedContentFormat::kSQLite3)))
     return NULL;
 
   switch (open_mode) {
@@ -119,14 +104,14 @@ history::History *Assistant::GetHistory(OpenMode open_mode) {
 }
 
 bool Assistant::FetchObject(const shash::Any& id, const string& local_path,
-                            zip::DecompressionAlg decomp_alg) {
+                            zip::Decompressor* decomp) {
   assert(!id.IsNull());
 
   download::Failures dl_retval;
   const std::string url = repository_url_ + "/data/" + id.MakePath();
 
   cvmfs::PathSink pathsink(local_path);
-  download::JobInfo download_info(&url, decomp_alg, false, &id, &pathsink);
+  download::JobInfo download_info(&url, decomp, false, &id, &pathsink);
   dl_retval = download_mgr_->Fetch(&download_info);
 
   if (dl_retval != download::kFailOk) {

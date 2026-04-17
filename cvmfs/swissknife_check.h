@@ -11,6 +11,7 @@
 #include "catalog.h"
 #include "compression/compressor.h"
 #include "compression/decompressor.h"
+#include "compression/decompressor_guess.h"
 #include "crypto/hash.h"
 #include "smallhash.h"
 #include "swissknife.h"
@@ -68,19 +69,16 @@ class CommandCheck : public Command {
                    const uint64_t                   catalog_size,
                    const bool                       is_nested_catalog,
                    const catalog::DirectoryEntry  *transition_point,
-                   catalog::DeltaCounters         *computed_counters,
-                   zip::DecompressionAlg decomp_alg);
+                   catalog::DeltaCounters         *computed_counters);
   catalog::Catalog* FetchCatalog(const std::string& path,
                                  const shash::Any& catalog_hash,
-                                 const uint64_t catalog_size,
-                                 zip::DecompressionAlg decomp_alg);
+                                 const uint64_t catalog_size);
   bool FindSubtreeRootCatalog(const std::string& subtree_path,
-                              shash::Any* root_hash, uint64_t* root_size,
-                              zip::DecompressionAlg decomp_alg);
+                              shash::Any* root_hash, uint64_t* root_size);
 
-  std::string DecompressPiece(const shash::Any catalog_hash);
-  std::string DownloadPiece(const shash::Any catalog_hash,
-                            zip::DecompressionAlg decomp_alg);
+  std::string DecompressPiece(const shash::Any catalog_hash,
+                              zip::ExpectedContentFormat expected_fmt);
+
   std::string FetchPath(const std::string &path);
   bool InspectReflog(const shash::Any &reflog_hash,
                      manifest::Manifest *manifest);
@@ -104,7 +102,6 @@ class CommandCheck : public Command {
   bool        no_duplicates_map_;
   bool        is_remote_;
   SmallHashDynamic<shash::Any, char> duplicates_map_;
-  UniquePtr<zip::Decompressor> decomp_;
   UniquePtr<zip::Compressor> copy_;
 };
 

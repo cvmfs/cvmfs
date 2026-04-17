@@ -22,6 +22,8 @@
 #include "catalog_sql.h"
 #include "compression/input_file.h"
 #include "compression/input_path.h"
+#include "compression/util.h"
+#include "compression/decompressor_guess.h"
 #include "file_chunk.h"
 #include "history_sqlite.h"
 #include "manifest.h"
@@ -55,7 +57,6 @@ CommandCheck::CommandCheck()
                             , is_remote_(false) {
   const shash::Any hash_null;
   duplicates_map_.Init(16, hash_null, hasher_any);
-  decomp_ = zip::Decompressor::Construct(zip::DecompressionAlgFromEnv());
   copy_ = zip::Compressor::Construct(zip::kNoCompression);
 }
 
@@ -676,46 +677,41 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
   return retval;
 }
 
-string CommandCheck::DownloadPiece(const shash::Any catalog_hash,
-                                   zip::DecompressionAlg decomp_alg) {
-  string source = "data/" + catalog_hash.MakePath();
-  const string dest = temp_directory_ + "/" + catalog_hash.ToString();
-  const string url = repo_base_path_ + "/" + source;
-
-  cvmfs::PathSink pathsink(dest);
-  download::JobInfo download_catalog(&url, decomp_alg, false, &catalog_hash,
-                                     &pathsink);
-  download::Failures retval = download_manager()->Fetch(&download_catalog);
-  if (retval != download::kFailOk) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to download object %s (%d)",
-             catalog_hash.ToString().c_str(), retval);
-    return "";
-  }
-
-  return dest;
-}
-
-string CommandCheck::DecompressPiece(const shash::Any catalog_hash) {
+string CommandCheck::DecompressPiece(const shash::Any catalog_hash,
+                                     zip::ExpectedContentFormat expected_fmt) {
   string source = "data/" + catalog_hash.MakePath();
   const string dest = temp_directory_ + "/" + catalog_hash.ToString();
   zip::InputPath in_path(source);
   cvmfs::PathSink out_path(dest);
-  if (decomp_->DecompressStream(&in_path, &out_path) != zip::kStreamEnd) {
-    assert(decomp_->Reset());
-    return "";
+
+  auto decomp = new zip::GuessDecompressor(expected_fmt);
+  if (is_remote_) {
+    const string url = repo_base_path_ + "/" + source;
+    // JobInfo takes over decomp
+    download::JobInfo download_catalog(&url, decomp, false, &catalog_hash,
+        &out_path);
+    download::Failures retval = download_manager()->Fetch(&download_catalog);
+    if (retval != download::kFailOk) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to download object %s (%d)",
+          catalog_hash.ToString().c_str(), retval);
+      return "";
+    }
+  } else {
+    auto ret = decomp->DecompressStream(&in_path, &out_path);
+    delete decomp;
+    if (ret != zip::kStreamEnd) {
+      return "";
+    }
   }
+
   return dest;
 }
 
 catalog::Catalog* CommandCheck::FetchCatalog(const string& path,
                                              const shash::Any& catalog_hash,
-                                             const uint64_t catalog_size,
-                                             zip::DecompressionAlg decomp_alg) {
+                                             const uint64_t catalog_size) {
   string tmp_file;
-  if (!is_remote_)
-    tmp_file = DecompressPiece(catalog_hash);
-  else
-    tmp_file = DownloadPiece(catalog_hash, decomp_alg);
+  tmp_file = DecompressPiece(catalog_hash, zip::ExpectedContentFormat::kSQLite3);
 
   if (tmp_file == "") {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to load catalog %s",
@@ -742,9 +738,8 @@ catalog::Catalog* CommandCheck::FetchCatalog(const string& path,
 
 bool CommandCheck::FindSubtreeRootCatalog(const string& subtree_path,
                                           shash::Any* root_hash,
-                                          uint64_t* root_size,
-                                          zip::DecompressionAlg decomp_alg) {
-  catalog::Catalog* current_catalog = FetchCatalog("", *root_hash, 0, decomp_alg);
+                                          uint64_t* root_size) {
+  catalog::Catalog* current_catalog = FetchCatalog("", *root_hash, 0);
   if (current_catalog == NULL) {
     return false;
   }
@@ -768,7 +763,7 @@ bool CommandCheck::FindSubtreeRootCatalog(const string& subtree_path,
       delete current_catalog;
 
       if (current_path.length() < subtree_path.length()) {
-        current_catalog = FetchCatalog(current_path, *root_hash, 0, decomp_alg);
+        current_catalog = FetchCatalog(current_path, *root_hash, 0);
         if (current_catalog == NULL) {
           break;
         }
@@ -788,16 +783,14 @@ bool CommandCheck::InspectTree(const string                  &path,
                                const uint64_t                 catalog_size,
                                const bool                     is_nested_catalog,
                                const catalog::DirectoryEntry *transition_point,
-                               catalog::DeltaCounters        *computed_counters,
-                               zip::DecompressionAlg decomp_alg)
+                               catalog::DeltaCounters        *computed_counters)
 {
   LogCvmfs(kLogCvmfs, kLogStdout | kLogInform, "[inspecting catalog] %s at %s",
            catalog_hash.ToString().c_str(), path == "" ? "/" : path.c_str());
 
   const catalog::Catalog *catalog = FetchCatalog(path,
                                                  catalog_hash,
-                                                 catalog_size,
-                                                 decomp_alg);
+                                                 catalog_size);
   if (catalog == NULL) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to open catalog %s",
              catalog_hash.ToString().c_str());
@@ -918,7 +911,7 @@ bool CommandCheck::InspectTree(const string                  &path,
       catalog::DeltaCounters nested_counters;
       const bool is_nested = true;
       if (!InspectTree(i->mountpoint.ToString(), i->hash, i->size, is_nested,
-                       &nested_transition_point, &nested_counters, decomp_alg))
+                       &nested_transition_point, &nested_counters))
         retval = false;
       nested_counters.PopulateToParent(computed_counters);
     }
@@ -978,26 +971,6 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
   if (args.find('R') != args.end())
     reflog_chksum_path = *args.find('R')->second;
 
-  // For manifest fields, we can make reasonable assumptions about content
-  // structure, and thus about reliability of autodetecting the decompression
-  // algorithm.
-  //
-  // We know the certificate is PEM-formatted, always starting with
-  // -----BEGIN CERTIFICATE-----. Definitely not an arbitrary binary, so
-  // kGuessCompression is completely reliable in this case.
-  //
-  // Metadata is JSON, also unambiguous for plain vs zlib vs zstd.
-  //
-  // "SQLite format 3" is literally the beginning of files which are.
-  // This applies to history (H).
-  zip::DecompressionAlg decomp_alg;
-#ifdef CVMFS_GUESS_DECOMPRESSOR
-  decomp_alg = zip::DecompressionAlg::kGuessDecompression;
-#else
-  // In future, we might have a manifest field for certificate decomp_alg
-  decomp_alg = zip::DecompressionAlgFromEnv();
-#endif
-
   // Repository can be HTTP address or on local file system
   is_remote_ = IsHttpUrl(repo_base_path_);
 
@@ -1043,10 +1016,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
   // Check meta-info object
   if (!manifest->meta_info().IsNull()) {
     string tmp_file;
-    if (!is_remote_)
-      tmp_file = DecompressPiece(manifest->meta_info());
-    else
-      tmp_file = DownloadPiece(manifest->meta_info(), decomp_alg);
+    tmp_file = DecompressPiece(manifest->meta_info(), zip::ExpectedContentFormat::kJSON);
     if (tmp_file == "") {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to load repository metainfo %s",
                manifest->meta_info().ToString().c_str());
@@ -1094,10 +1064,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
   UniquePtr<history::History> tag_db;
   if (!manifest->history().IsNull()) {
     string tmp_file;
-    if (!is_remote_)
-      tmp_file = DecompressPiece(manifest->history());
-    else
-      tmp_file = DownloadPiece(manifest->history(), decomp_alg);
+    tmp_file = DecompressPiece(manifest->history(), zip::ExpectedContentFormat::kSQLite3);
     if (tmp_file == "") {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to load history database %s",
                manifest->history().ToString().c_str());
@@ -1150,8 +1117,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
   const bool is_nested_catalog = (!subtree_path.empty());
   if (is_nested_catalog && !FindSubtreeRootCatalog( subtree_path,
                                                    &root_hash,
-                                                   &root_size,
-                                                   decomp_alg)) {
+                                                   &root_size)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "cannot find nested catalog at %s",
              subtree_path.c_str());
     return 1;
@@ -1164,8 +1130,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
                            root_size,
                            is_nested_catalog,
                            NULL,
-                           &computed_counters,
-                           decomp_alg) && successful;
+                           &computed_counters) && successful;
 
   if (!successful) {
     LogCvmfs(kLogCvmfs, kLogStderr, "CATALOG PROBLEMS OR OTHER ERRORS FOUND");

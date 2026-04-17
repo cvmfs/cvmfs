@@ -14,6 +14,7 @@
 #include "catalog_sql.h"
 #include "catalog_virtual.h"
 #include "compression/compressor.h"
+#include "compression/decompressor_guess.h"
 #include "compression/input_path.h"
 #include "crypto/hash.h"
 #include "network/sink_path.h"
@@ -164,17 +165,13 @@ int CommandMigrate::Main(const ArgumentList &args) {
       return 1;
     }
 
-    ObjectFetcher fetcher(repo_name,
-                          repo_url,
-                          tmp_dir,
-                          download_manager(),
-                          signature_manager(),
-                          zip::DecompressionAlgFromEnv());
+    ObjectFetcher fetcher(repo_name, repo_url, tmp_dir, download_manager(),
+                          signature_manager());
 
     loading_successful = LoadCatalogs(manual_root_hash, &fetcher);
   } else {
     typedef LocalObjectFetcher<catalog::WritableCatalog> ObjectFetcher;
-    ObjectFetcher fetcher(repo_url, tmp_dir, zip::DecompressionAlgFromEnv());
+    ObjectFetcher fetcher(repo_url, tmp_dir);
     loading_successful = LoadCatalogs(manual_root_hash, &fetcher);
   }
   catalog_loading_stopwatch_.Stop();

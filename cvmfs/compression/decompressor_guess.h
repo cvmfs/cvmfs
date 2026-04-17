@@ -8,8 +8,18 @@
 #include <string>
 
 #include "decompressor.h"
+#include "cache.h"
 
 namespace zip {
+
+enum ExpectedContentFormat {
+  kInvalid = 0,
+  kArbitrary,
+  kManifest,
+  kPEM,
+  kJSON,
+  kSQLite3,
+};
 
 /**
  * GuessDecompressor is a decompressor that tries to guess and use the right actual decompressor,
@@ -18,6 +28,11 @@ namespace zip {
 class GuessDecompressor: public Decompressor {
  public:
   explicit GuessDecompressor(const Algorithms &alg);
+  explicit GuessDecompressor(enum ExpectedContentFormat fmt);
+  explicit GuessDecompressor(const CacheManager::Label &label);
+  ~GuessDecompressor();
+  void SetExpectedFormat(enum ExpectedContentFormat fmt);
+  static char ExpectedFirstByte(enum ExpectedContentFormat fmt);
 
     /**
    * Compression function.
@@ -48,8 +63,10 @@ class GuessDecompressor: public Decompressor {
  private:
   Decompressor *backend_;
   zip::Algorithm alg_;
+  ExpectedContentFormat expected_fmt_;
 
-  void Guess(InputAbstract* input, cvmfs::Sink* output);
+  // returns true on success, false otherwise
+  bool Guess(InputAbstract* input, cvmfs::Sink* output);
 };
 
 }  // namespace zip

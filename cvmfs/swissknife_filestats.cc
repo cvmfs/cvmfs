@@ -63,11 +63,10 @@ int CommandFileStats::Main(const ArgumentList &args) {
                                                       repo_url,
                                                       tmp_dir,
                                                       download_manager(),
-                                                      signature_manager(),
-                                                      zip::DecompressionAlgFromEnv());
+                                                      signature_manager());
     success = Run(&fetcher);
   } else {
-    LocalObjectFetcher<> fetcher(repo_url, tmp_dir, zip::DecompressionAlgFromEnv());
+    LocalObjectFetcher<> fetcher(repo_url, tmp_dir);
     success = Run(&fetcher);
   }
 
