@@ -1,9 +1,14 @@
 #!/bin/bash
 
 usage() {
-  echo "$0 [logfile] [-o xUnit XML output] [-s suite labels] [-x <exclusion list> --] [test list]"
+  echo "$0 [logfile] [-o xUnit XML output] [-s suite labels] [-p profile]"
+  echo "          [-x <exclusion list> --] [test list]"
   echo "  -- or --"
   echo "$0 [logfile] -s3 <S3 storage path>"
+  echo ""
+  echo "Profiles are shell fragments loaded from $(dirname "$0")/profiles/<name>.sh;"
+  echo "they may set PROFILE_EXCLUSIONS, PROFILE_TESTSUITE, PROFILE_LABELS,"
+  echo "PROFILE_CLASS_NAME and may define a profile_setup() hook."
 }
 
 git_source_revision() {
@@ -136,7 +141,8 @@ labels="$CVMFS_TEST_SUITES"
 suite_option_provided=0
 default_suite_used=0
 default_testsuite_used=0
-while getopts "xo:ds:" option; do
+profile_name=""
+while getopts "xo:ds:p:" option; do
   case $option in
     x)
       test_exclusions=1
@@ -151,6 +157,9 @@ while getopts "xo:ds:" option; do
       labels="$OPTARG"
       suite_option_provided=1
     ;;
+    p)
+      profile_name="$OPTARG"
+    ;;
     ?)
       usage
       exit 1
@@ -159,8 +168,37 @@ while getopts "xo:ds:" option; do
 done
 shift $(( $OPTIND - 1 ))
 
+# load an optional test configuration profile
+PROFILE_EXCLUSIONS=""
+PROFILE_TESTSUITE=""
+PROFILE_LABELS=""
+PROFILE_CLASS_NAME=""
+if [ -n "$profile_name" ]; then
+  profile_file="$SCRIPT_DIR/profiles/${profile_name}.sh"
+  if [ ! -f "$profile_file" ]; then
+    echo "Error: profile '$profile_name' not found at $profile_file"
+    exit 1
+  fi
+  # shellcheck disable=SC1090
+  . "$profile_file"
+  echo "Using test profile: $profile_name"
+  echo "Using test profile: $profile_name" >> $logfile
+  if command -v profile_setup >/dev/null 2>&1; then
+    if ! profile_setup >> $logfile 2>&1; then
+      echo "profile_setup for '$profile_name' failed; see $logfile"
+      exit 1
+    fi
+  fi
+  if [ -n "$PROFILE_CLASS_NAME" ] && [ -z "$CVMFS_TEST_CLASS_NAME" ]; then
+    export CVMFS_TEST_CLASS_NAME="$PROFILE_CLASS_NAME"
+  fi
+  if [ -n "$PROFILE_LABELS" ] && [ -z "$labels" ] && [ "$suite_option_provided" -eq 0 ]; then
+    labels="$PROFILE_LABELS"
+  fi
+fi
+
 # configure the exclusion list of tests
-exclusions="$CVMFS_TEST_EXCLUDE"
+exclusions="$CVMFS_TEST_EXCLUDE $PROFILE_EXCLUSIONS"
 if [ $test_exclusions -ne 0 ]; then
   while [ $# -ne 0 ] && [ x"$1" != x"--" ]; do
     exclusions="$exclusions $1"
@@ -176,7 +214,11 @@ if [ -z "$testsuite" ]; then
       labels="quick"
       default_suite_used=1
     fi
-    testsuite="src/0* src/1* src/5* src/6*"
+    if [ -n "$PROFILE_TESTSUITE" ]; then
+      testsuite="$PROFILE_TESTSUITE"
+    else
+      testsuite="src/0* src/1* src/5* src/6*"
+    fi
     default_testsuite_used=1
   else
     testsuite=$(find src -mindepth 1 -maxdepth 1 -type d | sort)

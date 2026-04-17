@@ -1,0 +1,53 @@
+name: CI_streamingcache
+
+on:
+  push:
+    branches: ['devel', 'cvmfs*']
+  pull_request:
+    branches: ['devel', 'cvmfs*']
+
+jobs:
+  streamingcache:
+    name: "Client integration tests (streaming cache manager)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build CVMFS in Image
+        run: |
+          cd test/common/container
+          docker compose up --build -d cvmfs-dev
+
+      - name: Setup CVMFS
+        run: |
+          docker exec -u sftnight -t cvmfs-dev bash -c \
+            "sudo cvmfs_config setup"
+
+      - name: Run client tests with streaming cache profile
+        run: |
+          docker exec -u sftnight -t cvmfs-dev bash -c \
+            "cd /home/sftnight/cvmfs/test && \
+             CVMFS_TEST_PROXY=DIRECT \
+             ./run.sh /tmp/cvmfs-streamingcache-test.log \
+                      -o /tmp/cvmfs-streamingcache-test.log.xunit.xml \
+                      -p streamingcache \
+                      -s quick"
+
+      - name: Archive logs
+        if: ${{ always() }}
+        run: |
+          docker cp cvmfs-dev:/tmp/cvmfs-streamingcache-test.log /tmp/cvmfs-streamingcache-test.log || true
+          docker cp cvmfs-dev:/tmp/cvmfs-streamingcache-test.log.xunit.xml /tmp/cvmfs-streamingcache-test.log.xunit.xml || true
+
+      - name: Upload logs as artifact
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: CVMFS streaming cache test logs
+          if-no-files-found: warn
+          path: |
+              /tmp/cvmfs-streamingcache-test.log
+              /tmp/cvmfs-streamingcache-test.log.xunit.xml
