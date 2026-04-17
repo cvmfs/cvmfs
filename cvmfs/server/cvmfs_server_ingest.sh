@@ -303,11 +303,6 @@ cvmfs_server_ingest() {
       if [ ! x"$to_delete" = "x" ] && [ "$fast_delete" != true ]; then
         die "Mountless gateway ingest only supports deletion with --fast-delete (-f). Regular deletion requires the rdonly mount for filesystem traversal."
       fi
-      local _published_rev
-      _published_rev=$(get_repo_info -v 2>/dev/null) || _published_rev=0
-      if [ "${_published_rev:-0}" -gt 0 ]; then
-        die "Mountless gateway ingest currently only supports empty gateway repositories"
-      fi
       cvmfs_swissknife lease -u "$gateway_api_url" -a acquire \
         -k "$gw_key_file" -p "$gateway_lease_path" || \
         die "Impossible to start a transaction"
