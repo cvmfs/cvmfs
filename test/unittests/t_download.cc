@@ -15,7 +15,7 @@
 #include "interrupt.h"
 #include "network/download.h"
 #include "network/sink.h"
-#include "network/sind_mem.h"
+#include "network/sink_mem.h"
 #include "statistics.h"
 #include "util/file_guard.h"
 #include "util/posix.h"
