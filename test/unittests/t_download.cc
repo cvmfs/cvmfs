@@ -16,6 +16,7 @@
 #include "network/download.h"
 #include "network/sink.h"
 #include "network/sink_mem.h"
+#include "network/sink_file.h"
 #include "statistics.h"
 #include "util/file_guard.h"
 #include "util/posix.h"
