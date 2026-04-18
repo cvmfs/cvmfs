@@ -24,7 +24,6 @@
 #include "quota.h"
 #include "util/atomic.h"
 #include "util/concurrency.h"
-#include "util/single_copy.h"
 
 
 class ExternalCacheManager : public CacheManager {

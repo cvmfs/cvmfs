@@ -7,7 +7,6 @@
 #include <cassert>
 #include <cstring>
 #include <string>
-#include <vector>
 
 #include "crypto/hash.h"
 #include "crypto/signature.h"

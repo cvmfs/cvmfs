@@ -46,18 +46,10 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <map>
-#include <vector>
-
 #include "crypto/hash.h"
-#include "crypto/signature.h"
-#include "directory_entry.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
-#include "network/download.h"
 #include "quota.h"
-#include "shortstring.h"
-#include "statistics.h"
 #include "util/atomic.h"
 #include "util/logging.h"
 #include "util/platform.h"

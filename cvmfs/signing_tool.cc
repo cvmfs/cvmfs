@@ -7,7 +7,6 @@
 #include <string>
 
 #include "manifest.h"
-#include "network/sink_file.h"
 #include "object_fetcher.h"
 #include "reflog.h"
 #include "server_tool.h"

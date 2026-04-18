@@ -13,10 +13,9 @@
 #include "fetch.h"
 #include "manifest.h"
 #include "mountpoint.h"
-#include "network/download.h"
 #include "quota.h"
 #include "statistics.h"
-#include "util/posix.h"
+#include "util/posix.h"  // IWYU pragma: keep
 #include "util/string.h"
 
 using namespace std;  // NOLINT

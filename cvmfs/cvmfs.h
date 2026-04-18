@@ -9,7 +9,6 @@
 
 #include <string>
 
-#include "catalog_mgr.h"
 #include "loader.h"
 
 namespace cvmfs {

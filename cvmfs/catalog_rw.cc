@@ -11,7 +11,6 @@
 #include <cstdio>
 #include <cstdlib>
 
-#include "util/concurrency.h"
 #include "util/exception.h"
 #include "util/logging.h"
 #include "xattr.h"

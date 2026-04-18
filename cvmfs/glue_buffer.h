@@ -15,9 +15,7 @@
 
 #include <cassert>
 #include <cstring>
-#include <map>
 #include <string>
-#include <vector>
 
 #include "bigqueue.h"
 #include "bigvector.h"
@@ -28,8 +26,7 @@
 #include "util/atomic.h"
 #include "util/exception.h"
 #include "util/mutex.h"
-#include "util/platform.h"
-#include "util/posix.h"
+#include "util/posix.h"  // IWYU pragma: keep
 #include "util/smalloc.h"
 #include "util/string.h"
 

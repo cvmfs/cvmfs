@@ -15,8 +15,6 @@
 #include "catalog_counters.h"
 #include "directory_entry.h"
 #include "shortstring.h"
-#include "util/exception.h"
-#include "util/string.h"
 
 class MountPoint;
 

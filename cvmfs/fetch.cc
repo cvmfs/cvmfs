@@ -10,11 +10,9 @@
 #include "backoff.h"
 #include "cache.h"
 #include "clientctx.h"
-#include "interrupt.h"
 #include "network/download.h"
 #include "quota.h"
 #include "statistics.h"
-#include "util/concurrency.h"
 #include "util/logging.h"
 #include "util/posix.h"
 

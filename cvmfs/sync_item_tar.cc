@@ -7,11 +7,8 @@
 #include <string>
 
 #include "directory_entry.h"
-#include "duplex_libarchive.h"
 #include "ingestion/ingestion_source.h"
-#include "sync_union_tarball.h"
 #include "util/concurrency.h"
-#include "util/platform.h"
 
 namespace publish {
 

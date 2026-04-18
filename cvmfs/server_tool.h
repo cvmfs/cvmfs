@@ -57,6 +57,6 @@ class ServerTool {
   static const unsigned kDownloadRetries = 3;   // 4 attempts in total
 };
 
-#include "server_tool_impl.h"
+#include "server_tool_impl.h"  // IWYU pragma: keep
 
 #endif  // CVMFS_SERVER_TOOL_H_
