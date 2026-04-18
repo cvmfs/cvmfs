@@ -55,7 +55,6 @@
 #include "statistics.h"
 #include "tracer.h"
 #include "util/logging.h"
-#include "util/platform.h"
 #include "util/pointer.h"
 #include "wpad.h"
 

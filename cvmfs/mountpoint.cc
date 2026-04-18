@@ -16,7 +16,7 @@
 #include <cstring>
 #include <vector>
 
-#include "duplex_fuse.h"  // NOLINT
+#include "duplex_fuse.h"  // IWYU pragma: keep
 
 #ifndef CVMFS_LIBCVMFS
 #ifdef FUSE_CAP_EXPORT_SUPPORT
@@ -65,9 +65,7 @@
 #include "statistics.h"
 #include "telemetry_aggregator.h"
 #include "tracer.h"
-#include "util/concurrency.h"
 #include "util/logging.h"
-#include "util/platform.h"
 #include "util/pointer.h"
 #include "util/posix.h"
 #include "util/string.h"

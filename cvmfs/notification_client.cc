@@ -12,7 +12,6 @@
 #include <inttypes.h>
 
 #include <string>
-#include <vector>
 
 #include "crypto/signature.h"
 #include "manifest.h"
@@ -20,9 +19,8 @@
 #include "notify/messages.h"
 #include "notify/subscriber_sse.h"
 #include "notify/subscriber_supervisor.h"
-#include "supervisor.h"
 #include "util/logging.h"
-#include "util/posix.h"
+#include "util/posix.h"  // IWYU pragma: keep
 
 namespace {
 

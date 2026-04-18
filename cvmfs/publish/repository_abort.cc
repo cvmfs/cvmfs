@@ -12,7 +12,7 @@
 #include "publish/repository_util.h"
 #include "publish/settings.h"
 #include "util/logging.h"
-#include "util/posix.h"
+#include "util/posix.h"  // IWYU pragma: keep
 
 namespace {
 

@@ -16,7 +16,6 @@
 #include "compression/compression.h"
 #include "crypto/hash.h"
 #include "manifest.h"
-#include "util/pointer.h"
 
 
 class QuotaManager;

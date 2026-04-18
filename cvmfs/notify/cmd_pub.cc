@@ -11,6 +11,7 @@
 
 #include "manifest.h"
 #include "network/download.h"
+#include "network/sink_mem.h"
 #include "notify/messages.h"
 #include "notify/publisher_http.h"
 #include "util/pointer.h"

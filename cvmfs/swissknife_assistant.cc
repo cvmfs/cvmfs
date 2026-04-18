@@ -15,6 +15,7 @@
 #include "history_sqlite.h"
 #include "manifest.h"
 #include "network/download.h"
+#include "network/sink_path.h"
 #include "util/logging.h"
 #include "util/posix.h"
 

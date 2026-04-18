@@ -18,14 +18,13 @@
 
 #include "compression/compression.h"
 #include "crypto/hash.h"
-#include "duplex_curl.h"
+#include "duplex_curl.h"  // IWYU pragma: keep
 #include "duplex_testing.h"
 #include "network/dns.h"
 #include "network/health_check.h"
 #include "network/jobinfo.h"
 #include "network/network_errors.h"
 #include "network/sharding_policy.h"
-#include "network/sink.h"
 #include "ssl.h"
 #include "statistics.h"
 #include "util/atomic.h"

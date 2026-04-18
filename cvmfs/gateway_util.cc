@@ -10,7 +10,6 @@
 #include <algorithm>
 #include <vector>
 
-#include "util/logging.h"
 #include "util/posix.h"
 #include "util/string.h"
 

@@ -39,7 +39,6 @@
 #include "catalog_virtual.h"
 #include "manifest.h"
 #include "monitor.h"
-#include "network/download.h"
 #include "path_filters/dirtab.h"
 #include "reflog.h"
 #include "sanitizer.h"
@@ -51,7 +50,6 @@
 #include "sync_union_overlayfs.h"
 #include "util/capabilities.h"
 #include "util/logging.h"
-#include "util/platform.h"
 #include "util/string.h"
 
 using namespace std;  // NOLINT

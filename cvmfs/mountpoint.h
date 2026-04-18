@@ -23,7 +23,6 @@
 #include "loader.h"
 #include "magic_xattr.h"
 #include "util/algorithm.h"
-#include "util/pointer.h"
 
 class AuthzAttachment;
 class AuthzFetcher;

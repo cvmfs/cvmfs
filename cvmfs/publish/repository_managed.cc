@@ -10,8 +10,6 @@
 #include "publish/except.h"
 #include "publish/repository.h"
 #include "publish/repository_util.h"
-#include "upload.h"
-#include "upload_spooler_definition.h"
 #include "util/pointer.h"
 #include "util/posix.h"
 #include "util/string.h"

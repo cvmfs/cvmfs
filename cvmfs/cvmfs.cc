@@ -54,7 +54,6 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
-#include <functional>
 #include <google/dense_hash_map>
 #include <string>
 #include <utility>
@@ -76,7 +75,7 @@
 #include "crypto/crypto_util.h"
 #include "crypto/hash.h"
 #include "directory_entry.h"
-#include "duplex_fuse.h"
+//#include "duplex_fuse.h"
 #include "fence.h"
 #include "fetch.h"
 #include "file_chunk.h"
@@ -105,9 +104,7 @@
 #include "telemetry_aggregator.h"
 #include "tracer.h"
 #include "util/algorithm.h"
-#include "util/atomic.h"
 #include "util/capabilities.h"
-#include "util/concurrency.h"
 #include "util/exception.h"
 #include "util/logging.h"
 #include "util/mutex.h"

@@ -15,7 +15,6 @@
 #include "fetch.h"
 #include "mountpoint.h"
 #include "quota.h"
-#include "quota_posix.h"
 #include "util/logging.h"
 #include "util/string.h"
 

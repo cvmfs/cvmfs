@@ -9,11 +9,9 @@
 #include <unistd.h>
 
 #include "glue_buffer.h"
-#include "shortstring.h"
 #include "telemetry_aggregator_influx.h"
 #include "util/exception.h"
 #include "util/logging.h"
-#include "util/platform.h"
 #include "util/pointer.h"
 #include "util/posix.h"
 namespace perf {

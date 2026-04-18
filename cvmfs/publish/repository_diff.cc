@@ -11,7 +11,7 @@
 #include "catalog_mgr_ro.h"
 #include "crypto/hash.h"
 #include "file_chunk.h"
-#include "history_sqlite.h"
+#include "history_sqlite.h"  // IWYU pragma: keep
 #include "publish/except.h"
 #include "publish/repository.h"
 #include "shortstring.h"

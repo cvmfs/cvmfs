@@ -5,7 +5,6 @@
 #include <cassert>
 #include <string>
 
-#include "statistics_database.h"
 #include "swissknife.h"
 #include "swissknife_check.h"
 #include "swissknife_filestats.h"
@@ -30,7 +29,7 @@
 #include "swissknife_sync.h"
 #include "swissknife_zpipe.h"
 #include "util/logging.h"
-#include "util/posix.h"
+#include "util/posix.h"  // IWYU pragma: keep
 #include "util/string.h"
 
 using namespace std;  // NOLINT

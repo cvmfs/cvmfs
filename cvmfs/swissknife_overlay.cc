@@ -15,11 +15,9 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include <algorithm>
 #include <cassert>
 #include <ctime>
 #include <map>
-#include <sstream>
 #include <string>
 #include <vector>
 

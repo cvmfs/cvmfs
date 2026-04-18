@@ -12,10 +12,9 @@
 #include <cerrno>
 #include <vector>
 
-#include "duplex_libarchive.h"
 #include "ingestion/ingestion_source.h"
-#include "sync_mediator.h"
 #include "sync_union.h"
+#include "util/string.h"
 #include "util/exception.h"
 
 using namespace std;  // NOLINT

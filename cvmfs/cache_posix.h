@@ -8,20 +8,13 @@
 #include <stdint.h>
 #include <sys/types.h>
 
-#include <map>
 #include <string>
-#include <vector>
 
-#include "backoff.h"
 #include "cache.h"
-#include "catalog_mgr.h"
-#include "crypto/signature.h"
+#include "util/pointer.h"
 #include "duplex_testing.h"
 #include "fd_refcount_mgr.h"
-#include "file_chunk.h"
 #include "manifest_fetch.h"
-#include "shortstring.h"
-#include "statistics.h"
 #include "util/atomic.h"
 
 namespace catalog {
@@ -114,7 +107,7 @@ class PosixCacheManager : public CacheManager {
   virtual bool DoFreeState(void *data);
 
  private:
-  bool InitCacheDirectory(const string &cache_path);
+  bool InitCacheDirectory(const std::string &cache_path);
 
   struct Transaction {
     Transaction(const shash::Any &id, const std::string &final_path)

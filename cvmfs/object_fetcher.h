@@ -15,6 +15,7 @@
 #include "manifest.h"
 #include "manifest_fetch.h"
 #include "network/download.h"
+#include "network/sink_file.h"
 #include "reflog.h"
 #include "util/posix.h"
 

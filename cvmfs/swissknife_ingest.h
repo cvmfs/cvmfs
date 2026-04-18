@@ -8,7 +8,6 @@
 #include <string>
 
 #include "swissknife.h"
-#include "swissknife_sync.h"
 
 namespace swissknife {
 class Ingest : public Command {

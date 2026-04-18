@@ -9,8 +9,8 @@
 #include <string>
 #include <unistd.h>
 
+// IWYU pragma: keep
 #include "util/posix.h"
-
 
 namespace cvmfs {
 

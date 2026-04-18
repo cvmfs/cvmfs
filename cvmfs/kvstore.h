@@ -9,7 +9,6 @@
 #include <unistd.h>
 
 #include <string>
-#include <vector>
 
 #include "cache.h"
 #include "lru.h"

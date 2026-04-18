@@ -9,7 +9,7 @@
 #include <vector>
 
 #include "crypto/hash.h"
-#include "history_sqlite.h"
+#include "history.h"
 #include "swissknife.h"
 #include "util/future.h"
 

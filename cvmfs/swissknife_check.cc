@@ -14,7 +14,6 @@
 
 #include <cassert>
 #include <map>
-#include <queue>
 #include <set>
 #include <string>
 #include <vector>
@@ -25,6 +24,7 @@
 #include "history_sqlite.h"
 #include "manifest.h"
 #include "network/download.h"
+#include "network/sink_path.h"
 #include "reflog.h"
 #include "sanitizer.h"
 #include "shortstring.h"

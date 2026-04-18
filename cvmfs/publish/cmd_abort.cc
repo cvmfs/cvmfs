@@ -18,7 +18,6 @@
 #include "util/pointer.h"
 #include "util/posix.h"
 #include "util/string.h"
-#include "whitelist.h"
 
 namespace {
 std::string StripTrailingPath(const std::string &repo_and_path) {

@@ -9,7 +9,6 @@
 #include "util/fs_traversal.h"
 #include "util/logging.h"
 #include "util/posix.h"
-#include "util/smalloc.h"
 #include "util/string.h"
 
 using namespace std;  // NOLINT

@@ -12,6 +12,7 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "cache.h"
 #include "crypto/hash.h"
 #include "util/exception.h"
 #include "util/logging.h"

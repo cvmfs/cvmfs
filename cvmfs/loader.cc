@@ -36,17 +36,15 @@
 #include <string>
 #include <vector>
 
-#include "duplex_fuse.h"
 #include "fence.h"
 #include "fuse_main.h"
 #include "loader_talk.h"
 #include "options.h"
 #include "sanitizer.h"
-#include "util/atomic.h"
 #include "util/capabilities.h"
+#include "util/platform.h"
 #include "util/exception.h"
 #include "util/logging.h"
-#include "util/platform.h"
 #include "util/posix.h"
 #include "util/string.h"
 

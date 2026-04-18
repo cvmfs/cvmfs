@@ -12,7 +12,6 @@
 
 #include "pack.h"
 #include "repository_tag.h"
-#include "util/concurrency.h"
 #include "util/future.h"
 #include "util/pointer.h"
 #include "util/tube.h"

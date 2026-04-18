@@ -42,7 +42,6 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
-#include <functional>
 #include <map>
 #include <string>
 #include <vector>
@@ -54,24 +53,16 @@
 #include "compression/compression.h"
 #include "crypto/crypto_util.h"
 #include "crypto/hash.h"
-#include "crypto/signature.h"
 #include "directory_entry.h"
-#include "duplex_sqlite3.h"
+#include "duplex_sqlite3.h"  // IWYU pragma: keep
 #include "fetch.h"
-#include "globals.h"
-#include "interrupt.h"
 #include "libcvmfs.h"
 #include "lru_md.h"
 #include "network/download.h"
-#include "quota.h"
 #include "shortstring.h"
-#include "sqlitemem.h"
 #include "sqlitevfs.h"
-#include "util/atomic.h"
 #include "util/logging.h"
-#include "util/murmur.hxx"
 #include "util/posix.h"
-#include "util/smalloc.h"
 #include "util/string.h"
 #include "xattr.h"
 
