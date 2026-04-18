@@ -14,7 +14,7 @@
 #include <string>
 #include <vector>
 
-#include "duplex_cares.h"
+#include "duplex_cares.h"  // IWYU pragma: keep
 #include "duplex_testing.h"
 #include "util/atomic.h"
 #include "util/prng.h"

@@ -11,20 +11,15 @@
 #include <unistd.h>
 
 #include <cstdio>
-#include <map>
-#include <set>
 #include <string>
-#include <vector>
 
 #include "compression/compression.h"
 #include "crypto/hash.h"
-#include "duplex_curl.h"
+#include "duplex_curl.h"  // IWYU pragma: keep
 #include "network/network_errors.h"
 #include "network/sink.h"
-#include "network/sink_file.h"
-#include "network/sink_mem.h"
-#include "network/sink_path.h"
 #include "util/pipe.h"
+#include "util/pointer.h"
 #include "util/tube.h"
 
 class InterruptCue;

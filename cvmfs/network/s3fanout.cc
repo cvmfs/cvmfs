@@ -13,10 +13,7 @@
 #include <cerrno>
 #include <utility>
 
-#include "upload_facility.h"
-#include "util/concurrency.h"
 #include "util/exception.h"
-#include "util/platform.h"
 #include "util/posix.h"
 #include "util/string.h"
 

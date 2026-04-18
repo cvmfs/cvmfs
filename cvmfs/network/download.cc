@@ -52,13 +52,14 @@
 
 #include "compression/compression.h"
 #include "crypto/hash.h"
-#include "duplex_curl.h"
+#include "duplex_curl.h"  // IWYU pragma: keep
 #include "interrupt.h"
+#include "network/sink_mem.h"
+#include "network/sink_path.h"
 #include "sanitizer.h"
 #include "ssl.h"
 #include "util/algorithm.h"
 #include "util/atomic.h"
-#include "util/concurrency.h"
 #include "util/exception.h"
 #include "util/logging.h"
 #include "util/posix.h"
