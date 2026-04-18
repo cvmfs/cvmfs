@@ -19,6 +19,8 @@
 #include "manifest.h"
 #include "manifest_fetch.h"
 #include "network/download.h"
+#include "network/sink_file.h"
+#include "network/sink_mem.h"
 #include "publish/except.h"
 #include "publish/repository_util.h"
 #include "publish/settings.h"

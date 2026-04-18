@@ -13,6 +13,7 @@
 #include "crypto/signature.h"
 #include "manifest.h"
 #include "network/download.h"
+#include "network/sink_mem.h"
 #include "util/smalloc.h"
 #include "whitelist.h"
 

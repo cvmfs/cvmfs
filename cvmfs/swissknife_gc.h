@@ -7,7 +7,6 @@
 
 #include <string>
 
-#include "catalog_traversal.h"
 #include "swissknife.h"
 
 namespace swissknife {

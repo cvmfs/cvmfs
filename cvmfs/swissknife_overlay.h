@@ -23,7 +23,6 @@
 #include "catalog.h"
 #include "catalog_mgr_rw.h"
 #include "directory_entry.h"
-#include "shortstring.h"
 #include "swissknife.h"
 #include "upload.h"
 #include "xattr.h"

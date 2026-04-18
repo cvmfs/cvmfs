@@ -9,7 +9,6 @@
 #include <string>
 
 #include "options.h"
-#include "publish/except.h"
 #include "publish/repository.h"
 #include "publish/settings.h"
 #include "util/logging.h"

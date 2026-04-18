@@ -8,7 +8,6 @@
 #include <cassert>
 #include <string>
 
-#include "crypto/hash.h"
 #include "ingestion/pipeline.h"
 #include "swissknife.h"
 

@@ -4,7 +4,6 @@
 
 #include "swissknife_lease.h"
 
-#include <algorithm>
 #include <vector>
 
 #include "gateway_util.h"

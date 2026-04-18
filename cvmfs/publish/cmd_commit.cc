@@ -11,7 +11,6 @@
 #include <string>
 #include <vector>
 
-#include "publish/cmd_util.h"
 #include "publish/except.h"
 #include "publish/repository.h"
 #include "publish/settings.h"

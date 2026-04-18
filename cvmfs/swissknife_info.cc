@@ -14,6 +14,7 @@
 #include "crypto/hash.h"
 #include "manifest.h"
 #include "network/download.h"
+#include "network/sink_mem.h"
 #include "util/logging.h"
 #include "util/posix.h"
 #include "util/string.h"

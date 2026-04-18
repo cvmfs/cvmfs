@@ -9,17 +9,13 @@
 #include <cassert>
 #include <string>
 
-#include "backoff.h"
-#include "catalog_mgr_ro.h"
 #include "crypto/hash.h"
-#include "directory_entry.h"
-#include "duplex_curl.h"
+#include "duplex_curl.h"  // IWYU pragma: keep
 #include "gateway_util.h"
 #include "json_document.h"
 #include "publish/except.h"
 #include "publish/repository.h"
 #include "ssl.h"
-#include "upload.h"
 #include "util/logging.h"
 #include "util/pointer.h"
 #include "util/posix.h"

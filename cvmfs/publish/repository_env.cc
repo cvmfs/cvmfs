@@ -6,7 +6,6 @@
 #include "publish/except.h"
 #include "repository.h"
 #include "util/capabilities.h"
-#include "util/platform.h"
 #include "util/posix.h"
 
 namespace publish {

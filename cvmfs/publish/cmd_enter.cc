@@ -32,7 +32,6 @@
 #include "sanitizer.h"
 #include "util/logging.h"
 #include "util/namespace.h"
-#include "util/platform.h"
 #include "util/posix.h"
 #include "util/string.h"
 

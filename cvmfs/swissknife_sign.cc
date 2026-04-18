@@ -14,21 +14,13 @@
 
 #include <cstdio>
 #include <cstdlib>
-#include <set>
 #include <string>
-#include <vector>
 
 #include "compression/compression.h"
 #include "crypto/hash.h"
-#include "crypto/signature.h"
-#include "manifest.h"
 #include "object_fetcher.h"
-#include "reflog.h"
 #include "signing_tool.h"
-#include "upload.h"
-#include "util/logging.h"
-#include "util/posix.h"
-#include "util/smalloc.h"
+#include "util/posix.h"  // IWYU pragma: keep
 
 using namespace std;  // NOLINT
 
