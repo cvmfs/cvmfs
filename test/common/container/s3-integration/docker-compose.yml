@@ -40,10 +40,16 @@ services:
         build:
             context: ../../../..
             dockerfile: test/common/container/Dockerfile-dev
+        environment:
+            # Consumed by test/profiles/s3.sh via test/run.sh -p s3.
+            CVMFS_TEST_S3_CONFIG: /etc/cvmfs/test_s3.conf
+            CVMFS_TEST_HTTP_BASE: http://cvmfs.web.garage.internal:3902
+            CVMFS_TEST_S3_STORAGE: /tmp/unused-garage-storage
         volumes:
             - /sys/fs/cgroup:/sys/fs/cgroup
             - var_spool_cvmfs:/var/spool/cvmfs
             - ../../../../:/home/sftnight/cvmfs
+            - ./test_s3.conf:/etc/cvmfs/test_s3.conf:ro
         depends_on:
             garage-setup:
                 condition: service_completed_successfully
