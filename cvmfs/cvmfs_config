@@ -2360,8 +2360,78 @@ check_is_on() {
 }
 
 
+# Stat the given file in a cross-platform way, returning
+# "<owner> <group> <octal_perms>" (space separated) on stdout.
+_stat_owner_group_perms() {
+  local file="$1"
+  case $sys_arch in
+    Linux )
+      stat -c '%U %G %a' "$file" 2>/dev/null ;;
+    Darwin )
+      stat -f '%Su %Sg %Lp' "$file" 2>/dev/null ;;
+  esac
+}
+
+# Best-effort check that $user has mode bit $bit (4=r, 2=w) on $file
+# based on owner/group/other octal permissions. Does not account for
+# ACLs or parent-directory traversal permissions.
+_check_mode_bit() {
+  local file="$1"
+  local user="$2"
+  local bit="$3"
+  local owner group perms
+  [ -e "$file" ] || return 1
+  read -r owner group perms < <(_stat_owner_group_perms "$file") || return 1
+  [ -n "$perms" ] || return 1
+  while [ ${#perms} -lt 3 ]; do perms="0$perms"; done
+  local len=${#perms}
+  local digit
+  if [ "$user" = "$owner" ]; then
+    digit=${perms:$((len-3)):1}
+  elif id -Gn "$user" 2>/dev/null | tr ' ' '\n' | grep -qxF "$group"; then
+    digit=${perms:$((len-2)):1}
+  else
+    digit=${perms:$((len-1)):1}
+  fi
+  [ $(( digit & bit )) -ne 0 ]
+}
+
+check_readable() { _check_mode_bit "$1" "${2:-$(id -un)}" 4; }
+check_writable() { _check_mode_bit "$1" "${2:-$(id -un)}" 2; }
+
+check_owned_by() {
+  local file="$1"
+  local user="${2:-$(id -un)}"
+  local owner _g _p
+  [ -e "$file" ] || return 1
+  read -r owner _g _p < <(_stat_owner_group_perms "$file") || return 1
+  [ "$user" = "$owner" ]
+}
+
 runascvmfsuser() {
   local cmd=$1
+
+  # Without root we cannot su to CVMFS_USER. In rootless operation the
+  # invoking user is the one who will actually access cvmfs, so dispatch
+  # 'test -X PATH' probes to stat-based helpers targeting the current
+  # user. Anything else just runs as the current user.
+  if [ "$(id -u)" -ne 0 ]; then
+    if [[ "$cmd" =~ ^[[:space:]]*test[[:space:]]+-([rwOde])[[:space:]]+(.+)$ ]]; then
+      local op="${BASH_REMATCH[1]}"
+      local path="${BASH_REMATCH[2]}"
+      path="${path%"${path##*[![:space:]]}"}"
+      case "$op" in
+        r) check_readable "$path" ;;
+        w) check_writable "$path" ;;
+        O) check_owned_by "$path" ;;
+        d) [ -d "$path" ] ;;
+        e) [ -e "$path" ] ;;
+      esac
+      return $?
+    fi
+    sh -c "$cmd"
+    return $?
+  fi
 
   if [ -z "$CVMFS_USER" ]; then
     return 1
@@ -2529,10 +2599,6 @@ case "$1" in
     ;;
 
   chksetup)
-    if [ `id -u` -ne 0 ]; then
-      echo "root privileges required"
-      exit 1
-    fi
     shift 1
     cvmfs_chksetup
     RETVAL=$?
