@@ -790,10 +790,12 @@ void SyncMediator::PublishFilesCallback(const upload::SpoolerResult &result) {
   item.SetContentHash(result.content_hash);
   item.SetCompressionAlgorithm(result.compression_alg);
 
+  // Use xattrs that were pre-fetched during traversal (AddFile) to avoid
+  // lgetxattr() syscalls on the pipeline observer thread.
   XattrList *xattrs = &default_xattrs_;
-  if (params_->include_xattrs) {
-    xattrs = XattrList::CreateFromFile(result.local_path);
-    assert(xattrs != NULL);
+  XattrList *cached = item.TakeCachedXattrs();  // may be null if !include_xattrs
+  if (cached != NULL) {
+    xattrs = cached;
   }
 
   if (result.IsChunked()) {
@@ -809,8 +811,7 @@ void SyncMediator::PublishFilesCallback(const upload::SpoolerResult &result) {
         item.relative_parent_path());
   }
 
-  if (xattrs != &default_xattrs_)
-    free(xattrs);
+  delete cached;  // null-safe; default_xattrs_ is not deleted (not owned here)
 }
 
 
@@ -1011,6 +1012,12 @@ void SyncMediator::AddFile(SharedPtr<SyncItem> entry) {
              && entry->IsCatalogMarker()) {
     PANIC(kLogStderr, "Error: nested catalog marker in root directory");
   } else if (!params_->dry_run) {
+    // Pre-fetch xattrs here in the traversal thread so PublishFilesCallback
+    // does not need to call lgetxattr() from the pipeline observer thread,
+    // which would serialise all catalog insertions through TaskRegister.
+    if (params_->include_xattrs) {
+      entry->SetCachedXattrs(XattrList::CreateFromFile(entry->GetUnionPath()));
+    }
     {
       // Push the file to the spooler, remember the entry for the path
       const MutexLockGuard m(&lock_file_queue_);

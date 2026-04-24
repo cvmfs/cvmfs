@@ -4,9 +4,11 @@
 
 #include "upload_spooler_definition.h"
 
+#include <algorithm>
 #include <vector>
 
 #include "util/logging.h"
+#include "util/platform.h"
 #include "util/string.h"
 
 namespace upload {
@@ -34,7 +36,7 @@ SpoolerDefinition::SpoolerDefinition(
     , avg_file_chunk_size(avg_file_chunk_size)
     , max_file_chunk_size(max_file_chunk_size)
     , number_of_concurrent_uploads(kDefaultMaxConcurrentUploads)
-    , num_upload_tasks(kDefaultNumUploadTasks)
+    , num_upload_tasks(std::min(16U, std::max(4U, GetNumberOfCpuCores() / 2)))
     , session_token_file(session_token_file)
     , key_file(key_file)
     , valid_(false) {

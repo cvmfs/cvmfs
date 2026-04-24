@@ -36,7 +36,8 @@ SyncItem::SyncItem()
     , direct_io_(false)
     , graft_chunklist_(NULL)
     , compression_algorithm_(zlib::kZlibDefault)
-    , has_compression_algorithm_(false) { }
+    , has_compression_algorithm_(false)
+    , cached_xattrs_(NULL) { }
 
 SyncItem::SyncItem(const std::string &relative_parent_path,
                    const std::string &filename,
@@ -58,11 +59,15 @@ SyncItem::SyncItem(const std::string &relative_parent_path,
     , relative_parent_path_(relative_parent_path)
     , graft_chunklist_(NULL)
     , compression_algorithm_(zlib::kZlibDefault)
-    , has_compression_algorithm_(false) {
+    , has_compression_algorithm_(false)
+    , cached_xattrs_(NULL) {
   content_hash_.algorithm = shash::kAny;
 }
 
-SyncItem::~SyncItem() { delete graft_chunklist_; }
+SyncItem::~SyncItem() {
+  delete graft_chunklist_;
+  delete cached_xattrs_;
+}
 
 
 SyncItemType SyncItem::GetGenericFiletype(

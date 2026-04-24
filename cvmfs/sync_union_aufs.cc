@@ -46,11 +46,12 @@ void SyncUnionAufs::Traverse() {
   traversal.fn_new_fifo = &SyncUnionAufs::ProcessFifo;
   traversal.fn_new_socket = &SyncUnionAufs::ProcessSocket;
   LogCvmfs(kLogUnionFs, kLogVerboseMsg,
-           "Aufs starting traversal "
-           "recursion for scratch_path=[%s] with external data set to %d",
+           "Aufs starting parallel traversal "
+           "for scratch_path=[%s] with external data set to %d",
            scratch_path().c_str(), mediator_->IsExternalData());
-
-  traversal.Recurse(scratch_path());
+  // Phase 1: parallel opendir/lstat scan; Phase 2: serial callback replay.
+  // num_threads=0 → auto-detect from sysconf(_SC_NPROCESSORS_ONLN).
+  traversal.RecurseParallel(scratch_path());
 }
 
 bool SyncUnionAufs::IsWhiteoutEntry(SharedPtr<SyncItem> entry) const {

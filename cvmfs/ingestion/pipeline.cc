@@ -56,18 +56,12 @@ IngestionPipeline::IngestionPipeline(
   }
   tubes_write_.Activate();
 
-  for (unsigned i = 0; i < nfork_base * kNforkHash; ++i) {
-    Tube<BlockItem> *t = new Tube<BlockItem>();
-    tubes_hash_.TakeTube(t);
-    tasks_hash_.TakeConsumer(new TaskHash(t, &tubes_write_));
-  }
-  tubes_hash_.Activate();
-
+  // No separate hash stage: hashing is now inlined in TaskCompress.
   for (unsigned i = 0; i < nfork_base * kNforkCompress; ++i) {
     Tube<BlockItem> *t = new Tube<BlockItem>();
     tubes_compress_.TakeTube(t);
     tasks_compress_.TakeConsumer(
-        new TaskCompress(t, &tubes_hash_, &item_allocator_));
+        new TaskCompress(t, &tubes_write_, &item_allocator_));
   }
   tubes_compress_.Activate();
 
@@ -103,7 +97,6 @@ IngestionPipeline::~IngestionPipeline() {
     tasks_read_.Terminate();
     tasks_chunk_.Terminate();
     tasks_compress_.Terminate();
-    tasks_hash_.Terminate();
     tasks_write_.Terminate();
     tasks_register_.Terminate();
   }
@@ -137,7 +130,6 @@ void IngestionPipeline::Process(IngestionSource *source,
 void IngestionPipeline::Spawn() {
   tasks_register_.Spawn();
   tasks_write_.Spawn();
-  tasks_hash_.Spawn();
   tasks_compress_.Spawn();
   tasks_chunk_.Spawn();
   tasks_read_.Spawn();

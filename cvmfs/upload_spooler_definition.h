@@ -21,7 +21,11 @@ namespace upload {
  */
 struct SpoolerDefinition {
   static const unsigned kDefaultMaxConcurrentUploads = 512;
-  static const unsigned kDefaultNumUploadTasks = 1;
+  // kDefaultNumUploadTasks: was 1; now scaled to half the CPU count (min 4).
+  // Each upload task holds one open connection to the backend concurrently, so
+  // matching the compression worker count (≈ CPU/2) keeps the pipeline fed.
+  // Capped at 16 to avoid overwhelming backends with many short-lived streams.
+  static const unsigned kDefaultNumUploadTasks = 0;  // 0 = use CPU-derived value at runtime
   static const char *kDriverNames[];  ///< corresponds to DriverType
   enum DriverType {
     S3,

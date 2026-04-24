@@ -92,10 +92,12 @@ void SyncUnionOverlayfs::Traverse() {
   traversal.fn_new_symlink = &SyncUnionOverlayfs::ProcessSymlink;
 
   LogCvmfs(kLogUnionFs, kLogVerboseMsg,
-           "OverlayFS starting traversal "
-           "recursion for scratch_path=[%s]",
+           "OverlayFS starting parallel traversal "
+           "for scratch_path=[%s]",
            scratch_path().c_str());
-  traversal.Recurse(scratch_path());
+  // Phase 1: parallel opendir/lstat scan; Phase 2: serial callback replay.
+  // num_threads=0 → auto-detect from sysconf(_SC_NPROCESSORS_ONLN).
+  traversal.RecurseParallel(scratch_path());
 }
 
 /**

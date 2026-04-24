@@ -91,6 +91,15 @@ class Compressor : public PolymorphicConstruction<Compressor, Algorithms> {
   virtual size_t DeflateBound(const size_t bytes) = 0;
   virtual Compressor *Clone() = 0;
 
+  /**
+   * Returns true if this compressor is a pass-through (no-op) — i.e., it
+   * copies input to output verbatim with no transformation.  TaskCompress uses
+   * this to avoid the intermediate buffer allocation and memcpy entirely:
+   * instead it hashes the raw input block and forwards it directly to the write
+   * stage with zero copies.
+   */
+  virtual bool IsPassthrough() const { return false; }
+
   static void RegisterPlugins();
 };
 
@@ -120,6 +129,7 @@ class EchoCompressor : public Compressor {
   size_t DeflateBound(const size_t bytes);
   Compressor *Clone();
   static bool WillHandle(const zlib::Algorithms &alg);
+  bool IsPassthrough() const { return true; }
 };
 
 

@@ -233,6 +233,24 @@ class WritableCatalogManager : public SimpleCatalogManager {
 
   bool CopyCatalogToLocalCache(const upload::SpoolerResult &result);
 
+  /**
+   * Argument bundle passed to each leaf-finalization thread spawned by
+   * SnapshotCatalogs().  One instance is heap-allocated per leaf and freed
+   * by FinalizeLeafThread before it returns.
+   */
+  struct FinalizeLeafArgs {
+    WritableCatalogManager *self;
+    WritableCatalog        *catalog;
+    bool                    stop_for_tweaks;
+  };
+
+  /**
+   * pthread entry point: calls FinalizeCatalog (which includes the optional
+   * SQLite VACUUM) and then ScheduleCatalogProcessing for a single leaf
+   * catalog.  Multiple instances run concurrently — one per dirty leaf.
+   */
+  static void *FinalizeLeafThread(void *arg);
+
  private:
   inline void SyncLock() { pthread_mutex_lock(sync_lock_); }
   inline void SyncUnlock() { pthread_mutex_unlock(sync_lock_); }

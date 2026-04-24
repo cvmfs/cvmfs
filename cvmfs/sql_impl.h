@@ -191,7 +191,15 @@ bool Database<DerivedT>::Configure() {
     return Sql(sqlite_db(), "PRAGMA temp_store=2;").Execute()
            && Sql(sqlite_db(), "PRAGMA locking_mode=EXCLUSIVE;").Execute();
   }
-  return true;
+
+  // Writable databases (publish-path catalogs):
+  //   WAL mode: sequential append writes replace random-write rollback journal,
+  //   improving throughput on all storage types.
+  //   synchronous=OFF: skips fsync after each transaction commit.  Safe here
+  //   because a crashed publish is recovered by gateway lease rollback; the
+  //   catalog is rebuilt from scratch on the next run.
+  return Sql(sqlite_db(), "PRAGMA journal_mode=WAL;").Execute()
+         && Sql(sqlite_db(), "PRAGMA synchronous=OFF;").Execute();
 }
 
 

@@ -17,7 +17,7 @@ class ItemAllocator;
 
 class TaskCompress : public TubeConsumer<BlockItem> {
  public:
-  static const unsigned kCompressedBlockSize = kPageSize * 2;
+  static const unsigned kCompressedBlockSize = kPageSize * 16;  // 64 KB; was 2×PAGE (8 KB)
 
   TaskCompress(Tube<BlockItem> *tube_in,
                TubeGroup<BlockItem> *tubes_out,
