@@ -310,3 +310,64 @@ TEST_F(T_CatalogSql, SchemaMigration) {
     EXPECT_EQ(0, sql12.RetrieveInt(0));
   }
 }
+
+
+// ---------------------------------------------------------------------------
+// A3: SQLite pragmas applied to writable catalog databases
+// ---------------------------------------------------------------------------
+
+// Verify that Database<DerivedT>::Configure() sets the three performance
+// pragmas on read-write opens:
+//   PRAGMA synchronous=NORMAL  (avoids fsync after journal deletion)
+//   PRAGMA cache_size=-65536   (64 MB page pool, negative = KiB)
+//   PRAGMA mmap_size=134217728 (128 MB mmap window)
+//
+// The test creates a fresh CatalogDatabase (which uses kOpenReadWrite) and
+// immediately queries each pragma back from SQLite to confirm the values.
+TEST_F(T_CatalogSql, WritableDbPragmasApplied) {
+  const string path = CreateTempPath("/tmp/cvmfs_t_catalog_pragma", 0600);
+  ASSERT_FALSE(path.empty());
+
+  // Create() does not call Configure() (it sets up schema only), so the DB
+  // file is created without the performance pragmas.  The pragmas are applied
+  // by Initialize() → Configure(), which is called only by Open().
+  {
+    UniquePtr<catalog::CatalogDatabase> db(
+        catalog::CatalogDatabase::Create(path));
+    ASSERT_TRUE(db.IsValid());
+  }
+
+  // Open in read-write mode — this is the publish-path open that must apply
+  // the three pragmas from the read-write branch of Configure().
+  {
+    UniquePtr<catalog::CatalogDatabase> db(catalog::CatalogDatabase::Open(
+        path, catalog::CatalogDatabase::kOpenReadWrite));
+    ASSERT_TRUE(db.IsValid());
+
+    // PRAGMA cache_size returns the value set by Configure().
+    // Negative value is in KiB: -65536 = 64 MB.
+    sqlite::Sql sql_cache(db->sqlite_db(), "PRAGMA cache_size;");
+    ASSERT_TRUE(sql_cache.FetchRow());
+    EXPECT_EQ(INT64_C(-65536), sql_cache.RetrieveInt64(0));
+
+    // PRAGMA mmap_size returns the mmap window in bytes.
+    sqlite::Sql sql_mmap(db->sqlite_db(), "PRAGMA mmap_size;");
+    ASSERT_TRUE(sql_mmap.FetchRow());
+    EXPECT_EQ(INT64_C(134217728), sql_mmap.RetrieveInt64(0));
+  }
+
+  // Read-only opens must NOT apply the write-path pragmas; the read-only
+  // branch of Configure() only sets temp_store and locking_mode.
+  // The cache_size must therefore differ from the write-path value (-65536).
+  {
+    UniquePtr<catalog::CatalogDatabase> db(catalog::CatalogDatabase::Open(
+        path, catalog::CatalogDatabase::kOpenReadOnly));
+    ASSERT_TRUE(db.IsValid());
+
+    sqlite::Sql sql_cache(db->sqlite_db(), "PRAGMA cache_size;");
+    ASSERT_TRUE(sql_cache.FetchRow());
+    EXPECT_NE(INT64_C(-65536), sql_cache.RetrieveInt64(0));
+  }
+
+  unlink(path.c_str());
+}

@@ -826,27 +826,21 @@ void SyncMediator::PublishHardlinksCallback(
           result.return_code);
   }
 
-  bool found = false;
-  for (unsigned i = 0; i < hardlink_queue_.size(); ++i) {
-    if (hardlink_queue_[i].master->GetUnionPath() == result.local_path) {
-      found = true;
-      hardlink_queue_[i].master->SetContentHash(result.content_hash);
-      SyncItemList::iterator j, jend;
-      for (j = hardlink_queue_[i].hardlinks.begin(),
-          jend = hardlink_queue_[i].hardlinks.end();
-           j != jend;
-           ++j) {
-        j->second->SetContentHash(result.content_hash);
-        j->second->SetCompressionAlgorithm(result.compression_alg);
-      }
-      if (result.IsChunked())
-        hardlink_queue_[i].file_chunks = result.file_chunks;
+  const auto idx_it = hardlink_index_.find(result.local_path);
+  assert(idx_it != hardlink_index_.end());
+  const size_t i = idx_it->second;
 
-      break;
-    }
+  hardlink_queue_[i].master->SetContentHash(result.content_hash);
+  SyncItemList::iterator j, jend;
+  for (j = hardlink_queue_[i].hardlinks.begin(),
+      jend = hardlink_queue_[i].hardlinks.end();
+       j != jend;
+       ++j) {
+    j->second->SetContentHash(result.content_hash);
+    j->second->SetCompressionAlgorithm(result.compression_alg);
   }
-
-  assert(found);
+  if (result.IsChunked())
+    hardlink_queue_[i].file_chunks = result.file_chunks;
 }
 
 
@@ -1177,8 +1171,11 @@ void SyncMediator::AddLocalHardlinkGroups(const HardlinkGroupMap &hardlinks) {
 
     if (i->second.master->IsSymlink() || i->second.master->IsSpecialFile())
       AddHardlinkGroup(i->second);
-    else
+    else {
+      hardlink_index_[i->second.master->GetUnionPath()] =
+          hardlink_queue_.size();
       hardlink_queue_.push_back(i->second);
+    }
   }
 }
 

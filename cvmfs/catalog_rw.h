@@ -58,6 +58,17 @@ class WritableCatalog : public Catalog {
   inline bool IsWritable() const { return true; }
   uint32_t GetMaxLinkId() const;
 
+  /**
+   * Returns the next available hardlink group ID for this catalog and caches
+   * the value so that subsequent calls do not re-query the database.
+   *
+   * The first call executes one SELECT MAX(hardlinks>>32) query; every further
+   * call during the same publish session just increments a counter in memory.
+   * This eliminates the O(N) pattern of one query per hardlink group that
+   * existed when callers directly used GetMaxLinkId()+1 in a loop.
+   */
+  uint32_t IssueHardlinkGroupId();
+
   void AddEntry(const DirectoryEntry &entry,
                 const XattrList &xattr,
                 const std::string &entry_path,
@@ -153,6 +164,14 @@ class WritableCatalog : public Catalog {
   SqlIncLinkcount *sql_inc_linkcount_;
 
   bool dirty_; /**< Indicates if the catalog has been changed */
+
+  /**
+   * Cached state for IssueHardlinkGroupId().  link_id_seq_ holds the next
+   * ID to hand out; link_id_ready_ is false until the first call initializes
+   * the sequence from GetMaxLinkId().
+   */
+  bool     link_id_ready_;
+  uint32_t link_id_seq_;
 
   DeltaCounters delta_counters_;
 

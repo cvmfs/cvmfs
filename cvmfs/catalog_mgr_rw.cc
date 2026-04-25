@@ -545,6 +545,10 @@ void WritableCatalogManager::AddChunkedFile(const DirectoryEntryBase &entry,
   DirectoryEntry full_entry(entry);
   full_entry.set_is_chunked_file(true);
 
+  // AddFile() calls catalog->AddEntry() which calls SetDirty()->Transaction(),
+  // opening an SQLite transaction on the target catalog.  All AddFileChunk()
+  // calls below therefore execute within that already-open transaction — no
+  // explicit BEGIN/COMMIT wrapper is needed around this loop.
   AddFile(full_entry, xattrs, parent_directory);
 
   const string parent_path = MakeRelativePath(parent_directory);
@@ -619,7 +623,7 @@ void WritableCatalogManager::AddHardlinkGroup(
 
   // Get a valid hardlink group id for the catalog the group will end up in
   // TODO(unknown): Compaction
-  const uint32_t new_group_id = catalog->GetMaxLinkId() + 1;
+  const uint32_t new_group_id = catalog->IssueHardlinkGroupId();
   LogCvmfs(kLogCatalog, kLogVerboseMsg, "hardlink group id %u issued",
            new_group_id);
   assert(new_group_id > 0);
@@ -1297,6 +1301,14 @@ void WritableCatalogManager::FinalizeCatalog(WritableCatalog *catalog,
   LogCvmfs(kLogCatalog, kLogVerboseMsg, "creating snapshot of catalog '%s'",
            catalog->mountpoint().c_str());
 
+  // All metadata writes below — UpdateCounters (24 UPDATEs), UpdateLastModified,
+  // IncrementRevision, SetPreviousRevision — run within the single SQLite
+  // transaction that was opened by the first SetDirty() call on this catalog
+  // (guaranteed by the CatalogUploadCallback->UpdateNestedCatalog->SetDirty()
+  // path for non-leaf catalogs, and by direct entry modifications for leaf
+  // catalogs).  catalog->Commit() at the end of this function closes that
+  // transaction, flushing all ~30 writes in one shot.  No additional
+  // BEGIN/COMMIT wrapper is needed here.
   catalog->UpdateCounters();
   catalog->UpdateLastModified();
   catalog->IncrementRevision();

@@ -33,7 +33,12 @@ func OpenDB(config gw.Config) (*DB, error) {
 		createDB = true
 	}
 
-	sqlDB, err := sql.Open("sqlite3", "file:"+dbFile+"?mode=rwc")
+	// _busy_timeout=5000: wait up to 5 s before returning SQLITE_BUSY.
+	// This is necessary because per-repository lease locks allow concurrent
+	// writers for different repositories; without a timeout, a second writer
+	// that arrives while SQLite holds a write lock returns SQLITE_BUSY
+	// immediately instead of retrying.
+	sqlDB, err := sql.Open("sqlite3", "file:"+dbFile+"?mode=rwc&_busy_timeout=5000")
 	if err != nil {
 		return nil, fmt.Errorf("could not open DB: %w", err)
 	}

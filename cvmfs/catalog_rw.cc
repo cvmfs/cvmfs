@@ -40,7 +40,9 @@ WritableCatalog::WritableCatalog(const string &path,
     , sql_chunks_count_(NULL)
     , sql_max_link_id_(NULL)
     , sql_inc_linkcount_(NULL)
-    , dirty_(false) {
+    , dirty_(false)
+    , link_id_ready_(false)
+    , link_id_seq_(0) {
   atomic_init32(&dirty_children_);
 }
 
@@ -115,6 +117,23 @@ void WritableCatalog::FinalizePreparedStatements() {
   delete sql_chunks_count_;
   delete sql_max_link_id_;
   delete sql_inc_linkcount_;
+}
+
+
+/**
+ * Returns the next available hardlink group ID, caching the result so that
+ * subsequent calls during the same publish session do not re-query the DB.
+ *
+ * The first call executes one SELECT MAX(hardlinks>>32) query via
+ * GetMaxLinkId(); every further call just increments link_id_seq_ in memory.
+ */
+uint32_t WritableCatalog::IssueHardlinkGroupId() {
+  if (!link_id_ready_) {
+    link_id_seq_   = GetMaxLinkId() + 1;
+    link_id_ready_ = true;
+  }
+  assert(link_id_seq_ > 0);
+  return link_id_seq_++;
 }
 
 
@@ -732,8 +751,15 @@ void WritableCatalog::CopyToParent() {
 
 /**
  * Writes delta_counters_ to the database.
+ *
+ * The 24 individual SqlUpdateCounter::Execute() calls in
+ * TreeCountersBase::WriteToDatabase() execute inside the outer SQLite
+ * transaction that was opened by the first SetDirty() call on this catalog.
+ * No additional SAVEPOINT/RELEASE is needed; the outer transaction already
+ * batches all counter UPDATEs into a single fsync at Commit() time.
  */
 void WritableCatalog::UpdateCounters() {
+  assert(dirty_);  // transaction must already be open
   const bool retval = delta_counters_.WriteToDatabase(database())
                       && ReadCatalogCounters();
   assert(retval);
@@ -741,23 +767,35 @@ void WritableCatalog::UpdateCounters() {
 
 
 /**
- * Checks if the database of this catalogs needs cleanup and defragments it
- * if necessary
+ * Checks if the database of this catalog needs cleanup and defragments it
+ * if necessary.
+ *
+ * The lock is held only while reading the page-ratio metrics.  SQLite VACUUM
+ * rewrites the entire database file and can take several seconds on large
+ * catalogs; holding lock_ across that I/O would block concurrent callers of
+ * UpdateNestedCatalog() (which also takes lock_) for the entire duration.
+ * Since VACUUM is called only after dirty_children has reached zero — meaning
+ * no further UpdateNestedCatalog() calls are expected for this catalog —
+ * releasing the lock before the I/O is safe.
  */
 void WritableCatalog::VacuumDatabaseIfNecessary() {
   const CatalogDatabase &db = database();
   bool needs_defragmentation = false;
   double ratio = 0.0;
   std::string reason;
-  const MutexLockGuard m(lock_);
 
-  if ((ratio = db.GetFreePageRatio()) > kMaximalFreePageRatio) {
-    needs_defragmentation = true;
-    reason = "free pages";
-  } else if ((ratio = db.GetRowIdWasteRatio()) > kMaximalRowIdWasteRatio) {
-    needs_defragmentation = true;
-    reason = "wasted row IDs";
-  }
+  // Read page metrics under the lock, then release before the potentially long
+  // VACUUM I/O so that sibling finalization threads are not stalled.
+  {
+    const MutexLockGuard m(lock_);
+    if ((ratio = db.GetFreePageRatio()) > kMaximalFreePageRatio) {
+      needs_defragmentation = true;
+      reason = "free pages";
+    } else if ((ratio = db.GetRowIdWasteRatio()) > kMaximalRowIdWasteRatio) {
+      needs_defragmentation = true;
+      reason = "wasted row IDs";
+    }
+  }  // lock_ released here — VACUUM proceeds without holding it
 
   if (needs_defragmentation) {
     LogCvmfs(kLogCatalog, kLogStdout | kLogNoLinebreak,

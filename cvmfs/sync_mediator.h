@@ -29,6 +29,7 @@
 #include <map>
 #include <stack>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "catalog_mgr_rw.h"
@@ -297,6 +298,12 @@ class SyncMediator : public virtual AbstractSyncMediator {
   SyncItemList file_queue_;
 
   HardlinkGroupList hardlink_queue_;
+  /**
+   * Maps the union-path of a hardlink group's master SyncItem to its index in
+   * hardlink_queue_, providing O(1) lookup in PublishHardlinksCallback instead
+   * of an O(N) linear scan.
+   */
+  std::unordered_map<std::string, size_t> hardlink_index_;
 
   const SyncParameters *params_;
   mutable unsigned int changed_items_;
