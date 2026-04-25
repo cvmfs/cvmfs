@@ -25,7 +25,7 @@ Publisher workstation
        │  HTTP (port 8000)
        │
 ┌──────▼──────────────────────────────────────────────────────────┐
-│  Site Squid proxy  (1–3 per grid site, ~700 sites worldwide)    │
+│  Site Squid proxy  (1–3 per grid site, ~70 sites worldwide)     │
 │  Squid 3/4/5  with disk cache (200 GB – 2 TB)                  │
 │  Config: cache_peer to Stratum 1, hierarchy_stoplist, acl      │
 │  WPAD / PAC file or static CVMFS_HTTP_PROXY on each worker     │
@@ -62,7 +62,7 @@ Publisher workstation
 
 | Area | Problem |
 |---|---|
-| **Squid ops burden** | Each of ~700 sites runs 1–3 Squid instances. Requires local sysadmin expertise: config, disk management, cache tuning, security patches. |
+| **Squid ops burden** | Each of ~70 sites runs 1–3 Squid instances. Requires local sysadmin expertise: config, disk management, cache tuning, security patches. |
 | **Squid age** | Squid 3/4 is a 25-year-old C codebase. Limited observability, TLS termination is awkward, no native HTTP/2. |
 | **Stratum 1 lag** | Pull-based replication adds 5–120 min staleness. Clients hold stale catalog views during the window. |
 | **Cold-start thundering herd** | After a publish, 100s of workers simultaneously miss the Squid cold cache, hammering Stratum 1. |
@@ -405,17 +405,17 @@ it; the burst drops to zero upstream requests.
 | Squid (cold cache) | ~2,000 connections in < 10 s |
 | Varnish + push pre-warm | 0–1 (only the pre-warm fetch) |
 
-**Ops savings across the WLCG grid (~700 sites):**
+**Ops savings across the WLCG grid (~70 sites):**
 
 | Activity | Squid | Varnish/Nginx | Saving |
 |---|---|---|---|
 | Initial config per site | 4 h manual | 30 min (Puppet template) | −87% |
 | Annual maintenance per site | 8 h (patches, tuning, restarts) | 1 h (OS package update) | −87% |
 | Emergency response (security CVE) | 2–5 days, all sites manually | 1 PR → Puppet → all sites in 2 h | −95% |
-| Total grid-wide ops (700 sites) | ~700 × 8 h = 5,600 h/yr | ~700 × 1 h = 700 h/yr | **−4,900 h/yr** |
+| Total grid-wide ops (70 sites) | ~70 × 8 h = 560 h/yr | ~70 × 1 h = 70 h/yr | **−490 h/yr** |
 
 At a representative sysadmin cost of €80/h, that is a saving of approximately
-**€390,000/year** across the grid — without any hardware procurement.
+**€39,000/year** across the grid — without any hardware procurement.
 
 **Stratum 1 upstream load:**
 
