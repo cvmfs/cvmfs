@@ -22,9 +22,17 @@ bool ZstdCompressor::WillHandle(const zip::Algorithms &alg) {
   return alg == kZstd;
 }
 
+ZstdCompressor::ZstdCompressor(const Algorithms& alg)
+    : Compressor(alg, ZSTD_CStreamOutSize()) {
+  Init();
+}
 
-ZstdCompressor::ZstdCompressor(const Algorithms &alg) :
-                                        Compressor(alg, ZSTD_CStreamOutSize()) {
+ZstdCompressor::ZstdCompressor()
+    : Compressor(zip::Algorithm::kZstd, ZSTD_CStreamOutSize()) {
+  Init();
+}
+
+void ZstdCompressor::Init() {
   stream_ = ZSTD_createCCtx();
   ZSTD_CCtx_setParameter(stream_, ZSTD_c_compressionLevel, 3);
   ZSTD_CCtx_setParameter(stream_, ZSTD_c_checksumFlag, 1);

@@ -55,7 +55,7 @@ class CommandGraft : public Command {
                    const std::string &dir_name);
 
   bool ChecksumFdWithChunks(const std::string &input_file,
-                            zip::ZlibCompressor *compressor,
+                            zip::Compressor *compressor,
                             uint64_t *file_size,
                             shash::Any *file_hash,
                             std::vector<uint64_t> *chunk_offsets,

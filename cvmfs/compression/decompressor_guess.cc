@@ -16,7 +16,7 @@ namespace zip {
 GuessDecompressor::GuessDecompressor(const zip::Algorithms& alg)
     : Decompressor(alg)
     , backend_(NULL)
-    , expected_fmt_(ExpectedContentFormat::kInvalid)
+    , expected_fmt_(ExpectedContentFormat::kInvalidFormat)
 {
 }
 
@@ -58,7 +58,7 @@ void GuessDecompressor::SetExpectedFormat(enum ExpectedContentFormat fmt)
 
 char GuessDecompressor::ExpectedFirstByte(enum ExpectedContentFormat fmt)
 {
-  assert(fmt != kInvalid);
+  assert(fmt != kInvalidFormat);
   assert(fmt != kArbitrary);
 #pragma GCC diagnostic push
 #pragma GCC diagnostic error "-Wswitch"
@@ -67,7 +67,7 @@ char GuessDecompressor::ExpectedFirstByte(enum ExpectedContentFormat fmt)
     case kPEM:       return '-';
     case kJSON:      return '{';
     case kSQLite3:   return 'S';
-    case kInvalid:   return '\0';
+    case kInvalidFormat:   return '\0';
     case kArbitrary: return '\0';
   }
 #pragma GCC diagnostic pop
@@ -87,7 +87,7 @@ Decompressor* GuessDecompressor::Clone() {
 bool GuessDecompressor::Guess(InputAbstract* input, cvmfs::Sink* output)
 {
   assert(!backend_);
-  assert(expected_fmt_ != ExpectedContentFormat::kInvalid);
+  assert(expected_fmt_ != ExpectedContentFormat::kInvalidFormat);
   assert(expected_fmt_ != ExpectedContentFormat::kArbitrary);
   if (input->chunk_size() == 0) {
     bool ok = input->NextChunk();

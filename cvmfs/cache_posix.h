@@ -73,8 +73,7 @@ class PosixCacheManager : public CacheManager {
     const std::string &cache_path,
     const bool alien_cache,
     const RenameWorkarounds rename_workaround = kRenameNormal,
-    const bool do_refcount = false,
-    zip::Algorithm compression_alg = zip::Algorithm::kDefault);
+    const bool do_refcount = false);
   virtual ~PosixCacheManager() { }
   virtual bool AcquireQuotaManager(QuotaManager *quota_mgr);
 
@@ -141,9 +140,8 @@ class PosixCacheManager : public CacheManager {
   };
 
   PosixCacheManager(const std::string &cache_path, const bool alien_cache,
-                    const bool do_refcount = false,
-                    zip::Algorithm compression_alg = zip::Algorithm::kDefault)
-    : CacheManager(compression_alg)
+                    const bool do_refcount = false)
+    : CacheManager()
     , cache_path_(cache_path)
     , txn_template_path_(cache_path_ + "/txn/fetchXXXXXX")
     , alien_cache_(alien_cache)

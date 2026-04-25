@@ -54,7 +54,6 @@ cvmfs_server_eliminate_bulk_hashes() {
 
   local migrate_command="
     CVMFS_COMPRESSION_ALGORITHM=$CVMFS_COMPRESSION_ALGORITHM \
-    CVMFS_DECOMPRESSION_ALGORITHM=$CVMFS_DECOMPRESSION_ALGORITHM \
     $(__swissknife_cmd dbg) migrate                          \
                               -v 'bulkhash'                  \
                               -r $CVMFS_STRATUM0             \

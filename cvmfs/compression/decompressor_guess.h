@@ -13,7 +13,7 @@
 namespace zip {
 
 enum ExpectedContentFormat {
-  kInvalid = 0,
+  kInvalidFormat = 0,
   kArbitrary,
   kManifest,
   kPEM,

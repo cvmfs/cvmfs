@@ -36,6 +36,7 @@ enum Algorithm {
 #else
 #error "Define CVMFS_COMPRESSION_DEFAULT_(something)"
 #endif
+  kInvalid = 2000,
 };
 typedef Algorithm Algorithms;
 typedef Algorithm DecompressionAlg;
@@ -48,6 +49,8 @@ Algorithms ParseCompressionAlgorithm(const std::string &algorithm_option);
 
 std::string AlgorithmName(const zip::Algorithms alg);
 
+// Use strictly for the cases when getting it from catalog context is
+// impossible, e.g. fsck.
 Algorithm DecompressionAlgFromEnv();
 
 Algorithm CompressionAlgFromEnv();

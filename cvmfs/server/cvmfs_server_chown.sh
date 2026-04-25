@@ -45,7 +45,6 @@ cvmfs_server_catalog_chown() {
 
   local migrate_command="
     CVMFS_COMPRESSION_ALGORITHM=$CVMFS_COMPRESSION_ALGORITHM \
-    CVMFS_DECOMPRESSION_ALGORITHM=$CVMFS_DECOMPRESSION_ALGORITHM \
     $(__swissknife_cmd dbg) migrate                          \
                               -v 'chown'                     \
                               -r $CVMFS_STRATUM0             \

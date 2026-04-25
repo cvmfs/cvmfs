@@ -546,7 +546,6 @@ class MountPoint : SingleCopy, public BootFactory {
   bool ReloadBlacklists();
   void DisableCacheSymlinks();
   void EnableFuseExpireEntry();
-  const zip::Algorithm GetDecompressionAlg();
 
  private:
   /**

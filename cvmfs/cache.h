@@ -95,7 +95,7 @@ class CacheManager : SingleCopy {
   struct Label {
     Label() : flags(0)
             , size(kSizeUnknown)
-            , zip_algorithm(zip::kDefault)
+            , zip_algorithm(zip::DecompressionAlg::kInvalid)
             , range_offset(-1)
     {}
 
@@ -182,7 +182,7 @@ class CacheManager : SingleCopy {
 
   virtual void Spawn() = 0;
 
-  int ChecksumFd(int fd, shash::Any *id);
+  int ChecksumFd(int fd, shash::Any *id, zip::Compressor *comp);
   int OpenPinned(const LabeledObject &object);
   bool Open2Mem(const LabeledObject &object,
                 unsigned char **buffer, uint64_t *size);
@@ -222,7 +222,7 @@ class CacheManager : SingleCopy {
   }
 
  protected:
-  CacheManager(zip::Algorithm compression_alg = zip::Algorithm::kDefault);
+  CacheManager();
 
   // Unless overwritten, Saving/Restoring states will crash the Fuse module
   virtual void *DoSaveState() { return NULL; }
@@ -233,7 +233,6 @@ class CacheManager : SingleCopy {
    * Never NULL but defaults to NoopQuotaManager.
    */
   QuotaManager *quota_mgr_;
-  UniquePtr<zip::Compressor> compress_;
 
  private:
   static const unsigned kStateVersion = 0;

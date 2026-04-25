@@ -53,7 +53,6 @@ ClientCatalogManager::ClientCatalogManager(MountPoint *mountpoint)
     "cache.n_certificate_hits", "Number of certificate hits");
   n_certificate_misses_ = mountpoint->statistics()->Register(
     "cache.n_certificate_misses", "Number of certificate misses");
-  decomp_alg_ = mountpoint->GetDecompressionAlg();
 }
 
 

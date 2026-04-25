@@ -17,6 +17,7 @@ namespace zip {
 class EchoCompressor: public Compressor {
  public:
   explicit EchoCompressor(const Algorithms &alg);
+  explicit EchoCompressor();
 
   virtual StreamStates Compress(InputAbstract *input, cvmfs::Sink *output);
   virtual StreamStates Compress(InputAbstract *input, cvmfs::Sink *output,

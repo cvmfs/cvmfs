@@ -450,9 +450,12 @@ void LHashMagicXattr::FinalizeValue() {
     result = "Not in cache";
   } else {
     shash::Any hash(dirent_->checksum().algorithm);
+    zip::Compressor* comp =
+        zip::Compressor::Construct(dirent_->compression_algorithm());
     int retval_i =
       xattr_mgr_->mount_point()->file_system()->cache_mgr()
-                                              ->ChecksumFd(fd, &hash);
+                                              ->ChecksumFd(fd, &hash, comp);
+    delete comp;
     if (retval_i != 0)
       result = "I/O error (" + StringifyInt(retval_i) + ")";
     else

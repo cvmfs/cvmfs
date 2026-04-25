@@ -19,8 +19,10 @@ class ZlibCompressor : public Compressor {
  public:
   explicit ZlibCompressor(const Algorithms &alg);
   ZlibCompressor(const ZlibCompressor &other);
+  ZlibCompressor();
   ~ZlibCompressor();
 
+  void Init();
   virtual StreamStates Compress(InputAbstract *input, cvmfs::Sink *output);
   virtual StreamStates Compress(InputAbstract *input, cvmfs::Sink *output,
                                 shash::Any *compressed_hash);

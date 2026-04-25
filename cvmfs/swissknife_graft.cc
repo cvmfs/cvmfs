@@ -22,7 +22,7 @@
 #include "util/posix.h"
 
 bool swissknife::CommandGraft::ChecksumFdWithChunks(
-                 const std::string &input_file, zip::ZlibCompressor *compressor,
+                 const std::string &input_file, zip::Compressor *compressor,
                  uint64_t *file_size, shash::Any *file_hash,
                  std::vector<uint64_t> *chunk_offsets,
                  std::vector<shash::Any> *chunk_checksums) {
@@ -252,9 +252,8 @@ int swissknife::CommandGraft::Publish(const std::string &input_file,
                        compressor(zip::Compressor::Construct(compression_alg_));
 
   bool retval =
-      ChecksumFdWithChunks(input_file,
-                 static_cast<zip::ZlibCompressor*>(compressor.weak_ref()),
-                 &processed_size, &file_hash, &chunk_offsets, &chunk_checksums);
+      ChecksumFdWithChunks(input_file, compressor.weak_ref(), &processed_size,
+                           &file_hash, &chunk_offsets, &chunk_checksums);
 
   if (!input_file_is_stdin) {
     close(fd);

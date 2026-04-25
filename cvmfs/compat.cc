@@ -202,7 +202,6 @@ void Migrate(ChunkTables *old_tables, ::ChunkTables *new_tables) {
       new_list->PushBack(::FileChunk(hash, offset, size));
     }
     delete old_list;
-    // how does that even compile? no ctor with such sig 
     ::FileChunkReflist new_reflist(new_list, old_reflist->path,
                                    zip::CompressionAlgFromEnv(), false);
     new_tables->inode2chunks.Insert(inode, new_reflist);
@@ -250,7 +249,7 @@ void Migrate(ChunkTables *old_tables, ::ChunkTables *new_tables) {
     }
     delete old_list;
     ::FileChunkReflist new_reflist(new_list, old_reflist->path,
-                                   zip::kDefault, false);
+                                   zip::CompressionAlgFromEnv(), false);
     new_tables->inode2chunks.Insert(inode, new_reflist);
   }
 }

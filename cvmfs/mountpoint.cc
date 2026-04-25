@@ -691,45 +691,17 @@ CacheManager *FileSystem::SetupExternalCacheMgr(const string &instance) {
   return cache_mgr;
 }
 
-const zip::Algorithm MountPoint::GetDecompressionAlg()
-{
-  zip::Algorithm decomp_alg;
-  {
-    std::string optarg;
-    if (options_mgr_->GetValue("CVMFS_DECOMPRESSION_ALGORITHM", &optarg) && !optarg.empty()) {
-      decomp_alg = zip::ParseCompressionAlgorithm(optarg);
-    } else if (options_mgr_->GetValue("CVMFS_COMPRESSION_ALGORITHM", &optarg) && !optarg.empty()) {
-      decomp_alg = zip::ParseCompressionAlgorithm(optarg);
-    } else {
-      decomp_alg = zip::Algorithm::kDefault;
-    }
-  }
-  return decomp_alg;
-}
-
 CacheManager *FileSystem::SetupPosixCacheMgr(const string &instance) {
   PosixCacheSettings settings = DeterminePosixCacheSettings(instance);
   if (!CheckPosixCacheSettings(settings))
     return NULL;
 
-  zip::Algorithm decomp_alg;
-  {
-    std::string optarg;
-    if (options_mgr_->GetValue("CVMFS_DECOMPRESSION_ALGORITHM", &optarg) && !optarg.empty()) {
-      decomp_alg = zip::ParseCompressionAlgorithm(optarg);
-    } else if (options_mgr_->GetValue("CVMFS_COMPRESSION_ALGORITHM", &optarg) && !optarg.empty()) {
-      decomp_alg = zip::ParseCompressionAlgorithm(optarg);
-    } else {
-      decomp_alg = zip::Algorithm::kDefault;
-    }
-  }
   UniquePtr<PosixCacheManager> cache_mgr(PosixCacheManager::Create(
     settings.cache_path,
     settings.is_alien,
     settings.avoid_rename ? PosixCacheManager::kRenameLink
                           : PosixCacheManager::kRenameNormal,
-    settings.do_refcount,
-    decomp_alg));
+    settings.do_refcount));
   if (!cache_mgr.IsValid()) {
     boot_error_ = "Failed to setup posix cache '" + instance + "' in " +
                   settings.cache_path + ": " + strerror(errno);
@@ -1832,7 +1804,7 @@ bool MountPoint::FetchHistory(std::string *history_path) {
   CacheManager::Label label;
   label.flags = CacheManager::kLabelHistory;
   label.path = fqrn_;
-  label.zip_algorithm = GetDecompressionAlg();
+  label.zip_algorithm = zip::DecompressionAlg::kGuessDecompression;
   int fd = fetcher_->Fetch(CacheManager::LabeledObject(history_hash, label));
   if (fd < 0) {
     boot_error_ = "failed to download history: " + StringifyInt(-fd);

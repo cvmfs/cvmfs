@@ -19,6 +19,10 @@ EchoCompressor::EchoCompressor(const zip::Algorithms &alg) : Compressor(alg) {
   output_full_ = false;
 }
 
+EchoCompressor::EchoCompressor() : Compressor(zip::Algorithm::kNoCompression) {
+  is_healthy_ = true;
+  output_full_ = false;
+}
 
 bool EchoCompressor::WillHandle(const zip::Algorithms &alg) {
   return alg == kNoCompression;

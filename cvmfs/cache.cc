@@ -25,9 +25,8 @@ using namespace std;  // NOLINT
 
 const uint64_t CacheManager::kSizeUnknown = uint64_t(-1);
 
-CacheManager::CacheManager(zip::Algorithm compression_alg)
+CacheManager::CacheManager()
     : quota_mgr_(new NoopQuotaManager()) {
-  compress_ = zip::Compressor::Construct(compression_alg);
 }
 
 CacheManager::~CacheManager() {
@@ -38,8 +37,9 @@ CacheManager::~CacheManager() {
 /**
  * Compresses and checksums the file pointed to by fd.  The hash algorithm needs
  * to be set in id.
+ * Caller keeps ownership of `comp`.
  */
-int CacheManager::ChecksumFd(int fd, shash::Any *id) {
+int CacheManager::ChecksumFd(int fd, shash::Any *id, zip::Compressor *comp) {
   unsigned char buf[10];
   // TODO(heretherebedragons) if it is ok to accept a generic IO error from the
   // compressor then we do not need this extra write (e.g. -EIO)
@@ -51,7 +51,7 @@ int CacheManager::ChecksumFd(int fd, shash::Any *id) {
 
   zip::InputCache input(this, fd, 4096);
   cvmfs::NullSink out_null;
-  const zip::StreamStates retval = compress_->Compress(&input, &out_null, id);
+  const zip::StreamStates retval = comp->Compress(&input, &out_null, id);
 
   if (retval != zip::kStreamEnd) {
     return -EINVAL;

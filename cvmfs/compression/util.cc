@@ -44,6 +44,9 @@ std::string AlgorithmName(const zip::Algorithms alg) {
     case zip::Algorithm::kGuessDecompression:
       return "guess";
       break;
+    case zip::Algorithm::kInvalid:
+      return "invalid";
+      break;
     // Purposely did not add a 'default' statement here: this will
     // cause the compiler to generate a warning if a new algorithm
     // is added but this function is not updated.

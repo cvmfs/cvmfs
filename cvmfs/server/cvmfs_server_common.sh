@@ -171,7 +171,7 @@ load_repo_config() {
   else
     . /etc/cvmfs/repositories.d/${name}/replica.conf
   fi
-  export CVMFS_COMPRESSION_ALGORITHM CVMFS_DECOMPRESSION_ALGORITHM
+  export CVMFS_COMPRESSION_ALGORITHM
 }
 
 
@@ -1060,12 +1060,6 @@ CVMFS_TALK_SOCKET=/var/spool/cvmfs/${name}/cvmfs_io
 CVMFS_TALK_OWNER=$cvmfs_user
 CVMFS_USE_SSL_SYSTEM_CA=true
 EOF
-
-if [[ "$compression_alg" != 'default' ]]; then
-  cat >> $client_conf << EOF
-CVMFS_DECOMPRESSION_ALGORITHM=$compression_alg
-EOF
-fi
 
   if [ "x$X509_CERT_BUNDLE" != "x" ]; then
     cat >> $client_conf << EOF

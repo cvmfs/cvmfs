@@ -58,19 +58,10 @@ do_alg() {
 
   [[ "$(cat /cvmfs/$repo_name/subdir/hello.txt)" == "hello" ]] || return 7
 
-  # The newly created repo has CVMFS_DECOMPRESSION_ALGORITHM setting in client.conf, but it actually can and should work with no such setting.
+  # There is not such thing as "decompression algorithm setting" in client.conf, it actually can and does work with no such setting.
   # Metadata bits (manifest, certificate, metadata, catalogs) are of established formats and their compression format can be reliably recognized from first bytes of content.
   # This works by invoking zip::GuessDecompressor in the codebase, and this doesn't require a setting in client.conf.
   # The directory entires have their compression format stored in the catalogs.
-  # Here we operate on the repo with no CVMFS_DECOMPRESSION_ALGORITHM setting, but this is how adding an explicit setting would work:
-  #echo CVMFS_DECOMPRESSION_ALGORITHM=guess | sudo tee -a /etc/cvmfs/repositories.d/"$repo_name"/client.conf
-
-  # remove CVMFS_DECOMPRESSION_ALGORITHM in client.conf and see if it reads repo correctly using catalog metadata
-  sudo umount /cvmfs/"$repo_name"
-  sudo umount /var/spool/cvmfs/"$repo_name"/rdonly
-  sudo sed -i /etc/cvmfs/repositories.d/"$repo_name"/client.conf -e "/CVMFS_DECOMPRESSION_ALGORITHM=/d" || return 11
-  sudo mount /var/spool/cvmfs/"$repo_name"/rdonly || return 12
-  sudo mount /cvmfs/"$repo_name"
 
   find /cvmfs/$repo_name
   ls -lR /cvmfs/$repo_name
@@ -99,7 +90,6 @@ do_alg() {
     sudo umount /var/spool/cvmfs/"$repo_name"/rdonly
 
     sudo sed -i /etc/cvmfs/repositories.d/"$repo_name"/server.conf -e "/CVMFS_COMPRESSION_ALGORITHM=/d"
-    sudo sed -i /etc/cvmfs/repositories.d/"$repo_name"/client.conf -e "/CVMFS_DECOMPRESSION_ALGORITHM=/d"
     if [[ "$alg_new_spec" == unset ]]; then
       new_alg=''
       # CVMFS_COMPRESSION_ALGORITHM env var left unset (undeclared)

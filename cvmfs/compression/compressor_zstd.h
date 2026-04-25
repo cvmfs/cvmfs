@@ -19,9 +19,11 @@ namespace zip {
 class ZstdCompressor : public Compressor {
  public:
   explicit ZstdCompressor(const Algorithms &alg);
+  explicit ZstdCompressor();
   ZstdCompressor(const ZstdCompressor &other);
   ~ZstdCompressor();
 
+  void Init();
   virtual StreamStates Compress(InputAbstract *input, cvmfs::Sink *output);
   virtual StreamStates Compress(InputAbstract *input, cvmfs::Sink *output,
                                 shash::Any *compressed_hash);

@@ -55,7 +55,6 @@ cvmfs_server_eliminate_hardlinks() {
 
   local migrate_command="
     CVMFS_COMPRESSION_ALGORITHM=$CVMFS_COMPRESSION_ALGORITHM \
-    CVMFS_DECOMPRESSION_ALGORITHM=$CVMFS_DECOMPRESSION_ALGORITHM \
     $(__swissknife_cmd dbg) migrate                          \
                               -v 'hardlink'                  \
                               -r $CVMFS_STRATUM0             \

@@ -33,9 +33,9 @@ void TaskCompress::Process(BlockItem *input_block) {
     output_block = new BlockItem(tag, allocator_);
     output_block->SetFileItem(input_block->file_item());
     output_block->SetChunkItem(input_block->chunk_item());
-    // FIXME either
-    // - adapt size to not run into ENOSPC in output->Write(); upper limit would be whole input size
-    // - do not use Adopt(is_owner=false) mode
+    // Since Adopt(is_owner=false) is used, using a buffer smaller than
+    // compressor->CompressUpperBound(input_block->size())
+    // would result in intractable ENOSPC in output->Write().
     output_block->MakeData(compressor->CompressUpperBound(input_block->size()));
     tag_map_.Insert(tag, output_block);
   }
@@ -50,8 +50,7 @@ void TaskCompress::Process(BlockItem *input_block) {
     ret_compress = compressor->CompressStream(&in_comp, &out_comp, flush);
     output_block->set_size(out_comp.pos());
 
-    if (/*output_block->IsFull()*/ret_compress == zip::kStreamOutBufFull || ret_compress == zip::kStreamEnd) {
-      //assert(ret_compress == zip::kStreamOutBufFull || ret_compress == zip::kStreamEnd);
+    if (ret_compress == zip::kStreamOutBufFull || ret_compress == zip::kStreamEnd) {
       tubes_out_->Dispatch(output_block);
       output_block = new BlockItem(tag, allocator_);
       output_block->SetFileItem(input_block->file_item());

@@ -22,9 +22,16 @@ bool ZlibCompressor::WillHandle(const zip::Algorithms &alg) {
   return alg == kZlib;
 }
 
+ZlibCompressor::ZlibCompressor(const Algorithms& alg) : Compressor(alg) {
+  Init();
+}
 
-ZlibCompressor::ZlibCompressor(const Algorithms &alg)
-  : Compressor(alg)
+ZlibCompressor::ZlibCompressor()
+    : Compressor(zip::Algorithm::kZlib) {
+  Init();
+}
+
+void ZlibCompressor::Init()
 {
   stream_.zalloc   = Z_NULL;
   stream_.zfree    = Z_NULL;
