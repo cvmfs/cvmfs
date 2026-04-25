@@ -55,7 +55,7 @@ struct SyncParameters {
       , manual_revision(0)
       , ttl_seconds(0)
       , max_concurrent_write_jobs(0)
-      , num_upload_tasks(1)
+      , num_upload_tasks(0)  // 0 = inherit CPU-scaled default from SpoolerDefinition
       , is_balanced(false)
       , max_weight(kDefaultMaxWeight)
       , min_weight(kDefaultMinWeight)

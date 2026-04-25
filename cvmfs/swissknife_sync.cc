@@ -770,7 +770,11 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     spooler_definition
         .number_of_concurrent_uploads = params.max_concurrent_write_jobs;
   }
-  spooler_definition.num_upload_tasks = params.num_upload_tasks;
+  // Only override if the operator explicitly set -0; otherwise keep the
+  // CPU-scaled default that SpoolerDefinition's constructor computed.
+  if (params.num_upload_tasks != 0) {
+    spooler_definition.num_upload_tasks = params.num_upload_tasks;
+  }
 
   const upload::SpoolerDefinition spooler_definition_catalogs(
       spooler_definition.Dup2DefaultCompression());

@@ -193,13 +193,17 @@ bool Database<DerivedT>::Configure() {
   }
 
   // Writable databases (publish-path catalogs):
-  //   WAL mode: sequential append writes replace random-write rollback journal,
-  //   improving throughput on all storage types.
-  //   synchronous=OFF: skips fsync after each transaction commit.  Safe here
-  //   because a crashed publish is recovered by gateway lease rollback; the
-  //   catalog is rebuilt from scratch on the next run.
-  return Sql(sqlite_db(), "PRAGMA journal_mode=WAL;").Execute()
-         && Sql(sqlite_db(), "PRAGMA synchronous=OFF;").Execute();
+  //   synchronous=NORMAL: skips most fsyncs (specifically the fsync on
+  //   rollback-journal deletion that fires after every COMMIT in the default
+  //   synchronous=FULL mode).  Data is still written to the main DB file
+  //   before the connection is used further, so ScheduleCatalogProcessing can
+  //   read the raw file and upload a correct catalog.
+  //
+  //   We intentionally do NOT set journal_mode=WAL: in WAL mode committed
+  //   pages live in the <db>-wal sidecar file until a checkpoint, and the
+  //   spooler reads only the main DB file at the OS level, which would result
+  //   in uploading a stale (pre-commit) catalog.
+  return Sql(sqlite_db(), "PRAGMA synchronous=NORMAL;").Execute();
 }
 
 

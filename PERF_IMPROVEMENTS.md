@@ -151,7 +151,8 @@ HDF5) where `kNoCompression` is the typical setting.
 ## Change 5 — Upload task parallelism scales with CPU count
 
 **Files:** `cvmfs/upload_spooler_definition.h`,
-`cvmfs/upload_spooler_definition.cc`
+`cvmfs/upload_spooler_definition.cc`, `cvmfs/swissknife_sync.h`,
+`cvmfs/swissknife_sync.cc`
 
 ### Problem
 
@@ -164,21 +165,24 @@ its own 16-connection pool; the gap affects everyone else.)
 
 ### Solution
 
-The `num_upload_tasks` field is initialised at construction time using
-`GetNumberOfCpuCores()`:
+The `num_upload_tasks` field is initialised at `SpoolerDefinition` construction
+time using `GetNumberOfCpuCores()`:
 
 ```cpp
 num_upload_tasks = std::min(16U, std::max(4U, GetNumberOfCpuCores() / 2))
 ```
 
 This gives 4 upload tasks on a 4-core machine, scales linearly to 16 on a
-32-core machine, and caps at 16 to avoid overwhelming backends with too many
-concurrent connections. Operators may override via the existing spooler
-configuration mechanism.
+32-core machine, and caps at 16 to avoid overwhelming backends.
+
+`SyncParameters::num_upload_tasks` is changed from `1` to `0` (sentinel meaning
+"inherit from SpoolerDefinition"). The override in `swissknife_sync.cc` is
+made conditional: `spooler_definition.num_upload_tasks` is only overwritten
+when the operator explicitly passes the `-0` flag.
 
 ---
 
-## Change 6 — SQLite WAL mode and `synchronous=OFF` for publish catalogs
+## Change 6 — `synchronous=NORMAL` for publish catalogs
 
 **Files:** `cvmfs/sql_impl.h`
 
@@ -186,29 +190,33 @@ configuration mechanism.
 
 `Database<DerivedT>::Configure()` applies pragmas only for read-only opens. For
 read-write opens (publish-path writable catalogs) no pragmas are set, so SQLite
-uses its defaults: DELETE rollback journal mode and `synchronous=FULL`. The
-latter calls `fsync()` after every transaction commit. During a publish with
-hundreds of catalog updates, this produces hundreds of serialised `fsync` calls,
-each of which stalls all further SQLite writes until the OS confirms the data
-has reached stable storage.
+uses its defaults: `synchronous=FULL`. This calls `fsync()` after every
+transaction commit — once to flush the rollback journal and once to flush the
+database file. During a publish with hundreds of catalog updates, this produces
+hundreds of serialised `fsync` pairs, each stalling all SQLite writes until the
+OS confirms the data has reached stable storage.
 
 ### Solution
 
 The read-write branch of `Configure()` now applies:
 
 ```sql
-PRAGMA journal_mode=WAL;
-PRAGMA synchronous=OFF;
+PRAGMA synchronous=NORMAL;
 ```
 
-WAL (Write-Ahead Log) replaces random-write rollback journals with sequential
-append writes, improving throughput on all storage types and allowing readers
-to proceed concurrently with writers.
+`synchronous=NORMAL` omits the fsync on rollback-journal deletion (the fsync
+that fires after every commit in FULL mode). Data is still written to the main
+database file before the SQLite connection moves on, so
+`ScheduleCatalogProcessing` can read the raw file with the spooler and upload
+a correct, up-to-date catalog.
 
-`synchronous=OFF` is safe here because a failed publish is recovered by gateway
-lease rollback — the partially-written catalog is discarded and the repository
-state reverts to the pre-publish snapshot. There is no data-integrity scenario
-that requires fsync during a publish transaction.
+`journal_mode=WAL` was deliberately considered and rejected for this use case:
+in WAL mode, committed pages live in a `<db>-wal` sidecar file until a
+checkpoint is performed. The spooler reads only the main database file at the
+OS level, so uploading before an explicit `PRAGMA wal_checkpoint` would silently
+upload a stale (pre-commit) catalog — a correctness bug. `synchronous=NORMAL`
+with the default DELETE journal gives the same fsync reduction without that
+ordering hazard.
 
 Read-only database opens (CVMFS clients, stratum-1 mirrors, catalog readers)
 are unaffected; their `Configure()` branch is unchanged.
