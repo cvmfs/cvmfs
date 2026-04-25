@@ -27,8 +27,12 @@ class ZstdCompressor : public Compressor {
   virtual StreamStates Compress(InputAbstract *input, cvmfs::Sink *output);
   virtual StreamStates Compress(InputAbstract *input, cvmfs::Sink *output,
                                 shash::Any *compressed_hash);
-  virtual StreamStates CompressStream(InputAbstract *input,
+  virtual StreamStates StreamingStep(InputAbstract* input,
+                                     cvmfs::MemSink* output, const bool flush);
+#if 0
+  virtual StreamStates CompressStreamHard(InputAbstract *input,
                                       cvmfs::MemSink *output, const bool flush);
+#endif
   virtual bool Reset();
   virtual size_t CompressUpperBound(const size_t bytes);
   Compressor* Clone();
@@ -37,7 +41,6 @@ class ZstdCompressor : public Compressor {
 
  private:
   ZSTD_CCtx *stream_;
-  bool is_healthy_;  // ZStream is healthy
   bool compress_stream_outbuf_full_;
 };
 

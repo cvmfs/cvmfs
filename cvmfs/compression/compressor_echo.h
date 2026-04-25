@@ -22,8 +22,12 @@ class EchoCompressor: public Compressor {
   virtual StreamStates Compress(InputAbstract *input, cvmfs::Sink *output);
   virtual StreamStates Compress(InputAbstract *input, cvmfs::Sink *output,
                                 shash::Any *compressed_hash);
-  virtual StreamStates CompressStream(InputAbstract *input,
-                                cvmfs::MemSink *output, const bool flush);
+  virtual StreamStates StreamingStep(InputAbstract* input,
+                                     cvmfs::MemSink* output, const bool flush);
+#if 0
+  virtual StreamStates CompressStreamHard(InputAbstract *input,
+                                      cvmfs::MemSink *output, const bool flush);
+#endif
   virtual size_t CompressUpperBound(const size_t bytes);
   virtual bool Reset()
                       { is_healthy_ = true; output_full_ = false; return true; }
@@ -33,7 +37,6 @@ class EchoCompressor: public Compressor {
   static bool WillHandle(const zip::Algorithms &alg);
 
  private:
-  bool is_healthy_;
   bool output_full_;
 };
 

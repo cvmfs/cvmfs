@@ -85,7 +85,7 @@ StreamStates ZlibDecompressor::DecompressStream(InputAbstract *input,
       const size_t have = kZChunk_ - stream_.avail_out;
       const int64_t written = output->Write(out, have);
 
-      if ((written < 0) || written != static_cast<int64_t>(have)) {
+      if (written < 0) {
         is_healthy_ = false;
         return kStreamIOError;
       }

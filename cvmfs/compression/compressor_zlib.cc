@@ -55,7 +55,35 @@ Compressor* ZlibCompressor::Clone() {
   return other;
 }
 
-StreamStates ZlibCompressor::CompressStream(InputAbstract *input,
+StreamStates ZlibCompressor::StreamingStep(InputAbstract* input,
+                                           cvmfs::MemSink* output,
+                                           const bool flush) {
+  int flush_int;
+  if (!input->has_chunk_left() && flush) {
+    flush_int = Z_FINISH;
+  } else {
+    flush_int = Z_NO_FLUSH;
+  }
+  const size_t avail_in = input->chunk_size() - input->GetIdxInsideChunk();
+  stream_.avail_in = avail_in;
+  stream_.next_in = input->chunk() + input->GetIdxInsideChunk();
+  const size_t avail_out = output->size() - output->pos();
+  stream_.avail_out = avail_out;
+  stream_.next_out = output->data() + output->pos();
+  int z_ret = deflate(&stream_, flush_int);
+  assert(z_ret == Z_OK || z_ret == Z_STREAM_END);
+  assert(output->SetPos(output->pos() + avail_out - stream_.avail_out));
+  const size_t processed_in = avail_in - stream_.avail_in;
+  input->SetIdxInsideChunk(input->GetIdxInsideChunk() + processed_in);
+
+  if (!input->HasInputLeftInChunk() && !input->has_chunk_left() && flush && z_ret == Z_STREAM_END) {
+    return kStreamEnd;
+  }
+  return kStreamContinue;
+}
+
+#if 0
+StreamStates ZlibCompressor::CompressStreamHard(InputAbstract *input,
                                      cvmfs::MemSink *output, const bool flush) {
   if (!is_healthy_) {
     return kStreamError;
@@ -65,7 +93,6 @@ StreamStates ZlibCompressor::CompressStream(InputAbstract *input,
   int z_ret;
 
   do {
-    // TODO TODO replace with input->HasInputLeftInChunk()
     if (input->GetIdxInsideChunk() < input->chunk_size()
         && input->chunk_size() != 0) {
       // still stuff to process in the current chunk
@@ -97,7 +124,6 @@ StreamStates ZlibCompressor::CompressStream(InputAbstract *input,
     if (stream_.avail_out == 0) {
       return kStreamOutBufFull;
     }
-  // TODO TODO replace with input->HasInputLeftInChunk()
   } while (input->has_chunk_left()
           || (input->GetIdxInsideChunk() < input->chunk_size()
               && input->chunk_size() != 0));
@@ -109,6 +135,7 @@ StreamStates ZlibCompressor::CompressStream(InputAbstract *input,
 
   return kStreamContinue;
 }
+#endif
 
 
 ZlibCompressor::~ZlibCompressor() {
@@ -133,8 +160,11 @@ StreamStates ZlibCompressor::Compress(InputAbstract *input,
   int flush = Z_NO_FLUSH;
 
   do {
-    if (!input->NextChunk()) {
-      return kStreamIOError;
+    if (input->GetIdxInsideChunk() == input->chunk_size() && input->has_chunk_left()) {
+      bool ok = input->NextChunk();
+      if (!ok) {
+        return kStreamIOError;
+      }
     }
 
     stream_.avail_in = input->chunk_size();
@@ -150,15 +180,14 @@ StreamStates ZlibCompressor::Compress(InputAbstract *input,
 
       z_ret = deflate(&stream_, flush);
       if (z_ret == Z_STREAM_ERROR) {
-        deflateEnd(&stream_);
         is_healthy_ = false;
         return kStreamDataError;
       }
+      input->SetIdxInsideChunk(stream_.next_in - input->chunk());
       const size_t have = kZChunk_ - stream_.avail_out;
       const int64_t written = output->Write(out, have);
 
       if (written != static_cast<int64_t>(have)) {
-        deflateEnd(&stream_);
         is_healthy_ = false;
         return kStreamIOError;
       }
@@ -169,7 +198,6 @@ StreamStates ZlibCompressor::Compress(InputAbstract *input,
 
   if (z_ret != Z_STREAM_END) {
     // here in original code "output" was reset and deleted
-    deflateEnd(&stream_);
     is_healthy_ = false;
     return kStreamDataError;
   } else {
@@ -193,8 +221,11 @@ StreamStates ZlibCompressor::Compress(InputAbstract *input, cvmfs::Sink *output,
   shash::Init(hash_context);
 
   do {
-    if (!input->NextChunk()) {
-      return kStreamIOError;
+    if (input->GetIdxInsideChunk() == input->chunk_size() && input->has_chunk_left()) {
+      bool ok = input->NextChunk();
+      if (!ok) {
+        return kStreamIOError;
+      }
     }
 
     stream_.avail_in = input->chunk_size();
@@ -210,15 +241,14 @@ StreamStates ZlibCompressor::Compress(InputAbstract *input, cvmfs::Sink *output,
 
       z_ret = deflate(&stream_, flush);
       if (z_ret == Z_STREAM_ERROR) {
-        deflateEnd(&stream_);
         is_healthy_ = false;
         return kStreamDataError;
       }
+      input->SetIdxInsideChunk(stream_.next_in - input->chunk());
       const size_t have = kZChunk_ - stream_.avail_out;
       const int64_t written = output->Write(out, have);
 
       if (written != static_cast<int64_t>(have)) {
-        deflateEnd(&stream_);
         is_healthy_ = false;
         return kStreamIOError;
       }
@@ -230,7 +260,6 @@ StreamStates ZlibCompressor::Compress(InputAbstract *input, cvmfs::Sink *output,
 
   if (z_ret != Z_STREAM_END) {
     // here in original code "output" was reset and deleted
-    deflateEnd(&stream_);
     is_healthy_ = false;
     return kStreamDataError;
   } else {

@@ -36,8 +36,7 @@ StreamStates EchoDecompressor::DecompressStream(InputAbstract *input,
 
     const size_t have = input->chunk_size();
     const int64_t written = output->Write(input->chunk(), have);
-
-    if (written != static_cast<int64_t>(have)) {
+    if (written < 0) {
       is_healthy_ = false;
       return kStreamIOError;
     }

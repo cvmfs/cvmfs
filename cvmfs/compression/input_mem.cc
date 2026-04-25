@@ -12,7 +12,7 @@ InputMem::InputMem(const unsigned char *src, const size_t src_size) :
                                   src_(src), src_size_(src_size) {
   if (InputMem::IsValid()) {
     idx_ = -1;
-    has_chunk_left_ = true;
+    has_chunk_left_ = src_size > 0;
   }
 }
 
@@ -22,7 +22,7 @@ InputMem::InputMem(const unsigned char* src, const size_t src_size,
                                   src_(src), src_size_(src_size) {
   if (InputMem::IsValid()) {
     idx_ = -1;
-    has_chunk_left_ = true;
+    has_chunk_left_ = src_size > 0;
   }
 }
 
@@ -72,7 +72,7 @@ bool InputMem::Reset() {
     idx_ = -1ul;
     chunk_size_ = 0;
     idx_inside_chunk_ = 0;
-    has_chunk_left_ = true;
+    has_chunk_left_ = src_size_ > 0;
     return true;
   }
   return false;

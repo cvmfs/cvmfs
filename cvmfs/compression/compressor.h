@@ -80,8 +80,11 @@ class Compressor: public PolymorphicConstruction<Compressor, Algorithms> {
    */
   // TODO(heretherebedragons) remove! when everything is replaced to use the
   // compressor
-  virtual StreamStates CompressStream(InputAbstract *input,
-                                  cvmfs::MemSink *output, const bool flush) = 0;
+  StreamStates CompressStream(InputAbstract* input, cvmfs::MemSink* output,
+                              const bool flush);
+  virtual StreamStates StreamingStep(InputAbstract* input,
+                                     cvmfs::MemSink* output,
+                                     const bool flush) = 0;
   /**
    * Reset stream to perform compression on a new, independent input
    */
@@ -96,6 +99,7 @@ class Compressor: public PolymorphicConstruction<Compressor, Algorithms> {
 
  protected:
   const size_t kZChunk_;
+  bool is_healthy_;
 };
 
 }  // namespace zlib

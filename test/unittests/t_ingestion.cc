@@ -674,17 +674,30 @@ void T_Ingestion::ExerciseCompressionRoundtrip(zip::Algorithm alg) {
       ASSERT_TRUE(res == zip::kStreamEnd || res == zip::kStreamContinue);
       memcpy(ptr_read_decomp + decomp_read_pos, out_tmp.data(), out_tmp.pos());
       decomp_read_pos += out_tmp.pos();
+      ASSERT_EQ(0, memcmp(ptr_read_decomp, block_raw.data(), decomp_read_pos));
     }
     if (alg == zip::kNoCompression) {
       ASSERT_EQ(read_pos, decomp_read_pos);
+      ASSERT_EQ(0, memcmp(ptr_read_large, ptr_read_decomp, read_pos));
     }
   } while (b->type() == BlockItem::kBlockData);
   EXPECT_EQ(BlockItem::kBlockStop, b->type());
   delete b;
-  EXPECT_EQ(0U, tube_out->size());
+  ASSERT_EQ(0U, tube_out->size());
+  ASSERT_EQ(decomp_read_pos, block_raw.size());
+  ASSERT_EQ(0, memcmp(ptr_read_decomp, block_raw.data(), decomp_read_pos));
+
+  // These are interesting assertions but they don't match and don't have to
+  //       Expected: comp_single_block.pos()
+  //      Which is: 201382
+  //To be equal to: read_pos
+  //      Which is: 201385
+  //ASSERT_EQ(comp_single_block.pos(), read_pos);
+  //ASSERT_EQ(0, memcmp(comp_single_block.data(), ptr_read_large, read_pos));
+
   if (alg == zip::kNoCompression) {
-    ASSERT_EQ(decomp_read_pos, read_pos);
     ASSERT_EQ(read_pos, block_raw.size());
+    ASSERT_EQ(0, memcmp(ptr_read_large, block_raw.data(), block_raw.size()));
   }
 
   decomp->Reset();

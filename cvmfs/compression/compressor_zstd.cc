@@ -69,7 +69,33 @@ Compressor* ZstdCompressor::Clone() {
   return other;
 }
 
-StreamStates ZstdCompressor::CompressStream(InputAbstract *input,
+StreamStates ZstdCompressor::StreamingStep(InputAbstract* input,
+                                           cvmfs::MemSink* output,
+                                           const bool flush) {
+  ZSTD_EndDirective mode;
+  if (!input->has_chunk_left() && flush) {
+    mode = ZSTD_e_end;
+  } else {
+    mode = ZSTD_e_continue;
+  }
+  ZSTD_inBuffer inBuffer = {input->chunk(), input->chunk_size(),
+    input->GetIdxInsideChunk()};
+  ZSTD_outBuffer outBuffer = {output->data(), output->size(), output->pos()};
+  size_t remaining = ZSTD_compressStream2(stream_, &outBuffer, &inBuffer, mode);
+  if (ZSTD_isError(remaining)) {
+    is_healthy_ = false;
+    return kStreamDataError;
+  }
+  assert(output->SetPos(outBuffer.pos));
+  input->SetIdxInsideChunk(inBuffer.pos);
+  if (!input->HasInputLeftInChunk() && !input->has_chunk_left() && flush && remaining == 0) {
+    return kStreamEnd;
+  }
+  return kStreamContinue;
+}
+
+#if 0
+StreamStates ZstdCompressor::CompressStreamHard(InputAbstract *input,
                                      cvmfs::MemSink *output, const bool flush) {
   if (!is_healthy_) {
     return kStreamError;
@@ -79,7 +105,6 @@ StreamStates ZstdCompressor::CompressStream(InputAbstract *input,
 
   size_t remaining;
   do {
-    // TODO TODO replace with input->HasInputLeftInChunk()
     if (input->GetIdxInsideChunk() < input->chunk_size()
         && input->chunk_size() != 0) {
       // still stuff to process in the current chunk
@@ -112,16 +137,17 @@ StreamStates ZstdCompressor::CompressStream(InputAbstract *input,
       compress_stream_outbuf_full_ = true;
       return kStreamOutBufFull;
     }
-  // TODO TODO replace with input->HasInputLeftInChunk()
   } while (input->has_chunk_left()
           || (input->GetIdxInsideChunk() < input->chunk_size()
               && input->chunk_size() != 0));
   return kStreamEnd;
 }
+#endif
 
 
 ZstdCompressor::~ZstdCompressor() {
-  assert(ZSTD_freeCCtx(stream_) == 0);
+  auto ret = ZSTD_freeCCtx(stream_);
+  assert(ret == 0);
 }
 
 
@@ -144,8 +170,11 @@ StreamStates ZstdCompressor::Compress(InputAbstract *input,
   ZSTD_EndDirective mode = ZSTD_e_continue;
 
   do {
-    if (!input->NextChunk()) {
-      return kStreamIOError;
+    if (input->GetIdxInsideChunk() == input->chunk_size() && input->has_chunk_left()) {
+      bool ok = input->NextChunk();
+      if (!ok) {
+        return kStreamIOError;
+      }
     }
 
     if (!input->has_chunk_left()) {
@@ -160,15 +189,14 @@ StreamStates ZstdCompressor::Compress(InputAbstract *input,
 
       remaining = ZSTD_compressStream2(stream_, &outBuffer, &inBuffer, mode);
       if (ZSTD_isError(remaining)) {
-        ZSTD_freeCCtx(stream_);
         is_healthy_ = false;
         return kStreamDataError;
       }
+      input->SetIdxInsideChunk(inBuffer.pos);
       const size_t have = outBuffer.pos;
       const int64_t written = output->Write(out, have);
 
       if (written != static_cast<int64_t>(have)) {
-        ZSTD_freeCCtx(stream_);
         is_healthy_ = false;
         return kStreamIOError;
       }
@@ -195,8 +223,11 @@ StreamStates ZstdCompressor::Compress(InputAbstract *input, cvmfs::Sink *output,
   shash::Init(hash_context);
 
   do {
-    if (!input->NextChunk()) {
-      return kStreamIOError;
+    if (input->GetIdxInsideChunk() == input->chunk_size() && input->has_chunk_left()) {
+      bool ok = input->NextChunk();
+      if (!ok) {
+        return kStreamIOError;
+      }
     }
 
     if (!input->has_chunk_left()) {
@@ -211,15 +242,14 @@ StreamStates ZstdCompressor::Compress(InputAbstract *input, cvmfs::Sink *output,
 
       remaining = ZSTD_compressStream2(stream_, &outBuffer, &inBuffer, mode);
       if (ZSTD_isError(remaining)) {
-        ZSTD_freeCCtx(stream_);
         is_healthy_ = false;
         return kStreamDataError;
       }
+      input->SetIdxInsideChunk(inBuffer.pos);
       const size_t have = outBuffer.pos;
       const int64_t written = output->Write(out, have);
 
       if (written != static_cast<int64_t>(have)) {
-        ZSTD_freeCCtx(stream_);
         is_healthy_ = false;
         return kStreamIOError;
       }

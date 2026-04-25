@@ -33,7 +33,30 @@ Compressor* EchoCompressor::Clone() {
   return new EchoCompressor(zip::kNoCompression);
 }
 
-StreamStates EchoCompressor::CompressStream(InputAbstract *input,
+StreamStates EchoCompressor::StreamingStep(InputAbstract* input,
+                                           cvmfs::MemSink* output,
+                                           const bool flush) {
+  const size_t have = input->chunk_size() - input->GetIdxInsideChunk();
+  const size_t can_write = output->size() - output->pos();
+  const size_t gonna_write = std::min(have, can_write);
+  if (gonna_write == 0) {
+    assert(flush);
+    return kStreamEnd;
+  }
+  const int64_t written = output->Write(input->chunk() + input->GetIdxInsideChunk(), gonna_write);
+  if (written < 0) {
+    return kStreamIOError;
+  }
+  input->SetIdxInsideChunk(input->GetIdxInsideChunk() + written);
+  if (!input->HasInputLeftInChunk() && !input->has_chunk_left() && flush) {
+    return kStreamEnd;
+  } else {
+    return kStreamContinue;
+  }
+}
+
+#if 0
+StreamStates EchoCompressor::CompressStreamHard(InputAbstract *input,
                                 cvmfs::MemSink *output, const bool /*flush*/) {
   if (!is_healthy_) {
     return kStreamError;
@@ -65,6 +88,7 @@ StreamStates EchoCompressor::CompressStream(InputAbstract *input,
   output_full_ = false;
   return kStreamEnd;
 }
+#endif
 
 // bool EchoCompressor::CompressStream(
 //   const bool /*flush*/,
@@ -90,17 +114,20 @@ StreamStates EchoCompressor::Compress(InputAbstract *input,
   }
 
   do {
-    if (!input->NextChunk()) {
-      return kStreamIOError;
+    if (input->GetIdxInsideChunk() == input->chunk_size() && input->has_chunk_left()) {
+      bool ok = input->NextChunk();
+      if (!ok) {
+        return kStreamIOError;
+      }
     }
 
     const size_t have = input->chunk_size();
-    const int64_t written = output->Write(input->chunk(), have);
-
-    if (written != static_cast<int64_t>(have)) {
+    const int64_t written = output->Write(input->chunk() + input->GetIdxInsideChunk(), have);
+    if (written < 0) {
       is_healthy_ = false;
       return kStreamIOError;
     }
+    input->SetIdxInsideChunk(input->GetIdxInsideChunk() + written);
   } while (input->has_chunk_left());
 
   output->Flush();
@@ -119,17 +146,20 @@ StreamStates EchoCompressor::Compress(InputAbstract *input, cvmfs::Sink *output,
   shash::Init(hash_context);
 
   do {
-    if (!input->NextChunk()) {
-      return kStreamIOError;
+    if (input->GetIdxInsideChunk() == input->chunk_size() && input->has_chunk_left()) {
+      bool ok = input->NextChunk();
+      if (!ok) {
+        return kStreamIOError;
+      }
     }
 
     const size_t have = input->chunk_size();
-    const int64_t written = output->Write(input->chunk(), have);
-
-    if (written != static_cast<int64_t>(have)) {
+    const int64_t written = output->Write(input->chunk() + input->GetIdxInsideChunk(), have);
+    if (written < 0) {
       is_healthy_ = false;
       return kStreamIOError;
     }
+    input->SetIdxInsideChunk(input->GetIdxInsideChunk() + written);
     shash::Update(input->chunk(), have, hash_context);
   } while (input->has_chunk_left());
 

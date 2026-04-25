@@ -80,7 +80,7 @@ StreamStates ZstdDecompressor::DecompressStream(InputAbstract *input,
       const size_t have = outBuffer.pos;
       const int64_t written = output->Write(out, have);
 
-      if ((written < 0) || written != static_cast<int64_t>(have)) {
+      if (written < 0) {
         is_healthy_ = false;
         return kStreamIOError;
       }

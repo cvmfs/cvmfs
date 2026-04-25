@@ -101,6 +101,7 @@ class InputAbstract {
   }
   virtual void SetIdxInsideChunk(const size_t idx) {
     assert(idx_inside_chunk_ <= chunk_size_);
+    assert(idx <= chunk_size_);
     idx_inside_chunk_ = idx;
     assert(idx_inside_chunk_ <= chunk_size_);
   }
