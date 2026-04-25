@@ -125,6 +125,12 @@ bool TreeCountersBase<FieldT>::ReadFromDatabase(const CatalogDatabase &database,
 template<typename FieldT>
 bool TreeCountersBase<FieldT>::WriteToDatabase(
     const CatalogDatabase &database) const {
+  // NOTE: this method is always called from WritableCatalog::UpdateCounters(),
+  // which asserts dirty_ == true.  dirty_ is set by SetDirty(), which opens
+  // an explicit SQLite transaction via WritableCatalog::Transaction().  All 24
+  // SqlUpdateCounter::Execute() calls below therefore already execute inside
+  // that outer transaction and are committed together by WritableCatalog::Commit().
+  // No additional SAVEPOINT/RELEASE is needed here.
   bool retval = true;
 
   const FieldsMap map = GetFieldsMap();

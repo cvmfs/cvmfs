@@ -435,6 +435,51 @@ while VACUUM is in progress.
 
 ---
 
+## Change 12 — Counter updates already batched by outer catalog transaction
+
+**Files:** `cvmfs/catalog_counters_impl.h`, `cvmfs/catalog_rw.cc`
+
+### Analysis
+
+`TreeCountersBase<FieldT>::WriteToDatabase()` fires 24 `SqlUpdateCounter::Execute()`
+calls — one per counter column.  The na&iuml;ve reading suggests that, without an
+enclosing transaction, each call triggers SQLite's implicit transaction machinery
+(BEGIN → UPDATE → COMMIT → journal flush), producing 1,200 round-trips for a
+50-catalog publish.
+
+### Why no additional transaction is needed
+
+`WriteToDatabase()` is only ever called from `WritableCatalog::UpdateCounters()`,
+which asserts `dirty_ == true`.  The `dirty_` flag is set by
+`WritableCatalog::SetDirty()`, which immediately opens a catalog-wide SQLite
+transaction via `WritableCatalog::Transaction()` (a `BEGIN;` statement).
+All 24 counter UPDATEs therefore execute inside that outer transaction and are
+flushed together by the subsequent `WritableCatalog::Commit()` call.
+
+Adding an inner `BeginTransaction()` would issue a nested `BEGIN;`, which
+SQLite rejects with `SQLITE_ERROR: cannot start a transaction within a
+transaction`, causing the `assert(retval)` in `UpdateCounters()` to fire.
+
+### Outcome
+
+The 24 → 1 transaction consolidation is already achieved by the outer catalog
+transaction.  No change to `WriteToDatabase()` itself is required; a clarifying
+comment has been added to document the invariant:
+
+```cpp
+// NOTE: always called inside the outer transaction opened by SetDirty().
+// All 24 UPDATEs are committed together by WritableCatalog::Commit().
+// No additional SAVEPOINT/RELEASE is needed here.
+```
+
+### Effect
+
+Same as if an explicit inner transaction were added — 50 BEGIN/COMMIT pairs
+for a 50-catalog publish instead of 1,200 — but via the outer transaction that
+was already in place rather than a nested one that would have failed.
+
+---
+
 ## Performance Estimates
 
 ### Reference workload
