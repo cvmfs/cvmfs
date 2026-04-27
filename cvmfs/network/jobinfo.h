@@ -37,12 +37,6 @@ enum DataTubeAction {
   kActionDecompress
 };
 
-enum DecompressorType {
-  kCreateNone,
-  kCreateZlib,
-  kCreateEcho
-};
-
 /**
  * Wrapper for the data tube to transfer data from CallbackCurlData() that is
  * executed in MainDownload() Thread to Fetch() called by a fuse thread
@@ -90,11 +84,9 @@ class JobInfo {
   const std::string *extra_info_;
 
   // decompression
-  DecompressorType decompressor_type_;  // ONLY change using SetDecompressor()
+  zip::Algorithm decompressor_alg_;  // ONLY change using SetDecompressor()
   cvmfs::Sink *sink_;
-  zip::Decompressor *active_decomp_;
-  UniquePtr<zip::Decompressor> decomp_zlib_;
-  UniquePtr<zip::Decompressor> decomp_echo_;
+  UniquePtr<zip::Decompressor> decomp_;
 
   // Allow byte ranges to be specified.
   off_t range_offset_;
@@ -123,13 +115,16 @@ class JobInfo {
 
   // TODO(heretherebedragons) c++11 allows to delegate constructors (N1986)
   // Replace Init() with JobInfo() that is called by the other constructors
-  void Init(const DecompressorType decompressor_type);
+  void Init(zip::Algorithm decompressor_alg);
 
  public:
   /**
    * Sink version: downloads entire data chunk where URL u points to
    */
-  JobInfo(const std::string *u, const bool c, const bool ph,
+  JobInfo(const std::string *u, const bool compressed, const bool ph,
+          const shash::Any *h, cvmfs::Sink *s);
+
+  JobInfo(const std::string *u, zip::Algorithm compression, const bool ph,
           const shash::Any *h, cvmfs::Sink *s);
 
   /**
@@ -193,7 +188,6 @@ class JobInfo {
   Tube<DataTubeElement> *GetDataTubePtr() { return data_tube_.weak_ref(); }
 
   const std::string* url() const { return url_; }
-  bool decompressor_type() const { return decompressor_type_; }
   bool probe_hosts() const { return probe_hosts_; }
   bool head_request() const { return head_request_; }
   bool follow_redirects() const { return follow_redirects_; }
@@ -233,7 +227,7 @@ class JobInfo {
 
 
   void SetUrl(const std::string *url) { url_ = url; }
-  void SetDecompressor(const DecompressorType decompressor_type);
+  void SetDecompressor(zip::Algorithm decompressor_alg);
   void SetProbeHosts(bool probe_hosts) { probe_hosts_ = probe_hosts; }
   void SetHeadRequest(bool head_request) { head_request_ = head_request; }
   void SetFollowRedirects(bool follow_redirects)
@@ -282,7 +276,7 @@ class JobInfo {
   void SetAllowFailure(bool allow_failure) { allow_failure_ = allow_failure; }
 
   // needed for fetch.h ThreadLocalStorage
-  JobInfo() { Init(kCreateNone); }
+  JobInfo() { Init(zip::Algorithm::kNoCompression); }
 };  // JobInfo
 
 }  // namespace download

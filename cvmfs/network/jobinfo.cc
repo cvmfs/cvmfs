@@ -12,13 +12,14 @@ namespace download {
 
 atomic_int64 JobInfo::next_uuid = 0;
 
-JobInfo::JobInfo(const std::string *u, const bool c, const bool ph,
+JobInfo::JobInfo(const std::string *u, const bool compressed, const bool ph,
          const shash::Any *h, cvmfs::Sink *s) {
-  if (c) {
-    Init(kCreateZlib);
-  } else {
-    Init(kCreateEcho);
-  }
+  JobInfo(u, compressed ? zip::Algorithm::kDefault : zip::Algorithm::kNoCompression, ph, h, s);
+}
+
+JobInfo::JobInfo(const std::string *u, zip::Algorithm compression, const bool ph,
+         const shash::Any *h, cvmfs::Sink *s) {
+  Init(compression);
 
   url_ = u;
   probe_hosts_ = ph;
@@ -27,7 +28,7 @@ JobInfo::JobInfo(const std::string *u, const bool c, const bool ph,
 }
 
 JobInfo::JobInfo(const std::string *u, const bool ph) {
-  Init(kCreateNone);
+  Init(zip::kNoCompression);
 
   url_ = u;
   probe_hosts_ = ph;
@@ -42,41 +43,17 @@ bool JobInfo::IsFileNotFound() {
   return http_code_ == 404;
 }
 
-void JobInfo::SetDecompressor(const DecompressorType decompressor_type) {
-  if (decompressor_type_ != decompressor_type) {
-    decompressor_type_ = decompressor_type;
-
-    switch (decompressor_type_) {
-      case kCreateNone:
-        active_decomp_ = NULL;
-      break;
-      case kCreateZlib:
-        if (!decomp_zlib_.IsValid()) {
-          decomp_zlib_ = zip::Decompressor::Construct(zip::kZlibDefault);
-        }
-        active_decomp_ = decomp_zlib_.weak_ref();
-      break;
-      case kCreateEcho:
-        if (!decomp_echo_.IsValid()) {
-          decomp_echo_ = zip::Decompressor::Construct(zip::kNoCompression);
-        }
-        active_decomp_ = decomp_echo_.weak_ref();
-      break;
-    }
-  }
+void JobInfo::SetDecompressor(zip::Algorithm decompressor_alg) {
+  decompressor_alg_ = decompressor_alg;
+  decomp_ = zip::Decompressor::Construct(decompressor_alg);
 }
 
 bool JobInfo::ResetDecompression() {
-  if (active_decomp_ == NULL) {
-    return true;
-  }
-  return active_decomp_->Reset();
+  return decomp_->Reset();
 }
 
 bool JobInfo::DecompressToSink(zip::InputAbstract *in) {
-  assert(active_decomp_ != NULL);
-
-  const zip::StreamStates ret = active_decomp_->DecompressStream(in, sink_);
+  const zip::StreamStates ret = decomp_->DecompressStream(in, sink_);
 
   switch (ret) {
     case zip::kStreamEnd:
@@ -86,32 +63,32 @@ bool JobInfo::DecompressToSink(zip::InputAbstract *in) {
     case zip::kStreamDataError:
       LogCvmfs(kLogDownload, kLogSyslogErr,
                         "(id %" PRId64 ") %s failed for input %s: bad data",
-                        id_, active_decomp_->Describe().c_str(), url_->c_str());
+                        id_, decomp_->Describe().c_str(), url_->c_str());
       SetErrorCode(kFailBadData);
     break;
     case zip::kStreamIOError:
       LogCvmfs(kLogDownload, kLogSyslogErr,
                       "(id %" PRId64 ") %s failed for input %s: local IO error",
-                      id_, active_decomp_->Describe().c_str(), url_->c_str());
+                      id_, decomp_->Describe().c_str(), url_->c_str());
       SetErrorCode(kFailLocalIO);
     break;
     case zip::kStreamError:
       LogCvmfs(kLogDownload, kLogSyslogErr,
                     "(id %" PRId64 ") %s failed for input %s: unhealthy status",
-                    id_, active_decomp_->Describe().c_str(), url_->c_str());
+                    id_, decomp_->Describe().c_str(), url_->c_str());
       SetErrorCode(kFailLocalIO);
     break;
     default:
       LogCvmfs(kLogDownload, kLogSyslogErr,
                     "(id %" PRId64 ") %s failed for input %s: unknown error %d",
-                    id_, active_decomp_->Describe().c_str(), url_->c_str(), ret);
+                    id_, decomp_->Describe().c_str(), url_->c_str(), ret);
       SetErrorCode(kFailLocalIO);
   }
 
   return false;
 }
 
-void JobInfo::Init(const DecompressorType decompressor_type) {
+void JobInfo::Init(zip::Algorithm decompressor_alg) {
   id_ = atomic_xadd64(&next_uuid, 1);
   pipe_job_results = NULL;
   url_ = NULL;
@@ -148,9 +125,7 @@ void JobInfo::Init(const DecompressorType decompressor_type) {
 
   allow_failure_ = false;
 
-  decompressor_type_ = kCreateNone;
-  active_decomp_ = NULL;
-  SetDecompressor(decompressor_type);
+  SetDecompressor(decompressor_alg);
 }
 
 }  // namespace download
