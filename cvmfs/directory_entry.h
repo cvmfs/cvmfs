@@ -114,7 +114,7 @@ class DirectoryEntryBase {
     , has_xattrs_(false)
     , is_external_file_(false)
     , is_direct_io_(false)
-    , compression_algorithm_(zip::kZlibDefault)
+    , compression_algorithm_(zip::kDefault)
     { }
 
   inline bool IsRegular() const                 { return S_ISREG(mode_); }

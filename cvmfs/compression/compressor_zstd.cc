@@ -19,7 +19,7 @@ using namespace std;  // NOLINT
 namespace zip {
 
 bool ZstdCompressor::WillHandle(const zip::Algorithms &alg) {
-  return alg == kZstdDefault;
+  return alg == kZstd;
 }
 
 
@@ -39,7 +39,7 @@ ZstdCompressor::ZstdCompressor(const Algorithms &alg) :
  * (i.e. after creation, but before first call to ZSTD_compressContinue()).
  */
 Compressor* ZstdCompressor::Clone() {
-  ZstdCompressor* other = new ZstdCompressor(zip::kZstdDefault);
+  ZstdCompressor* other = new ZstdCompressor(zip::kZstd);
 
   // WARNING WARNING NOT IMPLEMENTED
 

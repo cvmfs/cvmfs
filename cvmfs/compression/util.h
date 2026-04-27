@@ -22,9 +22,11 @@ enum StreamStates {
 
 // Do not change order of algorithms. Used as flags in the catalog
 enum Algorithms {
-  kZlibDefault = 0,
+  kZlib = 0,
   kNoCompression,
-  kZstdDefault,
+  kZstd,
+  kZlibDefault = kZlib,
+  kDefault = kZlib,
 };
 
 /**

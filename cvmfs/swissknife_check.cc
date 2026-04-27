@@ -55,7 +55,7 @@ CommandCheck::CommandCheck()
                             , is_remote_(false) {
   const shash::Any hash_null;
   duplicates_map_.Init(16, hash_null, hasher_any);
-  decomp_zlib_ = zip::Decompressor::Construct(zip::kZlibDefault);
+  decomp_ = zip::Decompressor::Construct(zip::kDefault);
   copy_ = zip::Compressor::Construct(zip::kNoCompression);
 }
 
@@ -700,8 +700,8 @@ string CommandCheck::DecompressPiece(const shash::Any catalog_hash) {
   const string dest = temp_directory_ + "/" + catalog_hash.ToString();
   zip::InputPath in_path(source);
   cvmfs::PathSink out_path(dest);
-  if (decomp_zlib_->DecompressStream(&in_path, &out_path) != zip::kStreamEnd) {
-    assert(decomp_zlib_->Reset());
+  if (decomp_->DecompressStream(&in_path, &out_path) != zip::kStreamEnd) {
+    assert(decomp_->Reset());
     return "";
   }
   return dest;

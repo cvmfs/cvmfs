@@ -27,7 +27,7 @@ const uint64_t CacheManager::kSizeUnknown = uint64_t(-1);
 
 
 CacheManager::CacheManager() : quota_mgr_(new NoopQuotaManager()) {
-  compress_ = zip::Compressor::Construct(zip::kZlibDefault);
+  compress_ = zip::Compressor::Construct(zip::kDefault);
 }
 
 CacheManager::~CacheManager() {

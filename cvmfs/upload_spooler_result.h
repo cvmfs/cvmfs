@@ -26,7 +26,7 @@ struct SpoolerResult {
       const std::string     &local_path  = "",
       const shash::Any      &digest      = shash::Any(),
       const FileChunkList   &file_chunks = FileChunkList(),
-      const zip::Algorithms  compression_alg = zip::kZlibDefault)
+      const zip::Algorithms  compression_alg = zip::kDefault)
     : return_code(return_code)
     , local_path(local_path)
     , content_hash(digest)

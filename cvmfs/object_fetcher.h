@@ -354,7 +354,7 @@ class LocalObjectFetcher :
     : BaseTN(temp_dir)
     , base_path_(base_path) {
     copy_ = zip::Decompressor::Construct(zip::kNoCompression);
-    decomp_zlib_ = zip::Decompressor::Construct(zip::kZlibDefault);
+    decomp_ = zip::Decompressor::Construct(zip::kDefault);
   }
 
   using BaseTN::FetchManifest;  // un-hiding convenience overload
@@ -416,7 +416,7 @@ class LocalObjectFetcher :
     zip::Decompressor *decomp;
 
     if (decompress) {
-      decomp = decomp_zlib_.weak_ref();
+      decomp = decomp_.weak_ref();
     } else {
       decomp = copy_.weak_ref();
     }
@@ -450,7 +450,7 @@ class LocalObjectFetcher :
  private:
   const std::string base_path_;
   UniquePtr<zip::Decompressor> copy_;
-  UniquePtr<zip::Decompressor> decomp_zlib_;
+  UniquePtr<zip::Decompressor> decomp_;
 };
 
 template <class CatalogT, class HistoryT, class ReflogT>

@@ -36,7 +36,7 @@ SyncItem::SyncItem() :
   external_data_(false),
   direct_io_(false),
   graft_chunklist_(NULL),
-  compression_algorithm_(zip::kZlibDefault),
+  compression_algorithm_(zip::kDefault),
   has_compression_algorithm_(false) {}
 
 SyncItem::SyncItem(const std::string  &relative_parent_path,
@@ -58,7 +58,7 @@ SyncItem::SyncItem(const std::string  &relative_parent_path,
   direct_io_(false),
   relative_parent_path_(relative_parent_path),
   graft_chunklist_(NULL),
-  compression_algorithm_(zip::kZlibDefault),
+  compression_algorithm_(zip::kDefault),
   has_compression_algorithm_(false) {
   content_hash_.algorithm = shash::kAny;
 }

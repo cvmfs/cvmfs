@@ -68,7 +68,7 @@ class ChunkJob {
   ChunkJob()
     : suffix(shash::kSuffixNone)
     , hash_algorithm(shash::kAny)
-    , compression_alg(zip::kZlibDefault) {}
+    , compression_alg(zip::kDefault) {}
 
   ChunkJob(const shash::Any &hash, zip::Algorithms compression_alg)
     : suffix(hash.suffix)
@@ -125,8 +125,8 @@ bool                 preload_cache = false;
 string              *preload_cachedir = NULL;
 bool                 inspect_existing_catalogs = false;
 manifest::Reflog    *reflog = NULL;
-UniquePtr<zip::Decompressor> decomp_zlib;
-UniquePtr<zip::Compressor> comp_zlib;
+UniquePtr<zip::Decompressor> decomp;
+UniquePtr<zip::Compressor> comp;
 UniquePtr<zip::Compressor> copy;
 }  // anonymous namespace
 
@@ -188,10 +188,11 @@ static void ReportDownloadError(const download::JobInfo &download_job) {
 static void Store(
   const string &local_path,
   const string &remote_path,
-  const bool compressed_src)
+  zip::Algorithm compressed_src = zip::kDefault
+  )
 {
   if (preload_cache) {
-    if (!compressed_src) {
+    if (compressed_src == zip::kNoCompression) {
       int retval = rename(local_path.c_str(), remote_path.c_str());
       if (retval != 0) {
         PANIC(kLogStderr, "Failed to move '%s' to '%s'", local_path.c_str(),
@@ -207,7 +208,7 @@ static void Store(
       }
       zip::InputPath in_p(local_path);
       cvmfs::FileSink out_f(fdest, true);
-      if (decomp_zlib->DecompressStream(&in_p, &out_f) != zip::kStreamEnd) {
+      if (decomp->DecompressStream(&in_p, &out_f) != zip::kStreamEnd) {
         PANIC(kLogStderr, "Failed to preload %s to %s", local_path.c_str(),
               remote_path.c_str());
       }
@@ -223,7 +224,8 @@ static void Store(
 static void Store(
   const string &local_path,
   const shash::Any &remote_hash,
-  const bool compressed_src = true)
+  zip::Algorithm compressed_src = zip::kDefault
+  )
 {
   Store(local_path, MakePath(remote_hash), compressed_src);
 }
@@ -242,7 +244,7 @@ static void StoreBuffer(const unsigned char *buffer, const unsigned size,
   const zip::StreamStates retval = compress->Compress(&in_mem, &out_f);
   assert(retval == zip::kStreamEnd);
 
-  Store(tmp_file, dest_path, true);
+  Store(tmp_file, dest_path, zip::kDefault);
 }
 
 static void StoreBuffer(const unsigned char *buffer, const unsigned size,
@@ -295,8 +297,7 @@ static void *MainWorker(void *data) {
         PANIC(kLogStderr, "Download error");
       }
       fclose(fchunk);
-      Store(tmp_file, chunk_hash,
-            (compression_alg == zip::kZlibDefault) ? true : false);
+      Store(tmp_file, chunk_hash, compression_alg);
       atomic_inc64(&overall_new);
     }
     if (atomic_xadd64(&overall_chunks, 1) % 1000 == 0)
@@ -426,10 +427,10 @@ bool CommandPull::Pull(const shash::Any   &catalog_hash,
   {  // anonymous namespace to prevent crosses initialization due to gotos
   zip::InputPath in_path(file_catalog_vanilla);
   cvmfs::PathSink out_path(file_catalog);
-  if (decomp_zlib->DecompressStream(&in_path, &out_path) != zip::kStreamEnd) {
+  if (decomp->DecompressStream(&in_path, &out_path) != zip::kStreamEnd) {
     LogCvmfs(kLogCvmfs, kLogStderr, "decompression failure (file %s, hash %s)",
              file_catalog_vanilla.c_str(), catalog_hash.ToString().c_str());
-    decomp_zlib->Reset();
+    decomp->Reset();
     goto pull_cleanup;
   }
   }   // end anonymous namespace
@@ -591,8 +592,8 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   atomic_init64(&overall_new);
   atomic_init64(&chunk_queue);
 
-  decomp_zlib = zip::Decompressor::Construct(zip::kZlibDefault);
-  comp_zlib = zip::Compressor::Construct(zip::kZlibDefault);
+  decomp = zip::Decompressor::Construct(zip::kDefault);
+  comp = zip::Compressor::Construct(zip::kDefault);
   copy = zip::Compressor::Construct(zip::kNoCompression);
 
   const bool     follow_redirects = false;
@@ -761,7 +762,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     zip::InputPath in_path(history_path);
     cvmfs::PathSink out_path(history_db_path);
     const zip::StreamStates ret
-                           = decomp_zlib->DecompressStream(&in_path, &out_path);
+                           = decomp->DecompressStream(&in_path, &out_path);
     assert(ret == zip::kStreamEnd);
     history::History *tag_db = history::SqliteHistory::Open(history_db_path);
     if (NULL == tag_db) {
@@ -846,7 +847,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     if (!Peek(ensemble.manifest->certificate())) {
       StoreBuffer(ensemble.cert_buf,
                   ensemble.cert_size,
-                  ensemble.manifest->certificate(), comp_zlib.weak_ref());
+                  ensemble.manifest->certificate(), comp.weak_ref());
     }
     if (reflog != NULL &&
         !reflog->AddCertificate(ensemble.manifest->certificate())) {
@@ -857,7 +858,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
       const unsigned char *info = reinterpret_cast<const unsigned char *>(
         meta_info.data());
       StoreBuffer(info, meta_info.size(), meta_info_hash,
-                  comp_zlib.weak_ref());
+                  comp.weak_ref());
       if (reflog != NULL && !reflog->AddMetainfo(meta_info_hash)) {
         LogCvmfs(kLogCvmfs, kLogStderr, "Failed to add metainfo to Reflog.");
         goto fini;

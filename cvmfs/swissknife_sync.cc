@@ -9,7 +9,7 @@
  * On the repository side we have a catalogs directory that mimics the
  * shadow directory structure and stores compressed and uncompressed
  * versions of all catalogs.  The raw data are stored in the data
- * subdirectory in zlib-compressed form.  They are named with their SHA-1
+ * subdirectory in compressed form.  They are named with their SHA-1
  * hash of the compressed file (like in CVMFS client cache, but with a
  * 2-level cache hierarchy).  Symlinks from the catalog directory to the
  * data directory form the connection. If necessary, add a .htaccess file
@@ -135,7 +135,7 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
   }
 
   const upload::SpoolerDefinition sd(spooler_definition, hash_algorithm,
-                                     zip::kZlibDefault);
+                                     zip::kDefault);
   UniquePtr<upload::Spooler> spooler(upload::Spooler::Construct(sd));
   assert(spooler.IsValid());
 

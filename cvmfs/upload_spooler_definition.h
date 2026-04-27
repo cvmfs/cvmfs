@@ -37,7 +37,7 @@ struct SpoolerDefinition {
   SpoolerDefinition(
       const std::string& definition_string,
       const shash::Algorithms hash_algorithm,
-      const zip::Algorithms compression_algorithm = zip::kZlibDefault,
+      const zip::Algorithms compression_algorithm = zip::kDefault,
       const bool generate_legacy_bulk_chunks = false,
       const bool use_file_chunking = false,
       const size_t min_file_chunk_size = 0,
@@ -50,7 +50,7 @@ struct SpoolerDefinition {
 
   /**
    * Creates a new SpoolerDefinition based on an existing one.  The new spooler
-   * has compression set to zlib, which is required for catalogs and other meta-
+   * has compression set, which is required for catalogs and other meta-
    * objects.
    */
   SpoolerDefinition Dup2DefaultCompression() const;

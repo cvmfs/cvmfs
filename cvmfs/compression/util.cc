@@ -15,10 +15,12 @@ namespace zip {
  * Aborts if string doesn't match any of the algorithms.
  */
 Algorithms ParseCompressionAlgorithm(const std::string &algorithm_option) {
-  if ((algorithm_option == "default") || (algorithm_option == "zlib"))
-    return kZlibDefault;
+  if (algorithm_option == "default")
+    return kDefault;
+  if (algorithm_option == "zlib")
+    return kZlib;
   if (algorithm_option == "zstd")
-    return kZstdDefault;
+    return kZstd;
   if (algorithm_option == "none")
     return kNoCompression;
   PANIC(kLogStderr, "unknown compression algorithms: %s",
@@ -28,13 +30,13 @@ Algorithms ParseCompressionAlgorithm(const std::string &algorithm_option) {
 
 std::string AlgorithmName(const zip::Algorithms alg) {
   switch (alg) {
-    case kZlibDefault:
+    case kZlib:
       return "zlib";
       break;
     case kNoCompression:
       return "none";
       break;
-    case kZstdDefault:
+    case kZstd:
       return "zstd";
       break;
     // Purposely did not add a 'default' statement here: this will

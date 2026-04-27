@@ -29,12 +29,12 @@ ZlibDecompressor::~ZlibDecompressor() {
 }
 
 bool ZlibDecompressor::WillHandle(const zip::Algorithms &alg) {
-  return alg == kZlibDefault;
+  return alg == kZlib;
 }
 
 
 Decompressor* ZlibDecompressor::Clone() {
-  ZlibDecompressor* other = new ZlibDecompressor(zip::kZlibDefault);
+  ZlibDecompressor* other = new ZlibDecompressor(zip::kZlib);
   assert(stream_.avail_in == 0);
   // Delete the other stream
   int retcode = inflateEnd(&other->stream_);
