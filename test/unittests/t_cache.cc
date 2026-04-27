@@ -43,7 +43,16 @@ class T_CacheManager : public ::testing::Test {
         /*do_refcount=*/false);
     ASSERT_TRUE(alien_cache_mgr_ != NULL);
 
+    refcounted_mgr_tmp_path_ = CreateTempDir("./cvmfs_ut_refcounted_cache_manager");
+    refcounted_cache_mgr_ = PosixCacheManager::Create(
+        refcounted_mgr_tmp_path_, /*alien_cache=*/false,
+        /*rename_workaround=*/PosixCacheManager::kRenameNormal,
+        /*do_refcount=*/true);
+    ASSERT_TRUE(refcounted_cache_mgr_ != NULL);
+
     ASSERT_TRUE(cache_mgr_->CommitFromMem(
+        CacheManager::LabeledObject(hash_null_), NULL, 0));
+    ASSERT_TRUE(refcounted_cache_mgr_->CommitFromMem(
         CacheManager::LabeledObject(hash_null_), NULL, 0));
     unsigned char buf = 'A';
     hash_one_.digest[0] = 1;
@@ -111,7 +120,9 @@ class T_CacheManager : public ::testing::Test {
  protected:
   PosixCacheManager *cache_mgr_;
   PosixCacheManager *alien_cache_mgr_;
+  PosixCacheManager *refcounted_cache_mgr_;
   string tmp_path_;
+  string refcounted_mgr_tmp_path_;
   shash::Any hash_null_;
   shash::Any hash_one_;
   shash::Any hash_page_;
@@ -618,9 +629,21 @@ TEST_F(T_CacheManager, Dup) {
   int fd = cache_mgr_->Open(CacheManager::LabeledObject(hash_null_));
   EXPECT_GE(fd, 0);
   int fd_dup = cache_mgr_->Dup(fd);
-  EXPECT_EQ(fd, fd_dup);
+  EXPECT_NE(fd, fd_dup);
   EXPECT_EQ(0, cache_mgr_->Close(fd));
   EXPECT_EQ(0, cache_mgr_->Close(fd_dup));
+}
+
+
+TEST_F(T_CacheManager, DupRefcounted) {
+  EXPECT_EQ(-EBADF, refcounted_cache_mgr_->Dup(-1));
+  int fd = refcounted_cache_mgr_->Open(CacheManager::LabeledObject(hash_null_));
+  EXPECT_GE(fd, 0);
+  int fd_dup = refcounted_cache_mgr_->Dup(fd);
+  EXPECT_EQ(fd, fd_dup);
+  EXPECT_EQ(0, refcounted_cache_mgr_->Close(fd));
+  EXPECT_EQ(0, refcounted_cache_mgr_->Close(fd_dup));
+  EXPECT_NE(0, refcounted_cache_mgr_->Close(fd_dup));
 }
 
 
