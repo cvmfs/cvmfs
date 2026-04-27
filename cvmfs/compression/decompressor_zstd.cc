@@ -9,6 +9,7 @@
 #include <zstd_errors.h>
 
 #include "decompressor.h"
+#include "util/logging.h"
 
 namespace zip {
 
