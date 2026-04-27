@@ -16,6 +16,7 @@
 #include "duplex_testing.h"
 #include "manifest_fetch.h"
 #include "shortstring.h"
+#include "compression/util.h"
 
 class CacheManager;
 namespace cvmfs {

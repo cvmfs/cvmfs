@@ -53,7 +53,9 @@ cvmfs_server_eliminate_hardlinks() {
     fi
   fi
 
-  local migrate_command="$(__swissknife_cmd dbg) migrate     \
+  local migrate_command="
+    CVMFS_COMPRESSION_ALGORITHM=$CVMFS_COMPRESSION_ALGORITHM \
+    $(__swissknife_cmd dbg) migrate                          \
                               -v 'hardlink'                  \
                               -r $CVMFS_STRATUM0             \
                               $(get_swissknife_proxy)        \

@@ -13,7 +13,7 @@
 #include <string>
 #include <vector>
 
-#include "compression/compression.h"
+#include "compression/compressor.h"
 #include "network/s3fanout.h"
 #include "options.h"
 #include "util/exception.h"

@@ -65,7 +65,7 @@ Fetcher::ThreadLocalStorage *Fetcher::GetTls() {
   tls = new ThreadLocalStorage();
   tls->fetcher = this;
   MakePipe(tls->pipe_wait);
-  tls->download_job.SetCompressed(true);
+
   tls->download_job.SetProbeHosts(true);
   const int retval = pthread_setspecific(thread_local_storage_, tls);
   assert(retval == 0);
@@ -168,8 +168,7 @@ int Fetcher::Fetch(const CacheManager::LabeledObject &object,
     *(tls->download_job.GetPidPtr()) = -1;
     *(tls->download_job.GetInterruptCuePtr()) = NULL;
   }
-  tls->download_job.SetCompressed(object.label.zip_algorithm
-                                  == zlib::kZlibDefault);
+  tls->download_job.SetDecompressor(object.label);
   tls->download_job.SetRangeOffset(object.label.range_offset);
   tls->download_job.SetRangeSize(static_cast<int64_t>(object.label.size));
   download_mgr_->Fetch(&tls->download_job);
@@ -202,6 +201,7 @@ int Fetcher::Fetch(const CacheManager::LabeledObject &object,
            download::Code2Ascii(tls->download_job.error_code()));
   cache_mgr_->AbortTxn(txn);
   backoff_throttle_->Throttle();
+  assert(tls->download_job.ResetDecompression());
   SignalWaitingThreads(-EIO, object.id, tls);
   return -EIO;
 }

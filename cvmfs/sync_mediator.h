@@ -32,7 +32,7 @@
 #include <vector>
 
 #include "catalog_mgr_rw.h"
-#include "compression/compression.h"
+#include "compression/compressor.h"
 #include "file_chunk.h"
 #include "publish/repository.h"
 #include "statistics.h"
@@ -126,7 +126,7 @@ class AbstractSyncMediator {
 
   virtual bool IsExternalData() const = 0;
   virtual bool IsDirectIo() const = 0;
-  virtual zlib::Algorithms GetCompressionAlgorithm() const = 0;
+  virtual zip::Algorithms GetCompressionAlgorithm() const = 0;
 };
 
 /**
@@ -171,7 +171,7 @@ class SyncMediator : public virtual AbstractSyncMediator {
   // sync items
   bool IsExternalData() const { return params_->external_data; }
   bool IsDirectIo() const { return params_->direct_io; }
-  zlib::Algorithms GetCompressionAlgorithm() const {
+  zip::Algorithms GetCompressionAlgorithm() const {
     return params_->compression_alg;
   }
 

@@ -9,6 +9,7 @@
 #include <ctime>
 
 #include "catalog_rw.h"
+#include "compression/decompressor_guess.h"
 #include "crypto/hash.h"
 #include "history_sqlite.h"
 #include "manifest_fetch.h"
@@ -173,7 +174,7 @@ CommandTag::Environment *CommandTag::InitializeEnvironment(
     const bool use_file_chunking = false;
     const bool generate_legacy_bulk_chunks = false;
     const upload::SpoolerDefinition sd(
-        spl_definition, hash_algo, zlib::kZlibDefault,
+        spl_definition, hash_algo, zip::CompressionAlgFromEnv(),
         generate_legacy_bulk_chunks, use_file_chunking, 0, 0, 0,
         session_token_file);
     env->spooler = upload::Spooler::Construct(sd);
@@ -329,16 +330,18 @@ bool CommandTag::UpdateUndoTags(
   return true;
 }
 
-bool CommandTag::FetchObject(const std::string &repository_url,
-                             const shash::Any &object_hash,
-                             const std::string &destination_path) const {
+bool CommandTag::FetchObject(const std::string& repository_url,
+                             const shash::Any& object_hash,
+                             const std::string& destination_path,
+                             zip::Decompressor* decomp) const {
   assert(!object_hash.IsNull());
 
   download::Failures dl_retval;
   const std::string url = repository_url + "/data/" + object_hash.MakePath();
 
   cvmfs::PathSink pathsink(destination_path);
-  download::JobInfo download_object(&url, true, false, &object_hash, &pathsink);
+  download::JobInfo download_object(&url, decomp, false, &object_hash,
+                                    &pathsink);
   dl_retval = download_manager()->Fetch(&download_object);
 
   if (dl_retval != download::kFailOk) {
@@ -366,7 +369,11 @@ history::History *CommandTag::GetHistory(const manifest::Manifest *manifest,
       return NULL;
     }
   } else {
-    if (!FetchObject(repository_url, history_hash, history_path)) {
+    // History is SQLite database so compression format is reliably guessable.
+    // In future, we might have explicit metadata for decomp_alg
+    zip::Decompressor *decomp = new zip::GuessDecompressor(zip::ExpectedContentFormat::kSQLite3);
+
+    if (!FetchObject(repository_url, history_hash, history_path, decomp)) {
       return NULL;
     }
 
@@ -390,7 +397,12 @@ catalog::Catalog *CommandTag::GetCatalog(const std::string &repository_url,
                                          const std::string catalog_path,
                                          const bool read_write) const {
   assert(shash::kSuffixCatalog == catalog_hash.suffix);
-  if (!FetchObject(repository_url, catalog_hash, catalog_path)) {
+
+  // Catalogs are SQLite databases so compression format is reliably guessable.
+  // In future, we might have explicit metadata for decomp_alg
+  zip::Decompressor *decomp = new zip::GuessDecompressor(zip::ExpectedContentFormat::kSQLite3);
+
+  if (!FetchObject(repository_url, catalog_hash, catalog_path, decomp)) {
     return NULL;
   }
 

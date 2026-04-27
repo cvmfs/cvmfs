@@ -11,8 +11,12 @@
 #include <cstdlib>
 #include <string>
 
-#include "compression/compression.h"
+#include "compression/compressor.h"
+#include "compression/input_cache.h"
 #include "crypto/hash.h"
+#include "directory_entry.h"
+#include "network/download.h"
+#include "network/sink_null.h"
 #include "quota.h"
 #include "util/posix.h"
 #include "util/smalloc.h"
@@ -21,9 +25,9 @@ using namespace std;  // NOLINT
 
 const uint64_t CacheManager::kSizeUnknown = uint64_t(-1);
 
-
-CacheManager::CacheManager() : quota_mgr_(new NoopQuotaManager()) { }
-
+CacheManager::CacheManager()
+    : quota_mgr_(new NoopQuotaManager()) {
+}
 
 CacheManager::~CacheManager() { delete quota_mgr_; }
 
@@ -31,39 +35,25 @@ CacheManager::~CacheManager() { delete quota_mgr_; }
 /**
  * Compresses and checksums the file pointed to by fd.  The hash algorithm needs
  * to be set in id.
+ * Caller keeps ownership of `comp`.
  */
-int CacheManager::ChecksumFd(int fd, shash::Any *id) {
-  shash::ContextPtr hash_context(id->algorithm);
-  hash_context.buffer = alloca(hash_context.size);
-  shash::Init(hash_context);
+int CacheManager::ChecksumFd(int fd, shash::Any *id, zip::Compressor *comp) {
+  unsigned char buf[10];
+  // TODO(heretherebedragons) if it is ok to accept a generic IO error from the
+  // compressor then we do not need this extra write (e.g. -EIO)
+  const int64_t check_read = Pread(fd, buf, 10, 0);
 
-  z_stream strm;
-  zlib::CompressInit(&strm);
-  zlib::StreamStates retval;
+  if (check_read < 0) {
+    return check_read;
+  }
 
-  unsigned char buf[4096];
-  uint64_t pos = 0;
-  bool eof;
-
-  do {
-    const int64_t nbytes = Pread(fd, buf, 4096, pos);
-    if (nbytes < 0) {
-      zlib::CompressFini(&strm);
-      return nbytes;
-    }
-    pos += nbytes;
-    eof = nbytes < 4096;
-    retval = zlib::CompressZStream2Null(buf, nbytes, eof, &strm, &hash_context);
-    if (retval == zlib::kStreamDataError) {
-      zlib::CompressFini(&strm);
-      return -EINVAL;
-    }
-  } while (!eof);
-
-  zlib::CompressFini(&strm);
-  if (retval != zlib::kStreamEnd)
+  zip::InputCache input(this, fd, 4096);
+  cvmfs::NullSink out_null;
+  const zip::StreamStates retval = comp->Compress(&input, &out_null, id);
+  if (retval != zip::kStreamEnd) {
     return -EINVAL;
-  shash::Final(hash_context, id);
+  }
+
   return 0;
 }
 

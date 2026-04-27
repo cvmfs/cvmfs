@@ -12,7 +12,7 @@
 #include <string>
 #include <vector>
 
-#include "compression/compression.h"
+#include "compression/compressor.h"
 #include "crypto/hash.h"
 #include "file_chunk.h"
 #include "ingestion/chunk_detector.h"
@@ -37,7 +37,7 @@ class FileItem : SingleCopy {
                     uint64_t min_chunk_size = 4 * 1024 * 1024,
                     uint64_t avg_chunk_size = 8 * 1024 * 1024,
                     uint64_t max_chunk_size = 16 * 1024 * 1024,
-                    zlib::Algorithms compression_algorithm = zlib::kZlibDefault,
+                    zip::Algorithms compression_algorithm = zip::kDefault,
                     shash::Algorithms hash_algorithm = shash::kSha1,
                     shash::Suffix hash_suffix = shash::kSuffixNone,
                     bool may_have_chunks = true,
@@ -57,7 +57,7 @@ class FileItem : SingleCopy {
   uint64_t size() { return size_; }
   Xor32Detector *chunk_detector() { return &chunk_detector_; }
   shash::Any bulk_hash() { return bulk_hash_; }
-  zlib::Algorithms compression_algorithm() { return compression_algorithm_; }
+  zip::Algorithms compression_algorithm() { return compression_algorithm_; }
   shash::Algorithms hash_algorithm() { return hash_algorithm_; }
   shash::Suffix hash_suffix() { return hash_suffix_; }
   bool may_have_chunks() { return may_have_chunks_; }
@@ -91,7 +91,7 @@ class FileItem : SingleCopy {
   static const char kQuitBeaconMarker = '\0';
 
   UniquePtr<IngestionSource> source_;
-  const zlib::Algorithms compression_algorithm_;
+  const zip::Algorithms compression_algorithm_;
   const shash::Algorithms hash_algorithm_;
   const shash::Suffix hash_suffix_;
   const bool has_legacy_bulk_chunk_;
@@ -138,7 +138,7 @@ class ChunkItem : SingleCopy {
   // An active zlib compression stream requires 256kB of memory.  Therefore,
   // we create it only for the absolutely necessary duration and free the space
   // afterwards.
-  zlib::Compressor *GetCompressor();
+  zip::Compressor *GetCompressor();
   void ReleaseCompressor();
 
   shash::ContextPtr hash_ctx() { return hash_ctx_; }
@@ -166,7 +166,7 @@ class ChunkItem : SingleCopy {
    * Deleted by the uploader.
    */
   upload::UploadStreamHandle *upload_handle_;
-  UniquePtr<zlib::Compressor> compressor_;
+  UniquePtr<zip::Compressor> compressor_;
   shash::ContextPtr hash_ctx_;
   shash::Any hash_value_;
   unsigned char hash_ctx_buffer_[shash::kMaxContextSize];

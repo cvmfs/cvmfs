@@ -361,8 +361,7 @@ bool CompressionMagicXattr::PrepareValueFenced() {
 }
 
 void CompressionMagicXattr::FinalizeValue() {
-  result_pages_.push_back(
-      zlib::AlgorithmName(dirent_->compression_algorithm()));
+  result_pages_.push_back(zip::AlgorithmName(dirent_->compression_algorithm()));
 }
 
 bool DirectIoMagicXattr::PrepareValueFenced() { return dirent_->IsRegular(); }
@@ -458,10 +457,13 @@ void LHashMagicXattr::FinalizeValue() {
     result = "Not in cache";
   } else {
     shash::Any hash(dirent_->checksum().algorithm);
-    const int retval_i = xattr_mgr_->mount_point()
-                             ->file_system()
-                             ->cache_mgr()
-                             ->ChecksumFd(fd, &hash);
+    zip::Compressor *comp = zip::Compressor::Construct(
+        dirent_->compression_algorithm());
+    int retval_i = xattr_mgr_->mount_point()
+                       ->file_system()
+                       ->cache_mgr()
+                       ->ChecksumFd(fd, &hash, comp);
+    delete comp;
     if (retval_i != 0)
       result = "I/O error (" + StringifyInt(retval_i) + ")";
     else

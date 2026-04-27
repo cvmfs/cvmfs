@@ -11,29 +11,58 @@
 #include "jobinfo.h"
 #include "util/capabilities.h"
 #include "util/logging.h"
+
+#include <inttypes.h>
+
+#include "cache.h"
+#include "compression/decompressor_guess.h"
 #include "util/string.h"
 
 namespace download {
 
 atomic_int64 JobInfo::next_uuid = 0;
 
-JobInfo::JobInfo(const std::string *u, const bool c, const bool ph,
-                 const shash::Any *h, cvmfs::Sink *s) {
+JobInfo::JobInfo()
+{
   Init();
+  SetDecompressor(zip::Algorithm::kNoCompression);
+}
+
+JobInfo::JobInfo(const std::string *u, zip::DecompressionAlg decompressor_alg,
+                 const bool ph, const shash::Any *h, cvmfs::Sink *s) {
+  Init();
+  SetDecompressor(decompressor_alg);
 
   url_ = u;
-  compressed_ = c;
   probe_hosts_ = ph;
+  head_request_ = false;
   expected_hash_ = h;
   sink_ = s;
 }
 
-JobInfo::JobInfo(const std::string *u, const bool ph) {
+JobInfo::JobInfo(const std::string* u, zip::Decompressor* decomp, const bool ph,
+                 const shash::Any* h, cvmfs::Sink* s)
+{
   Init();
+  SetDecompressor(decomp);
+
+  url_ = u;
+  probe_hosts_ = ph;
+  head_request_ = false;
+  expected_hash_ = h;
+  sink_ = s;
+}
+
+JobInfo::JobInfo(const std::string *u, const bool ph)
+{
+  Init();
+  SetDecompressor(zip::kNoCompression);
 
   url_ = u;
   probe_hosts_ = ph;
   head_request_ = true;
+  expected_hash_ = NULL;
+  sink_ = NULL;
 }
 
 
@@ -44,11 +73,66 @@ bool JobInfo::IsFileNotFound() {
   return http_code_ == 404;
 }
 
+void JobInfo::SetDecompressor(zip::Algorithm decompressor_alg) {
+  decomp_ = zip::Decompressor::Construct(decompressor_alg);
+}
+
+void JobInfo::SetDecompressor(zip::Decompressor* decomp) {
+  decomp_ = decomp;
+}
+
+void JobInfo::SetDecompressor(const CacheManager::Label &label) {
+  if (label.zip_algorithm == zip::Algorithm::kGuessDecompression) {
+    decomp_ = new zip::GuessDecompressor(label);
+  } else {
+    SetDecompressor(label.zip_algorithm);
+  }
+}
+
+bool JobInfo::ResetDecompression() {
+  return decomp_->Reset();
+}
+
+bool JobInfo::DecompressToSink(zip::InputAbstract *in) {
+  const zip::StreamStates ret = decomp_->DecompressStream(in, sink_);
+
+  switch (ret) {
+    case zip::kStreamEnd:
+    case zip::kStreamContinue:
+      return true;
+    break;
+    case zip::kStreamDataError:
+      LogCvmfs(kLogDownload, kLogSyslogErr,
+                        "(id %" PRId64 ") %s failed for input %s: bad data",
+                        id_, decomp_->Describe().c_str(), url_->c_str());
+      SetErrorCode(kFailBadData);
+    break;
+    case zip::kStreamIOError:
+      LogCvmfs(kLogDownload, kLogSyslogErr,
+                      "(id %" PRId64 ") %s failed for input %s: local IO error",
+                      id_, decomp_->Describe().c_str(), url_->c_str());
+      SetErrorCode(kFailLocalIO);
+    break;
+    case zip::kStreamError:
+      LogCvmfs(kLogDownload, kLogSyslogErr,
+                    "(id %" PRId64 ") %s failed for input %s: unhealthy status",
+                    id_, decomp_->Describe().c_str(), url_->c_str());
+      SetErrorCode(kFailLocalIO);
+    break;
+    default:
+      LogCvmfs(kLogDownload, kLogSyslogErr,
+                    "(id %" PRId64 ") %s failed for input %s: unknown error %d",
+                    id_, decomp_->Describe().c_str(), url_->c_str(), ret);
+      SetErrorCode(kFailLocalIO);
+  }
+
+  return false;
+}
+
 void JobInfo::Init() {
   id_ = atomic_xadd64(&next_uuid, 1);
   pipe_job_results = NULL;
   url_ = NULL;
-  compressed_ = false;
   probe_hosts_ = false;
   head_request_ = false;
   follow_redirects_ = false;
@@ -84,8 +168,6 @@ void JobInfo::Init() {
   current_host_chain_index_ = -1;
 
   allow_failure_ = false;
-
-  memset(&zstream_, 0, sizeof(zstream_));
 }
 
 

@@ -15,7 +15,7 @@
 #include <cstdlib>
 
 #include "catalog_virtual.h"
-#include "compression/compression.h"
+#include "compression/compressor.h"
 #include "crypto/hash.h"
 #include "directory_entry.h"
 #include "json_document.h"

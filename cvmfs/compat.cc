@@ -207,7 +207,7 @@ void Migrate(ChunkTables *old_tables, ::ChunkTables *new_tables) {
     }
     delete old_list;
     const ::FileChunkReflist new_reflist(new_list, old_reflist->path,
-                                         zlib::kZlibDefault, false);
+                                         zip::CompressionAlgFromEnv(), false);
     new_tables->inode2chunks.Insert(inode, new_reflist);
   }
 }
@@ -254,7 +254,7 @@ void Migrate(ChunkTables *old_tables, ::ChunkTables *new_tables) {
     }
     delete old_list;
     const ::FileChunkReflist new_reflist(new_list, old_reflist->path,
-                                         zlib::kZlibDefault, false);
+                                         zip::CompressionAlgFromEnv(), false);
     new_tables->inode2chunks.Insert(inode, new_reflist);
   }
 }

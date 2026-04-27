@@ -10,13 +10,19 @@
 #include <string>
 
 #include "catalog.h"
+#include "compression/decompressor.h"
+#include "compression/decompressor_guess.h"
+#include "compression/input_file.h"
+#include "compression/input_path.h"
 #include "crypto/signature.h"
 #include "history_sqlite.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
 #include "network/download.h"
 #include "network/sink_file.h"
+#include "network/sink_path.h"
 #include "reflog.h"
+#include "util/pointer.h"
 #include "util/posix.h"
 
 /**
@@ -127,7 +133,9 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
 
     // download the history hash
     std::string path;
-    const Failures retval = Fetch(effective_history_hash, &path);
+    const Failures retval =
+        Fetch(effective_history_hash, &path,
+              new zip::GuessDecompressor(zip::ExpectedContentFormat::kSQLite3));
     if (retval != kFailOk) {
       return retval;
     }
@@ -162,7 +170,10 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
     assert(catalog_hash.suffix == shash::kSuffixCatalog);
 
     std::string path;
-    const Failures retval = Fetch(catalog_hash, &path);
+
+    const Failures retval =
+        Fetch(catalog_hash, &path,
+              new zip::GuessDecompressor(zip::ExpectedContentFormat::kSQLite3));
     if (retval != kFailOk) {
       return retval;
     }
@@ -182,9 +193,10 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
     assert(reflog_hash.suffix == shash::kSuffixNone);
 
     std::string tmp_path;
-    const bool decompress = false;
     const bool nocache = true;
-    Failures failure = Fetch(kReflogFilename, decompress, nocache, &tmp_path);
+    auto decomp = zip::Decompressor::Construct(zip::DecompressionAlg::kNoCompression);
+    // decomp freeing responsibility is transferred to Fetch()
+    Failures failure = Fetch(kReflogFilename, decomp, nocache, &tmp_path);
     if (failure != kFailOk) {
       return failure;
     }
@@ -271,16 +283,34 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
    * @param file_path    temporary file path to store the download result
    * @return             failure code (if not kFailOk, file_path is invalid)
    */
+#if 0
   Failures Fetch(const shash::Any &object_hash, std::string *file_path) {
     return static_cast<DerivedT *>(this)->Fetch(object_hash, file_path);
   }
+#endif
+  Failures Fetch(const shash::Any& object_hash, std::string* file_path,
+                 zip::DecompressionAlg decomp_alg) {
+    return static_cast<DerivedT*>(this)->Fetch(object_hash, file_path,
+                                               decomp_alg);
+  }
 
   Failures Fetch(const std::string &relative_path,
-                 const bool decompress,
+                 zip::DecompressionAlg decomp_alg,
                  const bool nocache,
                  std::string *file_path) {
-    return static_cast<DerivedT *>(this)->Fetch(relative_path, decompress,
-                                                nocache, file_path);
+    return static_cast<DerivedT *>(this)->Fetch(
+        relative_path, decomp_alg, nocache, file_path);
+  }
+
+  Failures Fetch(const shash::Any &object_hash, std::string *file_path,
+                 zip::Decompressor *decomp) {
+    return static_cast<DerivedT *>(this)->Fetch(object_hash, file_path, decomp);
+  }
+
+  Failures Fetch(const std::string &relative_path, zip::Decompressor *decomp,
+                 const bool nocache, std::string *file_path) {
+    return static_cast<DerivedT *>(this)->Fetch(
+        relative_path, decomp, nocache, file_path);
   }
 
   /**
@@ -338,8 +368,30 @@ class LocalObjectFetcher
    * @param base_path  the path to the repository's backend storage
    * @param temp_dir   location to store decompressed tmp data
    */
-  LocalObjectFetcher(const std::string &base_path, const std::string &temp_dir)
-      : BaseTN(temp_dir), base_path_(base_path) { }
+  [[deprecated("Pass zip::Decompressor object to Fetch() instead")]]
+  LocalObjectFetcher(const std::string &base_path,
+                     const std::string &temp_dir,
+                     zip::Algorithm decomp_alg)
+    : BaseTN(temp_dir)
+    , base_path_(base_path) {
+    decomp_ = zip::Decompressor::Construct(decomp_alg);
+  }
+
+  [[deprecated("Pass zip::Decompressor object to Fetch() instead")]]
+  LocalObjectFetcher(const std::string &base_path,
+                     const std::string &temp_dir,
+                     zip::Decompressor* decomp)
+    : BaseTN(temp_dir)
+    , base_path_(base_path)
+    , decomp_(decomp)
+  { }
+
+  LocalObjectFetcher(const std::string &base_path,
+                     const std::string &temp_dir)
+    : BaseTN(temp_dir)
+    , base_path_(base_path)
+    , decomp_(NULL)
+  { }
 
   using BaseTN::FetchManifest;  // un-hiding convenience overload
   Failures FetchManifest(manifest::Manifest **manifest) {
@@ -356,21 +408,41 @@ class LocalObjectFetcher
     return "file://" + BuildPath(BuildRelativePath(hash));
   }
 
-  Failures Fetch(const shash::Any &object_hash, std::string *file_path) {
+  Failures Fetch(const shash::Any& object_hash, std::string* file_path) {
+    return Fetch(object_hash, file_path, decomp_);
+  }
+
+  Failures Fetch(const shash::Any& object_hash, std::string* file_path,
+                 zip::DecompressionAlg decomp_alg) {
     assert(file_path != NULL);
     file_path->clear();
 
     const std::string relative_path = BuildRelativePath(object_hash);
-    const bool decompress = true;
-    const bool nocache = false;
-    return Fetch(relative_path, decompress, nocache, file_path);
+    const bool        nocache       = false;
+    return Fetch(relative_path, decomp_alg, nocache, file_path);
   }
 
+  Failures Fetch(const shash::Any& object_hash, std::string* file_path,
+                 zip::Decompressor* decomp) {
+    assert(file_path != NULL);
+    file_path->clear();
 
-  Failures Fetch(const std::string &relative_path,
-                 const bool decompress,
-                 const bool /* nocache */,
-                 std::string *file_path) {
+    const std::string relative_path = BuildRelativePath(object_hash);
+    const bool        nocache       = false;
+    return Fetch(relative_path, decomp, nocache, file_path);
+  }
+
+  Failures Fetch(const std::string& relative_path,
+                 zip::DecompressionAlg decomp_alg, const bool nocache,
+                 std::string* file_path) {
+    zip::Decompressor* decomp = zip::Decompressor::Construct(decomp_alg);
+    // decomp freeing responsibility is transferred to Fetch()
+    auto ret = Fetch(relative_path, decomp, nocache, file_path);
+    return ret;
+  }
+
+  Failures Fetch(const std::string& relative_path, zip::Decompressor* decomp,
+                 const bool /* nocache */, std::string* file_path) {
     assert(file_path != NULL);
     file_path->clear();
 
@@ -394,9 +466,11 @@ class LocalObjectFetcher
     }
 
     // decompress or copy the requested object file
-    const bool success = (decompress) ? zlib::DecompressPath2File(source, f)
-                                      : CopyPath2File(source, f);
-    fclose(f);
+    zip::InputPath in_path(source);
+    cvmfs::FileSink out_file(f, true);
+
+    const bool success = (decomp->DecompressStream(&in_path, &out_file)
+                                                            == zip::kStreamEnd);
 
     // check the decompression success and remove the temporary file otherwise
     if (!success) {
@@ -406,6 +480,7 @@ class LocalObjectFetcher
                source.c_str(), file_path->c_str(), errno);
       unlink(file_path->c_str());
       file_path->clear();
+      decomp->Reset();
       return BaseTN::kFailDecompression;
     }
 
@@ -423,6 +498,7 @@ class LocalObjectFetcher
 
  private:
   const std::string base_path_;
+  UniquePtr <zip::Decompressor> decomp_;
 };
 
 template<class CatalogT, class HistoryT, class ReflogT>
@@ -521,22 +597,44 @@ class HttpObjectFetcher : public AbstractObjectFetcher<
     return BuildUrl(BuildRelativeUrl(hash));
   }
 
-  Failures Fetch(const shash::Any &object_hash, std::string *object_file) {
+  Failures Fetch(const shash::Any& object_hash, std::string* object_file,
+                 zip::DecompressionAlg decomp_alg) {
     assert(object_file != NULL);
     assert(!object_hash.IsNull());
 
-    const bool decompress = true;
     const bool nocache = false;
     const std::string url = BuildRelativeUrl(object_hash);
-    return Download(url, decompress, nocache, &object_hash, object_file);
+    return Download(url, decomp_alg, nocache, &object_hash, object_file);
   }
 
   Failures Fetch(const std::string &relative_path,
-                 const bool decompress,
+                 zip::DecompressionAlg decomp_alg,
                  const bool nocache,
                  std::string *file_path) {
     const shash::Any *expected_hash = NULL;
-    return Download(relative_path, decompress, nocache, expected_hash,
+    zip::Decompressor* decomp = zip::Decompressor::Construct(decomp_alg);
+    // decomp freeing responsibility is transferred to Fetch()
+    auto ret =
+        Download(relative_path, decomp, nocache, expected_hash, file_path);
+    return ret;
+  }
+
+  Failures Fetch(const shash::Any& object_hash, std::string* object_file,
+                 zip::Decompressor* decomp) {
+    assert(object_file != NULL);
+    assert(!object_hash.IsNull());
+
+    const bool nocache = false;
+    const std::string url = BuildRelativeUrl(object_hash);
+    return Download(url, decomp, nocache, &object_hash, object_file);
+  }
+
+  Failures Fetch(const std::string &relative_path,
+                 zip::Decompressor* decomp,
+                 const bool         nocache,
+                       std::string *file_path) {
+    const shash::Any *expected_hash = NULL;
+    return Download(relative_path, decomp, nocache, expected_hash,
                     file_path);
   }
 
@@ -550,7 +648,7 @@ class HttpObjectFetcher : public AbstractObjectFetcher<
   }
 
   Failures Download(const std::string &relative_path,
-                    const bool decompress,
+                    zip::Decompressor *decomp,
                     const bool nocache,
                     const shash::Any *expected_hash,
                     std::string *file_path) {
@@ -571,7 +669,7 @@ class HttpObjectFetcher : public AbstractObjectFetcher<
     const std::string url = BuildUrl(relative_path);
     const bool probe_hosts = false;
     cvmfs::FileSink filesink(f);
-    download::JobInfo download_job(&url, decompress, probe_hosts, expected_hash,
+    download::JobInfo download_job(&url, decomp, probe_hosts, expected_hash,
                                    &filesink);
     download_job.SetForceNocache(nocache);
     download::Failures retval = download_manager_->Fetch(&download_job);

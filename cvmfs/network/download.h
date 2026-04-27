@@ -16,7 +16,7 @@
 #include <string>
 #include <vector>
 
-#include "compression/compression.h"
+#include "compression/decompressor.h"
 #include "crypto/hash.h"
 #include "duplex_curl.h"  // IWYU pragma: keep
 #include "duplex_testing.h"

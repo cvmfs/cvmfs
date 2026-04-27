@@ -10,6 +10,10 @@ cvmfs_run_test() {
 
   local scratch_dir=$(pwd)
 
+  # This test has pre-existing assertions expecting certain hashes.
+  # Hence we fixate on the compression algorithm which was the default then.
+  export CVMFS_COMPRESSION_ALGORITHM=zlib
+
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return 10
 

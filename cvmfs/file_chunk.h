@@ -17,7 +17,7 @@
 #include <vector>
 
 #include "bigvector.h"
-#include "compression/compression.h"
+#include "compression/compressor.h"
 #include "crypto/hash.h"
 #include "shortstring.h"
 #include "smallhash.h"
@@ -49,7 +49,7 @@ typedef BigVector<FileChunk> FileChunkList;
 struct FileChunkReflist {
   FileChunkReflist()
       : list(NULL)
-      , compression_alg(zlib::kZlibDefault)
+      , compression_alg(zip::kDefault)
       , external_data(false) { }
   FileChunkReflist(FileChunkList *l,
                    const PathString &p,
@@ -62,7 +62,7 @@ struct FileChunkReflist {
 
   FileChunkList *list;
   PathString path;
-  zlib::Algorithms compression_alg;
+  zip::Algorithms compression_alg;
   bool external_data;
 };
 

@@ -349,6 +349,10 @@ LoadReturn ClientCatalogManager::FetchCatalogByHash(
   CacheManager::Label label;
   label.path = name;
   label.flags = CacheManager::kLabelCatalog;
+  // Catalogs are SQLite so decompression algorithm can be guessed among zlib,
+  // zstd, none.
+  // But in future we may have an explicit metadata.
+  label.zip_algorithm = zip::DecompressionAlg::kGuessDecompression;
   const int fd = fetcher_->Fetch(CacheManager::LabeledObject(hash, label),
                                  alt_root_catalog_path);
   if (fd >= 0) {
@@ -375,6 +379,10 @@ void ClientCatalogManager::StageNestedCatalogByHash(
   CacheManager::Label label;
   label.path = GetCatalogDescription(mountpoint, hash);
   label.flags = CacheManager::kLabelCatalog;
+  // Catalogs are SQLite so decompression algorithm can be guessed among zlib,
+  // zstd, none.
+  // But in future we may have an explicit metadata.
+  label.zip_algorithm = zip::DecompressionAlg::kGuessDecompression;
   const int fd = fetcher_->Fetch(CacheManager::LabeledObject(hash, label));
   if (fd >= 0)
     fetcher_->cache_mgr()->Close(fd);
@@ -444,6 +452,12 @@ void CachedManifestEnsemble::FetchCertificate(const shash::Any &hash) {
   CacheManager::Label label;
   label.flags |= CacheManager::kLabelCertificate;
   label.path = catalog_mgr_->repo_name();
+
+  // Certificates are PEM-formatted so decompression algorithm can be guessed
+  // among zlib, zstd, none.
+  // But in future we may have an explicit metadata.
+  label.zip_algorithm = zip::DecompressionAlg::kGuessDecompression;
+
   uint64_t size;
   const bool retval = cache_mgr_->Open2Mem(
       CacheManager::LabeledObject(hash, label), &cert_buf, &size);

@@ -16,7 +16,7 @@
 #include <vector>
 
 #include "bigvector.h"
-#include "compression/compression.h"
+#include "compression/compressor.h"
 #include "crypto/hash.h"
 #include "shortstring.h"
 #include "util/platform.h"
@@ -122,7 +122,7 @@ class DirectoryEntryBase {
       , has_xattrs_(false)
       , is_external_file_(false)
       , is_direct_io_(false)
-      , compression_algorithm_(zlib::kZlibDefault) { }
+      , compression_algorithm_(zip::kDefault) { }
 
   inline bool IsRegular() const { return S_ISREG(mode_); }
   inline bool IsLink() const { return S_ISLNK(mode_); }
@@ -181,7 +181,7 @@ class DirectoryEntryBase {
     has_xattrs_ = has_xattrs;
   }
 
-  inline zlib::Algorithms compression_algorithm() const {
+  inline zip::Algorithms compression_algorithm() const {
     return compression_algorithm_;
   }
 
@@ -256,7 +256,7 @@ class DirectoryEntryBase {
   bool is_direct_io_;
 
   // The compression algorithm
-  zlib::Algorithms compression_algorithm_;
+  zip::Algorithms compression_algorithm_;
 };
 
 

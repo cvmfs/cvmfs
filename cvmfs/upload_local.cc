@@ -8,7 +8,7 @@
 
 #include <string>
 
-#include "compression/compression.h"
+#include "compression/compressor.h"
 #include "util/logging.h"
 #include "util/posix.h"
 

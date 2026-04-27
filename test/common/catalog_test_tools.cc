@@ -10,9 +10,12 @@
 #include <sstream>
 
 #include "catalog_rw.h"
-#include "compression/compression.h"
+#include "compression/compressor.h"
+#include "compression/input_mem.h"
 #include "crypto/hash.h"
 #include "directory_entry.h"
+#include "network/sink_file.h"
+#include "network/sink_null.h"
 #include "options.h"
 #include "testutil.h"
 #include "util/posix.h"
@@ -450,10 +453,10 @@ bool CatalogTestTool::DirSpecAtRootHash(const shash::Any &root_hash,
 
 CatalogTestTool::~CatalogTestTool() { }
 
-upload::Spooler *CatalogTestTool::CreateSpooler(const std::string &config) {
-  upload::SpoolerDefinition definition(config, shash::kSha1, zlib::kZlibDefault,
-                                       false, true, 4194304, 8388608, 16777216,
-                                       "dummy_token", "dummy_key");
+upload::Spooler* CatalogTestTool::CreateSpooler(const std::string& config) {
+   upload::SpoolerDefinition definition(config, shash::kSha1, zip::kDefault,
+                                        false, true, 4194304, 8388608, 16777216,
+                                        "dummy_token", "dummy_key");
   return upload::Spooler::Construct(definition);
 }
 
@@ -497,9 +500,19 @@ void CatalogTestTool::CreateHistory(string repo_path_,
     ASSERT_TRUE(history->Insert(tag));
   }
   history_hash->suffix = shash::kSuffixHistory;
-  ASSERT_TRUE(zlib::CompressPath2Null(history_path, history_hash));
-  ASSERT_TRUE(zlib::CompressPath2Path(
-      history_path, repo_path_ + "/data/" + history_hash->MakePath()));
+
+  const UniquePtr<zip::Compressor>
+                        compress(zip::Compressor::Construct(zip::kDefault));
+  zip::InputPath input(history_path);
+  cvmfs::NullSink out_null;
+  // TODO(heretherebedragons) for what do we need the hash here?
+  EXPECT_EQ(compress->Compress(&input, &out_null, history_hash),
+            zip::kStreamEnd);
+
+  zip::InputPath in_path(history_path);
+  cvmfs::PathSink out_path(repo_path_ + "/data/" + history_hash->MakePath());
+  const zip::StreamStates retval = compress->Compress(&in_path, &out_path);
+  EXPECT_EQ(retval, zip::kStreamEnd);
 }
 
 
@@ -645,10 +658,20 @@ void CatalogTestTool::CreateKeys(string repo_path_,
   ASSERT_TRUE(SafeWriteToFile(key, repo_path_ + "/testrepo.key", 0600));
 
   hash_cert->suffix = shash::kSuffixCertificate;
-  ASSERT_TRUE(zlib::CompressPath2Null(repo_path_ + "/testrepo.crt", hash_cert));
-  ASSERT_TRUE(
-      zlib::CompressPath2Path(repo_path_ + "/testrepo.crt",
-                              repo_path_ + "/data/" + hash_cert->MakePath()));
+
+  const UniquePtr<zip::Compressor>
+                        compress(zip::Compressor::Construct(zip::kDefault));
+  zip::InputPath in_path(repo_path_ + "/testrepo.crt");
+  cvmfs::NullSink out_null;
+  // TODO(heretherebedragons) for what do we need the hash here?
+  EXPECT_EQ(compress->Compress(&in_path, &out_null, hash_cert),
+            zip::kStreamEnd);
+
+
+  zip::InputPath in_path2(repo_path_ + "/testrepo.crt");
+  cvmfs::PathSink out_path(repo_path_ + "/data/" + hash_cert->MakePath());
+  const zip::StreamStates retval = compress->Compress(&in_path2, &out_path);
+  EXPECT_EQ(retval, zip::kStreamEnd);
 
   *public_key = repo_path_ + string("/testrepo.pub");
 }

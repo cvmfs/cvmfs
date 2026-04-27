@@ -50,7 +50,8 @@
 #include <set>
 #include <utility>
 
-#include "compression/compression.h"
+#include "compression/decompressor.h"
+#include "compression/input_mem.h"
 #include "crypto/hash.h"
 #include "duplex_curl.h"  // IWYU pragma: keep
 #include "interrupt.h"
@@ -273,32 +274,9 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
                   info->hash_context());
   }
 
-  if (info->compressed()) {
-    const zlib::StreamStates retval = zlib::DecompressZStream2Sink(
-        ptr, static_cast<int64_t>(num_bytes), info->GetZstreamPtr(),
-        info->sink());
-    if (retval == zlib::kStreamDataError) {
-      LogCvmfs(kLogDownload, kLogSyslogErr,
-               "(id %" PRId64 ") failed to decompress %s", info->id(),
-               info->url()->c_str());
-      info->SetErrorCode(kFailBadData);
-      return 0;
-    } else if (retval == zlib::kStreamIOError) {
-      LogCvmfs(kLogDownload, kLogSyslogErr,
-               "(id %" PRId64 ") decompressing %s, local IO error", info->id(),
-               info->url()->c_str());
-      info->SetErrorCode(kFailLocalIO);
-      return 0;
-    }
-  } else {
-    const int64_t written = info->sink()->Write(ptr, num_bytes);
-    if (written < 0 || static_cast<uint64_t>(written) != num_bytes) {
-      LogCvmfs(kLogDownload, kLogDebug,
-               "(id %" PRId64 ") "
-               "Failed to perform write of %zu bytes to sink %s with errno %ld",
-               info->id(), num_bytes, info->sink()->Describe().c_str(),
-               written);
-    }
+  zip::InputMem in_mem(reinterpret_cast<unsigned char*>(ptr), num_bytes);
+  if (!info->DecompressToSink(&in_mem)) {
+    return 0;
   }
 
   return num_bytes;
@@ -902,9 +880,7 @@ void DownloadManager::InitializeRequest(JobInfo *info, CURL *handle) {
   } else {
     info->SetNocache(false);
   }
-  if (info->compressed()) {
-    zlib::DecompressInit(info->GetZstreamPtr());
-  }
+  // info->ResetDecompression();
   if (info->expected_hash()) {
     assert(info->hash_context().buffer != NULL);
     shash::Init(info->hash_context());
@@ -1662,9 +1638,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     if (info->expected_hash()) {
       shash::Init(info->hash_context());
     }
-    if (info->compressed()) {
-      zlib::DecompressInit(info->GetZstreamPtr());
-    }
+    info->ResetDecompression();
 
     if (sharding_policy_.UseCount() > 0) {  // sharding policy
       ReleaseCredential(info);
@@ -1740,9 +1714,7 @@ verify_and_finalize_stop:
     info->SetErrorCode(kFailLocalIO);
   }
 
-  if (info->compressed())
-    zlib::DecompressFini(info->GetZstreamPtr());
-
+  info->ResetDecompression();
   if (info->headers()) {
     header_lists_->PutList(info->headers());
     info->SetHeaders(NULL);
@@ -2413,7 +2385,8 @@ void DownloadManager::ProbeHosts() {
   string url;
 
   cvmfs::MemSink memsink;
-  JobInfo info(&url, false, false, NULL, &memsink);
+  JobInfo info(&url, zip::DecompressionAlg::kNoCompression, false, NULL,
+               &memsink);
   for (retries = 0; retries < 2; ++retries) {
     for (i = 0; i < host_chain.size(); ++i) {
       url = host_chain[i] + "/.cvmfspublished";
@@ -2497,8 +2470,9 @@ bool DownloadManager::GeoSortServers(std::vector<std::string> *servers,
              "(manager '%s') requesting ordered server list from %s",
              name_.c_str(), url.c_str());
     cvmfs::MemSink memsink;
-    JobInfo info(&url, false, false, NULL, &memsink);
-    const Failures result = Fetch(&info);
+    JobInfo info(&url, zip::DecompressionAlg::kNoCompression, false, NULL,
+                 &memsink);
+    Failures result = Fetch(&info);
     if (result == kFailOk) {
       const string order(reinterpret_cast<char *>(memsink.data()),
                          memsink.pos());

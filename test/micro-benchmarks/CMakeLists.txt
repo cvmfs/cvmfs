@@ -34,6 +34,20 @@ set (CVMFS_UBENCHMARKS_SOURCES
   ${CVMFS_SOURCE_DIR}/catalog_rw.cc
   ${CVMFS_SOURCE_DIR}/catalog_sql.cc
   ${CVMFS_SOURCE_DIR}/compression/compression.cc
+  ${CVMFS_SOURCE_DIR}/compression/compressor.cc
+  ${CVMFS_SOURCE_DIR}/compression/compressor_echo.cc
+  ${CVMFS_SOURCE_DIR}/compression/compressor_zlib.cc
+  ${CVMFS_SOURCE_DIR}/compression/compressor_zstd.cc
+  ${CVMFS_SOURCE_DIR}/compression/decompressor.cc
+  ${CVMFS_SOURCE_DIR}/compression/decompressor_echo.cc
+  ${CVMFS_SOURCE_DIR}/compression/decompressor_guess.cc
+  ${CVMFS_SOURCE_DIR}/compression/decompressor_zlib.cc
+  ${CVMFS_SOURCE_DIR}/compression/decompressor_zstd.cc
+  ${CVMFS_SOURCE_DIR}/compression/input_cache.cc
+  ${CVMFS_SOURCE_DIR}/compression/input_file.cc
+  ${CVMFS_SOURCE_DIR}/compression/input_mem.cc
+  ${CVMFS_SOURCE_DIR}/compression/input_path.cc
+  ${CVMFS_SOURCE_DIR}/compression/util.cc
   ${CVMFS_SOURCE_DIR}/crypto/hash.cc
   ${CVMFS_SOURCE_DIR}/crypto/signature.cc
   ${CVMFS_SOURCE_DIR}/directory_entry.cc
@@ -136,6 +150,7 @@ set (UBENCHMARKS_LINK_LIBRARIES ${GOOGLEBENCH_LIBRARIES}
                                 ${SHA3_LIBRARIES}
                                 ${PROTOBUF_LITE_LIBRARY}
                                 ${ZLIB_LIBRARIES}
+                                ${ZSTD_LIBRARIES}
                                 ${RT_LIBRARY}
                                 ${SQLITE3_LIBRARY}
                                 nlohmann_json::nlohmann_json

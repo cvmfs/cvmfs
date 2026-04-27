@@ -50,7 +50,7 @@
 #include "catalog.h"
 #include "catalog_mgr_client.h"
 #include "clientctx.h"
-#include "compression/compression.h"
+#include "compression/compressor.h"
 #include "crypto/crypto_util.h"
 #include "crypto/hash.h"
 #include "directory_entry.h"
@@ -606,8 +606,8 @@ int64_t LibContext::Pread(int fd, void *buf, uint64_t size, uint64_t off) {
     SimpleChunkTables::OpenChunks
         open_chunks = mount_point_->simple_chunk_tables()->Get(chunk_handle);
     FileChunkList *chunk_list = open_chunks.chunk_reflist.list;
-    const zlib::Algorithms compression_alg = open_chunks.chunk_reflist
-                                                 .compression_alg;
+    const zip::Algorithms compression_alg = open_chunks.chunk_reflist
+                                                .compression_alg;
     if (chunk_list == NULL)
       return -EBADF;
 

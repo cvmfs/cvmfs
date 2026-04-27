@@ -10,7 +10,8 @@
 #include <string>
 #include <vector>
 
-#include "compression/compression.h"
+#include "compression/compressor.h"
+#include "compression/compressor_zlib.h"
 #include "crypto/hash.h"
 #include "swissknife.h"
 #include "util/string.h"
@@ -54,8 +55,8 @@ class CommandGraft : public Command {
   bool DirCallback(const std::string &relative_path,
                    const std::string &dir_name);
 
-  bool ChecksumFdWithChunks(int fd,
-                            zlib::Compressor *compressor,
+  bool ChecksumFdWithChunks(const std::string &input_file,
+                            zip::Compressor *compressor,
                             uint64_t *file_size,
                             shash::Any *file_hash,
                             std::vector<uint64_t> *chunk_offsets,
@@ -64,7 +65,7 @@ class CommandGraft : public Command {
   std::string output_file_;
   std::string input_file_;
   bool verbose_;
-  zlib::Algorithms compression_alg_;
+  zip::Algorithms compression_alg_;
   shash::Algorithms hash_alg_;
   uint64_t chunk_size_;
   bool generate_bulk_hash_;

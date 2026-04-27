@@ -20,7 +20,7 @@ class T_FileChunk : public ::testing::Test {
     FileChunkReflist result;
     result.list = new FileChunkList();
     result.path.Assign("/42", 3);
-    result.compression_alg = zlib::kZlibDefault;
+    result.compression_alg = zip::kDefault;
     result.external_data = false;
     return result;
   }
@@ -31,7 +31,7 @@ class T_FileChunk : public ::testing::Test {
 
 TEST_F(T_FileChunk, FindChunkIdx) {
   FileChunkList single;
-  FileChunkReflist reflist(&single, PathString(""), zlib::kZlibDefault, false);
+  FileChunkReflist reflist(&single, PathString(""), zip::kDefault, false);
   EXPECT_DEATH(reflist.FindChunkIdx(0), ".*");
 
   single.PushBack(FileChunk());
@@ -91,7 +91,7 @@ TEST_F(T_FileChunk, Simple) {
 
 TEST_F(T_FileChunk, HashChunkList) {
   FileChunkList single;
-  FileChunkReflist reflist(&single, PathString(""), zlib::kZlibDefault, false);
+  FileChunkReflist reflist(&single, PathString(""), zip::kDefault, false);
 
   single.PushBack(FileChunk(shash::Any(shash::kSha1), 0, 1));
   single.PushBack(FileChunk(shash::Any(shash::kSha1), 1, 1));

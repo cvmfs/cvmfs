@@ -19,11 +19,15 @@
 #include <vector>
 
 #include "catalog_sql.h"
-#include "compression/compression.h"
+#include "compression/input_file.h"
+#include "compression/input_path.h"
+#include "compression/util.h"
+#include "compression/decompressor_guess.h"
 #include "file_chunk.h"
 #include "history_sqlite.h"
 #include "manifest.h"
 #include "network/download.h"
+#include "network/sink_file.h"
 #include "network/sink_path.h"
 #include "reflog.h"
 #include "sanitizer.h"
@@ -47,9 +51,12 @@ static inline uint32_t hasher_any(const shash::Any &key) {
 namespace swissknife {
 
 CommandCheck::CommandCheck()
-    : check_chunks_(false), no_duplicates_map_(false), is_remote_(false) {
+                            : check_chunks_(false)
+                            , no_duplicates_map_(false)
+                            , is_remote_(false) {
   const shash::Any hash_null;
   duplicates_map_.Init(16, hash_null, hasher_any);
+  copy_ = zip::Compressor::Construct(zip::kNoCompression);
 }
 
 bool CommandCheck::CompareEntries(const catalog::DirectoryEntry &a,
@@ -198,15 +205,18 @@ string CommandCheck::FetchPath(const string &path) {
   const string url = repo_base_path_ + "/" + path;
   if (is_remote_) {
     cvmfs::FileSink filesink(f);
-    download::JobInfo download_job(&url, false, false, NULL, &filesink);
-    const download::Failures retval = download_manager()->Fetch(&download_job);
+    download::JobInfo download_job(&url, zip::DecompressionAlg::kNoCompression,
+                                   false, NULL, &filesink);
+    download::Failures retval = download_manager()->Fetch(&download_job);
     if (retval != download::kFailOk) {
       PANIC(kLogStderr, "failed to read %s", url.c_str());
     }
   } else {
-    const bool retval = CopyPath2File(url, f);
-    if (!retval) {
-      PANIC(kLogStderr, "failed to read %s", url.c_str());
+    zip::InputPath input(url);
+    cvmfs::FileSink output(f);
+    const zip::StreamStates retval = copy_->Compress(&input, &output);
+    if (retval != zip::kStreamEnd) {
+      PANIC(kLogStderr, "failed to read %s - error %d", url.c_str(), retval);
     }
   }
 
@@ -677,45 +687,41 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
   return retval;
 }
 
-
-string CommandCheck::DownloadPiece(const shash::Any catalog_hash) {
-  const string source = "data/" + catalog_hash.MakePath();
+string CommandCheck::DecompressPiece(const shash::Any catalog_hash,
+                                     zip::ExpectedContentFormat expected_fmt) {
+  string source = "data/" + catalog_hash.MakePath();
   const string dest = temp_directory_ + "/" + catalog_hash.ToString();
-  const string url = repo_base_path_ + "/" + source;
+  zip::InputPath in_path(source);
+  cvmfs::PathSink out_path(dest);
 
-  cvmfs::PathSink pathsink(dest);
-  download::JobInfo download_catalog(&url, true, false, &catalog_hash,
-                                     &pathsink);
-  const download::Failures retval = download_manager()->Fetch(
-      &download_catalog);
-  if (retval != download::kFailOk) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to download object %s (%d)",
-             catalog_hash.ToString().c_str(), retval);
-    return "";
+  auto decomp = new zip::GuessDecompressor(expected_fmt);
+  if (is_remote_) {
+    const string url = repo_base_path_ + "/" + source;
+    // JobInfo takes over decomp
+    download::JobInfo download_catalog(&url, decomp, false, &catalog_hash,
+        &out_path);
+    download::Failures retval = download_manager()->Fetch(&download_catalog);
+    if (retval != download::kFailOk) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to download object %s (%d)",
+          catalog_hash.ToString().c_str(), retval);
+      return "";
+    }
+  } else {
+    auto ret = decomp->DecompressStream(&in_path, &out_path);
+    delete decomp;
+    if (ret != zip::kStreamEnd) {
+      return "";
+    }
   }
 
   return dest;
 }
 
-
-string CommandCheck::DecompressPiece(const shash::Any catalog_hash) {
-  const string source = "data/" + catalog_hash.MakePath();
-  const string dest = temp_directory_ + "/" + catalog_hash.ToString();
-  if (!zlib::DecompressPath2Path(source, dest))
-    return "";
-
-  return dest;
-}
-
-
-catalog::Catalog *CommandCheck::FetchCatalog(const string &path,
-                                             const shash::Any &catalog_hash,
+catalog::Catalog* CommandCheck::FetchCatalog(const string& path,
+                                             const shash::Any& catalog_hash,
                                              const uint64_t catalog_size) {
   string tmp_file;
-  if (!is_remote_)
-    tmp_file = DecompressPiece(catalog_hash);
-  else
-    tmp_file = DownloadPiece(catalog_hash);
+  tmp_file = DecompressPiece(catalog_hash, zip::ExpectedContentFormat::kSQLite3);
 
   if (tmp_file == "") {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to load catalog %s",
@@ -772,7 +778,7 @@ bool CommandCheck::FindSubtreeRootCatalog(const string &subtree_path,
       delete current_catalog;
 
       if (current_path.length() < subtree_path.length()) {
-        current_catalog = FetchCatalog(current_path, *root_hash);
+        current_catalog = FetchCatalog(current_path, *root_hash, 0);
         if (current_catalog == NULL) {
           break;
         }
@@ -783,7 +789,6 @@ bool CommandCheck::FindSubtreeRootCatalog(const string &subtree_path,
   }
   return false;
 }
-
 
 /**
  * Recursion on nested catalog level.  No ownership of computed_counters.
@@ -1029,10 +1034,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
   // Check meta-info object
   if (!manifest->meta_info().IsNull()) {
     string tmp_file;
-    if (!is_remote_)
-      tmp_file = DecompressPiece(manifest->meta_info());
-    else
-      tmp_file = DownloadPiece(manifest->meta_info());
+    tmp_file = DecompressPiece(manifest->meta_info(), zip::ExpectedContentFormat::kJSON);
     if (tmp_file == "") {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to load repository metainfo %s",
                manifest->meta_info().ToString().c_str());
@@ -1080,10 +1082,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
   UniquePtr<history::History> tag_db;
   if (!manifest->history().IsNull()) {
     string tmp_file;
-    if (!is_remote_)
-      tmp_file = DecompressPiece(manifest->history());
-    else
-      tmp_file = DownloadPiece(manifest->history());
+    tmp_file = DecompressPiece(manifest->history(), zip::ExpectedContentFormat::kSQLite3);
     if (tmp_file == "") {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to load history database %s",
                manifest->history().ToString().c_str());

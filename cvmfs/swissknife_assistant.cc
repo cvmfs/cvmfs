@@ -11,6 +11,7 @@
 
 #include "catalog.h"
 #include "catalog_rw.h"
+#include "compression/decompressor_guess.h"
 #include "history.h"
 #include "history_sqlite.h"
 #include "manifest.h"
@@ -29,7 +30,9 @@ catalog::Catalog *Assistant::GetCatalog(const shash::Any &catalog_hash,
   const string local_path = CreateTempPath(tmp_dir_ + "/catalog", 0600);
   assert(!local_path.empty());
 
-  if (!FetchObject(catalog_hash, local_path)) {
+  if (!FetchObject(
+          catalog_hash, local_path,
+          new zip::GuessDecompressor(zip::ExpectedContentFormat::kSQLite3))) {
     return NULL;
   }
 
@@ -70,7 +73,9 @@ history::History *Assistant::GetHistory(OpenMode open_mode) {
     return history;
   }
 
-  if (!FetchObject(history_hash, local_path))
+  if (!FetchObject(
+          history_hash, local_path,
+          new zip::GuessDecompressor(zip::ExpectedContentFormat::kSQLite3)))
     return NULL;
 
   switch (open_mode) {
@@ -95,15 +100,15 @@ history::History *Assistant::GetHistory(OpenMode open_mode) {
   return history;
 }
 
-
-bool Assistant::FetchObject(const shash::Any &id, const string &local_path) {
+bool Assistant::FetchObject(const shash::Any& id, const string& local_path,
+                            zip::Decompressor* decomp) {
   assert(!id.IsNull());
 
   download::Failures dl_retval;
   const std::string url = repository_url_ + "/data/" + id.MakePath();
 
   cvmfs::PathSink pathsink(local_path);
-  download::JobInfo download_info(&url, true, false, &id, &pathsink);
+  download::JobInfo download_info(&url, decomp, false, &id, &pathsink);
   dl_retval = download_mgr_->Fetch(&download_info);
 
   if (dl_retval != download::kFailOk) {

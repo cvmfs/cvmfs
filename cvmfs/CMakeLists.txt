@@ -57,7 +57,20 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS)
        catalog_mgr_client.cc
        catalog_sql.cc
        clientctx.cc
-       compression/compression.cc
+       compression/compressor.cc
+       compression/compressor_echo.cc
+       compression/compressor_zlib.cc
+       compression/compressor_zstd.cc
+       compression/decompressor.cc
+       compression/decompressor_echo.cc
+       compression/decompressor_guess.cc
+       compression/decompressor_zlib.cc
+       compression/decompressor_zstd.cc
+       compression/input_cache.cc
+       compression/input_file.cc
+       compression/input_mem.cc
+       compression/input_path.cc
+       compression/util.cc
        directory_entry.cc
        duplex_fuse.cc
        fd_refcount_mgr.cc
@@ -137,14 +150,29 @@ if (BUILD_CVMFS)
   # /usr/bin/cvmfs_fsck
   #
   add_executable (cvmfs_fsck
-                  compression/compression.cc
+                  compression/compressor.cc
+                  compression/compressor_echo.cc
+                  compression/compressor_zlib.cc
+                  compression/compressor_zstd.cc
+                  compression/decompressor.cc
+                  compression/decompressor_echo.cc
+                  compression/decompressor_guess.cc
+                  compression/decompressor_zlib.cc
+                  compression/decompressor_zstd.cc
+                  compression/input_cache.cc
+                  compression/input_file.cc
+                  compression/input_mem.cc
+                  compression/input_path.cc
+                  compression/util.cc
                   cvmfs_fsck.cc
+                  network/sink_mem.cc
                   statistics.cc
   )
   target_link_libraries (cvmfs_fsck
                          cvmfs_crypto
                          cvmfs_util
                          ${ZLIB_LIBRARIES}
+                         ${ZSTD_LIBRARIES}
                          ${RT_LIBRARY}
                          pthread
   )
@@ -267,6 +295,7 @@ if (BUILD_CVMFS)
        ${PACPARSER_LIBRARIES}
        ${SQLITE3_LIBRARY}
        ${ZLIB_LIBRARIES}
+       ${ZSTD_LIBRARIES}
        ${SPARSEHASH_LIBRARIES}
        ${LEVELDB_LIBRARIES}
        ${PROTOBUF_LITE_LIBRARY}
@@ -433,6 +462,8 @@ if (BUILD_LIBCVMFS)
                                  ${PACPARSER_LIBRARIES}
                                  ${ZLIB_LIBRARIES}
                                  nlohmann_json::nlohmann_json
+                                 ${ZSTD_LIBRARIES}
+                                 ${VJSON_LIBRARIES}
                                  ${PROTOBUF_LITE_LIBRARY}
   )
 
@@ -517,9 +548,24 @@ if (BUILD_LIBCVMFS_CACHE)
                   cache_plugin/cvmfs_cache_posix.cc
                   cache.cc
                   cache_posix.cc
-                  compression/compression.cc
+                  compression/compressor.cc
+                  compression/compressor_echo.cc
+                  compression/compressor_zlib.cc
+                  compression/compressor_zstd.cc
+                  compression/decompressor.cc
+                  compression/decompressor_echo.cc
+                  compression/decompressor_guess.cc
+                  compression/decompressor_zlib.cc
+                  compression/decompressor_zstd.cc
+                  compression/input_cache.cc
+                  compression/input_file.cc
+                  compression/input_mem.cc
+                  compression/input_path.cc
+                  compression/util.cc
                   fd_refcount_mgr.cc
                   manifest.cc
+                  network/sink_path.cc
+                  network/sink_file.cc
                   quota.cc
   )
   set_target_properties (cvmfs_cache_posix PROPERTIES COMPILE_FLAGS "-DDEBUGMSG")
@@ -528,6 +574,7 @@ if (BUILD_LIBCVMFS_CACHE)
                          cvmfs_crypto
                          cvmfs_util_debug
                          ${ZLIB_LIBRARIES}
+                         ${ZSTD_LIBRARIES}
                          pthread
   )
 
@@ -597,7 +644,20 @@ if (BUILD_SERVER)
        catalog_rw.cc
        catalog_virtual.cc
        clientctx.cc
-       compression/compression.cc
+       compression/compressor.cc
+       compression/compressor_echo.cc
+       compression/compressor_zlib.cc
+       compression/compressor_zstd.cc
+       compression/decompressor.cc
+       compression/decompressor_echo.cc
+       compression/decompressor_guess.cc
+       compression/decompressor_zlib.cc
+       compression/decompressor_zstd.cc
+       compression/input_cache.cc
+       compression/input_file.cc
+       compression/input_mem.cc
+       compression/input_path.cc
+       compression/util.cc
        directory_entry.cc
        file_chunk.cc
        gateway_util.cc
@@ -705,6 +765,7 @@ if (BUILD_SERVER)
         ${CURL_LIBRARIES}
         ${CARES_LIBRARIES} ${CARES_LDFLAGS}
         ${ZLIB_LIBRARIES}
+        ${ZSTD_LIBRARIES}
         ${OPENSSL_LIBRARIES}
         ${RT_LIBRARY}
         nlohmann_json::nlohmann_json
@@ -744,7 +805,20 @@ if (BUILD_SERVER)
        catalog_mgr_rw.cc
        catalog_virtual.cc
        catalog_downloader.cc
-       compression/compression.cc
+       compression/compressor.cc
+       compression/compressor_echo.cc
+       compression/compressor_zlib.cc
+       compression/compressor_zstd.cc
+       compression/decompressor.cc
+       compression/decompressor_echo.cc
+       compression/decompressor_guess.cc
+       compression/decompressor_zlib.cc
+       compression/decompressor_zstd.cc
+       compression/input_cache.cc
+       compression/input_file.cc
+       compression/input_mem.cc
+       compression/input_path.cc
+       compression/util.cc
        directory_entry.cc
        gateway_util.cc
        globals.cc
@@ -822,6 +896,7 @@ if (BUILD_SERVER)
         ${ZLIB_LIBRARIES}
         nlohmann_json::nlohmann_json
         LibArchive::LibArchive
+        ${ZSTD_LIBRARIES}
         ${RT_LIBRARY}
         pthread
         dl
@@ -854,7 +929,20 @@ if (BUILD_SERVER)
   #
   set (CVMFS_PUBLISH_SOURCES
        backoff.cc
-       compression/compression.cc
+       compression/compressor.cc
+       compression/compressor_echo.cc
+       compression/compressor_zlib.cc
+       compression/compressor_zstd.cc
+       compression/decompressor.cc
+       compression/decompressor_echo.cc
+       compression/decompressor_guess.cc
+       compression/decompressor_zlib.cc
+       compression/decompressor_zstd.cc
+       compression/input_cache.cc
+       compression/input_file.cc
+       compression/input_mem.cc
+       compression/input_path.cc
+       compression/util.cc
        directory_entry.cc
        manifest.cc
        network/dns.cc
@@ -1043,7 +1131,20 @@ if(BUILD_RECEIVER)
        catalog_sql.cc
        catalog_mgr_ro.cc
        catalog_mgr_rw.cc
-       compression/compression.cc
+       compression/compressor.cc
+       compression/compressor_echo.cc
+       compression/compressor_zlib.cc
+       compression/compressor_zstd.cc
+       compression/decompressor.cc
+       compression/decompressor_echo.cc
+       compression/decompressor_guess.cc
+       compression/decompressor_zlib.cc
+       compression/decompressor_zstd.cc
+       compression/input_cache.cc
+       compression/input_file.cc
+       compression/input_mem.cc
+       compression/input_path.cc
+       compression/util.cc
        directory_entry.cc
        gateway_util.cc
        globals.cc
@@ -1108,6 +1209,7 @@ if(BUILD_RECEIVER)
         nlohmann_json::nlohmann_json
         ${OPENSSL_LIBRARIES}
         ${ZLIB_LIBRARIES}
+        ${ZSTD_LIBRARIES}
         ${RT_LIBRARY}
         LibArchive::LibArchive
         pthread
@@ -1204,7 +1306,20 @@ if (BUILD_PRELOADER)
                   backoff.cc
                   catalog.cc
                   catalog_sql.cc
-                  compression/compression.cc
+                  compression/compressor.cc
+                  compression/compressor_echo.cc
+                  compression/compressor_zlib.cc
+                  compression/compressor_zstd.cc
+                  compression/decompressor.cc
+                  compression/decompressor_echo.cc
+                  compression/decompressor_guess.cc
+                  compression/decompressor_zlib.cc
+                  compression/decompressor_zstd.cc
+                  compression/input_cache.cc
+                  compression/input_file.cc
+                  compression/input_mem.cc
+                  compression/input_path.cc
+                  compression/util.cc
                   gateway_util.cc
                   globals.cc
                   history_sql.cc
@@ -1266,6 +1381,7 @@ if (BUILD_PRELOADER)
                         ${CURL_LIBRARIES}
                         ${CARES_LIBRARIES} ${CARES_LDFLAGS}
                         ${ZLIB_LIBRARIES}
+                        ${ZSTD_LIBRARIES}
                         ${OPENSSL_LIBRARIES}
                         ${RT_LIBRARY}
                         ${UUID_LIBRARIES}

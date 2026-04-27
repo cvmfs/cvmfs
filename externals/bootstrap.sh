@@ -16,6 +16,7 @@ PROTOBUF_VERSION=2.6.1
 RAPIDCHECK_VERSION=0.0
 LIBARCHIVE_VERSION=3.3.2
 GOLANG_VERSION=1.24.2
+ZSTD_VERSION=1.5.6
 
 if [ x"$EXTERNALS_LIB_LOCATION" = x"" ]; then
   echo "Bootstrap - Missing environment variable: EXTERNALS_LIB_LOCATION"
@@ -274,6 +275,10 @@ build_lib() {
         do_download_go
         do_build "golang_rev2"
       ;;
+    zstd)
+      do_extract "zstd"         "zstd-${ZSTD_VERSION}.tar.gz"
+      do_build "zstd"
+      ;;
     *)
       echo "Unknown library name. Exiting."
       exit 1
@@ -290,7 +295,7 @@ if [ x"$BUILTIN_EXTERNALS_LIST" != x"" ] && ! echo ";${BUILTIN_EXTERNALS_LIST};"
     missing_libs=$(echo "$BUILTIN_EXTERNALS_LIST" | tr ';' ' ')
     echo "Bootstrap - Using custom externals list: $missing_libs"
 else
-    missing_libs="libcurl libcrypto pacparser zlib sparsehash leveldb maxminddb protobuf sqlite3 sha3"
+    missing_libs="libcurl libcrypto pacparser zlib sparsehash leveldb maxminddb protobuf sqlite3 sha3 zstd"
 
     if [ x"$BUILD_UBENCHMARKS" != x"" ]; then
         missing_libs="$missing_libs googlebench"

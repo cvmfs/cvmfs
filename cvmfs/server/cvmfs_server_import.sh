@@ -64,13 +64,14 @@ cvmfs_server_import() {
   local unionfs=
   local recreate_whitelist=0
   local configure_apache=1
+  local compression_alg=${CVMFS_COMPRESSION_ALGORITHM-}
   local recreate_repo_key=0
   local require_masterkeycard=0
   local proxy_url
 
   # parameter handling
   OPTIND=1
-  while getopts "w:o:c:u:k:lsmgf:rptRx:" option; do
+  while getopts "w:o:c:u:k:lsmgf:rptRx:Z:" option; do
     case $option in
       w)
         stratum0=$OPTARG
@@ -104,6 +105,9 @@ cvmfs_server_import() {
       ;;
       r)
         recreate_whitelist=1
+      ;;
+      Z)
+        compression_alg=$OPTARG
       ;;
       p)
         configure_apache=0
@@ -226,7 +230,7 @@ cvmfs_server_import() {
                                          "true"              \
                                          "false"             \
                                          "$configure_apache" \
-                                         "default"           \
+                                         "$compression_alg"  \
                                          "false"             \
                                          ""                  \
                                          ""                  \
@@ -309,6 +313,7 @@ cvmfs_server_import() {
     IMPORT_DESASTER_MANIFEST_BACKUP="${storage_location}/.cvmfspublished.bak"
     cp ${storage_location}/.cvmfspublished \
        $IMPORT_DESASTER_MANIFEST_BACKUP || die "fail! (cannot backup .cvmfspublished)"
+    CVMFS_COMPRESSION_ALGORITHM=$CVMFS_COMPRESSION_ALGORITHM \
     __swissknife migrate               \
       -v "2.0.x"                       \
       -r $storage_location             \
