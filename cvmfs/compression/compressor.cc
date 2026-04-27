@@ -19,7 +19,6 @@
 #include <cstring>
 #include <iostream>
 
-#include "cvmfs_config.h"
 #include "compressor_echo.h"
 #include "compressor_zlib.h"
 #include "compressor_zstd.h"
