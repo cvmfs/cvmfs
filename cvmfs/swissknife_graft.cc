@@ -257,7 +257,7 @@ int swissknife::CommandGraft::Publish(const std::string &input_file,
   // make the compressor a class-wide variable
   const UniquePtr<zip::Compressor>
                        compressor(zip::Compressor::Construct(compression_alg_));
-
+  bool retval =
       ChecksumFdWithChunks(input_file, compressor.weak_ref(), &processed_size,
                            &file_hash, &chunk_offsets, &chunk_checksums);
 

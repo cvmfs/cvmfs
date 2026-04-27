@@ -322,7 +322,7 @@ bool CommandMigrate::UpdateUndoTags(PendingCatalog *root_catalog,
                                     shash::Any *history_hash) {
   const string filename_old = history_upstream_->filename();
   const string filename_new = filename_old + ".new";
-
+  bool retval;
   zip::InputPath in_path(filename_old);
   cvmfs::PathSink out_path(filename_new);
   if (copy_->Compress(&in_path, &out_path) != zip::kStreamEnd) {
