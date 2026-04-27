@@ -134,7 +134,7 @@ class SettingsTransaction {
       : layout_revision_(0)
       , in_enter_session_(false)
       , hash_algorithm_(shash::kShake128)
-      , compression_algorithm_(zip::kZlibDefault)
+      , compression_algorithm_(zip::kDefault)
       , ttl_second_(240)
       , is_garbage_collectable_(true)
       , is_volatile_(false)

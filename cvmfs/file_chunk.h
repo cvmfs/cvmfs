@@ -53,7 +53,7 @@ struct FileChunkReflist {
       , external_data(false) { }
   FileChunkReflist(FileChunkList *l,
                    const PathString &p,
-                   zlib::Algorithms alg,
+                   zip::Algorithms alg,
                    bool external)
       : list(l), path(p), compression_alg(alg), external_data(external) { }
 
