@@ -644,6 +644,7 @@ if (BUILD_SERVER)
        catalog_rw.cc
        catalog_virtual.cc
        clientctx.cc
+       compression/compression.cc
        compression/compressor.cc
        compression/compressor_echo.cc
        compression/compressor_zlib.cc
