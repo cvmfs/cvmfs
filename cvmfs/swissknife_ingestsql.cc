@@ -20,6 +20,7 @@
 #include "acl.h"
 #include "catalog_downloader.h"
 #include "catalog_mgr_rw.h"
+#include "compression/util.h"
 #include "curl/curl.h"
 #include "gateway_util.h"
 #include "shortstring.h"
@@ -751,7 +752,7 @@ int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
   // now initialise the various bits we need
 
   upload::SpoolerDefinition spooler_definition(
-      spooler_definition_string, shash::kSha1, zlib::kZlibDefault, false, true,
+      spooler_definition_string, shash::kSha1, zip::CompressionAlgFromEnv(), false, true,
       SyncParameters::kDefaultMinFileChunkSize,
       SyncParameters::kDefaultAvgFileChunkSize,
       SyncParameters::kDefaultMaxFileChunkSize, g_session_token_file, key_file);
@@ -761,8 +762,8 @@ int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
         *args.find('q')->second);
   }
 
-  upload::SpoolerDefinition const spooler_definition_catalogs(
-      spooler_definition.Dup2DefaultCompression());
+  upload::SpoolerDefinition spooler_definition_catalogs(spooler_definition);
+  spooler_definition_catalogs.compression_alg = zip::CompressionAlgFromEnv();
 
   UniquePtr<upload::Spooler> const spooler_catalogs(
       upload::Spooler::Construct(spooler_definition_catalogs, nullptr));
@@ -1431,16 +1432,16 @@ int swissknife::IngestSQL::add_files(
 
     switch (file.compressed) {
       case 1:  // Uncompressed
-        dir.compression_algorithm_ = zlib::kNoCompression;
+        dir.compression_algorithm_ = zip::kNoCompression;
         break;
       case 2:  // Compressed with Zlib
-        dir.compression_algorithm_ = zlib::kZlibDefault;
+        dir.compression_algorithm_ = zip::kZlib;
         break;
       // future cases: different compression schemes
       default:  // default behaviour: compressed if internal, content-addressed.
                 // Uncompressed if external
-        dir.compression_algorithm_ = file.internal ? zlib::kZlibDefault
-                                                   : zlib::kNoCompression;
+        dir.compression_algorithm_ = file.internal ? zip::kZlib
+                                                   : zip::kNoCompression;
     }
 
     if (exists) {
