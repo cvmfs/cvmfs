@@ -260,7 +260,6 @@ class JobInfo {
   void SetTracingHeaderUid(char *tracing_header_uid) {
     tracing_header_uid_ = tracing_header_uid;
   };
-  void SetZstream(z_stream zstream) { zstream_ = zstream; }
   void SetHashContext(shash::ContextPtr hash_context) {
     hash_context_ = hash_context;
   }
