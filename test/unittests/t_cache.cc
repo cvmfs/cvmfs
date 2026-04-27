@@ -94,6 +94,7 @@ class T_CacheManager : public ::testing::Test {
     if (sum_ms > timeout_ms) {
       retval = pthread_cancel(thread_teardown);
       assert(retval == 0);
+      pthread_join(thread_teardown, NULL);
       return true;
     }
     pthread_join(thread_teardown, 0);
@@ -842,6 +843,7 @@ TEST_F(T_CacheManager, TearDown2ReadOnly) {
     pthread_join(thread_teardown, NULL);
   else
     pthread_cancel(thread_teardown);
+    pthread_join(thread_teardown, NULL);
 }
 
 
