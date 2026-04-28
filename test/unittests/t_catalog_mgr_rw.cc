@@ -428,7 +428,11 @@ TEST_F(T_CatalogMgrRw, VacuumDatabaseNoDeadlock) {
     catalog::DirectoryEntry entry =
         catalog::DirectoryEntryTestFactory::RegularFile(name, g_file_size,
                                                         hash);
-    catalog_mgr->AddFile(entry, xattrs, "dir");
+    // Cast to DirectoryEntryBase to route through the public overload.
+    // The protected DirectoryEntry overload is the internal implementation;
+    // the public base overload is the intended external API.
+    catalog_mgr->AddFile(
+        static_cast<const catalog::DirectoryEntryBase &>(entry), xattrs, "dir");
   }
   for (int i = 0; i < 50; ++i) {
     catalog_mgr->RemoveFile("dir/vac_tmp_" + StringifyInt(i));
