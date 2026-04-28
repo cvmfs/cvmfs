@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 
+#include "quota.h"        // full definition needed for 'delete quota_mgr_'
 #include "util/posix.h"  // IWYU pragma: keep
 
 
