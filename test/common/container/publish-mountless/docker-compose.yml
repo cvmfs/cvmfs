@@ -137,7 +137,6 @@ services:
             - ./config/repo.json:/etc/cvmfs/gateway/repo.json:ro
             - etc-cvmfs-repos:/etc/cvmfs/repositories.d
             - etc-cvmfs-keys:/etc/cvmfs/keys
-            - var-spool-cvmfs:/var/spool/cvmfs
             - var-lib-gateway:/var/lib/cvmfs-gateway
         ports:
             - "4929:4929"   # Gateway lease API
@@ -159,14 +158,10 @@ services:
             GW_PORT: "4929"
             STRATUM0_URL: http://cvmfs.web.garage.internal:3902
             <<: *gw-key-env
-        volumes:
-            - publisher-spool:/var/spool/cvmfs
 
 volumes:
     garage-meta:
     garage-data:
     etc-cvmfs-repos:
     etc-cvmfs-keys:
-    var-spool-cvmfs:
     var-lib-gateway:
-    publisher-spool:
