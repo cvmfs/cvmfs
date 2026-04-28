@@ -437,7 +437,7 @@ and 15% miss rate, the number of simultaneous S1 connections drops from
 **Migration path:** same hardware, same port (3128 → 80 or keep 3128 with
 Varnish listening on that port), `CVMFS_HTTP_PROXY` unchanged if a
 site-local DNS alias is used.  1–2 days per site; fully templated centrally
-via Puppet/Ansible.  Reference VCL for HepCDN Tier-2 is in §6.
+via Puppet/Ansible.  Reference VCL for HepCDN Tier-2 is in §7.
 
 ---
 
@@ -529,22 +529,170 @@ client would need to speak the OCI blob API, which is a non-trivial change.
 
 ---
 
-## 5. Recommended Roadmap
+## 5. Implementation Gap Analysis
+
+The table below maps every component the HepCDN architecture requires to its
+current implementation status.  "cvmfs-bits" refers to the `cvmfs-bits`
+repository; "new" means a new binary or repository is needed.
+
+### 5.1 Component inventory
+
+| Component | Role | Status | Home |
+|---|---|---|---|
+| cvmfs-bits distributor | Push new objects from S0 to Tier-1 | ✅ Implemented | cvmfs-bits `cmd/prepub` |
+| cvmfs-bits receiver (control + data channels) | Accept pushed objects at Tier-1 | ✅ Implemented | cvmfs-bits `internal/distribute/receiver` |
+| Publisher-side dedup bloom filter | Skip re-pushing already-present objects across builds; shared via NFS snapshots | ✅ Implemented | cvmfs-bits `internal/pipeline/dedup` |
+| Prometheus metrics (publisher) | Job, pipeline, CAS, distribution counters | ✅ Implemented | cvmfs-bits `pkg/observe`, `internal/api/server.go` |
+| Tier-1 inventory bloom filter | Per-node filter of objects the receiver holds; built from CAS at startup, updated on each PUT | ✅ Implemented | cvmfs-bits `internal/distribute/receiver/inventory.go` |
+| Bloom filter HTTP endpoint | `GET /api/v1/bloom` — serves serialised inventory filter to distributor and coord service | ✅ Implemented | cvmfs-bits `internal/distribute/receiver/bloom_handler.go` |
+| Distributor delta mode | Query each receiver's bloom endpoint before pushing; push only absent objects | ✅ Implemented | cvmfs-bits `internal/distribute/distributor.go` (`BloomQueryTimeout`, `fetchReceiverBloom`) |
+| Prometheus /metrics on receiver | Receiver-specific counters (objects received, bytes, bloom size, heartbeat errors) exposed at `/metrics` on the control channel | ✅ Implemented | cvmfs-bits `pkg/observe/metrics.go`, `receiver.go` |
+| Tier-1 registration + heartbeat | Receiver registers with coordination service at startup; sends 30 s heartbeat with bloom_size and ready state; deregisters on shutdown | ✅ Implemented | cvmfs-bits `internal/distribute/receiver/coord_client.go` |
+| **HepCDN coordination service** | Topology-aware routing, health registry, publish announce, Tier-2 pre-warm broadcast | ❌ Missing | New binary (`cmd/hepcdn-coord`) |
+| **Tier-2 pre-warm signal handler** | Receives pre-warm signal from coord service; issues Varnish PURGE+prefetch | ❌ Missing | New sidecar or cvmfs-bits |
+| **AS-topology routing database** | BGP data from GÉANT/ESnet; maps AS → nearest healthy Tier-1 | ❌ Missing | Coord service data layer |
+| Varnish/Nginx at Tier-1 (replaces Apache) | HTTP cache with CVMFS TTL rules | ❌ Not deployed | Site config management |
+| Varnish/Nginx at Tier-2 (replaces Squid) | Site edge cache with pre-warm support | ❌ Not deployed | Site config management |
+| Puppet/Ansible deployment templates | Central config rollout for Tier-1 and Tier-2 | ❌ Missing | Ops/infra repo |
+| Unified Prometheus/Grafana dashboard | Cross-tier hit rate, lag, health | ❌ Missing | Monitoring infrastructure |
+| S1 webhook for pull replication trigger | On publish, notify S1 to run `cvmfs_server snapshot` immediately | ❌ Missing | Separate from cvmfs-bits push |
+
+### 5.2 The two bloom filters and why they are different
+
+A common point of confusion: there are **two distinct bloom filters** in the
+HepCDN design, with different owners, purposes, and sharing mechanisms.
+
+```
+Publisher node (Stratum 0)                   Tier-1 node (Stratum 1)
+─────────────────────────────────            ────────────────────────────────
+Publisher-side dedup filter                  Tier-1 inventory filter
+  Purpose: avoid re-pushing objects            Purpose: answer "do you have
+  already present across builds                hash X?" for delta computation
+  Scope: across all build nodes               Scope: this node's local CAS only
+  Sharing: NFS-shared .bloom snapshots        Sharing: HTTP GET /api/v1/bloom
+  Built: scan shared CAS at startup           Built: walk local CAS at startup,
+         + load peer snapshots                        update on each PUT success
+  Status: ✅ implemented                      Status: ✅ implemented
+  Location: internal/pipeline/dedup/         Location: internal/distribute/receiver/
+```
+
+The dedup filter prevents the distributor from re-uploading objects that are
+already in the shared CAS backend (bandwidth saving within a single publish
+site).  The inventory filter lets the distributor compute a per-Tier-1-node
+delta — pushing only objects the specific remote node does not yet hold — and
+lets the coordination service confirm object availability before routing clients
+there.
+
+### 5.3 Should cvmfs-bits host the bloom filter service?
+
+Yes.  The arguments are decisive:
+
+**Cohesion:** the receiver is the only process that knows exactly which objects
+it has accepted (each successful `PUT /api/v1/objects/{hash}` updates the
+inventory).  Hosting the filter in a separate process would require IPC to stay
+in sync with every PUT.
+
+**Shared dependency:** `github.com/bits-and-blooms/bloom/v3` is already a
+first-class dependency of cvmfs-bits.  The serialisation format (`WriteTo` /
+`ReadFrom`) is already used for the dedup snapshots, so the distributor can
+deserialise a receiver's bloom endpoint response with zero new code on that side.
+
+**Existing HTTPS server:** the receiver already runs a TLS control channel
+(`:9100` by default).  The bloom endpoint and Prometheus metrics are served on
+the same mux:
+
+```go
+controlMux.HandleFunc("/api/v1/bloom", r.bloomHandler)
+controlMux.Handle("/metrics", promhttp.Handler())
+```
+
+**Single binary deployment:** operators install one `cvmfs-prepub --mode receiver`
+unit, not a receiver plus a separate bloom-filter sidecar.
+
+**Registration fits naturally:** at startup the receiver initialises its
+inventory filter by walking the local CAS, then the coordination client
+registers the node with the coordination service.  The registration, heartbeat,
+and filter maintenance are all part of the same lifecycle.
+
+All five points have been validated: these components are now implemented and
+tested in `cvmfs-bits` (see §5.1).
+
+### 5.4 Remaining gaps — priority order
+
+Items 1–4 from the original list are now **implemented and tested** in
+`cvmfs-bits`.  The following components must still be built before HepCDN v1
+can function end-to-end.  They are listed in dependency order.
+
+**✅ Completed (cvmfs-bits):**
+
+1. ~~Inventory bloom filter + HTTP endpoint~~ — done (`inventory.go`,
+   `bloom_handler.go`; `GET /api/v1/bloom` on control channel).
+
+2. ~~Prometheus `/metrics` endpoint on receiver~~ — done (wired via
+   `promhttp.Handler()` on the control mux; four new receiver-specific metrics).
+
+3. ~~Tier-1 registration + heartbeat~~ — done (`coord_client.go`; 30 s
+   heartbeat with `bloom_size` and `ready` state; deregisters on shutdown).
+
+4. ~~Per-node delta push mode~~ — done (`fetchReceiverBloom`,
+   `BloomQueryTimeout` in `distributor.go`; panic-safe bloom deserialisation).
+
+**❌ Still missing — New binary — HepCDN coordination service:**
+
+5. **HepCDN coordination service** (`cmd/hepcdn-coord` in cvmfs-bits, or a
+   separate repository).  Minimum viable API (client protocol already implemented
+   in the receiver — see REFERENCE.md §22):
+
+   ```
+   POST /api/v1/nodes              — Tier-1 registers (node_id, repos, data_url)
+   PUT  /api/v1/nodes/{id}/heartbeat — Tier-1 sends bloom_size + ready
+   DELETE /api/v1/nodes/{id}       — Tier-1 deregisters on shutdown
+   POST /api/v1/announce           — distributor announces publish completion;
+                                     coord broadcasts pre-warm signal to Tier-2
+   GET  /route?client=IP&repo=NAME — returns ordered Tier-1 list for this client
+   GET  /health                    — cluster health summary for monitoring
+   ```
+
+   Phase 1 can use simple IP-geolocation routing (same as GeoAPI) and upgrade
+   to AS-topology routing in Phase 3 without changing the API surface.
+   Estimated effort: 1–2 weeks.
+
+**❌ Still missing — Tier-2 pre-warm handler:**
+
+6. **Pre-warm signal handler** — a small HTTP listener at each Tier-2 node.
+   On signal from the coordination service it issues:
+   `varnishadm ban req.url ~ "\.cvmfspublished$"` (force catalog revalidation)
+   and prefetches the new root catalog.  Can be a 50-line Go binary or a
+   Varnish inline C vmod.  Estimated effort: 1 day.
+
+**❌ Still missing — Supporting infrastructure (ops, not code):**
+
+7. Puppet/Ansible Varnish template for Tier-2 rollout.
+8. Grafana dashboard templates (hit rate, replication lag, node health).
+9. S1 webhook receiver for pull replication triggering (independent of push).
+10. BGP/AS-topology dataset for Phase 3 coord service routing upgrade.
+
+---
+
+## 6. Recommended Roadmap
+
+> Components listed in §5.4 are reflected in phases 1–2 below.
 
 ```
 Now  ──────────────────────────────────────────────────── +3 years
 
  Phase 1 (0–6 months): Prerequisite infrastructure
  ├─ Replace site Squid with Varnish (central Puppet/Ansible template)
- ├─ Deploy cvmfs-bits distributor at Stratum 0 (done in this branch)
+ ├─ Deploy cvmfs-bits distributor at Stratum 0 ✅ done
+ ├─ Receiver: inventory bloom filter, /api/v1/bloom, delta push, coord client ✅ done
  ├─ Enable webhook-triggered S1 replication (eliminates polling lag)
- └─ Instrument Stratum 1 nodes with Prometheus exporters
+ └─ Instrument Stratum 1 nodes with Prometheus exporters (receiver /metrics ✅ done; Grafana dashboards pending)
 
  Phase 2 (6–18 months): HepCDN v1 — coordination + seeding
- ├─ Deploy HepCDN coordination service (routing API, health registry)
+ ├─ Deploy HepCDN coordination service (routing API, health registry) [§5.4 item 5]
  ├─ Upgrade 3–5 pilot Stratum 1 nodes to HepCDN Tier-1 software stack
- │   (cvmfs-bits receiver, bloom filter service, coordination registration)
- ├─ Wire Varnish Tier-2 nodes to receive push pre-warm signals
+ │   (cvmfs-bits receiver + inventory bloom filter + coord registration — DONE in cvmfs-bits)
+ ├─ Wire Varnish Tier-2 nodes to receive push pre-warm signals [§5.4 item 6]
  ├─ Update CVMFS client documentation: coordination service URL replaces
  │   static CVMFS_SERVER_URL list
  └─ Unified Prometheus/Grafana dashboard across all tiers
@@ -568,10 +716,11 @@ Now  ─────────────────────────
 | Option | Ops saving | Perf gain | Disruption | Effort | Phase |
 |---|---|---|---|---|---|
 | Varnish/Nginx replaces Squid | High | Medium | Low | Low | **1 — now** |
-| cvmfs-bits push seeding | High | Very high | Low | Low | **1 — now** |
-| S1 Prometheus instrumentation | Medium | — | Very low | Low | **1 — now** |
+| cvmfs-bits push seeding | High | Very high | Low | Low | **1 — ✅ done** |
+| S1 Prometheus instrumentation | Medium | — | Very low | Low | **1 — ✅ done** |
 | HepCDN coordination service | Very high | High | Medium | Medium | **2** |
-| Tier-1 software upgrade (pilot) | High | High | Low | Medium | **2** |
+| Tier-1 software upgrade — receiver code | High | High | Low | Medium | **1 — ✅ done** |
+| Tier-1 software upgrade — deployment | High | High | Low | Medium | **2** |
 | Unified observability dashboard | Medium | — | Very low | Low | **2** |
 | Full HepCDN Tier-1 rollout | Very high | Very high | Medium | Medium | **3** |
 | K8s-native Tier-1 | High | Low | Medium | Medium | **3** |
@@ -582,7 +731,7 @@ Now  ─────────────────────────
 
 ---
 
-## 6. Reference Varnish Configuration for HepCDN Tier-2
+## 7. Reference Varnish Configuration for HepCDN Tier-2
 
 Squid is the biggest operational burden and the area where a drop-in replacement
 delivers the most value with the least risk.

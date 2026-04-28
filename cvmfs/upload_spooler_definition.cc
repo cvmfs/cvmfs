@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <vector>
 
+#include "util/concurrency.h"
 #include "util/logging.h"
 #include "util/platform.h"
 #include "util/string.h"
