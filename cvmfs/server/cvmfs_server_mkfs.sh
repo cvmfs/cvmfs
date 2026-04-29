@@ -304,14 +304,10 @@ cvmfs_server_mkfs() {
   done
 
   # Testbed mode: the repository is served by a Docker container (stratum0),
-  # not by a host Apache vhost.  Disable all Apache configuration and the
-  # "publisher" steps (FUSE mount, health check, initial commit) that require
-  # a running stratum0 HTTP endpoint or a host-level CVMFS FUSE mount.
-  # The repository structure in /srv/cvmfs/ is complete after signing; Docker
-  # handles serving and mounting.
+  # not by a host Apache vhost.  Disable Apache configuration so mkfs does
+  # not try to reload the host Apache or wait for the Docker-internal URL.
   if [ "${CVMFS_TESTBED:-}" = "true" ]; then
     configure_apache=0
-    no_publisher=1
   fi
 
   # get repository name
