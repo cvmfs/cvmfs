@@ -303,6 +303,14 @@ cvmfs_server_mkfs() {
     esac
   done
 
+  # Testbed mode: the repository is served by a Docker container (stratum0),
+  # not by a host Apache vhost.  Disable all Apache configuration so mkfs does
+  # not try to reload the host Apache or wait for the Docker-internal URL to
+  # become reachable.
+  if [ "${CVMFS_TESTBED:-}" = "true" ]; then
+    configure_apache=0
+  fi
+
   # get repository name
   shift $(($OPTIND-1))
   check_parameter_count 1 $#
@@ -357,7 +365,7 @@ cvmfs_server_mkfs() {
   check_autofs_on_cvmfs             && die "Autofs on /cvmfs has to be disabled"
   lower_hardlink_restrictions
   ensure_swissknife_suid $unionfs   || die "Need CAP_SYS_ADMIN for cvmfs_swissknife"
-  if is_local_upstream $upstream; then
+  if is_local_upstream $upstream && [ "${CVMFS_TESTBED:-}" != "true" ]; then
     check_apache                    || die "Apache must be installed and running"
     ensure_enabled_apache_modules
   fi
