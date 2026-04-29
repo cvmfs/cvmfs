@@ -29,6 +29,7 @@ set (CVMFS_UBENCHMARKS_SOURCES
   ${CVMFS_SOURCE_DIR}/cache_transport.cc
   ${CVMFS_SOURCE_DIR}/catalog.cc
   ${CVMFS_SOURCE_DIR}/catalog_counters.cc
+  ${CVMFS_SOURCE_DIR}/catalog_downloader.cc
   ${CVMFS_SOURCE_DIR}/catalog_mgr_ro.cc
   ${CVMFS_SOURCE_DIR}/catalog_mgr_rw.cc
   ${CVMFS_SOURCE_DIR}/catalog_rw.cc
@@ -66,7 +67,6 @@ set (CVMFS_UBENCHMARKS_SOURCES
   ${CVMFS_SOURCE_DIR}/network/sink_path.cc
   ${CVMFS_SOURCE_DIR}/options.cc
   ${CVMFS_SOURCE_DIR}/pack.cc
-  ${CVMFS_SOURCE_DIR}/receiver/lease_path_util.cc
   ${CVMFS_SOURCE_DIR}/reflog.cc
   ${CVMFS_SOURCE_DIR}/reflog_sql.cc
   ${CVMFS_SOURCE_DIR}/upload_facility.cc
@@ -86,6 +86,7 @@ set (CVMFS_UBENCHMARKS_SOURCES
   ${CVMFS_SOURCE_DIR}/swissknife_lease_curl.cc
   ${CVMFS_SOURCE_DIR}/upload.cc
   ${CVMFS_SOURCE_DIR}/util/algorithm.cc
+  ${CVMFS_SOURCE_DIR}/util/capabilities.cc
   ${CVMFS_SOURCE_DIR}/util/concurrency.cc
   ${CVMFS_SOURCE_DIR}/util/exception.cc
   ${CVMFS_SOURCE_DIR}/util/file_backed_buffer.cc
@@ -138,6 +139,10 @@ set (UBENCHMARKS_LINK_LIBRARIES ${GOOGLEBENCH_LIBRARIES}
                                 ${ZLIB_LIBRARIES}
                                 ${RT_LIBRARY}
                                 ${SQLITE3_LIBRARY}
+                                ${CAP_LIBRARIES}
+                                GTest::gmock
+                                GTest::gtest
+                                LibArchive::LibArchive
                                 nlohmann_json::nlohmann_json
                                 pthread dl)
 
