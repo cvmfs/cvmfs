@@ -705,10 +705,14 @@ _setcap_if_needed() {
 #       normal unprivileged process
 ensure_swissknife_suid() {
   local unionfs="$1"
-  local sk_bin="/usr/bin/$CVMFS_SERVER_SWISSKNIFE"
-  local sk_dbg_bin="/usr/bin/${CVMFS_SERVER_SWISSKNIFE}_debug"
-  local pb_bin="/usr/bin/cvmfs_publish"
-  local pb_dbg_bin="/usr/bin/cvmfs_publish_debug"
+  # In testbed mode binaries live in CVMFS_TESTBED_SOFTWARE_ROOT, not /usr/bin.
+  local _bin_dir="/usr/bin"
+  [ "${CVMFS_TESTBED:-}" = "true" ] && [ -n "${CVMFS_TESTBED_SOFTWARE_ROOT:-}" ] && \
+    _bin_dir="${CVMFS_TESTBED_SOFTWARE_ROOT}"
+  local sk_bin="${_bin_dir}/$CVMFS_SERVER_SWISSKNIFE"
+  local sk_dbg_bin="${_bin_dir}/${CVMFS_SERVER_SWISSKNIFE}_debug"
+  local pb_bin="${_bin_dir}/cvmfs_publish"
+  local pb_dbg_bin="${_bin_dir}/cvmfs_publish_debug"
   local cap_read="cap_dac_read_search"
   local cap_overlay="cap_sys_admin"
 

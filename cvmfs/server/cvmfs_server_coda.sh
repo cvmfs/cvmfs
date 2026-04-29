@@ -145,6 +145,21 @@ CVMFS_SERVER_SWISSKNIFE_DEBUG=$CVMFS_SERVER_SWISSKNIFE
 CVMFS_SERVER_PUBLISH="/usr/bin/cvmfs_publish"
 CVMFS_SERVER_PUBLISH_DEBUG=$CVMFS_SERVER_PUBLISH
 
+# Testbed mode: binaries and libraries live in CVMFS_TESTBED_SOFTWARE_ROOT rather
+# than the standard /usr/bin install prefix.  Override the publish binary path and
+# prepend the software root (and its lib/ subdirectory if present) to
+# LD_LIBRARY_PATH so that shared libraries such as libcvmfs_server.so are found
+# without installing anything system-wide.
+if [ "${CVMFS_TESTBED:-}" = "true" ] && [ -n "${CVMFS_TESTBED_SOFTWARE_ROOT:-}" ]; then
+  CVMFS_SERVER_PUBLISH="${CVMFS_TESTBED_SOFTWARE_ROOT}/cvmfs_publish"
+  CVMFS_SERVER_PUBLISH_DEBUG="${CVMFS_TESTBED_SOFTWARE_ROOT}/cvmfs_publish_debug"
+  _tb_lib_path="${CVMFS_TESTBED_SOFTWARE_ROOT}"
+  [ -d "${CVMFS_TESTBED_SOFTWARE_ROOT}/lib" ] && \
+    _tb_lib_path="${_tb_lib_path}:${CVMFS_TESTBED_SOFTWARE_ROOT}/lib"
+  export LD_LIBRARY_PATH="${_tb_lib_path}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+  unset _tb_lib_path
+fi
+
 # On newer Apache version, reloading is asynchonrous and not guaranteed to succeed.
 # The integration test cases set this parameter to true.
 CVMFS_SERVER_APACHE_RELOAD_IS_RESTART=${CVMFS_SERVER_APACHE_RELOAD_IS_RESTART:=false}
