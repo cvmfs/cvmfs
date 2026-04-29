@@ -4,8 +4,6 @@
  * A cache plugin that stores all data in a fixed-size memory chunk.
  */
 
-#define __STDC_FORMAT_MACROS
-
 #include <alloca.h>
 #include <fcntl.h>
 #include <inttypes.h>

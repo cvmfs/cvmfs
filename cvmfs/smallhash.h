@@ -5,11 +5,6 @@
 #ifndef CVMFS_SMALLHASH_H_
 #define CVMFS_SMALLHASH_H_
 
-#ifndef __STDC_FORMAT_MACROS
-// NOLINTNEXTLINE
-#define __STDC_FORMAT_MACROS
-#endif
-
 #include "duplex_testing.h"
 #include <inttypes.h>
 #include <pthread.h>

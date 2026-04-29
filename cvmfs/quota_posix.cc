@@ -13,7 +13,6 @@
  */
 
 #define __STDC_LIMIT_MACROS
-#define __STDC_FORMAT_MACROS
 
 
 #include "quota_posix.h"

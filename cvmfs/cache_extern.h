@@ -4,10 +4,6 @@
 #ifndef CVMFS_CACHE_EXTERN_H_
 #define CVMFS_CACHE_EXTERN_H_
 
-#ifndef __STDC_FORMAT_MACROS
-#define __STDC_FORMAT_MACROS
-#endif
-
 #include <pthread.h>
 #include <stdint.h>
 #include <unistd.h>

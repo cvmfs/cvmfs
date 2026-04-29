@@ -6,10 +6,6 @@
 #ifndef CVMFS_CATALOG_MGR_IMPL_H_
 #define CVMFS_CATALOG_MGR_IMPL_H_
 
-#ifndef __STDC_FORMAT_MACROS
-#define __STDC_FORMAT_MACROS
-#endif
-
 
 #include <cassert>
 #include <string>

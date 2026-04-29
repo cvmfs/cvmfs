@@ -5,10 +5,6 @@
 #ifndef CVMFS_CACHE_H_
 #define CVMFS_CACHE_H_
 
-#ifndef __STDC_FORMAT_MACROS
-#define __STDC_FORMAT_MACROS
-#endif
-
 #include <stdint.h>
 
 #include <string>

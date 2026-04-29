@@ -6,8 +6,6 @@
  * and publishes the result as a repository subdirectory.
  */
 
-#define __STDC_FORMAT_MACROS
-
 #include "swissknife_overlay.h"
 
 #include <fcntl.h>

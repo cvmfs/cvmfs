@@ -12,11 +12,6 @@
  * The talk module runs in a separate thread.
  */
 
-#ifndef __STDC_FORMAT_MACROS
-#define __STDC_FORMAT_MACROS
-#endif
-
-
 #include "talk.h"
 
 #include <errno.h>

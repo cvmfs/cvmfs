@@ -4,9 +4,6 @@
  * This tool checks a cvmfs repository for file catalog errors.
  */
 
-#define __STDC_FORMAT_MACROS
-
-
 #include "swissknife_check.h"
 
 #include <inttypes.h>

@@ -5,10 +5,6 @@
 #ifndef CVMFS_CATALOG_MGR_H_
 #define CVMFS_CATALOG_MGR_H_
 
-#ifndef __STDC_FORMAT_MACROS
-#define __STDC_FORMAT_MACROS
-#endif
-
 #include <inttypes.h>
 #include <pthread.h>
 
