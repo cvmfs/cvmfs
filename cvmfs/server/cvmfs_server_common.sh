@@ -662,11 +662,23 @@ sign_manifest() {
   load_repo_config $name
   local user_shell="$(get_user_shell $name)"
 
+  # In testbed mode the stratum0 hostname (e.g. "stratum0") is a Docker-internal
+  # name that is not resolvable from the host where cvmfs_server runs.  The
+  # swissknife sign command uses -u to fetch the existing .cvmfsreflog via HTTP;
+  # a DNS failure causes a fatal connection error (kFailHostResolve, error 4).
+  # Fix: replace the HTTP URL with a file:// URL pointing to the upstream storage
+  # directory, where the reflog was just written by swissknife create.
+  # The CVMFS download manager explicitly supports file:// transfers (curl native).
+  local _sign_stratum0="$CVMFS_STRATUM0"
+  if [ "${CVMFS_TESTBED:-}" = "true" ] && is_local_upstream "$CVMFS_UPSTREAM_STORAGE"; then
+    _sign_stratum0="file://$(get_upstream_config "$CVMFS_UPSTREAM_STORAGE")"
+  fi
+
   local sign_command="$(__swissknife_cmd) sign \
           -c /etc/cvmfs/keys/${name}.crt       \
           -k /etc/cvmfs/keys/${name}.key       \
           -n $name                             \
-          -u $CVMFS_STRATUM0                   \
+          -u $_sign_stratum0                   \
           -m $unsigned_manifest                \
           -t ${CVMFS_SPOOL_DIR}/tmp            \
           $(get_swissknife_proxy)              \
