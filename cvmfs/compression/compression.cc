@@ -93,18 +93,18 @@ file_copy_final:
 
 bool CopyMem2File(const unsigned char *buffer, const unsigned buffer_size,
                   FILE *fdest) {
-  int written = fwrite(buffer, 1, buffer_size, fdest);
+  int const written = fwrite(buffer, 1, buffer_size, fdest);
   return (written >= 0) && (unsigned(written) == buffer_size);
 }
 
 
 bool CopyMem2Path(const unsigned char *buffer, const unsigned buffer_size,
                   const string &path) {
-  int fd = open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, kDefaultFileMode);
+  int const fd = open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, kDefaultFileMode);
   if (fd < 0)
     return false;
 
-  int written = write(fd, buffer, buffer_size);
+  int const written = write(fd, buffer, buffer_size);
   close(fd);
 
   return (written >= 0) && (unsigned(written) == buffer_size);
@@ -121,7 +121,7 @@ bool CopyPath2Mem(const string &path, unsigned char **buffer,
   *buffer = reinterpret_cast<unsigned char *>(smalloc(*buffer_size));
   unsigned total_bytes = 0;
   while (true) {
-    int num_bytes = read(fd, *buffer + total_bytes, *buffer_size - total_bytes);
+    int const num_bytes = read(fd, *buffer + total_bytes, *buffer_size - total_bytes);
     if (num_bytes == 0)
       break;
     if (num_bytes < 0) {
@@ -182,7 +182,7 @@ void CompressInit(z_stream *strm) {
   strm->opaque = Z_NULL;
   strm->next_in = Z_NULL;
   strm->avail_in = 0;
-  int retval = deflateInit(strm, Z_DEFAULT_COMPRESSION);
+  int const retval = deflateInit(strm, Z_DEFAULT_COMPRESSION);
   assert(retval == 0);
 }
 
@@ -193,7 +193,7 @@ void DecompressInit(z_stream *strm) {
   strm->opaque = Z_NULL;
   strm->avail_in = 0;
   strm->next_in = Z_NULL;
-  int retval = inflateInit(strm);
+  int const retval = inflateInit(strm);
   assert(retval == 0);
 }
 
@@ -222,7 +222,7 @@ StreamStates CompressZStream2Null(const void *buf,
     z_ret = deflate(strm, eof ? Z_FINISH : Z_NO_FLUSH);  // no bad return value
     if (z_ret == Z_STREAM_ERROR)
       return kStreamDataError;
-    size_t have = kZChunk - strm->avail_out;
+    size_t const have = kZChunk - strm->avail_out;
     shash::Update(out, have, *hash_context);
   } while (strm->avail_out == 0);
 
@@ -256,8 +256,8 @@ StreamStates DecompressZStream2Sink(const void *buf,
         case Z_MEM_ERROR:
           return kStreamIOError;
       }
-      size_t have = kZChunk - strm->avail_out;
-      int64_t written = sink->Write(out, have);
+      size_t const have = kZChunk - strm->avail_out;
+      int64_t const written = sink->Write(out, have);
       if ((written < 0) || (static_cast<uint64_t>(written) != have))
         return kStreamIOError;
     } while (strm->avail_out == 0);
@@ -295,7 +295,7 @@ StreamStates DecompressZStream2File(const void *buf,
         case Z_MEM_ERROR:
           return kStreamIOError;
       }
-      size_t have = kZChunk - strm->avail_out;
+      size_t const have = kZChunk - strm->avail_out;
       if (fwrite(out, 1, have, f) != have || ferror(f)) {
         LogCvmfs(kLogCompress, kLogDebug,
                  "Inflate to file failed with %s "
@@ -476,7 +476,7 @@ bool CompressFd2Null(int fd_src, shash::Any *compressed_hash,
 
   // Compress until end of file
   do {
-    ssize_t bytes_read = read(fd_src, in, kZChunk);
+    ssize_t const bytes_read = read(fd_src, in, kZChunk);
     if (bytes_read < 0) {
       if (errno == EINTR) {
         continue;
@@ -527,7 +527,7 @@ bool CompressPath2Null(const string &src, shash::Any *compressed_hash) {
   FILE *fsrc = fopen(src.c_str(), "r");
   if (fsrc == NULL)
     return false;
-  bool retval = CompressFile2Null(fsrc, compressed_hash);
+  bool const retval = CompressFile2Null(fsrc, compressed_hash);
   fclose(fsrc);
   return retval;
 }
@@ -589,7 +589,7 @@ bool CompressPath2File(const string &src, FILE *fdest,
   if (!fsrc)
     return false;
 
-  bool retval = CompressFile2File(fsrc, fdest, compressed_hash);
+  bool const retval = CompressFile2File(fsrc, fdest, compressed_hash);
   fclose(fsrc);
   return retval;
 }
@@ -683,7 +683,7 @@ bool DecompressPath2File(const string &src, FILE *fdest) {
   if (!fsrc)
     return false;
 
-  bool retval = DecompressFile2File(fsrc, fdest);
+  bool const retval = DecompressFile2File(fsrc, fdest);
   fclose(fsrc);
   return retval;
 }
@@ -781,7 +781,7 @@ bool CompressMem2Mem(const void *buf, const int64_t size, void **out_buf,
         *out_size = 0;
         return false;
       }
-      size_t have = kZChunk - strm.avail_out;
+      size_t const have = kZChunk - strm.avail_out;
       if (*out_size + have > alloc_size) {
         alloc_size *= 2;
         *out_buf = srealloc(*out_buf, alloc_size);
@@ -841,7 +841,7 @@ bool DecompressMem2Mem(const void *buf, const int64_t size, void **out_buf,
           *out_size = 0;
           return false;
       }
-      size_t have = kZChunk - strm.avail_out;
+      size_t const have = kZChunk - strm.avail_out;
       if (*out_size + have > alloc_size) {
         alloc_size *= 2;
         *out_buf = srealloc(*out_buf, alloc_size);
@@ -934,7 +934,7 @@ bool ZlibCompressor::Deflate(const bool flush, unsigned char **inbuf,
 
 
 ZlibCompressor::~ZlibCompressor() {
-  int retcode = deflateEnd(&stream_);
+  int const retcode = deflateEnd(&stream_);
   assert(retcode == Z_OK);
 }
 
@@ -965,7 +965,7 @@ Compressor *EchoCompressor::Clone() {
 bool EchoCompressor::Deflate(const bool flush, unsigned char **inbuf,
                              size_t *inbufsize, unsigned char **outbuf,
                              size_t *outbufsize) {
-  size_t bytes_to_copy = min(*outbufsize, *inbufsize);
+  size_t const bytes_to_copy = min(*outbufsize, *inbufsize);
   memcpy(*outbuf, *inbuf, bytes_to_copy);
   const bool done = (bytes_to_copy == *inbufsize);
 

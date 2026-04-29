@@ -1217,7 +1217,7 @@ bool DownloadManager::ValidateProxyIpsUnlocked(const string &url,
     }
   }
   vector<ProxyInfo> new_infos;
-  set<string> best_addresses = new_host.ViewBestAddresses(opt_ip_preference_);
+  set<string> const best_addresses = new_host.ViewBestAddresses(opt_ip_preference_);
   set<string>::const_iterator iter_ips = best_addresses.begin();
   for (; iter_ips != best_addresses.end(); ++iter_ips) {
     const string url_ip = dns::RewriteUrl(url, *iter_ips);
@@ -2691,7 +2691,7 @@ bool DownloadManager::ValidateGeoReply(const string &reply_order,
     return false;
 
   // Check if tmp_vals contains the number 1..n
-  set<uint64_t> coverage(tmp_vals.begin(), tmp_vals.end());
+  set<uint64_t> const coverage(tmp_vals.begin(), tmp_vals.end());
   if (coverage.size() != tmp_vals.size())
     return false;
   if ((*coverage.begin() != 1) || (*coverage.rbegin() != coverage.size()))
@@ -2870,7 +2870,7 @@ void DownloadManager::SetProxyChain(const string &proxy_list,
       }
 
       // IPv4 addresses have precedence
-      set<string> best_addresses = hosts[num_proxy].ViewBestAddresses(
+      set<string> const best_addresses = hosts[num_proxy].ViewBestAddresses(
           opt_ip_preference_);
       set<string>::const_iterator iter_ips = best_addresses.begin();
       for (; iter_ips != best_addresses.end(); ++iter_ips) {

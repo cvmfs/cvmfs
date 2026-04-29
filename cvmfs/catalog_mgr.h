@@ -289,7 +289,7 @@ class AbstractCatalogManager : public SingleCopy {
   Statistics statistics() const { return statistics_; }
   uint64_t inode_gauge() {
     ReadLock();
-    uint64_t r = inode_gauge_;
+    uint64_t const r = inode_gauge_;
     Unlock();
     return r;
   }

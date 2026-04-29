@@ -303,7 +303,7 @@ void CreateFile(const std::string &path,
  * Symlinks /tmp/cvmfs.XYZ/l --> ParentPath(path) to make it shorter
  */
 static std::string MakeShortSocketLink(const std::string &path) {
-  struct sockaddr_un sock_addr;
+  struct sockaddr_un const sock_addr;
   const unsigned max_length = sizeof(sock_addr.sun_path);
 
   std::string result;
