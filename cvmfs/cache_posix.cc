@@ -24,9 +24,6 @@
  * the download and informs the other, waiting threads on pipes.
  */
 
-#define __STDC_FORMAT_MACROS
-
-
 #include "cache_posix.h"
 
 #include <dirent.h>

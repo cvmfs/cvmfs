@@ -25,9 +25,6 @@
  */
 
 // TODO(jblomer): MS for time summing
-// NOLINTNEXTLINE
-#define __STDC_FORMAT_MACROS
-
 
 #include "download.h"
 

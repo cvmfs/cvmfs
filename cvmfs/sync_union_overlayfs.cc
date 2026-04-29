@@ -2,8 +2,6 @@
  * This file is part of the CernVM File System
  */
 
-#define __STDC_FORMAT_MACROS
-
 #include "sync_union_overlayfs.h"
 
 #include <sys/types.h>

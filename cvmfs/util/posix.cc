@@ -4,11 +4,6 @@
  * Some common functions.
  */
 
-#ifndef __STDC_FORMAT_MACROS
-// NOLINTNEXTLINE
-#define __STDC_FORMAT_MACROS
-#endif
-
 #include <cctype>
 #include <stdlib.h>
 #include <cstdlib>

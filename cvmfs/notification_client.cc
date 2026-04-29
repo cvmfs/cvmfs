@@ -2,11 +2,6 @@
  * This file is part of the CernVM File System.
  */
 
-#ifndef __STDC_FORMAT_MACROS
-// NOLINTNEXTLINE
-#define __STDC_FORMAT_MACROS
-#endif
-
 #include "notification_client.h"
 
 #include <inttypes.h>

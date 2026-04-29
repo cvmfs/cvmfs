@@ -2,8 +2,6 @@
  * This file is part of the CernVM file system.
  */
 
-#define __STDC_FORMAT_MACROS
-
 #include "catalog_mgr_rw.h"
 
 #include <inttypes.h>

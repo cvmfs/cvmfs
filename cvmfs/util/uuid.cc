@@ -4,8 +4,6 @@
  * UUID generation and caching.
  */
 
-#define __STDC_FORMAT_MACROS
-
 #include "util/uuid.h"
 
 #include <cassert>

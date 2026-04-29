@@ -7,10 +7,6 @@
 #ifndef CVMFS_LRU_MD_H_
 #define CVMFS_LRU_MD_H_
 
-#ifndef __STDC_FORMAT_MACROS
-#define __STDC_FORMAT_MACROS
-#endif
-
 #include <stdint.h>
 
 #include "crypto/hash.h"

@@ -18,8 +18,6 @@
 
 // NOLINTNEXTLINE
 #define _FILE_OFFSET_BITS 64
-// NOLINTNEXTLINE
-#define __STDC_FORMAT_MACROS
 
 #include "swissknife_sync.h"
 
