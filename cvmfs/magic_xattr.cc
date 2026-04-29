@@ -653,7 +653,7 @@ void RepoCountersMagicXattr::FinalizeValue() {
   result_pages_.push_back(counters_.GetCsvMap());
 }
 
-uint64_t RepoMetainfoMagicXattr::kMaxMetainfoLength = 65536;
+const uint64_t RepoMetainfoMagicXattr::kMaxMetainfoLength = 65536;
 
 bool RepoMetainfoMagicXattr::PrepareValueFenced() {
   if (!xattr_mgr_->mount_point()->catalog_mgr()->manifest()) {
