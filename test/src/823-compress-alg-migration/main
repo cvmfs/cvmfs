@@ -2,10 +2,11 @@
 cvmfs_test_name="Creating and using repository should work with every compression algorithm"
 cvmfs_test_autofs_on_startup=false
 cvmfs_test_suites="quick"
+set -x
 
 ALG_SET=(unset default zlib zstd none)
 
-default_alg_actual=$(cvmfs_swissknife -h | grep -o 'compression algorithm [(]default: [^)]*[)]' | sed -e 's/compression algorithm (default: //' -e 's/)//')
+default_alg_actual=$(cvmfs_swissknife -h | grep -o 'compression algorithm [(]default: [^)]*[)]' | sed -e 's/compression algorithm (default: //' -e 's/)//' | uniq)
 
 do_alg() {
   alg_spec=$1
@@ -137,6 +138,11 @@ do_alg() {
 
 cvmfs_run_test() {
   logfile=$1
+
+  case "$default_alg_actual" in
+    zlib|zstd|none) ;;
+    *) echo "Unrecognized default alg reported in swissknife help: $default_alg_actual"; return 1; ;;
+  esac
 
   for alg in ${ALG_SET[@]}; do
     do_alg "$alg" || return $?
