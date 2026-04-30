@@ -1,0 +1,223 @@
+#!/bin/bash
+
+cvmfs_test_name="Shared quota manager FIFO multi-write race"
+cvmfs_test_suites="quick"
+cvmfs_test_timeout=900
+
+# Reproducer for the cachemgr panic triggered by the non-atomic multi-write
+# protocol of kSetCleanupPolicy and kRegisterMountpoint introduced in #4029.
+#
+# These methods (PosixQuotaManager::SetCleanupPolicy / RegisterMountpoint) emit
+# the LruCommand and its trailing payload (bool / size_t + string) in *separate*
+# WritePipe calls. The shared-cache FIFO is written to by every FUSE client of
+# the same cachemgr. With concurrent Touch traffic from worker threads in
+# already-mounted repos, another atomic LruCommand can land between the two
+# writes of one logical command, desynchronising the cachemgr's read stream
+# and causing it to PANIC(NULL) on an unrecognised command_type at
+# quota_posix.cc:2014.
+#
+# The race window per fnInit call is microseconds, so the test maximises the
+# rate of both (a) Touch writes from worker threads of stable mounts, and
+# (b) fnInit invocations on cycle mounts. Touch is driven by tight-loop
+# open()s on already-cached files; fnInit is driven by a fan of parallel
+# autofs-triggered mount/unmount cycles on several different repositories.
+# The cachemgr stays alive throughout because the stable mounts always have
+# the FIFO write end open (cvmfs_config reload, by contrast, drains every
+# writer at once and the cachemgr exits cleanly on EOF — that's a different
+# code path and obscures the race we're after).
+#
+# The test fails if syslog shows a PANIC from quota_posix.cc, a FUSE process
+# logs "watchdog disappeared", a mount probe times out, or any /cvmfs mount
+# stops being readable.
+
+# Stable repositories drive Touch traffic. CYCLE_REPOS are mounted/unmounted
+# in parallel to fire SetCleanupPolicy + RegisterMountpoint over and over.
+STABLE_REPOS="sft.cern.ch atlas.cern.ch cms.cern.ch alice.cern.ch"
+CYCLE_REPOS="lhcb.cern.ch grid.cern.ch na62.cern.ch ams.cern.ch geant4.cern.ch"
+ALL_REPOS="$STABLE_REPOS $CYCLE_REPOS"
+ALL_REPOS_CSV=$(echo $ALL_REPOS | tr ' ' ',')
+
+HAMMERS_PER_REPO=4
+ITERATIONS_PER_CYCLER=400
+
+BG_PIDS=""
+
+cleanup() {
+  echo "running cleanup() ..."
+  if [ -n "$BG_PIDS" ]; then
+    for p in $BG_PIDS; do
+      kill $p 2>/dev/null || true
+    done
+    wait 2>/dev/null || true
+  fi
+  for r in $CYCLE_REPOS; do
+    local mp="/tmp/cvmfs-cycle-${r//./_}"
+    sudo umount -l "$mp" 2>/dev/null || true
+    sudo rmdir "$mp" 2>/dev/null || true
+  done
+}
+
+# Ask any of the stable repos for the shared cachemgr PID via the talk
+# socket. All mounts share one cachemgr, so any repo answers identically.
+# `pid cachemgr` does a pipe RPC into the cachemgr; if the cachemgr is dead
+# the FUSE side blocks on the write, so wrap it in a timeout.
+get_cachemgr_pid() {
+  local probe_repo=${STABLE_REPOS%% *}
+  sudo timeout 5 cvmfs_talk -i $probe_repo pid cachemgr 2>/dev/null \
+    | tr -d '[:space:]'
+}
+
+# Tight-loop reader of a fixed cached-file list. After warmup every read
+# is a cache HIT, which the client serves via PosixCacheManager::Open ->
+# PosixQuotaManager::Touch -> single WritePipe of an LruCommand{kTouch}.
+hammer() {
+  local repo=$1
+  local files
+  files=$(find /cvmfs/$repo -maxdepth 4 -type f 2>/dev/null \
+            | head -50 \
+            | tr '\n' ' ')
+  if [ -z "$files" ]; then
+    return
+  fi
+  # Warm the cache so subsequent reads stay local.
+  for f in $files; do cat "$f" >/dev/null 2>&1; done
+  while true; do
+    for f in $files; do
+      cat "$f" >/dev/null 2>&1
+    done
+  done
+}
+
+# Repeatedly mount and unmount one repository at a private mountpoint that
+# autofs does NOT manage, so every iteration is a guaranteed fresh cvmfs2
+# spawn -> fnInit -> SetCleanupPolicy (2 writes) + RegisterMountpoint
+# (3 writes) on the shared FIFO. Going via /cvmfs/$repo would let autofs
+# cache the mount and skip Init on subsequent iterations.
+cycler() {
+  local repo=$1
+  local n=$2
+  local mp="/tmp/cvmfs-cycle-${repo//./_}"
+  sudo mkdir -p "$mp" 2>/dev/null
+  local i
+  for i in $(seq 1 $n); do
+    if ! sudo timeout 30 mount -t cvmfs $repo "$mp" 2>/dev/null; then
+      continue
+    fi
+    sudo umount "$mp" 2>/dev/null || sudo umount -l "$mp" 2>/dev/null || true
+  done
+  sudo rmdir "$mp" 2>/dev/null || true
+}
+
+cvmfs_run_test() {
+  local logfile=$1
+  local src_location=$2
+
+  trap cleanup EXIT HUP INT TERM || return $?
+
+  echo "*** mounting all repositories with shared cache: $ALL_REPOS_CSV"
+  cvmfs_mount $ALL_REPOS_CSV \
+    "CVMFS_KCACHE_TIMEOUT=3" \
+    "CVMFS_SHARED_CACHE=yes" \
+    || return 10
+
+  local cachemgr_pid_initial
+  cachemgr_pid_initial=$(get_cachemgr_pid)
+  if [ -z "$cachemgr_pid_initial" ]; then
+    echo "ERROR: no shared cachemgr process found after mount"
+    return 11
+  fi
+  echo "*** shared cachemgr PID: $cachemgr_pid_initial"
+
+  # The cycle repos are mounted by cvmfs_mount above as a sanity check; the
+  # cyclers themselves use private mountpoints under /tmp, so detach the
+  # /cvmfs entries here to keep autofs out of the way.
+  local r
+  for r in $CYCLE_REPOS; do
+    sudo umount /cvmfs/$r 2>/dev/null || true
+  done
+
+  echo "*** starting $HAMMERS_PER_REPO hammer(s) per stable repo"
+  for r in $STABLE_REPOS; do
+    local h
+    for h in $(seq 1 $HAMMERS_PER_REPO); do
+      hammer $r &
+      BG_PIDS="$BG_PIDS $!"
+    done
+  done
+  echo "*** background hammer PIDs:$BG_PIDS"
+
+  # Let the hammers warm up and start emitting Touch.
+  sleep 5
+
+  echo "*** starting parallel cyclers ($ITERATIONS_PER_CYCLER iters each):"
+  echo "***   $CYCLE_REPOS"
+  local cycler_pids=""
+  for r in $CYCLE_REPOS; do
+    cycler $r $ITERATIONS_PER_CYCLER &
+    cycler_pids="$cycler_pids $!"
+    BG_PIDS="$BG_PIDS $!"
+  done
+
+  # Periodically poll the cachemgr while the cyclers run, so a wedged or
+  # panicked cachemgr surfaces immediately instead of after the loop ends.
+  echo "*** monitoring cachemgr every 10s"
+  local poll
+  for poll in $(seq 1 80); do
+    sleep 10
+
+    # Have all cyclers finished?
+    local still_running=0
+    local p
+    for p in $cycler_pids; do
+      if kill -0 $p 2>/dev/null; then
+        still_running=$((still_running + 1))
+      fi
+    done
+
+    local pid_now
+    pid_now=$(get_cachemgr_pid)
+    if [ -z "$pid_now" ]; then
+      echo "ERROR: cachemgr unreachable after poll $poll (cyclers running: $still_running)"
+      echo "--- syslog tail (looking for PANIC) ---"
+      sudo grep -E "PANIC.*quota_posix\.cc|Signal: 6, errno: 2|watchdog disappeared" \
+        $CVMFS_TEST_SYSLOG_TARGET /var/log/messages 2>/dev/null \
+        | tail -5
+      return 21
+    fi
+    echo "    poll $poll (${still_running} cyclers running): cachemgr PID $pid_now"
+
+    if [ $still_running -eq 0 ]; then
+      break
+    fi
+  done
+
+  # Smoking-gun checks in syslog. The cachemgr's PANIC at quota_posix.cc:2014
+  # (which the optimiser sometimes attributes to neighbouring lines) goes to
+  # kLogSyslogErr; the FUSE-side cascade emits "watchdog disappeared".
+  if sudo grep -E "PANIC.*quota_posix\.cc" \
+       $CVMFS_TEST_SYSLOG_TARGET >>$logfile 2>&1; then
+    echo "ERROR: cachemgr logged PANIC from quota_posix.cc"
+    return 31
+  fi
+  if sudo grep -E "watchdog disappeared" \
+       $CVMFS_TEST_SYSLOG_TARGET >>$logfile 2>&1; then
+    echo "ERROR: a FUSE process aborted because the watchdog disappeared"
+    return 32
+  fi
+  if sudo grep -E "Signal: 6.*errno: 2" \
+       $CVMFS_TEST_SYSLOG_TARGET >>$logfile 2>&1; then
+    echo "ERROR: a cvmfs2 process aborted with SIGABRT/ENOENT (cachemgr panic signature)"
+    return 33
+  fi
+
+  # Final liveness check: each stable mount must still serve reads.
+  for r in $STABLE_REPOS; do
+    if ! sudo timeout 10 ls /cvmfs/$r >/dev/null 2>&1; then
+      echo "ERROR: /cvmfs/$r is no longer readable after the loop"
+      return 40
+    fi
+  done
+
+  echo "*** cachemgr survived; no panic detected"
+  return 0
+}
