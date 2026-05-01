@@ -1199,13 +1199,17 @@ cvmfs_status() {
       # no more detail is available on macOS
       continue
     fi
-    # provide more detail if specific repo(s) requested
+    if [ ! -t 0 ]; then
+      continue
+    fi
+    # provide more detail if specific repo(s) requested interactively
     local s1="$(attr -qg host $mountpoint)"
     if [ -z "$s1" ]; then
       echo "- could not read host from $mountpoint"
       RETVAL=1
       continue
     fi
+    export http_proxy="$(attr -qg proxy $mountpoint)"
     local last_snapshot="$(curl -s -m 5 "$s1/.cvmfs_status.json" | sed -n 's/"//g;s/,$//;s/.*last_snapshot[^ ]* //p')"
     if [ -z "$last_snapshot" ]; then
       echo "- could not read last_snapshot from $s1/.cvmfs_status.json"
@@ -1219,7 +1223,7 @@ cvmfs_status() {
     if [ -n "$external_host" ]; then
       echo "- external host $external_host"
     fi
-    echo "- proxy $(attr -qg proxy $mountpoint)"
+    echo "- proxy $http_proxy"
     echo "- host updated $(($age / 60)) minutes and $(($age % 60)) seconds ago"
     local host_list="$(attr -qg host_list $mountpoint)"
     local max_revision=0
