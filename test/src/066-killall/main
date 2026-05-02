@@ -147,7 +147,7 @@ test_extra_args(){
 
   unfreeze
 
-  sleep 1
+  wait_for_umount
 
   # At this point the ls process should have terminated
   if [ -d /proc/$d_pid ]; then
