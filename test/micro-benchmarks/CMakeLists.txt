@@ -44,6 +44,7 @@ set (CVMFS_UBENCHMARKS_SOURCES
   ${CVMFS_SOURCE_DIR}/compression/decompressor_zlib.cc
   ${CVMFS_SOURCE_DIR}/compression/decompressor_zstd.cc
   ${CVMFS_SOURCE_DIR}/compression/input_cache.cc
+  ${CVMFS_SOURCE_DIR}/compression/input_fd.cc
   ${CVMFS_SOURCE_DIR}/compression/input_file.cc
   ${CVMFS_SOURCE_DIR}/compression/input_mem.cc
   ${CVMFS_SOURCE_DIR}/compression/input_path.cc
