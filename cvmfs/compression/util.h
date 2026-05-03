@@ -11,6 +11,8 @@
 
 namespace zip {
 
+const unsigned kZChunk = 16384;
+
 enum StreamState {
   kStreamDataError = 0,
   kStreamIOError,
