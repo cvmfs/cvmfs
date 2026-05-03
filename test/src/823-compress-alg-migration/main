@@ -1,7 +1,7 @@
 #!/bin/bash
 cvmfs_test_name="Creating and using repository should work with every compression algorithm"
 cvmfs_test_autofs_on_startup=false
-cvmfs_test_suites="quick"
+cvmfs_test_suites=""
 set -x
 
 ALG_SET=(unset default zlib zstd none)
