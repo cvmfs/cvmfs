@@ -55,6 +55,8 @@ class T_Compressor : public FileSandbox {
     free(test_string);
   }
 
+  void ExerciseCompressionLongNewOutbufTooSmall(zip::Algorithm alg);
+
   char *test_string, *ptr_test_string;
   std::string str_test_string;
   unsigned char *buf;
@@ -698,10 +700,10 @@ TEST_F(T_Compressor, CompressionNewBigEnough) {
   EXPECT_EQ(0, memcmp(out.data(), test_string, strlen(test_string) + 1));
 }
 
-TEST_F(T_Compressor, ZstdCompressionLongNewOutbufTooSmall) {
+void T_Compressor::ExerciseCompressionLongNewOutbufTooSmall(zip::Algorithm alg) {
   UniquePtr<Compressor> compressor;
   UniquePtr<Decompressor> decompressor;
-  compressor = zip::Compressor::Construct(zip::kZstd);
+  compressor = zip::Compressor::Construct(alg);
   unsigned compress_pos = 0;
   unsigned rounds = 0;
 
@@ -740,7 +742,7 @@ TEST_F(T_Compressor, ZstdCompressionLongNewOutbufTooSmall) {
   EXPECT_GT(compress_pos, 0U);
 
   // Decompress it, check if it's still the same
-  decompressor = zip::Decompressor::Construct(zip::kZstd);
+  decompressor = zip::Decompressor::Construct(alg);
   zip::InputMem in(compress_buf, compress_pos);
   cvmfs::MemSink out(0);
   const zip::StreamStates res = decompressor->DecompressStream(&in, &out);
@@ -749,6 +751,12 @@ TEST_F(T_Compressor, ZstdCompressionLongNewOutbufTooSmall) {
   EXPECT_EQ(0, memcmp(out.data(), in_buf, in_size));
 
   delete[] compress_buf;
+}
+
+TEST_F(T_Compressor, EveryCompressionLongNewOutbufTooSmall) {
+  ExerciseCompressionLongNewOutbufTooSmall(zip::Algorithm::kNoCompression);
+  ExerciseCompressionLongNewOutbufTooSmall(zip::Algorithm::kZlib);
+  ExerciseCompressionLongNewOutbufTooSmall(zip::Algorithm::kZstd);
 }
 
 TEST_F(T_Compressor, CompressionLongNewOutbufTooSmall) {
