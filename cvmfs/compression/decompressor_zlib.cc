@@ -82,15 +82,20 @@ StreamStates ZlibDecompressor::DecompressStream(InputAbstract *input,
           return kStreamIOError;
         break;
       }
+      input->SetIdxInsideChunk(input->chunk_size() - stream_.avail_in);
       const size_t have = kZChunk_ - stream_.avail_out;
+      if (have == 0) {
+        break;
+      }
       const int64_t written = output->Write(out, have);
 
       if (written < 0) {
         is_healthy_ = false;
         return kStreamIOError;
       }
-      input->SetIdxInsideChunk(input->chunk_size() - stream_.avail_in);
-
+      if (z_ret == Z_STREAM_END) {
+        break;
+      }
     } while (
         //stream_.avail_out == 0 // output buffer is full
         stream_.avail_in > 0 // input buffer has something to process
