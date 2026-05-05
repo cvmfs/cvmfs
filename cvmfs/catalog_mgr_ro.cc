@@ -71,7 +71,7 @@ std::string SimpleCatalogManager::CopyCatalogToTempFile(
   }
 
   zip::InputPath in_path(cache_path);
-  cvmfs::FileSink out_file(fcatalog, true);
+  cvmfs::FileSink out_file(fcatalog, false);
 
   const bool retval = (copy_->DecompressStream(&in_path, &out_file)
                                                             == zip::kStreamEnd);
