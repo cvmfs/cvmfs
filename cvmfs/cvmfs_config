@@ -1173,6 +1173,7 @@ cvmfs_status() {
   else
     mountpoints="$mounted_repos"
   fi
+  local non_terminal_message=false
   for mountpoint in $mountpoints
   do
     local fqrn=
@@ -1200,6 +1201,10 @@ cvmfs_status() {
       continue
     fi
     if [ ! -t 0 ]; then
+      if ! $non_terminal_message; then
+        echo "skipping detail because not running on a terminal"
+        non_terminal_message=true
+      fi
       continue
     fi
     # provide more detail if specific repo(s) requested interactively
