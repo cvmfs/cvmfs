@@ -110,7 +110,7 @@ cvmfs_server_publish() {
     scratch_dir="${spool_dir}/scratch/current"
     stratum0=$CVMFS_STRATUM0
     hash_algorithm="${CVMFS_HASH_ALGORITHM-sha1}"
-    compression_alg="${CVMFS_COMPRESSION_ALGORITHM-default}"
+    compression_alg="${CVMFS_COMPRESSION_ALGORITHM:-default}"
     if [ x"$force_compression_algorithm" != "x" ]; then
       compression_alg="$force_compression_algorithm"
       export CVMFS_COMPRESSION_ALGORITHM=$force_compression_algorithm

@@ -150,7 +150,7 @@ cvmfs_server_tag() {
       -w $CVMFS_STRATUM0                                 \
       -o ${new_manifest}~                                \
       -e $hash_algorithm                                 \
-      -Z ${CVMFS_COMPRESSION_ALGORITHM-default}          \
+      -Z ${CVMFS_COMPRESSION_ALGORITHM:-default}         \
       -N $name                                           \
       -K $CVMFS_PUBLIC_KEY                               \
       $(get_swissknife_proxy)                            \
