@@ -69,8 +69,9 @@ ParameterList CommandOverlay::GetParams() const {
   r.push_back(Parameter::Mandatory('d', "destination subdirectory path in "
                "repository for the merged overlay"));
   r.push_back(Parameter::Optional('e', "hash algorithm (default: sha1)"));
-  r.push_back(Parameter::Optional('Z', "compression algorithm "
-               "(default: zlib)"));
+  r.push_back(Parameter::Optional('Z', "compression algorithm (default: "
+                                           + zip::AlgorithmName(zip::kDefault)
+                                           + ")"));
   r.push_back(Parameter::Optional('@', "proxy URL"));
   r.push_back(Parameter::Switch('L', "follow HTTP redirects"));
   r.push_back(Parameter::Optional('c', "OCI image config JSON file path "
