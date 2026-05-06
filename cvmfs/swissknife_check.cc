@@ -181,13 +181,14 @@ bool CommandCheck::CompareCounters(const catalog::Counters &a,
 /**
  * Checks for existence of a file either locally or via HTTP head
  */
-bool CommandCheck::Exists(const string &file) {
+bool CommandCheck::Exists(const string &file, zip::Algorithm decomp_alg) {
   if (!is_remote_) {
     return FileExists(file) || SymlinkExists(file);
   } else {
     const string url = repo_base_path_ + "/" + file;
     LogCvmfs(kLogCvmfs, kLogVerboseMsg, "[Exists::url] %s", url.c_str());
-    download::JobInfo head(&url, false);
+    download::JobInfo head(&url, decomp_alg, false, /*hash=*/NULL, /*sink=*/NULL);
+    head.SetHeadRequest(true);
     return download_manager()->Fetch(&head) == download::kFailOk;
   }
 }
@@ -424,7 +425,7 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
       string chunk_path = "data/" + entries[i].checksum().MakePath();
       if (entries[i].IsDirectory())
         chunk_path += shash::kSuffixMicroCatalog;
-      if (!Exists(chunk_path)) {
+      if (!Exists(chunk_path, entries[i].compression_algorithm())) {
         LogCvmfs(kLogCvmfs, kLogStderr, "data chunk %s (%s) missing",
                  entries[i].checksum().ToString().c_str(), full_path.c_str());
         retval = false;

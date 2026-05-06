@@ -86,7 +86,7 @@ class CommandCheck : public Command {
             const PathString &path,
             catalog::DeltaCounters *computed_counters,
             std::set<PathString> *bind_mountpoints);
-  bool Exists(const std::string &file);
+  bool Exists(const std::string &file, zip::Algorithm decomp_alg = zip::Algorithm::kNoCompression);
   bool CompareCounters(const catalog::Counters &a, const catalog::Counters &b);
   bool CompareEntries(const catalog::DirectoryEntry &a,
                       const catalog::DirectoryEntry &b,
