@@ -425,8 +425,8 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
     return NULL;
   }
   LogCvmfs(kLogQuota, kLogDebug,
-           "new cache manager pid: %d protocol revision %d",
-           new_cachemgr_pid, QuotaManager::kProtocolRevision);
+           "new cache manager pid: %d protocol revision %d", new_cachemgr_pid,
+           QuotaManager::kProtocolRevision);
   quota_mgr->SetCacheMgrPid(new_cachemgr_pid);
   const int fd_lockfile_rw = open((workspace_dir + "/lock_cachemgr").c_str(),
                                   O_RDWR | O_TRUNC, 0600);
@@ -553,17 +553,20 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
 
       // Avoid evicting open files hopping there are enough more recently used
       // files to satisfy the cleanup request
-/*
-      const bool is_open = std::find_if(
-                               open_files_.begin(), open_files_.end(),
-                               [&candidates, &i](const auto &elem) -> bool {
-                                 return elem.Collide(candidates[i].hash);
-                               })
-                           != open_files_.end();
-*/
-      bool is_open=false;
-      for(auto it=open_files_.begin();it!=open_files_.end();++it){
-        if (it->Collide(candidates[i].hash)){is_open=true; break;}
+      /*
+            const bool is_open = std::find_if(
+                                     open_files_.begin(), open_files_.end(),
+                                     [&candidates, &i](const auto &elem) -> bool
+         { return elem.Collide(candidates[i].hash);
+                                     })
+                                 != open_files_.end();
+      */
+      bool is_open = false;
+      for (auto it = open_files_.begin(); it != open_files_.end(); ++it) {
+        if (it->Collide(candidates[i].hash)) {
+          is_open = true;
+          break;
+        }
       }
 
       if (is_pinned) {
@@ -792,29 +795,47 @@ uint32_t PosixQuotaManager::GetProtocolRevision() {
 }
 
 void PosixQuotaManager::SetCleanupPolicy(bool cleanup_unused_first) {
-  if (protocol_revision_ < 3) return;
+  if (protocol_revision_ < 3)
+    return;
 
-  LruCommand cmd;
-  cmd.command_type = kSetCleanupPolicy;
-  WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
+  LogCvmfs(
+      kLogQuota, kLogDebug, "Set cleanup policy to %s",
+      (cleanup_unused_first) ? "cleanup unused files first." : "vanilla lru.");
 
-  WritePipe(pipe_lru_[1], &cleanup_unused_first, sizeof(bool));
+  char policy = (cleanup_unused_first) ? 'S' : 'R';  // S: smart, R: regular;
+
+  LruCommand *cmd = reinterpret_cast<LruCommand *>(
+      alloca(sizeof(LruCommand) + sizeof(policy)));
+  new (cmd) LruCommand;
+  cmd->command_type = kSetCleanupPolicy;
+  cmd->desc_length = sizeof(policy);
+  memcpy(reinterpret_cast<char *>(cmd) + sizeof(LruCommand), &policy,
+         sizeof(policy));
+  WritePipe(pipe_lru_[1], cmd, sizeof(LruCommand) + sizeof(policy));
 }
 
 void PosixQuotaManager::RegisterMountpoint(const std::string &mountpoint) {
-  if (protocol_revision_ < 3) return;
+  if (protocol_revision_ < 3)
+    return;
 
-  LruCommand cmd;
-  cmd.command_type = kRegisterMountpoint;
-  WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
+  LogCvmfs(kLogQuota, kLogDebug, "Register Mountpoint %s", mountpoint.c_str());
 
-  size_t mp_size = mountpoint.size();
-  WritePipe(pipe_lru_[1], &mp_size, sizeof(size_t));
-  WritePipe(pipe_lru_[1], mountpoint.data(), mp_size);
+  const unsigned desc_length = (mountpoint.size() > kMaxDescription)
+                                   ? kMaxDescription
+                                   : mountpoint.size();
+  LruCommand *cmd = reinterpret_cast<LruCommand *>(
+      alloca(sizeof(LruCommand) + desc_length));
+  new (cmd) LruCommand;
+  cmd->command_type = kRegisterMountpoint;
+  cmd->desc_length = desc_length;
+  memcpy(reinterpret_cast<char *>(cmd) + sizeof(LruCommand), mountpoint.data(),
+         desc_length);
+  WritePipe(pipe_lru_[1], cmd, sizeof(LruCommand) + desc_length);
 }
 
 std::string PosixQuotaManager::GetMountpoints() {
-  if (protocol_revision_ < 3) return "";
+  if (protocol_revision_ < 3)
+    return "";
 
   int pipe_mp[2];
   MakeReturnPipe(pipe_mp);
@@ -831,7 +852,8 @@ std::string PosixQuotaManager::GetMountpoints() {
 }
 
 std::string PosixQuotaManager::GetGroupHashes() {
-  if (protocol_revision_ < 3) return "";
+  if (protocol_revision_ < 3)
+    return "";
 
   int pipe_gh[2];
   MakeReturnPipe(pipe_gh);
@@ -1222,7 +1244,8 @@ int PosixQuotaManager::MainCacheManager(int argc, char **argv) {
     assert(SetLimitCore(0));
   }
 
-  const UniquePtr<Watchdog> watchdog(Watchdog::Create(NULL, false /* needs_read_environ */));
+  const UniquePtr<Watchdog> watchdog(
+      Watchdog::Create(NULL, false /* needs_read_environ */));
   assert(watchdog.IsValid());
   watchdog->Spawn("./stacktrace.cachemgr");
 
@@ -1344,7 +1367,9 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
 
     // Inserts and pins come with a description (usually a path)
     if ((command_type == kInsert) || (command_type == kInsertVolatile)
-        || (command_type == kPin) || (command_type == kPinRegular)) {
+        || (command_type == kPin) || (command_type == kPinRegular)
+        || (command_type == kRegisterMountpoint)
+        || (command_type == kSetCleanupPolicy)) {
       const int desc_length = command_buffer[num_commands].desc_length;
       ReadPipe(quota_mgr->pipe_lru_[0],
                &description_buffer[kMaxDescription * num_commands],
@@ -1365,10 +1390,8 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
 
     // Register a new mountpoint
     if (command_type == kRegisterMountpoint) {
-      size_t mp_size = 0;
-      ReadPipe(quota_mgr->pipe_lru_[0], &mp_size, sizeof(size_t));
-      std::string mountpoint(mp_size, '\0');
-      ReadPipe(quota_mgr->pipe_lru_[0], (void *)mountpoint.data(), mp_size);
+      std::string mountpoint(description_buffer,
+                             command_buffer[num_commands].desc_length);
       quota_mgr->mountpoints_.push_back(mountpoint);
       LogCvmfs(kLogQuota, kLogDebug | kLogSyslog,
                "Mountpoint %s registered in the group", mountpoint.c_str());
@@ -1377,9 +1400,7 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
 
     // Set Cleanup Policy
     if (command_type == kSetCleanupPolicy) {
-      bool policy = false;
-      ReadPipe(quota_mgr->pipe_lru_[0], &policy, sizeof(bool));
-      quota_mgr->cleanup_unused_first_ = policy;
+      quota_mgr->cleanup_unused_first_ = (description_buffer[0] == 'S') ? true : false;
       continue;
     }
     // Mountpoints are returned immediately
@@ -2314,7 +2335,8 @@ void *PosixQuotaManager::CollectMountpointsHashes(void *data) {
   }
   const MutexLockGuard lock_guard(handler->l);
   for (auto hash_str : hash_strs) {
-    handler->of.push_back(shash::Short( shash::MkFromHexPtr(shash::HexPtr(hash_str)) ));
+    handler->of.push_back(
+        shash::Short(shash::MkFromHexPtr(shash::HexPtr(hash_str))));
   }
 #endif
   pthread_exit(nullptr);
