@@ -1390,7 +1390,7 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
 
     // Register a new mountpoint
     if (command_type == kRegisterMountpoint) {
-      std::string mountpoint(description_buffer,
+      const std::string mountpoint(description_buffer,
                              command_buffer[num_commands].desc_length);
       quota_mgr->mountpoints_.push_back(mountpoint);
       LogCvmfs(kLogQuota, kLogDebug | kLogSyslog,
