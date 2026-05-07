@@ -833,6 +833,15 @@ void PosixQuotaManager::RegisterMountpoint(const std::string &mountpoint) {
   WritePipe(pipe_lru_[1], cmd, sizeof(LruCommand) + desc_length);
 }
 
+std::string PosixQuotaManager::ReadPipeString(int fd, size_t size) {
+  if (size == 0)
+    return "";
+
+  std::vector<char> buf(size);
+  ManagedReadHalfPipe(fd, buf.data(), size);
+  return std::string(buf.data(), size);
+}
+
 std::string PosixQuotaManager::GetMountpoints() {
   if (protocol_revision_ < 3)
     return "";
@@ -846,9 +855,9 @@ std::string PosixQuotaManager::GetMountpoints() {
   WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
   size_t mp_str_size = 0;
   ManagedReadHalfPipe(pipe_mp[0], &mp_str_size, sizeof(size_t));
-  char *buf = (char *)malloc(mp_str_size * sizeof(char));
-  ManagedReadHalfPipe(pipe_mp[0], buf, mp_str_size);
-  return std::string(buf);
+  const std::string result = ReadPipeString(pipe_mp[0], mp_str_size);
+  CloseReturnPipe(pipe_mp);
+  return result;
 }
 
 std::string PosixQuotaManager::GetGroupHashes() {
@@ -864,9 +873,9 @@ std::string PosixQuotaManager::GetGroupHashes() {
   WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
   size_t mp_str_size = 0;
   ManagedReadHalfPipe(pipe_gh[0], &mp_str_size, sizeof(size_t));
-  char *buf = (char *)malloc(mp_str_size * sizeof(char));
-  ManagedReadHalfPipe(pipe_gh[0], buf, mp_str_size);
-  return std::string(buf);
+  const std::string result = ReadPipeString(pipe_gh[0], mp_str_size);
+  CloseReturnPipe(pipe_gh);
+  return result;
 }
 
 /**
