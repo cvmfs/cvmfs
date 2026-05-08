@@ -38,6 +38,9 @@ class PosixQuotaManager : public QuotaManager {
   FRIEND_TEST(T_QuotaManager, Contains);
   FRIEND_TEST(T_QuotaManager, InitDatabase);
   FRIEND_TEST(T_QuotaManager, MakeReturnPipe);
+  FRIEND_TEST(T_QuotaManager, ReadPipeStringUsesExactLength);
+  FRIEND_TEST(T_QuotaManager, RegisterMountpointUsesCorrectDescriptionBuffer);
+  FRIEND_TEST(T_QuotaManager, SetCleanupPolicyUsesCorrectDescriptionBuffer);
 
  public:
   static PosixQuotaManager *Create(const std::string &cache_workspace,
@@ -273,6 +276,7 @@ class PosixQuotaManager : public QuotaManager {
   PosixQuotaManager(const uint64_t limit, const uint64_t cleanup_threshold,
                     const std::string &cache_workspace);
   void SkipEviction(const EvictCandidate &candidate);
+  std::string ReadPipeString(int fd, size_t size);
 
   /**
    * Indicates if the cache manager is a shared process or a thread within the
