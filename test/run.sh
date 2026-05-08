@@ -207,7 +207,7 @@ if [ $test_exclusions -ne 0 ]; then
   shift # get rid of '--'
 fi
 
-testsuite="$@"
+testsuite=$(shuf -e $@)
 if [ -z "$testsuite" ]; then
   if [ "$suite_option_provided" -eq 0 ] && [ -z "$labels" ]; then
     labels="quick"
