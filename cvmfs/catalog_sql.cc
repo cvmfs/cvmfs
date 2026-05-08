@@ -88,7 +88,9 @@ const float CatalogDatabase::kLatestSupportedSchema = 2.5;  // + 1.X (r/o)
 //              and may be NULL
 //   7 --> 8: (Sep 30 2025):
 //            * add kFlagBundleTrigger
-const unsigned CatalogDatabase::kLatestSchemaRevision = 8;
+//   8 --> 9: (May 08 2026):
+//            * Add kFlagFileVolatile per-file flag bit (no DDL change)
+const unsigned CatalogDatabase::kLatestSchemaRevision = 9;
 
 bool CatalogDatabase::CheckSchemaCompatibility() {
   return !((schema_version() >= 2.0 - kSchemaEpsilon)
@@ -241,6 +243,17 @@ bool CatalogDatabase::LiveSchemaUpgradeIfNecessary() {
     LogCvmfs(kLogCatalog, kLogDebug, "upgrading schema revision (7 --> 8)");
 
     set_schema_revision(8);
+    if (!StoreSchemaRevision()) {
+      LogCvmfs(kLogCatalog, kLogDebug, "failed to upgrade schema revision");
+      return false;
+    }
+  }
+
+  if (IsEqualSchema(schema_version(), 2.5) && (schema_revision() == 8)) {
+    LogCvmfs(kLogCatalog, kLogDebug, "upgrading schema revision (8 --> 9)");
+
+    // No DDL change: kFlagFileVolatile is encoded in the existing flags column.
+    set_schema_revision(9);
     if (!StoreSchemaRevision()) {
       LogCvmfs(kLogCatalog, kLogDebug, "failed to upgrade schema revision");
       return false;
@@ -494,6 +507,8 @@ unsigned SqlDirent::CreateDatabaseFlags(const DirectoryEntry &entry) const {
       database_flags |= kFlagDirectIo;
     if (entry.IsBundleTrigger())
       database_flags |= kFlagBundleTrigger;
+    if (entry.IsVolatile())
+      database_flags |= kFlagFileVolatile;
   }
 
   if (!entry.checksum_ptr()->IsNull() || entry.IsChunkedFile())
@@ -786,6 +801,7 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog,
     result.is_chunked_file_ = (database_flags & kFlagFileChunk);
     result.is_hidden_ = (database_flags & kFlagHidden);
     result.is_direct_io_ = (database_flags & kFlagDirectIo);
+    result.is_volatile_ = (database_flags & kFlagFileVolatile);
     result.is_external_file_ = (database_flags & kFlagFileExternal);
     result.is_bundle_trigger_ = (database_flags & kFlagBundleTrigger);
     result.has_xattrs_ = RetrieveInt(15) != 0;

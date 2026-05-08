@@ -73,6 +73,9 @@ DirectoryEntryBase::Differences DirectoryEntry::CompareTo(
   if (IsBundleTrigger() != other.IsBundleTrigger()) {
     result |= Difference::kBundleTriggerFlag;
   }
+  if (IsVolatile() != other.IsVolatile()) {
+    result |= Difference::kVolatileFlag;
+  }
 
   return result;
 }

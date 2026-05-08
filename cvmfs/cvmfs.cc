@@ -1301,7 +1301,8 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
         chunk_tables->inode2chunks.Insert(
             unique_inode, FileChunkReflist(chunks.Release(), path,
                                            dirent.compression_algorithm(),
-                                           dirent.IsExternalFile()));
+                                           dirent.IsExternalFile(),
+                                           dirent.IsVolatile()));
         chunk_tables->inode2references.Insert(unique_inode, 1);
       } else {
         uint32_t refctr;
@@ -1363,7 +1364,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   label.path = path.ToString();
   label.size = dirent.size();
   label.zip_algorithm = dirent.compression_algorithm();
-  if (mount_point_->catalog_mgr()->volatile_flag())
+  if (mount_point_->catalog_mgr()->volatile_flag() || dirent.IsVolatile())
     label.flags |= CacheManager::kLabelVolatile;
   if (dirent.IsExternalFile())
     label.flags |= CacheManager::kLabelExternal;
@@ -1539,7 +1540,8 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
         label.size = chunks.list->AtPtr(chunk_idx)->size();
         label.zip_algorithm = chunks.compression_alg;
         label.flags |= CacheManager::kLabelChunked;
-        if (mount_point_->catalog_mgr()->volatile_flag())
+        if (mount_point_->catalog_mgr()->volatile_flag()
+            || chunks.volatile_data)
           label.flags |= CacheManager::kLabelVolatile;
         if (chunks.external_data) {
           label.flags |= CacheManager::kLabelExternal;

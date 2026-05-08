@@ -34,6 +34,7 @@ SyncItem::SyncItem()
     , graft_marker_present_(false)
     , external_data_(false)
     , direct_io_(false)
+    , volatile_(false)
     , graft_chunklist_(NULL)
     , compression_algorithm_(zlib::kZlibDefault)
     , has_compression_algorithm_(false) { }
@@ -55,6 +56,7 @@ SyncItem::SyncItem(const std::string &relative_parent_path,
     , graft_marker_present_(false)
     , external_data_(false)
     , direct_io_(false)
+    , volatile_(false)
     , relative_parent_path_(relative_parent_path)
     , graft_chunklist_(NULL)
     , compression_algorithm_(zlib::kZlibDefault)
@@ -218,6 +220,7 @@ catalog::DirectoryEntryBase SyncItemNative::CreateBasicCatalogDirent(
   dirent.checksum_ = this->GetContentHash();
   dirent.is_external_file_ = this->IsExternalData();
   dirent.is_direct_io_ = this->IsDirectIo();
+  dirent.is_volatile_ = this->IsVolatile();
   dirent.compression_algorithm_ = this->GetCompressionAlgorithm();
 
   dirent.name_.Assign(filename().data(), filename().length());

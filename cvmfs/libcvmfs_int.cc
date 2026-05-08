@@ -564,7 +564,8 @@ int LibContext::Open(const char *c_path) {
     }
 
     fd = mount_point_->simple_chunk_tables()->Add(FileChunkReflist(
-        chunks, path, dirent.compression_algorithm(), dirent.IsExternalFile()));
+        chunks, path, dirent.compression_algorithm(), dirent.IsExternalFile(),
+        dirent.IsVolatile()));
     return fd | kFdChunked;
   }
 
