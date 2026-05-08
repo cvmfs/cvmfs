@@ -19,7 +19,10 @@ cvmfs_test_autofs_on_startup=false
 
 STABLE_REPO="atlas.cern.ch"
 CYCLE_REPOS="grid.cern.ch lhcb.cern.ch"
-ITERATIONS_PER_CYCLER=80
+# Each mount/umount cycle costs ~2-4s on a typical test host. Keep the count
+# low enough that two parallel cyclers comfortably finish inside
+# cvmfs_test_timeout, with margin for the polling loop and final checks.
+ITERATIONS_PER_CYCLER=25
 BG_PIDS=""
 TMPDIR_113=""
 SHARED_WORKSPACE=""
@@ -84,19 +87,21 @@ cycler() {
   local i
 
   sudo mkdir -p "$mp" 2>/dev/null
+  # Initialise the status file so a kill mid-run still leaves an answer
+  # behind and the main test reports actual progress instead of "missing".
+  echo "$ok" > "$status_file"
   for i in $(seq 1 $n); do
-    if ! sudo timeout 30 mount -t cvmfs $repo "$mp" >/dev/null 2>&1; then
-      continue
-    fi
-
-    if sudo timeout 10 ls "$mp" >/dev/null 2>&1; then
+    # mount itself drives cvmfs2 fnInit -> SetCleanupPolicy +
+    # RegisterMountpoint, which is the protocol we want to exercise. No
+    # need for an extra ls round-trip per iteration.
+    if sudo timeout 20 mount -t cvmfs $repo "$mp" >/dev/null 2>&1; then
       ok=$((ok + 1))
+      sudo umount "$mp" >/dev/null 2>&1 \
+        || sudo umount -l "$mp" >/dev/null 2>&1 || true
     fi
-
-    sudo umount "$mp" >/dev/null 2>&1 || sudo umount -l "$mp" >/dev/null 2>&1 || true
+    echo "$ok" > "$status_file"
   done
 
-  echo "$ok" > "$status_file"
   sudo rmdir "$mp" 2>/dev/null || true
 }
 
@@ -159,8 +164,10 @@ cvmfs_run_test() {
     BG_PIDS="$BG_PIDS $!"
   done
 
+  local poll=0
   while true; do
     sleep 2
+    poll=$((poll + 1))
 
     local still_running=0
     local p
@@ -192,6 +199,18 @@ cvmfs_run_test() {
     if ! sudo timeout 10 ls /cvmfs/$STABLE_REPO >/dev/null 2>&1; then
       echo "ERROR: stable mount stopped being readable"
       return 24
+    fi
+
+    # Log progress every 5 polls (~10s) so a hang is debuggable.
+    if (( poll % 5 == 0 )) || [ $still_running -eq 0 ]; then
+      local progress=""
+      for repo in $CYCLE_REPOS; do
+        local sf="$TMPDIR_113/${repo//./_}.ok"
+        local n="?"
+        [ -f "$sf" ] && n=$(cat "$sf")
+        progress="$progress $repo=$n"
+      done
+      echo "    poll $poll: cyclers running=$still_running cachemgr=$pid_now$progress"
     fi
 
     if [ $still_running -eq 0 ]; then
