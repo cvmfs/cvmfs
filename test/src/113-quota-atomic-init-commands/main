@@ -45,7 +45,10 @@ cleanup() {
 
 get_cachemgr_pid_from_lock() {
   local lockfile="$SHARED_WORKSPACE/lock_cachemgr"
-  python3 - "$lockfile" <<'PY'
+  # The lockfile lives inside the shared-cache workspace, which is owned by
+  # the cvmfs user with mode 0700, so the unprivileged test driver can't
+  # read it directly — drop into the cvmfs user via sudo.
+  sudo python3 - "$lockfile" <<'PY'
 import os
 import struct
 import sys
@@ -117,7 +120,9 @@ cvmfs_run_test() {
   fi
 
   SHARED_WORKSPACE="$(get_cvmfs_cachedir $STABLE_REPO)"
-  if [ ! -p "$SHARED_WORKSPACE/cachemgr" ]; then
+  # The shared-cache workspace is mode 0700 owned by the cvmfs user, so
+  # the unprivileged test driver needs sudo to stat files inside it.
+  if ! sudo test -p "$SHARED_WORKSPACE/cachemgr"; then
     echo "ERROR: shared cachemgr FIFO not found in $SHARED_WORKSPACE"
     return 12
   fi
@@ -179,7 +184,7 @@ cvmfs_run_test() {
       echo "ERROR: cachemgr pid $pid_now died while cyclers were running"
       return 22
     fi
-    if [ ! -p "$SHARED_WORKSPACE/cachemgr" ]; then
+    if ! sudo test -p "$SHARED_WORKSPACE/cachemgr"; then
       echo "ERROR: shared cachemgr FIFO disappeared"
       return 23
     fi
