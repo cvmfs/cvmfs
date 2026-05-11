@@ -895,6 +895,7 @@ static void AddToDirListing(const fuse_req_t req, const char *name,
   fuse_add_direntry(req, buffer + listing->size(), remaining_size, name,
                     stat_info, listing->size() + entry_size);
   listing->SetSize(listing->size() + entry_size);
+  listing->UnshareBuffer();
 }
 
 
@@ -999,6 +1000,7 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
                     &fixed_info, &fuse_listing);
   }
   fuse_remounter_->fence()->Leave();
+  fuse_listing.ShrinkToFit();
 
   DirectoryListing stream_listing;
   stream_listing.size = fuse_listing.size();
