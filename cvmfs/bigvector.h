@@ -108,6 +108,26 @@ class BigVector {
     buffer_ = new_buffer;
   }
 
+  void ShrinkToFit() {
+    assert(!shared_buffer_);
+    assert(size_ <= capacity_);
+
+    if (size_ <= kNumInit)
+      return;
+
+    if (large_alloc_) {
+      if ((sizeof(Item) * capacity_) - (sizeof(Item) * size_) < SMMAP_PAGE_SIZE) {
+        return;
+      }
+    }
+    bool old_large_alloc = large_alloc_;
+    Item *new_buffer = Alloc(size_);
+    for (size_t i = 0; i < size_; ++i)
+      new (new_buffer + i) Item(buffer_[i]);
+    FreeBuffer(buffer_, size_, old_large_alloc);
+    buffer_ = new_buffer;
+  }
+
   // Careful!  Only for externally modified buffer.
   void SetSize(const size_t new_size) {
     assert(new_size <= capacity_);
