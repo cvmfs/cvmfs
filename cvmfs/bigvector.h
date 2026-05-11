@@ -80,6 +80,11 @@ class BigVector {
     shared_buffer_ = true;
   }
 
+  // Certify buffer is not referenced anymore
+  void UnshareBuffer() {
+    shared_buffer_ = false;
+  }
+
   void DoubleCapacity() {
     Item *old_buffer = buffer_;
     const bool old_large_alloc = large_alloc_;
