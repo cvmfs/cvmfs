@@ -1,0 +1,12 @@
+cvmfs_test_name="Measure memory footprint of opendir handling"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites=""
+
+cvmfs_run_test() {
+  this_script_dir=$TEST_ROOT/src/824-dirfd-mem
+  # We want bash & strict mode here, to catch any failure.
+  exe="$this_script_dir"/run_test
+  echo Launching "$exe"
+  exec "$exe" "$@"
+}
+

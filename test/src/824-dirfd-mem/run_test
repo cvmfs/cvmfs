@@ -1,0 +1,125 @@
+#!/usr/bin/env bash
+
+[[ -v TEST_ROOT ]]
+
+source "$TEST_ROOT"/test_functions
+
+set -euo pipefail
+set -x
+
+# Based on struct fuse_libent, see include/fuse_kernel.h in libfuse repo.
+# struct fuse_dirent {
+# 	uint64_t	ino;
+# 	uint64_t	off;
+# 	uint32_t	namelen;
+# 	uint32_t	type;
+# 	char name[];
+# };
+# We use same-length (NAMELEN-1)-chars-long filenames, and assume null terminator is stored.
+# NAMELEN is chosen so that EXPECTED_BYTES_PER_DIRENT=128, for convenient calculation.
+NAMELEN=104
+EXPECTED_BYTES_PER_DIRENT=$(( 8 + 8 + 4 + 4 + NAMELEN ))
+[[ "$EXPECTED_BYTES_PER_DIRENT" == 128 ]]
+echo Expected BYTES_PER_DIRENT: $EXPECTED_BYTES_PER_DIRENT
+WOULD_BE_TOO_MUCH=$(( EXPECTED_BYTES_PER_DIRENT * 130 / 100 ))
+echo This would be too much per dirent: $WOULD_BE_TOO_MUCH
+
+# The design of BigVector is that it's doubling in capacity.
+# BigVector used to store data pertaining to directory stream is of char
+# content type, and is initialized with 512 bytes size.
+# In particular, 0.5, 1, 2 and 4 MiB are some of the points which capacity
+# "visits" on its growth trajectory.
+# Let's design the big dir so that it's as far from these points as possible.
+TARGET_DIR_FOOTPRINT_BYTES=$((1024*1024 * 3 / 4))
+NUM_DIRENT=$(( TARGET_DIR_FOOTPRINT_BYTES / EXPECTED_BYTES_PER_DIRENT ))
+
+
+echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+create_empty_repo "$CVMFS_TEST_REPO" "$CVMFS_TEST_USER" -
+
+echo "starting transaction to edit repository"
+start_transaction "$CVMFS_TEST_REPO"
+
+repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+
+pushd "$repo_dir"
+# tar is faster (e.g. 35s vs 75s for whole test), but below code is equivalent:
+if [[ -f "$TEST_ROOT"/src/824-dirfd-mem/big_dir.tar.zst ]]; then
+  tar -xaf "$TEST_ROOT"/src/824-dirfd-mem/big_dir.tar.zst
+else
+  mkdir big_dir
+  pushd big_dir
+  for i in $(seq 1 $NUM_DIRENT); do
+    touch "$(printf %0$((NAMELEN-1))d $i)"
+  done
+  popd
+fi
+popd
+
+echo "creating CVMFS snapshot"
+publish_repo "$CVMFS_TEST_REPO"
+
+sudo umount /cvmfs/"$CVMFS_TEST_REPO"
+sudo umount /var/spool/cvmfs/"$CVMFS_TEST_REPO"/rdonly
+sudo sed -i /etc/fstab -e 's/cvmfs_suid,/&disable_watchdog,debug,/'
+echo CVMFS_DEBUGLOG=/tmp/"$CVMFS_TEST_REPO".log >> /var/spool/cvmfs/test.cern.ch/client.local
+sudo mount /var/spool/cvmfs/"$CVMFS_TEST_REPO"/rdonly
+
+# measure cvmfs2 RSS
+# We need either of
+# VmRSS field of /proc/pid/status
+# `resident` (field 2) of /proc/pid/statm (given in pages)
+# The latter is simpler to parse.
+CVMFS_PID=$(pgrep cvmfs2)
+[[ "$CVMFS_PID" != "" ]]
+
+(while true; do
+  date +%F_%T
+  cut -d ' ' -f 2 /proc/"$CVMFS_PID"/statm
+  sleep 1
+done > /tmp/statm.watch.log) &
+WATCH_PID=$!
+
+RSS_0=$(cut -d ' ' -f 2 /proc/"$CVMFS_PID"/statm)
+
+# run C program doing opendir("$repo_dir"/big_dir) and keeping it open
+gcc -Wall -o opendir "$TEST_ROOT"/src/824-dirfd-mem/opendir.c
+
+round() {
+  i=$1
+  rm -f opendir.log || true
+  ./opendir /var/spool/cvmfs/"$CVMFS_TEST_REPO"/rdonly/big_dir > opendir.log &
+  OPENDIR_PID=$!
+  while ! [[ -s opendir.log ]]; do
+    sleep 1
+  done
+
+  # measure cvmfs2 RSS
+  RSS_BEFORE=$(cut -d ' ' -f 2 /proc/"$CVMFS_PID"/statm)
+  kill "$OPENDIR_PID"
+  wait "$OPENDIR_PID" || true
+  RSS_AFTER=$(cut -d ' ' -f 2 /proc/"$CVMFS_PID"/statm)
+
+  RSS_DELTA=$(( RSS_BEFORE - RSS_AFTER ))
+  BYTES_PER_DIRENT=$(( RSS_DELTA * 4096 / NUM_DIRENT ))
+  echo Calculated BYTES_PER_DIRENT, round $i: $BYTES_PER_DIRENT
+
+  if [[ "$BYTES_PER_DIRENT" -lt "$(( EXPECTED_BYTES_PER_DIRENT - 1 ))" ]]; then
+    echo "Bytes per dirent (round $i) is too little, must be some measurement mistake"
+    exit 1
+  fi
+  if [[ "$BYTES_PER_DIRENT" -gt "$WOULD_BE_TOO_MUCH" ]]; then
+    echo "Bytes per dirent (round $i) is too much"
+    exit 2
+  fi
+}
+for i in {1..10}; do
+  round $i
+done
+
+RSS_END=$(cut -d ' ' -f 2 /proc/"$CVMFS_PID"/statm)
+echo "Total climb of RSS since startup: " $(( (RSS_END - RSS_0) * 4096 / 1024 )) " KiB"
+
+kill "$WATCH_PID"
+wait "$WATCH_PID" || true
