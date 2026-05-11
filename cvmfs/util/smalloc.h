@@ -80,15 +80,17 @@ static inline void * __attribute__((used)) scalloc(size_t count, size_t size) {
   return mem;
 }
 
+#define SMMAP_PAGE_SIZE 4096
+
 static inline void * __attribute__((used)) smmap(size_t size) {
   // TODO(reneme): make page size platform independent
   assert(size > 0);
-  assert(size < std::numeric_limits<size_t>::max() - 4096);
+  assert(size < std::numeric_limits<size_t>::max() - SMMAP_PAGE_SIZE);
 
   const int anonymous_fd = -1;
   const off_t offset = 0;
-  const size_t pages = ((size + 2 * sizeof(size_t)) + 4095)
-                       / 4096;  // round to full page
+  const size_t pages = ((size + 2 * sizeof(size_t)) + (SMMAP_PAGE_SIZE - 1))
+                       / SMMAP_PAGE_SIZE;  // round to full page
   unsigned char *mem = NULL;
 
 #ifdef CVMFS_SUPPRESS_ASSERTS
@@ -96,7 +98,7 @@ static inline void * __attribute__((used)) smmap(size_t size) {
 #endif
     mem = static_cast<unsigned char *>(
         mmap(NULL,
-             pages * 4096,
+             pages * SMMAP_PAGE_SIZE,
              PROT_READ | PROT_WRITE,
              MAP_PRIVATE | PLATFORM_MAP_ANONYMOUS,
              anonymous_fd,
@@ -105,7 +107,7 @@ static inline void * __attribute__((used)) smmap(size_t size) {
 #ifdef CVMFS_SUPPRESS_ASSERTS
   } while (mem == MAP_FAILED);
 #endif
-  // printf("SMMAP %d bytes at %p\n", pages*4096, mem);
+  // printf("SMMAP %d bytes at %p\n", pages*SMMAP_PAGE_SIZE, mem);
   // NOLINTNEXTLINE(performance-no-int-to-ptr)
   assert((mem != MAP_FAILED) && "Out Of Memory");
   *(reinterpret_cast<size_t *>(mem)) = kMemMarker;
@@ -117,8 +119,8 @@ static inline void __attribute__((used)) smunmap(void *mem) {
   unsigned char *area = static_cast<unsigned char *>(mem);
   area = area - sizeof(size_t);
   const size_t pages = *(reinterpret_cast<size_t *>(area));
-  const int retval = munmap(area - sizeof(size_t), pages * 4096);
-  // printf("SUNMMAP %d bytes at %p\n", pages*4096, area);
+  const int retval = munmap(area - sizeof(size_t), pages * SMMAP_PAGE_SIZE);
+  // printf("SUNMMAP %d bytes at %p\n", pages*SMMAP_PAGE_SIZE, area);
   assert((retval == 0) && "Invalid umnmap");
 }
 
