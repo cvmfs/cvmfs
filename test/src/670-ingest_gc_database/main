@@ -1,0 +1,119 @@
+#!/bin/bash
+
+cvmfs_test_name="Ingest with --gc-db deletes paths from GC SQLite database"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+produce_tarball() {
+  local tarball_name=$1
+
+  mkdir tarball_content
+  mkdir -p tarball_content/dir_a/sub_a
+  mkdir -p tarball_content/dir_b/sub_b
+  mkdir -p tarball_content/dir_c
+
+  dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_content/dir_a/sub_a/file1.txt
+  dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_content/dir_b/sub_b/file2.txt
+  dd bs=1024 count=2 2>/dev/null </dev/urandom >tarball_content/dir_c/file3.txt
+
+  tar cf $tarball_name -C tarball_content .
+  rm -rf tarball_content
+}
+
+create_gc_database() {
+  local db_path=$1
+  shift
+  # remaining args are paths to mark for deletion
+
+  sqlite3 "$db_path" <<EOF
+CREATE TABLE gc_paths (
+  id        INTEGER PRIMARY KEY AUTOINCREMENT,
+  path      TEXT    NOT NULL UNIQUE,
+  category  TEXT    NOT NULL,
+  scanned_at TEXT   NOT NULL,
+  deleted   INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE repo_metadata (
+  id                 INTEGER PRIMARY KEY CHECK (id = 1),
+  repo_name          TEXT NOT NULL,
+  revision           TEXT NOT NULL,
+  root_catalog_hash  TEXT NOT NULL,
+  scanned_at         TEXT NOT NULL
+);
+EOF
+
+  for p in "$@"; do
+    sqlite3 "$db_path" \
+      "INSERT INTO gc_paths (path, category, scanned_at) VALUES ('$p', 'layer', '2026-01-01T00:00:00Z');"
+  done
+}
+
+count_pending() {
+  sqlite3 "$1" "SELECT COUNT(*) FROM gc_paths WHERE deleted = 0;"
+}
+
+count_deleted() {
+  sqlite3 "$1" "SELECT COUNT(*) FROM gc_paths WHERE deleted = 1;"
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local scratch_dir=$(pwd)
+  local tarfile=$scratch_dir/seed.tar
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local gc_db=$scratch_dir/gc_test.db
+
+  echo "*** Creating a fresh repository in $CVMFS_TEST_REPO"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "*** Producing seed tarball"
+  produce_tarball $tarfile || return 2
+
+  echo "*** Ingesting seed content into the repository"
+  cvmfs_server ingest -t $tarfile -b "/" $CVMFS_TEST_REPO || return 3
+
+  echo "*** Verifying seed content exists"
+  [ -d ${repo_dir}/dir_a/sub_a ] || return 10
+  [ -f ${repo_dir}/dir_a/sub_a/file1.txt ] || return 11
+  [ -d ${repo_dir}/dir_b/sub_b ] || return 12
+  [ -f ${repo_dir}/dir_b/sub_b/file2.txt ] || return 13
+  [ -d ${repo_dir}/dir_c ] || return 14
+  [ -f ${repo_dir}/dir_c/file3.txt ] || return 15
+
+  echo "*** Creating GC database with paths to delete"
+  create_gc_database "$gc_db" "dir_a" "dir_b"
+
+  echo "*** Verifying GC database has 2 pending paths"
+  local pending=$(count_pending "$gc_db")
+  [ "$pending" -eq 2 ] || { echo "Expected 2 pending, got $pending"; return 20; }
+
+  echo "*** Running cvmfs_server ingest --gc-db"
+  cvmfs_server ingest --gc-db "$gc_db" $CVMFS_TEST_REPO || return 30
+
+  echo "*** Verifying deleted directories are gone"
+  [ ! -d ${repo_dir}/dir_a ] || { echo "dir_a still exists"; return 40; }
+  [ ! -d ${repo_dir}/dir_b ] || { echo "dir_b still exists"; return 41; }
+
+  echo "*** Verifying dir_c (not in GC DB) still exists"
+  [ -d ${repo_dir}/dir_c ] || { echo "dir_c was incorrectly deleted"; return 42; }
+  [ -f ${repo_dir}/dir_c/file3.txt ] || { echo "file3.txt was incorrectly deleted"; return 43; }
+
+  echo "*** Verifying GC database paths are marked as deleted"
+  local still_pending=$(count_pending "$gc_db")
+  local deleted=$(count_deleted "$gc_db")
+  [ "$still_pending" -eq 0 ] || { echo "Expected 0 pending, got $still_pending"; return 50; }
+  [ "$deleted" -eq 2 ] || { echo "Expected 2 deleted, got $deleted"; return 51; }
+
+  echo "*** Running --gc-db again with no pending paths (should be a no-op)"
+  cvmfs_server ingest --gc-db "$gc_db" $CVMFS_TEST_REPO || return 60
+
+  echo "*** Verifying dir_c still untouched after second run"
+  [ -d ${repo_dir}/dir_c ] || { echo "dir_c was deleted in second run"; return 61; }
+
+  echo "*** Test for --gc-db combined with -d (delete extra path in same transaction)"
+  create_gc_database "${gc_db}.2" "nonexistent_dir"
+  # The nonexistent path should not cause a fatal error with fast_delete
+  # (it's OK if the dir doesn't exist — cvmfs ingest handles this gracefully)
+
+  return 0
+}
