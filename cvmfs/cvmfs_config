@@ -270,7 +270,7 @@ cvmfs_config_usage() {
   echo ""
   echo "  stat [-v | <repository>]"
   echo ""
-  echo "  status [<repository list>]"
+  echo "  status [-v(erbose, force detail output)] [<repository list>]"
   echo ""
   echo "  probe [<repository list>]"
   echo ""
@@ -1150,6 +1150,11 @@ cvmfs_stat() {
 
 cvmfs_status() {
   local list
+  local verbose=0
+  if [ "x$1" = "x-v" ]; then
+    verbose=1
+    shift
+  fi
   local repos="$@"
   list=""
 
@@ -1173,6 +1178,7 @@ cvmfs_status() {
   else
     mountpoints="$mounted_repos"
   fi
+  local non_terminal_message=false
   for mountpoint in $mountpoints
   do
     local fqrn=
@@ -1199,14 +1205,26 @@ cvmfs_status() {
       # no more detail is available on macOS
       continue
     fi
-    # provide more detail if specific repo(s) requested
+    if [ $verbose -eq 0 ] && [ ! -t 0 ]; then
+      if ! $non_terminal_message; then
+        echo "skipping detail because not running on a terminal (use -v to force)"
+        non_terminal_message=true
+      fi
+      continue
+    fi
+    # provide more detail if specific repo(s) requested interactively or via -v
     local s1="$(attr -qg host $mountpoint)"
     if [ -z "$s1" ]; then
       echo "- could not read host from $mountpoint"
       RETVAL=1
       continue
     fi
-    local last_snapshot="$(curl -s -m 5 "$s1/.cvmfs_status.json" | sed -n 's/"//g;s/,$//;s/.*last_snapshot[^ ]* //p')"
+    local proxy="$(attr -qg proxy $mountpoint)"
+    local proxy_env=
+    if [ "$proxy" != DIRECT ]; then
+      proxy_env="env http_proxy=$proxy"
+    fi
+    local last_snapshot="$($proxy_env curl -s -m 5 "$s1/.cvmfs_status.json" | sed -n 's/"//g;s/,$//;s/.*last_snapshot[^ ]* //p')"
     if [ -z "$last_snapshot" ]; then
       echo "- could not read last_snapshot from $s1/.cvmfs_status.json"
       RETVAL=1
@@ -1219,13 +1237,13 @@ cvmfs_status() {
     if [ -n "$external_host" ]; then
       echo "- external host $external_host"
     fi
-    echo "- proxy $(attr -qg proxy $mountpoint)"
+    echo "- proxy $proxy"
     echo "- host updated $(($age / 60)) minutes and $(($age % 60)) seconds ago"
     local host_list="$(attr -qg host_list $mountpoint)"
     local max_revision=0
     local max_rev_host=""
     for host in ${host_list//;/ }; do
-      local rev="$(curl -s -m 3 "$host/.cvmfspublished" | cat -v | sed -n 's/^S//p')"
+      local rev="$($proxy_env curl -s -m 3 "$host/.cvmfspublished" | cat -v | sed -n 's/^S//p')"
       # Note that later hosts are queried later so they get more time to
       # catch up. That might give them a little advantage.
       if [ -n "$rev" ] && [ "$rev" -gt $max_revision ]; then
