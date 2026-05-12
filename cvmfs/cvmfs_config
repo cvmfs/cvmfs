@@ -270,7 +270,7 @@ cvmfs_config_usage() {
   echo ""
   echo "  stat [-v | <repository>]"
   echo ""
-  echo "  status [<repository list>]"
+  echo "  status [-v(erbose, force detail output)] [<repository list>]"
   echo ""
   echo "  probe [<repository list>]"
   echo ""
@@ -1150,6 +1150,11 @@ cvmfs_stat() {
 
 cvmfs_status() {
   local list
+  local verbose=0
+  if [ "x$1" = "x-v" ]; then
+    verbose=1
+    shift
+  fi
   local repos="$@"
   list=""
 
@@ -1200,14 +1205,14 @@ cvmfs_status() {
       # no more detail is available on macOS
       continue
     fi
-    if [ ! -t 0 ]; then
+    if [ $verbose -eq 0 ] && [ ! -t 0 ]; then
       if ! $non_terminal_message; then
-        echo "skipping detail because not running on a terminal"
+        echo "skipping detail because not running on a terminal (use -v to force)"
         non_terminal_message=true
       fi
       continue
     fi
-    # provide more detail if specific repo(s) requested interactively
+    # provide more detail if specific repo(s) requested interactively or via -v
     local s1="$(attr -qg host $mountpoint)"
     if [ -z "$s1" ]; then
       echo "- could not read host from $mountpoint"
