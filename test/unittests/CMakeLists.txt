@@ -770,6 +770,7 @@ set_target_properties (cvmfs_unittests_mockfuse PROPERTIES
 target_link_libraries (cvmfs_unittests_mockfuse
                        cvmfs_crypto
                        cvmfs_util
+                       cvmfs_fuzzy
 		       ${FUSE3_LIBRARIES}
                        ${CVMFS_UNITTESTS_LINK_LIBRARIES})
 
@@ -781,6 +782,7 @@ set_target_properties (cvmfs_unittests PROPERTIES
 target_link_libraries (cvmfs_unittests
                        cvmfs_crypto
                        cvmfs_util
+                       cvmfs_fuzzy
                        ${CVMFS_UNITTESTS_LINK_LIBRARIES})
 
 if (INSTALL_UNITTESTS)
@@ -800,6 +802,7 @@ if (BUILD_UNITTESTS_DEBUG)
   target_link_libraries (cvmfs_unittests_debug
                          cvmfs_crypto_debug
                          cvmfs_util_debug
+                         cvmfs_fuzzy_debug
                          ${CVMFS_UNITTESTS_LINK_LIBRARIES})
 
   if (INSTALL_UNITTESTS)

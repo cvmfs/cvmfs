@@ -7,11 +7,16 @@
 #include <unordered_map>
 #include <vector>
 
+#ifdef CVMFS_UTIL_EXPORTS
+#define CVMFS_UTIL_API __attribute__((visibility("default")))
+#else
+#define CVMFS_UTIL_API
+#endif
 
 namespace fuzzy {
 
-int GetDLDistance(const std::string &a, const std::string &b);
-double GetYWDistance(const std::string &a, const std::string &b);
+CVMFS_UTIL_API int GetDLDistance(const std::string &a, const std::string &b);
+CVMFS_UTIL_API double GetYWDistance(const std::string &a, const std::string &b);
 
 struct BKNode {
   std::string word;
@@ -70,12 +75,9 @@ class BKTree {
 };
 
 class FuzzySearch {
-  BKTree tree;
-  int max_edits;
-
  public:
   explicit FuzzySearch(const std::vector<std::string> &dictionary,
-                       int max_edits = 2)
+                       int max_edits = 3)
       : tree(GetDLDistance), max_edits(max_edits) {
     for (const auto &word : dictionary) {
       tree.insert(word);
@@ -87,7 +89,6 @@ class FuzzySearch {
     if (candidates.empty())
       return "";
 
-    // Replace std::ranges::sort with std::sort
     std::sort(candidates.begin(), candidates.end(),
               [&query](const auto &a, const auto &b) {
                 return GetYWDistance(query, a.first)
@@ -96,6 +97,10 @@ class FuzzySearch {
 
     return candidates[0].first;
   }
+
+ private:
+  BKTree tree;
+  int max_edits;
 };
 
 }  // namespace fuzzy

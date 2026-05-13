@@ -294,11 +294,13 @@ if (BUILD_CVMFS)
     target_link_libraries (cvmfs_fuse
                            cvmfs_crypto
                            cvmfs_util
+                           cvmfs_fuzzy
                            ${FUSE_LIBRARIES} ${CVMFS_FUSE_LINK_LIBRARIES}
     )
     target_link_libraries (cvmfs_fuse_debug
                            cvmfs_crypto_debug
                            cvmfs_util_debug
+                           cvmfs_fuzzy_debug
                            ${FUSE_LIBRARIES} ${CVMFS_FUSE_LINK_LIBRARIES}
     )
   endif()
@@ -321,11 +323,13 @@ if (BUILD_CVMFS)
     target_link_libraries (cvmfs_fuse3
                            cvmfs_crypto
                            cvmfs_util
+                           cvmfs_fuzzy
                            ${FUSE3_LIBRARIES} ${CVMFS_FUSE_LINK_LIBRARIES}
     )
     target_link_libraries (cvmfs_fuse3_debug
                            cvmfs_crypto_debug
                            cvmfs_util_debug
+                           cvmfs_fuzzy_debug
                            ${FUSE3_LIBRARIES} ${CVMFS_FUSE_LINK_LIBRARIES}
     )
   endif()
@@ -424,6 +428,7 @@ if (BUILD_LIBCVMFS)
   target_link_libraries (cvmfs_client
                          PUBLIC cvmfs_crypto
                                 cvmfs_util
+                                cvmfs_fuzzy
                                 ${CARES_LDFLAGS}
                                 ${OPENSSL_LIBRARIES}
                          PRIVATE ${SQLITE3_LIBRARY}
@@ -1179,6 +1184,7 @@ if (BUILD_SHRINKWRAP)
                         cvmfs_client
                         cvmfs_crypto
                         cvmfs_util
+                        cvmfs_fuzzy
                         pthread
                         dl
   )
