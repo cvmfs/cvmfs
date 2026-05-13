@@ -49,7 +49,7 @@ struct DataTubeElement : SingleCopy {
   DataTubeElement(char *mov_data, size_t xsize, DataTubeAction xact)
       : data(mov_data), size(xsize), action(xact) { }
 
-  ~DataTubeElement() { delete data; }
+  ~DataTubeElement() { delete[] data; }
 };
 
 /**

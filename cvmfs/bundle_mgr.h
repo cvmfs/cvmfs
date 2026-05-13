@@ -5,8 +5,12 @@
 #ifndef CVMFS_BUNDLE_MGR_H_
 #define CVMFS_BUNDLE_MGR_H_
 
+#include <pthread.h>
+
 #include <cassert>
+#include <cstddef>
 #include <type_traits>
+#include <vector>
 
 #include "duplex_testing.h"
 #include "file_bundle.h"
@@ -25,6 +29,8 @@ class BundleMgr : SingleCopy {
   BundleMgr(MountPoint *mp, const PathString &path);
   virtual ~BundleMgr() {
     JoinFetcher();
+    pthread_mutex_destroy(&worker_read_mutex_);
+    delete fetcher_threads_;
     delete bfm_;
   }
   void Fetch();
@@ -105,7 +111,12 @@ class BundleMgr : SingleCopy {
   PathString bundle_file_path_;
   BundleFileMgr *bfm_;
 
-  pthread_t *fetcher_thread_;
+  // Pool of fetcher threads. All workers share pipe_bm_[0] (read end)
+  // and serialize their reads via worker_read_mutex_ so cmd+payload
+  // pairs are received atomically.
+  std::vector<pthread_t> *fetcher_threads_;
+  pthread_mutex_t worker_read_mutex_;
+  size_t pool_size_;
   int back_channel_;
 
   enum class Command {
@@ -114,7 +125,8 @@ class BundleMgr : SingleCopy {
   };
 
   /**
-   * Used to send RPCs to the BundleMgr by the fetcher threads
+   * Work queue (a pipe). Main thread writes Command + path payload to
+   * pipe_bm_[1]; workers read from pipe_bm_[0] under worker_read_mutex_.
    */
   int pipe_bm_[2];
   bool is_valid_ = true;

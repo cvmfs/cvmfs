@@ -1202,7 +1202,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
 
   std::string is_prefetching_enabled;
   if (options_mgr_) {
-    options_mgr_->GetValue("CVMFS_FUSE_NOTIFY_INVALIDATION",
+    options_mgr_->GetValue("CVMFS_PREFETCH_FILEBUNDLES",
                            &is_prefetching_enabled);
   }
   if (dirent.IsBundleTrigger() and (options_mgr_)

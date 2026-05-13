@@ -379,7 +379,13 @@ std::string SyncMediator::GetBundleTriggerPath(
     PANIC(kLogStderr, "invalid empty bundle specification: %s",
           bundle_spec_entry->GetUnionPath().c_str());
   }
-  return bundle_spec_entry->relative_parent_path() + "/" + main_file_name;
+  // relative_parent_path() is empty for the repo root and otherwise lacks a
+  // leading slash (e.g. "root/lib/ROOT/__pycache__"). The catalog lookup in
+  // WritableCatalogManager::FindCatalog needs an absolute path, so prepend
+  // "/" — but skip it when relative_parent_path() is empty, in which case
+  // the existing literal "/" already produces a valid "/<basename>".
+  const std::string &parent = bundle_spec_entry->relative_parent_path();
+  return (parent.empty() ? "" : "/" + parent) + "/" + main_file_name;
 }
 
 void SyncMediator::InsertBundleSpec(SharedPtr<SyncItem> entry) {
