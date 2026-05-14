@@ -34,7 +34,7 @@ func (r *MockReceiver) Echo() error {
 	return nil
 }
 
-func (r *MockReceiver) Commit(leasePath, oldRootHash, newRootHash string, tag gw.RepositoryTag) (uint64, error) {
+func (r *MockReceiver) Commit(leasePath, oldRootHash, newRootHash string, tag gw.RepositoryTag, directGraft bool) (uint64, error) {
 	gw.LogC(r.ctx, "mock_receiver", gw.LogDebug).
 		Str("command", "commit").
 		Str("lease_path", leasePath).

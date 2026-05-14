@@ -45,6 +45,7 @@ type commitTask struct {
 	oldRootHash  string
 	newRootHash  string
 	tag          gw.RepositoryTag
+	directGraft  bool
 	replyChan    chan<- error
 	finalRevChan chan<- uint64
 }
@@ -117,10 +118,10 @@ func (p *Pool) SubmitPayload(ctx context.Context, leasePath string, payload io.R
 }
 
 // CommitLease associated with the token (transaction commit)
-func (p *Pool) CommitLease(ctx context.Context, leasePath, oldRootHash, newRootHash string, tag gw.RepositoryTag) (uint64, error) {
+func (p *Pool) CommitLease(ctx context.Context, leasePath, oldRootHash, newRootHash string, tag gw.RepositoryTag, directGraft bool) (uint64, error) {
 	reply := make(chan error, 1)
 	finalRevChan := make(chan uint64, 1)
-	p.tasks <- commitTask{ctx, leasePath, oldRootHash, newRootHash, tag, reply, finalRevChan}
+	p.tasks <- commitTask{ctx, leasePath, oldRootHash, newRootHash, tag, directGraft, reply, finalRevChan}
 	result := <-reply
 	if result == nil {
 		return <-finalRevChan, nil
@@ -207,7 +208,7 @@ M:
 				result = recv.SubmitPayload(t.leasePath, t.payload, t.digest, t.headerSize)
 				taskType = "payload"
 			case commitTask:
-				finalRev, result = recv.Commit(t.leasePath, t.oldRootHash, t.newRootHash, t.tag)
+				finalRev, result = recv.Commit(t.leasePath, t.oldRootHash, t.newRootHash, t.tag, t.directGraft)
 				taskType = "commit"
 				t.finalRevChan <- finalRev
 				close(t.finalRevChan)

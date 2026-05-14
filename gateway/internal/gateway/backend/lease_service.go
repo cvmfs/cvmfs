@@ -321,7 +321,7 @@ func (s *Services) CancelLease(ctx context.Context, token string) error {
 }
 
 // CommitLease associated with the token (transaction commit)
-func (s *Services) CommitLease(ctx context.Context, token, oldRootHash, newRootHash string, tag gw.RepositoryTag) (uint64, error) {
+func (s *Services) CommitLease(ctx context.Context, token, oldRootHash, newRootHash string, tag gw.RepositoryTag, directGraft bool) (uint64, error) {
 	t0 := time.Now()
 
 	outcome := "success"
@@ -359,7 +359,7 @@ func (s *Services) CommitLease(ctx context.Context, token, oldRootHash, newRootH
 		// DB.WithLock serialises commits and GC runs for the same repository.
 		if err := s.DB.WithLock(ctx, lease.Repository, func() error {
 			var err error
-			finalRev, err = s.Pool.CommitLease(ctx, leasePath, oldRootHash, newRootHash, tag)
+			finalRev, err = s.Pool.CommitLease(ctx, leasePath, oldRootHash, newRootHash, tag, directGraft)
 			return err
 		}); err != nil {
 			return err

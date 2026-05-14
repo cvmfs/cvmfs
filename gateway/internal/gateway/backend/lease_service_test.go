@@ -245,7 +245,7 @@ func TestLeaseServiceCommitLease(t *testing.T) {
 			gw.RepositoryTag{
 				Name:        "mytag",
 				Description: "this is a tag",
-			}); err != nil {
+			}, false); err != nil {
 			t.Fatalf("could not commit existing lease: %v", err)
 			backend.CancelLease(context.TODO(), token)
 		}
@@ -258,7 +258,7 @@ func TestLeaseServiceCommitLease(t *testing.T) {
 			gw.RepositoryTag{
 				Name:        "mytag",
 				Description: "this is a tag",
-			}); err == nil {
+			}, false); err == nil {
 			t.Fatalf("invalid lease should not have been accepted for commit")
 		}
 	})
@@ -276,7 +276,7 @@ func TestLeaseServiceCommitLease(t *testing.T) {
 			gw.RepositoryTag{
 				Name:        "mytag",
 				Description: "this is a tag",
-			}); err == nil {
+			}, false); err == nil {
 			t.Fatalf("expired lease should not have been accepted for commit")
 		}
 	})
