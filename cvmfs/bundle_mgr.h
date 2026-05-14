@@ -5,6 +5,7 @@
 #ifndef CVMFS_BUNDLE_MGR_H_
 #define CVMFS_BUNDLE_MGR_H_
 
+#include <limits.h>
 #include <pthread.h>
 
 #include <cassert>

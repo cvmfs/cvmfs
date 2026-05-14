@@ -16,6 +16,7 @@
 #include "mountpoint.h"
 #include "options.h"
 #include "shortstring.h"
+#include "util/posix.h"
 
 class MockCatalogManager : public catalog::ClientCatalogManager {
  public:
