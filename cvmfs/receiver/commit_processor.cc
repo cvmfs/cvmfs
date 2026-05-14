@@ -198,6 +198,12 @@ CommitProcessor::Result CommitProcessor::Process(
     const std::string graft_temp = graft_temp_dir->dir();
 
     perf::StatisticsTemplate stats_tmpl("publish", statistics_);
+    // Register the FsCounters (n_files_added, n_directories_added, etc.) that
+    // StorePublishStatistics expects.  In the DiffRec path these are created by
+    // CatalogMergeTool::Run(); DirectGraft bypasses that, so we register them
+    // here.  The values stay 0 — accurate for a graft that adds a whole subtree
+    // atomically rather than individual file-level diffs.
+    perf::FsCounters fs_counters(stats_tmpl);
     upload::SpoolerDefinition definition(
         params.spooler_configuration, params.hash_alg, params.compression_alg,
         params.generate_legacy_bulk_chunks, params.use_file_chunking,
