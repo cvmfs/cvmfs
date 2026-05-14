@@ -409,6 +409,13 @@ bool Reactor::HandleCommit(const std::string &req, std::string *reply) {
       req_json->root(), "tag_name", JSON_STRING);
   const JSON *tag_description_json = JsonDocument::SearchInObject(
       req_json->root(), "tag_description", JSON_STRING);
+  // direct_graft is an optional boolean field (default false).  When true the
+  // commit skips CatalogMergeTool/DiffRec entirely and grafts the pre-built
+  // subtree catalog directly into the parent catalog.
+  const JSON *direct_graft_json = JsonDocument::SearchInObject(
+      req_json->root(), "direct_graft", JSON_BOOL);
+  const bool direct_graft =
+      (direct_graft_json != NULL && direct_graft_json->get<bool>());
 
   if (lease_path_json == NULL || old_root_hash_json == NULL
       || new_root_hash_json == NULL) {
@@ -438,7 +445,7 @@ bool Reactor::HandleCommit(const std::string &req, std::string *reply) {
                                tag_description_json->get<std::string>());
   const CommitProcessor::Result res = proc->Process(
       lease_path_json->get<std::string>(), old_root_hash, new_root_hash,
-      repo_tag, &final_revision);
+      repo_tag, &final_revision, direct_graft);
 
   JsonStringGenerator reply_input;
   switch (res) {
