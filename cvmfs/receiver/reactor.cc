@@ -391,6 +391,10 @@ bool Reactor::HandleCommit(const std::string &req, std::string *reply) {
   if (!reply) {
     PANIC(kLogSyslogErr, "HandleCommit: Invalid reply pointer.");
   }
+  // Diagnostic: log the full commit request so we can verify which fields the
+  // gateway forwards to the receiver (temporary, remove after confirming).
+  LogCvmfs(kLogReceiver, kLogSyslog, "HandleCommit: raw request: %s",
+           req.c_str());
   // Extract the Path from the request JSON.
   const UniquePtr<JsonDocument> req_json(JsonDocument::Create(req));
   if (!req_json.IsValid()) {
