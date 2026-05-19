@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <unistd.h>
+#include <memory>
 
 #include <cassert>
 #include <cerrno>
@@ -98,7 +99,7 @@ BundleFileMgr *LoadBundleFromCvmfs(MountPoint *mp,
 BundleMgr::BundleMgr(MountPoint *mp, const PathString &path)
     : mount_point_(mp),
       path_(path),
-      fetcher_threads_(new std::vector<pthread_t>()),
+      fetcher_threads_(),
       pool_size_(kDefaultBundlePoolSize) {
   fname_ = GetFileName(path_);
   parent_path_ = GetParentPath(path_);
@@ -156,7 +157,7 @@ void BundleMgr::JoinFetcher() {
   // Send one kTerminate per worker. Workers drain all queued kFetch
   // messages before reaching their kTerminate (FIFO pipe), so we can't
   // just close the pipe — that would EOF some workers mid-drain.
-  for (size_t i = 0; i < fetcher_threads_->size(); ++i) {
+  for (size_t i = 0; i < fetcher_threads_.size(); ++i) {
     Command cmd = Command::kTerminate;
     while (true) {
       const ssize_t n = ::write(pipe_bm_[1], &cmd, sizeof(Command));
@@ -165,8 +166,8 @@ void BundleMgr::JoinFetcher() {
     }
   }
   // Wait for every worker to drain its share of the queue and exit.
-  for (auto &t : *fetcher_threads_) {
-    pthread_join(t, nullptr);
+  for (auto &t : fetcher_threads_) {
+    pthread_join(*t, nullptr);
   }
   ClosePipe(pipe_bm_);
 }
@@ -181,18 +182,18 @@ void BundleMgr::SpawnFetcher() {
   const int flags = fcntl(back_channel_, F_GETFL);
   fcntl(back_channel_, F_SETFL, flags | O_NONBLOCK);
 
-  fetcher_threads_->resize(pool_size_);
   for (size_t i = 0; i < pool_size_; ++i) {
-    const int res = pthread_create(&(*fetcher_threads_)[i], nullptr,
+    auto thread =std::make_unique<pthread_t>();
+    const int res = pthread_create(thread.get(), nullptr,
                                    MainBundleMgrFetcher, this);
     if (res != 0) {
       LogCvmfs(kLogBundleMgr, kLogDebug,
                "Thread creation failed! pool_size_=%zu spawned=%zu",
                pool_size_, i);
-      fetcher_threads_->resize(i);
       is_valid_ = false;
       return;
     }
+    fetcher_threads_.emplace_back(std::move(thread));
   }
 }
 
