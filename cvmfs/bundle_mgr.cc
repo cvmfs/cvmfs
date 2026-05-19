@@ -134,7 +134,7 @@ BundleMgr::BundleMgr(MountPoint *mp, const PathString &path)
     }
   }
 
-  SpawnFetcher();
+  SpawnFetcherPool();
 }
 
 void BundleMgr::Fetch() {
@@ -152,7 +152,7 @@ void BundleMgr::Fetch() {
   }
 }
 
-void BundleMgr::JoinFetcher() {
+void BundleMgr::JoinFetcherPool() {
   if (pipe_bm_[1] < 0) return;
   // Send one kTerminate per worker. Workers drain all queued kFetch
   // messages before reaching their kTerminate (FIFO pipe), so we can't
@@ -172,7 +172,7 @@ void BundleMgr::JoinFetcher() {
   ClosePipe(pipe_bm_);
 }
 
-void BundleMgr::SpawnFetcher() {
+void BundleMgr::SpawnFetcherPool() {
   MakePipe(pipe_bm_);
   back_channel_ = pipe_bm_[1];
 

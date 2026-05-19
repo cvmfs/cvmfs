@@ -30,7 +30,7 @@ class BundleMgr : SingleCopy {
  public:
   BundleMgr(MountPoint *mp, const PathString &path);
   virtual ~BundleMgr() {
-    JoinFetcher();
+    JoinFetcherPool();
     pthread_mutex_destroy(&worker_read_mutex_);
     delete bfm_;
   }
@@ -39,8 +39,8 @@ class BundleMgr : SingleCopy {
 
  private:
   static void *MainBundleMgrFetcher(void *data);
-  void SpawnFetcher();
-  void JoinFetcher();
+  void SpawnFetcherPool();
+  void JoinFetcherPool();
   PathString ReceivePath(int fd) const;
   bool TrySendPath(int fd, const PathString &path) const;
 
