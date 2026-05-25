@@ -1,4 +1,13 @@
 
+cvmfs-release (4.9) unstable; urgency=low
+
+  * Add Ubuntu 26.04 "resolute"
+  * Fix Ubuntu fallback: $ID in os-release is lowercase "ubuntu", so
+    unsupported Ubuntu releases were wrongly falling back to Debian bookworm
+  * Add noble (24.04) and resolute (26.04) Ubuntu fallback tiers
+
+ -- Valentin Volkl <vavolkl@cern.ch>  Mon, 25 May 2026 09:34:00 +0200
+
 cvmfs-release (4.8) unstable; urgency=low
 
   * Add Ubuntu 25.10 "questing"
