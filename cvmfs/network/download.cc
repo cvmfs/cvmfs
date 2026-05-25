@@ -645,7 +645,7 @@ void *DownloadManager::MainDownload(void *data) {
                                    &still_running);
         } else {
           // Return easy handle into pool and write result back
-          download_mgr->ReleaseCurlHandle(easy_handle);
+          download_mgr->ReleaseCurlHandle(easy_handle, true);
 
           DataTubeElement *ele = new DataTubeElement(kActionStop);
           info->GetDataTubePtr()->EnqueueBack(ele);
@@ -844,11 +844,11 @@ CURL *DownloadManager::AcquireCurlHandle() {
 }
 
 
-void DownloadManager::ReleaseCurlHandle(CURL *handle) {
+void DownloadManager::ReleaseCurlHandle(CURL *handle, bool allow_reuse) {
   const set<CURL *>::iterator elem = pool_handles_inuse_->find(handle);
   assert(elem != pool_handles_inuse_->end());
 
-  if (pool_handles_idle_->size() > pool_max_handles_) {
+  if (!allow_reuse || pool_handles_idle_->size() > pool_max_handles_) {
     curl_easy_cleanup(*elem);
   } else {
     pool_handles_idle_->insert(*elem);
@@ -2020,7 +2020,7 @@ Failures DownloadManager::Fetch(JobInfo *info) {
       }
     } while (VerifyAndFinalize(retval, info));
     result = info->error_code();
-    ReleaseCurlHandle(info->curl_handle());
+    ReleaseCurlHandle(info->curl_handle(), false);
   }
 
   if (result != kFailOk) {
