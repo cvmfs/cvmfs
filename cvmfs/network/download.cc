@@ -2020,7 +2020,12 @@ Failures DownloadManager::Fetch(JobInfo *info) {
       }
     } while (VerifyAndFinalize(retval, info));
     result = info->error_code();
-    ReleaseCurlHandle(info->curl_handle(), false);
+    // Prevent the handle from being added to the idle list, which
+    // avoids that it is mistakenly picked up by the multi handle later
+    // in multi-threaded context. This, in turn, would fail to wait for
+    // for resolver threads that meanwhile vanished due to a fork()
+    // in Daemonize()
+    ReleaseCurlHandle(info->curl_handle(), false /* allow_reuse */);
   }
 
   if (result != kFailOk) {
