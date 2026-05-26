@@ -645,7 +645,7 @@ void *DownloadManager::MainDownload(void *data) {
                                    &still_running);
         } else {
           // Return easy handle into pool and write result back
-          download_mgr->ReleaseCurlHandle(easy_handle, true);
+          download_mgr->ReleaseCurlHandle(easy_handle, true /* allow_reuse */);
 
           DataTubeElement *ele = new DataTubeElement(kActionStop);
           info->GetDataTubePtr()->EnqueueBack(ele);
