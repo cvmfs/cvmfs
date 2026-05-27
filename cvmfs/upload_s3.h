@@ -112,6 +112,10 @@ class S3Uploader : public AbstractUploader {
   bool ParseSpoolerDefinition(const SpoolerDefinition &spooler_definition);
   void UploadJobInfo(s3fanout::JobInfo *info);
 
+  // Per S3 spec the multi-object DELETE request supports at most 1000 keys.
+  // kDefaultBatchDeleteSize is the default flush threshold; it can be tuned
+  // via CVMFS_S3_BATCH_DELETE_SIZE up to kMaxBatchDeleteSize.
+  static const unsigned kDefaultBatchDeleteSize = 100;
   static const unsigned kMaxBatchDeleteSize = 1000;
 
   s3fanout::JobInfo *CreateJobInfo(const std::string &path) const;
@@ -134,6 +138,7 @@ class S3Uploader : public AbstractUploader {
   bool peek_before_put_;
   bool use_https_;
   bool batch_delete_enabled_;
+  unsigned batch_delete_size_;
   std::string proxy_;
 
   const std::string temporary_path_;

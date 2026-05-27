@@ -16,6 +16,14 @@ import (
 	l "github.com/cvmfs/ducc/log"
 )
 
+// ConstructGCDBDeleteCommand returns a single cvmfs_server ingest command that
+// reads pending paths from the given GC database and deletes them all in one
+// CVMFS transaction.
+func ConstructGCDBDeleteCommand(gcDBPath string, CVMFSRepo string) []string {
+	repoName, _ := cvmfs.GetRepoAndSubdir(CVMFSRepo)
+	return []string{"cvmfs_server", "ingest", "--gc-db", gcDBPath, repoName}
+}
+
 func ConstructDeleteCommands(pathsToDelete []string, pathsPerBatchCommand int, CVMFSRepo string) ([][]string, error) {
 
 	if pathsPerBatchCommand < 1 {

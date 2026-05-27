@@ -1427,10 +1427,16 @@ Supported Commands:
                   -b base directory
                   [-d <folder to delete>]
                   [-c create nested catalog in base directory]
+                  [--gc-db <path to GC SQLite database>]
                   <fully qualified name>
                   Extract the content of the tarfile inside the base directory,
                   in the same transaction it also delete the required folders.
                   Use '-' as -t argument to read the tarball from STDIN.
+                  Use --gc-db to delete pending paths from a GC database
+                  (as produced by cvmfs_ducc gc --scan-only).  Paths are
+                  removed in batches, one publish per batch; the batch size
+                  is controlled by CVMFS_GC_DB_BATCH_SIZE in the server
+                  config (default 1000, 0 = all in a single batch).
   ingestsql       -D <sqlite database>
                   [-l <lease path>] [-p <prefix>]
                   [-q <concurrent jobs>] [-n <create empty db file>]
