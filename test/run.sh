@@ -593,6 +593,7 @@ run_test_with_timeout() {
         set -e &&
         set -o pipefail &&
         set -x &&
+        set -u &&
         cd "$4" &&
         . ./test_functions &&
         . "$1/main" &&
