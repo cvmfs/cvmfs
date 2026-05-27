@@ -590,6 +590,7 @@ run_test_with_timeout() {
       trap '\''stop_test_tree TERM; wait "$test_tree_pid" 2>/dev/null || true; exit 143'\'' TERM
 
       bash -c '\''
+        set -e &&
         cd "$4" &&
         . ./test_functions &&
         . "$1/main" &&
