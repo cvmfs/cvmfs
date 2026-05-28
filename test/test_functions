@@ -64,7 +64,7 @@ if [ ! -z "$CVMFS_TEST_GEO_ACCOUNT_ID" ]; then
   echo "CVMFS_GEO_ACCOUNT_ID=$CVMFS_TEST_GEO_ACCOUNT_ID" | sudo tee -a /etc/cvmfs/server.local > /dev/null
 fi
 
-if [ -z "$CVMFS_TEST_DOCKER" ]; then
+if ! [[ -v CVMFS_TEST_DOCKER ]]; then
   if [ -f /.dockerinit ]; then
     CVMFS_TEST_DOCKER=yes
   else
