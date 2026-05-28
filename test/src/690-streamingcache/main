@@ -28,7 +28,7 @@ cvmfs_run_test() {
   mkdir -p ${repo_dir}/nested                                    || return 2
   touch ${repo_dir}/nested/.cvmfscatalog                         || return 2
   echo "Hello World" > ${repo_dir}/internal/small                || return 3
-  cat /dev/urandom | head -c 2500 > ${repo_dir}/internal/bar     || return 4
+  dd if=/dev/urandom bs=2500 count=1 of="${repo_dir}"/internal/bar || return 4
   publish_repo $CVMFS_TEST_REPO -v                               || return 5
 
   start_transaction $CVMFS_TEST_REPO                                      || return $?
