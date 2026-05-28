@@ -17,7 +17,7 @@ set_up_work_dir() {
 
     test_volume=$(pwd)/test_vol
     sudo dd if=/dev/zero of=$test_volume bs=1 count=0 seek=2GB
-    sudo yes | sudo mkfs.$fs_type $fs_args $test_volume
+    sudo mkfs.$fs_type $fs_args $test_volume
 
     # preparation
     echo "$fs_type $mkfs_args - Creating overlay fs"
@@ -149,13 +149,13 @@ run_test_cases() {
 cvmfs_run_test() {
     trap clean_work_dir EXIT HUP INT TERM || return $?
 
-    run_test_cases "xfs"
+    run_test_cases "xfs -f"
     local status_xfs1=$?
 
-    run_test_cases "xfs -n ftype=1"
+    run_test_cases "xfs -f -n ftype=1"
     local status_xfs2=$?
 
-    run_test_cases "ext4"
+    run_test_cases "ext4 -FF"
     local status_ext4=$?
 
     return $(check_status $(( $status_xfs1 || $status_xfs2 || $status_ext4 )))
