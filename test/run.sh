@@ -592,6 +592,7 @@ run_test_with_timeout() {
       bash -c '\''
         set -e &&
         set -o pipefail &&
+        set -x &&
         cd "$4" &&
         . ./test_functions &&
         . "$1/main" &&
