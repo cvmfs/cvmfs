@@ -7,7 +7,9 @@ CVMFS_TEST077_MOUNTPOINT_ONE=
 CVMFS_TEST077_MOUNTPOINT_TWO=
 
 cleanup() {
-  sudo umount $CVMFS_TEST077_MOUNTPOINT_ONE $CVMFS_TEST077_MOUNTPOINT_TWO
+  sudo umount $CVMFS_TEST077_MOUNTPOINT_ONE
+  # mountpoint_two is not expected to be mounted normally, but it might in case of a bug
+  sudo umount $CVMFS_TEST077_MOUNTPOINT_TWO || true
 }
 
 cvmfs_run_test() {
