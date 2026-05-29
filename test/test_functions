@@ -341,8 +341,12 @@ autofs_check() {
 # @param state   the desired state of autofs (on|off)
 # @return        0 on success
 autofs_switch() {
-  autofs_check
-  if service_should_switch $1 $?; then
+  RC=$(
+    set +e
+    autofs_check &>/dev/null
+    echo $?
+  )
+  if service_should_switch $1 "$RC"; then
     service_switch autofs $1
   fi
 }
@@ -352,8 +356,12 @@ autofs_switch() {
 # @param state   the desired state of autofs (on|off)
 # @return        0 on success
 apache_switch() {
-  service_request $APACHE_SERVICE status > /dev/null 2>&1
-  if service_should_switch $1 $?; then
+  RC=$(
+    set +e
+    service_request $APACHE_SERVICE status > /dev/null 2>&1
+    echo $?
+  )
+  if service_should_switch $1 "$RC"; then
     service_switch $APACHE_SERVICE $1
   fi
 }
