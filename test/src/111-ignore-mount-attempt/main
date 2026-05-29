@@ -46,10 +46,7 @@ cvmfs_run_test() {
   to_syslog "CVMFS_TEST_111_SYSLOG_MARKER_1"
 
   echo "*** accessing ignored repo ${ignored_repo} via autofs (should fail)"
-  local ls_output
-  ls_output=$(ls /cvmfs/${ignored_repo}/ 2>&1)
-  local ls_retval=$?
-  if [ $ls_retval -eq 0 ]; then
+  if ls /cvmfs/${ignored_repo}/; then
     echo "ERROR: listing ignored repo ${ignored_repo} via autofs should have failed"
     return 20
   fi
@@ -97,9 +94,7 @@ cvmfs_run_test() {
   to_syslog "CVMFS_TEST_111_SYSLOG_MARKER_2"
 
   echo "*** attempting to access ignored repo with spaces in list (should fail)"
-  ls_output=$(ls /cvmfs/${ignored_repo}/ 2>&1)
-  ls_retval=$?
-  if [ $ls_retval -eq 0 ]; then
+  if ls /cvmfs/${ignored_repo}/; then
     echo "ERROR: access to ignored repo should have failed (spaces test)"
     return 60
   fi
