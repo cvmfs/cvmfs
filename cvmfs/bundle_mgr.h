@@ -10,6 +10,7 @@
 
 #include <cassert>
 #include <cstddef>
+#include <memory>
 #include <type_traits>
 #include <vector>
 
@@ -29,9 +30,8 @@ class BundleMgr : SingleCopy {
  public:
   BundleMgr(MountPoint *mp, const PathString &path);
   virtual ~BundleMgr() {
-    JoinFetcher();
+    JoinFetcherPool();
     pthread_mutex_destroy(&worker_read_mutex_);
-    delete fetcher_threads_;
     delete bfm_;
   }
   void Fetch();
@@ -39,8 +39,8 @@ class BundleMgr : SingleCopy {
 
  private:
   static void *MainBundleMgrFetcher(void *data);
-  void SpawnFetcher();
-  void JoinFetcher();
+  void SpawnFetcherPool();
+  void JoinFetcherPool();
   PathString ReceivePath(int fd) const;
   bool TrySendPath(int fd, const PathString &path) const;
 
@@ -115,7 +115,7 @@ class BundleMgr : SingleCopy {
   // Pool of fetcher threads. All workers share pipe_bm_[0] (read end)
   // and serialize their reads via worker_read_mutex_ so cmd+payload
   // pairs are received atomically.
-  std::vector<pthread_t> *fetcher_threads_;
+  std::vector<std::unique_ptr<pthread_t> > fetcher_threads_;
   pthread_mutex_t worker_read_mutex_;
   size_t pool_size_;
   int back_channel_;
