@@ -198,11 +198,6 @@ Pages available: 1"
   [ "x$info_machine" != "$info_machine_correct" ] || return 41
 
   echo "*** Check invalid input for num pages"
-  negative_num=$(get_xattr proxy_list@-2 /cvmfs/grid.cern.ch/README 2>&1)
-  large_num=$(get_xattr proxy_list~1000 /cvmfs/grid.cern.ch/README 2>&1)  
-  letters_num=$(get_xattr proxy_list~xxx /cvmfs/grid.cern.ch/README 2>&1) 
-  nothing=$(get_xattr proxy_list@ /cvmfs/grid.cern.ch/README 2>&1) 
-
   local error
   if running_on_osx; then
     error="No message available on STREAM"
@@ -210,18 +205,14 @@ Pages available: 1"
     error="attr_get: No data available"
   fi
 
-  if echo $negative_num | grep -v "$error"; then
-    return 50
-  fi
-  if echo $large_num | grep -v "$error"; then
-    return 51
-  fi
-  if echo $letters_num | grep -v "$error"; then
-    return 52
-  fi
-  if echo $nothing | grep -v "$error"; then
-    return 53
-  fi
+  # negative
+  get_xattr proxy_list@-2 /cvmfs/grid.cern.ch/README 2>&1 | grep -v "$error" && return 50
+  # large_num
+  get_xattr proxy_list~1000 /cvmfs/grid.cern.ch/README 2>&1 | grep -v "$error" && return 51
+  # letters
+  get_xattr proxy_list~xxx /cvmfs/grid.cern.ch/README 2>&1 | grep -v "$error" && return 52
+  # nothing
+  get_xattr proxy_list@ /cvmfs/grid.cern.ch/README 2>&1 | grep -v "$error" && return 53
 
   cvmfs_umount grid.cern.ch || return 2
 
