@@ -265,9 +265,9 @@ find_new_package() {
   local name="$1"
   local dir="${CVMFS_PACKAGE_DIR:-/tmp}"
   if has_binary rpm; then
-    ls ${dir}/${name}*.rpm 2>/dev/null | head -1
+    (ls ${dir}/${name}*.rpm 2>/dev/null || true) | head -1
   else
-    ls ${dir}/${name}*.deb 2>/dev/null | head -1
+    (ls ${dir}/${name}*.deb 2>/dev/null || true) | head -1
   fi
 }
 
