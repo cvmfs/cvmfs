@@ -61,9 +61,13 @@ cvmfs_run_test() {
   start_transaction $CVMFS_TEST_REPO || return $?
 
   echo "*** checking transaction retries"
-  cvmfs_server transaction $CVMFS_TEST_REPO
+  RC=$(
+    set +e
+    cvmfs_server transaction $CVMFS_TEST_REPO >/dev/null
+    echo $?
+  )
   # Expect EEXIST
-  [ $? -eq 17 ] || return 30
+  [ "$RC" -eq 17 ] || return 30
   cvmfs_server transaction -t 0 $CVMFS_TEST_REPO &
   local pid_txn=$!
   sleep 2
