@@ -84,7 +84,8 @@ cvmfs_run_test() {
   sudo mount $repo_dir  || return 21
 
   echo "*** create a transaction (should fail)"
-  start_transaction $CVMFS_TEST_REPO 2>&1 | grep -q "$CVMFS_TEST_REPO is not based on the newest" || return 22
+  start_transaction $CVMFS_TEST_REPO 2>transaction.err && return 22
+  grep -q "$CVMFS_TEST_REPO is not based on the newest" transaction.err || return 22
 
   echo "*** repair the root hash ($latest_root_hash)"
   sed -i -e "s/CVMFS_ROOT_HASH=.*/CVMFS_ROOT_HASH=${latest_root_hash}/" $client_config
