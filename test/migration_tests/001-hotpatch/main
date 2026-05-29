@@ -2,11 +2,6 @@
 cvmfs_test_name="Hotpatching during Linux kernel tar and checksumming large files"
 
 
-skip_bytes() {
-    local num_of_bytes=$1
-    dd bs=512k 2>/dev/null | { dd bs=$num_of_bytes count=1 > /dev/null 2>&1; dd bs=512k 2>/dev/null; }
-}
-
 tar_gzip_and_hash() {
     local dir_path=$1
     local tar_log=$2
