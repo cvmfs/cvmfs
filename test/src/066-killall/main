@@ -35,7 +35,6 @@ fs_cleanup(){
     local loopdev=$(findmnt -n -o SOURCE --target "$DEST")
     sudo fsfreeze -u ${DEST} || true # may be unfrozen and give EINVAL
     sudo umount ${DEST}
-    sudo losetup -d "$loopdev"
     sudo rm -rf ${DEST}
   fi
   if [ -f ${SRC} ]; then
