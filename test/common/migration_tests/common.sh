@@ -128,7 +128,7 @@ package_version() {
   local pkg_path=$1
 
   if has_binary rpm; then
-    rpm -qp --queryformat='%{VERSION}' $pkg_path 2>/dev/null
+    rpm -qp --queryformat='%{VERSION}' $pkg_path
   elif has_binary dpkg; then
     dpkg --info $pkg_path 2>/dev/null | grep -e "^ Version:" | sed 's/^ Version: \([0-9]\.[0-9]\.[0-9]*\).*$/\1/'
   else
