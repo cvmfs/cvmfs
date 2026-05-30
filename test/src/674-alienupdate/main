@@ -10,11 +10,9 @@ cleanup() {
   echo "running cleanup()"
   if [ ! -z $CVMFS_TEST_674_MOUNTPOINT_A ]; then
     sudo fusermount -u $CVMFS_TEST_674_MOUNTPOINT_A
-    sudo umount        $CVMFS_TEST_674_MOUNTPOINT_A
   fi
   if [ ! -z $CVMFS_TEST_674_MOUNTPOINT_B ]; then
     sudo fusermount -u $CVMFS_TEST_674_MOUNTPOINT_B
-    sudo umount        $CVMFS_TEST_674_MOUNTPOINT_B
   fi
 }
 
