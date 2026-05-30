@@ -173,8 +173,7 @@ cvmfs_run_test() {
   check_symlinks "$TEST_592_MOUNTPOINT" || return 5
 
   echo "ensure raw symlinks in server mode"
-  check_symlinks "/var/spool/cvmfs/${CVMFS_TEST_REPO}/rdonly"
-  if [ $? -eq 0 ]; then
+  if check_symlinks "/var/spool/cvmfs/${CVMFS_TEST_REPO}/rdonly"; then
     return 30
   fi
 
