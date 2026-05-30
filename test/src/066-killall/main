@@ -33,7 +33,7 @@ fs_cleanup(){
   # unfreeze it and unmount it
   if mountpoint -q "${DEST}"; then
     local loopdev=$(findmnt -n -o SOURCE --target "$DEST")
-    sudo fsfreeze -u ${DEST} 2> /dev/null
+    sudo fsfreeze -u ${DEST}
     sudo umount ${DEST}
     sudo losetup -d "$loopdev"
     sudo rm -rf ${DEST}
