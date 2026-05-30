@@ -97,13 +97,14 @@ cvmfs_run_test() {
   # but be different if PID gets recycled.
   local authz_helper_pid_stat=$(stat --terse /proc/"$authz_helper_pid")
   echo "authz helper has pid $authz_helper_pid; killing it."
-  sudo ps axfu
+  sudo ps -fu -p "$authz_helper_pid"
   sudo kill -KILL $authz_helper_pid
-  sleep 1
-  sudo ps axfu
-  while [[ -d /proc/"$authz_helper_pid" ]] && [[ "$(stat --terse /proc/"$authz_helper_pid")" == "$authz_helper_pid_stat" ]]; do
+  sudo ps -fu -p "$authz_helper_pid" || true
+  # authz_helper_pid is observed a zombie not reaped by cvmfs2 for a long time. 2026-05-30
+  while [[ -d /proc/"$authz_helper_pid" ]] && [[ "$(stat --terse /proc/"$authz_helper_pid")" == "$authz_helper_pid_stat" ]] && [[ "$(ps -o stat= -p "$authz_helper_pid")" != Z ]]; do
     sleep 0.1
   done
+  sudo ps -fu -p "$authz_helper_pid" || true
   echo "authz helper has died, access should fail"
   sudo -u nobody setsid -w /bin/sh -c "cat ${mntpnt}/hello_world" && return 74
   echo "Waiting for rate-limit timeout to pass"
