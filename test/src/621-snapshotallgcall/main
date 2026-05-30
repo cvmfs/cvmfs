@@ -102,7 +102,9 @@ cvmfs_run_test() {
   echo "*** ms0 ***"
   cat ms0
   echo "*** mr0 ***"
-  cat mr0
+  if ! running_on_s3; then
+    cat mr0
+  fi
   echo "*** mr1 ***"
   cat mr1
   echo "*** mr5 ***"
