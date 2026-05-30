@@ -46,10 +46,6 @@ cvmfs_run_test() {
   echo "$output"
 
   verify_hello_world "$output"
-  local verify_result=$?
-  if [ $verify_result -ne 0 ]; then
-    return $verify_result
-  fi
 
   #################################################################
   echo "Test empty file"
@@ -74,10 +70,6 @@ cvmfs_run_test() {
   echo "$output"
 
   verify_hello_world "$output"
-  verify_result=$?
-  if [ $verify_result -ne 0 ]; then
-    return $verify_result
-  fi
 
   local uncompressed_cksum=$(echo "hello world" | cvmfs_swissknife graft -i - | grep checksum | tr '=' ' ' | awk '{print $2;}')
   local uncompressed_cksum_real=$(echo "hello world" | sha1sum | awk '{print $1;}')
@@ -99,10 +91,6 @@ cvmfs_run_test() {
   fi
 
   verify_hello_world "`cat simple1/.cvmfsgraft-hello_world`"
-  verify_result=$?
-  if [ $verify_result -ne 0 ]; then
-    return $verify_result
-  fi
 
   #################################################################
   echo "Single file output, absolute graft path"
@@ -116,10 +104,6 @@ cvmfs_run_test() {
   fi
 
   verify_hello_world "`cat simple2/.cvmfsgraft-hello_world2`"
-  verify_result=$?
-  if [ $verify_result -ne 0 ]; then
-    return $verify_result
-  fi
 
   #################################################################
   echo "Test nested directory."
@@ -149,23 +133,11 @@ cvmfs_run_test() {
   fi
 
   verify_hello_world "`cat deep_output/.cvmfsgraft-hello_world`"
-  verify_result=$?
-  if [ $verify_result -ne 0 ]; then
-    return $verify_result
-  fi
 
   verify_hello_world "`cat deep_output/sub1/sub2/.cvmfsgraft-hello_world`"
-  verify_result=$?
-  if [ $verify_result -ne 0 ]; then
-    return $verify_result
-  fi
 
   echo "Verifying test breaks on invalid input:"
-  verify_hello_world "`cat deep_output/sub1/sub2/.cvmfsgraft-check_break`"
-  verify_result=$?
-  if [ $verify_result -eq 0 ]; then
-    return $verify_result
-  fi
+  ! verify_hello_world "`cat deep_output/sub1/sub2/.cvmfsgraft-check_break`"
 
   echo "Test hash algorithm"
   local shake_checksum=$(echo -n "abc" | cvmfs_swissknife graft -i - -a shake128 \
