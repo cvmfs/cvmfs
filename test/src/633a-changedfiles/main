@@ -88,7 +88,7 @@ cvmfs_run_test() {
   start_transaction $CVMFS_TEST_REPO                              || return $?
   mkdir /cvmfs/$CVMFS_TEST_REPO/dir                               || return 3
   echo "Hello World" > $small_file                                || return 3
-  dd if=/dev/urandom of=$large_file bs=$((32*1024)) count=1024    || return 3
+  (yes || true) | head -c $((32*1024*1024)) > $large_file                   || return 3
   publish_repo $CVMFS_TEST_REPO -v                                || return $?
 
   local mntpnt="${scratch_dir}/private_mnt"
