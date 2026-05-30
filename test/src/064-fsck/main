@@ -20,10 +20,13 @@ cvmfs_run_test() {
   for f in $(sudo find $cms_cachedir -mindepth 2 -type f); do
     sudo sh -c "cat /dev/null > $f"
   done
-  sudo cvmfs_config fsck -j8 -p
-  if [ $? -ne 1 ]; then
-    return 12
-  fi
+  (
+    set +e
+    sudo cvmfs_config fsck -j8 -p
+    if [ $? -ne 1 ]; then
+      return 12
+    fi
+  )
   sudo mkdir -p $cms_cachedir/aa
   sudo touch $cms_cachedir/aa/aaaaaaaa # made-up, too short hash
   sudo cvmfs_config fsck -q && return 13
