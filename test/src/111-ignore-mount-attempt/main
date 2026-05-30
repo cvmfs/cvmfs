@@ -5,7 +5,7 @@ cvmfs_test_suites="quick"
 
 cleanup() {
   echo "running cleanup()"
-  sudo umount /cvmfs/projects.cern.ch 2>/dev/null
+  ! sudo umount /cvmfs/projects.cern.ch 2>/dev/null
   if [ -f /etc/cvmfs/default.local.111bak ]; then
     sudo cp /etc/cvmfs/default.local.111bak /etc/cvmfs/default.local
     sudo rm -f /etc/cvmfs/default.local.111bak
