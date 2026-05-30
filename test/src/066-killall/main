@@ -180,11 +180,11 @@ cvmfs_run_test() {
 
   sudo cvmfs_config killall || return 20
   echo "Wait for reload to finish"
-  wait $reload_pid
+  # non-zero exit code is legit but not tested for, got 137 as of 2026-05-30
+  wait $reload_pid || true
 
   echo "Killall once again because we don't know where the reloaded was interrupted"
   sudo cvmfs_config killall || return 30
-  wait $!
 
   if [ "$(uname)" != "Linux" ]; then
     # specific killall options are not meant
