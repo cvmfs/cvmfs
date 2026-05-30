@@ -98,8 +98,7 @@ cvmfs_run_test() {
     sudo stat $CVMFS_TEST081_SHRINKWRAP_DEST/.data || return 11
     ls $CVMFS_TEST081_SHRINKWRAP_DEST/.provenance || return 12
 
-    ls $CVMFS_TEST081_SHRINKWRAP_DEST/$repo/lcg/lastUpdate
-    [ $? -ne 0 ] || return 20
+    ls $CVMFS_TEST081_SHRINKWRAP_DEST/$repo/lcg/lastUpdate && return 20
 
     echo "*** Update destination..."
     echo | sudo tee -a $workdir/cvmfs-$repo.spec.txt
