@@ -109,6 +109,5 @@ cvmfs_run_test() {
       --dest-base $CVMFS_TEST081_SHRINKWRAP_DEST
     [ $? -eq 0 ] || return 30
     ls $CVMFS_TEST081_SHRINKWRAP_DEST/$repo/lcg/lastUpdate || return 31
-    rm $workdir
     return 0
 }
