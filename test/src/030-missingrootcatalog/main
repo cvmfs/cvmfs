@@ -71,7 +71,7 @@ cvmfs_run_test() {
     local expected_max=6000  
   fi
 
-  if [ $milliseconds -gt $expected_max ]; then
+  if [ "$milliseconds" -gt "$expected_max" ]; then
     echo "mounting took too long with $milliseconds seconds (expected $expected_max)"
     CVMFS_TIME_WARNING_FLAG=1
   fi
