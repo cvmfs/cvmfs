@@ -97,7 +97,7 @@ cvmfs_run_test() {
   # but be different if PID gets recycled.
   local authz_helper_pid_stat=$(stat --terse /proc/"$authz_helper_pid")
   echo "authz helper has pid $authz_helper_pid; killing it."
-  sudo kill -SEGV $authz_helper_pid
+  sudo kill -KILL $authz_helper_pid
   while [[ -d /proc/"$authz_helper_pid" ]] && [[ "$(stat --terse /proc/"$authz_helper_pid")" == "$authz_helper_pid_stat" ]]; do
     sleep 0.1
   done
