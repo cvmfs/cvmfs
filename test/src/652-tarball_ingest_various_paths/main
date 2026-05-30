@@ -34,6 +34,7 @@ produce_tarball() {
 
 cvmfs_run_test() {
   logfile=$1
+  local script_location=$2
   local scratch_dir=$(pwd)
   local tarfile=$scratch_dir/tarball.tar
   local dir=tar_dir
