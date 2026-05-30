@@ -127,9 +127,10 @@ decrement_version() {
 package_version() {
   local pkg_path=$1
 
-  if has_binary rpm; then
+  source /etc/os-release
+  if [[ "$ID_LIKE" =~ rhel ]]; then
     rpm -qp --queryformat='%{VERSION}' $pkg_path
-  elif has_binary dpkg; then
+  elif [[ "$ID_LIKE" =~ debian ]]; then
     dpkg --info $pkg_path 2>/dev/null | grep -e "^ Version:" | sed 's/^ Version: \([0-9]\.[0-9]\.[0-9]*\).*$/\1/'
   else
     return 1
