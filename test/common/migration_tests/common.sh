@@ -264,9 +264,11 @@ uninstall_package() {
 find_new_package() {
   local name="$1"
   local dir="${CVMFS_PACKAGE_DIR:-/tmp}"
-  if has_binary rpm; then
+  source /etc/os-release
+  if [[ "$ID_LIKE" =~ rhel ]]; then
     (ls ${dir}/${name}*.rpm 2>/dev/null || true) | head -1
   else
+    [[ "$ID_LIKE" =~ debian ]]
     (ls ${dir}/${name}*.deb 2>/dev/null || true) | head -1
   fi
 }
