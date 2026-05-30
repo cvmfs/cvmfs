@@ -56,13 +56,13 @@ cvmfs_run_test() {
 
   cd /cvmfs/$CVMFS_TEST_REPO || return 8
   start_transaction $CVMFS_TEST_REPO || return 9
-  echo y | publish_repo $CVMFS_TEST_REPO
-  if [ $? -eq 0 ]; then
+  if echo y | publish_repo $CVMFS_TEST_REPO; then
+    echo "Should have refused due to busy dir, telling user to cd out"
     return 10
   fi
   cd foo || return 11
-  echo y | publish_repo $CVMFS_TEST_REPO
-  if [ $? -eq 0 ]; then
+  if echo y | publish_repo $CVMFS_TEST_REPO; then
+    echo "Should have refused due to busy dir, telling user to cd out"
     return 12
   fi
   cd / || return 13
