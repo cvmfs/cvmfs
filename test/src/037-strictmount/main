@@ -10,5 +10,6 @@ cvmfs_run_test() {
     "CVMFS_STRICT_MOUNT=yes" || return 1
 
   try_automount lhcb.cern.ch && return 2
+  return 0
 }
 
