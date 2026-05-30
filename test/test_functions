@@ -1490,20 +1490,9 @@ pushdir() {
   fi
 }
 
-
-# wrapper around popd (that is not available in dash)
-# if popd is not available, a normal `cd -` is used to go back to the last dir
-# Note: We do not reimplement the whole functionality of popd, with our work-
-#       around it is only possible to have ONE directory-level stored
+# Deprecated. Was devised for compatibility across bash and dash
 popdir() {
-  type popd > /dev/null 2>&1
-  if [ $? -eq 0 ]; then
-    popd $1
-    return $?
-  else
-    cd -
-    return $?
-  fi
+  popd
 }
 
 
