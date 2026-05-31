@@ -547,7 +547,7 @@ cvmfs_mount() {
   fi
 
   # add additional parameters
-  local proberunner
+  local proberunner=
   while [ $# -gt 0 ]; do
     local param="$1"
     if [ "$param" = "CVMFS_SUID=yes" ]; then
