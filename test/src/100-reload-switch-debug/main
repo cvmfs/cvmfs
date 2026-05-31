@@ -30,6 +30,13 @@ reload_without_debuglog() {
 
   # assumption: debug log is already there
   echo "   ** Check non-empty existence of debug log"
+  # as observed, it's not there yet
+  for attempt in {1..10}; do
+    if [ -s "$CVMFS_TEST_100_TMPFILE" ]; then
+      break
+    fi
+    sleep 1
+  done
   if [ -s "$CVMFS_TEST_100_TMPFILE" ]
   then
     echo "     *** True"
