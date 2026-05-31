@@ -557,19 +557,19 @@ cvmfs_mount() {
     shift 1
   done
 
-  if [ "x$CVMFS_TEST_DEBUGLOG" != "x" ]; then
+  if [[ "${CVMFS_TEST_DEBUGLOG:-}" != '' ]]; then
     sudo sh -c "echo 'CVMFS_DEBUGLOG=${CVMFS_TEST_DEBUGLOG}' >> /etc/cvmfs/default.local" || return 100
   fi
 
-  if [ "x$CVMFS_TEST_QUOTED_PARAM_KEY_VAL" != "x" ]; then
+  if [[ -v CVMFS_TEST_QUOTED_PARAM_KEY_VAL ]]; then
     sudo sh -c "echo '${CVMFS_TEST_QUOTED_PARAM_KEY_VAL}' >> /etc/cvmfs/default.local" || return 100
   fi
 
   if running_on_osx; then
     cvmfs_mount_direct $repositories
   fi
-  if [ "x$cvmfs_test_autofs_on_startup" = "xfalse" ] || \
-     [ "x$CVMFS_TEST_DOCKER" = "xyes" ]; then
+  if [ "${cvmfs_test_autofs_on_startup:-}" = "false" ] || \
+     [ "${CVMFS_TEST_DOCKER:-}" = "yes" ]; then
     cvmfs_mount_direct $repositories
   fi
 
