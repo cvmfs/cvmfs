@@ -176,7 +176,7 @@ cvmfs_run_test() {
   result="`curl -s -H "$cdnheader: $ipv4addr" http://localhost/$api/x/$cerncdn,$fnalcdn,$ihepcdn|head -5`"
   cvmfs_check_georesult "$result" $me cern,fnal,ihep || return 10
 
-  echo "checking $CDN IPv6"
+  echo "checking CDN IPv6"
   result="`curl -s -H "$cdnheader: $ipv6addr" http://localhost/$api/x/$ihepcdn,$cerncdn,$fnalcdn|head -5`"
   cvmfs_check_georesult "$result" $me ihep,cern,fnal || return 11
 
