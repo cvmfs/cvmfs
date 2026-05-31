@@ -2460,17 +2460,18 @@ __do_local_mount() {
   local mountpoint="$3"
   local repo_name="$4"
   local repo_url="$5"
-  local config_file="$6"   # config file containing CVMFS client options,
+  # sometimes not passed:
+  local config_file="${6:-}"   # config file containing CVMFS client options,
                            # if used the options listed below are not added
-  local extra_option="$7"  # CVMFS client options as str
-  local mount_options="$8" # comma separated mount options
+  local extra_option="${7:-}"  # CVMFS client options as str
+  local mount_options="${8:-}" # comma separated mount options
 
   local cache="$(get_cache_directory $mountpoint)"
   local config="$(mktemp ${mountpoint}.conf.XXXXX)"
   local output="$(mktemp ${mountpoint}.log.XXXXX)"
 
   mkdir -p $mountpoint $cache
-  if [ -z $config_file ]; then
+  if [ -z "$config_file" ]; then
     cat > $config << EOF
 CVMFS_MOUNT_DIR=/cvmfs
 CVMFS_CACHE_BASE=$cache
@@ -2483,13 +2484,13 @@ CVMFS_DEBUGLOG=$output
 CVMFS_USYSLOG=${mountpoint}.log
 EOF
   else
-    cat $config_file > $config
+    cat "$config_file" > $config
   fi
   printf "$extra_option\n" >> $config
   echo "  *** local mount config:"
   cat "$config"
 
-  if [ ! -z $mount_options ]; then
+  if [ ! -z "$mount_options" ]; then
     mount_options="${mount_options},"
   fi
 
