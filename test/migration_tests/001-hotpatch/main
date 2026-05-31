@@ -6,7 +6,7 @@ tar_gzip_and_hash() {
     local dir_path=$1
     local tar_log=$2
     local script_location=$3
-    local result_file=$4
+    local result_file=${4:-}
 
     local tar_archive="$(mktemp ./tar.XXXX)"
 
@@ -15,7 +15,7 @@ tar_gzip_and_hash() {
     md5_result="$(${script_location}/tarsum $tar_archive | cut -d' ' -f1 | sort | md5sum | cut -d' ' -f1)"
     rm -f $tar_archive || return 2
 
-    if [ x"$result_file" != x"" ]; then
+    if [[ "$result_file" != '' ]]; then
       echo -n "$md5_result" > $result_file
     else
       echo -n "$md5_result"
