@@ -275,39 +275,3 @@ install_new_packages() {
     install_packages ${dir}/cvmfs*.deb
   fi
 }
-
-
-#
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-#
-
-
-# check availability of packages
-if ! [[ -v CVMFS_CLIENT_PACKAGE ]]; then
-  echo "CernVM-FS client package not specified in CVMFS_CLIENT_PACKAGE!"
-  # not fatal
-elif [ ! -f "$CVMFS_CLIENT_PACKAGE" ]; then
-  echo "CernVM-FS client package '$CVMFS_CLIENT_PACKAGE' not found!"
-  # not fatal
-fi
-
-if ! [[ -v CVMFS_SERVER_PACKAGE ]]; then
-  CVMFS_SERVER_PACKAGE="${CVMFS_CLIENT_PACKAGE/cvmfs/cvmfs-server}"
-fi
-if [ ! -f $CVMFS_SERVER_PACKAGE ]; then
-  echo "CernVM-FS server package '$CVMFS_SERVER_PACKAGE' not found!"
-fi
-
-if ! [[ -v CVMFS_LIBS_PACKAGE ]]; then
-  CVMFS_LIBS_PACKAGE="${CVMFS_CLIENT_PACKAGE/cvmfs/cvmfs-libs}"
-fi
-if [ ! -f $CVMFS_LIBS_PACKAGE ]; then
-  echo "CernVM-FS libs package '$CVMFS_LIBS_PACKAGE' not found!"
-fi
-
-if ! [[ -v CVMFS_FUSE_PACKAGE ]]; then
-  CVMFS_FUSE_PACKAGE="${CVMFS_CLIENT_PACKAGE/cvmfs/cvmfs-fuse3}"
-fi
-if [ ! -f $CVMFS_FUSE_PACKAGE ]; then
-  echo "CernVM-FS fuse package '$CVMFS_FUSE_PACKAGE' not found!"
-fi
