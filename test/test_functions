@@ -1644,7 +1644,7 @@ get_apache_config_filename() {
 }
 
 get_backend_spooler() {
-  if [ -n "${TEST_CVMFS_RECEIVER_UPSTREAM_STORAGE}" ] ; then
+  if [[ -n "${TEST_CVMFS_RECEIVER_UPSTREAM_STORAGE:-}" ]] ; then
     # A gateway test is running: access the backend storage directly
     echo "${TEST_CVMFS_RECEIVER_UPSTREAM_STORAGE}"
   else
