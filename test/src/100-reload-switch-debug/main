@@ -24,7 +24,7 @@ reload_without_debuglog() {
   local specific_repo
   specific_repo=$1
   local some_file
-  some_file=$(find /cvmfs/lhcb.cern.ch/lib/etc/ -type f | head -n1)
+  some_file=$(find /cvmfs/lhcb.cern.ch/lib/etc/ -type f -print -quit)
   echo "   ** Access some data at $TEST100_REPO: $some_file"
   cat "$some_file" > /dev/null || return 10
 
