@@ -50,7 +50,7 @@ cvmfs_run_test() {
   disable_auto_garbage_collection $CVMFS_TEST_REPO || return $?
 
   echo "*** delete older stats.db files:"
-  rm -vf $CVMFS_TEST_662_DB_PATH
+  rm -vf $CVMFS_TEST_661_DB_PATH
 
   echo "*** starting transaction to edit repository"
   start_transaction $CVMFS_TEST_REPO || return $?
