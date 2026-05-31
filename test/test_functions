@@ -1734,8 +1734,8 @@ plant_tarball() {
 plant_legacy_repository_revision() {
   local tarball="$1"
   local legacy_repo_name="$2"
-  local repo_owner="$3"
-  local verbose="$4"
+  local repo_owner=${3:-}
+  local verbose=${4:-}
   local legacy_repo_storage="$(get_local_repo_storage $legacy_repo_name)"
 
   plant_tarball "$tarball" "$verbose" || return 104
