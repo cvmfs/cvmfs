@@ -8,6 +8,4 @@ cvmfs_run_test() {
 
   cvmfs_mount oasis.opensciencegrid.org,atlas.cern.ch \
     "CVMFS_HTTP_PROXY=DIRECT" || return 3
-
-  return $retval
 }
