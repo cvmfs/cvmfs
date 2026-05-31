@@ -1711,7 +1711,7 @@ _resign_legacy_repository() {
 # @param verbose  print the verbose output of tar
 plant_tarball() {
   local tarball="$1"
-  local verbose="$2"
+  local verbose=${2:-}
   local olddir="$(pwd)"
   local tar_params="xzf"
 
