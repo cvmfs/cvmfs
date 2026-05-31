@@ -6,7 +6,6 @@ cvmfs_test_suites="quick"
 
 produce_tarball() {
   local tarball_name=$1
-  local script_location=$2
 
   mkdir tarball_foo
   mkdir -p tarball_foo/a/b/c
