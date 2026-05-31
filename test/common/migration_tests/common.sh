@@ -283,25 +283,29 @@ install_new_packages() {
 
 
 # check availability of packages
-if [ x"$CVMFS_CLIENT_PACKAGE" = x"" ] || [ ! -f $CVMFS_CLIENT_PACKAGE ]; then
+if ! [[ -v CVMFS_CLIENT_PACKAGE ]]; then
+  echo "CernVM-FS client package not specified in CVMFS_CLIENT_PACKAGE!"
+  # not fatal
+elif [ ! -f "$CVMFS_CLIENT_PACKAGE" ]; then
   echo "CernVM-FS client package '$CVMFS_CLIENT_PACKAGE' not found!"
+  # not fatal
 fi
 
-if [ x"$CVMFS_SERVER_PACKAGE" = x"" ]; then
+if ! [[ -v CVMFS_SERVER_PACKAGE ]]; then
   CVMFS_SERVER_PACKAGE="${CVMFS_CLIENT_PACKAGE/cvmfs/cvmfs-server}"
 fi
 if [ ! -f $CVMFS_SERVER_PACKAGE ]; then
   echo "CernVM-FS server package '$CVMFS_SERVER_PACKAGE' not found!"
 fi
 
-if [ x"$CVMFS_LIBS_PACKAGE" = x"" ]; then
+if ! [[ -v CVMFS_LIBS_PACKAGE ]]; then
   CVMFS_LIBS_PACKAGE="${CVMFS_CLIENT_PACKAGE/cvmfs/cvmfs-libs}"
 fi
 if [ ! -f $CVMFS_LIBS_PACKAGE ]; then
   echo "CernVM-FS libs package '$CVMFS_LIBS_PACKAGE' not found!"
 fi
 
-if [ x"$CVMFS_FUSE_PACKAGE" = x"" ]; then
+if ! [[ -v CVMFS_FUSE_PACKAGE ]]; then
   CVMFS_FUSE_PACKAGE="${CVMFS_CLIENT_PACKAGE/cvmfs/cvmfs-fuse3}"
 fi
 if [ ! -f $CVMFS_FUSE_PACKAGE ]; then
