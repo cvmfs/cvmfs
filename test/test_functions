@@ -770,7 +770,7 @@ destroy_repo() {
   fi
 
   load_repo_config $repo
-  if [ x"$TEST_CVMFS_RECEIVER_UPSTREAM_STORAGE" != x"" ]; then
+  if [ "${TEST_CVMFS_RECEIVER_UPSTREAM_STORAGE:-}" != "" ]; then
     # It is possible to have publisher and gateway on the same machine for testing purposes.
     # However, `cvmfs_server rmfs` then incorrectly does not delete the repository backend storage.
     # Let's do it here instead.
