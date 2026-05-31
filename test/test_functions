@@ -1085,7 +1085,7 @@ create_listing() {
 compare_directories() {
   local dir1=$1
   local dir2=$2
-  local repo_name=$3
+  local repo_name=${3:-''}
   local show_linkcount="yes"
 
   if [ ! -z $repo_name ] && uses_overlayfs $repo_name; then
