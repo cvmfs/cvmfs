@@ -590,7 +590,7 @@ _cvmfs_mount_manually() {
 }
 
 cvmfs_umount() {
-  if [ x$PARROT_ENABLED = "xTRUE" ]; then
+  if [ "${PARROT_ENABLED:-}" = "TRUE" ]; then
     return 0
   fi
 
