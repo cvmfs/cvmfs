@@ -155,7 +155,7 @@ test_extra_args(){
 }
 
 logdebug(){
-  if [[  "${DEBUG_LOGGING_MODE}" == "colored"  ]]; then
+  if [[  "${DEBUG_LOGGING_MODE:-}" == "colored"  ]]; then
     echo -e "\e[35m$1\e[0m"
   else
     echo -e "$1"
