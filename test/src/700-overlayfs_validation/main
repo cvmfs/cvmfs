@@ -46,7 +46,7 @@ delete_file_in_lower_branch() {
     set_up_work_dir $@
 
     echo "$@ - Delete file from read-only layer"
-    rm -f $union/foo/bar
+    sudo rm -f $union/foo/bar
 
     # ls produces obviously bogus output (a non-zero return code here, makes the test case fail)
     ls -lisa $union
