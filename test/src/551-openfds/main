@@ -52,7 +52,7 @@ cvmfs_run_test() {
   start_transaction $CVMFS_TEST_REPO || return 5
   publish_repo $CVMFS_TEST_REPO || return 6
 
-  kill $pid || return 7
+  kill $pid || true
 
   cd /cvmfs/$CVMFS_TEST_REPO || return 8
   start_transaction $CVMFS_TEST_REPO || return 9
