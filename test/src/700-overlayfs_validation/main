@@ -7,7 +7,7 @@ cvmfs_test_suites="quick"
 set_up_work_dir() {
     fs_type=$1
     shift
-    mkfs_args=$@
+    mkfs_args=($@)
 
     root_dir=$(pwd)
     read_only=$root_dir/read_only
@@ -20,7 +20,7 @@ set_up_work_dir() {
     sudo mkfs.$fs_type "${mkfs_args[@]}" $test_volume
 
     # preparation
-    echo "$fs_type $mkfs_args - Creating overlay fs"
+    echo "$fs_type ${mkfs_args[@]} - Creating overlay fs"
     mkdir -p $read_only $read_write $work_dir $union
     sudo mount -o loop $test_volume $read_only
     sudo mkdir $read_only/foo
