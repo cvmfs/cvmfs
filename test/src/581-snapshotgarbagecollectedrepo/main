@@ -149,7 +149,7 @@ cvmfs_run_test() {
   produce_files_1_in $repo_dir || return 3
 
   echo "putting exactly the same stuff in the scratch spaces for comparison"
-  produce_files_1_in $reference_dir1 || return 4
+  cp -a "$repo_dir"/* $reference_dir1 || return 4
 
   echo "creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO > publish_1.log 2>&1 || return $?
@@ -167,8 +167,7 @@ cvmfs_run_test() {
   produce_files_2_in $repo_dir || return 5
 
   echo "putting exactly the same stuff in the scratch spaces for comparison"
-  produce_files_1_in $reference_dir2 || return 6
-  produce_files_2_in $reference_dir2 || return 7
+  cp -a "$repo_dir"/* $reference_dir2 || return 7
 
   echo "creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO > publish_2.log 2>&1 || return $?
@@ -186,9 +185,7 @@ cvmfs_run_test() {
   produce_files_3_in $repo_dir || return 8
 
   echo "putting exactly the same stuff in the scratch spaces for comparison"
-  produce_files_1_in $reference_dir3 || return  9
-  produce_files_2_in $reference_dir3 || return 10
-  produce_files_3_in $reference_dir3 || return 11
+  cp -a "$repo_dir"/* $reference_dir3 || return 9
 
   echo "creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO > publish_3.log 2>&1 || return $?
