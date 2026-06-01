@@ -138,7 +138,7 @@ cvmfs_run_test() {
   produce_files_in $repo_dir || return 3
 
   echo "putting exactly the same stuff in the scratch space for comparison"
-  produce_files_in $reference_dir || return 4
+  cp -a "$repo_dir"/* "$reference_dir" || return 4
 
   echo "creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO || return $?
