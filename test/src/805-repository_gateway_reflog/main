@@ -14,7 +14,9 @@ cvmfs_run_test() {
     cvmfs_server transaction ${test_repo} || return 11
     echo "*** Transaction opened"
 
+    set +o pipefail
     cvmfs_server publish ${test_repo} 2>&1 | tee publish.log || return 12
+    set -o pipefail
     local output=$(cat publish.log | grep "missing_reflog")
 
     if [ x"$output" = x"" ]; then
