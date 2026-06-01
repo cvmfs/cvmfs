@@ -874,9 +874,9 @@ create_empty_repo() {
 create_filled_repo() {
   local repo=$1
   local uid=$2
-  local debug_log=$3
+  local debug_log=${3:-}
 
-  create_empty_repo $repo $uid $debug_log || return 101
+  create_empty_repo $repo $uid "$debug_log" || return 101
 
   sudo cvmfs_server transaction $repo || return 102
 
