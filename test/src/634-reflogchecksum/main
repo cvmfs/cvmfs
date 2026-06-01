@@ -30,7 +30,7 @@ cvmfs_run_test() {
 
   echo "*** check validation of checksum"
   mv $checksum $checksum.backup
-  cat /dev/zero | head -c 40 > $checksum
+  dd if=/dev/zero bs=40 count=1 status=none of=$checksum
   check_repository $CVMFS_TEST_REPO && return 21
   start_transaction $CVMFS_TEST_REPO || return $?
   publish_repo $CVMFS_TEST_REPO && return 20
