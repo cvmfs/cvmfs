@@ -1669,7 +1669,7 @@ cleanup_legacy_repo_leftovers() {
      [ -f /etc/cvmfs/keys/${legacy_repo_name}.masterkey ]; then
     sudo rm -f /etc/cvmfs/keys/${legacy_repo_name}.*
   fi
-  remove_apache_config_file $apache_config_file
+  remove_apache_config_file $apache_config_file || true
   echo "done"
 }
 
