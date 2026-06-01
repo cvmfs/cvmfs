@@ -8,7 +8,8 @@ CVMFS_TEST_688_REPO_NAMES=
 cleanup() {
   if [ -n "$CVMFS_TEST_688_REPO_NAMES" ]; then
     for repo in $CVMFS_TEST_688_REPO_NAMES; do
-      sudo cvmfs_server rmfs -f $repo
+      # may not exist
+      sudo cvmfs_server rmfs -f $repo || true
     done
   fi
 }
