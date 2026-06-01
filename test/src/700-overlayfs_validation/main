@@ -87,7 +87,7 @@ delete_dir_in_lower_branch () {
     set_up_work_dir $@
 
     # reproduction
-    rm -fR $union/foo
+    sudo rm -fR $union/foo
 
     # ls shows that 'foo' is still there
     ls -lisa $union
