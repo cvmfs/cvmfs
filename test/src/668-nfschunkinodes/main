@@ -39,11 +39,10 @@ cvmfs_run_test() {
   echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
 
-  local size=$((32*1024*1024))
   echo "*** put a a large file into $CVMFS_TEST_REPO"
   start_transaction $CVMFS_TEST_REPO                              || return $?
   mkdir /cvmfs/$CVMFS_TEST_REPO/dir                               || return 3
-  dd if=/dev/urandom bs=1 count=$size of=/cvmfs/$CVMFS_TEST_REPO/dir/large || return 3
+  dd if=/dev/urandom bs=1M count=32 of=/cvmfs/$CVMFS_TEST_REPO/dir/large || return 3
   sha1sum /cvmfs/$CVMFS_TEST_REPO/dir/large > CHECKSUM
   publish_repo $CVMFS_TEST_REPO -v                                || return $?
 
@@ -66,7 +65,7 @@ cvmfs_run_test() {
   echo "*** change contents of large file"
   ls -lisa ${mntpnt}/dir/*
   start_transaction $CVMFS_TEST_REPO                         || return $?
-  dd if=/dev/urandom bs=1 count=$size of=/cvmfs/$CVMFS_TEST_REPO/dir/large || return 30
+  dd if=/dev/urandom bs=1M count=32 of=/cvmfs/$CVMFS_TEST_REPO/dir/large || return 30
   sha1sum /cvmfs/$CVMFS_TEST_REPO/dir/large > CHECKSUM
   publish_repo $CVMFS_TEST_REPO -v                           || return $?
 
