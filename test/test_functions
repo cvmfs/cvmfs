@@ -1581,7 +1581,7 @@ remove_apache_config_file() {
 
   # disable configuration on newer apache versions
   if [ x"$(get_apache_conf_mode)" = x"$APACHE_CONF_MODE_CONFAVAIL" ]; then
-    sudo a2disconf $file_name > /dev/null 2>&1 || return 1
+    sudo a2disconf $file_name || return 1
   fi
 
   # remove configuration file
