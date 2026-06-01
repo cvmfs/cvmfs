@@ -24,7 +24,6 @@ produce_files_in() {
 }
 
 block_repo() {
-  cd /cvmfs/$CVMFS_TEST_REPO
   while true; do ls .; sleep 1; done
 }
 
@@ -40,7 +39,9 @@ cvmfs_run_test() {
   start_transaction $CVMFS_TEST_REPO || return $?
 
   echo "block repository"
+  pushd /cvmfs/$CVMFS_TEST_REPO
   block_repo &
+  popd
   local pid=$!
 
   echo "putting some stuff in the new repository"
