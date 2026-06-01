@@ -17,7 +17,7 @@ set_up_work_dir() {
 
     test_volume=$(pwd)/test_vol
     sudo dd if=/dev/zero of=$test_volume bs=1 count=0 seek=2GB
-    sudo mkfs.$fs_type $fs_args $test_volume
+    sudo mkfs.$fs_type "${mkfs_args[@]}" $test_volume
 
     # preparation
     echo "$fs_type $mkfs_args - Creating overlay fs"
