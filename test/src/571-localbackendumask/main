@@ -56,21 +56,21 @@ check_permissions_of_new_files() {
 
 create_random_files() {
   local filename_dummy="$1"
-  local bytes="$2"
+  local kbytes="$2"
   local filecount="$3"
 
   local i=0
   while [ $i -lt $filecount ]; do
     local filename=$(mktemp $filename_dummy)
-    dd if=/dev/urandom of="$filename" bs=1 count=$bytes status=none || return 1
+    dd if=/dev/urandom of="$filename" bs=1K count=$kbytes status=none || return 1
     i=$(( $i + 1 ))
   done
 }
 
 put_files_in() {
   local repo_dir="$1"
-  create_random_files "${repo_dir}/largeXXXXXX" $(( 15 * 1024 * 1024 ))  2
-  create_random_files "${repo_dir}/smallXXXXXX" $(( 15 * 1024 ))        10
+  create_random_files "${repo_dir}/largeXXXXXX" $(( 15 * 1024 ))  2
+  create_random_files "${repo_dir}/smallXXXXXX" $(( 15 ))        10
 }
 
 cvmfs_run_test() {
