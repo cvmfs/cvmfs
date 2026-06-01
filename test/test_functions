@@ -2757,3 +2757,16 @@ expect_exit_code() {
   "$@" || rc=$?
   [[ "$rc" == "$expected" ]]
 }
+
+inflate_file() {
+  local destination_file=$1
+  local source_file=${2}
+  local desired_file_size=$3
+
+  local bs=10000
+  local count=$(( desired_file_size / bs + 1 ))
+  local resulting_size=$(( bs * count ))
+  [[ "$resulting_size" -ge "$desired_file_size" ]] || exit 1
+  dd if=/dev/urandom of="$destination_file" bs=$bs count=$count status=none
+  [[ "$(stat -c %s "$destination_file")" -ge "$desired_file_size" ]]
+}

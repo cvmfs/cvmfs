@@ -10,17 +10,6 @@ CVMFS_TEST_660_TAR_FILE=tarfile.tar
 CVMFS_TEST_660_TAR_DIR=newTarDir
 CVMFS_TEST_660_REPO=
 
-inflate_file() {
-  local destination_file=$1
-  local source_file=$2
-  local desired_file_size=$3
-
-  touch $destination_file
-  while [ $(stat -c %s $destination_file) -lt $desired_file_size ]; do
-    cat $source_file >> $destination_file
-  done
-}
-
 test1() {
   local working_dir=$1
 

@@ -3,17 +3,6 @@ cvmfs_test_name="Change a Chunked File"
 cvmfs_test_autofs_on_startup=false
 cvmfs_test_suites="quick"
 
-inflate_file() {
-  local destination_file=$1
-  local source_file=$2
-  local desired_file_size=$3
-
-  touch $destination_file
-  while [ $(stat -c %s $destination_file) -lt $desired_file_size ]; do
-    cat $source_file >> $destination_file
-  done
-}
-
 produce_files_in() {
   local working_dir=$1
 
