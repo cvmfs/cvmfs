@@ -139,7 +139,7 @@ run_test_cases() {
     local status4=$?
 
     echo "$@ - Check deleting files in the lower read-only branch of the union fs: Status $status1"
-    echo "$@ - Check open file paths in /proc/$PID/fd: Status $status2"
+    echo "$@ - Check open file paths in /proc/PID/fd: Status $status2"
     echo "$@ - Check deleting directories in the lower read-only branch of the union fs: Status $status3"
     echo "$@ - Check suid or sgid bits during writes on overlayfs: Status $status4"
 
