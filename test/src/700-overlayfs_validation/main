@@ -158,6 +158,7 @@ cvmfs_run_test() {
     run_test_cases "ext4 -FF"
     local status_ext4=$?
 
+    trap - EXIT HUP INT TERM
     return $(check_status $(( $status_xfs1 || $status_xfs2 || $status_ext4 )))
 }
 
