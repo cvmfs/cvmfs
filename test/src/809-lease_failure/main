@@ -21,8 +21,12 @@ cvmfs_run_test() {
     echo "New file" > /cvmfs/test.repo.org/new/c/d/new_file.txt || return 12
 
     echo "  *** Checking that we cannot open a transaction again"
-    cvmfs_server transaction test.repo.org
-    if [ $? -ne 17 ]; then
+    local retval=$(
+      set +e
+      cvmfs_server transaction test.repo.org >/dev/null
+      echo $?
+    )
+    if [ $retval -ne 17 ]; then
         echo "cvmfs_server transaction should tell us that we have a transaction already"
         return 20
     fi
