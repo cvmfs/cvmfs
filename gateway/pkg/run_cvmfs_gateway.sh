@@ -41,9 +41,9 @@ elif [ x"$action" = xrestart ]; then
     echo "CVMFS repository gateway restarted."
 elif [ x"$action" = xstatus ]; then
     if $has_systemd; then
-        systemctl status cvmfs-gateway@$user > /dev/null 2>&1
+        systemctl status cvmfs-gateway@$user
     else
-        service cvmfs-gateway status > /dev/null 2>&1
+        service cvmfs-gateway status
     fi
     retval=$?
     if [ "x$retval" = "x0" ]; then
