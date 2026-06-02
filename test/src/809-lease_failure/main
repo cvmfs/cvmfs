@@ -45,8 +45,11 @@ cvmfs_run_test() {
       /var/spool/cvmfs/test.repo.org/session_token.save || return 41
 
     echo "  *** Checking that the lease is taken and that cvmfs_transaction fails"
-    cvmfs_server transaction test.repo.org/new/c
-    retcode=$?
+    retcode=$(
+      set +e
+      cvmfs_server transaction test.repo.org/new/c >&2
+      echo $?
+    )
     if [ $retcode -ne 16 ]; then
         echo "Return code should be 16 EBUSY instead of ${retcode}"
         return 50
