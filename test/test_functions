@@ -2715,11 +2715,7 @@ EOF'
     # Wait for the gateway to be ready: `status` only confirms the VM is up,
     # not that the HTTP listener on :4929 is accepting connections.  Probe the
     # API endpoint directly so callers of acquire-lease don't race startup.
-    if ! timeout 30 bash -c "
-        until $gateway_script status &>/dev/null \
-              && curl -sf -o /dev/null -m 2 http://localhost:4929/api/v1/repos; do
-            sleep 1
-        done"; then
+    if ! curl -v -f --retry 30 --retry-max-time 30 --retry-connrefused -o /dev/null -m 2 http://localhost:4929/api/v1/repos; then
         echo "Gateway failed to start within 30 seconds" >&2
         return 1
     fi
