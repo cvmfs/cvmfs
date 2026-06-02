@@ -74,17 +74,7 @@ change_files_in() {
 
   # remove the original 50 megabyte file and replace it by a
   # slightly different version
-  local bigfile=big_file/50megabyte
-  rm $bigfile
-  touch $bigfile
-  local first_hit=0
-  while [ $(stat -c %s $bigfile) -lt 52428800 ]; do
-    cat /bin/ls >> $bigfile
-    if [ $first_hit -eq 0 ]; then
-      echo "You need to understand recursion in order to understand recursion" >> $bigfile
-      first_hit=1
-    fi
-  done
+  inflate_file big_file/50megabyte _ 50000000
 
   popdir
 }
@@ -135,7 +125,7 @@ cvmfs_run_test() {
   change_files_in $repo_dir || return 5
 
   echo "change the chunked file slightly in the reference directory"
-  change_files_in $reference_dir || return 6
+  cp -a "$repo_dir"/* $reference_dir || return 6
 
   echo "creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO || return $?
