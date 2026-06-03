@@ -5,7 +5,7 @@ set -e
 SCRIPT_LOCATION=$(cd "$(dirname "$0")"; pwd)
 
 has_systemd=false
-if [ x"$(pidof systemd >/dev/null && echo yes || echo no)" = "xyes" ]; then
+if [ -d /run/systemd/system ]; then
     has_systemd=true
 fi
 
