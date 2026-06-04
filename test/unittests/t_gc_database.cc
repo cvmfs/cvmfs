@@ -194,7 +194,7 @@ TEST_F(T_GCDatabase, ReadPreservesInsertionOrder) {
   EXPECT_EQ("m_third", paths[2]);
 }
 
-TEST_F(T_GCDatabase, LargeNumberOfPaths) {
+TEST_F(T_GCDatabase, LargeNumberOfPathsSlow) {
   std::vector<std::string> input;
   for (int i = 0; i < 5000; ++i) {
     input.push_back(".layers/sha256/" + StringifyInt(i));
