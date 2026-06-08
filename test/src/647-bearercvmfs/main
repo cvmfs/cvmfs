@@ -290,7 +290,7 @@ cvmfs_run_test() {
   sudo -u nobody /bin/sh -c "cat ${mntpnt}/hello_world" || return 31
 
   echo "*** This should not work"
-  sudo -u nobody setsid /bin/sh -c "env && cat ${mntpnt}/hello_world" && return 32
+  sudo -u nobody setsid -w /bin/sh -c "env && cat ${mntpnt}/hello_world" && return 32
 
 
   echo "*** Check authz attr"
@@ -309,7 +309,7 @@ cvmfs_run_test() {
   echo "*** This should work"
   sudo -u nobody /bin/sh -c "export _CONDOR_CREDS=${TEST647_CRED_DIR}; cat ${mntpnt}/hello_world" > /dev/null || return 51
   echo "*** This should not work"
-  sudo -u nobody setsid /bin/sh -c "env && cat ${mntpnt}/hello_world" && return 52
+  sudo -u nobody setsid -w /bin/sh -c "env && cat ${mntpnt}/hello_world" && return 52
 
   return 0
 }

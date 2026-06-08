@@ -96,7 +96,7 @@ cvmfs_run_test() {
   echo "authz helper has pid $authz_helper_pid; killing it."
   sudo kill -SEGV $authz_helper_pid
   echo "authz helper has died, access should fail"
-  sudo -u nobody setsid /bin/sh -c "cat ${mntpnt}/hello_world" && return 74
+  sudo -u nobody setsid -w /bin/sh -c "cat ${mntpnt}/hello_world" && return 74
   echo "Waiting for rate-limit timeout to pass"
   sleep 11
   #
@@ -109,7 +109,7 @@ cvmfs_run_test() {
         --debug || return 75
   echo "Waiting for reload to finish"
   sleep 2
-  sudo -u nobody setsid /bin/sh -c "cat ${mntpnt}/hello_world" || return 76
+  sudo -u nobody setsid -w /bin/sh -c "cat ${mntpnt}/hello_world" || return 76
   local authz_helper_pid_new=$(pgrep -P $secure_mnt_pid cvmfs_allow)
   echo "new authz helper pid $authz_helper_pid_new"
   [ "x$authz_helper_pid_new" = "x" ] && return 77
