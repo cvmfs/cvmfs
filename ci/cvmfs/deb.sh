@@ -72,13 +72,9 @@ cd $copied_source
 
 . /etc/os-release
 VERSION_NUMBER=$(echo ${VERSION_ID} | tr -d '.')
-BUILD_LIBFUSE2=yes
-if [ "$ID" = "ubuntu" ] && [ ${VERSION_NUMBER} -ge 2504 ]; then
-  BUILD_LIBFUSE2=no
-fi
-if [ "$ID" = "debian" ] && [ ${VERSION_NUMBER} -ge 13 ]; then
-  BUILD_LIBFUSE2=no
-fi
+# libfuse2 packaging is disabled: libfuse-dev is not available in the build
+# environment and libfuse3 is used on all supported platforms.
+BUILD_LIBFUSE2=no
 if [ "${BUILD_LIBFUSE2}" = "yes" ]; then
   sed -i -e "s/^#BUILD_LIBFUSE2//g" debian/control
   sed -i -e "s/^#BUILD_LIBFUSE2/BUILD_LIBFUSE2/g" debian/rules
