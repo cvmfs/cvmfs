@@ -2474,7 +2474,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
         is_prefetching_enabled);
   } else {
     LogCvmfs(kLogCvmfs, kLogSyslog | kLogDebug,
-             "OptionsManager excpected to be initialized but isn't");
+             "OptionsManager expected to be initialized but isn't");
   }
 
   // We need logging set up before forking the watchdog
