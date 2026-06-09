@@ -48,11 +48,12 @@ class BundleMgr : SingleCopy {
 
   // CT stands for contiguous type
   template<typename CT,
-           typename = std::enable_if_t<std::is_trivially_copyable_v<CT> > >
+           typename = typename std::enable_if<
+               std::is_trivially_copyable<CT>::value>::type>
   void BlockingSend(int fd, const CT &obj, size_t size = sizeof(CT)) const {
-    using T = std::remove_cv_t<CT>;
+    typedef typename std::remove_cv<CT>::type T;
     static_assert(
-        std::is_trivially_copyable_v<T>,
+        std::is_trivially_copyable<T>::value,
         "Can't directly send non trivially copyable types over a pipe");
     static_assert(sizeof(T) == sizeof(CT), "CT illformed");
     static_assert(
@@ -84,9 +85,10 @@ class BundleMgr : SingleCopy {
   }
 
   template<typename CT,
-           typename = std::enable_if_t<std::is_trivially_copyable_v<CT> > >
+           typename = typename std::enable_if<
+               std::is_trivially_copyable<CT>::value>::type>
   CT BlockingReceive(int fd) const {
-    using T = std::remove_cv_t<CT>;
+    typedef typename std::remove_cv<CT>::type T;
     static_assert(
         sizeof(T) <= PIPE_BUF,
         "Type too big to be guaranteed atomic transmission over a pipe");
@@ -99,7 +101,7 @@ class BundleMgr : SingleCopy {
     const size_t size = BlockingReceive<size_t>(fd);
     assert(size * sizeof(char) < PIPE_BUF);
     std::string result(size, '\t');
-    ::read(fd, static_cast<void *>(result.data()), size * sizeof(char));
+    ::read(fd, static_cast<void *>(&result[0]), size * sizeof(char));
     return result;
   }
 
