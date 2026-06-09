@@ -183,7 +183,7 @@ void BundleMgr::SpawnFetcherPool() {
   fcntl(back_channel_, F_SETFL, flags | O_NONBLOCK);
 
   for (size_t i = 0; i < pool_size_; ++i) {
-    auto thread =std::make_unique<pthread_t>();
+    std::unique_ptr<pthread_t> thread(new pthread_t());
     const int res = pthread_create(thread.get(), nullptr,
                                    MainBundleMgrFetcher, this);
     if (res != 0) {
@@ -225,7 +225,9 @@ void BundleMgr::FetchPath(const PathString &path) {
 }
 
 void *BundleMgr::MainBundleMgrFetcher(void *data) {
+#ifndef __APPLE__
   pthread_setname_np(pthread_self(), "bm_fetcher");
+#endif
   BundleMgr *mgr = static_cast<BundleMgr *>(data);
   const int rfd = mgr->pipe_bm_[0];
 
