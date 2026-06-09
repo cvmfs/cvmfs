@@ -46,7 +46,7 @@ EOL
 
 	# crete the repository where to store the content
     echo -n "*** Creating CVMFS repo..."
-    create_empty_repo $CVMFS_TEST405_REPOSITORY $USER || return $?
+    create_empty_repo $CVMFS_TEST405_REPOSITORY $CVMFS_TEST_USER || return $?
     echo "done"
 
 	touch $CVMFS_TEST405_DUCC_ERR
