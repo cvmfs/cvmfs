@@ -2258,66 +2258,66 @@ TEST(Log2Histogram, Quantiles) {
   }
 }
 TEST_F(T_Util, FuzzyExactMatch) {
-    EXPECT_EQ(fuzzy_searcher->search("apple"), "apple");
-    EXPECT_EQ(fuzzy_searcher->search("banana"), "banana");
-    EXPECT_EQ(fuzzy_searcher->search("kiwi"), "kiwi");
+    EXPECT_EQ(fuzzy_searcher->Search("apple"), "apple");
+    EXPECT_EQ(fuzzy_searcher->Search("banana"), "banana");
+    EXPECT_EQ(fuzzy_searcher->Search("kiwi"), "kiwi");
 }
 
 TEST_F(T_Util, FuzzySingleCharacterTypos) {
-    EXPECT_EQ(fuzzy_searcher->search("aple"), "apple");
-    EXPECT_EQ(fuzzy_searcher->search("bannana"), "banana");
-    EXPECT_EQ(fuzzy_searcher->search("oragne"), "orange");
-    EXPECT_EQ(fuzzy_searcher->search("peachh"), "peach");
+    EXPECT_EQ(fuzzy_searcher->Search("aple"), "apple");
+    EXPECT_EQ(fuzzy_searcher->Search("bannana"), "banana");
+    EXPECT_EQ(fuzzy_searcher->Search("oragne"), "orange");
+    EXPECT_EQ(fuzzy_searcher->Search("peachh"), "peach");
 }
 
 TEST_F(T_Util, FuzzyTranspositions) {
-    EXPECT_EQ(fuzzy_searcher->search("aplpe"), "apple");
-    EXPECT_EQ(fuzzy_searcher->search("banan"), "banana");
-    EXPECT_EQ(fuzzy_searcher->search("oraneg"), "orange");
-    EXPECT_EQ(fuzzy_searcher->search("peahc"), "peach");
+    EXPECT_EQ(fuzzy_searcher->Search("aplpe"), "apple");
+    EXPECT_EQ(fuzzy_searcher->Search("banan"), "banana");
+    EXPECT_EQ(fuzzy_searcher->Search("oraneg"), "orange");
+    EXPECT_EQ(fuzzy_searcher->Search("peahc"), "peach");
 }
 
 TEST_F(T_Util, FuzzyMissingCharacters) {
-    EXPECT_EQ(fuzzy_searcher->search("appl"), "apple");
-    EXPECT_EQ(fuzzy_searcher->search("bana"), "banana");
-    EXPECT_EQ(fuzzy_searcher->search("oran"), "orange");
-    EXPECT_EQ(fuzzy_searcher->search("peac"), "peach");
+    EXPECT_EQ(fuzzy_searcher->Search("appl"), "apple");
+    EXPECT_EQ(fuzzy_searcher->Search("bana"), "banana");
+    EXPECT_EQ(fuzzy_searcher->Search("oran"), "orange");
+    EXPECT_EQ(fuzzy_searcher->Search("peac"), "peach");
 }
 
 TEST_F(T_Util, FuzzyExtraCharacters) {
-    EXPECT_EQ(fuzzy_searcher->search("appple"), "apple");
-    EXPECT_EQ(fuzzy_searcher->search("banaanana"), "banana");
-    EXPECT_EQ(fuzzy_searcher->search("oraange"), "orange");
-    EXPECT_EQ(fuzzy_searcher->search("peeach"), "peach");
+    EXPECT_EQ(fuzzy_searcher->Search("appple"), "apple");
+    EXPECT_EQ(fuzzy_searcher->Search("banaanana"), "banana");
+    EXPECT_EQ(fuzzy_searcher->Search("oraange"), "orange");
+    EXPECT_EQ(fuzzy_searcher->Search("peeach"), "peach");
 }
 
 TEST_F(T_Util, FuzzyPhoneticMatches) {
-    EXPECT_EQ(fuzzy_searcher->search("appel"), "apple");
-    EXPECT_EQ(fuzzy_searcher->search("bannanna"), "banana");
-    EXPECT_EQ(fuzzy_searcher->search("oranj"), "orange");
-    EXPECT_EQ(fuzzy_searcher->search("peech"), "peach");
+    EXPECT_EQ(fuzzy_searcher->Search("appel"), "apple");
+    EXPECT_EQ(fuzzy_searcher->Search("bannanna"), "banana");
+    EXPECT_EQ(fuzzy_searcher->Search("oranj"), "orange");
+    EXPECT_EQ(fuzzy_searcher->Search("peech"), "peach");
 }
 
 TEST_F(T_Util, FuzzyNoMatch) {
-    EXPECT_TRUE(fuzzy_searcher->search("xyz").empty());
-    EXPECT_TRUE(fuzzy_searcher->search("qwerty").empty());
-    EXPECT_TRUE(fuzzy_searcher->search("12345").empty());
+    EXPECT_TRUE(fuzzy_searcher->Search("xyz").empty());
+    EXPECT_TRUE(fuzzy_searcher->Search("qwerty").empty());
+    EXPECT_TRUE(fuzzy_searcher->Search("12345").empty());
 }
 
 TEST_F(T_Util, FuzzyEmptyInput) {
-    EXPECT_TRUE(fuzzy_searcher->search("").empty());
+    EXPECT_TRUE(fuzzy_searcher->Search("").empty());
 }
 
 TEST_F(T_Util, FuzzyCaseSensitivity) {
     // Test with case variations if needed
-    // EXPECT_EQ(fuzzy_searcher->search("Apple"), "apple");
+    // EXPECT_EQ(fuzzy_searcher->Search("Apple"), "apple");
     // Would need to modify implementation to handle case insensitivity
 }
 
 TEST_F(T_Util, FuzzyMultipleCloseMatches) {
     // Test when multiple words are equally close
     std::unique_ptr<fuzzy::FuzzySearch> aggressive_searcher= std::make_unique<fuzzy::FuzzySearch>(dictionary,5);
-    EXPECT_EQ(aggressive_searcher->search("berry"), "blueberry");
+    EXPECT_EQ(aggressive_searcher->Search("berry"), "blueberry");
     //prefer substring matching over pure replacements "melon"->"apple" is less prefered than "melon"->watermelon
-    EXPECT_EQ(aggressive_searcher->search("melon"), "watermelon");
+    EXPECT_EQ(aggressive_searcher->Search("melon"), "watermelon");
 }

@@ -30,16 +30,16 @@ class BKTree {
   using DistanceFunc = int (*)(const std::string &, const std::string &);
   DistanceFunc distance;
 
-  void add(BKNode *node, const std::string &word) {
+  void Add(BKNode *node, const std::string &word) {
     const int d = distance(node->word, word);
     if (node->children.find(d) == node->children.end()) {
       node->children[d] = std::unique_ptr<BKNode>(new BKNode{word});
     } else {
-      add(node->children[d].get(), word);
+      Add(node->children[d].get(), word);
     }
   }
 
-  void query(const BKNode *node, const std::string &word, int threshold,
+  void Query(const BKNode *node, const std::string &word, int threshold,
              std::vector<std::pair<std::string, int> > &results) const {
     const int d = distance(node->word, word);
     if (d <= threshold)
@@ -49,7 +49,7 @@ class BKTree {
     const int end = d + threshold;
     for (const auto &[dist, child] : node->children) {
       if (dist >= start && dist <= end) {
-        query(child.get(), word, threshold, results);
+        Query(child.get(), word, threshold, results);
       }
     }
   }
@@ -57,19 +57,19 @@ class BKTree {
  public:
   explicit BKTree(DistanceFunc dist) : distance(dist) { }
 
-  void insert(const std::string &word) {
+  void Insert(const std::string &word) {
     if (!root) {
       root = std::unique_ptr<BKNode>(new BKNode(word));
     } else {
-      add(root.get(), word);
+      Add(root.get(), word);
     }
   }
 
-  std::vector<std::pair<std::string, int> > search(const std::string &word,
+  std::vector<std::pair<std::string, int> > Search(const std::string &word,
                                                    int threshold) const {
     std::vector<std::pair<std::string, int> > results;
     if (root)
-      query(root.get(), word, threshold, results);
+      Query(root.get(), word, threshold, results);
     return results;
   }
 };
@@ -80,37 +80,37 @@ class FuzzySearch {
                        int max_edits = 3)
       : tree(GetDLDistance), max_edits(max_edits) {
     for (const auto &word : dictionary) {
-      tree.insert(word);
+      tree.Insert(word);
     }
   }
 
-  std::string search(const std::string &query) const {
-    auto candidates = tree.search(query, max_edits);
+  std::string Search(const std::string &Query) const {
+    auto candidates = tree.Search(Query, max_edits);
     if (candidates.empty())
       return "";
 
-    std::sort(candidates.begin(), candidates.end(), CandidateComparator(query));
+    std::sort(candidates.begin(), candidates.end(), CandidateComparator(Query));
 
     return candidates[0].first;
   }
 
  private:
-  static bool SortingCriterion(const std::string &query,
+  static bool SortingCriterion(const std::string &Query,
                                const std::pair<std::string, int> &a,
                                const std::pair<std::string, int> &b) {
-    const bool a_sub = a.first.find(query) != std::string::npos;
-    const bool b_sub = b.first.find(query) != std::string::npos;
+    const bool a_sub = a.first.find(Query) != std::string::npos;
+    const bool b_sub = b.first.find(Query) != std::string::npos;
     if (a_sub != b_sub)
       return a_sub;
-    return GetYWDistance(query, a.first) > GetYWDistance(query, b.first);
+    return GetYWDistance(Query, a.first) > GetYWDistance(Query, b.first);
   }
 
   struct CandidateComparator {
-    const std::string &query;
-    CandidateComparator(const std::string &q) : query(q) { }
+    const std::string &Query;
+    CandidateComparator(const std::string &q) : Query(q) { }
     bool operator()(const std::pair<std::string, int> &a,
                     const std::pair<std::string, int> &b) const {
-      return FuzzySearch::SortingCriterion(query, a, b);
+      return FuzzySearch::SortingCriterion(Query, a, b);
     }
   };
 
