@@ -14,6 +14,8 @@
 #include <cassert>
 #include <climits>
 #include <cstring>
+#include <sstream>
+#include <string>
 #include <vector>
 
 #include "duplex_fuse.h"  // IWYU pragma: keep
@@ -65,6 +67,7 @@
 #include "statistics.h"
 #include "telemetry_aggregator.h"
 #include "tracer.h"
+#include "util/fuzzy.h"
 #include "util/logging.h"
 #include "util/pointer.h"
 #include "util/posix.h"
@@ -1325,6 +1328,26 @@ bool MountPoint::CreateCatalogManager() {
   }
   if (!retval) {
     boot_error_ = "Failed to initialize root file catalog";
+    if (options_mgr_->GetValue("CVMFS_KNOWN_REPOS", &optarg)) {
+      std::istringstream iss(optarg);
+      std::string repo;
+      std::vector<std::string> repos;
+
+      // Assume repos list in a  column separated string
+      while (std::getline(iss, repo, ':')) {
+        repos.push_back(repo);
+      }
+      assert(not repos.empty());
+
+      fuzzy::FuzzySearch fz(repos);
+      std::string mountpoint = this->fqrn();
+      std::string fuzzy_res = fz.Search(mountpoint);
+      boot_error_ += (fuzzy_res.empty())
+                         ? ""
+                         : " for " + mountpoint + ". Did you mean " + fuzzy_res
+                               + "?";
+    }
+
     boot_status_ = loader::kFailCatalog;
     return false;
   }
@@ -2205,13 +2228,11 @@ void MountPoint::SetupHttpTuning() {
       && options_mgr_->IsOn(optarg)) {
     download_mgr_->EnableRedirects();
   }
-  if (options_mgr_->GetValue("CVMFS_INFO_HEADER", &optarg) && (optarg != ""))
-  {
+  if (options_mgr_->GetValue("CVMFS_INFO_HEADER", &optarg) && (optarg != "")) {
     download_mgr_->EnableInfoHeader();
     download_mgr_->SetInfoHeaderTemplate(optarg);
   } else if (options_mgr_->GetValue("CVMFS_SEND_INFO_HEADER", &optarg)
-      && options_mgr_->IsOn(optarg))
-  {
+             && options_mgr_->IsOn(optarg)) {
     download_mgr_->EnableInfoHeader();
     download_mgr_->SetInfoHeaderTemplate("%{path}");
   }
@@ -2221,7 +2242,7 @@ void MountPoint::SetupHttpTuning() {
  * Check whether permission is needed to read from user process environment.
  */
 bool MountPoint::NeedsReadEnviron(OptionsManager *omgr) {
-  // This is a class (static) method because it is used early, before 
+  // This is a class (static) method because it is used early, before
   // all the above initialization is done, so can't rely on mountpoint
   // object data.
   string info_header;
@@ -2281,4 +2302,3 @@ bool MountPoint::SetupOwnerMaps() {
 
   return true;
 }
-
