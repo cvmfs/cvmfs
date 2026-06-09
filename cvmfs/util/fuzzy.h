@@ -89,19 +89,33 @@ class FuzzySearch {
     if (candidates.empty())
       return "";
 
-    std::sort(candidates.begin(), candidates.end(),
-              [&query](const auto &a, const auto &b) {
-                return GetYWDistance(query, a.first)
-                       > GetYWDistance(query, b.first);
-              });
+    std::sort(candidates.begin(), candidates.end(), CandidateComparator(query));
 
     return candidates[0].first;
   }
 
  private:
+  static bool SortingCriterion(const std::string &query,
+                               const std::pair<std::string, int> &a,
+                               const std::pair<std::string, int> &b) {
+    const bool a_sub = a.first.find(query) != std::string::npos;
+    const bool b_sub = b.first.find(query) != std::string::npos;
+    if (a_sub != b_sub)
+      return a_sub;
+    return GetYWDistance(query, a.first) > GetYWDistance(query, b.first);
+  }
+
+  struct CandidateComparator {
+    const std::string &query;
+    CandidateComparator(const std::string &q) : query(q) { }
+    bool operator()(const std::pair<std::string, int> &a,
+                    const std::pair<std::string, int> &b) const {
+      return FuzzySearch::SortingCriterion(query, a, b);
+    }
+  };
+
   BKTree tree;
   int max_edits;
 };
 
 }  // namespace fuzzy
-
