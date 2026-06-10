@@ -2310,8 +2310,8 @@ TEST_F(T_Util, FuzzyEmptyInput) {
 
 TEST_F(T_Util, FuzzyCaseSensitivity) {
     // Test with case variations if needed
-    // EXPECT_EQ(fuzzy_searcher->Search("Apple"), "apple");
-    // Would need to modify implementation to handle case insensitivity
+    EXPECT_EQ(fuzzy_searcher->Search("Kiwi"), "kiwi");
+    EXPECT_EQ(fuzzy_searcher->Search("Appel"), "apple");
 }
 
 TEST_F(T_Util, FuzzyMultipleCloseMatches) {
