@@ -1339,9 +1339,9 @@ bool MountPoint::CreateCatalogManager() {
       }
       assert(not repos.empty());
 
-      fuzzy::FuzzySearch fz(repos);
-      std::string mountpoint = this->fqrn();
-      std::string fuzzy_res = fz.Search(mountpoint);
+      const fuzzy::FuzzySearch fz(repos);
+      const std::string mountpoint = this->fqrn();
+      const std::string fuzzy_res = fz.Search(mountpoint);
       boot_error_ += (fuzzy_res.empty())
                          ? ""
                          : " for " + mountpoint + ". Did you mean " + fuzzy_res
