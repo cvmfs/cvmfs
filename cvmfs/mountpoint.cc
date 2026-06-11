@@ -15,6 +15,7 @@
 #include <climits>
 #include <cstring>
 #include <vector>
+#include <string>
 
 #include "duplex_fuse.h"  // IWYU pragma: keep
 
@@ -1326,6 +1327,13 @@ bool MountPoint::CreateCatalogManager() {
   if (!retval) {
     boot_error_ = "Failed to initialize root file catalog";
     boot_status_ = loader::kFailCatalog;
+    std::vector<std::string> host_chain;
+    download_mgr_->GetHostInfo(&host_chain,nullptr,nullptr);
+    boot_error_ += ". Server chain: ";
+
+    for(auto url :host_chain){
+      boot_error_+=url+"|";
+    }
     return false;
   }
 
