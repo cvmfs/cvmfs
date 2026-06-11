@@ -6,9 +6,8 @@ set -x
 RUN_PASSING_TESTS=1
 RUN_FAILING_TESTS=0
 
-mkdir -p /var/{spool,run}/cvmfs/
+sudo mkdir -p /var/{spool,run}/cvmfs/
 [[ -d /etc/cvmfs/default.d ]]
-[[ "$(whoami)" == root ]]
 echo CVMFS_USER=$(whoami) | sudo tee /etc/cvmfs/default.d/98-user.conf
 export CVMFS_TEST_USER=$(whoami)
 
@@ -36,47 +35,47 @@ proxy_setup() {
     echo CVMFS_HTTP_PROXY="$PROXY_SPEC" | sudo tee /etc/cvmfs/default.d/98-proxy.conf
 
     if [[ "$PROXY_SPEC" != DIRECT ]]; then
-	which varnishd || dnf install -y varnish
-	cat > /etc/varnish/default.vcl <<-EOF
+	which varnishd || sudo dnf install -y varnish
+	sudo tee /etc/varnish/default.vcl <<-EOF
 vcl 4.1;
 backend default {
     .host = "$S3_HOST";
     .port = "9000";
 }
 EOF
-	systemctl enable --now varnish
+	sudo systemctl enable --now varnish
     fi
 }
 
 global_setup() {
-    rsyslogd &
+    sudo rsyslogd &
 
-    echo keepcache=true >> /etc/dnf/dnf.conf
+    echo keepcache=true | sudo tee -a /etc/dnf/dnf.conf || true
     if ! which minio; then
-	which wget || dnf install -y wget
+	which wget || sudo dnf install -y wget
 	[[ -f minio.rpm ]] || wget https://dl.min.io/server/minio/release/linux-amd64/minio.rpm
-	dnf install -y minio.rpm
+	sudo dnf install -y minio.rpm
     fi
     if ! which mc; then
-	which wget || dnf install -y wget
+	which wget || sudo dnf install -y wget
 	[[ -f mc ]] || wget https://dl.min.io/client/mc/release/linux-amd64/mc
-	install mc /usr/local/bin/mc
+	sudo install mc /usr/local/bin/mc
     fi
-    getent passwd minio-user || useradd minio-user -m --home-dir /var/local/minio
-    cat > /etc/default/minio <<EOF
+    getent passwd minio-user || sudo useradd minio-user -m --home-dir /var/local/minio
+    sudo tee /etc/default/minio <<EOF
 MINIO_ROOT_USER=minioadmin
 MINIO_ROOT_PASSWORD=minioadmin	
 MINIO_VOLUMES="/var/local/minio"
 MINIO_OPTS="--address 0.0.0.0:9000"
 EOF
-    systemctl enable --now minio
-    mc alias set myminio http://"$S3_HOST":9000 minioadmin minioadmin
-    mc admin user add myminio minioaccesskey miniosecretkey
-    mc admin policy attach myminio readwrite --user minioaccesskey
-    mc mb myminio/mybucket
-    mc anonymous set download myminio/mybucket
+    sudo systemctl enable --now minio
+    sudo mc alias set myminio http://"$S3_HOST":9000 minioadmin minioadmin
+    sudo mc admin user add myminio minioaccesskey miniosecretkey
+    sudo mc admin policy attach myminio readwrite --user minioaccesskey
+    sudo mc mb myminio/mybucket
+    sudo mc anonymous set download myminio/mybucket
 
-    cat > /etc/cvmfs/s3.conf <<-EOF
+    sudo tee /etc/cvmfs/s3.conf <<-EOF
 CVMFS_S3_ACCESS_KEY=minioaccesskey
 CVMFS_S3_SECRET_KEY=miniosecretkey
 CVMFS_S3_HOST=$S3_HOST
@@ -85,54 +84,60 @@ CVMFS_S3_DNS_BUCKETS=false
 CVMFS_S3_BUCKET=mybucket
 CVMFS_S3_MAX_NUMBER_OF_PARALLEL_CONNECTIONS=1
 EOF
-    cat > ~/.s3cfg <<-EOF
+    sudo tee ~/.s3cfg <<-EOF
 host_base = $S3_HOST:9000
 host_bucket = $S3_HOST:9000
 use_https = False
 access_key = minioaccesskey
 secret_key = miniosecretkey
 EOF
-    systemctl enable --now httpd
+    (
+	source $TEST_ROOT/test_functions
+	apache_switch on
+    )
 
     if [[ -v DEBUG ]]; then
-	cp "$this_script_dir"/swissknife-wrapper /usr/local/bin/cvmfs_swissknife
+	sudo cp "$this_script_dir"/swissknife-wrapper /usr/local/bin/cvmfs_swissknife
 	#which ngrep || dnf install -y ngrep
 	#ngrep -t -e -d any -W byline -O /var/log/ngrep.pcap port 9000 or port 6081 > /var/log/ngrep.log &
     fi
 
     export CVMFS_MAX_TTL_SECS=1
-    cat > /etc/cvmfs/default.d/98-ttl-for-mkfs.conf <<-EOF
+    sudo tee /etc/cvmfs/default.d/98-ttl-for-mkfs.conf <<-EOF
 CVMFS_MAX_TTL_SECS=$CVMFS_MAX_TTL_SECS
 EOF
 }
 
 repo_set_layout_ingestsql() {
-    umount /cvmfs/"$CVMFS_TEST_REPO"
-    umount /var/spool/cvmfs/"$CVMFS_TEST_REPO"/rdonly
+    sudo umount /cvmfs/"$CVMFS_TEST_REPO"
+    sudo umount /var/spool/cvmfs/"$CVMFS_TEST_REPO"/rdonly
+    while pgrep cvmfs2 >/dev/null; do sleep 1; done
 
-    cp /etc/fstab.hack /etc/fstab
-    systemctl daemon-reload
+    sudo cp /etc/fstab.hack /etc/fstab
+    sudo systemctl daemon-reload
 
-    mount /cvmfs/"$CVMFS_TEST_REPO"
+    sudo mount /cvmfs/"$CVMFS_TEST_REPO"
 }
 
 repo_set_layout_mkfs() {
     # return it to the layout created by mkfs
-    umount /cvmfs/"$CVMFS_TEST_REPO"
+    sudo umount /cvmfs/"$CVMFS_TEST_REPO"
+    while pgrep cvmfs2 >/dev/null; do sleep 1; done
 
-    cp /etc/fstab.non-hacky /etc/fstab
-    systemctl daemon-reload
+    sudo cp /etc/fstab.non-hacky /etc/fstab
+    sudo systemctl daemon-reload
 
-    mount /cvmfs/"$CVMFS_TEST_REPO"
-    mount /var/spool/cvmfs/"$CVMFS_TEST_REPO"/rdonly
+    sudo mount /cvmfs/"$CVMFS_TEST_REPO"
+    sudo mount /var/spool/cvmfs/"$CVMFS_TEST_REPO"/rdonly
 }
 
 create_repo() {
     # Usage: set $CVMFS_TEST_REPO
-    rm -rf /var/spool/cvmfs/$CVMFS_TEST_REPO # just in case
-    cp -a /etc/fstab{,.orig}
-    > /etc/fstab
-    cvmfs_server mkfs -s /etc/cvmfs/s3.conf -w http://$S3_HOST:9000/mybucket -X -o root "$CVMFS_TEST_REPO"
+    sudo rm -rf /var/spool/cvmfs/$CVMFS_TEST_REPO # just in case
+    # CentOS 9 container just doesn't have /etc/fstab
+    sudo cp -a /etc/fstab{,.orig} || sudo touch /etc/fstab{,.orig}
+    sudo truncate --size=0 /etc/fstab
+    sudo cvmfs_server mkfs -s /etc/cvmfs/s3.conf -w http://$S3_HOST:9000/mybucket -X -o root "$CVMFS_TEST_REPO"
 
     # cvmfs-posix-tools currently expect to see "revision" attribute at the mountpoint, which is not actually visible at /cvmfs/$CVMFS_TEST_REPO, but only at /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly.
     # /cvmfs/$CVMFS_TEST_REPO as created by mkfs is FUSE overlayfs.
@@ -141,12 +146,12 @@ create_repo() {
     # Hopefully we'll make the tools look for the lower dir of the overlay.
 
     if [[ -v DEBUG ]]; then
-	sed -i /etc/fstab -e 's/,noauto/,debug,noauto/'
+	sudo sed -i /etc/fstab -e 's/,noauto/,debug,noauto/'
     fi
-    cp -a /etc/fstab{,.non-hacky}
-    grep -E '^(cvmfs2#)?'"$CVMFS_TEST_REPO" /etc/fstab | sed -e s:/var/spool/cvmfs/"$CVMFS_TEST_REPO"/rdonly:/cvmfs/"$CVMFS_TEST_REPO": > /etc/fstab.hack
+    sudo cp -a /etc/fstab{,.non-hacky}
+    grep -E '^(cvmfs2#)?'"$CVMFS_TEST_REPO" /etc/fstab | sed -e s:/var/spool/cvmfs/"$CVMFS_TEST_REPO"/rdonly:/cvmfs/"$CVMFS_TEST_REPO": | sudo tee /etc/fstab.hack
 
-    cat >> /etc/cvmfs/repositories.d/"$CVMFS_TEST_REPO"/client.conf <<EOF
+    sudo tee -a /etc/cvmfs/repositories.d/"$CVMFS_TEST_REPO"/client.conf <<EOF
 CVMFS_HTTP_PROXY=$PROXY_SPEC
 CVMFS_EXTERNAL_HTTP_PROXY=$PROXY_SPEC
 CVMFS_EXTERNAL_URL=http://$S3_HOST:9000/mybucket/$CVMFS_TEST_REPO/external
@@ -158,26 +163,27 @@ EOF
 
     repo_set_layout_ingestsql
 
-    cat > /etc/cvmfs/keys/"$CVMFS_TEST_REPO".gw <<-EOF
+    sudo tee /etc/cvmfs/keys/"$CVMFS_TEST_REPO".gw <<-EOF
 plain_text PUBLISHER_KEY_ID SECRET
 EOF
-    mkdir -p /etc/cvmfs/gateway/"$CVMFS_TEST_REPO"
-    cat > /etc/cvmfs/gateway/"$CVMFS_TEST_REPO"/repo.json <<-EOF
+    sudo mkdir -p /etc/cvmfs/gateway/"$CVMFS_TEST_REPO"
+    sudo tee -a /etc/cvmfs/gateway/"$CVMFS_TEST_REPO"/repo.json <<-EOF
 { "version": 2, "repos": [ "$CVMFS_TEST_REPO" ] }
 EOF
 }
 destroy_repo() {
     stop_gateway
-    umount /cvmfs/"$CVMFS_TEST_REPO"
-    umount /var/spool/cvmfs/"$CVMFS_TEST_REPO"/rdonly || true
-    > /etc/fstab
+    sudo umount /cvmfs/"$CVMFS_TEST_REPO"
+    sudo umount /var/spool/cvmfs/"$CVMFS_TEST_REPO"/rdonly || true
+    while pgrep cvmfs2 >/dev/null; do sleep 1; done
+    sudo truncate --size=0 /etc/fstab
 }
 
 gateway_up() {
-    fuser -n tcp 4929
+    sudo fuser -n tcp 4929
 }
 run_gateway() {
-    rm -f /var/run/cvmfs_gateway.blocked
+    sudo rm -f /var/run/cvmfs_gateway.blocked
     while ! [[ -f /var/run/cvmfs_gateway.blocked ]]; do
         MAYBE_TRACER=''
         RECEIVER=$(which cvmfs_receiver)
@@ -185,17 +191,19 @@ run_gateway() {
             MAYBE_TRACER=rr
             RECEIVER="$this_script_dir/receiver-wrapper"
         fi
-        $MAYBE_TRACER cvmfs_gateway --access_config_file /etc/cvmfs/gateway/"$CVMFS_TEST_REPO"/repo.json --work_dir /var/lib/cvmfs-gateway/"$CVMFS_TEST_REPO" --receiver_path "$RECEIVER" &>> /var/log/gateway.log
+        sudo $MAYBE_TRACER cvmfs_gateway --access_config_file /etc/cvmfs/gateway/"$CVMFS_TEST_REPO"/repo.json --work_dir /var/lib/cvmfs-gateway/"$CVMFS_TEST_REPO" --receiver_path "$RECEIVER" | sudo tee -a /var/log/gateway.log
     done &
     for seconds in {1..10}; do
 	if gateway_up; then break; fi
 	sleep 1
     done
+    # shouldn't be needed, but let's see if this helps
+    sudo systemctl restart varnish
 }
 stop_gateway() {
-    touch /var/run/cvmfs_gateway.blocked
-    killall cvmfs_gateway
-    while pgrep cvmfs_gateway; do
+    sudo touch /var/run/cvmfs_gateway.blocked
+    sudo killall cvmfs_gateway
+    while sudo pgrep cvmfs_gateway; do
 	sleep 0.1
     done
 }
@@ -241,7 +249,11 @@ check_ingestsql_works() {
     s3cmd put "$SOME_FILE" s3://mybucket/"$CVMFS_TEST_REPO"/external/"$SOME_FILE_NAME"
     curl --fail --no-progress-meter -H 'Cache-Control: no-cache' http://$S3_HOST:9000/mybucket/"$CVMFS_TEST_REPO"/external/"$SOME_FILE_NAME" | sha1sum | grep "^$SHA1SUM  -$"
     if [[ "$PROXY_SPEC" != DIRECT ]]; then
-	curl --fail --no-progress-meter -H 'Cache-Control: no-cache' --proxy "$PROXY_SPEC"  http://$S3_HOST:9000/mybucket/"$CVMFS_TEST_REPO"/external/"$SOME_FILE_NAME" | sha1sum | grep "^$SHA1SUM  -$"
+	# sudo ngrep -t -e -d any -W byline -O /tmp/9000.$(date +%F_%T).pcap port 9000 &
+	sleep 1
+	curl --verbose --fail --no-progress-meter -H 'Cache-Control: no-cache' --proxy "$PROXY_SPEC"  http://$S3_HOST:9000/mybucket/"$CVMFS_TEST_REPO"/external/"$SOME_FILE_NAME" | sha1sum | grep "^$SHA1SUM  -$"
+	# sudo killall ngrep || true
+	sleep 1
     fi
 
     LAST_REPO_REVISION=$(revision)
@@ -268,7 +280,8 @@ check_ingestsql_works() {
 	    fi
 	    sleep 1
 	    if [[ "$REMOUNT_WHILE_WAITING" == 1 ]]; then
-		umount "$CVMFS_TEST_MOUNTPOINT"
+		sudo umount "$CVMFS_TEST_MOUNTPOINT"
+		while pgrep cvmfs2 >/dev/null; do sleep 1; done
 	    fi
 	    # drop cache:
 	    if [[ "$PROXY_SPEC" != DIRECT ]]; then
@@ -276,7 +289,7 @@ check_ingestsql_works() {
 	    fi
 	    curl --fail --no-progress-meter -o /dev/null -H 'Cache-Control: no-cache'  http://$S3_HOST:9000/mybucket/"$CVMFS_TEST_REPO"/.cvmfspublished
 	    if [[ "$REMOUNT_WHILE_WAITING" == 1 ]]; then
-		mount "$CVMFS_TEST_MOUNTPOINT"
+		sudo mount "$CVMFS_TEST_MOUNTPOINT"
 	    fi
 	done
 	echo Revision incremented after $(( "$(date +%s)" - TIME_START )) seconds
@@ -288,17 +301,17 @@ check_ingestsql_works() {
 }
 
 configure_tools() {
-    mkdir -p /etc/cvmfs/gateway-client/"$CVMFS_TEST_REPO"
-    cp /etc/cvmfs/keys/"$CVMFS_TEST_REPO".pub /etc/cvmfs/gateway-client/"$CVMFS_TEST_REPO"/pubkey
+    sudo mkdir -p /etc/cvmfs/gateway-client/"$CVMFS_TEST_REPO"
+    sudo cp /etc/cvmfs/keys/"$CVMFS_TEST_REPO".pub /etc/cvmfs/gateway-client/"$CVMFS_TEST_REPO"/pubkey
 
-    cat > /etc/cvmfs/gateway-client/"$CVMFS_TEST_REPO"/config <<EOF
+    sudo tee /etc/cvmfs/gateway-client/"$CVMFS_TEST_REPO"/config <<EOF
 CVMFS_GATEWAY=http://127.0.0.1:4929/api/v1
 CVMFS_STRATUM0=http://$S3_HOST:9000/mybucket/$CVMFS_TEST_REPO
 CVMFS_HTTP_PROXY=$PROXY_SPEC
 EOF
-    cp /etc/cvmfs/keys/"$CVMFS_TEST_REPO".gw /etc/cvmfs/gateway-client/"$CVMFS_TEST_REPO"/gatewaykey
-    cp /etc/cvmfs/s3.conf /etc/cvmfs/gateway-client/"$CVMFS_TEST_REPO"/
-    cat > /etc/cvmfs/gateway-client/"$CVMFS_TEST_REPO"/cvmfs-rsync.yaml <<EOF
+    sudo cp /etc/cvmfs/keys/"$CVMFS_TEST_REPO".gw /etc/cvmfs/gateway-client/"$CVMFS_TEST_REPO"/gatewaykey
+    sudo cp /etc/cvmfs/s3.conf /etc/cvmfs/gateway-client/"$CVMFS_TEST_REPO"/
+    sudo tee /etc/cvmfs/gateway-client/"$CVMFS_TEST_REPO"/cvmfs-rsync.yaml <<EOF
 repos:
   $CVMFS_TEST_REPO:
     dot-scheme: false
@@ -326,17 +339,18 @@ EOF
 check_tools() {
     touch /tmp/touched
     LAST_REPO_REVISION=$(revision)
-    cvmfs_rsync /tmp/touched "$CVMFS_TEST_MOUNTPOINT"/touched
+    sudo cvmfs_rsync /tmp/touched "$CVMFS_TEST_MOUNTPOINT"/touched
     TIME_START=$(date +%s)
     while [[ "$(revision)" == "$LAST_REPO_REVISION" ]]; do
 	sleep 1
-	umount "$CVMFS_TEST_MOUNTPOINT"
+	sudo umount "$CVMFS_TEST_MOUNTPOINT"
+	while pgrep cvmfs2 >/dev/null; do sleep 1; done
 	# drop cache:
 	if [[ "$PROXY_SPEC" != DIRECT ]]; then
 	    curl --fail --no-progress-meter -o /dev/null -H 'Cache-Control: no-cache' --proxy "$PROXY_SPEC"  http://$S3_HOST:9000/mybucket/"$CVMFS_TEST_REPO"/.cvmfspublished
 	fi
 	curl --fail --no-progress-meter -o /dev/null -H 'Cache-Control: no-cache'  http://$S3_HOST:9000/mybucket/"$CVMFS_TEST_REPO"/.cvmfspublished
-	mount "$CVMFS_TEST_MOUNTPOINT"
+	sudo mount "$CVMFS_TEST_MOUNTPOINT"
     done
     echo Revision incremented after $(( "$(date +%s)" - TIME_START )) seconds
 
@@ -344,17 +358,18 @@ check_tools() {
     TOUCHED_MTIME=$(date "+%F %T.%N %z" --reference="$CVMFS_TEST_MOUNTPOINT"/touched)
 
     LAST_REPO_REVISION=$(revision)
-    cvmfs_touch "$CVMFS_TEST_MOUNTPOINT"/touched
+    sudo cvmfs_touch "$CVMFS_TEST_MOUNTPOINT"/touched
     TIME_START=$(date +%s)
     while [[ "$(revision)" == "$LAST_REPO_REVISION" ]]; do
 	sleep 1
-	umount "$CVMFS_TEST_MOUNTPOINT"
+	sudo umount "$CVMFS_TEST_MOUNTPOINT"
+	while pgrep cvmfs2 >/dev/null; do sleep 1; done
 	# drop cache:
 	if [[ "$PROXY_SPEC" != DIRECT ]]; then
 	    curl --fail --no-progress-meter -o /dev/null -H 'Cache-Control: no-cache' --proxy "$PROXY_SPEC"  http://$S3_HOST:9000/mybucket/"$CVMFS_TEST_REPO"/.cvmfspublished
 	fi
 	curl --fail --no-progress-meter -o /dev/null -H 'Cache-Control: no-cache'  http://$S3_HOST:9000/mybucket/"$CVMFS_TEST_REPO"/.cvmfspublished
-	mount "$CVMFS_TEST_MOUNTPOINT"
+	sudo mount "$CVMFS_TEST_MOUNTPOINT"
     done
     echo Revision incremented after $(( "$(date +%s)" - TIME_START )) seconds
 
@@ -366,11 +381,11 @@ wipe_repo() {
     stop_gateway
     repo_set_layout_mkfs
 
-    cvmfs_server transaction "$CVMFS_TEST_REPO"
+    sudo cvmfs_server transaction "$CVMFS_TEST_REPO"
     # delete everything - hidden or not, leave empty mountpoint.
-    rm -rf /cvmfs/"$CVMFS_TEST_REPO"/* /cvmfs/"$CVMFS_TEST_REPO"/.[^.]*
+    sudo rm -rf /cvmfs/"$CVMFS_TEST_REPO"/* /cvmfs/"$CVMFS_TEST_REPO"/.[^.]*
     [[ "$(ls -A /cvmfs/"$CVMFS_TEST_REPO")" == '' ]]
-    cvmfs_server publish "$CVMFS_TEST_REPO"
+    sudo cvmfs_server publish "$CVMFS_TEST_REPO"
 
     repo_set_layout_ingestsql
     run_gateway &
@@ -385,13 +400,14 @@ wipe_repo() {
     TIME_START=$(date +%s)
     while [[ "$(revision)" == "$LAST_REPO_REVISION" ]]; do
 	sleep 1
-	umount "$CVMFS_TEST_MOUNTPOINT"
+	sudo umount "$CVMFS_TEST_MOUNTPOINT"
+	while pgrep cvmfs2 >/dev/null; do sleep 1; done
 	# drop cache:
 	if [[ "$PROXY_SPEC" != DIRECT ]]; then
 	    curl --fail --no-progress-meter -o /dev/null -H 'Cache-Control: no-cache' --proxy "$PROXY_SPEC"  http://$S3_HOST:9000/mybucket/"$CVMFS_TEST_REPO"/.cvmfspublished
 	fi
 	curl --fail --no-progress-meter -o /dev/null -H 'Cache-Control: no-cache'  http://$S3_HOST:9000/mybucket/"$CVMFS_TEST_REPO"/.cvmfspublished
-	mount "$CVMFS_TEST_MOUNTPOINT"
+	sudo mount "$CVMFS_TEST_MOUNTPOINT"
     done
     echo Wipe: Revision incremented after $(( "$(date +%s)" - TIME_START )) seconds
 }
@@ -412,7 +428,7 @@ run_all_golang_tests() {
 
 	pushd $cmd
 	set +o pipefail
-	./$cmd.test |& tee /var/log/$cmd.test.log
+	sudo -E ./$cmd.test |& sudo tee /var/log/$cmd.test.log
 	if [[ ${PIPESTATUS[0]} != 0 ]]; then
 	    echo "$cmd test failed"
 	    FAILED+=" $cmd"
@@ -439,7 +455,8 @@ run_golang_tests_for_these() {
 
 	pushd $cmd
 	set +o pipefail
-	./$cmd.test |& tee /var/log/$cmd.test.log
+	# cmd.test binaries live in build, but .cvmfs_rsync.yaml etc live in source tree
+	sudo -E /usr/local/src/cvmfs/build/cvmfs-posix-tools/cmd/$cmd/$cmd.test |& sudo tee /var/log/$cmd.test.log
 	if [[ ${PIPESTATUS[0]} != 0 ]]; then
 	    echo "$cmd test failed"
 	    FAILED+=" $cmd"
