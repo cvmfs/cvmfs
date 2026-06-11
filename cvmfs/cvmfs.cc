@@ -1305,11 +1305,13 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
       open_directives = mount_point_->page_cache_tracker()->Open(
           ino, chunk_reflist.HashChunkList(), dirent.GetStatStructure());
     }
-    FillOpenFlags(open_directives, fi);
-
     fuse_remounter_->fence()->Leave();
 
     fi->fh = chunk_tables->next_handle;
+    // Encode the page cache tracker flags (in particular kBitDirectIo) into the
+    // handle _after_ assigning next_handle and _before_ turning it into a
+    // negative chunked handle.
+    FillOpenFlags(open_directives, fi);
     fi->fh = static_cast<uint64_t>(-static_cast<int64_t>(fi->fh));
     ++chunk_tables->next_handle;
     chunk_tables->Unlock();
