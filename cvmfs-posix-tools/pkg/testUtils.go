@@ -56,6 +56,7 @@ func TestingTempDir() string {
 func ClearCvmfsCache() {
 	cmd := exec.Command("rm", "-r", "-f", "/tmp/var/cache/cvmfs/" + TestMountName())
 	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
 		panic(err)
 	}
@@ -64,6 +65,8 @@ func ClearCvmfsCache() {
 // Unmount test mount
 func UmountRepo() {
 	cmd := exec.Command("umount", TestMount())
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
 		panic(err)
 	}
@@ -72,6 +75,8 @@ func UmountRepo() {
 // Mount test mount as cvmfs dir
 func MountRepo() {
 	cmd := exec.Command("mount", TestMount())
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
 		panic(err)
 	}
@@ -81,11 +86,13 @@ func MountRepo() {
 func StopContainer() {
 	preCmd := exec.Command("podman", "stop", "-i", "cvmfs_rsync_tests")
 	preCmd.Stdout = os.Stdout
+	preCmd.Stderr = os.Stderr
 	if err := preCmd.Run(); err != nil {
 		panic(err)
 	}
 	cmd := exec.Command("podman", "rm", "-f", "-i", "-v", "cvmfs_rsync_tests")
 	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
 		panic(err)
 	}
@@ -95,6 +102,7 @@ func StopContainer() {
 func BuildContainer() {
 	cmd := exec.Command("podman", "build", "-t", "cvmfs_gateway", "../../pkg")
 	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
 		panic(err)
 	}
@@ -105,6 +113,7 @@ func StartContainer() {
 	cmd := exec.Command("podman", "run", "--cap-add=SYS_PTRACE", "-d", "-p", "8000:8000", "-p", "4929:4929",
 		"--name", "cvmfs_rsync_tests", "cvmfs_gateway")
 	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
 		panic(err)
 	}
