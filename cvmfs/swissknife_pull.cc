@@ -321,7 +321,8 @@ bool CommandPull::PullRecursion(catalog::Catalog *catalog,
 
 bool CommandPull::Pull(const shash::Any &catalog_hash,
                        const std::string &path,
-                       shash::Any &previous_catalog) {
+                       shash::Any &previous_catalog,
+                       bool is_historic_catalog) {
   int retval;
   download::Failures dl_retval;
   assert(shash::kSuffixCatalog == catalog_hash.suffix);
@@ -390,10 +391,12 @@ bool CommandPull::Pull(const shash::Any &catalog_hash,
   dl_retval = download_manager()->Fetch(&download_catalog);
   fclose(fcatalog_vanilla);
   if (dl_retval != download::kFailOk) {
-    if (path == "" && is_garbage_collectable) {
+    const bool genuinely_missing = (dl_retval == download::kFailHostHttp)
+                                   && (download_catalog.http_code() == 404);
+    if (is_historic_catalog && is_garbage_collectable && genuinely_missing) {
       LogCvmfs(kLogCvmfs, kLogStdout,
-               "skipping missing root catalog %s - "
-               "probably sweeped by garbage collection",
+               "skipping missing catalog %s - "
+               "probably swept by garbage collection",
                catalog_hash.ToString().c_str());
       goto pull_skip;
     } else {
@@ -771,14 +774,21 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
 
   LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from trunk catalog at /");
   current_catalog_hash = ensemble.manifest->catalog_hash();
-  do {
-    retval = Pull(current_catalog_hash, "", previous_catalog_hash);
-    if (pull_history && !previous_catalog_hash.IsNull()) {
-      LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from historic catalog %s",
-               previous_catalog_hash.ToString().c_str());
-    }
-    current_catalog_hash = previous_catalog_hash;
-  } while (pull_history && !previous_catalog_hash.IsNull());
+  retval = 1;
+  {
+    bool is_historic = false;
+    do {
+      retval = static_cast<int>(
+          Pull(current_catalog_hash, "", previous_catalog_hash, is_historic)
+          && (retval != 0));
+      if (pull_history && !previous_catalog_hash.IsNull()) {
+        LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from historic catalog %s",
+                 previous_catalog_hash.ToString().c_str());
+      }
+      current_catalog_hash = previous_catalog_hash;
+      is_historic = true;
+    } while (pull_history && !previous_catalog_hash.IsNull());
+  }
 
   if (!historic_tags.empty()) {
     LogCvmfs(kLogCvmfs, kLogStdout, "Checking tagged snapshots...");
@@ -793,10 +803,12 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
              i->name.c_str());
     apply_timestamp_threshold = false;
 
-    bool retval2;
+    bool retval2 = true;
     current_catalog_hash = i->root_hash;
     do {
-      retval2 = Pull(current_catalog_hash, "", previous_catalog_hash);
+      retval2 = Pull(current_catalog_hash, "", previous_catalog_hash,
+                     true /* is_historic_catalog */)
+                && retval2;
       if (pull_history && !previous_catalog_hash.IsNull()) {
         LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from historic catalog %s",
                  previous_catalog_hash.ToString().c_str());
@@ -820,6 +832,15 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
 
   if (!retval)
     goto fini;
+
+  WaitForStorage();
+  if (!Peek(ensemble.manifest->catalog_hash())) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "root catalog %s is missing from the destination - refusing to "
+             "publish an incomplete revision",
+             ensemble.manifest->catalog_hash().ToString().c_str());
+    goto fini;
+  }
 
   // Upload manifest ensemble
   {
