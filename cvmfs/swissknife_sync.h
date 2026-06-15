@@ -38,6 +38,7 @@ struct SyncParameters {
       , include_xattrs(false)
       , enable_mtime_ns(false)
       , fast_delete(false)
+      , tolerate_missing_hardlinks(false)
       , external_data(false)
       , direct_io(false)
       , voms_authz(false)
@@ -92,6 +93,7 @@ struct SyncParameters {
   bool include_xattrs;
   bool enable_mtime_ns;
   bool fast_delete;
+  bool tolerate_missing_hardlinks;
   bool external_data;
   bool direct_io;
   bool voms_authz;

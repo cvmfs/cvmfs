@@ -1427,6 +1427,9 @@ Supported Commands:
                   -b base directory
                   [-d <folder to delete>]
                   [-c create nested catalog in base directory]
+                  [-m tolerate hardlinks whose target is missing from the
+                      tarball; materialize an empty file with a warning
+                      instead of aborting]
                   [--gc-db <path to GC SQLite database>]
                   <fully qualified name>
                   Extract the content of the tarfile inside the base directory,
