@@ -28,7 +28,8 @@ PROFILE_EXCLUSIONS="\
   src/094-attachmount \
   src/096-cancelreq \
   src/102-reusefd \
-  src/103-reloadcachemgr"
+  src/103-reloadcachemgr \
+  src/112-quota-multiwrite-race"
 
 profile_setup() {
   local conf=/etc/cvmfs/default.d/90-streamingcache.conf

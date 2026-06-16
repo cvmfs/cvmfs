@@ -23,7 +23,7 @@ cvmfs_run_test() {
   trap ducc_test_401_clean_up EXIT HUP INT TERM
 
   echo "*** creating empty repo ***"
-  create_empty_repo $CVMFS_TEST_REPO $USER || return 1
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return 1
     
   echo -n "*** Starting docker registry for tests..."
   docker run -d -p 5000:5000 --name $CVMFS_TEST404_REGISTRY registry:2 >> /dev/null || return 3
