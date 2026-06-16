@@ -7,6 +7,8 @@
 
 #include <string>
 
+#include "server_tool.h"
+
 template<class ObjectFetcherT>
 manifest::Reflog *ServerTool::FetchReflog(ObjectFetcherT *object_fetcher,
                                           const std::string &repo_name,
