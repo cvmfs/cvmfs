@@ -14,6 +14,29 @@ type MockReceiver struct {
 	ctx context.Context
 }
 
+// mockCommitGate, when non-nil, blocks MockReceiver.Commit until it can receive
+// from the channel. mockCommitEntered is signalled each time a commit reaches
+// the gate. Both are used by tests to keep a commit parked in flight.
+var (
+	mockCommitGate    chan struct{}
+	mockCommitEntered chan struct{}
+)
+
+// SetMockCommitGate makes every subsequent mock commit block until a value can
+// be received from release. The returned channel receives a value each time a
+// commit reaches the gate, letting tests wait until a commit is parked in
+// flight. Pass nil to remove the gate.
+func SetMockCommitGate(release chan struct{}) <-chan struct{} {
+	mockCommitGate = release
+	if release == nil {
+		mockCommitEntered = nil
+		return nil
+	}
+	entered := make(chan struct{}, 1)
+	mockCommitEntered = entered
+	return entered
+}
+
 // NewMockReceiver constructs a new MockReceiver object which implements the
 // Receiver interface
 func NewMockReceiver(ctx context.Context) (Receiver, error) {
@@ -35,6 +58,15 @@ func (r *MockReceiver) Echo() error {
 }
 
 func (r *MockReceiver) Commit(leasePath, oldRootHash, newRootHash string, tag gw.RepositoryTag) (uint64, error) {
+	if entered := mockCommitEntered; entered != nil {
+		select {
+		case entered <- struct{}{}:
+		default:
+		}
+	}
+	if gate := mockCommitGate; gate != nil {
+		<-gate
+	}
 	gw.LogC(r.ctx, "mock_receiver", gw.LogDebug).
 		Str("command", "commit").
 		Str("lease_path", leasePath).
