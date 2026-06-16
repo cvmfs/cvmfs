@@ -207,7 +207,14 @@ if [ $test_exclusions -ne 0 ]; then
   shift # get rid of '--'
 fi
 
-testsuite=$(shuf -e $@)
+# Optionally shuffle the order of the explicitly listed test cases. This is off
+# by default so that foundational tests (e.g. 000-dummy, 001-chksetup) run first;
+# set CVMFS_TEST_SHUFFLE=1 to stress-test that tests have no ordering dependency.
+if [ -n "$CVMFS_TEST_SHUFFLE" ] && [ "$CVMFS_TEST_SHUFFLE" != "0" ]; then
+  testsuite=$(shuf -e $@)
+else
+  testsuite="$@"
+fi
 if [ -z "$testsuite" ]; then
   if [ "$suite_option_provided" -eq 0 ] && [ -z "$labels" ]; then
     labels="quick"
