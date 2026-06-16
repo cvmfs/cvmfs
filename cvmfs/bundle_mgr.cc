@@ -7,11 +7,11 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <unistd.h>
-#include <memory>
 
 #include <cassert>
 #include <cerrno>
 #include <cstdlib>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -27,14 +27,13 @@
 namespace {
 constexpr size_t kDefaultBundlePoolSize = 8;
 
-// Read the .cvmfsbundle.<basename> file via the cvmfs cache 
+// Read the .cvmfsbundle.<basename> file via the cvmfs cache
 BundleFileMgr *LoadBundleFromCvmfs(MountPoint *mp,
                                    const PathString &bundle_file_path) {
   catalog::DirectoryEntry dirent;
-  if (!mp->catalog_mgr()->LookupPath(
-          bundle_file_path, catalog::kLookupDefault, &dirent)) {
-    LogCvmfs(kLogCvmfs, kLogDebug,
-             "BUNDLE-LOAD: LookupPath failed for %s",
+  if (!mp->catalog_mgr()->LookupPath(bundle_file_path, catalog::kLookupDefault,
+                                     &dirent)) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "BUNDLE-LOAD: LookupPath failed for %s",
              bundle_file_path.ToString().c_str());
     return nullptr;
   }
@@ -51,20 +50,17 @@ BundleFileMgr *LoadBundleFromCvmfs(MountPoint *mp,
   const int fd = fetcher->Fetch(
       CacheManager::LabeledObject(dirent.checksum(), label));
   if (fd < 0) {
-    LogCvmfs(kLogCvmfs, kLogDebug,
-             "BUNDLE-LOAD: Fetch returned fd=%d", fd);
+    LogCvmfs(kLogCvmfs, kLogDebug, "BUNDLE-LOAD: Fetch returned fd=%d", fd);
     return nullptr;
   }
 
   CacheManager *cache_mgr = mp->file_system()->cache_mgr();
   std::string content;
   content.resize(static_cast<size_t>(dirent.size()));
-  const int64_t n = cache_mgr->Pread(
-      fd, &content[0], content.size(), 0);
+  const int64_t n = cache_mgr->Pread(fd, &content[0], content.size(), 0);
   cache_mgr->Close(fd);
   if (n < 0 || static_cast<size_t>(n) != content.size()) {
-    LogCvmfs(kLogCvmfs, kLogDebug,
-             "BUNDLE-LOAD: Pread returned %ld want %zu",
+    LogCvmfs(kLogCvmfs, kLogDebug, "BUNDLE-LOAD: Pread returned %ld want %zu",
              static_cast<long>(n), content.size());
     return nullptr;
   }
@@ -75,12 +71,14 @@ BundleFileMgr *LoadBundleFromCvmfs(MountPoint *mp,
   size_t json_start = 0;
   while (json_start < content.size() && content[json_start] == '#') {
     const size_t nl = content.find('\n', json_start);
-    if (nl == std::string::npos) { json_start = content.size(); break; }
+    if (nl == std::string::npos) {
+      json_start = content.size();
+      break;
+    }
     json_start = nl + 1;
   }
-  const std::string json_text = (json_start == 0)
-      ? content
-      : content.substr(json_start);
+  const std::string json_text = (json_start == 0) ? content
+                                                  : content.substr(json_start);
 
   JsonDocument *doc = JsonDocument::Create(json_text);
   if (doc == nullptr) {
@@ -89,18 +87,17 @@ BundleFileMgr *LoadBundleFromCvmfs(MountPoint *mp,
              json_text.size());
     return nullptr;
   }
-  LogCvmfs(kLogCvmfs, kLogDebug,
-           "BUNDLE-LOAD: loaded bundle %s (%zu bytes)",
+  LogCvmfs(kLogCvmfs, kLogDebug, "BUNDLE-LOAD: loaded bundle %s (%zu bytes)",
            bundle_file_path.ToString().c_str(), content.size());
   return new BundleFileMgr(doc);
 }
 }  // namespace
 
 BundleMgr::BundleMgr(MountPoint *mp, const PathString &path)
-    : mount_point_(mp),
-      path_(path),
-      fetcher_threads_(),
-      pool_size_(kDefaultBundlePoolSize) {
+    : mount_point_(mp)
+    , path_(path)
+    , fetcher_threads_()
+    , pool_size_(kDefaultBundlePoolSize) {
   fname_ = GetFileName(path_);
   parent_path_ = GetParentPath(path_);
   // There is a naming convention regarding the name of the file with the
@@ -113,8 +110,7 @@ BundleMgr::BundleMgr(MountPoint *mp, const PathString &path)
 
   bfm_ = LoadBundleFromCvmfs(mount_point_, bundle_file_path_);
   if (bfm_ == nullptr) {
-    LogCvmfs(kLogCvmfs, kLogDebug,
-             "BundleMgr: failed to load bundle file %s",
+    LogCvmfs(kLogCvmfs, kLogDebug, "BundleMgr: failed to load bundle file %s",
              bundle_file_path_.ToString().c_str());
     is_valid_ = false;
     return;
@@ -146,14 +142,16 @@ void BundleMgr::Fetch() {
   }
 
   while (auto file = bfm_->GetNext()) {
-    // TODO(christge): Make sure this TrySend is actually needed
+    // A TrySendPath() here is used as a profylaxis to a scenario where the pipe
+    // is currently blocked.
     while (not TrySendPath(back_channel_, file)) {
     }
   }
 }
 
 void BundleMgr::JoinFetcherPool() {
-  if (pipe_bm_[1] < 0) return;
+  if (pipe_bm_[1] < 0)
+    return;
   // Send one kTerminate per worker. Workers drain all queued kFetch
   // messages before reaching their kTerminate (FIFO pipe), so we can't
   // just close the pipe — that would EOF some workers mid-drain.
@@ -161,8 +159,10 @@ void BundleMgr::JoinFetcherPool() {
     Command cmd = Command::kTerminate;
     while (true) {
       const ssize_t n = ::write(pipe_bm_[1], &cmd, sizeof(Command));
-      if (n == sizeof(Command)) break;
-      if (errno != EAGAIN && errno != EWOULDBLOCK) break;
+      if (n == sizeof(Command))
+        break;
+      if (errno != EAGAIN && errno != EWOULDBLOCK)
+        break;
     }
   }
   // Wait for every worker to drain its share of the queue and exit.
@@ -184,12 +184,12 @@ void BundleMgr::SpawnFetcherPool() {
 
   for (size_t i = 0; i < pool_size_; ++i) {
     std::unique_ptr<pthread_t> thread(new pthread_t());
-    const int res = pthread_create(thread.get(), nullptr,
-                                   MainBundleMgrFetcher, this);
+    const int res = pthread_create(thread.get(), nullptr, MainBundleMgrFetcher,
+                                   this);
     if (res != 0) {
       LogCvmfs(kLogBundleMgr, kLogDebug,
-               "Thread creation failed! pool_size_=%zu spawned=%zu",
-               pool_size_, i);
+               "Thread creation failed! pool_size_=%zu spawned=%zu", pool_size_,
+               i);
       is_valid_ = false;
       return;
     }
@@ -250,19 +250,18 @@ void *BundleMgr::MainBundleMgrFetcher(void *data) {
     }
     pthread_mutex_unlock(&mgr->worker_read_mutex_);
 
-    if (eof) break;
+    if (eof)
+      break;
 
     bool terminate = false;
     switch (cmd) {
-      case Command::kFetch:
-        {
-          if (!got_path) {
-            terminate = true;
-            break;
-          }
-          mgr->FetchPath(path);
+      case Command::kFetch: {
+        if (!got_path) {
+          terminate = true;
+          break;
         }
-        break;
+        mgr->FetchPath(path);
+      } break;
       case Command::kTerminate:
       default:
         terminate = true;
