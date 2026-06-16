@@ -4,31 +4,105 @@ cvmfs_test_autofs_on_startup=false
 cvmfs_test_suites="quick"
 
 
+produce_dependency_files() {
+  local working_dir=$1
+  pushd "$working_dir" >/dev/null || return 1
+
+  printf "This is dependency 1\n" > dep1.txt
+  printf "This is dependency 2\n" > dep2.txt
+  printf "This is a trigger\n" > trigger.txt
+
+  cat > .cvmfsbundle.trigger.txt <<-EOF
+{
+  "name": "CVMFS_BUNDLE",
+  "version": "1.0.0",
+  "encoding": "UTF-8",
+  "dependencies": ["./dep1.txt", "./dep2.txt"]
+}
+EOF
+
+  popd >/dev/null || return 1
+}
+
 cvmfs_run_test() {
   logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
 
-  echo "*** Create a new repository"
-  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return 1
+  local scratch_dir=$(mktemp -d)
+  mkdir -p  $scratch_dir/reference_dir
+  local reference_dir=$scratch_dir/reference_dir
 
-  echo "*** Create and edit a bundle spec"
-  start_transaction $CVMFS_TEST_REPO || return 2
-  touch /cvmfs/$CVMFS_TEST_REPO/foo || return 3
-  touch /cvmfs/$CVMFS_TEST_REPO/trigger || return 3
-  touch /cvmfs/$CVMFS_TEST_REPO/.cvmfsbundle-trigger || return 3
-  publish_repo $CVMFS_TEST_REPO || return 5
+  local mnt_point="$scratch_dir/mountpoint"
+  local cache="$(get_cache_directory $mnt_point)"/$CVMFS_TEST_REPO
 
-  local trigger_attr=$(get_xattr bundle_trigger /cvmfs/$CVMFS_TEST_REPO/foo)
-  [ "x$trigger_attr" = x0 ] || return 11
-  trigger_attr=$(get_xattr bundle_trigger /cvmfs/$CVMFS_TEST_REPO/trigger)
-  [ "x$trigger_attr" = x1 ] || return 10
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
 
-  start_transaction $CVMFS_TEST_REPO || return 20
-  rm -f /cvmfs/$CVMFS_TEST_REPO/.cvmfsbundle-trigger || return 21
-  publish_repo $CVMFS_TEST_REPO || return 22
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
 
-  # TODO(jblomer): test error cases
-  trigger_attr=$(get_xattr bundle_trigger /cvmfs/$CVMFS_TEST_REPO/trigger)
-  [ "x$trigger_attr" = x0 ] || return 30
+  echo "putting some stuff in the new repository"
+  produce_dependency_files $repo_dir || return 3
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "putting exactly the same stuff in the scratch space for comparison"
+  produce_dependency_files $reference_dir || return 4
+
+  echo "compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir || return $?
+
+  echo "putting some stuff in the new repository"
+  produce_dependency_files $repo_dir || return 3
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  echo "mount the repository on a local mountpoint"
+  do_local_mount $mnt_point $CVMFS_TEST_REPO $(get_repo_url $CVMFS_TEST_REPO) || { desaster_cleanup $mnt_point $CVMFS_TEST_REPO; return 10; }
+
+  echo "check if the Stratum1 repository contains exactly the same as the reference copy"
+  compare_directories $mnt_point $reference_dir || { desaster_cleanup $mnt_point $CVMFS_TEST_REPO; return 11; }
+
+  dep1_hash=$(attr -g hash "$mnt_point/dep1.txt" | cut -d: -f2 | xargs)
+  trigger_hash=$(attr -g hash "$mnt_point/trigger.txt" | cut -d: -f2 | xargs)
+
+  dep1_location=$cache/"$(echo $dep1_hash | cut -c 1-2)"
+  trigger_location=$cache/"$(echo $trigger_hash | cut -c 1-2)"
+
+  trigger_in_cas=$(echo $trigger_hash | cut -c 3- )
+  dep1_in_cas=$(echo $dep1_hash | cut -c 3- )
+
+  # core testing here
+  echo "Opening trigger file"
+  cat $mnt_point/trigger.txt
+
+  echo "Cache location"
+  echo $cache
+
+  echo "Trigger expected location"
+  echo $trigger_location/$trigger_in_cas
+
+  if [ -f "$trigger_location/$trigger_in_cas" ]; then
+      echo "Trigger FOUND inside the cache in the expected location"
+  else
+      echo "Trigger NOT FOUND inside the cache in the expected location"
+      return 55
+  fi
+
+  if [ -f "$dep1_location/$dep1_in_cas" ]; then
+      echo "Dep1 FOUND inside the cache in the expected location"
+  else
+      echo "Dep1 NOT FOUND inside the cache in the expected location"
+      return 56
+  fi
+
+  echo "unmount the Stratum1 repository"
+  sudo umount $mnt_point || { desaster_cleanup $mnt_point; return 12; }
+
+  echo "clean up"
+  sudo cvmfs_server rmfs -f $CVMFS_TEST_REPO
 
   return 0
 }
