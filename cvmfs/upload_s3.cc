@@ -54,6 +54,7 @@ S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition)
     , peek_before_put_(true)
     , use_https_(false)
     , batch_delete_enabled_(true)
+    , batch_delete_size_(kDefaultBatchDeleteSize)
     , proxy_("")
     , temporary_path_(spooler_definition.temporary_path)
     , x_amz_acl_("public-read") {
@@ -217,6 +218,24 @@ bool S3Uploader::ParseSpoolerDefinition(
 
   if (options_manager.GetValue("CVMFS_S3_BATCH_DELETE", &parameter)) {
     batch_delete_enabled_ = options_manager.IsOn(parameter);
+  }
+
+  if (options_manager.GetValue("CVMFS_S3_BATCH_DELETE_SIZE", &parameter)) {
+    const unsigned requested = String2Uint64(parameter);
+    if (requested == 0) {
+      LogCvmfs(kLogUploadS3, kLogStderr,
+               "CVMFS_S3_BATCH_DELETE_SIZE must be > 0, using default %u",
+               kDefaultBatchDeleteSize);
+      batch_delete_size_ = kDefaultBatchDeleteSize;
+    } else if (requested > kMaxBatchDeleteSize) {
+      LogCvmfs(kLogUploadS3, kLogStderr,
+               "Warning: CVMFS_S3_BATCH_DELETE_SIZE=%u exceeds the S3 "
+               "multi-object DELETE limit of %u, clamping to %u",
+               requested, kMaxBatchDeleteSize, kMaxBatchDeleteSize);
+      batch_delete_size_ = kMaxBatchDeleteSize;
+    } else {
+      batch_delete_size_ = requested;
+    }
   }
 
   if (options_manager.GetValue("CVMFS_S3_USE_HTTPS", &parameter)) {
@@ -517,7 +536,7 @@ void S3Uploader::DoRemoveAsync(const std::string &file_to_delete) {
   DecJobsInFlight();
   const MutexLockGuard guard(delete_batch_mutex_);
   pending_deletes_.push_back(mangled_path);
-  if (pending_deletes_.size() >= kMaxBatchDeleteSize) {
+  if (pending_deletes_.size() >= batch_delete_size_) {
     FlushDeleteBatch();
   }
 }

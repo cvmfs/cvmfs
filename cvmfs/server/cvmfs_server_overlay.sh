@@ -14,6 +14,8 @@ cvmfs_server_overlay() {
   local layers=""
   local dest_path=""
   local name=""
+  local oci_config=""
+  local skip_singularity=0
 
   while [ "$2" != "" ]; do
     case $1 in
@@ -24,6 +26,12 @@ cvmfs_server_overlay() {
         dest_path=$2
         # remove any duplicated slashes in pathname
         dest_path=$(echo $dest_path | tr -s / )
+        ;;
+      -c | --config )
+        oci_config=$2
+        ;;
+      -S | --skip-singularity )
+        skip_singularity=1
         ;;
     esac
     shift

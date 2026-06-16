@@ -56,7 +56,8 @@ class CommandPull : public Command {
 
  protected:
   bool PullRecursion(catalog::Catalog *catalog, const std::string &path);
-  bool Pull(const shash::Any &catalog_hash, const std::string &path, shash::Any &previous_catalog);
+  bool Pull(const shash::Any &catalog_hash, const std::string &path,
+            shash::Any &previous_catalog, bool is_historic_catalog = false);
 };
 
 }  // namespace swissknife
