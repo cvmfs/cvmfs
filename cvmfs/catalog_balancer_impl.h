@@ -13,6 +13,7 @@
 #include <string>
 #include <vector>
 
+#include "catalog_balancer.h"
 #include "catalog_mgr.h"
 #include "compression/compression.h"
 #include "crypto/hash.h"
