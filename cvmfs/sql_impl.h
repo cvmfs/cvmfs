@@ -11,6 +11,7 @@
 #include <cerrno>
 #include <string>
 
+#include "sql.h"
 #include "sqlitemem.h"
 #include "util/logging.h"
 #include "util/platform.h"
@@ -94,7 +95,7 @@ bool Database<DerivedT>::Initialize() {
   const int flags = (read_write_) ? SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_READWRITE
                                   : SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_READONLY;
 
-  bool successful = OpenDatabase(flags) && Configure() && FileReadAhead()
+  bool const successful = OpenDatabase(flags) && Configure() && FileReadAhead()
                     && PrepareCommonQueries();
   if (!successful) {
     LogCvmfs(kLogSql, kLogDebug, "failed to open database file '%s'",
@@ -128,7 +129,7 @@ template<class DerivedT>
 bool Database<DerivedT>::OpenDatabase(const int flags) {
   // Open database file (depending on the flags read-only or read-write)
   LogCvmfs(kLogSql, kLogDebug, "opening database file %s", filename().c_str());
-  int retval = sqlite3_open_v2(filename().c_str(),
+  int const retval = sqlite3_open_v2(filename().c_str(),
                                &database_.sqlite_db,
                                flags | SQLITE_OPEN_EXRESCODE,
                                NULL);

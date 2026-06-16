@@ -255,7 +255,7 @@ class CatalogTraversalBase
     }
 
     HashList root_hashes;
-    bool success = tag_db->GetHashes(&root_hashes);
+    bool const success = tag_db->GetHashes(&root_hashes);
     assert(success);
     return TraverseList(root_hashes, type);
   }
@@ -717,7 +717,7 @@ class CatalogTraversal : public CatalogTraversalBase<ObjectFetcherT> {
     typedef typename CatalogTN::NestedCatalogList NestedCatalogList;
     const NestedCatalogList nested = job.catalog->ListOwnNestedCatalogs();
     typename NestedCatalogList::const_iterator i = nested.begin();
-    typename NestedCatalogList::const_iterator iend = nested.end();
+    typename NestedCatalogList::const_iterator const iend = nested.end();
     for (; i != iend; ++i) {
       CatalogTN *parent = (this->no_close_) ? job.catalog : NULL;
       const CatalogJob new_job(i->mountpoint.ToString(),

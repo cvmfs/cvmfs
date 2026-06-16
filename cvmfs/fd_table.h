@@ -10,6 +10,7 @@
 #include <stdint.h>
 
 #include <cassert>
+#include <cstddef>
 #include <vector>
 
 #include "util/single_copy.h"
@@ -78,7 +79,7 @@ class FdTable : SingleCopy {
     if (fd_pivot_ >= fd_index_.size())
       return -ENFILE;
 
-    size_t next_fd = fd_index_[fd_pivot_];
+    size_t const next_fd = fd_index_[fd_pivot_];
     assert(next_fd < open_fds_.size());
     assert(open_fds_[next_fd].handle == invalid_handle_);
     open_fds_[next_fd] = FdWrapper(handle, fd_pivot_);
@@ -102,14 +103,14 @@ class FdTable : SingleCopy {
     if (!IsValid(fd))
       return -EBADF;
 
-    unsigned index = open_fds_[fd].index;
+    unsigned const index = open_fds_[fd].index;
     assert(index < fd_index_.size());
     assert(fd_pivot_ <= fd_index_.size());
     assert(fd_pivot_ > 0);
     open_fds_[fd].handle = invalid_handle_;
     --fd_pivot_;
     if (index < fd_pivot_) {
-      unsigned other = fd_index_[fd_pivot_];
+      unsigned const other = fd_index_[fd_pivot_];
       assert(other < open_fds_.size());
       assert(open_fds_[other].handle != invalid_handle_);
       open_fds_[other].index = index;

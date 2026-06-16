@@ -880,7 +880,7 @@ int S3FanoutManager::InitializeDnsSettings(CURL *handle,
   // We need to resolve the hostname
   // TODO(ssheikki): support ipv6 also...  if (opt_ipv4_only_)
   const dns::Host host = resolver_->Resolve(remote_host);
-  set<string> ipv4_addresses = host.ipv4_addresses();
+  set<string> const ipv4_addresses = host.ipv4_addresses();
   std::set<string>::iterator its = ipv4_addresses.begin();
   S3FanOutDnsEntry *dnse = NULL;
   for (; its != ipv4_addresses.end(); ++its) {

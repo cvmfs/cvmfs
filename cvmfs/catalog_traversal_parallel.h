@@ -122,7 +122,7 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
     const HashList::const_reverse_iterator iend = root_catalog_list.rend();
     bool has_pushed = false;
     {
-      MutexLockGuard m(&catalogs_lock_);
+      MutexLockGuard const m(&catalogs_lock_);
       for (; i != iend; ++i) {
         if (this->no_repeat_history_ && catalogs_done_.Contains(*i)) {
           continue;
@@ -140,7 +140,7 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
     effective_traversal_type_ = type;
     effective_history_depth_ = Parameters::kNoHistory;
     effective_timestamp_threshold_ = Parameters::kNoTimestampThreshold;
-    bool result = DoTraverse();
+    bool const result = DoTraverse();
     effective_history_depth_ = this->default_history_depth_;
     effective_timestamp_threshold_ = this->default_timestamp_threshold_;
     return result;
@@ -158,7 +158,7 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
                         const TraversalType type = Base::kBreadthFirst) {
     effective_history_depth_ = Parameters::kNoHistory;
     effective_timestamp_threshold_ = Parameters::kNoTimestampThreshold;
-    bool result = Traverse(root_catalog_hash, type);
+    bool const result = Traverse(root_catalog_hash, type);
     effective_history_depth_ = this->default_history_depth_;
     effective_timestamp_threshold_ = this->default_timestamp_threshold_;
     return result;
@@ -177,14 +177,14 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
     threads_process_ = reinterpret_cast<pthread_t *>(
         smalloc(sizeof(pthread_t) * num_threads_));
     for (unsigned int i = 0; i < num_threads_; ++i) {
-      int retval = pthread_create(&threads_process_[i], NULL, MainProcessQueue,
+      int const retval = pthread_create(&threads_process_[i], NULL, MainProcessQueue,
                                   this);
       if (retval != 0)
         PANIC(kLogStderr, "failed to create thread");
     }
 
     for (unsigned int i = 0; i < num_threads_; ++i) {
-      int retval = pthread_join(threads_process_[i], NULL);
+      int const retval = pthread_join(threads_process_[i], NULL);
       assert(retval == 0);
     }
     free(threads_process_);
@@ -229,7 +229,7 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
   }
 
   void PushJob(CatalogJob *job) {
-    MutexLockGuard m(&catalogs_lock_);
+    MutexLockGuard const m(&catalogs_lock_);
     PushJobUnlocked(job);
   }
 
@@ -248,12 +248,12 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
       FinalizeJob(job);
       return;
     }
-    NestedCatalogList catalog_list = job->catalog->ListOwnNestedCatalogs();
+    NestedCatalogList const catalog_list = job->catalog->ListOwnNestedCatalogs();
     unsigned int num_children;
     // Ensure that pushed children won't call ProcessJobPost on this job
     // before this function finishes
     {
-      MutexLockGuard m(&catalogs_lock_);
+      MutexLockGuard const m(&catalogs_lock_);
       if (effective_traversal_type_ == Base::kBreadthFirst) {
         num_children = PushPreviousRevision(job)
                        + PushNestedCatalogs(job, catalog_list);
@@ -279,7 +279,7 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
   unsigned int PushNestedCatalogs(CatalogJob *job,
                                   const NestedCatalogList &catalog_list) {
     typename NestedCatalogList::const_iterator i = catalog_list.begin();
-    typename NestedCatalogList::const_iterator iend = catalog_list.end();
+    typename NestedCatalogList::const_iterator const iend = catalog_list.end();
     unsigned int num_children = 0;
     for (; i != iend; ++i) {
       if (this->no_repeat_history_ && catalogs_done_.Contains(i->hash)) {
@@ -358,7 +358,7 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
       }
     }
     if (serialize_callbacks_) {
-      MutexLockGuard m(&catalog_callback_lock_);
+      MutexLockGuard const m(&catalog_callback_lock_);
       this->NotifyListeners(job->GetCallbackData());
     } else {
       this->NotifyListeners(job->GetCallbackData());
@@ -375,7 +375,7 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
 
   void FinalizeJob(CatalogJob *job) {
     {
-      MutexLockGuard m(&catalogs_lock_);
+      MutexLockGuard const m(&catalogs_lock_);
       catalogs_processing_.Erase(job->hash);
       catalogs_done_.Insert(job->hash, true);
       // No more catalogs to process -> finish
