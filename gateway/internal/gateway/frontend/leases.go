@@ -122,6 +122,7 @@ func handleCommitLease(services be.ActionController, token string, w http.Respon
 	var reqMsg struct {
 		OldRootHash string `json:"old_root_hash"`
 		NewRootHash string `json:"new_root_hash"`
+		DirectGraft bool   `json:"direct_graft"`
 		gw.RepositoryTag
 	}
 	if err := json.NewDecoder(h.Body).Decode(&reqMsg); err != nil {
@@ -131,7 +132,7 @@ func handleCommitLease(services be.ActionController, token string, w http.Respon
 
 	msg := make(map[string]interface{})
 	if finalRev, err := services.CommitLease(
-		ctx, token, reqMsg.OldRootHash, reqMsg.NewRootHash, reqMsg.RepositoryTag); err != nil {
+		ctx, token, reqMsg.OldRootHash, reqMsg.NewRootHash, reqMsg.RepositoryTag, reqMsg.DirectGraft); err != nil {
 		msg["status"] = "error"
 		msg["reason"] = err.Error()
 	} else {

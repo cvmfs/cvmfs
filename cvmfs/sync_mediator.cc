@@ -788,10 +788,12 @@ void SyncMediator::PublishFilesCallback(const upload::SpoolerResult &result) {
   item.SetContentHash(result.content_hash);
   item.SetCompressionAlgorithm(result.compression_alg);
 
+  // Use xattrs that were pre-fetched during traversal (AddFile) to avoid
+  // lgetxattr() syscalls on the pipeline observer thread.
   XattrList *xattrs = &default_xattrs_;
-  if (params_->include_xattrs) {
-    xattrs = XattrList::CreateFromFile(result.local_path);
-    assert(xattrs != NULL);
+  XattrList *cached = item.TakeCachedXattrs();  // may be null if !include_xattrs
+  if (cached != NULL) {
+    xattrs = cached;
   }
 
   if (result.IsChunked()) {
@@ -807,8 +809,7 @@ void SyncMediator::PublishFilesCallback(const upload::SpoolerResult &result) {
         item.relative_parent_path());
   }
 
-  if (xattrs != &default_xattrs_)
-    free(xattrs);
+  delete cached;  // null-safe; default_xattrs_ is not deleted (not owned here)
 }
 
 
@@ -823,27 +824,21 @@ void SyncMediator::PublishHardlinksCallback(
           result.return_code);
   }
 
-  bool found = false;
-  for (unsigned i = 0; i < hardlink_queue_.size(); ++i) {
-    if (hardlink_queue_[i].master->GetUnionPath() == result.local_path) {
-      found = true;
-      hardlink_queue_[i].master->SetContentHash(result.content_hash);
-      SyncItemList::iterator j, jend;
-      for (j = hardlink_queue_[i].hardlinks.begin(),
-          jend = hardlink_queue_[i].hardlinks.end();
-           j != jend;
-           ++j) {
-        j->second->SetContentHash(result.content_hash);
-        j->second->SetCompressionAlgorithm(result.compression_alg);
-      }
-      if (result.IsChunked())
-        hardlink_queue_[i].file_chunks = result.file_chunks;
+  const auto idx_it = hardlink_index_.find(result.local_path);
+  assert(idx_it != hardlink_index_.end());
+  const size_t i = idx_it->second;
 
-      break;
-    }
+  hardlink_queue_[i].master->SetContentHash(result.content_hash);
+  SyncItemList::iterator j, jend;
+  for (j = hardlink_queue_[i].hardlinks.begin(),
+      jend = hardlink_queue_[i].hardlinks.end();
+       j != jend;
+       ++j) {
+    j->second->SetContentHash(result.content_hash);
+    j->second->SetCompressionAlgorithm(result.compression_alg);
   }
-
-  assert(found);
+  if (result.IsChunked())
+    hardlink_queue_[i].file_chunks = result.file_chunks;
 }
 
 
@@ -1009,6 +1004,12 @@ void SyncMediator::AddFile(SharedPtr<SyncItem> entry) {
              && entry->IsCatalogMarker()) {
     PANIC(kLogStderr, "Error: nested catalog marker in root directory");
   } else if (!params_->dry_run) {
+    // Pre-fetch xattrs here in the traversal thread so PublishFilesCallback
+    // does not need to call lgetxattr() from the pipeline observer thread,
+    // which would serialise all catalog insertions through TaskRegister.
+    if (params_->include_xattrs) {
+      entry->SetCachedXattrs(XattrList::CreateFromFile(entry->GetUnionPath()));
+    }
     {
       // Push the file to the spooler, remember the entry for the path
       const MutexLockGuard m(&lock_file_queue_);
@@ -1168,8 +1169,11 @@ void SyncMediator::AddLocalHardlinkGroups(const HardlinkGroupMap &hardlinks) {
 
     if (i->second.master->IsSymlink() || i->second.master->IsSpecialFile())
       AddHardlinkGroup(i->second);
-    else
+    else {
+      hardlink_index_[i->second.master->GetUnionPath()] =
+          hardlink_queue_.size();
       hardlink_queue_.push_back(i->second);
+    }
   }
 }
 

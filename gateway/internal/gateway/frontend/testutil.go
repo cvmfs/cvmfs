@@ -81,7 +81,7 @@ func (b *mockBackend) CancelLease(ctx context.Context, tokenStr string) error {
 	return nil
 }
 
-func (b *mockBackend) CommitLease(ctx context.Context, tokenStr, oldRootHash, newRootHash string, tag gw.RepositoryTag) (uint64, error) {
+func (b *mockBackend) CommitLease(ctx context.Context, tokenStr, oldRootHash, newRootHash string, tag gw.RepositoryTag, directGraft bool) (uint64, error) {
 	return 1, nil
 }
 

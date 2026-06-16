@@ -662,6 +662,17 @@ sign_manifest() {
   load_repo_config $name
   local user_shell="$(get_user_shell $name)"
 
+  # In testbed mode the stratum0 hostname is a Docker-internal name not
+  # resolvable from the host at sign time.  Pass -L so swissknife sign reads
+  # .cvmfsreflog directly from the local backend storage instead of fetching
+  # it via HTTP.  -L is a no-op for non-local upstreams (swissknife falls back
+  # to HTTP with a warning), so the guard keeps behaviour unchanged outside
+  # testbed mode.
+  local _local_reflog_flag=
+  if [ "${CVMFS_TESTBED:-}" = "true" ] && is_local_upstream "$CVMFS_UPSTREAM_STORAGE"; then
+    _local_reflog_flag="-L"
+  fi
+
   local sign_command="$(__swissknife_cmd) sign \
           -c /etc/cvmfs/keys/${name}.crt       \
           -k /etc/cvmfs/keys/${name}.key       \
@@ -670,7 +681,7 @@ sign_manifest() {
           -m $unsigned_manifest                \
           -t ${CVMFS_SPOOL_DIR}/tmp            \
           $(get_swissknife_proxy)              \
-          -r $CVMFS_UPSTREAM_STORAGE $return_early"
+          -r $CVMFS_UPSTREAM_STORAGE $_local_reflog_flag $return_early"
 
   if [ x"$metainfo_file" != x"" ]; then
     sign_command="$sign_command -M $metainfo_file"

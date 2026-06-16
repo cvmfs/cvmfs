@@ -21,6 +21,7 @@
 #include "file_chunk.h"
 #include "util/platform.h"
 #include "util/shared_ptr.h"
+#include "xattr.h"
 
 class IngestionSource;
 
@@ -128,6 +129,24 @@ class SyncItem {
   inline void SetCompressionAlgorithm(const zlib::Algorithms &alg) {
     compression_algorithm_ = alg;
     has_compression_algorithm_ = true;
+  }
+
+  /**
+   * Pre-fetches extended attributes during traversal so the pipeline callback
+   * thread does not have to issue lgetxattr() syscalls.  Takes ownership.
+   */
+  inline void SetCachedXattrs(XattrList *xattrs) {
+    delete cached_xattrs_;
+    cached_xattrs_ = xattrs;
+  }
+  /**
+   * Returns the cached XattrList and clears the internal pointer (ownership
+   * transfers to the caller).  Returns null if not pre-fetched.
+   */
+  inline XattrList *TakeCachedXattrs() {
+    XattrList *result = cached_xattrs_;
+    cached_xattrs_ = NULL;
+    return result;
   }
 
   /**
@@ -320,6 +339,14 @@ class SyncItem {
   zlib::Algorithms compression_algorithm_;
   // The compression algorithm has been set explicitly
   bool has_compression_algorithm_;
+
+  /**
+   * Xattrs pre-fetched during traversal so that PublishFilesCallback does not
+   * need to call lgetxattr() from the pipeline observer thread.  Ownership is
+   * held here; TakeCachedXattrs() transfers ownership to the caller.
+   * Null if not yet fetched or already consumed.
+   */
+  XattrList *cached_xattrs_;
 
   // Lazy evaluation and caching of results of file stats
   inline void StatRdOnly(const bool refresh = false) const {

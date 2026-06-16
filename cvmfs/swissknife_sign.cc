@@ -53,6 +53,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
   const bool garbage_collectable = (args.count('g') > 0);
   const bool bootstrap_shortcuts = (args.count('A') > 0);
   const bool return_early = (args.count('e') > 0);
+  const bool local_reflog = (args.count('L') > 0);
 
   string reflog_chksum_path;
   const shash::Any reflog_hash;
@@ -64,5 +65,6 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
   return signing_tool.Run(manifest_path, repo_url, spooler_definition, temp_dir,
                           certificate, priv_key, repo_name, pwd, meta_info,
                           reflog_chksum_path, proxy, garbage_collectable,
-                          bootstrap_shortcuts, return_early);
+                          bootstrap_shortcuts, return_early,
+                          std::vector<shash::Any>(), local_reflog);
 }

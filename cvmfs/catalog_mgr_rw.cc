@@ -11,6 +11,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <string>
+#include <vector>
 
 #include "catalog_balancer.h"
 #include "catalog_rw.h"
@@ -542,6 +543,10 @@ void WritableCatalogManager::AddChunkedFile(const DirectoryEntryBase &entry,
   DirectoryEntry full_entry(entry);
   full_entry.set_is_chunked_file(true);
 
+  // AddFile() calls catalog->AddEntry() which calls SetDirty()->Transaction(),
+  // opening an SQLite transaction on the target catalog.  All AddFileChunk()
+  // calls below therefore execute within that already-open transaction — no
+  // explicit BEGIN/COMMIT wrapper is needed around this loop.
   AddFile(full_entry, xattrs, parent_directory);
 
   const string parent_path = MakeRelativePath(parent_directory);
@@ -616,7 +621,7 @@ void WritableCatalogManager::AddHardlinkGroup(
 
   // Get a valid hardlink group id for the catalog the group will end up in
   // TODO(unknown): Compaction
-  const uint32_t new_group_id = catalog->GetMaxLinkId() + 1;
+  const uint32_t new_group_id = catalog->IssueHardlinkGroupId();
   LogCvmfs(kLogCatalog, kLogVerboseMsg, "hardlink group id %u issued",
            new_group_id);
   assert(new_group_id > 0);
@@ -1196,9 +1201,32 @@ bool WritableCatalogManager::Commit(const bool stop_for_tweaks,
  *       happens in a worker thread (i.e. the callback method) for non-leaf
  *       catalogs.
  *
- * TODO(rmeusel): since all leaf catalogs are finalized in the main thread, we
- *                sacrifice some potential concurrency for simplicity.
+ * Leaf catalogs are now finalized in parallel worker threads so that the
+ * SQLite VACUUM calls (the dominant per-catalog cost) overlap with each other
+ * and with the spooler uploads of already-completed catalogs.  Non-leaf
+ * catalogs remain processed in CatalogUploadCallback as before.
  */
+
+/**
+ * pthread entry point for parallel leaf-catalog finalization.
+ *
+ * Each dirty leaf catalog is independent: it owns its SQLite file and does not
+ * share mutable state with sibling leaves (FinalizeCatalog acquires sync_lock_
+ * only for the brief parent->FindNested read).  Running one thread per leaf
+ * therefore parallelises both the SQLite COMMIT and the VACUUM defragmentation
+ * step without introducing data races.
+ *
+ * The FinalizeLeafArgs struct is heap-allocated by SnapshotCatalogs and freed
+ * here before the thread exits.
+ */
+void *WritableCatalogManager::FinalizeLeafThread(void *arg) {
+  FinalizeLeafArgs *a = static_cast<FinalizeLeafArgs *>(arg);
+  a->self->FinalizeCatalog(a->catalog, a->stop_for_tweaks);
+  a->self->ScheduleCatalogProcessing(a->catalog);
+  delete a;
+  return NULL;
+}
+
 WritableCatalogManager::CatalogInfo WritableCatalogManager::SnapshotCatalogs(
     const bool stop_for_tweaks) {
   // prepare environment for parallel processing
@@ -1215,12 +1243,45 @@ WritableCatalogManager::CatalogInfo WritableCatalogManager::SnapshotCatalogs(
   WritableCatalogList leafs_to_snapshot;
   GetModifiedCatalogLeafs(&leafs_to_snapshot);
 
-  // finalize and schedule the catalog processing
-  WritableCatalogList::const_iterator i = leafs_to_snapshot.begin();
-  const WritableCatalogList::const_iterator iend = leafs_to_snapshot.end();
-  for (; i != iend; ++i) {
-    FinalizeCatalog(*i, stop_for_tweaks);
-    ScheduleCatalogProcessing(*i);
+  // Finalize and schedule leaf catalogs.
+  //
+  // When stop_for_tweaks is set the operator interacts with each catalog via
+  // getchar(), which is inherently serial; fall back to the simple loop.
+  // For the common (non-interactive) case we spawn one thread per leaf so that
+  // UpdateCounters + SQLite COMMIT + VacuumDatabaseIfNecessary all run in
+  // parallel across independent catalog databases.
+  if (stop_for_tweaks || leafs_to_snapshot.size() <= 1) {
+    // Serial path — interactive mode or trivial single-leaf publish.
+    WritableCatalogList::const_iterator i = leafs_to_snapshot.begin();
+    const WritableCatalogList::const_iterator iend = leafs_to_snapshot.end();
+    for (; i != iend; ++i) {
+      FinalizeCatalog(*i, stop_for_tweaks);
+      ScheduleCatalogProcessing(*i);
+    }
+  } else {
+    // Parallel path — one thread per dirty leaf catalog.
+    // VacuumDatabaseIfNecessary() calls now overlap with each other and with
+    // the spooler processing catalogs that finished earlier in the batch.
+    const size_t nleafs = leafs_to_snapshot.size();
+    std::vector<pthread_t> tids(nleafs);
+
+    LogCvmfs(kLogCatalog, kLogVerboseMsg,
+             "finalizing %zu leaf catalogs in parallel", nleafs);
+
+    for (size_t j = 0; j < nleafs; ++j) {
+      FinalizeLeafArgs *a = new FinalizeLeafArgs;
+      a->self            = this;
+      a->catalog         = leafs_to_snapshot[j];
+      a->stop_for_tweaks = false;
+      const int retval = pthread_create(&tids[j], NULL,
+                                        FinalizeLeafThread, a);
+      assert(retval == 0);
+    }
+
+    for (size_t j = 0; j < nleafs; ++j) {
+      const int retval = pthread_join(tids[j], NULL);
+      assert(retval == 0);
+    }
   }
 
   LogCvmfs(kLogCatalog, kLogVerboseMsg, "waiting for upload of catalogs");
@@ -1238,6 +1299,14 @@ void WritableCatalogManager::FinalizeCatalog(WritableCatalog *catalog,
   LogCvmfs(kLogCatalog, kLogVerboseMsg, "creating snapshot of catalog '%s'",
            catalog->mountpoint().c_str());
 
+  // All metadata writes below — UpdateCounters (24 UPDATEs), UpdateLastModified,
+  // IncrementRevision, SetPreviousRevision — run within the single SQLite
+  // transaction that was opened by the first SetDirty() call on this catalog
+  // (guaranteed by the CatalogUploadCallback->UpdateNestedCatalog->SetDirty()
+  // path for non-leaf catalogs, and by direct entry modifications for leaf
+  // catalogs).  catalog->Commit() at the end of this function closes that
+  // transaction, flushing all ~30 writes in one shot.  No additional
+  // BEGIN/COMMIT wrapper is needed here.
   catalog->UpdateCounters();
   catalog->UpdateLastModified();
   catalog->IncrementRevision();

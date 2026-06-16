@@ -40,7 +40,7 @@ class IngestionPipeline : public Observable<upload::SpoolerResult> {
   static const unsigned kMaxFilesInFlight = 8000;
   static const unsigned kNforkRegister = 1;
   static const unsigned kNforkWrite = 1;
-  static const unsigned kNforkHash = 2;
+  // kNforkHash removed: hashing is now inline in TaskCompress (no separate stage)
   static const unsigned kNforkCompress = 4;
   static const unsigned kNforkChunk = 1;
   static const unsigned kNforkRead = 8;
@@ -76,8 +76,7 @@ class IngestionPipeline : public Observable<upload::SpoolerResult> {
   TubeGroup<BlockItem> tubes_compress_;
   TubeConsumerGroup<BlockItem> tasks_compress_;
 
-  TubeGroup<BlockItem> tubes_hash_;
-  TubeConsumerGroup<BlockItem> tasks_hash_;
+  // tubes_hash_ / tasks_hash_ removed: hashing is inline in TaskCompress.
 
   TubeGroup<BlockItem> tubes_write_;
   TubeConsumerGroup<BlockItem> tasks_write_;

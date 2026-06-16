@@ -33,7 +33,7 @@ SigningTool::Result SigningTool::Run(
     const std::string &meta_info, const std::string &reflog_chksum_path,
     const std::string &proxy, const bool garbage_collectable,
     const bool bootstrap_shortcuts, const bool return_early,
-    const std::vector<shash::Any> reflog_catalogs) {
+    const std::vector<shash::Any> reflog_catalogs, const bool local_reflog) {
   shash::Any reflog_hash;
   if (reflog_chksum_path != "") {
     if (!manifest::Reflog::ReadChecksum(reflog_chksum_path, &reflog_hash)) {
@@ -58,7 +58,7 @@ SigningTool::Result SigningTool::Run(
     return kInitError;
   }
 
-  // init the download helper
+  // init the HTTP download helper (used unless -L overrides for local upstreams)
   ObjectFetcher object_fetcher(repo_name, repo_url, temp_dir,
                                server_tool_->download_manager(),
                                server_tool_->signature_manager());
@@ -87,7 +87,25 @@ SigningTool::Result SigningTool::Run(
 
   UniquePtr<manifest::Reflog> reflog;
   if (!reflog_hash.IsNull()) {
-    reflog = server_tool_->FetchReflog(&object_fetcher, repo_name, reflog_hash);
+    if (local_reflog && sd.driver_type == upload::SpoolerDefinition::Local) {
+      // Fetch the reflog directly from the local backend storage, bypassing
+      // the HTTP stratum0 endpoint.  This is useful when the stratum0 web
+      // server is not yet running at sign time — for example during initial
+      // repository creation in a container-based testbed, or for offline
+      // signing of a locally-stored repository.
+      // sd.spooler_configuration is the storage root (third field of the
+      // "local,<txndir>,<storagepath>" definition string).
+      LocalObjectFetcher<> local_fetcher(sd.spooler_configuration, temp_dir);
+      reflog = server_tool_->FetchReflog(&local_fetcher, repo_name, reflog_hash);
+    } else {
+      if (local_reflog) {
+        LogCvmfs(kLogCvmfs, kLogStderr,
+                 "-L (local reflog fetch) is only supported for local "
+                 "upstreams; falling back to HTTP fetch via %s",
+                 repo_url.c_str());
+      }
+      reflog = server_tool_->FetchReflog(&object_fetcher, repo_name, reflog_hash);
+    }
     if (!reflog.IsValid()) {
       LogCvmfs(kLogCvmfs, kLogStderr, "reflog missing");
       return kReflogMissing;

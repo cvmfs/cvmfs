@@ -43,6 +43,11 @@ class CommandSign : public Command {
     r.push_back(Parameter::Switch('e',
                                   "return early, don't upload signed "
                                   "manifest"));
+    r.push_back(Parameter::Switch('L',
+                                  "fetch reflog from local backend storage "
+                                  "instead of downloading via the stratum0 "
+                                  "URL (-u); only effective with a local "
+                                  "(-r local,...) upstream"));
     return r;
   }
   int Main(const ArgumentList &args);

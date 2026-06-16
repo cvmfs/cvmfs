@@ -4,11 +4,19 @@
 
 #include <gtest/gtest.h>
 
+#include "catalog_mgr.h"
 #include "catalog_mgr_rw.h"
+#include "catalog_rw.h"
 #include "catalog_test_tools.h"
+#include "directory_entry.h"
+#include "file_chunk.h"
+#include "manifest.h"
 #include "network/download.h"
 #include "statistics.h"
+#include "testutil.h"
 #include "upload.h"
+#include "util/string.h"
+#include "xattr.h"
 
 using namespace std;  // NOLINT
 
@@ -285,6 +293,160 @@ TEST_F(T_CatalogMgrRw, GraftNestedCatalogFail) {
   EXPECT_DEATH(
       catalog_mgr->GraftNestedCatalog("dir/dir/dir/sub1", sub1_hash, sub1_size),
       ".*");
+}
+
+// ---------------------------------------------------------------------------
+// A1: IssueHardlinkGroupId() — cached per-catalog hardlink ID sequence
+// ---------------------------------------------------------------------------
+
+// Verify that repeated calls to IssueHardlinkGroupId() on a fresh catalog
+// (no pre-existing hardlinks) return a strictly monotonically increasing
+// sequence starting at 1, without re-querying the database on every call.
+TEST_F(T_CatalogMgrRw, IssueHardlinkGroupIdSequence) {
+  CatalogTestTool tester("issue_hardlink_group_id_seq");
+  EXPECT_TRUE(tester.Init());
+
+  DirSpec spec = MakeBaseSpec();
+  EXPECT_TRUE(tester.ApplyAtRootHash(tester.manifest()->catalog_hash(), spec));
+
+  catalog::WritableCatalogManager *catalog_mgr = tester.catalog_mgr();
+
+  // "file3" is in the root catalog (see MakeBaseSpec). GetHostingCatalog
+  // returns the WritableCatalog that hosts it — the root catalog.
+  catalog::WritableCatalog *root = catalog_mgr->GetHostingCatalog("file3");
+  ASSERT_NE(nullptr, root);
+
+  // MakeBaseSpec has no hardlinks, so GetMaxLinkId() returns 0 (MAX on an
+  // empty set → NULL → 0 in SQLite). IssueHardlinkGroupId() must therefore
+  // start at 1 and count upward without an additional DB query.
+  uint32_t id1 = root->IssueHardlinkGroupId();
+  uint32_t id2 = root->IssueHardlinkGroupId();
+  uint32_t id3 = root->IssueHardlinkGroupId();
+
+  EXPECT_EQ(1u, id1);
+  EXPECT_EQ(2u, id2);
+  EXPECT_EQ(3u, id3);
+}
+
+
+// Verify that consecutive AddHardlinkGroup calls issued through the catalog
+// manager allocate strictly sequential, distinct, non-zero group IDs and
+// that the lookup of each group's members returns the correct ID.
+TEST_F(T_CatalogMgrRw, HardlinkGroupsGetDistinctIds) {
+  CatalogTestTool tester("hardlink_groups_distinct_ids");
+  EXPECT_TRUE(tester.Init());
+
+  DirSpec spec = MakeBaseSpec();
+  EXPECT_TRUE(tester.ApplyAtRootHash(tester.manifest()->catalog_hash(), spec));
+
+  catalog::WritableCatalogManager *catalog_mgr = tester.catalog_mgr();
+
+  // Build two independent hardlink groups in "/dir".
+  // Group A: two names sharing one content hash.
+  const shash::Any hash_a =
+      shash::MkFromHexPtr(shash::HexPtr(g_hashes[5]), shash::kSuffixNone);
+  catalog::DirectoryEntryBaseList group_a;
+  group_a.push_back(
+      catalog::DirectoryEntryTestFactory::RegularFile("hlink_a1", g_file_size,
+                                                      hash_a));
+  group_a.push_back(
+      catalog::DirectoryEntryTestFactory::RegularFile("hlink_a2", g_file_size,
+                                                      hash_a));
+
+  // Group B: two names sharing a different content hash.
+  const shash::Any hash_b =
+      shash::MkFromHexPtr(shash::HexPtr(g_hashes[6]), shash::kSuffixNone);
+  catalog::DirectoryEntryBaseList group_b;
+  group_b.push_back(
+      catalog::DirectoryEntryTestFactory::RegularFile("hlink_b1", g_file_size,
+                                                      hash_b));
+  group_b.push_back(
+      catalog::DirectoryEntryTestFactory::RegularFile("hlink_b2", g_file_size,
+                                                      hash_b));
+
+  XattrList xattrs;
+  FileChunkList no_chunks;
+  catalog_mgr->AddHardlinkGroup(group_a, xattrs, "dir", no_chunks);
+  catalog_mgr->AddHardlinkGroup(group_b, xattrs, "dir", no_chunks);
+
+  // Verify that the two groups received different non-zero IDs.
+  catalog::DirectoryEntry dirent_a1, dirent_a2, dirent_b1, dirent_b2;
+  ASSERT_TRUE(catalog_mgr->LookupPath("/dir/hlink_a1", kLookupDefault,
+                                      &dirent_a1));
+  ASSERT_TRUE(catalog_mgr->LookupPath("/dir/hlink_a2", kLookupDefault,
+                                      &dirent_a2));
+  ASSERT_TRUE(catalog_mgr->LookupPath("/dir/hlink_b1", kLookupDefault,
+                                      &dirent_b1));
+  ASSERT_TRUE(catalog_mgr->LookupPath("/dir/hlink_b2", kLookupDefault,
+                                      &dirent_b2));
+
+  const uint32_t id_a = dirent_a1.hardlink_group();
+  const uint32_t id_b = dirent_b1.hardlink_group();
+
+  // Both IDs must be positive (assert link_id_seq_ > 0 in the source).
+  EXPECT_GT(id_a, 0u);
+  EXPECT_GT(id_b, 0u);
+
+  // Members of the same group share an ID.
+  EXPECT_EQ(id_a, dirent_a2.hardlink_group());
+  EXPECT_EQ(id_b, dirent_b2.hardlink_group());
+
+  // The two groups have different IDs (sequential allocation).
+  EXPECT_NE(id_a, id_b);
+
+  // Group B was added second so its ID must be exactly one higher.
+  EXPECT_EQ(id_a + 1u, id_b);
+}
+
+
+// ---------------------------------------------------------------------------
+// B3: VacuumDatabaseIfNecessary() — lock released before VACUUM
+// ---------------------------------------------------------------------------
+
+// After many AddFile / RemoveFile cycles the catalog accumulates free pages
+// that exceed kMaximalFreePageRatio.  Commit() calls FinalizeCatalog() which
+// calls VacuumDatabaseIfNecessary().  If the lock were still held across the
+// multi-second VACUUM the catalog would deadlock when the subsequent
+// UpdateNestedCatalog on the parent tried to acquire it.  This test verifies
+// that Commit() completes and the catalog remains accessible afterward.
+TEST_F(T_CatalogMgrRw, VacuumDatabaseNoDeadlock) {
+  CatalogTestTool tester("vacuum_no_deadlock");
+  EXPECT_TRUE(tester.Init());
+
+  DirSpec spec = MakeBaseSpec();
+  EXPECT_TRUE(tester.ApplyAtRootHash(tester.manifest()->catalog_hash(), spec));
+
+  catalog::WritableCatalogManager *catalog_mgr = tester.catalog_mgr();
+
+  // Add a batch of files to create real catalog churn, then remove them so
+  // that freed page space eventually triggers VACUUM.
+  const shash::Any hash =
+      shash::MkFromHexPtr(shash::HexPtr(g_hashes[0]), shash::kSuffixNone);
+  const XattrList xattrs;
+  for (int i = 0; i < 50; ++i) {
+    const string name = "vac_tmp_" + StringifyInt(i);
+    catalog::DirectoryEntry entry =
+        catalog::DirectoryEntryTestFactory::RegularFile(name, g_file_size,
+                                                        hash);
+    // Cast to DirectoryEntryBase to route through the public overload.
+    // The protected DirectoryEntry overload is the internal implementation;
+    // the public base overload is the intended external API.
+    catalog_mgr->AddFile(
+        static_cast<const catalog::DirectoryEntryBase &>(entry), xattrs, "dir");
+  }
+  for (int i = 0; i < 50; ++i) {
+    catalog_mgr->RemoveFile("dir/vac_tmp_" + StringifyInt(i));
+  }
+
+  // Commit should not deadlock and must report success.
+  manifest::Manifest manifest(shash::Any(), 1, "");
+  const bool committed = catalog_mgr->Commit(false, 0, &manifest);
+  EXPECT_TRUE(committed);
+
+  // The catalog must still be queryable after vacuum.
+  catalog::DirectoryEntry dirent;
+  EXPECT_TRUE(catalog_mgr->LookupPath("/dir/file1", kLookupDefault, &dirent));
+  EXPECT_STREQ(g_hashes[0], dirent.checksum().ToString().c_str());
 }
 
 }  // namespace catalog

@@ -191,7 +191,30 @@ bool Database<DerivedT>::Configure() {
     return Sql(sqlite_db(), "PRAGMA temp_store=2;").Execute()
            && Sql(sqlite_db(), "PRAGMA locking_mode=EXCLUSIVE;").Execute();
   }
-  return true;
+
+  // Writable databases (publish-path catalogs):
+  //   synchronous=NORMAL: skips most fsyncs (specifically the fsync on
+  //   rollback-journal deletion that fires after every COMMIT in the default
+  //   synchronous=FULL mode).  Data is still written to the main DB file
+  //   before the connection is used further, so ScheduleCatalogProcessing can
+  //   read the raw file and upload a correct catalog.
+  //
+  //   We intentionally do NOT set journal_mode=WAL: in WAL mode committed
+  //   pages live in the <db>-wal sidecar file until a checkpoint, and the
+  //   spooler reads only the main DB file at the OS level, which would result
+  //   in uploading a stale (pre-commit) catalog.
+  //
+  //   cache_size=-65536: 64 MB page buffer pool for the writable catalog.
+  //   The negative value is interpreted in kibibytes (KiB) by SQLite ≥ 3.7.10.
+  //   Larger pool reduces the number of page read-backs during UPDATE-heavy
+  //   publish sessions (counter updates, dirent inserts, nested catalog rows).
+  //
+  //   mmap_size=134217728: Allow SQLite to memory-map up to 128 MB of the DB
+  //   file.  For catalogs that fit in the map window, random page reads become
+  //   simple memory accesses without pread() syscall overhead.
+  return Sql(sqlite_db(), "PRAGMA synchronous=NORMAL;").Execute()
+         && Sql(sqlite_db(), "PRAGMA cache_size=-65536;").Execute()
+         && Sql(sqlite_db(), "PRAGMA mmap_size=134217728;").Execute();
 }
 
 

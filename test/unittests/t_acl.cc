@@ -31,7 +31,14 @@ static void should_pass_noncompat(const char *textual, unsigned char *acl_binary
   } else {
     ASSERT_FALSE(equiv_mode);
     ASSERT_NE(binary_acl, nullptr);
+    ASSERT_NE(static_cast<void *>(acl_binary_expected), nullptr);
+    // GCC -Wnonnull fires here because the compiler cannot prove the pointer
+    // parameter is non-null at compile time, even though the ASSERT above
+    // would abort at runtime.  Suppress it locally.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wnonnull"
     ASSERT_EQ(0, memcmp(binary_acl, acl_binary_expected, binary_size));
+#pragma GCC diagnostic pop
   }
   free(binary_acl);
 }
@@ -54,7 +61,11 @@ static void should_pass(const char *textual, unsigned char *acl_binary_expected,
   } else {
     ASSERT_FALSE(equiv_mode);
     ASSERT_NE(binary_acl, nullptr);
+    ASSERT_NE(static_cast<void *>(acl_binary_expected), nullptr);
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wnonnull"
     ASSERT_EQ(0, memcmp(binary_acl, acl_binary_expected, binary_size));
+#pragma GCC diagnostic pop
   }
   free(binary_acl);
 }

@@ -35,9 +35,21 @@ class CommitProcessor {
   CommitProcessor();
   virtual ~CommitProcessor();
 
+  // Process the committed lease.
+  //
+  // When direct_graft is false (the default) the standard CatalogMergeTool /
+  // DiffRec path is used — identical behaviour to before this parameter was
+  // added.
+  //
+  // When direct_graft is true the fast path is used: new_root_hash is grafted
+  // directly into the parent catalog at lease_path via GraftNestedCatalog,
+  // bypassing DiffRec entirely.  This is only valid when lease_path points to
+  // a brand-new directory subtree with no pre-existing entry in the parent
+  // catalog.  Using it on an existing path will cause a PANIC inside
+  // GraftNestedCatalog (the built-in safety check).
   Result Process(const std::string &lease_path, const shash::Any &old_root_hash,
                  const shash::Any &new_root_hash, const RepositoryTag &tag,
-                 uint64_t *final_revision);
+                 uint64_t *final_revision, bool direct_graft = false);
 
   int GetNumErrors() const { return num_errors_; }
 
