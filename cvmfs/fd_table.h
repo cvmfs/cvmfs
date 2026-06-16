@@ -10,6 +10,7 @@
 #include <stdint.h>
 
 #include <cassert>
+#include <cstddef>
 #include <vector>
 
 #include "util/single_copy.h"

@@ -7,6 +7,7 @@
 
 #include <sys/types.h>
 
+#include <cassert>
 #include <cerrno>
 #include <map>
 #include <string>

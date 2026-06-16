@@ -11,6 +11,7 @@
 #include <cerrno>
 #include <string>
 
+#include "sql.h"
 #include "sqlitemem.h"
 #include "util/logging.h"
 #include "util/platform.h"

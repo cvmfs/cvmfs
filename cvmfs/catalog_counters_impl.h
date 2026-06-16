@@ -8,6 +8,7 @@
 #include <map>
 #include <string>
 
+#include "catalog_counters.h"
 #include "catalog_sql.h"
 #include "util/string.h"
 
