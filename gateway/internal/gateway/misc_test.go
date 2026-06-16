@@ -7,9 +7,9 @@ import (
 
 func TestRepositoryTagJSONRoundTrip(t *testing.T) {
 	tag := RepositoryTag{
-		Name:            "generic-2024-01-01T00:00:00Z",
-		Description:     "auto tag",
-		AutoTagTimespan: "30 days ago",
+		Name:             "generic-2024-01-01T00:00:00Z",
+		Description:      "auto tag",
+		AutoTagThreshold: 1700000000,
 	}
 
 	data, err := json.Marshal(tag)
@@ -28,12 +28,12 @@ func TestRepositoryTagJSONRoundTrip(t *testing.T) {
 	if decoded.Description != tag.Description {
 		t.Errorf("Description mismatch: got %q, want %q", decoded.Description, tag.Description)
 	}
-	if decoded.AutoTagTimespan != tag.AutoTagTimespan {
-		t.Errorf("AutoTagTimespan mismatch: got %q, want %q", decoded.AutoTagTimespan, tag.AutoTagTimespan)
+	if decoded.AutoTagThreshold != tag.AutoTagThreshold {
+		t.Errorf("AutoTagThreshold mismatch: got %d, want %d", decoded.AutoTagThreshold, tag.AutoTagThreshold)
 	}
 }
 
-func TestRepositoryTagJSONOmitEmptyTimespan(t *testing.T) {
+func TestRepositoryTagJSONOmitEmptyThreshold(t *testing.T) {
 	tag := RepositoryTag{
 		Name:        "tag1",
 		Description: "a tag",
@@ -44,18 +44,19 @@ func TestRepositoryTagJSONOmitEmptyTimespan(t *testing.T) {
 		t.Fatalf("failed to marshal RepositoryTag: %v", err)
 	}
 
-	// auto_tag_timespan should be omitted when empty
+	// auto_tag_threshold should be omitted when zero
 	var raw map[string]interface{}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		t.Fatalf("failed to unmarshal to map: %v", err)
 	}
-	if _, exists := raw["auto_tag_timespan"]; exists {
-		t.Errorf("auto_tag_timespan should be omitted when empty, but was present")
+	if _, exists := raw["auto_tag_threshold"]; exists {
+		t.Errorf("auto_tag_threshold should be omitted when zero, but was present")
 	}
 }
 
 func TestRepositoryTagJSONBackwardsCompatible(t *testing.T) {
-	// Simulate a message from an older publisher that doesn't send auto_tag_timespan
+	// Simulate a message from an older publisher that doesn't send
+	// auto_tag_threshold
 	jsonStr := `{"tag_name":"tag1","tag_description":"desc"}`
 
 	var tag RepositoryTag
@@ -69,7 +70,7 @@ func TestRepositoryTagJSONBackwardsCompatible(t *testing.T) {
 	if tag.Description != "desc" {
 		t.Errorf("Description mismatch: got %q, want %q", tag.Description, "desc")
 	}
-	if tag.AutoTagTimespan != "" {
-		t.Errorf("AutoTagTimespan should be empty for old-format messages, got %q", tag.AutoTagTimespan)
+	if tag.AutoTagThreshold != 0 {
+		t.Errorf("AutoTagThreshold should be zero for old-format messages, got %d", tag.AutoTagThreshold)
 	}
 }

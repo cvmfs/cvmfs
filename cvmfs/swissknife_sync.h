@@ -331,7 +331,8 @@ class CommandSync : public Command {
     r.push_back(Parameter::Optional('H', "key file for HTTP API"));
     r.push_back(Parameter::Optional('@', "proxy URL"));
     r.push_back(Parameter::Optional('C',
-        "auto tag timespan (only used when upstream is GW)"));
+        "auto tag cleanup threshold as a Unix timestamp; auto tags older than "
+        "this are removed (only used when upstream is GW)"));
 
     return r;
   }

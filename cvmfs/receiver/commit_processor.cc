@@ -4,9 +4,9 @@
 
 #include "commit_processor.h"
 
-#include <stdio.h>
 #include <time.h>
 
+#include <cctype>
 #include <string>
 #include <vector>
 
@@ -49,7 +49,8 @@ bool CreateNewTag(const RepositoryTag &repo_tag, const std::string &repo_name,
                   const receiver::Params &params, const std::string &temp_dir,
                   const std::string &manifest_path,
                   const std::string &public_key_path,
-                  const std::string &proxy) {
+                  const std::string &proxy,
+                  const time_t auto_tag_threshold) {
   swissknife::ArgumentList args;
   args['r'].Reset(new std::string(params.spooler_configuration));
   args['w'].Reset(new std::string(params.stratum0));
@@ -62,6 +63,12 @@ bool CreateNewTag(const RepositoryTag &repo_tag, const std::string &repo_name,
   args['D'].Reset(new std::string(repo_tag.description()));
   args['x'].Reset(new std::string());
   args['@'].Reset(new std::string(proxy));
+  // Remove outdated auto-generated tags in the same history transaction as the
+  // tag we are about to add, so that only a single new history database is
+  // published (and registered in the reflog) for this commit.
+  if (auto_tag_threshold > 0) {
+    args['c'].Reset(new std::string(StringifyInt(auto_tag_threshold)));
+  }
 
   const UniquePtr<swissknife::CommandEditTag> edit_cmd(
       new swissknife::CommandEditTag());
@@ -76,63 +83,83 @@ bool CreateNewTag(const RepositoryTag &repo_tag, const std::string &repo_name,
   return true;
 }
 
-/**
- * Parse a human-readable date string (like "30 days ago") into a Unix
- * timestamp using the system 'date' command.  Returns 0 on failure.
- */
-time_t ParseDateToTimestamp(const std::string &date_string) {
-  // Try GNU date first, then BSD date as fallback
-  const std::string cmd =
-      "date --date '" + date_string + "' +%s 2>/dev/null || "
-      "date -jf '%Y-%m-%d' '" + date_string + "' +%s 2>/dev/null";
-  FILE *fp = popen(cmd.c_str(), "r");
-  if (fp == NULL) {
-    return 0;
-  }
-  char buffer[64];
-  if (fgets(buffer, sizeof(buffer), fp) == NULL) {
-    pclose(fp);
-    return 0;
-  }
-  pclose(fp);
-  return static_cast<time_t>(String2Int64(std::string(buffer)));
-}
-
-
-bool RemoveOldAutoTags(const std::string &repo_name,
-                       const receiver::Params &params,
-                       const std::string &temp_dir,
-                       const std::string &manifest_path,
-                       const std::string &public_key_path,
-                       const std::string &proxy,
-                       const time_t threshold_timestamp) {
-  swissknife::ArgumentList args;
-  args['r'].Reset(new std::string(params.spooler_configuration));
-  args['w'].Reset(new std::string(params.stratum0));
-  args['t'].Reset(new std::string(temp_dir));
-  args['m'].Reset(new std::string(manifest_path));
-  args['p'].Reset(new std::string(public_key_path));
-  args['f'].Reset(new std::string(repo_name));
-  args['e'].Reset(new std::string(params.hash_alg_str));
-  args['c'].Reset(new std::string(StringifyInt(threshold_timestamp)));
-  args['@'].Reset(new std::string(proxy));
-
-  const UniquePtr<swissknife::CommandEditTag> edit_cmd(
-      new swissknife::CommandEditTag());
-  const int ret = edit_cmd->Main(args);
-
-  if (ret) {
-    LogCvmfs(kLogReceiver, kLogSyslogErr,
-             "Error %d cleaning up old auto tags", ret);
-    return false;
-  }
-
-  return true;
-}
-
 }  // namespace
 
 namespace receiver {
+
+// See commit_processor.h for the contract. `now` is injected so the parser is
+// deterministic and unit-testable.
+time_t ParseRelativeTimespan(const std::string &timespan, time_t now) {
+  // Tokenize on whitespace, lower-casing as we go.
+  std::vector<std::string> tokens;
+  std::string current;
+  for (size_t i = 0; i < timespan.size(); ++i) {
+    const unsigned char c = static_cast<unsigned char>(timespan[i]);
+    if (isspace(c)) {
+      if (!current.empty()) {
+        tokens.push_back(current);
+        current.clear();
+      }
+    } else {
+      current += static_cast<char>(tolower(c));
+    }
+  }
+  if (!current.empty()) {
+    tokens.push_back(current);
+  }
+
+  // Expect exactly "<number> <unit> ago".
+  if (tokens.size() != 3 || tokens[2] != "ago") {
+    return 0;
+  }
+  const std::string &number = tokens[0];
+  if (number.empty()) {
+    return 0;
+  }
+  for (size_t i = 0; i < number.size(); ++i) {
+    if (!isdigit(static_cast<unsigned char>(number[i]))) {
+      return 0;
+    }
+  }
+  const int64_t count = String2Int64(number);
+
+  // De-pluralize the unit.
+  std::string unit = tokens[1];
+  if (!unit.empty() && unit[unit.size() - 1] == 's') {
+    unit.resize(unit.size() - 1);
+  }
+
+  // Fixed-length units can be subtracted directly.
+  int64_t factor = 0;
+  if (unit == "sec" || unit == "second") {
+    factor = 1;
+  } else if (unit == "min" || unit == "minute") {
+    factor = 60;
+  } else if (unit == "hour") {
+    factor = 3600;
+  } else if (unit == "day") {
+    factor = 86400;
+  } else if (unit == "week") {
+    factor = 604800;
+  }
+  if (factor > 0) {
+    return now - static_cast<time_t>(count * factor);
+  }
+
+  // Calendar units: let mktime() normalize the broken-down time.
+  struct tm broken_time;
+  localtime_r(&now, &broken_time);
+  if (unit == "month") {
+    broken_time.tm_mon -= static_cast<int>(count);
+    return mktime(&broken_time);
+  }
+  if (unit == "year") {
+    broken_time.tm_year -= static_cast<int>(count);
+    return mktime(&broken_time);
+  }
+
+  return 0;
+}
 
 CommitProcessor::CommitProcessor() : num_errors_(0), statistics_(NULL) { }
 
@@ -265,40 +292,38 @@ CommitProcessor::Result CommitProcessor::Process(
       RaiiTempDir::Create(temp_dir_root));
   const std::string temp_dir = raii_temp_dir->dir();
 
+  // Determine the cutoff below which outdated auto-generated tags are removed.
+  // A value sent by the publisher (already an absolute timestamp) takes
+  // precedence over the gateway's local CVMFS_AUTO_TAG_TIMESPAN configuration,
+  // which is a relative "<N> <unit> ago" timespan resolved here. 0 disables
+  // cleanup.
+  time_t auto_tag_threshold = final_tag.auto_tag_threshold();
+  if (auto_tag_threshold <= 0 && !params.auto_tag_timespan.empty()) {
+    auto_tag_threshold = ParseRelativeTimespan(params.auto_tag_timespan,
+                                               time(NULL));
+    if (auto_tag_threshold <= 0) {
+      LogCvmfs(kLogReceiver, kLogSyslogErr,
+               "CommitProcessor - warning: could not parse "
+               "CVMFS_AUTO_TAG_TIMESPAN '%s' (expected \"<N> <unit> ago\")",
+               params.auto_tag_timespan.c_str());
+    }
+  }
+  if (auto_tag_threshold > 0) {
+    LogCvmfs(kLogReceiver, kLogSyslog,
+             "CommitProcessor - lease_path: %s, cleaning up auto tags "
+             "older than %ld",
+             lease_path.c_str(), static_cast<long>(auto_tag_threshold));
+  }
+
+  // CreateNewTag adds the tag for the new revision and, when a cleanup
+  // threshold is set, removes the outdated auto tags in the same history
+  // transaction. A failure here is fatal: leaving the new revision untagged
+  // (or silently keeping stale tags) would be worse than aborting the commit.
   if (!CreateNewTag(final_tag, repo_name, params, temp_dir, new_manifest_path,
-                    public_key, params.proxy)) {
+                    public_key, params.proxy, auto_tag_threshold)) {
     LogCvmfs(kLogReceiver, kLogSyslogErr, "Error creating tag: %s",
              final_tag.name().c_str());
     return kError;
-  }
-
-  // Remove outdated automatically created tags based on CVMFS_AUTO_TAG_TIMESPAN
-  // Publisher-provided value takes precedence over gateway config
-  std::string auto_tag_timespan = tag.auto_tag_timespan();
-  if (auto_tag_timespan.empty()) {
-    auto_tag_timespan = params.auto_tag_timespan;
-  }
-  if (!auto_tag_timespan.empty()) {
-    const time_t threshold = ParseDateToTimestamp(auto_tag_timespan);
-    if (threshold > 0) {
-      LogCvmfs(kLogReceiver, kLogSyslog,
-               "CommitProcessor - lease_path: %s, cleaning up auto tags "
-               "older than %ld (timespan: %s)",
-               lease_path.c_str(), static_cast<long>(threshold),
-               auto_tag_timespan.c_str());
-      if (!RemoveOldAutoTags(repo_name, params, temp_dir, new_manifest_path,
-                             public_key, params.proxy, threshold)) {
-        LogCvmfs(kLogReceiver, kLogSyslogErr,
-                 "CommitProcessor - warning: auto tag cleanup failed for %s",
-                 lease_path.c_str());
-        // Non-fatal: continue with signing even if cleanup fails
-      }
-    } else {
-      LogCvmfs(kLogReceiver, kLogSyslogErr,
-               "CommitProcessor - warning: could not parse "
-               "CVMFS_AUTO_TAG_TIMESPAN: '%s'",
-               auto_tag_timespan.c_str());
-    }
   }
 
   LogCvmfs(kLogReceiver, kLogSyslog,

@@ -5,6 +5,7 @@
 #ifndef CVMFS_RECEIVER_COMMIT_PROCESSOR_H_
 #define CVMFS_RECEIVER_COMMIT_PROCESSOR_H_
 
+#include <ctime>
 #include <string>
 
 #include "repository_tag.h"
@@ -12,6 +13,20 @@
 #include "util/pointer.h"
 
 namespace receiver {
+
+/**
+ * Resolve the gateway-local CVMFS_AUTO_TAG_TIMESPAN configuration value into a
+ * Unix timestamp threshold, relative to `now`, in-process and without spawning
+ * `date` or any other subprocess. Only the documented relative form
+ * "<N> <unit> ago" is supported (e.g. "30 days ago", "1 month ago"); the unit
+ * may be sec(ond), min(ute), hour, day, week, month or year, singular or
+ * plural. Month and year arithmetic is calendar-aware (via mktime), matching
+ * the GNU `date` semantics the publisher uses. Anything else (absolute dates,
+ * "N days" without "ago", garbage, ...) returns 0 so the caller skips cleanup.
+ *
+ * Exposed in the header so it can be unit tested with a fixed `now`.
+ */
+time_t ParseRelativeTimespan(const std::string &timespan, time_t now);
 
 /**
  * This class is used in the `cvmfs_receiver` tool, on repository gateway

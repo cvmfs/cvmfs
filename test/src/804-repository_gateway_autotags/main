@@ -74,6 +74,20 @@ cvmfs_run_test() {
         return 56
     fi
 
+    # A cutoff at/in the future must still keep the freshly created tag
+    # ("latest auto tag is set in any case"), matching the non-gateway
+    # behaviour in test 636: cleanup removes all older auto tags but the new
+    # tag, created after the cleanup, survives.
+    sudo bash -c "echo 'CVMFS_AUTO_TAG_TIMESPAN=\"tomorrow\"' >> /etc/cvmfs/repositories.d/test.repo.org/server.conf"
+    cvmfs_server transaction test.repo.org || return 57
+    cvmfs_server publish test.repo.org || return 58
+    local tags_future=$(cvmfs_server tag -l -x test.repo.org | grep generic | wc -l)
+    echo "Auto tags after future-cutoff cleanup: $tags_future"
+    if [ $tags_future -ne 1 ]; then
+        echo "Expected exactly one (latest) auto tag to survive a future cutoff"
+        return 59
+    fi
+
     cvmfs_server check -i test.repo.org || return 60
     check_repo_integrity test.repo.org || return 61
 

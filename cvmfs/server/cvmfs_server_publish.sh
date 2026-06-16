@@ -217,8 +217,15 @@ cvmfs_server_publish() {
     # one containing the session token
     if [ x"$upstream_type" = xgw ]; then
       sync_command="$sync_command -H $gw_key_file -P ${spool_dir}/session_token"
-      if [ ! -z "$CVMFS_AUTO_TAG_TIMESPAN" ]; then
-        sync_command="$sync_command -C \"$CVMFS_AUTO_TAG_TIMESPAN\""
+      # Resolve CVMFS_AUTO_TAG_TIMESPAN to an absolute Unix timestamp here, on
+      # the publisher, and pass only the integer to the gateway. The gateway
+      # never has to parse a human-readable date string from the publisher.
+      # get_auto_tags_timespan echoes "0" when unset and fails on a bad value.
+      local auto_tags_threshold=
+      auto_tags_threshold=$(get_auto_tags_timespan "$name") \
+        || { echo "failed to parse CVMFS_AUTO_TAG_TIMESPAN on $name"; retcode=1; continue; }
+      if [ "$auto_tags_threshold" -gt 0 ] 2>/dev/null; then
+        sync_command="$sync_command -C $auto_tags_threshold"
       fi
     fi
     if [ "x$CVMFS_UNION_FS_TYPE" != "x" ]; then

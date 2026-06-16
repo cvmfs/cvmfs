@@ -746,7 +746,8 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   }
 
   if (args.find('C') != args.end()) {
-    params.repo_tag.SetAutoTagTimespan(*args.find('C')->second);
+    params.repo_tag.SetAutoTagThreshold(
+        static_cast<time_t>(String2Int64(*args.find('C')->second)));
   }
 
   if (args.find('G') != args.end()) {

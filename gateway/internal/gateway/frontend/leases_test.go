@@ -150,16 +150,16 @@ func TestLeaseHandlerCommitLease(t *testing.T) {
 	}
 }
 
-func TestLeaseHandlerCommitLeaseWithAutoTagTimespan(t *testing.T) {
+func TestLeaseHandlerCommitLeaseWithAutoTagThreshold(t *testing.T) {
 	backend := mockBackend{}
 	token := "lease_token"
 
 	msg, _ := json.Marshal(map[string]interface{}{
-		"old_root_hash":     "abcdef",
-		"new_root_hash":     "defabc",
-		"tag_name":          "generic-2024-01-01T00:00:00Z",
-		"tag_description":   "auto tag",
-		"auto_tag_timespan": "30 days ago",
+		"old_root_hash":      "abcdef",
+		"new_root_hash":      "defabc",
+		"tag_name":           "generic-2024-01-01T00:00:00Z",
+		"tag_description":    "auto tag",
+		"auto_tag_threshold": 1700000000,
 	})
 
 	req := httptest.NewRequest("POST", "/api/v1/leases/"+token, bytes.NewReader(msg))
@@ -189,11 +189,11 @@ func TestLeaseHandlerCommitLeaseWithAutoTagTimespan(t *testing.T) {
 	}
 }
 
-func TestLeaseHandlerCommitLeaseWithoutAutoTagTimespan(t *testing.T) {
+func TestLeaseHandlerCommitLeaseWithoutAutoTagThreshold(t *testing.T) {
 	backend := mockBackend{}
 	token := "lease_token"
 
-	// Simulate an older publisher that doesn't send auto_tag_timespan
+	// Simulate an older publisher that doesn't send auto_tag_threshold
 	msg, _ := json.Marshal(map[string]interface{}{
 		"old_root_hash":   "abcdef",
 		"new_root_hash":   "defabc",

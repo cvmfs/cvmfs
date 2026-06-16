@@ -403,6 +403,7 @@ set(CVMFS_UNITTEST_SOURCES
   t_pipe.cc
   t_platforms.cc
   t_polymorphic_construction.cc
+  t_commit_processor.cc
   t_prng.cc
   t_quota.cc
   t_reactor.cc

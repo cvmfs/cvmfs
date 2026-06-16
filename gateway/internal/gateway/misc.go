@@ -2,7 +2,11 @@ package gateway
 
 // RepositoryTag represents a tag of a CernVM-FS repository
 type RepositoryTag struct {
-	Name            string `json:"tag_name"`
-	Description     string `json:"tag_description"`
-	AutoTagTimespan string `json:"auto_tag_timespan,omitempty"`
+	Name        string `json:"tag_name"`
+	Description string `json:"tag_description"`
+	// AutoTagThreshold is a Unix timestamp: auto-generated tags older than this
+	// are removed by the receiver on commit. 0 (omitted) disables the cleanup.
+	// The publisher resolves CVMFS_AUTO_TAG_TIMESPAN to an absolute timestamp
+	// before sending it, so the gateway only ever forwards an integer.
+	AutoTagThreshold int64 `json:"auto_tag_threshold,omitempty"`
 }
