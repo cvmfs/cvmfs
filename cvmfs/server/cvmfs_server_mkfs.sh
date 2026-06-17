@@ -471,7 +471,7 @@ cvmfs_server_mkfs() {
   create_repometa_skeleton $repoinfo_file
   if is_local_upstream $upstream && [ $configure_apache -eq 1 ]; then
     reload_apache > /dev/null
-    wait_for_apache "${stratum0}/.cvmfswhitelist" || die "fail (Apache configuration)"
+    wait_for_apache "${stratum0}/.cvmfswhitelist" || die "Stratum0: ${stratum0}. fail (Apache configuration)"
   fi
 
   local volatile_opt=
