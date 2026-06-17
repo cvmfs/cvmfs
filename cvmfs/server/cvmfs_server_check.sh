@@ -110,7 +110,62 @@ __do_check() {
                      $(get_swissknife_proxy)           \
                      $(get_follow_http_redirects_flag) \
                      $with_reflog"
-  $user_shell "$check_cmd"
+
+  # Set CVMFS_SERVER_CHECK_SUMMARY=0 to restore the previous behavior.
+  if [ "${CVMFS_SERVER_CHECK_SUMMARY:-1}" = "0" ]; then
+    $user_shell "$check_cmd"
+    return $?
+  fi
+
+  # The check produces a lot of progress output on stdout while problems are
+  # reported on stderr.  Mirror stderr into a temporary file so that a concise
+  # summary can be printed at the end without changing the live output.
+  local check_error_log
+  check_error_log="$(mktemp)" || die "Failed to create temporary file"
+  local check_error_pipe
+  check_error_pipe="$(mktemp)" || die "Failed to create temporary file"
+  rm -f "$check_error_pipe"
+  mkfifo "$check_error_pipe" || die "Failed to create temporary pipe"
+
+  tee -a "$check_error_log" < "$check_error_pipe" >&2 &
+  local tee_pid=$!
+
+  set +e
+  $user_shell "$check_cmd" 2>"$check_error_pipe"
+  local check_retval=$?
+  wait "$tee_pid"
+  set -e
+
+  rm -f "$check_error_pipe"
+  if [ $check_retval -ne 0 ]; then
+    __print_check_summary "$name" "$check_error_log"
+  fi
+  rm -f "$check_error_log"
+  return $check_retval
+}
+
+# Prints a summary of the errors reported by a check run.
+# $1: repository name
+# $2: path to a file holding the check's stderr output (one error per line)
+__print_check_summary() {
+  local name="$1"
+  local error_log="$2"
+  local max_show=50
+
+  echo
+  echo "Check summary for $name:"
+  if [ ! -s "$error_log" ]; then
+    echo "  no problems reported"
+    return 0
+  fi
+
+  local num_errors
+  num_errors=$(wc -l < "$error_log" | tr -d ' ')
+  echo "  $num_errors error message(s) reported:"
+  sed -e 's/^/    /' -e "${max_show}q" "$error_log"
+  if [ "$num_errors" -gt "$max_show" ]; then
+    echo "    ... ($((num_errors - max_show)) more, see the output above)"
+  fi
 }
 
 # Checks for mismatch between the reflog and the checksum and tries to fix them,
