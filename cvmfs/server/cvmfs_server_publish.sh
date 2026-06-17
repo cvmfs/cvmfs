@@ -146,6 +146,10 @@ cvmfs_server_publish() {
       fi
     fi
 
+    # Auto-tag cleanup threshold to forward to the gateway (empty/0 = disabled).
+    # Resolved (and only applied) for non-checked-out publishes, mirroring the
+    # direct-publish auto_tag_cleanup_list below.
+    local gw_auto_tag_threshold=
     if is_checked_out $name; then
       if [ x"$tag_name" = "x" ]; then
         echo "Publishing a checked out revision requires a tag name"
@@ -166,6 +170,14 @@ cvmfs_server_publish() {
 
       local auto_tag_cleanup_list=
       auto_tag_cleanup_list="$(filter_auto_tags $name)" || { echo "failed to determine outdated auto tags on $name"; retcode=1; continue; }
+
+      # For gateway upstreams the receiver performs the cleanup, so resolve the
+      # threshold here and forward it via -C (see below). Resolving it in this
+      # branch ensures checked-out publishes never prune auto tags and never
+      # fail on an invalid CVMFS_AUTO_TAG_TIMESPAN, matching direct publish.
+      if [ x"$upstream_type" = xgw ]; then
+        gw_auto_tag_threshold=$(get_auto_tags_timespan "$name") || { echo "failed to parse CVMFS_AUTO_TAG_TIMESPAN on $name"; retcode=1; continue; }
+      fi
     fi
 
     # prepare the commands to be used for the publishing later
@@ -217,6 +229,12 @@ cvmfs_server_publish() {
     # one containing the session token
     if [ x"$upstream_type" = xgw ]; then
       sync_command="$sync_command -H $gw_key_file -P ${spool_dir}/session_token"
+      # CVMFS_AUTO_TAG_TIMESPAN has already been resolved to an absolute Unix
+      # timestamp above (only for non-checked-out publishes); forward just the
+      # integer so the gateway never parses a human-readable date string.
+      if [ -n "$gw_auto_tag_threshold" ] && [ "$gw_auto_tag_threshold" -gt 0 ] 2>/dev/null; then
+        sync_command="$sync_command -C $gw_auto_tag_threshold"
+      fi
     fi
     if [ "x$CVMFS_UNION_FS_TYPE" != "x" ]; then
       sync_command="$sync_command -f $CVMFS_UNION_FS_TYPE"

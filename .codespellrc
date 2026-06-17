@@ -9,3 +9,6 @@ skip = .git,*.rtf,cvmfs-universal.spec
 #                folder name for a generally mistyped word, so ignored altogether
 # MSDOS -- used in C-preprocessor directives
 ignore-words-list = gir,ative,parm,numer,quarantaine,msdos
+# exclude-file holds exact source lines to skip (e.g. "sec(ond)" abbreviation
+# notation), so we don't have to whitelist common-typo words like "ond"
+exclude-file = .codespell-exclude

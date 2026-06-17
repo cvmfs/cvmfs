@@ -403,10 +403,12 @@ set(CVMFS_UNITTEST_SOURCES
   t_pipe.cc
   t_platforms.cc
   t_polymorphic_construction.cc
+  t_commit_processor.cc
   t_prng.cc
   t_quota.cc
   t_reactor.cc
   t_reflog.cc
+  t_repository_tag.cc
   t_relaxed_path_filter.cc
   t_s3fanout.cc
   t_resolv_conf_event_handler.cc
