@@ -53,11 +53,13 @@ __do_check() {
     url=$CVMFS_STRATUM0
   fi
 
+  local gc_lock_held=0
   if [ "x$tag" = "x" ] && is_garbage_collectable $name; then
     # acquire gc lock
     # waits for gc on the same repository to finish
     # and prevents a gc from starting
     acquire_gc_lock $name check || die "Failed to acquire gc lock for $name"
+    gc_lock_held=1
     trap "release_gc_lock $name" EXIT HUP INT TERM
   fi
 
@@ -123,10 +125,25 @@ __do_check() {
   local check_error_log
   check_error_log="$(mktemp)" || die "Failed to create temporary file"
   local check_error_pipe
-  check_error_pipe="$(mktemp)" || die "Failed to create temporary file"
+  check_error_pipe="$(mktemp)"  \
+    || { rm -f "$check_error_log"; die "Failed to create temporary file"; }
+
+  # Make sure the temporary files are removed even if the function exits early,
+  # e.g. through 'die' or a signal.  Keep the gc lock release (set above) in the
+  # trap if it was installed.
+  local cleanup_cmd="rm -f '$check_error_pipe' '$check_error_log'"
+  [ $gc_lock_held -eq 1 ] && cleanup_cmd="release_gc_lock $name; $cleanup_cmd"
+  trap "$cleanup_cmd" EXIT HUP INT TERM
+
   rm -f "$check_error_pipe"
   mkfifo "$check_error_pipe" || die "Failed to create temporary pipe"
 
+  # Run tee in the background reading from a FIFO, rather than as the second
+  # stage of a pipeline (... 2>&1 | tee ...).  This way the check command keeps
+  # its own exit status in $? instead of it being masked by tee's.  In bash this
+  # could be done more simply with PIPESTATUS or the pipefail option, but this
+  # script must also run under dash (the default /bin/sh on Ubuntu), which
+  # supports neither.
   tee -a "$check_error_log" < "$check_error_pipe" >&2 &
   local tee_pid=$!
 
