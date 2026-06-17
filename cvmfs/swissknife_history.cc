@@ -540,7 +540,7 @@ int CommandEditTag::CleanupOldAutoTags(const ArgumentList &args,
       return 1;
     }
   }
-  bool retval = env->history->PruneBranches();
+  const bool retval = env->history->PruneBranches();
   if (!retval) {
     LogCvmfs(kLogCvmfs, kLogStderr,
              "failed to prune unused branches from history");
