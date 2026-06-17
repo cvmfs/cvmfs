@@ -249,8 +249,8 @@ class AbstractCatalogManager : public SingleCopy {
   LoadReturn ChangeRoot(const shash::Any &root_hash);
   void DetachNested();
 
-  bool LookupPath(const PathString &path, const LookupOptions options,
-                  DirectoryEntry *entry);
+  virtual bool LookupPath(const PathString &path, const LookupOptions options,
+                          DirectoryEntry *entry);
   bool LookupPath(const std::string &path, const LookupOptions options,
                   DirectoryEntry *entry) {
     PathString p;
@@ -535,3 +535,4 @@ class InodeNfsGenerationAnnotation : public InodeAnnotation {
 #include "catalog_mgr_impl.h"
 
 #endif  // CVMFS_CATALOG_MGR_H_
+

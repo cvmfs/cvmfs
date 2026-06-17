@@ -249,6 +249,16 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
 
 /**
  * Called by curl for every received data chunk.
+ *
+ * In multi-threaded mode the chunk's hash is updated here (cheap) and the
+ * raw bytes are handed off to the calling Fetch() thread via JobInfo's
+ * data tube; the (relatively expensive) zlib decompression and sink->Write
+ * happen on that caller thread. This lets multiple callers — e.g. main
+ * thread plus N file-bundle prefetch workers — run their decompression in
+ * parallel instead of serializing on this single MainDownload thread.
+ *
+ * In single-threaded mode (no MainDownload thread, e.g. unit tests) the
+ * old inline path is kept.
  */
 static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
                                void *info_link) {
@@ -260,14 +270,24 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
   // come here
   assert(info->sink() != NULL);
 
-  // LogCvmfs(kLogDownload, kLogDebug, "Data callback,  %d bytes", num_bytes);
-
   if (num_bytes == 0)
     return 0;
 
   if (info->expected_hash()) {
     shash::Update(reinterpret_cast<unsigned char *>(ptr), num_bytes,
                   info->hash_context());
+  }
+
+  if (info->IsValidDataTube()) {
+    // Parallel-decompress path: copy bytes onto a buffer the caller will own
+    // and enqueue. The caller thread (DownloadManager::Fetch) pops these
+    // elements and runs DecompressZStream2Sink / sink->Write itself.
+    char *buf = new char[num_bytes];
+    memcpy(buf, ptr, num_bytes);
+    DataTubeElement *ele = new DataTubeElement(buf, num_bytes,
+                                               kActionDecompress);
+    info->GetDataTubePtr()->EnqueueBack(ele);
+    return num_bytes;
   }
 
   if (info->compressed()) {
@@ -1731,14 +1751,22 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
   }
 
 verify_and_finalize_stop:
-  // Finalize, flush destination file
+  // Finalize, flush destination file.
   ReleaseCredential(info);
-  if (info->sink() != NULL && info->sink()->Flush() != 0) {
-    info->SetErrorCode(kFailLocalIO);
-  }
 
-  if (info->compressed())
-    zlib::DecompressFini(info->GetZstreamPtr());
+  // In parallel-decompress mode (data_tube_ valid) the caller has not yet
+  // pushed bytes through the sink / zstream — those operations happen on
+  // the caller thread when it pops the queued chunks. Flushing the sink
+  // and tearing down the zstream here would race the caller's decompress
+  // and corrupt the output. Defer both to the caller.
+  const bool defer_finalize = info->IsValidDataTube();
+  if (!defer_finalize) {
+    if (info->sink() != NULL && info->sink()->Flush() != 0) {
+      info->SetErrorCode(kFailLocalIO);
+    }
+    if (info->compressed())
+      zlib::DecompressFini(info->GetZstreamPtr());
+  }
 
   if (info->headers()) {
     header_lists_->PutList(info->headers());
@@ -1990,6 +2018,11 @@ Failures DownloadManager::Fetch(JobInfo *info) {
     //          info->wait_at[0], info->wait_at[1]);
     pipe_jobs_->Write<JobInfo *>(info);
 
+    // Decompress / copy chunks on this caller thread (in parallel across
+    // concurrent Fetch() callers) instead of on the single MainDownload
+    // thread. Track decompression errors locally and apply them at the end
+    // — VerifyAndFinalize already ran by the time kActionStop arrives.
+    Failures decompress_err = kFailOk;
     do {
       DataTubeElement *ele = info->GetDataTubePtr()->PopFront();
 
@@ -1997,10 +2030,57 @@ Failures DownloadManager::Fetch(JobInfo *info) {
         delete ele;
         break;
       }
-      // TODO(heretherebedragons) add compression
+
+      if (decompress_err == kFailOk && ele->size > 0) {
+        if (info->compressed()) {
+          const zlib::StreamStates retval = zlib::DecompressZStream2Sink(
+              ele->data, static_cast<int64_t>(ele->size),
+              info->GetZstreamPtr(), info->sink());
+          if (retval == zlib::kStreamDataError) {
+            LogCvmfs(kLogDownload, kLogSyslogErr,
+                     "(id %" PRId64 ") failed to decompress %s",
+                     info->id(), info->url()->c_str());
+            decompress_err = kFailBadData;
+          } else if (retval == zlib::kStreamIOError) {
+            LogCvmfs(kLogDownload, kLogSyslogErr,
+                     "(id %" PRId64 ") decompressing %s, local IO error",
+                     info->id(), info->url()->c_str());
+            decompress_err = kFailLocalIO;
+          }
+        } else {
+          const int64_t written = info->sink()->Write(ele->data, ele->size);
+          if (written < 0 ||
+              static_cast<uint64_t>(written) != ele->size) {
+            LogCvmfs(kLogDownload, kLogDebug,
+                     "(id %" PRId64 ") sink write failed for %s (%ld of %zu)",
+                     info->id(), info->url()->c_str(),
+                     static_cast<long>(written), ele->size);
+            decompress_err = kFailLocalIO;
+          }
+        }
+      }
+      delete ele;
     } while (true);
 
     info->GetPipeJobResultPtr()->Read<download::Failures>(&result);
+
+    // Caller-side finalize (deferred from VerifyAndFinalize). Must run after
+    // all kActionDecompress chunks have been popped and decompressed.
+    if (result == kFailOk && decompress_err == kFailOk) {
+      if (info->sink() != NULL && info->sink()->Flush() != 0) {
+        decompress_err = kFailLocalIO;
+      }
+    }
+    if (info->compressed()) {
+      zlib::DecompressFini(info->GetZstreamPtr());
+    }
+    if (result == kFailOk && decompress_err != kFailOk) {
+      result = decompress_err;
+      info->SetErrorCode(decompress_err);
+      if (info->sink() != NULL) {
+        info->sink()->Purge();
+      }
+    }
     // LogCvmfs(kLogDownload, kLogDebug, "got result %d", result);
   } else {
     const MutexLockGuard l(lock_synchronous_mode_);

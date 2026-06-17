@@ -110,6 +110,8 @@ class WritableCatalogManager : public SimpleCatalogManager {
                       const FileChunkList &file_chunks);
   void RemoveFile(const std::string &file_path);
 
+  void UpdateBundleTrigger(const std::string &file_path, bool new_value);
+
   void AddDirectory(const DirectoryEntryBase &entry,
                     const XattrList &xattrs,
                     const std::string &parent_directory);

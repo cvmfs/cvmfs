@@ -135,6 +135,12 @@ class AbstractSyncMediator {
 typedef std::map<uint64_t, HardlinkGroup> HardlinkGroupMap;
 
 /**
+ * List of bundle specification files found in a certain directory
+ * (non-recursive).
+ */
+typedef std::vector<std::string> BundleSpecs;
+
+/**
  * The SyncMediator refines the input received from a concrete UnionSync object.
  * For example, it resolves the insertion and deletion of complete directories
  * by recursing them.  It works as a mediator between the union file system and
@@ -245,6 +251,10 @@ class SyncMediator : public virtual AbstractSyncMediator {
   void PublishFilesCallback(const upload::SpoolerResult &result);
   void PublishHardlinksCallback(const upload::SpoolerResult &result);
 
+  std::string GetBundleTriggerPath(SharedPtr<SyncItem> bundle_spec_entry) const;
+  void InsertBundleSpec(SharedPtr<SyncItem> entry);
+  void AddBundleSpecs();
+
   // Hardlink handling
   void CompleteHardlinks(SharedPtr<SyncItem> entry);
   HardlinkGroupMap &GetHardlinkMap() { return hardlink_stack_.top(); }
@@ -288,6 +298,15 @@ class SyncMediator : public virtual AbstractSyncMediator {
    * popped and the HardlinkGroupMap is processed.
    */
   HardlinkGroupMapStack hardlink_stack_;
+
+  /**
+   * Files that trigger preloading a file bundle have a .cvmfsbundle-<filename>
+   * bundle specification file. We don't know in which order we encounter the
+   * main file and the bundle specification file. So we pick up all the bundle
+   * specifications first and compare them to the present files at the end of
+   * the transaction.
+   */
+  BundleSpecs bundle_specs_;
 
   /**
    * New and modified files are sent to an external spooler for hashing and

@@ -60,6 +60,7 @@
 #include "auto_umount.h"
 #include "backoff.h"
 #include "bigvector.h"
+#include "bundle_mgr.h"
 #include "cache.h"
 #include "cache_posix.h"
 #include "cache_stream.h"
@@ -180,6 +181,10 @@ const int kNumReservedFd = 512;
  * Warn if the process has a lower limit for the number of open file descriptors
  */
 const unsigned int kMinOpenFiles = 8192;
+/**
+ * Indicates if file bundle prefetching is enabled.
+ */
+bool prefetch_file_bundles_= false;
 
 
 class FuseInterruptCue : public InterruptCue {
@@ -1198,6 +1203,20 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   }
 
   perf::Inc(file_system_->n_fs_open());  // Count actual open / fetch operations
+
+  if (dirent.IsBundleTrigger() and prefetch_file_bundles_) {
+    // fetch dependences if not there already
+    PathString trigger_path;
+    assert(GetPathForInode(ino, &trigger_path)
+           && "Unable to retrieve the path of the trigger file");
+    BundleMgr bundle_mgr(mount_point_, trigger_path);
+    if (bundle_mgr) {
+      bundle_mgr.Fetch();
+    } else {
+      LogCvmfs(kLogCvmfs, kLogDebug,
+               "Couldn't fetch bundle associated to file %s", path.c_str());
+    }
+  }
 
   glue::PageCacheTracker::OpenDirectives open_directives;
   if (!dirent.IsChunkedFile()) {
@@ -2447,6 +2466,16 @@ static int Init(const loader::LoaderExports *loader_exports) {
   crypto::SetupLibcryptoMt();
 
   InitOptionsMgr(loader_exports);
+  if (cvmfs::options_mgr_) {
+    std::string is_prefetching_enabled;
+    cvmfs::options_mgr_->GetValue("CVMFS_PREFETCH_FILEBUNDLES",
+                                  &is_prefetching_enabled);
+    cvmfs::prefetch_file_bundles_ = cvmfs::options_mgr_->IsOn(
+        is_prefetching_enabled);
+  } else {
+    LogCvmfs(kLogCvmfs, kLogSyslog | kLogDebug,
+             "OptionsManager expected to be initialized but isn't");
+  }
 
   // We need logging set up before forking the watchdog
   FileSystem::SetupLoggingStandalone(*cvmfs::options_mgr_,
