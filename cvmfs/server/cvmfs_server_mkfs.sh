@@ -213,6 +213,7 @@ cvmfs_server_mkfs() {
   local volatile_content=0
   local autotagging=true
   local auto_tag_timespan=
+  local auto_tag_timespan_set=0
   local unionfs
   local hash_algo
   local compression_alg
@@ -265,6 +266,7 @@ cvmfs_server_mkfs() {
       ;;
       G)
         auto_tag_timespan="$OPTARG"
+        auto_tag_timespan_set=1
       ;;
       a)
         hash_algo=$OPTARG
@@ -360,6 +362,14 @@ cvmfs_server_mkfs() {
   if is_local_upstream $upstream; then
     check_apache                    || die "Apache must be installed and running"
     ensure_enabled_apache_modules
+  fi
+  # Apply the documented default auto tag timespan when auto tagging is enabled
+  # and the user did not pass -G at all. Without a timespan, every publish is
+  # tagged forever and nothing is ever removed, so neither fresh stratum 1
+  # snapshots nor garbage collection can free up space. Passing an empty
+  # timespan (-G "") explicitly opts back into keeping all auto tags forever.
+  if [ x"$autotagging" = x"true" ] && [ $auto_tag_timespan_set -eq 0 ]; then
+    auto_tag_timespan="2 weeks ago"
   fi
   if [ "x$auto_tag_timespan" != "x" ]; then
     date --date "$auto_tag_timespan" +%s >/dev/null 2>&1 || die "Auto tags time span cannot be parsed"
