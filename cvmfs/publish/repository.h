@@ -325,7 +325,7 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   const SettingsPublisher &settings() const { return settings_; }
   const ServerFlagFile &in_transaction() const { return in_transaction_; }
   const ServerLockFile &is_publishing() const { return is_publishing_; }
-  Session *session() const { return session_.weak_ref(); }
+  Session *session() const { return session_.get(); }
   const upload::Spooler *spooler_files() const { return spooler_files_; }
   const upload::Spooler *spooler_catalogs() const { return spooler_catalogs_; }
 

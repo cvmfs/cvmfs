@@ -102,25 +102,25 @@ bool SqliteHistory::CreateDatabase(const std::string &file_name,
 void SqliteHistory::PrepareQueries() {
   assert(database_.IsValid());
 
-  find_tag_ = new SqlFindTag(database_.weak_ref());
-  find_tag_by_date_ = new SqlFindTagByDate(database_.weak_ref());
-  count_tags_ = new SqlCountTags(database_.weak_ref());
-  list_tags_ = new SqlListTags(database_.weak_ref());
-  get_hashes_ = new SqlGetHashes(database_.weak_ref());
-  list_rollback_tags_ = new SqlListRollbackTags(database_.weak_ref());
-  list_branches_ = new SqlListBranches(database_.weak_ref());
+  find_tag_ = new SqlFindTag(database_.get());
+  find_tag_by_date_ = new SqlFindTagByDate(database_.get());
+  count_tags_ = new SqlCountTags(database_.get());
+  list_tags_ = new SqlListTags(database_.get());
+  get_hashes_ = new SqlGetHashes(database_.get());
+  list_rollback_tags_ = new SqlListRollbackTags(database_.get());
+  list_branches_ = new SqlListBranches(database_.get());
 
   if (database_->ContainsRecycleBin()) {
-    recycle_list_ = new SqlRecycleBinList(database_.weak_ref());
+    recycle_list_ = new SqlRecycleBinList(database_.get());
   }
 
   if (IsWritable()) {
-    insert_tag_ = new SqlInsertTag(database_.weak_ref());
-    remove_tag_ = new SqlRemoveTag(database_.weak_ref());
-    rollback_tag_ = new SqlRollbackTag(database_.weak_ref());
-    recycle_empty_ = new SqlRecycleBinFlush(database_.weak_ref());
-    insert_branch_ = new SqlInsertBranch(database_.weak_ref());
-    find_branch_head_ = new SqlFindBranchHead(database_.weak_ref());
+    insert_tag_ = new SqlInsertTag(database_.get());
+    remove_tag_ = new SqlRemoveTag(database_.get());
+    rollback_tag_ = new SqlRollbackTag(database_.get());
+    recycle_empty_ = new SqlRecycleBinFlush(database_.get());
+    insert_branch_ = new SqlInsertBranch(database_.get());
+    find_branch_head_ = new SqlFindBranchHead(database_.get());
   }
 }
 
@@ -229,7 +229,7 @@ bool SqliteHistory::GetByDate(const time_t timestamp, Tag *tag) const {
 
 bool SqliteHistory::List(std::vector<Tag> *tags) const {
   assert(list_tags_.IsValid());
-  return RunListing(tags, list_tags_.weak_ref());
+  return RunListing(tags, list_tags_.get());
 }
 
 
@@ -439,7 +439,7 @@ bool SqliteHistory::ListTagsAffectedByRollback(
   }
 
   // run the listing and return the results
-  return RunListing(tags, list_rollback_tags_.weak_ref());
+  return RunListing(tags, list_rollback_tags_.get());
 }
 
 

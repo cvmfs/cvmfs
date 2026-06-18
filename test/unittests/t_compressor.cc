@@ -146,7 +146,7 @@ TEST_F(T_Compressor, EchoCompressionLong) {
     // Compress the output in multiple stages
     deflate_finished = compressor->Deflate(true, &input, &remaining, &buf,
                                            &buf_size);
-    memcpy(compress_buf.weak_ref() + compress_pos, buf, buf_size);
+    memcpy(compress_buf.get() + compress_pos, buf, buf_size);
     compress_pos += buf_size;
     rounds++;
   }
@@ -156,7 +156,7 @@ TEST_F(T_Compressor, EchoCompressionLong) {
   ASSERT_EQ(0U, remaining);
 
   EXPECT_EQ(compress_pos, long_size);
-  EXPECT_EQ(0, memcmp(compress_buf.weak_ref(), long_string, long_size));
+  EXPECT_EQ(0, memcmp(compress_buf.get(), long_string, long_size));
 }
 
 

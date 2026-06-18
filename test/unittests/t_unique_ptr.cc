@@ -102,8 +102,8 @@ TEST_F(T_UniquePtr, WeakReference) {
     EXPECT_EQ(1u, Foo::global_constructor_calls);
     EXPECT_EQ(0u, Foo::global_destructor_calls);
 
-    EXPECT_EQ(object, foo.weak_ref());
-    Foo *weak_foo = foo.weak_ref();
+    EXPECT_EQ(object, foo.get());
+    Foo *weak_foo = foo.get();
     EXPECT_EQ(27, weak_foo->GetIdentifier());
     EXPECT_EQ(1u, weak_foo->local_constructor_calls);
     EXPECT_EQ(1u, Foo::global_constructor_calls);
@@ -258,9 +258,9 @@ TEST_F(T_UniquePtr, SelfAssignment) {
 TEST_F(T_UniquePtr, VoidPtr) {
   std::unique_ptr<void> p(malloc(1024));
   EXPECT_TRUE(p.IsValid());
-  EXPECT_NE(static_cast<void *>(NULL), p.weak_ref());
+  EXPECT_NE(static_cast<void *>(NULL), p.get());
 
   std::unique_ptr<void> p2;
   EXPECT_FALSE(p2.IsValid());
-  EXPECT_EQ(static_cast<void *>(NULL), p2.weak_ref());
+  EXPECT_EQ(static_cast<void *>(NULL), p2.get());
 }

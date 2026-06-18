@@ -213,7 +213,7 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
       new CachedManifestEnsemble(fetcher_->cache_mgr(), this));
   manifest_failure = manifest::Fetch(
       "", repo_name_, local_newest_timestamp, &local_newest_hash,
-      signature_mgr_, fetcher_->download_mgr(), ensemble.weak_ref());
+      signature_mgr_, fetcher_->download_mgr(), ensemble.get());
 
   if (manifest_failure == manifest::kFailOk) {
     // server has newest revision or no valid local revision

@@ -1273,7 +1273,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
       // Retrieve File chunks from the catalog
       std::unique_ptr<FileChunkList> chunks(new FileChunkList());
       if (!catalog_mgr->ListFileChunks(path, dirent.hash_algorithm(),
-                                       chunks.weak_ref())
+                                       chunks.get())
           || chunks->IsEmpty()) {
         fuse_remounter_->fence()->Leave();
         LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,

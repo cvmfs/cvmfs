@@ -839,7 +839,7 @@ int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
   bool const is_balanced = false;
 
   catalog::WritableCatalogManager catalog_manager(
-      base_hash, stratum0, dir_temp, spooler_catalogs.weak_ref(),
+      base_hash, stratum0, dir_temp, spooler_catalogs.get(),
       download_manager(), false, SyncParameters::kDefaultNestedKcatalogLimit,
       SyncParameters::kDefaultRootKcatalogLimit,
       SyncParameters::kDefaultFileMbyteLimit, statistics(), is_balanced,
@@ -867,7 +867,7 @@ int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
 
   // commit changes
   LogCvmfs(kLogCvmfs, kLogStdout, "Committing changes...");
-  if (!catalog_manager.Commit(false, false, manifest.weak_ref())) {
+  if (!catalog_manager.Commit(false, false, manifest.get())) {
     LogCvmfs(kLogCvmfs, kLogStderr, "something went wrong during sync");
     cancel_lease();
     return 1;

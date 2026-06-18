@@ -185,13 +185,13 @@ int CommandGc::Main(const ArgumentList &args) {
   reflog->BeginTransaction();
 
   GcConfig config;
-  config.uploader = uploader.weak_ref();
+  config.uploader = uploader.get();
   config.keep_history_depth = revisions;
   config.keep_history_timestamp = timestamp;
   config.dry_run = dry_run;
   config.verbose = list_condemned_objects;
   config.object_fetcher = &object_fetcher;
-  config.reflog = reflog.weak_ref();
+  config.reflog = reflog.get();
   config.deleted_objects_logfile = deletion_log_file;
   config.statistics = statistics();
   config.extended_stats = extended_stats;
@@ -223,7 +223,7 @@ int CommandGc::Main(const ArgumentList &args) {
     if (!dry_run) {
       stats_db->StoreGCStatistics(this->statistics(), start_time, false);
       if (upload_statsdb) {
-        stats_db->UploadStatistics(uploader.weak_ref());
+        stats_db->UploadStatistics(uploader.get());
       }
     }
     uploader->TearDown();
@@ -244,7 +244,7 @@ int CommandGc::Main(const ArgumentList &args) {
     if (!dry_run) {
       stats_db->StoreGCStatistics(this->statistics(), start_time, false);
       if (upload_statsdb) {
-        stats_db->UploadStatistics(uploader.weak_ref());
+        stats_db->UploadStatistics(uploader.get());
       }
     }
     uploader->TearDown();
@@ -283,7 +283,7 @@ int CommandGc::Main(const ArgumentList &args) {
 
     stats_db->StoreGCStatistics(this->statistics(), start_time, false);
     if (upload_statsdb) {
-      stats_db->UploadStatistics(uploader.weak_ref());
+      stats_db->UploadStatistics(uploader.get());
     }
 
     uploader->TearDown();
@@ -293,7 +293,7 @@ int CommandGc::Main(const ArgumentList &args) {
   if (!dry_run) {
     stats_db->StoreGCStatistics(this->statistics(), start_time, true);
     if (upload_statsdb) {
-      stats_db->UploadStatistics(uploader.weak_ref());
+      stats_db->UploadStatistics(uploader.get());
     }
   }
   uploader->TearDown();

@@ -626,7 +626,7 @@ TEST_F(T_Util, ClosePipe) {
   MakePipe(fd);
   ClosePipe(fd);
   ASSERT_DEATH(WritePipe(fd[1], to_write.c_str(), to_write.length()), ".*");
-  ASSERT_DEATH(ReadPipe(fd[0], buffer_output.weak_ref(), to_write.length()),
+  ASSERT_DEATH(ReadPipe(fd[0], buffer_output.get(), to_write.length()),
                ".*");
 }
 
@@ -1811,9 +1811,9 @@ TEST_F(T_Util, ManagedExecCommandLine) {
                         true /* double_fork */, &pid);
   ASSERT_TRUE(success);
   close(fd_stdout[1]);
-  ssize_t bytes_read = read(fd_stdout[0], buffer.weak_ref(), message.length());
+  ssize_t bytes_read = read(fd_stdout[0], buffer.get(), message.length());
   EXPECT_EQ(static_cast<size_t>(bytes_read), message.length());
-  string result(reinterpret_cast<char *>(buffer.weak_ref()));
+  string result(reinterpret_cast<char *>(buffer.get()));
   ASSERT_EQ(message, result);
   close(fd_stdout[0]);
 }
@@ -1842,7 +1842,7 @@ TEST_F(T_Util, ManagedExecClearEnv) {
                         true /* double_fork */, &pid);
   close(fd_stdout[1]);
   ASSERT_TRUE(success);
-  ssize_t bytes_read = read(fd_stdout[0], buffer.weak_ref(), 64);
+  ssize_t bytes_read = read(fd_stdout[0], buffer.get(), 64);
 
   // env will be cleared (normally it is way larger than 64 bytes)
   // debug mode: there will be a log message in similar to 25-byte long:

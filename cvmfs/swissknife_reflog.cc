@@ -115,9 +115,9 @@ int CommandReconstructReflog::Main(const ArgumentList &args) {
   reflog->TakeDatabaseFileOwnership();
 
   reflog->BeginTransaction();
-  AddStaticManifestObjects(reflog.weak_ref(), manifest.weak_ref());
-  RootChainWalker walker(manifest.weak_ref(), &object_fetcher,
-                         reflog.weak_ref());
+  AddStaticManifestObjects(reflog.get(), manifest.get());
+  RootChainWalker walker(manifest.get(), &object_fetcher,
+                         reflog.get());
   walker.FindObjectsAndPopulateReflog();
   reflog->CommitTransaction();
 
@@ -204,7 +204,7 @@ void RootChainWalker::WalkHistories(const shash::Any &history_hash) {
     LogCvmfs(kLogCvmfs, kLogStdout, "History: %s",
              current_hash.ToString().c_str());
 
-    const bool cancel = WalkCatalogsInHistory(current_history.weak_ref());
+    const bool cancel = WalkCatalogsInHistory(current_history.get());
     const bool success = reflog_->AddHistory(current_hash);
     assert(success);
 

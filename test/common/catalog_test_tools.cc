@@ -279,20 +279,20 @@ bool CatalogTestTool::Init() {
     return false;
   }
 
-  manifest_ = CreateRepository(temp_dir_, spooler_.weak_ref());
+  manifest_ = CreateRepository(temp_dir_, spooler_.get());
 
   if (!manifest_.IsValid()) {
     return false;
   }
 
   shash::Any history_hash(shash::kSha1);
-  CreateHistory(stratum0_, manifest_.weak_ref(), &history_hash);
+  CreateHistory(stratum0_, manifest_.get(), &history_hash);
 
   manifest_->set_certificate(hash_cert);
   manifest_->set_history(history_hash);
   manifest_->set_repository_name("keys.cern.ch");
   manifest_->set_publish_timestamp(time(NULL));
-  CreateManifest(stratum0_, manifest_.weak_ref());
+  CreateManifest(stratum0_, manifest_.get());
 
 
   history_.clear();
@@ -302,7 +302,7 @@ bool CatalogTestTool::Init() {
 }
 
 void CatalogTestTool::UpdateManifest() {
-  CreateManifest(stratum0_, manifest_.weak_ref());
+  CreateManifest(stratum0_, manifest_.get());
 }
 
 // Note: we always apply the dir spec to the revision corresponding to the
@@ -311,7 +311,7 @@ bool CatalogTestTool::Apply(const std::string &id, const DirSpec &spec) {
   statistics_ = new perf::Statistics();
   catalog_mgr_ = CreateCatalogMgr(
       history_.front().second, "file://" + stratum0_, temp_dir_,
-      spooler_.weak_ref(), download_manager(), statistics_.weak_ref());
+      spooler_.get(), download_manager(), statistics_.get());
   if (!catalog_mgr_.IsValid()) {
     return false;
   }
@@ -335,7 +335,7 @@ bool CatalogTestTool::Apply(const std::string &id, const DirSpec &spec) {
   }
 
 
-  if (!catalog_mgr_->Commit(false, 0, manifest_.weak_ref())) {
+  if (!catalog_mgr_->Commit(false, 0, manifest_.get())) {
     return false;
   }
 
@@ -348,8 +348,8 @@ bool CatalogTestTool::ApplyAtRootHash(const shash::Any &root_hash,
                                       const DirSpec &spec) {
   statistics_ = new perf::Statistics();
   catalog_mgr_ = CreateCatalogMgr(root_hash, "file://" + stratum0_, temp_dir_,
-                                  spooler_.weak_ref(), download_manager(),
-                                  statistics_.weak_ref());
+                                  spooler_.get(), download_manager(),
+                                  statistics_.get());
   if (!catalog_mgr_.IsValid()) {
     return false;
   }
@@ -372,7 +372,7 @@ bool CatalogTestTool::ApplyAtRootHash(const shash::Any &root_hash,
     catalog_mgr_->CreateNestedCatalog(*it);
   }
 
-  if (!catalog_mgr_->Commit(false, 0, manifest_.weak_ref())) {
+  if (!catalog_mgr_->Commit(false, 0, manifest_.get())) {
     return false;
   }
 
@@ -385,7 +385,7 @@ bool CatalogTestTool::LookupNestedCatalogHash(const shash::Any &root_hash,
   perf::Statistics stats;
   std::unique_ptr<catalog::WritableCatalogManager> catalog_mgr(
       CreateCatalogMgr(root_hash, "file://" + stratum0_, temp_dir_,
-                       spooler_.weak_ref(), download_manager(), &stats));
+                       spooler_.get(), download_manager(), &stats));
   if (!catalog_mgr.IsValid()) {
     return false;
   }
@@ -420,7 +420,7 @@ bool CatalogTestTool::FindEntry(const shash::Any &root_hash,
   perf::Statistics stats;
   std::unique_ptr<catalog::WritableCatalogManager> catalog_mgr(
       CreateCatalogMgr(root_hash, "file://" + stratum0_, temp_dir_,
-                       spooler_.weak_ref(), download_manager(), &stats));
+                       spooler_.get(), download_manager(), &stats));
   if (!catalog_mgr.IsValid()) {
     return false;
   }
@@ -439,13 +439,13 @@ bool CatalogTestTool::DirSpecAtRootHash(const shash::Any &root_hash,
   perf::Statistics stats;
   std::unique_ptr<catalog::WritableCatalogManager> catalog_mgr(
       CreateCatalogMgr(root_hash, "file://" + stratum0_, temp_dir_,
-                       spooler_.weak_ref(), download_manager(), &stats));
+                       spooler_.get(), download_manager(), &stats));
 
   if (!catalog_mgr.IsValid()) {
     return false;
   }
 
-  return ExportDirSpec("", catalog_mgr.weak_ref(), spec);
+  return ExportDirSpec("", catalog_mgr.get(), spec);
 }
 
 CatalogTestTool::~CatalogTestTool() { }

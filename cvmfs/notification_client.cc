@@ -149,7 +149,7 @@ void *NotificationClient::Run(void *data) {
   const int num_retries = 10;
   const uint64_t interval = 60;
   notify::SubscriberSupervisor supervisor(
-      cl->subscriber_.weak_ref(), cl->repo_name_, num_retries, interval);
+      cl->subscriber_.get(), cl->repo_name_, num_retries, interval);
   supervisor.Run();
 
   return NULL;

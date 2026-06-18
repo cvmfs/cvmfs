@@ -108,7 +108,7 @@ NfsMapsLeveldb *NfsMapsLeveldb::Create(const string &leveldb_dir,
                                            "total number of issued inode");
 
   maps->root_inode_ = root_inode;
-  maps->fork_aware_env_ = new ForkAwareEnv(maps.weak_ref());
+  maps->fork_aware_env_ = new ForkAwareEnv(maps.get());
   leveldb::Status status;
   leveldb::Options leveldb_options;
   leveldb_options.create_if_missing = true;

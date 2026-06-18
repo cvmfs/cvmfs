@@ -123,7 +123,7 @@ struct CatalogContext {
   uint64_t root_ctlg_revision() const { return root_ctlg_revision_; }
   RootCatalogLocation root_ctlg_location() const { return root_ctlg_location_; }
   manifest::ManifestEnsemble *manifest_ensemble() const {
-    return manifest_ensemble_.weak_ref();
+    return manifest_ensemble_.get();
   }
 
   void SetHash(shash::Any hash) { hash_ = hash; }

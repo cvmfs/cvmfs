@@ -64,7 +64,7 @@ TEST_F(T_FileWatcher, NoEventStop) {
       file_watcher::FileWatcher::Create());
   EXPECT_TRUE(watcher.IsValid());
 
-  TestEventHandler *hd(new TestEventHandler(&counters_, channel_.weak_ref()));
+  TestEventHandler *hd(new TestEventHandler(&counters_, channel_.get()));
   watcher->RegisterHandler(watched_file_name, hd);
 
   EXPECT_TRUE(watcher->Spawn());
@@ -81,7 +81,7 @@ TEST_F(T_FileWatcher, ModifiedEvent) {
       file_watcher::FileWatcher::Create());
   EXPECT_TRUE(watcher.IsValid());
 
-  TestEventHandler *hd(new TestEventHandler(&counters_, channel_.weak_ref()));
+  TestEventHandler *hd(new TestEventHandler(&counters_, channel_.get()));
   TestEventHandler::EventMask mask;
   mask.insert(file_watcher::kModified);
   hd->SetEventMask(mask);
@@ -109,7 +109,7 @@ TEST_F(T_FileWatcher, DeletedEvent) {
       file_watcher::FileWatcher::Create());
   EXPECT_TRUE(watcher.IsValid());
 
-  TestEventHandler *hd(new TestEventHandler(&counters_, channel_.weak_ref()));
+  TestEventHandler *hd(new TestEventHandler(&counters_, channel_.get()));
   TestEventHandler::EventMask mask;
   mask.insert(file_watcher::kDeleted);
   hd->SetEventMask(mask);
@@ -137,7 +137,7 @@ TEST_F(T_FileWatcher, ModifiedThenDeletedEvent) {
       file_watcher::FileWatcher::Create());
   EXPECT_TRUE(watcher.IsValid());
 
-  TestEventHandler *hd(new TestEventHandler(&counters_, channel_.weak_ref()));
+  TestEventHandler *hd(new TestEventHandler(&counters_, channel_.get()));
   TestEventHandler::EventMask mask;
   mask.insert(file_watcher::kModified);
   mask.insert(file_watcher::kDeleted);

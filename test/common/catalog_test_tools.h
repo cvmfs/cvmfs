@@ -149,7 +149,7 @@ class CatalogTestTool : public ServerTool {
 
   bool DirSpecAtRootHash(const shash::Any &root_hash, DirSpec *spec);
 
-  manifest::Manifest *manifest() { return manifest_.weak_ref(); }
+  manifest::Manifest *manifest() { return manifest_.get(); }
 
   History history() { return history_; }
 
@@ -157,7 +157,7 @@ class CatalogTestTool : public ServerTool {
   std::string public_key() { return public_key_; }
   catalog::WritableCatalogManager *catalog_mgr() {
     assert(catalog_mgr_.IsValid());
-    return catalog_mgr_.weak_ref();
+    return catalog_mgr_.get();
   }
 
   // Necessary for libcvmfs unit tests in order to avoid clash of sqlite

@@ -161,7 +161,7 @@ CommandTag::Environment *CommandTag::InitializeEnvironment(
   }
 
   // download the history database referenced in the manifest
-  env->history = GetHistory(env->manifest.weak_ref(), env->repository_url,
+  env->history = GetHistory(env->manifest.get(), env->repository_url,
                             env->history_path.path(), read_write);
   if (!env->history.IsValid()) {
     return NULL;
@@ -465,7 +465,7 @@ int CommandEditTag::Main(const ArgumentList &args) {
 
   int retval;
   if (args.find('d') != args.end()) {
-    retval = RemoveTags(args, env.weak_ref());
+    retval = RemoveTags(args, env.get());
     if (retval != 0)
       return retval;
   }
@@ -478,19 +478,19 @@ int CommandEditTag::Main(const ArgumentList &args) {
   // non-gateway publish ordering (cleanup before tagging), so the latest auto
   // tag always survives.
   if (args.find('c') != args.end()) {
-    retval = CleanupOldAutoTags(args, env.weak_ref());
+    retval = CleanupOldAutoTags(args, env.get());
     if (retval != 0)
       return retval;
   }
 
   if ((args.find('a') != args.end()) || (args.find('x') != args.end())) {
-    retval = AddNewTag(args, env.weak_ref());
+    retval = AddNewTag(args, env.get());
     if (retval != 0)
       return retval;
   }
 
   // finalize processing and upload new history database
-  if (!CloseAndPublishHistory(env.weak_ref())) {
+  if (!CloseAndPublishHistory(env.get())) {
     return 1;
   }
   return 0;
@@ -1176,7 +1176,7 @@ int CommandRollbackTag::Main(const ArgumentList &args) {
   catalog->Commit();
 
   // Upload catalog (handing over ownership of catalog pointer)
-  if (!UploadCatalogAndUpdateManifest(env.weak_ref(), catalog.Release())) {
+  if (!UploadCatalogAndUpdateManifest(env.get(), catalog.Release())) {
     LogCvmfs(kLogCvmfs, kLogStderr, "catalog upload failed");
     return 1;
   }
@@ -1196,13 +1196,13 @@ int CommandRollbackTag::Main(const ArgumentList &args) {
   assert(retval);
 
   // set the magic undo tags
-  if (!UpdateUndoTags(env.weak_ref(), updated_target_tag, undo_rollback)) {
+  if (!UpdateUndoTags(env.get(), updated_target_tag, undo_rollback)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to update magic undo tags");
     return 1;
   }
 
   // finalize the history and upload it
-  if (!CloseAndPublishHistory(env.weak_ref())) {
+  if (!CloseAndPublishHistory(env.get())) {
     return 1;
   }
 
@@ -1252,7 +1252,7 @@ int CommandEmptyRecycleBin::Main(const ArgumentList &args) {
   }
 
   // finalize the history and upload it
-  if (!CloseAndPublishHistory(env.weak_ref())) {
+  if (!CloseAndPublishHistory(env.get())) {
     return 1;
   }
 

@@ -28,13 +28,13 @@ class T_StreamingCacheManager : public ::testing::Test {
   virtual void SetUp() {
     statistics_ = new perf::Statistics();
     download_mgr_ = new download::DownloadManager(
-        16, perf::StatisticsTemplate("download", statistics_.weak_ref()));
+        16, perf::StatisticsTemplate("download", statistics_.get()));
     download_mgr_->SetHostChain("file://" + GetCurrentWorkingDirectory());
     backing_cache_ = PosixCacheManager::Create("cache", true /* alien_cache */);
-    backing_cache_ref_ = backing_cache_.weak_ref();
+    backing_cache_ref_ = backing_cache_.get();
     streaming_cache_ = new StreamingCacheManager(32, backing_cache_.Release(),
-                                                 download_mgr_.weak_ref(), NULL,
-                                                 1000, statistics_.weak_ref());
+                                                 download_mgr_.get(), NULL,
+                                                 1000, statistics_.get());
 
     EXPECT_TRUE(MkdirDeep("data", 0700));
     EXPECT_TRUE(MakeCacheDirectories("data", 0700));

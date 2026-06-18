@@ -77,7 +77,7 @@ class S3Uploader : public AbstractUploader {
 
   // Only for testing
   s3fanout::S3FanoutManager *GetS3FanoutManager() {
-    return s3fanout_mgr_.weak_ref();
+    return s3fanout_mgr_.get();
   }
 
  private:

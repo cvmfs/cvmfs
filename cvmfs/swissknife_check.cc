@@ -1107,7 +1107,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
                ".cvmfsreflog present but no checksum provided, aborting");
       return 1;
     }
-    const bool retval = InspectReflog(reflog_hash, manifest.weak_ref());
+    const bool retval = InspectReflog(reflog_hash, manifest.get());
     if (!retval) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to verify reflog");
       return 1;
@@ -1145,7 +1145,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
       return 1;
     }
     tag_db->TakeDatabaseFileOwnership();
-    successful = InspectHistory(tag_db.weak_ref()) && successful;
+    successful = InspectHistory(tag_db.get()) && successful;
   }
 
   if (manifest->has_alt_catalog_path()) {

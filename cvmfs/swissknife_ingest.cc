@@ -208,7 +208,7 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
 
   catalog::WritableCatalogManager catalog_manager(
       params.base_hash, params.stratum0, params.dir_temp,
-      spooler_catalogs.weak_ref(), download_manager(), params.enforce_limits,
+      spooler_catalogs.get(), download_manager(), params.enforce_limits,
       params.nested_kcatalog_limit, params.root_kcatalog_limit,
       params.file_mbyte_limit, statistics(), params.is_balanced,
       params.max_weight, params.min_weight);
@@ -259,7 +259,7 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
     catalog_manager.SetVOMSAuthz(new_authz);
   }
 
-  if (!mediator.Commit(manifest.weak_ref())) {
+  if (!mediator.Commit(manifest.get())) {
     PrintError("Swissknife Ingest: something went wrong during sync");
     stats_db->StorePublishStatistics(this->statistics(), start_time, false);
     if (upload_statsdb) {

@@ -1305,7 +1305,7 @@ int CommandOverlay::Main(const ArgumentList &args) {
   // Inject Singularity dotfiles if requested
   if (!oci_config_path.empty() && !skip_singularity) {
     if (!InjectSingularityDotfiles(oci_config_path,
-                                   spooler_files.weak_ref(), &merged)) {
+                                   spooler_files.get(), &merged)) {
       PrintError("Failed to inject Singularity dotfiles");
       return 4;
     }
@@ -1318,7 +1318,7 @@ int CommandOverlay::Main(const ArgumentList &args) {
 
   catalog::WritableCatalogManager catalog_manager(
       base_hash, stratum0, temp_dir,
-      spooler_catalogs.weak_ref(), download_manager(),
+      spooler_catalogs.get(), download_manager(),
       false /* enforce_limits */,
       0 /* nested_kcatalog_limit */,
       0 /* root_kcatalog_limit */,
@@ -1335,7 +1335,7 @@ int CommandOverlay::Main(const ArgumentList &args) {
 
   // Commit catalog changes and produce updated manifest
   catalog_manager.PrecalculateListings();
-  if (!catalog_manager.Commit(false, 0, manifest.weak_ref())) {
+  if (!catalog_manager.Commit(false, 0, manifest.get())) {
     PrintError("Failed to commit catalog changes");
     return 5;
   }

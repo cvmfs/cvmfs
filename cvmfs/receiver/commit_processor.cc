@@ -493,7 +493,7 @@ CommitProcessor::Result CommitProcessor::Process(
   std::vector<shash::Any> reflog_catalogs;
   reflog_catalogs.push_back(new_root_hash);
 
-  SigningTool signing_tool(server_tool.weak_ref());
+  SigningTool signing_tool(server_tool.get());
   const SigningTool::Result res = signing_tool.Run(
       new_manifest_path, params.stratum0, params.spooler_configuration,
       temp_dir, certificate, private_key, repo_name, "", "",

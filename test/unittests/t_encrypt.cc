@@ -75,11 +75,11 @@ TEST(T_Encrypt, MemoryKeyDatabase) {
   MemoryKeyDatabase database;
   std::unique_ptr<Key> k(Key::CreateRandomly(32));
   string id;
-  EXPECT_TRUE(database.StoreNew(k.weak_ref(), &id));
-  EXPECT_FALSE(database.StoreNew(k.weak_ref(), &id));
+  EXPECT_TRUE(database.StoreNew(k.get(), &id));
+  EXPECT_FALSE(database.StoreNew(k.get(), &id));
   EXPECT_EQ(NULL, database.Find("not available"));
   const Key *found = database.Find(id);
-  EXPECT_EQ(k.weak_ref(), found);
+  EXPECT_EQ(k.get(), found);
 }
 
 

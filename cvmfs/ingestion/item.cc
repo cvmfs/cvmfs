@@ -90,7 +90,7 @@ zlib::Compressor *ChunkItem::GetCompressor() {
     compressor_ = zlib::Compressor::Construct(
         file_item_->compression_algorithm());
   }
-  return compressor_.weak_ref();
+  return compressor_.get();
 }
 
 

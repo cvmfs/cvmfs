@@ -166,9 +166,9 @@ class JobInfo {
   CURL **GetCurlHandle() { return &curl_handle_; }
   shash::ContextPtr *GetHashContextPtr() { return &hash_context_; }
   Pipe<kPipeDownloadJobsResults> *GetPipeJobResultPtr() {
-    return pipe_job_results.weak_ref();
+    return pipe_job_results.get();
   }
-  Tube<DataTubeElement> *GetDataTubePtr() { return data_tube_.weak_ref(); }
+  Tube<DataTubeElement> *GetDataTubePtr() { return data_tube_.get(); }
 
   const std::string *url() const { return url_; }
   bool compressed() const { return compressed_; }

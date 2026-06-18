@@ -437,7 +437,7 @@ bool Reactor::DoCommit(const std::string &req, std::string *reply,
 
   perf::Statistics statistics;
   std::string start_time;
-  if (!Reactor::ExtractStatsFromReq(req_json.weak_ref(), &statistics,
+  if (!Reactor::ExtractStatsFromReq(req_json.get(), &statistics,
                                     &start_time)) {
     LogCvmfs(
         kLogReceiver, kLogSyslogErr,

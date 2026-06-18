@@ -71,7 +71,7 @@ class ClientCatalogManager : public AbstractCatalogManager<Catalog> {
   uint64_t all_inodes() const { return all_inodes_; }
   uint64_t loaded_inodes() const { return loaded_inodes_; }
   std::string repo_name() const { return repo_name_; }
-  manifest::Manifest *manifest() const { return manifest_.weak_ref(); }
+  manifest::Manifest *manifest() const { return manifest_.get(); }
   int root_fd() const { return root_fd_; }
 
  protected:

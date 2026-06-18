@@ -134,7 +134,7 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
 
   const std::unique_ptr<manifest::Manifest> manifest(
       catalog::WritableCatalogManager::CreateRepository(
-          dir_temp, volatile_content, voms_authz, spooler.weak_ref()));
+          dir_temp, volatile_content, voms_authz, spooler.get()));
   if (!manifest.IsValid()) {
     PrintError("Swissknife Sync: Failed to create new repository");
     return 1;
@@ -828,7 +828,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
 
   catalog::WritableCatalogManager catalog_manager(
       params.base_hash, params.stratum0, params.dir_temp,
-      spooler_catalogs.weak_ref(), download_manager(), params.enforce_limits,
+      spooler_catalogs.get(), download_manager(), params.enforce_limits,
       params.nested_kcatalog_limit, params.root_kcatalog_limit,
       params.file_mbyte_limit, statistics(), params.is_balanced,
       params.max_weight, params.min_weight, params.cache_dir);
@@ -875,7 +875,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   } else {
     assert(!manifest->history().IsNull());
     catalog::VirtualCatalog virtual_catalog(
-        manifest.weak_ref(), download_manager(), &catalog_manager, &params);
+        manifest.get(), download_manager(), &catalog_manager, &params);
     virtual_catalog.Generate(params.virtual_dir_actions);
   }
 
@@ -907,7 +907,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     catalog_manager.SetVOMSAuthz(new_authz);
   }
 
-  if (!mediator.Commit(manifest.weak_ref())) {
+  if (!mediator.Commit(manifest.get())) {
     PrintError("Swissknife Sync: Something went wrong during sync");
     if (!params.dry_run) {
       stats_db->StorePublishStatistics(this->statistics(), start_time, false);

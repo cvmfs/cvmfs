@@ -704,7 +704,7 @@ CacheManager *FileSystem::SetupPosixCacheMgr(const string &instance) {
   CreateFile(settings.cache_path + "/.cvmfscache", 0600, ignore_failure);
 
   if (settings.is_managed) {
-    if (!SetupPosixQuotaMgr(settings, cache_mgr.weak_ref()))
+    if (!SetupPosixQuotaMgr(settings, cache_mgr.get()))
       return NULL;
   }
   return cache_mgr.Release();

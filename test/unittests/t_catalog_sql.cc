@@ -213,7 +213,7 @@ TEST_F(T_CatalogSql, SchemaMigration) {
     ASSERT_TRUE(db.IsValid());
     catalog::Counters counters;
     EXPECT_TRUE(counters.InsertIntoDatabase(*db));
-    RevertToRevision1(db.weak_ref());
+    RevertToRevision1(db.get());
   }
   {
     std::unique_ptr<catalog::CatalogDatabase> db(catalog::CatalogDatabase::Open(
@@ -258,7 +258,7 @@ TEST_F(T_CatalogSql, SchemaMigration) {
     std::unique_ptr<catalog::CatalogDatabase> db(catalog::CatalogDatabase::Open(
         path, catalog::CatalogDatabase::kOpenReadWrite));
     ASSERT_TRUE(db.IsValid());
-    RevertToRevision0(db.weak_ref());
+    RevertToRevision0(db.get());
   }
   {
     std::unique_ptr<catalog::CatalogDatabase> db(catalog::CatalogDatabase::Open(

@@ -92,8 +92,8 @@ TEST_F(T_StatisticsSql, SchemaMigration1To3) {
   {
     std::unique_ptr<StatisticsDatabase> db(StatisticsDatabase::Create(path));
     ASSERT_TRUE(db.IsValid());
-    RevertToRevision2(db.weak_ref());
-    RevertToRevision1(db.weak_ref());
+    RevertToRevision2(db.get());
+    RevertToRevision1(db.get());
   }
   {
     std::unique_ptr<StatisticsDatabase> db(
@@ -124,7 +124,7 @@ TEST_F(T_StatisticsSql, SchemaMigration2To3) {
   {
     std::unique_ptr<StatisticsDatabase> db(StatisticsDatabase::Create(path));
     ASSERT_TRUE(db.IsValid());
-    RevertToRevision2(db.weak_ref());
+    RevertToRevision2(db.get());
   }
   {
     std::unique_ptr<StatisticsDatabase> db(

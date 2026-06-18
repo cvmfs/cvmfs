@@ -110,12 +110,12 @@ bool Reflog::OpenDatabase(const std::string &database_path) {
 
 void Reflog::PrepareQueries() {
   assert(database_.IsValid());
-  insert_reference_ = new SqlInsertReference(database_.weak_ref());
-  count_references_ = new SqlCountReferences(database_.weak_ref());
-  list_references_ = new SqlListReferences(database_.weak_ref());
-  remove_reference_ = new SqlRemoveReference(database_.weak_ref());
-  contains_reference_ = new SqlContainsReference(database_.weak_ref());
-  get_timestamp_ = new SqlGetTimestamp(database_.weak_ref());
+  insert_reference_ = new SqlInsertReference(database_.get());
+  count_references_ = new SqlCountReferences(database_.get());
+  list_references_ = new SqlListReferences(database_.get());
+  remove_reference_ = new SqlRemoveReference(database_.get());
+  contains_reference_ = new SqlContainsReference(database_.get());
+  get_timestamp_ = new SqlGetTimestamp(database_.get());
 }
 
 

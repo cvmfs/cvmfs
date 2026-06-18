@@ -359,7 +359,7 @@ int PosixCacheManager::DoRestoreState(void *data) {
                "Restoring refcount cache manager from "
                "refcounted posix cache manager");
 
-      fd_mgr_->AssignFrom(state->fd_mgr.weak_ref());
+      fd_mgr_->AssignFrom(state->fd_mgr.get());
     } else {
       LogCvmfs(kLogCache, kLogDebug,
                "Restoring refcount cache manager from "
@@ -376,7 +376,7 @@ int PosixCacheManager::DoRestoreState(void *data) {
              "Restoring non-refcount cache manager from "
              "refcounted posix cache manager - this "
              " is not possible, keep refcounting.");
-    fd_mgr_->AssignFrom(state->fd_mgr.weak_ref());
+    fd_mgr_->AssignFrom(state->fd_mgr.get());
     do_refcount_ = true;
   }
   return -1;

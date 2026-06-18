@@ -95,12 +95,12 @@ bool ServerTool::InitSignatureManager(const std::string &pubkey_path,
 
 download::DownloadManager *ServerTool::download_manager() const {
   assert(download_manager_.IsValid());
-  return download_manager_.weak_ref();
+  return download_manager_.get();
 }
 
 signature::SignatureManager *ServerTool::signature_manager() const {
   assert(signature_manager_.IsValid());
-  return signature_manager_.weak_ref();
+  return signature_manager_.get();
 }
 
 manifest::Manifest *ServerTool::OpenLocalManifest(
