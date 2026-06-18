@@ -9,6 +9,7 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <memory>
 #include <utility>
 #include <vector>
 
@@ -20,7 +21,6 @@
 #include "upload_facility.h"
 #include "util/exception.h"
 #include "util/logging.h"
-#include <memory>
 #include "util/posix.h"
 #include "util/string.h"
 
@@ -198,7 +198,7 @@ bool Reactor::HandleGenerateToken(const std::string &req, std::string *reply) {
     PANIC(kLogSyslogErr, "HandleGenerateToken: Invalid reply pointer.");
   }
   const std::unique_ptr<JsonDocument> req_json(JsonDocument::Create(req));
-  if (!req_json.IsValid()) {
+  if (req_json.get() == nullptr) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
              "HandleGenerateToken: Invalid JSON request.");
     return false;
@@ -266,7 +266,7 @@ bool Reactor::HandleCheckToken(const std::string &req, std::string *reply) {
   }
 
   const std::unique_ptr<JsonDocument> req_json(JsonDocument::Create(req));
-  if (!req_json.IsValid()) {
+  if (req_json.get() == nullptr) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
              "HandleCheckToken: Invalid JSON request.");
     return false;
@@ -326,7 +326,7 @@ bool Reactor::HandleSubmitPayload(int fdin, const std::string &req,
   // Extract the Path (used for verification), Digest and DigestSize from the
   // request JSON.
   const std::unique_ptr<JsonDocument> req_json(JsonDocument::Create(req));
-  if (!req_json.IsValid()) {
+  if (req_json.get() == nullptr) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
              "HandleSubmitPayload: Invalid JSON request.");
     return false;
@@ -405,7 +405,7 @@ bool Reactor::DoCommit(const std::string &req, std::string *reply,
   }
   // Extract the Path from the request JSON.
   const std::unique_ptr<JsonDocument> req_json(JsonDocument::Create(req));
-  if (!req_json.IsValid()) {
+  if (req_json.get() == nullptr) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
              "HandleCommit: Invalid JSON request.");
     return false;
@@ -437,8 +437,7 @@ bool Reactor::DoCommit(const std::string &req, std::string *reply,
 
   perf::Statistics statistics;
   std::string start_time;
-  if (!Reactor::ExtractStatsFromReq(req_json.get(), &statistics,
-                                    &start_time)) {
+  if (!Reactor::ExtractStatsFromReq(req_json.get(), &statistics, &start_time)) {
     LogCvmfs(
         kLogReceiver, kLogSyslogErr,
         "HandleCommit: Could not extract statistics counters from request");
@@ -575,3 +574,4 @@ bool Reactor::HandleRequest(Request req, const std::string &data) {
 }
 
 }  // namespace receiver
+

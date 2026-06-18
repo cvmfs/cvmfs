@@ -506,7 +506,7 @@ SettingsPublisher *SettingsBuilder::CreateSettingsPublisherFromSession() {
   settings_publisher->GetTransaction()->SetUnionFsType("overlayfs");
   settings_publisher->SetOwner(geteuid(), getegid());
 
-  return settings_publisher.Release();
+  return settings_publisher.release();
 }
 
 void SettingsBuilder::ApplyOptionsFromServerPath(
@@ -635,7 +635,7 @@ SettingsPublisher *SettingsBuilder::CreateSettingsPublisher(
   ApplyOptionsFromServerPath(*options_mgr_, &*settings_publisher);
 
   // TODO(jblomer): process other parameters
-  return settings_publisher.Release();
+  return settings_publisher.release();
 }
 
 }  // namespace publish

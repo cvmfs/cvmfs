@@ -117,8 +117,8 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
                         const shash::Any &history_hash = shash::Any()) {
     // retrieve the current HEAD history hash (if nothing else given)
     shash::Any const effective_history_hash = (!history_hash.IsNull())
-                                            ? history_hash
-                                            : GetHistoryHash();
+                                                  ? history_hash
+                                                  : GetHistoryHash();
     if (effective_history_hash.IsNull()) {
       return kFailNotFound;
     }
@@ -184,7 +184,8 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
     std::string tmp_path;
     const bool decompress = false;
     const bool nocache = true;
-    Failures const failure = Fetch(kReflogFilename, decompress, nocache, &tmp_path);
+    Failures const failure = Fetch(kReflogFilename, decompress, nocache,
+                                   &tmp_path);
     if (failure != kFailOk) {
       return failure;
     }
@@ -293,7 +294,7 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
     std::unique_ptr<manifest::Manifest> manifest;
     const Failures retval = FetchManifest(&manifest);
 
-    if (retval != kFailOk || !manifest.IsValid()
+    if (retval != kFailOk || manifest.get() == nullptr
         || manifest->history().IsNull()) {
       return shash::Any();
     }
@@ -482,12 +483,12 @@ class HttpObjectFetcher : public AbstractObjectFetcher<
     // Download manifest file
     struct manifest::ManifestEnsemble manifest_ensemble;
     manifest::Failures const retval = manifest::Fetch(repo_url_,
-                                                repo_name_,
-                                                0,
-                                                NULL,
-                                                signature_manager_,
-                                                download_manager_,
-                                                &manifest_ensemble);
+                                                      repo_name_,
+                                                      0,
+                                                      NULL,
+                                                      signature_manager_,
+                                                      download_manager_,
+                                                      &manifest_ensemble);
 
     // Check if manifest was loaded correctly
     switch (retval) {
@@ -645,3 +646,4 @@ struct object_fetcher_traits<HttpObjectFetcher<CatalogT, HistoryT, ReflogT> > {
 };
 
 #endif  // CVMFS_OBJECT_FETCHER_H_
+

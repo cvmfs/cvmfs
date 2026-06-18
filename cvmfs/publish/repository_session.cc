@@ -154,7 +154,7 @@ static LeaseReply ParseAcquireReply(const CurlBuffer &buffer,
   }
 
   const std::unique_ptr<JsonDocument> reply(JsonDocument::Create(buffer.data));
-  if (!reply.IsValid() || !reply->IsValid()) {
+  if (reply.get()==nullptr || !reply->IsValid()) {
     return kLeaseReplyFailure;
   }
 
@@ -201,7 +201,7 @@ static LeaseReply ParseDropReply(const CurlBuffer &buffer, int llvl) {
   }
 
   const std::unique_ptr<const JsonDocument> reply(JsonDocument::Create(buffer.data));
-  if (!reply.IsValid() || !reply->IsValid()) {
+  if (reply.get()==nullptr || !reply->IsValid()) {
     return kLeaseReplyFailure;
   }
 

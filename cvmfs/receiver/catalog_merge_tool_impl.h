@@ -5,6 +5,7 @@
 #ifndef CVMFS_RECEIVER_CATALOG_MERGE_TOOL_IMPL_H_
 #define CVMFS_RECEIVER_CATALOG_MERGE_TOOL_IMPL_H_
 
+#include <memory>
 #include <string>
 
 #include "catalog.h"
@@ -58,23 +59,26 @@ bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::Run(
     shash::Any *new_manifest_hash, uint64_t *final_rev) {
   std::unique_ptr<upload::Spooler> spooler;
   perf::StatisticsTemplate stats_tmpl("publish", statistics_);
-  counters_ = new perf::FsCounters(stats_tmpl);
+  counters_ = std::unique_ptr<perf::FsCounters>(
+      new perf::FsCounters(stats_tmpl));
 
-  std::unique_ptr<RaiiTempDir> raii_temp_dir(RaiiTempDir::Create(temp_dir_prefix_));
+  std::unique_ptr<RaiiTempDir> raii_temp_dir(
+      RaiiTempDir::Create(temp_dir_prefix_));
   if (needs_setup_) {
     upload::SpoolerDefinition definition(
         params.spooler_configuration, params.hash_alg, params.compression_alg,
         params.generate_legacy_bulk_chunks, params.use_file_chunking,
         params.min_chunk_size, params.avg_chunk_size, params.max_chunk_size,
         "dummy_token", "dummy_key");
-    spooler = upload::Spooler::Construct(definition, &stats_tmpl);
+    spooler = std::unique_ptr<upload::Spooler>(
+        upload::Spooler::Construct(definition, &stats_tmpl));
     const std::string temp_dir = raii_temp_dir->dir();
-    output_catalog_mgr_ = new RwCatalogMgr(
+    output_catalog_mgr_ = std::unique_ptr<RwCatalogMgr>(new RwCatalogMgr(
         manifest_->catalog_hash(), repo_path_, temp_dir, spooler.get(),
         download_manager_, params.enforce_limits, params.nested_kcatalog_limit,
         params.root_kcatalog_limit, params.file_mbyte_limit, statistics_,
         params.use_autocatalogs, params.max_weight, params.min_weight,
-        cache_dir_);
+        cache_dir_));
     output_catalog_mgr_->Init();
   }
 
@@ -84,7 +88,7 @@ bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::Run(
   *new_manifest_hash = manifest_->catalog_hash();
   *final_rev = manifest_->revision();
 
-  output_catalog_mgr_.Destroy();
+  output_catalog_mgr_.reset();
 
   return ret;
 }
@@ -344,3 +348,4 @@ bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::CreateNewManifest(
 }  // namespace receiver
 
 #endif  // CVMFS_RECEIVER_CATALOG_MERGE_TOOL_IMPL_H_
+

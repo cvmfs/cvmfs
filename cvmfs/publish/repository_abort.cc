@@ -41,7 +41,7 @@ namespace publish {
 
 void Publisher::WipeScratchArea() {
   // TODO(jblomer): implement for enter shell etc.
-  if (!managed_node_.IsValid())
+  if (managed_node_.get() == nullptr)
     return;
 
   managed_node_->ClearScratch();
@@ -63,7 +63,7 @@ void Publisher::Abort() {
 
   TrySessionDrop(session_.get(), settings_.ignore_invalid_lease());
 
-  if (managed_node_.IsValid()) {
+  if (managed_node_.get() != nullptr) {
     // We already checked for is_publishing and in_transaction.  Normally, at
     // this point we do want to repair the mount points of a repository
     // in transaction
@@ -87,3 +87,4 @@ void Publisher::Abort() {
 }
 
 }  // namespace publish
+

@@ -260,7 +260,7 @@ SessionContext::SessionContext()
 
 bool SessionContext::InitializeDerived(uint64_t max_queue_size) {
   // Start worker thread
-  upload_jobs_ = new Tube<UploadJob>(max_queue_size);
+  upload_jobs_ =std::unique_ptr< Tube<UploadJob>>( new Tube<UploadJob>(max_queue_size));
 
   const int retval = pthread_create(&worker_, NULL, UploadLoop,
                                     reinterpret_cast<void *>(this));

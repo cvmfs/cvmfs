@@ -113,7 +113,7 @@ int Publisher::ManagedNode::Check(bool is_quiet) {
   shash::Any expected_hash;
   if (publisher_->manifest() != NULL)
     expected_hash = publisher_->manifest()->catalog_hash();
-  if (marker.IsValid())
+  if (marker.get()!=nullptr)
     expected_hash = marker->hash();
 
   if (!IsMountPoint(rdonly_mnt)) {
@@ -128,7 +128,7 @@ int Publisher::ManagedNode::Check(bool is_quiet) {
         const shash::Any root_hash = shash::MkFromHexPtr(
             shash::HexPtr(root_hash_str), shash::kSuffixCatalog);
         if (expected_hash != root_hash) {
-          if (marker.IsValid()) {
+          if (marker.get()!=nullptr) {
             result |= kFailRdOnlyWrongRevision;
           } else {
             result |= kFailRdOnlyOutdated;

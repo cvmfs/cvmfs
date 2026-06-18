@@ -9,7 +9,7 @@
 ServerTool::ServerTool() { }
 
 ServerTool::~ServerTool() {
-  if (signature_manager_.IsValid()) {
+  if (signature_manager_.get()!=nullptr) {
     signature_manager_->Fini();
   }
 }
@@ -17,13 +17,13 @@ ServerTool::~ServerTool() {
 bool ServerTool::InitDownloadManager(const bool follow_redirects,
                                      const std::string &proxy,
                                      const unsigned max_pool_handles) {
-  if (download_manager_.IsValid()) {
+  if (download_manager_.get()!=nullptr) {
     return true;
   }
 
-  download_manager_ = new download::DownloadManager(
-      max_pool_handles, perf::StatisticsTemplate("download", statistics()));
-  assert(download_manager_.IsValid());
+  download_manager_ =std::unique_ptr< download::DownloadManager>( new download::DownloadManager(
+      max_pool_handles, perf::StatisticsTemplate("download", statistics())));
+  assert(download_manager_.get()!=nullptr);
 
   download_manager_->SetTimeout(kDownloadTimeout, kDownloadTimeout);
   download_manager_->SetRetryParameters(kDownloadRetries, 2000, 5000);
@@ -44,12 +44,12 @@ bool ServerTool::InitDownloadManager(const bool follow_redirects,
 bool ServerTool::InitSignatureManager(const std::string &pubkey_path,
                                       const std::string &certificate_path,
                                       const std::string &private_key_path) {
-  if (signature_manager_.IsValid()) {
+  if (signature_manager_.get()!=nullptr) {
     return true;
   }
 
-  signature_manager_ = new signature::SignatureManager();
-  assert(signature_manager_.IsValid());
+  signature_manager_ =std::unique_ptr< signature::SignatureManager>( new signature::SignatureManager());
+  assert(signature_manager_.get()!=nullptr);
   signature_manager_->Init();
 
   // We may not have a public key. In this case, the signature manager
@@ -94,12 +94,12 @@ bool ServerTool::InitSignatureManager(const std::string &pubkey_path,
 }
 
 download::DownloadManager *ServerTool::download_manager() const {
-  assert(download_manager_.IsValid());
+  assert(download_manager_.get()!=nullptr);
   return download_manager_.get();
 }
 
 signature::SignatureManager *ServerTool::signature_manager() const {
-  assert(signature_manager_.IsValid());
+  assert(signature_manager_.get()!=nullptr);
   return signature_manager_.get();
 }
 
@@ -137,11 +137,11 @@ manifest::Manifest *ServerTool::FetchRemoteManifest(
   } else {
     // copy-construct a fresh manifest object because ManifestEnsemble will
     // free manifest_ensemble.manifest when it goes out of scope
-    manifest = new manifest::Manifest(*manifest_ensemble.manifest);
+    manifest =std::unique_ptr< manifest::Manifest>( new manifest::Manifest(*manifest_ensemble.manifest));
   }
 
   // check if manifest fetching was successful
-  if (!manifest.IsValid()) {
+  if (manifest.get()==nullptr) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to load repository manifest");
     return NULL;
   }
@@ -157,7 +157,7 @@ manifest::Manifest *ServerTool::FetchRemoteManifest(
   }
 
   // return the fetched manifest (releasing pointer ownership)
-  return manifest.Release();
+  return manifest.release();
 }
 
 manifest::Reflog *ServerTool::CreateEmptyReflog(

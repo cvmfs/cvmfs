@@ -27,8 +27,8 @@ TelemetryAggregator *TelemetryAggregator::Create(Statistics *statistics,
 
   switch (type) {
     case kTelemetryInflux:
-      telemetryInflux = new TelemetryAggregatorInflux(
-          statistics, send_rate, options_mgr, mount_point, fqrn);
+      telemetryInflux =std::unique_ptr< TelemetryAggregatorInflux>( new TelemetryAggregatorInflux(
+          statistics, send_rate, options_mgr, mount_point, fqrn));
       telemetry = reinterpret_cast<std::unique_ptr<TelemetryAggregator> *>(
           &telemetryInflux);
       break;
@@ -39,7 +39,7 @@ TelemetryAggregator *TelemetryAggregator::Create(Statistics *statistics,
       break;
   }
 
-  if (telemetry->weak_ref()->is_zombie_) {
+  if (telemetry->get()->is_zombie_) {
     LogCvmfs(kLogTelemetry, kLogDebug | kLogSyslogErr,
              "Requested telemetry will NOT be used. "
              "It was not constructed correctly.");
@@ -47,7 +47,7 @@ TelemetryAggregator *TelemetryAggregator::Create(Statistics *statistics,
   }
 
   LogCvmfs(kLogTelemetry, kLogDebug, "TelemetryAggregator created.");
-  return telemetry->Release();
+  return telemetry->release();
 }
 
 TelemetryAggregator::~TelemetryAggregator() {

@@ -1255,7 +1255,7 @@ int PosixQuotaManager::MainCacheManager(int argc, char **argv) {
 
   const std::unique_ptr<Watchdog> watchdog(
       Watchdog::Create(NULL, false /* needs_read_environ */));
-  assert(watchdog.IsValid());
+  assert(watchdog.get()!=nullptr);
   watchdog->Spawn("./stacktrace.cachemgr");
 
   // Initialize pipe, open non-blocking as cvmfs is not yet connected

@@ -247,7 +247,7 @@ CommitProcessor::Result CommitProcessor::Process(
                                        manifest_base_hash));
 
   // Current catalog from the gateway machine
-  if (!manifest_tgt.IsValid()) {
+  if (manifest_tgt.get()==nullptr) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
              "CommitProcessor - error: Could not open repository manifest");
     return kError;

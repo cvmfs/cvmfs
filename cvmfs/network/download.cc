@@ -1890,9 +1890,9 @@ DownloadManager::DownloadManager(const unsigned max_pool_handles,
     , pool_handles_idle_(new set<CURL *>)
     , pool_handles_inuse_(new set<CURL *>)
     , pool_max_handles_(max_pool_handles)
-    , pipe_terminate_(NULL)
-    , pipe_jobs_(NULL)
-    , watch_fds_(NULL)
+    , pipe_terminate_(nullptr)
+    , pipe_jobs_(nullptr)
+    , watch_fds_(nullptr)
     , watch_fds_size_(0)
     , watch_fds_inuse_(0)
     , watch_fds_max_(4 * max_pool_handles)
@@ -1967,8 +1967,8 @@ DownloadManager::DownloadManager(const unsigned max_pool_handles,
  * No way back except Fini(); Init();
  */
 void DownloadManager::Spawn() {
-  pipe_terminate_ = new Pipe<kPipeThreadTerminator>();
-  pipe_jobs_ = new Pipe<kPipeDownloadJobs>();
+  pipe_terminate_ =std::unique_ptr< Pipe<kPipeThreadTerminator>>( new Pipe<kPipeThreadTerminator>());
+  pipe_jobs_ =std::unique_ptr< Pipe<kPipeDownloadJobs>>( new Pipe<kPipeDownloadJobs>());
 
   const int retval = pthread_create(&thread_download_, NULL, MainDownload,
                                     static_cast<void *>(this));

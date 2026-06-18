@@ -47,7 +47,7 @@ SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalog_manager,
 
   params->spooler->RegisterListener(&SyncMediator::PublishFilesCallback, this);
 
-  counters_ = new perf::FsCounters(statistics);
+  counters_ =std::unique_ptr< perf::FsCounters>( new perf::FsCounters(statistics));
 }
 
 SyncMediator::~SyncMediator() { pthread_mutex_destroy(&lock_file_queue_); }

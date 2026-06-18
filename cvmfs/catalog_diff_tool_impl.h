@@ -57,25 +57,27 @@ template<typename RoCatalogMgr>
 bool CatalogDiffTool<RoCatalogMgr>::Init() {
   if (needs_setup_) {
     // Create a temp directory
-    old_raii_temp_dir_ = RaiiTempDir::Create(temp_dir_prefix_);
-    new_raii_temp_dir_ = RaiiTempDir::Create(temp_dir_prefix_);
+    old_raii_temp_dir_ = std::unique_ptr<RaiiTempDir>(
+        RaiiTempDir::Create(temp_dir_prefix_));
+    new_raii_temp_dir_ = std::unique_ptr<RaiiTempDir>(
+        RaiiTempDir::Create(temp_dir_prefix_));
 
     // Old catalog from release manager machine (before lease)
-    old_catalog_mgr_ = OpenCatalogManager(repo_path_, old_raii_temp_dir_->dir(),
-                                          old_root_hash_, download_manager_,
-                                          &stats_old_, cache_dir_);
+    old_catalog_mgr_ = std::unique_ptr<RoCatalogMgr>(OpenCatalogManager(
+        repo_path_, old_raii_temp_dir_->dir(), old_root_hash_,
+        download_manager_, &stats_old_, cache_dir_));
 
     // New catalog from release manager machine (before lease)
-    new_catalog_mgr_ = OpenCatalogManager(repo_path_, new_raii_temp_dir_->dir(),
-                                          new_root_hash_, download_manager_,
-                                          &stats_new_, cache_dir_);
+    new_catalog_mgr_ = std::unique_ptr<RoCatalogMgr>(OpenCatalogManager(
+        repo_path_, new_raii_temp_dir_->dir(), new_root_hash_,
+        download_manager_, &stats_new_, cache_dir_));
 
-    if (!old_catalog_mgr_.IsValid()) {
+    if (old_catalog_mgr_.get() == nullptr) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Could not open old catalog");
       return false;
     }
 
-    if (!new_catalog_mgr_.IsValid()) {
+    if (new_catalog_mgr_.get() == nullptr) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Could not open new catalog");
       return false;
     }
@@ -235,3 +237,4 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString &path) {
 }
 
 #endif  // CVMFS_CATALOG_DIFF_TOOL_IMPL_H_
+

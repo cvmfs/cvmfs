@@ -81,9 +81,11 @@ bool Reflog::WriteChecksum(const std::string &path, const shash::Any &value) {
 
 bool Reflog::CreateDatabase(const std::string &database_path,
                             const std::string &repo_name) {
-  assert(!database_.IsValid());
-  database_ = ReflogDatabase::Create(database_path);
-  if (!database_.IsValid() || !database_->InsertInitialValues(repo_name)) {
+  assert(database_.get() == nullptr);
+  database_ = std::unique_ptr<ReflogDatabase>(
+      ReflogDatabase::Create(database_path));
+  if (database_.get() == nullptr
+      || !database_->InsertInitialValues(repo_name)) {
     LogCvmfs(kLogReflog, kLogDebug, "failed to initialize empty database '%s'",
              database_path.c_str());
     return false;
@@ -95,11 +97,12 @@ bool Reflog::CreateDatabase(const std::string &database_path,
 
 
 bool Reflog::OpenDatabase(const std::string &database_path) {
-  assert(!database_.IsValid());
+  assert(database_.get() == nullptr);
 
   const ReflogDatabase::OpenMode mode = ReflogDatabase::kOpenReadWrite;
-  database_ = ReflogDatabase::Open(database_path, mode);
-  if (!database_.IsValid()) {
+  database_ = std::unique_ptr<ReflogDatabase>(
+      ReflogDatabase::Open(database_path, mode));
+  if (database_.get() == nullptr) {
     return false;
   }
 
@@ -109,13 +112,19 @@ bool Reflog::OpenDatabase(const std::string &database_path) {
 
 
 void Reflog::PrepareQueries() {
-  assert(database_.IsValid());
-  insert_reference_ = new SqlInsertReference(database_.get());
-  count_references_ = new SqlCountReferences(database_.get());
-  list_references_ = new SqlListReferences(database_.get());
-  remove_reference_ = new SqlRemoveReference(database_.get());
-  contains_reference_ = new SqlContainsReference(database_.get());
-  get_timestamp_ = new SqlGetTimestamp(database_.get());
+  assert(database_.get() != nullptr);
+  insert_reference_ = std::unique_ptr<SqlInsertReference>(
+      new SqlInsertReference(database_.get()));
+  count_references_ = std::unique_ptr<SqlCountReferences>(
+      new SqlCountReferences(database_.get()));
+  list_references_ = std::unique_ptr<SqlListReferences>(
+      new SqlListReferences(database_.get()));
+  remove_reference_ = std::unique_ptr<SqlRemoveReference>(
+      new SqlRemoveReference(database_.get()));
+  contains_reference_ = std::unique_ptr<SqlContainsReference>(
+      new SqlContainsReference(database_.get()));
+  get_timestamp_ = std::unique_ptr<SqlGetTimestamp>(
+      new SqlGetTimestamp(database_.get()));
 }
 
 
@@ -145,7 +154,7 @@ bool Reflog::AddMetainfo(const shash::Any &metainfo) {
 
 
 uint64_t Reflog::CountEntries() {
-  assert(database_.IsValid());
+  assert(database_.get() != nullptr);
   const bool success_exec = count_references_->Execute();
   assert(success_exec);
   const uint64_t count = count_references_->RetrieveCount();
@@ -164,7 +173,7 @@ bool Reflog::List(SqlReflog::ReferenceType type,
 bool Reflog::ListOlderThan(SqlReflog::ReferenceType type,
                            uint64_t timestamp,
                            std::vector<shash::Any> *hashes) const {
-  assert(database_.IsValid());
+  assert(database_.get() != nullptr);
   assert(NULL != hashes);
 
   hashes->clear();
@@ -182,7 +191,7 @@ bool Reflog::ListOlderThan(SqlReflog::ReferenceType type,
 
 
 bool Reflog::Remove(const shash::Any &hash) {
-  assert(database_.IsValid());
+  assert(database_.get() != nullptr);
 
   SqlReflog::ReferenceType type;
   switch (hash.suffix) {
@@ -280,25 +289,25 @@ bool Reflog::GetReferenceTimestamp(const shash::Any &hash,
 
 
 void Reflog::BeginTransaction() {
-  assert(database_.IsValid());
+  assert(database_.get() != nullptr);
   database_->BeginTransaction();
 }
 
 
 void Reflog::CommitTransaction() {
-  assert(database_.IsValid());
+  assert(database_.get() != nullptr);
   database_->CommitTransaction();
 }
 
 
 void Reflog::TakeDatabaseFileOwnership() {
-  assert(database_.IsValid());
+  assert(database_.get() != nullptr);
   database_->TakeFileOwnership();
 }
 
 
 void Reflog::DropDatabaseFileOwnership() {
-  assert(database_.IsValid());
+  assert(database_.get() != nullptr);
   database_->DropFileOwnership();
 }
 
@@ -314,14 +323,15 @@ void Reflog::HashDatabase(const std::string &database_path,
 
 
 std::string Reflog::fqrn() const {
-  assert(database_.IsValid());
+  assert(database_.get() != nullptr);
   return database_->GetProperty<std::string>(ReflogDatabase::kFqrnKey);
 }
 
 
 std::string Reflog::database_file() const {
-  assert(database_.IsValid());
+  assert(database_.get() != nullptr);
   return database_->filename();
 }
 
 }  // namespace manifest
+

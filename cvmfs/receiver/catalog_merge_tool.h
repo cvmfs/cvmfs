@@ -5,13 +5,13 @@
 #ifndef CVMFS_RECEIVER_CATALOG_MERGE_TOOL_H_
 #define CVMFS_RECEIVER_CATALOG_MERGE_TOOL_H_
 
+#include <memory>
 #include <string>
 
 #include "catalog_diff_tool.h"
 #include "file_chunk.h"
 #include "params.h"
 #include "statistics.h"
-#include <memory>
 
 namespace catalog {
 class WritableCatalogManager;
@@ -49,7 +49,7 @@ class CatalogMergeTool : public CatalogDiffTool<RoCatalogMgr> {
       , output_catalog_mgr_(output_catalog_mgr)
       , needs_setup_(false)
       , statistics_(statistics)
-      , counters_(NULL) { }
+      , counters_(nullptr) { }
 
   CatalogMergeTool(RoCatalogMgr *old_catalog_mgr, RoCatalogMgr *new_catalog_mgr,
                    const std::string &repo_path, const PathString &lease_path,
@@ -65,7 +65,7 @@ class CatalogMergeTool : public CatalogDiffTool<RoCatalogMgr> {
       , manifest_(manifest)
       , needs_setup_(true)
       , statistics_(statistics)
-      , counters_(NULL) { }
+      , counters_(nullptr) { }
 
   CatalogMergeTool(const std::string &repo_path,
                    const shash::Any &old_root_hash,
@@ -87,7 +87,7 @@ class CatalogMergeTool : public CatalogDiffTool<RoCatalogMgr> {
       , manifest_(manifest)
       , needs_setup_(true)
       , statistics_(statistics)
-      , counters_(NULL) { }
+      , counters_(nullptr) { }
 
   virtual ~CatalogMergeTool() { }
 
@@ -136,3 +136,4 @@ class CatalogMergeTool : public CatalogDiffTool<RoCatalogMgr> {
 #include "catalog_merge_tool_impl.h"
 
 #endif  // CVMFS_RECEIVER_CATALOG_MERGE_TOOL_H_
+

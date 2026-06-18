@@ -61,7 +61,7 @@ void Publisher::TransactionRetry() {
     }  // try-catch
   }  // while (true)
 
-  if (managed_node_.IsValid())
+  if (managed_node_.get()!=nullptr)
     managed_node_->Open();
 }
 
@@ -129,7 +129,7 @@ void Publisher::TransactionImpl() {
   // if the disk fills up before abort is called.
   is_publishing_.Touch();
   ConstructSpoolers();
-  if (marker.IsValid())
+  if (marker.get()!=nullptr)
     settings_.GetTransaction()->SetBaseHash(marker->hash());
   else
     settings_.GetTransaction()->SetBaseHash(manifest_->catalog_hash());

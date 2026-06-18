@@ -17,7 +17,7 @@ namespace cvmfs {
 PathSink::PathSink(const std::string &destination_path)
     : Sink(true), path_(destination_path) {
   file_ = fopen(destination_path.c_str(), "w");
-  sink_ = new FileSink(file_, true);
+  sink_ =std::unique_ptr< FileSink>( new FileSink(file_, true));
 }
 
 /**
