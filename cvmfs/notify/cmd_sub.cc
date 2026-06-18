@@ -94,7 +94,7 @@ class SwissknifeSubscriber : public notify::SubscriberSSE {
       return notify::Subscriber::kError;
     }
 
-    const UniquePtr<manifest::Manifest> manifest(manifest::Manifest::LoadMem(
+    const std::unique_ptr<manifest::Manifest> manifest(manifest::Manifest::LoadMem(
         reinterpret_cast<const unsigned char *>(msg.manifest_.data()),
         msg.manifest_.size()));
 
@@ -129,8 +129,8 @@ class SwissknifeSubscriber : public notify::SubscriberSSE {
   std::string repository_;
 
   perf::Statistics stats_;
-  UniquePtr<download::DownloadManager> dl_mgr_;
-  UniquePtr<signature::SignatureManager> sig_mgr_;
+  std::unique_ptr<download::DownloadManager> dl_mgr_;
+  std::unique_ptr<signature::SignatureManager> sig_mgr_;
 
   uint64_t revision_;
   bool continuous_;

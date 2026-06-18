@@ -133,7 +133,7 @@ int CommandGc::Main(const ArgumentList &args) {
                                download_manager(),
                                signature_manager());
 
-  UniquePtr<manifest::Manifest> manifest;
+  std::unique_ptr<manifest::Manifest> manifest;
   const ObjectFetcher::Failures retval = object_fetcher.FetchManifest(
       &manifest);
   if (retval != ObjectFetcher::kFailOk) {
@@ -153,12 +153,12 @@ int CommandGc::Main(const ArgumentList &args) {
     return 1;
   }
 
-  UniquePtr<manifest::Reflog> reflog;
+  std::unique_ptr<manifest::Reflog> reflog;
   reflog = FetchReflog(&object_fetcher, repo_name, reflog_hash);
   assert(reflog.IsValid());
 
   const upload::SpoolerDefinition spooler_definition(spooler, shash::kAny);
-  const UniquePtr<upload::AbstractUploader> uploader(
+  const std::unique_ptr<upload::AbstractUploader> uploader(
       upload::AbstractUploader::Construct(spooler_definition));
 
   if (!uploader.IsValid()) {

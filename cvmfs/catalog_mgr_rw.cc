@@ -125,7 +125,7 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
 
   // Create the database schema and the initial root entry
   {
-    const UniquePtr<CatalogDatabase> new_clg_db(
+    const std::unique_ptr<CatalogDatabase> new_clg_db(
         CatalogDatabase::Create(file_path));
     if (!new_clg_db.IsValid()
         || !new_clg_db->InsertInitialValues(root_path, volatile_content,
@@ -997,7 +997,7 @@ void WritableCatalogManager::SwapNestedCatalog(const string &mountpoint,
             "failed to swap nested catalog '%s': not found in parent",
             nested_root_path.c_str());
     }
-    const UniquePtr<Catalog> old_free_catalog(
+    const std::unique_ptr<Catalog> old_free_catalog(
         LoadFreeCatalog(nested_root_ps, old_hash));
     if (!old_free_catalog.IsValid()) {
       SyncUnlock();
@@ -1009,7 +1009,7 @@ void WritableCatalogManager::SwapNestedCatalog(const string &mountpoint,
   }
 
   // Load freely attached new catalog
-  const UniquePtr<Catalog> new_catalog(
+  const std::unique_ptr<Catalog> new_catalog(
       LoadFreeCatalog(nested_root_ps, new_hash));
   if (!new_catalog.IsValid()) {
     SyncUnlock();
@@ -1092,7 +1092,7 @@ bool WritableCatalogManager::TryGraftNestedCatalog(const string &mountpoint,
   }
 
   // Load freely attached new catalog
-  const UniquePtr<Catalog> new_catalog(
+  const std::unique_ptr<Catalog> new_catalog(
       LoadFreeCatalog(nested_root_ps, new_hash));
   if (!new_catalog.IsValid()) {
     LogCvmfs(kLogCatalog, kLogStderr,

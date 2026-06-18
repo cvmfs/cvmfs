@@ -209,7 +209,7 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
 
   // 3) Get remote root catalog (fails if remote catalog is older)
   manifest::Failures manifest_failure;
-  UniquePtr<CachedManifestEnsemble> ensemble(
+  std::unique_ptr<CachedManifestEnsemble> ensemble(
       new CachedManifestEnsemble(fetcher_->cache_mgr(), this));
   manifest_failure = manifest::Fetch(
       "", repo_name_, local_newest_timestamp, &local_newest_hash,

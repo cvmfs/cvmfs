@@ -40,7 +40,7 @@ int CmdAbort::Main(const Options &options) {
     builder.SetConfigPath(session_dir);
   }
 
-  UniquePtr<SettingsPublisher> settings;
+  std::unique_ptr<SettingsPublisher> settings;
   try {
     // Legacy behaviour is that trailing paths after the repository name should
     // be ignored, e.g. cvmfs_server abort repo.cern.ch/some/path is equivalent
@@ -132,7 +132,7 @@ int CmdAbort::Main(const Options &options) {
     }
   }
 
-  UniquePtr<Publisher> publisher;
+  std::unique_ptr<Publisher> publisher;
   // Pass exists=false to skip downloading the whitelist and manifest, which
   // would fail under disk-full conditions. Abort only needs the session (to
   // drop any gateway lease) and the managed node (to repair mount points).

@@ -52,7 +52,7 @@ class T_FileWatcher : public ::testing::Test {
   }
 
   Counters counters_;
-  UniquePtr<FifoChannel<bool> > channel_;
+  std::unique_ptr<FifoChannel<bool> > channel_;
 };
 
 TEST_F(T_FileWatcher, NoEventStop) {
@@ -60,7 +60,7 @@ TEST_F(T_FileWatcher, NoEventStop) {
                                         + "/file_watcher_test.txt";
   SafeWriteToFile("test", watched_file_name, 0600);
 
-  UniquePtr<file_watcher::FileWatcher> watcher(
+  std::unique_ptr<file_watcher::FileWatcher> watcher(
       file_watcher::FileWatcher::Create());
   EXPECT_TRUE(watcher.IsValid());
 
@@ -77,7 +77,7 @@ TEST_F(T_FileWatcher, ModifiedEvent) {
                                         + "/file_watcher_test.txt";
   SafeWriteToFile("test", watched_file_name, 0600);
 
-  UniquePtr<file_watcher::FileWatcher> watcher(
+  std::unique_ptr<file_watcher::FileWatcher> watcher(
       file_watcher::FileWatcher::Create());
   EXPECT_TRUE(watcher.IsValid());
 
@@ -105,7 +105,7 @@ TEST_F(T_FileWatcher, DeletedEvent) {
                                         + "/file_watcher_test2.txt";
   SafeWriteToFile("test", watched_file_name, 0600);
 
-  UniquePtr<file_watcher::FileWatcher> watcher(
+  std::unique_ptr<file_watcher::FileWatcher> watcher(
       file_watcher::FileWatcher::Create());
   EXPECT_TRUE(watcher.IsValid());
 
@@ -133,7 +133,7 @@ TEST_F(T_FileWatcher, ModifiedThenDeletedEvent) {
                                         + "/file_watcher_test.txt";
   SafeWriteToFile("test", watched_file_name, 0600);
 
-  UniquePtr<file_watcher::FileWatcher> watcher(
+  std::unique_ptr<file_watcher::FileWatcher> watcher(
       file_watcher::FileWatcher::Create());
   EXPECT_TRUE(watcher.IsValid());
 

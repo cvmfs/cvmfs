@@ -103,7 +103,7 @@ NfsMapsLeveldb *NfsMapsLeveldb::Create(const string &leveldb_dir,
                                        const bool rebuild,
                                        perf::Statistics *statistics) {
   assert(root_inode > 0);
-  UniquePtr<NfsMapsLeveldb> maps(new NfsMapsLeveldb());
+  std::unique_ptr<NfsMapsLeveldb> maps(new NfsMapsLeveldb());
   maps->n_db_added_ = statistics->Register("nfs.leveldb.n_added",
                                            "total number of issued inode");
 

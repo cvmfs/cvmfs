@@ -49,10 +49,10 @@ class T_StreamingCacheManager : public ::testing::Test {
     statistics_.Destroy();
   }
 
-  UniquePtr<perf::Statistics> statistics_;
-  UniquePtr<download::DownloadManager> download_mgr_;
-  UniquePtr<PosixCacheManager> backing_cache_;
-  UniquePtr<StreamingCacheManager> streaming_cache_;
+  std::unique_ptr<perf::Statistics> statistics_;
+  std::unique_ptr<download::DownloadManager> download_mgr_;
+  std::unique_ptr<PosixCacheManager> backing_cache_;
+  std::unique_ptr<StreamingCacheManager> streaming_cache_;
 
   CacheManager *backing_cache_ref_;
   std::string demo_;

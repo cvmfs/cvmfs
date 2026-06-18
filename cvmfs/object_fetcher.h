@@ -206,7 +206,7 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
     return kFailOk;
   }
 
-  Failures FetchManifest(UniquePtr<manifest::Manifest> *manifest) {
+  Failures FetchManifest(std::unique_ptr<manifest::Manifest> *manifest) {
     manifest::Manifest *raw_manifest_ptr = NULL;
     Failures const failure = FetchManifest(&raw_manifest_ptr);
     if (failure == kFailOk)
@@ -214,7 +214,7 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
     return failure;
   }
 
-  Failures FetchHistory(UniquePtr<HistoryTN> *history,
+  Failures FetchHistory(std::unique_ptr<HistoryTN> *history,
                         const shash::Any &history_hash = shash::Any()) {
     HistoryTN *raw_history_ptr = NULL;
     Failures const failure = FetchHistory(&raw_history_ptr, history_hash);
@@ -225,7 +225,7 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
 
   Failures FetchCatalog(const shash::Any &catalog_hash,
                         const std::string &catalog_path,
-                        UniquePtr<CatalogTN> *catalog,
+                        std::unique_ptr<CatalogTN> *catalog,
                         const bool is_nested = false,
                         CatalogTN *parent = NULL) {
     CatalogTN *raw_catalog_ptr = NULL;
@@ -237,7 +237,7 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
   }
 
   Failures FetchReflog(const shash::Any &reflog_hash,
-                       UniquePtr<ReflogTN> *reflog) {
+                       std::unique_ptr<ReflogTN> *reflog) {
     ReflogTN *raw_reflog_ptr = NULL;
     Failures failure = FetchReflog(reflog_hash, &raw_reflog_ptr);
     if (failure == kFailOk)
@@ -290,7 +290,7 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
    * @return  the content hash of the HEAD history db or a null-hash on error
    */
   shash::Any GetHistoryHash() {
-    UniquePtr<manifest::Manifest> manifest;
+    std::unique_ptr<manifest::Manifest> manifest;
     const Failures retval = FetchManifest(&manifest);
 
     if (retval != kFailOk || !manifest.IsValid()

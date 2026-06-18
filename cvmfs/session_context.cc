@@ -383,7 +383,7 @@ bool SessionContext::DoUpload(const SessionContext::UploadJob *job) {
              "SessionContext::DoUpload - curl_easy_perform failed: %d", ret);
   }
 
-  const UniquePtr<JsonDocument> reply_json(JsonDocument::Create(reply));
+  const std::unique_ptr<JsonDocument> reply_json(JsonDocument::Create(reply));
   const JSON *reply_status = JsonDocument::SearchInObject(
       reply_json->root(), "status", JSON_STRING);
   const bool ok = (reply_status != NULL

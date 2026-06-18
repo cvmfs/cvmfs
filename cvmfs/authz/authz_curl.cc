@@ -160,7 +160,7 @@ bool AuthzAttachment::ConfigureCurlHandle(CURL *curl_handle,
   curl_easy_setopt(curl_handle, CURLOPT_FORBID_REUSE, 1);
   curl_easy_setopt(curl_handle, CURLOPT_SSL_SESSIONID_CACHE, 0);
 
-  const UniquePtr<AuthzToken> token(
+  const std::unique_ptr<AuthzToken> token(
       authz_session_manager_->GetTokenCopy(pid, membership_));
   if (!token.IsValid()) {
     LogCvmfs(kLogAuthz, kLogDebug, "failed to get authz token for pid %d", pid);
@@ -200,7 +200,7 @@ bool AuthzAttachment::ConfigureCurlHandle(CURL *curl_handle,
     return false;
   }
 
-  UniquePtr<sslctx_info> parm(new sslctx_info);
+  std::unique_ptr<sslctx_info> parm(new sslctx_info);
 
   STACK_OF(X509_INFO) *sk = NULL;
   STACK_OF(X509) *certstack = sk_X509_new_null();

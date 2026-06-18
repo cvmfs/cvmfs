@@ -210,7 +210,7 @@ bool VirtualCatalog::ParseActions(const string &action_desc, int *actions) {
 
 
 void VirtualCatalog::GetSortedTagsFromHistory(vector<TagId> *tags) {
-  const UniquePtr<history::History> history(
+  const std::unique_ptr<history::History> history(
       assistant_.GetHistory(swissknife::Assistant::kOpenReadOnly));
   vector<history::History::Tag> tags_history;
   const bool retval = history->List(&tags_history);
@@ -243,7 +243,7 @@ void VirtualCatalog::GetSortedTagsFromCatalog(vector<TagId> *tags) {
 void VirtualCatalog::InsertSnapshot(TagId tag) {
   LogCvmfs(kLogCatalog, kLogDebug, "add snapshot %s (%s) to virtual catalog",
            tag.name.c_str(), tag.hash.ToString().c_str());
-  const UniquePtr<Catalog> catalog(
+  const std::unique_ptr<Catalog> catalog(
       assistant_.GetCatalog(tag.hash, swissknife::Assistant::kOpenReadOnly));
   assert(catalog.IsValid());
   assert(catalog->root_prefix().IsEmpty());

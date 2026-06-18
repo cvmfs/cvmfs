@@ -192,10 +192,10 @@ class CatalogTestTool : public ServerTool {
   std::string public_key_;
   std::string temp_dir_;
 
-  UniquePtr<perf::Statistics> statistics_;
-  UniquePtr<manifest::Manifest> manifest_;
-  UniquePtr<upload::Spooler> spooler_;
-  UniquePtr<catalog::WritableCatalogManager> catalog_mgr_;
+  std::unique_ptr<perf::Statistics> statistics_;
+  std::unique_ptr<manifest::Manifest> manifest_;
+  std::unique_ptr<upload::Spooler> spooler_;
+  std::unique_ptr<catalog::WritableCatalogManager> catalog_mgr_;
   History history_;
 };
 

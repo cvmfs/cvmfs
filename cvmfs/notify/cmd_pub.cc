@@ -48,7 +48,7 @@ int DoPublish(const std::string &server_url, const std::string &repository_url,
   const std::string manifest_url = repo_url + "/.cvmfspublished";
   if (IsHttpUrl(repo_url)) {
     perf::Statistics stats;
-    const UniquePtr<download::DownloadManager> download_manager(
+    const std::unique_ptr<download::DownloadManager> download_manager(
         new download::DownloadManager(
             kMaxPoolHandles, perf::StatisticsTemplate("download", &stats)));
     assert(download_manager.IsValid());
@@ -83,7 +83,7 @@ int DoPublish(const std::string &server_url, const std::string &repository_url,
     close(fd);
   }
 
-  const UniquePtr<manifest::Manifest> manifest(manifest::Manifest::LoadMem(
+  const std::unique_ptr<manifest::Manifest> manifest(manifest::Manifest::LoadMem(
       reinterpret_cast<const unsigned char *>(manifest_contents.data()),
       manifest_contents.size()));
 
@@ -95,7 +95,7 @@ int DoPublish(const std::string &server_url, const std::string &repository_url,
   const std::string repository_name = manifest->repository_name();
 
   // Publish message
-  const UniquePtr<notify::Publisher> publisher(
+  const std::unique_ptr<notify::Publisher> publisher(
       new notify::PublisherHTTP(server_url));
 
   std::string msg_text;

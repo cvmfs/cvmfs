@@ -143,23 +143,23 @@ TEST_F(T_MountPoint, CheckPosixCacheSettings) {
 
 TEST_F(T_MountPoint, TriageCacheMgr) {
   {
-    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    std::unique_ptr<FileSystem> fs(FileSystem::Create(fs_info_));
     EXPECT_EQ(loader::kFailOk, fs->boot_status());
     EXPECT_EQ("default", fs->cache_mgr_instance());
   }
   options_mgr_.SetValue("CVMFS_CACHE_PRIMARY", "string with spaces");
   {
-    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    std::unique_ptr<FileSystem> fs(FileSystem::Create(fs_info_));
     EXPECT_EQ(loader::kFailCacheDir, fs->boot_status());
   }
   options_mgr_.SetValue("CVMFS_CACHE_PRIMARY", "foo");
   {
-    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    std::unique_ptr<FileSystem> fs(FileSystem::Create(fs_info_));
     EXPECT_EQ(loader::kFailCacheDir, fs->boot_status());
   }
   options_mgr_.SetValue("CVMFS_CACHE_PRIMARY", "default");
   {
-    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    std::unique_ptr<FileSystem> fs(FileSystem::Create(fs_info_));
     EXPECT_EQ(loader::kFailOk, fs->boot_status());
     EXPECT_EQ("default", fs->cache_mgr_instance());
   }
@@ -171,19 +171,19 @@ TEST_F(T_MountPoint, RamCacheMgr) {
   options_mgr_.SetValue("CVMFS_CACHE_ram_TYPE", "ram");
   options_mgr_.SetValue("CVMFS_CACHE_ram_SIZE", "75");
   {
-    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    std::unique_ptr<FileSystem> fs(FileSystem::Create(fs_info_));
     EXPECT_EQ(loader::kFailOk, fs->boot_status());
     EXPECT_EQ("ram", fs->cache_mgr_instance());
     EXPECT_EQ(kRamCacheManager, fs->cache_mgr()->id());
   }
   options_mgr_.SetValue("CVMFS_CACHE_ram_MALLOC", "unknown");
   {
-    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    std::unique_ptr<FileSystem> fs(FileSystem::Create(fs_info_));
     EXPECT_EQ(loader::kFailOptions, fs->boot_status());
   }
   options_mgr_.SetValue("CVMFS_CACHE_ram_MALLOC", "libc");
   {
-    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    std::unique_ptr<FileSystem> fs(FileSystem::Create(fs_info_));
     EXPECT_EQ(loader::kFailOk, fs->boot_status());
   }
 }
@@ -193,14 +193,14 @@ TEST_F(T_MountPoint, TieredCacheMgr) {
   options_mgr_.SetValue("CVMFS_CACHE_PRIMARY", "tiered");
   options_mgr_.SetValue("CVMFS_CACHE_tiered_TYPE", "tiered");
   {
-    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    std::unique_ptr<FileSystem> fs(FileSystem::Create(fs_info_));
     EXPECT_EQ(loader::kFailOptions, fs->boot_status());
   }
   options_mgr_.SetValue("CVMFS_CACHE_tiered_UPPER", "ram_upper");
   options_mgr_.SetValue("CVMFS_CACHE_ram_upper_TYPE", "ram");
   options_mgr_.SetValue("CVMFS_CACHE_ram_upper_SIZE", "75");
   {
-    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    std::unique_ptr<FileSystem> fs(FileSystem::Create(fs_info_));
     EXPECT_EQ(loader::kFailOptions, fs->boot_status());
   }
   options_mgr_.SetValue("CVMFS_CACHE_tiered_LOWER", "posix_lower");
@@ -209,7 +209,7 @@ TEST_F(T_MountPoint, TieredCacheMgr) {
   options_mgr_.SetValue("CVMFS_CACHE_posix_lower_SHARED", "false");
   options_mgr_.SetValue("CVMFS_CACHE_posix_lower_QUOTA_LIMIT", "0");
   {
-    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    std::unique_ptr<FileSystem> fs(FileSystem::Create(fs_info_));
     EXPECT_EQ(loader::kFailOk, fs->boot_status());
     EXPECT_EQ("tiered", fs->cache_mgr_instance());
     EXPECT_EQ(kTieredCacheManager, fs->cache_mgr()->id());
@@ -226,7 +226,7 @@ TEST_F(T_MountPoint, TieredCacheMgr) {
   options_mgr_.SetValue("CVMFS_CACHE_ram_lower_TYPE", "ram");
   options_mgr_.SetValue("CVMFS_CACHE_ram_lower_SIZE", "75");
   {
-    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    std::unique_ptr<FileSystem> fs(FileSystem::Create(fs_info_));
     EXPECT_EQ(loader::kFailOk, fs->boot_status());
     EXPECT_EQ("tiered", fs->cache_mgr_instance());
     EXPECT_EQ(kTieredCacheManager, fs->cache_mgr()->id());
@@ -234,7 +234,7 @@ TEST_F(T_MountPoint, TieredCacheMgr) {
 
   options_mgr_.SetValue("CVMFS_CACHE_tiered_LOWER", "tiered");
   {
-    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    std::unique_ptr<FileSystem> fs(FileSystem::Create(fs_info_));
     EXPECT_EQ(loader::kFailCacheDir, fs->boot_status());
   }
 }
@@ -265,7 +265,7 @@ TEST_F(T_MountPoint, TieredComplex) {
   options_mgr_.SetValue("CVMFS_CACHE_ll_posix_SHARED", "false");
   options_mgr_.SetValue("CVMFS_CACHE_ll_posix_QUOTA_LIMIT", "0");
   {
-    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    std::unique_ptr<FileSystem> fs(FileSystem::Create(fs_info_));
     EXPECT_EQ(loader::kFailOk, fs->boot_status()) << fs->boot_error();
     EXPECT_EQ("tiered", fs->cache_mgr_instance());
     EXPECT_EQ(kTieredCacheManager, fs->cache_mgr()->id());
@@ -287,21 +287,21 @@ TEST_F(T_MountPoint, CacheSettings) {
   options_mgr_.SetValue("CVMFS_QUOTA_LIMIT", "-1");
   options_mgr_.SetValue("CVMFS_SHARED_CACHE", "yes");
   {
-    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    std::unique_ptr<FileSystem> fs(FileSystem::Create(fs_info_));
     EXPECT_EQ(loader::kFailOptions, fs->boot_status());
   }
 
   options_mgr_.UnsetValue("CVMFS_SHARED_CACHE");
   options_mgr_.SetValue("CVMFS_QUOTA_LIMIT", "10");
   {
-    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    std::unique_ptr<FileSystem> fs(FileSystem::Create(fs_info_));
     EXPECT_EQ(loader::kFailOptions, fs->boot_status());
   }
 
   options_mgr_.SetValue("CVMFS_QUOTA_LIMIT", "-1");
   options_mgr_.SetValue("CVMFS_NFS_SOURCE", "yes");
   {
-    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    std::unique_ptr<FileSystem> fs(FileSystem::Create(fs_info_));
     EXPECT_EQ(loader::kFailOk, fs->boot_status());
   }
   options_mgr_.UnsetValue("CVMFS_NFS_SOURCE");
@@ -309,13 +309,13 @@ TEST_F(T_MountPoint, CacheSettings) {
   fs_info_.type = FileSystem::kFsLibrary;
   options_mgr_.SetValue("CVMFS_SHARED_CACHE", "yes");
   {
-    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    std::unique_ptr<FileSystem> fs(FileSystem::Create(fs_info_));
     EXPECT_EQ(loader::kFailOptions, fs->boot_status());
   }
 
   options_mgr_.UnsetValue("CVMFS_SHARED_CACHE");
   {
-    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    std::unique_ptr<FileSystem> fs(FileSystem::Create(fs_info_));
     EXPECT_EQ(loader::kFailOk, fs->boot_status());
     EXPECT_EQ(tmp_path_ + "/unit-test", fs->workspace());
     EXPECT_EQ(
@@ -325,7 +325,7 @@ TEST_F(T_MountPoint, CacheSettings) {
 
   fs_info_.type = FileSystem::kFsFuse;
   {
-    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    std::unique_ptr<FileSystem> fs(FileSystem::Create(fs_info_));
     EXPECT_EQ(loader::kFailOk, fs->boot_status());
     EXPECT_EQ(".", fs->workspace());
     EXPECT_EQ(
@@ -338,7 +338,7 @@ TEST_F(T_MountPoint, CacheSettings) {
   options_mgr_.SetValue("CVMFS_NFS_SOURCE", "yes");
   options_mgr_.SetValue("CVMFS_NFS_SHARED", tmp_path_ + "/nfs");
   {
-    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    std::unique_ptr<FileSystem> fs(FileSystem::Create(fs_info_));
     EXPECT_EQ(loader::kFailOk, fs->boot_status());
     EXPECT_TRUE(fs->IsNfsSource());
     EXPECT_TRUE(fs->IsHaNfsSource());
@@ -351,12 +351,12 @@ TEST_F(T_MountPoint, CacheSettings) {
 
   options_mgr_.SetValue("CVMFS_CACHE_DIR", tmp_path_ + "/cachedir_direct");
   {
-    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    std::unique_ptr<FileSystem> fs(FileSystem::Create(fs_info_));
     EXPECT_EQ(loader::kFailOptions, fs->boot_status());
   }
   options_mgr_.UnsetValue("CVMFS_CACHE_BASE");
   {
-    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    std::unique_ptr<FileSystem> fs(FileSystem::Create(fs_info_));
     EXPECT_EQ(loader::kFailOk, fs->boot_status());
   }
 }
@@ -370,12 +370,12 @@ TEST_F(T_MountPoint, SharedDirectory) {
       abort();
     case 0:
       fs_info_.name = "other";
-      UniquePtr<FileSystem> fs01(FileSystem::Create(fs_info_));
+      std::unique_ptr<FileSystem> fs01(FileSystem::Create(fs_info_));
       int retval = fs01->IsValid() ? 0 : 1;
       exit(retval);
   }
 
-  UniquePtr<FileSystem> fs01(FileSystem::Create(fs_info_));
+  std::unique_ptr<FileSystem> fs01(FileSystem::Create(fs_info_));
   EXPECT_TRUE(fs01->IsValid());
   int stat_loc;
   int retval = waitpid(pid, &stat_loc, 0);
@@ -387,7 +387,7 @@ TEST_F(T_MountPoint, SharedDirectory) {
 
 TEST_F(T_MountPoint, CrashGuard) {
   {
-    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    std::unique_ptr<FileSystem> fs(FileSystem::Create(fs_info_));
     EXPECT_EQ(loader::kFailOk, fs->boot_status());
     EXPECT_FALSE(fs->found_previous_crash());
   }
@@ -398,7 +398,7 @@ TEST_F(T_MountPoint, CrashGuard) {
   ASSERT_GE(fd, 0);
   close(fd);
 
-  UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+  std::unique_ptr<FileSystem> fs(FileSystem::Create(fs_info_));
   EXPECT_EQ(loader::kFailOk, fs->boot_status());
   EXPECT_TRUE(fs->found_previous_crash());
 }
@@ -414,7 +414,7 @@ TEST_F(T_MountPoint, LockWorkspace) {
       abort();
     case 0:
       SafeRead(pipe_sync[0], &pid, sizeof(pid));
-      UniquePtr<FileSystem> fs01(FileSystem::Create(fs_info_));
+      std::unique_ptr<FileSystem> fs01(FileSystem::Create(fs_info_));
       switch (fs01->boot_status()) {
         case loader::kFailOk:
           exit(0);
@@ -425,7 +425,7 @@ TEST_F(T_MountPoint, LockWorkspace) {
       }
   }
 
-  UniquePtr<FileSystem> fs01(FileSystem::Create(fs_info_));
+  std::unique_ptr<FileSystem> fs01(FileSystem::Create(fs_info_));
   SafeWrite(pipe_sync[1], &pid, sizeof(pid));
   int stat_loc;
   int retval = waitpid(pid, &stat_loc, 0);
@@ -441,13 +441,13 @@ TEST_F(T_MountPoint, LockWorkspace) {
 TEST_F(T_MountPoint, UuidCache) {
   string cached_uuid;
   {
-    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    std::unique_ptr<FileSystem> fs(FileSystem::Create(fs_info_));
     ASSERT_EQ(loader::kFailOk, fs->boot_status());
     cached_uuid = fs->uuid_cache()->uuid();
   }
   ASSERT_EQ(fchdir(fd_cwd_), 0);
 
-  UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+  std::unique_ptr<FileSystem> fs(FileSystem::Create(fs_info_));
   ASSERT_EQ(loader::kFailOk, fs->boot_status());
   EXPECT_EQ(cached_uuid, fs->uuid_cache()->uuid());
 }
@@ -456,14 +456,14 @@ TEST_F(T_MountPoint, UuidCache) {
 TEST_F(T_MountPoint, MountLatest) {
   CreateMiniRepository(&options_mgr_, &repo_path_);
   ASSERT_TRUE(HasSuffix(repo_path_, "repo", false));
-  UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+  std::unique_ptr<FileSystem> fs(FileSystem::Create(fs_info_));
   ASSERT_EQ(loader::kFailOk, fs->boot_status());
   string root_hash;
   EXPECT_TRUE(options_mgr_.GetValue("CVMFS_ROOT_HASH", &root_hash));
   options_mgr_.UnsetValue("CVMFS_ROOT_HASH");
 
   {
-    UniquePtr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
+    std::unique_ptr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
     EXPECT_EQ(loader::kFailOk, mp->boot_status());
     EXPECT_EQ(root_hash, mp->catalog_mgr()->GetRootHash().ToString());
     EXPECT_TRUE(fs->cache_mgr()->LoadBreadcrumb("keys.cern.ch").IsValid());
@@ -471,7 +471,7 @@ TEST_F(T_MountPoint, MountLatest) {
 
   // Again to check proper cleanup
   {
-    UniquePtr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
+    std::unique_ptr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
     EXPECT_EQ(loader::kFailOk, mp->boot_status());
   }
 }
@@ -479,23 +479,23 @@ TEST_F(T_MountPoint, MountLatest) {
 
 TEST_F(T_MountPoint, MountMulti) {
   CreateMiniRepository(&options_mgr_, &repo_path_);
-  UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+  std::unique_ptr<FileSystem> fs(FileSystem::Create(fs_info_));
   ASSERT_EQ(loader::kFailOk, fs->boot_status());
 
-  UniquePtr<MountPoint> mp01(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
+  std::unique_ptr<MountPoint> mp01(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
   EXPECT_EQ(loader::kFailOk, mp01->boot_status());
 
-  UniquePtr<MountPoint> mp02(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
+  std::unique_ptr<MountPoint> mp02(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
   EXPECT_EQ(loader::kFailOk, mp02->boot_status());
 }
 
 
 TEST_F(T_MountPoint, MountErrors) {
   CreateMiniRepository(&options_mgr_, &repo_path_);
-  UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+  std::unique_ptr<FileSystem> fs(FileSystem::Create(fs_info_));
   ASSERT_EQ(loader::kFailOk, fs->boot_status());
   {
-    UniquePtr<MountPoint> mp(MountPoint::Create("test", fs.weak_ref()));
+    std::unique_ptr<MountPoint> mp(MountPoint::Create("test", fs.weak_ref()));
     EXPECT_EQ(loader::kFailOk, mp->boot_status());
     string root_hash;
     EXPECT_TRUE(options_mgr_.GetValue("CVMFS_ROOT_HASH", &root_hash));
@@ -504,25 +504,25 @@ TEST_F(T_MountPoint, MountErrors) {
 
   options_mgr_.UnsetValue("CVMFS_ROOT_HASH");
   {
-    UniquePtr<MountPoint> mp(MountPoint::Create("wrong.name", fs.weak_ref()));
+    std::unique_ptr<MountPoint> mp(MountPoint::Create("wrong.name", fs.weak_ref()));
     EXPECT_EQ(loader::kFailCatalog, mp->boot_status());
   }
 
   options_mgr_.SetValue("CVMFS_UID_MAP", "/no/such/file");
   {
-    UniquePtr<MountPoint> mp(MountPoint::Create("test", fs.weak_ref()));
+    std::unique_ptr<MountPoint> mp(MountPoint::Create("test", fs.weak_ref()));
     EXPECT_EQ(loader::kFailOptions, mp->boot_status());
   }
 
   options_mgr_.UnsetValue("CVMFS_HTTP_PROXY");
   {
-    UniquePtr<MountPoint> mp(MountPoint::Create("test", fs.weak_ref()));
+    std::unique_ptr<MountPoint> mp(MountPoint::Create("test", fs.weak_ref()));
     EXPECT_EQ(loader::kFailWpad, mp->boot_status());
   }
 
   options_mgr_.SetValue("CVMFS_PUBLIC_KEY", "/no/such/key");
   {
-    UniquePtr<MountPoint> mp(MountPoint::Create("test", fs.weak_ref()));
+    std::unique_ptr<MountPoint> mp(MountPoint::Create("test", fs.weak_ref()));
     EXPECT_EQ(loader::kFailSignature, mp->boot_status());
   }
 }
@@ -536,9 +536,9 @@ TEST_F(T_MountPoint, Blacklist) {
   options_mgr_.UnsetValue("CVMFS_ROOT_HASH");
 
   {
-    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    std::unique_ptr<FileSystem> fs(FileSystem::Create(fs_info_));
     ASSERT_EQ(loader::kFailOk, fs->boot_status());
-    UniquePtr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
+    std::unique_ptr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
     EXPECT_EQ(loader::kFailOk, mp->boot_status());
     EXPECT_TRUE(mp->ReloadBlacklists());
   }
@@ -548,9 +548,9 @@ TEST_F(T_MountPoint, Blacklist) {
   EXPECT_TRUE(SafeWriteToFile(
       bad_revision, repo_path_ + "/config.test/etc/cvmfs/blacklist", 0600));
   {
-    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    std::unique_ptr<FileSystem> fs(FileSystem::Create(fs_info_));
     ASSERT_EQ(loader::kFailOk, fs->boot_status());
-    UniquePtr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
+    std::unique_ptr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
     EXPECT_EQ(loader::kFailRevisionBlacklisted, mp->boot_status());
   }
 
@@ -559,18 +559,18 @@ TEST_F(T_MountPoint, Blacklist) {
   EXPECT_TRUE(SafeWriteToFile(
       bad_fingerprint, repo_path_ + "/config.test/etc/cvmfs/blacklist", 0600));
   {
-    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    std::unique_ptr<FileSystem> fs(FileSystem::Create(fs_info_));
     ASSERT_EQ(loader::kFailOk, fs->boot_status());
-    UniquePtr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
+    std::unique_ptr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
     EXPECT_EQ(loader::kFailCatalog, mp->boot_status());
   }
 
   options_mgr_.UnsetValue("CVMFS_CONFIG_REPOSITORY");
   options_mgr_.SetValue("CVMFS_BLACKLIST", "/no/such/file");
   {
-    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    std::unique_ptr<FileSystem> fs(FileSystem::Create(fs_info_));
     ASSERT_EQ(loader::kFailOk, fs->boot_status());
-    UniquePtr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
+    std::unique_ptr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
     EXPECT_EQ(loader::kFailOk, mp->boot_status());
     EXPECT_TRUE(mp->ReloadBlacklists());
   }
@@ -579,9 +579,9 @@ TEST_F(T_MountPoint, Blacklist) {
   options_mgr_.SetValue("CVMFS_BLACKLIST",
                         repo_path_ + "/config.test/etc/cvmfs/blacklist");
   {
-    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+    std::unique_ptr<FileSystem> fs(FileSystem::Create(fs_info_));
     ASSERT_EQ(loader::kFailOk, fs->boot_status());
-    UniquePtr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
+    std::unique_ptr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
     EXPECT_EQ(loader::kFailCatalog, mp->boot_status());
   }
 }
@@ -590,12 +590,12 @@ TEST_F(T_MountPoint, Blacklist) {
 TEST_F(T_MountPoint, History) {
   CreateMiniRepository(&options_mgr_, &repo_path_);
   options_mgr_.UnsetValue("CVMFS_ROOT_HASH");
-  UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+  std::unique_ptr<FileSystem> fs(FileSystem::Create(fs_info_));
   ASSERT_EQ(loader::kFailOk, fs->boot_status());
 
   options_mgr_.SetValue("CVMFS_REPOSITORY_DATE", "1984-03-04T00:00:00Z");
   {
-    UniquePtr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
+    std::unique_ptr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
     EXPECT_EQ(loader::kFailHistory, mp->boot_status());
   }
 
@@ -605,19 +605,19 @@ TEST_F(T_MountPoint, History) {
     options_mgr_.SetValue("CVMFS_REPOSITORY_DATE", "2038-01-01T00:00:00Z");
   }
   {
-    UniquePtr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
+    std::unique_ptr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
     EXPECT_EQ(loader::kFailOk, mp->boot_status());
   }
 
   options_mgr_.SetValue("CVMFS_REPOSITORY_TAG", "no-such-tag");
   {
-    UniquePtr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
+    std::unique_ptr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
     EXPECT_EQ(loader::kFailHistory, mp->boot_status());
   }
 
   options_mgr_.SetValue("CVMFS_REPOSITORY_TAG", "snapshot");
   {
-    UniquePtr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
+    std::unique_ptr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
     EXPECT_EQ(loader::kFailOk, mp->boot_status());
   }
 }
@@ -630,13 +630,13 @@ TEST_F(T_MountPoint, MaxServers) {
   server_url += ";" + server_url;
   options_mgr_.SetValue("CVMFS_SERVER_URL", server_url);
 
-  UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
+  std::unique_ptr<FileSystem> fs(FileSystem::Create(fs_info_));
   ASSERT_EQ(loader::kFailOk, fs->boot_status());
   std::vector<std::string> host_chain;
 
   options_mgr_.SetValue("CVMFS_MAX_SERVERS", "10");
   {
-    UniquePtr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
+    std::unique_ptr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
     ASSERT_EQ(loader::kFailOk, mp->boot_status());
     mp->download_mgr()->GetHostInfo(&host_chain, NULL, NULL);
     EXPECT_EQ(2U, host_chain.size());
@@ -646,7 +646,7 @@ TEST_F(T_MountPoint, MaxServers) {
 
   options_mgr_.SetValue("CVMFS_EXTERNAL_MAX_SERVERS", "10");
   {
-    UniquePtr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
+    std::unique_ptr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
     ASSERT_EQ(loader::kFailOk, mp->boot_status());
     mp->external_download_mgr()->GetHostInfo(&host_chain, NULL, NULL);
     // Host chain has been set to one empty string in SetupExternalDownloadMgr
@@ -657,7 +657,7 @@ TEST_F(T_MountPoint, MaxServers) {
   options_mgr_.SetValue("CVMFS_MAX_SERVERS", "1");
   options_mgr_.SetValue("CVMFS_EXTERNAL_MAX_SERVERS", "1");
   {
-    UniquePtr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
+    std::unique_ptr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
     ASSERT_EQ(loader::kFailOk, mp->boot_status());
     mp->download_mgr()->GetHostInfo(&host_chain, NULL, NULL);
     EXPECT_EQ(1U, host_chain.size());
@@ -668,7 +668,7 @@ TEST_F(T_MountPoint, MaxServers) {
   options_mgr_.SetValue("CVMFS_MAX_SERVERS", "0");
   options_mgr_.SetValue("CVMFS_EXTERNAL_MAX_SERVERS", "0");
   {
-    UniquePtr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
+    std::unique_ptr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.weak_ref()));
     ASSERT_EQ(loader::kFailOk, mp->boot_status());
     mp->download_mgr()->GetHostInfo(&host_chain, NULL, NULL);
     EXPECT_EQ(2U, host_chain.size());

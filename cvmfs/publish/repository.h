@@ -370,7 +370,7 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   void TransactionImpl();
 
   SettingsPublisher settings_;
-  UniquePtr<perf::StatisticsTemplate> statistics_publish_;
+  std::unique_ptr<perf::StatisticsTemplate> statistics_publish_;
   /**
    * The log level, set to kLogNone if settings_.is_silent() == true
    */
@@ -385,8 +385,8 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
    * implemented, the lease should be dropped after the last successful write
    * operation.
    */
-  UniquePtr<Session> session_;
-  UniquePtr<ManagedNode> managed_node_;
+  std::unique_ptr<Session> session_;
+  std::unique_ptr<ManagedNode> managed_node_;
 
   upload::Spooler *spooler_files_;
   upload::Spooler *spooler_catalogs_;

@@ -38,7 +38,7 @@ class T_SyncUnionTarball : public ::testing::Test {
 
   virtual void TearDown() { unlink(tmp_tar_filename_.c_str()); }
 
-  UniquePtr<publish::MockSyncMediator> m_sync_mediator_;
+  std::unique_ptr<publish::MockSyncMediator> m_sync_mediator_;
   std::string tmp_tar_filename_;
 };
 

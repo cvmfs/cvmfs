@@ -433,7 +433,7 @@ class AbstractUploader
   mutable SynchronizingCounter<int32_t> jobs_in_flight_;
   TubeGroup<UploadJob> tubes_upload_;
   TubeConsumerGroup<UploadJob> tasks_upload_;
-  mutable UniquePtr<UploadCounters> counters_;
+  mutable std::unique_ptr<UploadCounters> counters_;
 };  // class AbstractUploader
 
 

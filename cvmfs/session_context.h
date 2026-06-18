@@ -122,7 +122,7 @@ class SessionContext : public SessionContextBase {
  private:
   static void *UploadLoop(void *data);
 
-  UniquePtr<Tube<UploadJob> > upload_jobs_;
+  std::unique_ptr<Tube<UploadJob> > upload_jobs_;
 
   pthread_t worker_;
 

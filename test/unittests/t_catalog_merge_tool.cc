@@ -108,7 +108,7 @@ TEST_F(T_CatalogMergeTool, CRUD) {
 
   EXPECT_TRUE(tester.Apply("second", spec2));
 
-  UniquePtr<ServerTool> server_tool(new ServerTool());
+  std::unique_ptr<ServerTool> server_tool(new ServerTool());
   EXPECT_TRUE(server_tool->InitDownloadManager(true, ""));
 
   receiver::Params params = MakeMergeToolParams("test");
@@ -132,7 +132,7 @@ TEST_F(T_CatalogMergeTool, CRUD) {
                              &output_manifest_hash, &final_rev));
   EXPECT_EQ(2U, final_rev);
 
-  UniquePtr<manifest::Manifest> output_manifest(
+  std::unique_ptr<manifest::Manifest> output_manifest(
       manifest::Manifest::LoadFile(output_manifest_path));
 
   EXPECT_TRUE(output_manifest.IsValid());
@@ -198,7 +198,7 @@ TEST_F(T_CatalogMergeTool, Symlink) {
 
   EXPECT_TRUE(tester.Apply("second", update));
 
-  UniquePtr<ServerTool> server_tool(new ServerTool());
+  std::unique_ptr<ServerTool> server_tool(new ServerTool());
   EXPECT_TRUE(server_tool->InitDownloadManager(true, ""));
 
   const receiver::Params params = MakeMergeToolParams(repo_name);
@@ -222,7 +222,7 @@ TEST_F(T_CatalogMergeTool, Symlink) {
                              &output_manifest_hash, &final_rev));
   EXPECT_EQ(2U, final_rev);
 
-  UniquePtr<manifest::Manifest> output_manifest(
+  std::unique_ptr<manifest::Manifest> output_manifest(
       manifest::Manifest::LoadFile(output_manifest_path));
 
   EXPECT_TRUE(output_manifest.IsValid());

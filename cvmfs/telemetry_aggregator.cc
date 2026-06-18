@@ -22,14 +22,14 @@ TelemetryAggregator *TelemetryAggregator::Create(Statistics *statistics,
                                                  MountPoint *mount_point,
                                                  const std::string &fqrn,
                                                  const TelemetrySelector type) {
-  UniquePtr<TelemetryAggregatorInflux> telemetryInflux;
-  UniquePtr<TelemetryAggregator> *telemetry;
+  std::unique_ptr<TelemetryAggregatorInflux> telemetryInflux;
+  std::unique_ptr<TelemetryAggregator> *telemetry;
 
   switch (type) {
     case kTelemetryInflux:
       telemetryInflux = new TelemetryAggregatorInflux(
           statistics, send_rate, options_mgr, mount_point, fqrn);
-      telemetry = reinterpret_cast<UniquePtr<TelemetryAggregator> *>(
+      telemetry = reinterpret_cast<std::unique_ptr<TelemetryAggregator> *>(
           &telemetryInflux);
       break;
     default:

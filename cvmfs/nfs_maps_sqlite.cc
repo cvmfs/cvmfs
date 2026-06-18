@@ -76,7 +76,7 @@ NfsMapsSqlite *NfsMapsSqlite::Create(const string &db_dir,
                                      const bool rebuild,
                                      perf::Statistics *statistics) {
   assert(root_inode > 0);
-  UniquePtr<NfsMapsSqlite> maps(new NfsMapsSqlite());
+  std::unique_ptr<NfsMapsSqlite> maps(new NfsMapsSqlite());
   maps->n_db_added_ = statistics->Register("nfs.sqlite.n_added",
                                            "total number of issued inode");
   maps->n_db_seq_ = statistics->Register("nfs.sqlite.n_seq",

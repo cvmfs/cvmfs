@@ -108,7 +108,7 @@ int Publisher::ManagedNode::Check(bool is_quiet) {
 
   // expected_hash is left null when manifest is not available (e.g. abort
   // with exists=false), in which case the root hash comparison is skipped.
-  const UniquePtr<CheckoutMarker> marker(CheckoutMarker::CreateFrom(
+  const std::unique_ptr<CheckoutMarker> marker(CheckoutMarker::CreateFrom(
       publisher_->settings_.transaction().spool_area().checkout_marker()));
   shash::Any expected_hash;
   if (publisher_->manifest() != NULL)

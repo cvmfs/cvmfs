@@ -41,7 +41,7 @@ void Activity::ToJSONString(std::string *s) {
 }
 
 bool Activity::FromJSONString(const std::string &s) {
-  const UniquePtr<JsonDocument> m(JsonDocument::Create(s));
+  const std::unique_ptr<JsonDocument> m(JsonDocument::Create(s));
   if (!m.IsValid()) {
     LogCvmfs(kLogCvmfs, kLogError, "Could not create JSON document.");
     return false;

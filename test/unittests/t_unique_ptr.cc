@@ -57,7 +57,7 @@ class T_UniquePtr : public ::testing::Test {
 
 TEST_F(T_UniquePtr, NullInitialisation) {
   {
-    UniquePtr<Foo> foo;
+    std::unique_ptr<Foo> foo;
     EXPECT_FALSE(foo.IsValid());
     EXPECT_EQ(0u, Foo::global_constructor_calls);
     EXPECT_EQ(0u, Foo::global_destructor_calls);
@@ -78,7 +78,7 @@ TEST_F(T_UniquePtr, NullInitialisation) {
 
 TEST_F(T_UniquePtr, DirectInitialisation) {
   {
-    UniquePtr<Foo> foo(new Foo(1337));
+    std::unique_ptr<Foo> foo(new Foo(1337));
     EXPECT_TRUE(foo.IsValid());
     EXPECT_EQ(1u, Foo::global_constructor_calls);
     EXPECT_EQ(0u, Foo::global_destructor_calls);
@@ -91,7 +91,7 @@ TEST_F(T_UniquePtr, DirectInitialisation) {
 
 TEST_F(T_UniquePtr, WeakReference) {
   {
-    UniquePtr<Foo> foo;
+    std::unique_ptr<Foo> foo;
     EXPECT_FALSE(foo.IsValid());
     EXPECT_EQ(0u, Foo::global_constructor_calls);
     EXPECT_EQ(0u, Foo::global_destructor_calls);
@@ -119,7 +119,7 @@ TEST_F(T_UniquePtr, PointerDereference) {
     Foo *object = new Foo(911);
     EXPECT_EQ(1u, object->local_constructor_calls);
 
-    UniquePtr<Foo> foo(object);
+    std::unique_ptr<Foo> foo(object);
     EXPECT_TRUE(foo.IsValid());
     EXPECT_EQ(1u, Foo::global_constructor_calls);
     EXPECT_EQ(0u, Foo::global_destructor_calls);
@@ -145,7 +145,7 @@ TEST_F(T_UniquePtr, PointerDereferenceAndMethodCall) {
     Foo *object = new Foo(87465);
     EXPECT_EQ(1u, object->local_constructor_calls);
 
-    UniquePtr<Foo> foo(object);
+    std::unique_ptr<Foo> foo(object);
     EXPECT_TRUE(foo.IsValid());
     EXPECT_EQ(1u, Foo::global_constructor_calls);
     EXPECT_EQ(0u, Foo::global_destructor_calls);
@@ -171,7 +171,7 @@ TEST_F(T_UniquePtr, ReleaseOwnership) {
     Foo *object = new Foo(837456);
     EXPECT_EQ(1u, object->local_constructor_calls);
 
-    UniquePtr<Foo> foo(object);
+    std::unique_ptr<Foo> foo(object);
     EXPECT_TRUE(foo.IsValid());
     EXPECT_EQ(1u, Foo::global_constructor_calls);
     EXPECT_EQ(0u, Foo::global_destructor_calls);
@@ -194,7 +194,7 @@ TEST_F(T_UniquePtr, ReleaseOwnership) {
 
 
 TEST_F(T_UniquePtr, AssignmentOperator) {
-  UniquePtr<Foo> foo(new Foo(12342));
+  std::unique_ptr<Foo> foo(new Foo(12342));
   EXPECT_EQ(1u, foo->local_constructor_calls);
   EXPECT_EQ(1u, Foo::global_constructor_calls);
 
@@ -229,7 +229,7 @@ TEST_F(T_UniquePtr, AssignmentOperator) {
 
 TEST_F(T_UniquePtr, SelfAssignment) {
   Foo *bare_foo = new Foo(12342);
-  UniquePtr<Foo> foo(bare_foo);
+  std::unique_ptr<Foo> foo(bare_foo);
   EXPECT_EQ(1u, foo->local_constructor_calls);
   EXPECT_EQ(1u, Foo::global_constructor_calls);
   EXPECT_EQ(0u, Foo::global_destructor_calls);
@@ -256,11 +256,11 @@ TEST_F(T_UniquePtr, SelfAssignment) {
 }
 
 TEST_F(T_UniquePtr, VoidPtr) {
-  UniquePtr<void> p(malloc(1024));
+  std::unique_ptr<void> p(malloc(1024));
   EXPECT_TRUE(p.IsValid());
   EXPECT_NE(static_cast<void *>(NULL), p.weak_ref());
 
-  UniquePtr<void> p2;
+  std::unique_ptr<void> p2;
   EXPECT_FALSE(p2.IsValid());
   EXPECT_EQ(static_cast<void *>(NULL), p2.weak_ref());
 }

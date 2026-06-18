@@ -123,7 +123,7 @@ int main(int argc, char **argv) {
   SetLogDebugFile(debug_log);
 
   // Spawn monitoring process (watchdog)
-  UniquePtr<Watchdog> watchdog;
+  std::unique_ptr<Watchdog> watchdog;
   if (watchdog_out_dir != "") {
     if (!MkdirDeep(watchdog_out_dir, 0755)) {
       LogCvmfs(kLogReceiver, kLogSyslogErr | kLogStderr,

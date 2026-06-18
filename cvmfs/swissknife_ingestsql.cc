@@ -764,7 +764,7 @@ int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
   upload::SpoolerDefinition const spooler_definition_catalogs(
       spooler_definition.Dup2DefaultCompression());
 
-  UniquePtr<upload::Spooler> const spooler_catalogs(
+  std::unique_ptr<upload::Spooler> const spooler_catalogs(
       upload::Spooler::Construct(spooler_definition_catalogs, nullptr));
 
   if (!spooler_catalogs.IsValid()) {
@@ -783,7 +783,7 @@ int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
     return 1;
   }
 
-  UniquePtr<manifest::Manifest> manifest;
+  std::unique_ptr<manifest::Manifest> manifest;
 
   manifest = FetchRemoteManifest(stratum0, repo_name, shash::Any());
 

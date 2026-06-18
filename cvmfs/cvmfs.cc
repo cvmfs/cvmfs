@@ -1271,7 +1271,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
       chunk_tables->Unlock();
 
       // Retrieve File chunks from the catalog
-      UniquePtr<FileChunkList> chunks(new FileChunkList());
+      std::unique_ptr<FileChunkList> chunks(new FileChunkList());
       if (!catalog_mgr->ListFileChunks(path, dirent.hash_algorithm(),
                                        chunks.weak_ref())
           || chunks->IsEmpty()) {

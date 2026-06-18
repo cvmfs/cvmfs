@@ -24,7 +24,7 @@ using namespace std;  // NOLINT
 namespace cvmfs {
 
 Uuid *Uuid::Create(const string &store_path) {
-  UniquePtr<Uuid> uuid(new Uuid());
+  std::unique_ptr<Uuid> uuid(new Uuid());
   if (store_path == "") {
     uuid->MkUuid();
     return uuid.Release();

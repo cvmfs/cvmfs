@@ -36,7 +36,7 @@ int CmdTransaction::Main(const Options &options) {
   }
 
   SettingsBuilder builder;
-  UniquePtr<SettingsPublisher> settings;
+  std::unique_ptr<SettingsPublisher> settings;
   try {
     settings = builder.CreateSettingsPublisher(fqrn, true /* needs_managed */);
   } catch (const EPublish &e) {
@@ -83,7 +83,7 @@ int CmdTransaction::Main(const Options &options) {
   settings->GetTransaction()->SetLeasePath(lease_path);
 
 
-  UniquePtr<Publisher> publisher;
+  std::unique_ptr<Publisher> publisher;
   try {
     publisher = new Publisher(*settings);
     if (publisher->whitelist()->IsExpired()) {

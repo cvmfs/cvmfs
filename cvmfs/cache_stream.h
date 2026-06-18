@@ -153,7 +153,7 @@ class StreamingCacheManager : public CacheManager {
   /// which may be NULL if only the size of the object is relevant.
   int64_t Stream(const FdInfo &info, void *buf, uint64_t size, uint64_t offset);
 
-  UniquePtr<CacheManager> cache_mgr_;
+  std::unique_ptr<CacheManager> cache_mgr_;
   download::DownloadManager *regular_download_mgr_;
   download::DownloadManager *external_download_mgr_;
 
@@ -162,11 +162,11 @@ class StreamingCacheManager : public CacheManager {
 
   /// A small in-memory cache to avoid frequent re-downloads if multiple blocks
   /// from the same chunk are read
-  UniquePtr<RingBuffer> buffer_;
+  std::unique_ptr<RingBuffer> buffer_;
   SmallHashDynamic<shash::Any, RingBuffer::ObjectHandle_t> buffered_objects_;
   pthread_mutex_t *lock_buffer_;
 
-  UniquePtr<Counters> counters_;
+  std::unique_ptr<Counters> counters_;
 };  // class StreamingCacheManager
 
 #endif  // CVMFS_CACHE_STREAM_H_

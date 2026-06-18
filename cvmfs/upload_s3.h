@@ -29,7 +29,7 @@ struct S3StreamHandle : public UploadStreamHandle {
   }
 
   // Ownership is later transferred to the S3 fanout
-  UniquePtr<FileBackedBuffer> buffer;
+  std::unique_ptr<FileBackedBuffer> buffer;
 };
 
 /**
@@ -121,7 +121,7 @@ class S3Uploader : public AbstractUploader {
   s3fanout::JobInfo *CreateJobInfo(const std::string &path) const;
   void FlushDeleteBatch() const;
 
-  mutable UniquePtr<s3fanout::S3FanoutManager> s3fanout_mgr_;
+  mutable std::unique_ptr<s3fanout::S3FanoutManager> s3fanout_mgr_;
   std::string repository_alias_;
   std::string host_name_port_;
   std::string host_name_;

@@ -30,7 +30,7 @@ SubscriberSSE::SubscriberSSE(const std::string &server_url)
 SubscriberSSE::~SubscriberSSE() { }
 
 bool SubscriberSSE::Subscribe(const std::string &topic) {
-  const UniquePtr<Url> url(Url::Parse(server_url_));
+  const std::unique_ptr<Url> url(Url::Parse(server_url_));
 
   if (!url.IsValid()) {
     LogCvmfs(kLogCvmfs, kLogError,

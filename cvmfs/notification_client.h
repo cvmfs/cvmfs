@@ -48,7 +48,7 @@ class NotificationClient : public SingleCopy {
   FuseRemounter *remounter_;
   download::DownloadManager *dl_mgr_;
   signature::SignatureManager *sig_mgr_;
-  UniquePtr<notify::Subscriber> subscriber_;
+  std::unique_ptr<notify::Subscriber> subscriber_;
   pthread_t thread_;
   bool spawned_;
 };

@@ -99,7 +99,7 @@ BENCHMARK_DEFINE_F(BM_CatalogGrafting, Baseline)(benchmark::State &st) {
   
     tester.Apply("second", spec2);
   
-    UniquePtr<ServerTool> server_tool(new ServerTool());
+    std::unique_ptr<ServerTool> server_tool(new ServerTool());
     server_tool->InitDownloadManager(true, "");
   
     receiver::Params params = MakeMergeToolParams("test");

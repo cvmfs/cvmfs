@@ -39,12 +39,12 @@ bool GenerateSessionToken(const std::string &key_id, const std::string &path,
     return false;
   }
 
-  const UniquePtr<cipher::Key> secret(cipher::Key::CreateRandomly(32));
+  const std::unique_ptr<cipher::Key> secret(cipher::Key::CreateRandomly(32));
   if (!secret.IsValid()) {
     return false;
   }
 
-  const UniquePtr<cipher::Cipher> cipher(
+  const std::unique_ptr<cipher::Cipher> cipher(
       cipher::Cipher::Create(cipher::kAes256Cbc));
   if (!cipher.IsValid()) {
     return false;
@@ -88,7 +88,7 @@ bool GetTokenPublicId(const std::string &token, std::string *public_id) {
     return false;
   }
 
-  const UniquePtr<JsonDocument> token_json(
+  const std::unique_ptr<JsonDocument> token_json(
       JsonDocument::Create(debased64_token));
   if (!token_json.IsValid()) {
     return false;
@@ -122,7 +122,7 @@ TokenCheckResult CheckToken(const std::string &token, const std::string &secret,
     return kInvalid;
   }
 
-  const UniquePtr<JsonDocument> token_json(
+  const std::unique_ptr<JsonDocument> token_json(
       JsonDocument::Create(debased64_token));
   if (!token_json.IsValid()) {
     return kInvalid;
@@ -140,7 +140,7 @@ TokenCheckResult CheckToken(const std::string &token, const std::string &secret,
   if (!Debase64(secret, &debased64_secret)) {
     return kInvalid;
   }
-  const UniquePtr<cipher::Key> key(
+  const std::unique_ptr<cipher::Key> key(
       cipher::Key::CreateFromString(debased64_secret));
   if (!key.IsValid()) {
     return kInvalid;
@@ -156,7 +156,7 @@ TokenCheckResult CheckToken(const std::string &token, const std::string &secret,
     return kInvalid;
   }
 
-  const UniquePtr<JsonDocument> body_json(JsonDocument::Create(body));
+  const std::unique_ptr<JsonDocument> body_json(JsonDocument::Create(body));
   if (!token_json.IsValid()) {
     return kInvalid;
   }

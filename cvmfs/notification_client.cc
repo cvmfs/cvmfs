@@ -52,7 +52,7 @@ class ActivitySubscriber : public notify::SubscriberSSE {
       return notify::Subscriber::kError;
     }
 
-    const UniquePtr<manifest::Manifest> manifest(manifest::Manifest::LoadMem(
+    const std::unique_ptr<manifest::Manifest> manifest(manifest::Manifest::LoadMem(
         reinterpret_cast<const unsigned char *>(msg.manifest_.data()),
         msg.manifest_.size()));
 

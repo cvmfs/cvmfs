@@ -154,7 +154,7 @@ bool MakeEndRequest(const std::string &method, const std::string &key_id,
   if (!doc) {
     ok = false;
   } else {
-    UniquePtr<JsonDocument> const reply_json(doc);
+    std::unique_ptr<JsonDocument> const reply_json(doc);
     const JSON *reply_status = JsonDocument::SearchInObject(
         reply_json->root(), "status", JSON_STRING);
     ok = (reply_status != NULL

@@ -163,7 +163,7 @@ bool FileSystem::CheckPosixCacheSettings(
  * method.
  */
 FileSystem *FileSystem::Create(const FileSystem::FileSystemInfo &fs_info) {
-  UniquePtr<FileSystem> file_system(new FileSystem(fs_info));
+  std::unique_ptr<FileSystem> file_system(new FileSystem(fs_info));
 
   file_system->SetupLogging();
   LogCvmfs(kLogCvmfs, kLogDebug, "Options:\n%s",
@@ -663,7 +663,7 @@ CacheManager *FileSystem::SetupExternalCacheMgr(const string &instance) {
     return NULL;
   }
 
-  const UniquePtr<ExternalCacheManager::PluginHandle> plugin_handle(
+  const std::unique_ptr<ExternalCacheManager::PluginHandle> plugin_handle(
       ExternalCacheManager::CreatePlugin(optarg, cmd_line));
   if (!plugin_handle->IsValid()) {
     boot_error_ = plugin_handle->error_msg();
@@ -686,7 +686,7 @@ CacheManager *FileSystem::SetupPosixCacheMgr(const string &instance) {
   const PosixCacheSettings settings = DeterminePosixCacheSettings(instance);
   if (!CheckPosixCacheSettings(settings))
     return NULL;
-  UniquePtr<PosixCacheManager> cache_mgr(PosixCacheManager::Create(
+  std::unique_ptr<PosixCacheManager> cache_mgr(PosixCacheManager::Create(
       settings.cache_path, settings.is_alien,
       settings.avoid_rename ? PosixCacheManager::kRenameLink
                             : PosixCacheManager::kRenameNormal,
@@ -768,7 +768,7 @@ CacheManager *FileSystem::SetupTieredCacheMgr(const string &instance) {
     boot_status_ = loader::kFailOptions;
     return NULL;
   }
-  UniquePtr<CacheManager> upper(SetupCacheMgr(optarg));
+  std::unique_ptr<CacheManager> upper(SetupCacheMgr(optarg));
   if (!upper.IsValid())
     return NULL;
 
@@ -778,7 +778,7 @@ CacheManager *FileSystem::SetupTieredCacheMgr(const string &instance) {
     boot_status_ = loader::kFailOptions;
     return NULL;
   }
-  UniquePtr<CacheManager> lower(SetupCacheMgr(optarg));
+  std::unique_ptr<CacheManager> lower(SetupCacheMgr(optarg));
   if (!lower.IsValid())
     return NULL;
 
@@ -1259,7 +1259,7 @@ MountPoint *MountPoint::Create(const string &fqrn,
                                OptionsManager *options_mgr) {
   if (options_mgr == NULL)
     options_mgr = file_system->options_mgr();
-  UniquePtr<MountPoint> mountpoint(
+  std::unique_ptr<MountPoint> mountpoint(
       new MountPoint(fqrn, file_system, options_mgr));
 
   // At this point, we have a repository name, the type (fuse or library) and
@@ -1853,7 +1853,7 @@ bool MountPoint::DetermineRootHash(shash::Any *root_hash) {
   if (!FetchHistory(&history_path))
     return false;
   const UnlinkGuard history_file(history_path);
-  const UniquePtr<history::History> tag_db(
+  const std::unique_ptr<history::History> tag_db(
       history::SqliteHistory::Open(history_path));
   if (!tag_db.IsValid()) {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,

@@ -129,10 +129,10 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
 
   const upload::SpoolerDefinition sd(spooler_definition, hash_algorithm,
                                      zlib::kZlibDefault);
-  const UniquePtr<upload::Spooler> spooler(upload::Spooler::Construct(sd));
+  const std::unique_ptr<upload::Spooler> spooler(upload::Spooler::Construct(sd));
   assert(spooler.IsValid());
 
-  const UniquePtr<manifest::Manifest> manifest(
+  const std::unique_ptr<manifest::Manifest> manifest(
       catalog::WritableCatalogManager::CreateRepository(
           dir_temp, volatile_content, voms_authz, spooler.weak_ref()));
   if (!manifest.IsValid()) {
@@ -140,7 +140,7 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
     return 1;
   }
 
-  UniquePtr<manifest::Reflog> reflog(CreateEmptyReflog(dir_temp, repo_name));
+  std::unique_ptr<manifest::Reflog> reflog(CreateEmptyReflog(dir_temp, repo_name));
   if (!reflog.IsValid()) {
     PrintError("Swissknife Sync: Failed to create fresh Reflog");
     return 1;
@@ -589,7 +589,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
                                  getpid());
   assert(path_size > 0);
   assert(path_size < PATH_MAX);
-  const UniquePtr<Watchdog> watchdog(Watchdog::Create(NULL, false /* needs_read_environ */));
+  const std::unique_ptr<Watchdog> watchdog(Watchdog::Create(NULL, false /* needs_read_environ */));
   watchdog->Spawn(std::string(watchdog_path));
 
   SyncParameters params;
@@ -782,7 +782,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
                                               &publish_statistics);
   if (NULL == params.spooler)
     return 3;
-  const UniquePtr<upload::Spooler> spooler_catalogs(upload::Spooler::Construct(
+  const std::unique_ptr<upload::Spooler> spooler_catalogs(upload::Spooler::Construct(
       spooler_definition_catalogs, &publish_statistics));
   if (!spooler_catalogs.IsValid())
     return 3;
@@ -803,7 +803,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
    * remote root hashes. We proceed by loading the remote manifest but we give
    * an empty base hash.
    */
-  UniquePtr<manifest::Manifest> manifest;
+  std::unique_ptr<manifest::Manifest> manifest;
   if (params.branched_catalog) {
     // Throw-away manifest
     manifest = new manifest::Manifest(shash::Any(), 0, "");

@@ -29,7 +29,7 @@ class MockSyncMediator : public AbstractSyncMediator {
   virtual void Add(SharedPtr<SyncItem> entry) {
     if (entry->IsRegularFile()) {
       // wake up the tar engine
-      UniquePtr<IngestionSource> is(entry->CreateIngestionSource());
+      std::unique_ptr<IngestionSource> is(entry->CreateIngestionSource());
       is->Close();
       n_reg++;
     } else {

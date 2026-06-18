@@ -697,7 +697,7 @@ bool CommandOverlay::InjectSingularityDotfiles(
   }
   close(fd);
 
-  const UniquePtr<JsonDocument> json(JsonDocument::Create(config_json));
+  const std::unique_ptr<JsonDocument> json(JsonDocument::Create(config_json));
   if (!json.IsValid()) {
     LogCvmfs(kLogCvmfs, kLogStderr,
              "Failed to parse OCI config JSON from %s",
@@ -1164,13 +1164,13 @@ int CommandOverlay::Main(const ArgumentList &args) {
   const upload::SpoolerDefinition spooler_definition_catalogs(
       spooler_definition.Dup2DefaultCompression());
 
-  const UniquePtr<upload::Spooler> spooler_files(
+  const std::unique_ptr<upload::Spooler> spooler_files(
       upload::Spooler::Construct(spooler_definition, &publish_statistics));
   if (!spooler_files.IsValid()) {
     PrintError("Failed to create file spooler");
     return 3;
   }
-  const UniquePtr<upload::Spooler> spooler_catalogs(
+  const std::unique_ptr<upload::Spooler> spooler_catalogs(
       upload::Spooler::Construct(spooler_definition_catalogs,
                                  &publish_statistics));
   if (!spooler_catalogs.IsValid()) {
@@ -1191,7 +1191,7 @@ int CommandOverlay::Main(const ArgumentList &args) {
   }
 
   // Fetch repository manifest
-  const UniquePtr<manifest::Manifest> manifest(
+  const std::unique_ptr<manifest::Manifest> manifest(
       FetchRemoteManifest(stratum0, repo_name, base_hash));
   if (!manifest.IsValid()) {
     PrintError("Failed to load repository manifest");

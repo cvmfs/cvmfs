@@ -784,7 +784,7 @@ TEST_F(T_Ingestion, PipelineNull) {
   upload::SpoolerDefinition spooler_definition = MockSpoolerDefinition();
   spooler_definition.compression_alg = zlib::kNoCompression;
 
-  UniquePtr<IngestionPipeline> pipeline_straight(
+  std::unique_ptr<IngestionPipeline> pipeline_straight(
       new IngestionPipeline(uploader_, spooler_definition));
   FnFileProcessed fn_processed;
   pipeline_straight->RegisterListener(&FnFileProcessed::OnFileProcessed,
@@ -804,7 +804,7 @@ TEST_F(T_Ingestion, PipelineNull) {
 
   spooler_definition.compression_alg = zlib::kZlibDefault;
   spooler_definition.hash_algorithm = shash::kShake128;
-  UniquePtr<IngestionPipeline> pipeline_zlib(
+  std::unique_ptr<IngestionPipeline> pipeline_zlib(
       new IngestionPipeline(uploader_, spooler_definition));
   pipeline_zlib->Spawn();
 
@@ -825,7 +825,7 @@ TEST_F(T_Ingestion, PipelineNull) {
 
 
 TEST_F(T_Ingestion, Scrubbing) {
-  UniquePtr<ScrubbingPipeline> pipeline_scrubbing(new ScrubbingPipeline());
+  std::unique_ptr<ScrubbingPipeline> pipeline_scrubbing(new ScrubbingPipeline());
   FnFileHashed fn_hashed;
   pipeline_scrubbing->RegisterListener(&FnFileHashed::OnFileProcessed,
                                        &fn_hashed);

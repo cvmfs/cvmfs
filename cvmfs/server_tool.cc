@@ -122,7 +122,7 @@ manifest::Manifest *ServerTool::FetchRemoteManifest(
     const std::string &repository_url, const std::string &repository_name,
     const shash::Any &base_hash) const {
   manifest::ManifestEnsemble manifest_ensemble;
-  UniquePtr<manifest::Manifest> manifest;
+  std::unique_ptr<manifest::Manifest> manifest;
 
   // fetch (and verify) the manifest
   const manifest::Failures retval = FetchRemoteManifestEnsemble(

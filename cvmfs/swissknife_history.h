@@ -51,10 +51,10 @@ class CommandTag : public Command {
     const std::string tmp_path;
 
     UnlinkGuard manifest_path;
-    UniquePtr<manifest::Manifest> manifest;
-    UniquePtr<manifest::Manifest> previous_manifest;
-    UniquePtr<history::History> history;
-    UniquePtr<upload::Spooler> spooler;
+    std::unique_ptr<manifest::Manifest> manifest;
+    std::unique_ptr<manifest::Manifest> previous_manifest;
+    std::unique_ptr<history::History> history;
+    std::unique_ptr<upload::Spooler> spooler;
     UnlinkGuard history_path;
   };
 

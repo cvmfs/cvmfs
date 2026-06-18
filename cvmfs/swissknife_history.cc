@@ -112,7 +112,7 @@ CommandTag::Environment *CommandTag::InitializeEnvironment(
   // Note: We use this encapsulation because we cannot be sure that the
   // Command object gets deleted properly. With the Environment object at
   // hand we have full control and can make heavy and safe use of RAII
-  UniquePtr<Environment> env(new Environment(repository_url, tmp_path));
+  std::unique_ptr<Environment> env(new Environment(repository_url, tmp_path));
   env->manifest_path.Set(manifest_path);
   env->history_path.Set(CreateTempPath(tmp_path + "/history", 0600));
 
@@ -235,7 +235,7 @@ bool CommandTag::UploadCatalogAndUpdateManifest(
   assert(env->spooler.IsValid());
 
   // gather information about catalog to be uploaded and update manifest
-  UniquePtr<catalog::WritableCatalog> wr_catalog(catalog);
+  std::unique_ptr<catalog::WritableCatalog> wr_catalog(catalog);
   const std::string catalog_path = wr_catalog->database_path();
   env->manifest->set_ttl(wr_catalog->GetTTL());
   env->manifest->set_revision(wr_catalog->GetRevision());
@@ -456,7 +456,7 @@ int CommandEditTag::Main(const ArgumentList &args) {
 
   // initialize the Environment (taking ownership)
   const bool history_read_write = true;
-  const UniquePtr<Environment> env(
+  const std::unique_ptr<Environment> env(
       InitializeEnvironment(args, history_read_write));
   if (!env.IsValid()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to init environment");
@@ -596,7 +596,7 @@ int CommandEditTag::AddNewTag(const ArgumentList &args, Environment *env) {
   const UnlinkGuard catalog_path(
       CreateTempPath(env->tmp_path + "/catalog", 0600));
   const bool catalog_read_write = false;
-  const UniquePtr<catalog::Catalog> catalog(GetCatalog(
+  const std::unique_ptr<catalog::Catalog> catalog(GetCatalog(
       env->repository_url, root_hash, catalog_path.path(), catalog_read_write));
   if (!catalog.IsValid()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "catalog with hash '%s' does not exist",
@@ -967,7 +967,7 @@ int CommandListTags::Main(const ArgumentList &args) {
 
   // initialize the Environment (taking ownership)
   const bool history_read_write = false;
-  const UniquePtr<Environment> env(
+  const std::unique_ptr<Environment> env(
       InitializeEnvironment(args, history_read_write));
   if (!env.IsValid()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to init environment");
@@ -1056,7 +1056,7 @@ int CommandInfoTag::Main(const ArgumentList &args) {
 
   // initialize the Environment (taking ownership)
   const bool history_read_write = false;
-  const UniquePtr<Environment> env(
+  const std::unique_ptr<Environment> env(
       InitializeEnvironment(args, history_read_write));
   if (!env.IsValid()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to init environment");
@@ -1097,7 +1097,7 @@ int CommandRollbackTag::Main(const ArgumentList &args) {
 
   // initialize the Environment (taking ownership)
   const bool history_read_write = true;
-  const UniquePtr<Environment> env(
+  const std::unique_ptr<Environment> env(
       InitializeEnvironment(args, history_read_write));
   if (!env.IsValid()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to init environment");
@@ -1147,7 +1147,7 @@ int CommandRollbackTag::Main(const ArgumentList &args) {
   const UnlinkGuard catalog_path(
       CreateTempPath(env->tmp_path + "/catalog", 0600));
   const bool catalog_read_write = true;
-  UniquePtr<catalog::WritableCatalog> catalog(
+  std::unique_ptr<catalog::WritableCatalog> catalog(
       dynamic_cast<catalog::WritableCatalog *>(
           GetCatalog(env->repository_url, target_tag.root_hash,
                      catalog_path.path(), catalog_read_write)));
@@ -1239,7 +1239,7 @@ ParameterList CommandEmptyRecycleBin::GetParams() const {
 int CommandEmptyRecycleBin::Main(const ArgumentList &args) {
   // initialize the Environment (taking ownership)
   const bool history_read_write = true;
-  const UniquePtr<Environment> env(
+  const std::unique_ptr<Environment> env(
       InitializeEnvironment(args, history_read_write));
   if (!env.IsValid()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to init environment");

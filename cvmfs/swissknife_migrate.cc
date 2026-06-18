@@ -321,7 +321,7 @@ bool CommandMigrate::UpdateUndoTags(PendingCatalog *root_catalog,
   bool retval = CopyPath2Path(filename_old, filename_new);
   if (!retval)
     return false;
-  UniquePtr<history::SqliteHistory> history(
+  std::unique_ptr<history::SqliteHistory> history(
       history::SqliteHistory::OpenWritable(filename_new));
   history->TakeDatabaseFileOwnership();
 
@@ -899,7 +899,7 @@ bool CommandMigrate::MigrationWorker_20x::CreateNewEmptyCatalog(
   {
     // TODO(rmeusel): Attach catalog should work with an open catalog database
     // as well, to remove this inefficiency
-    const UniquePtr<catalog::CatalogDatabase> new_clg_db(
+    const std::unique_ptr<catalog::CatalogDatabase> new_clg_db(
         catalog::CatalogDatabase::Create(clg_db_path));
     if (!new_clg_db.IsValid()
         || !new_clg_db->InsertInitialValues(root_path, volatile_content, "")) {

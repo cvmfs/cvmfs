@@ -312,9 +312,9 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
 
   pthread_t thread_download_;
   atomic_int32 multi_threaded_;
-  UniquePtr<Pipe<kPipeThreadTerminator> > pipe_terminate_;
+  std::unique_ptr<Pipe<kPipeThreadTerminator> > pipe_terminate_;
 
-  UniquePtr<Pipe<kPipeDownloadJobs> > pipe_jobs_;
+  std::unique_ptr<Pipe<kPipeDownloadJobs> > pipe_jobs_;
   struct pollfd *watch_fds_;
   uint32_t watch_fds_size_;
   uint32_t watch_fds_inuse_;

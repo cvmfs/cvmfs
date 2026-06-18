@@ -62,11 +62,11 @@ class UniquePtrBase : SingleCopy {
 
 
 template<class T>
-class UniquePtr : public UniquePtrBase<T, UniquePtr<T> > {
-  friend class UniquePtrBase<T, UniquePtr<T> >;
+class std::unique_ptr : public UniquePtrBase<T, std::unique_ptr<T> > {
+  friend class UniquePtrBase<T, std::unique_ptr<T> >;
 
  private:
-  typedef UniquePtrBase<T, UniquePtr<T> > BaseT;
+  typedef UniquePtrBase<T, std::unique_ptr<T> > BaseT;
 
  public:
   using BaseT::operator=;
@@ -80,12 +80,12 @@ class UniquePtr : public UniquePtrBase<T, UniquePtr<T> > {
 
 
 template<>
-class UniquePtr<void> : public UniquePtrBase<void, UniquePtr<void> > {
+class std::unique_ptr<void> : public UniquePtrBase<void, std::unique_ptr<void> > {
  private:
-  typedef UniquePtrBase<void, UniquePtr<void> > BaseT;
+  typedef UniquePtrBase<void, std::unique_ptr<void> > BaseT;
 
  public:
-  friend class UniquePtrBase<void, UniquePtr<void> >;
+  friend class UniquePtrBase<void, std::unique_ptr<void> >;
   using BaseT::operator=;
   inline UniquePtr() : BaseT(NULL) { }
   inline explicit UniquePtr(void *ref) : BaseT(ref) { }
@@ -99,13 +99,13 @@ class UniquePtr<void> : public UniquePtrBase<void, UniquePtr<void> > {
 };
 
 template<>
-class UniquePtr<unsigned char>
-    : public UniquePtrBase<unsigned char, UniquePtr<unsigned char> > {
+class std::unique_ptr<unsigned char>
+    : public UniquePtrBase<unsigned char, std::unique_ptr<unsigned char> > {
  private:
-  typedef UniquePtrBase<unsigned char, UniquePtr<unsigned char> > BaseT;
+  typedef UniquePtrBase<unsigned char, std::unique_ptr<unsigned char> > BaseT;
 
  public:
-  friend class UniquePtrBase<unsigned char, UniquePtr<unsigned char> >;
+  friend class UniquePtrBase<unsigned char, std::unique_ptr<unsigned char> >;
   using BaseT::operator=;
   inline UniquePtr() : BaseT(NULL) { }
   inline explicit UniquePtr(unsigned char *ref) : BaseT(ref) { }

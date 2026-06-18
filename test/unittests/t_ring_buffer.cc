@@ -18,7 +18,7 @@ class T_RingBuffer : public ::testing::Test {
 
   virtual void TearDown() { ring.Destroy(); }
 
-  UniquePtr<RingBuffer> ring;
+  std::unique_ptr<RingBuffer> ring;
 };
 
 const size_t T_RingBuffer::kSize = 997;

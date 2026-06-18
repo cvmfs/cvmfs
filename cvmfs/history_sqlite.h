@@ -159,22 +159,22 @@ class SqliteHistory : public History {
   bool RunListing(std::vector<Tag> *list, SqlListingT *sql) const;
 
  private:
-  UniquePtr<HistoryDatabase> database_;
+  std::unique_ptr<HistoryDatabase> database_;
 
-  UniquePtr<SqlInsertTag> insert_tag_;
-  UniquePtr<SqlRemoveTag> remove_tag_;
-  UniquePtr<SqlFindTag> find_tag_;
-  UniquePtr<SqlFindTagByDate> find_tag_by_date_;
-  UniquePtr<SqlCountTags> count_tags_;
-  UniquePtr<SqlListTags> list_tags_;
-  UniquePtr<SqlGetHashes> get_hashes_;
-  UniquePtr<SqlRollbackTag> rollback_tag_;
-  UniquePtr<SqlListRollbackTags> list_rollback_tags_;
-  UniquePtr<SqlListBranches> list_branches_;
-  UniquePtr<SqlInsertBranch> insert_branch_;
-  UniquePtr<SqlFindBranchHead> find_branch_head_;
-  UniquePtr<SqlRecycleBinList> recycle_list_;
-  UniquePtr<SqlRecycleBinFlush> recycle_empty_;
+  std::unique_ptr<SqlInsertTag> insert_tag_;
+  std::unique_ptr<SqlRemoveTag> remove_tag_;
+  std::unique_ptr<SqlFindTag> find_tag_;
+  std::unique_ptr<SqlFindTagByDate> find_tag_by_date_;
+  std::unique_ptr<SqlCountTags> count_tags_;
+  std::unique_ptr<SqlListTags> list_tags_;
+  std::unique_ptr<SqlGetHashes> get_hashes_;
+  std::unique_ptr<SqlRollbackTag> rollback_tag_;
+  std::unique_ptr<SqlListRollbackTags> list_rollback_tags_;
+  std::unique_ptr<SqlListBranches> list_branches_;
+  std::unique_ptr<SqlInsertBranch> insert_branch_;
+  std::unique_ptr<SqlFindBranchHead> find_branch_head_;
+  std::unique_ptr<SqlRecycleBinList> recycle_list_;
+  std::unique_ptr<SqlRecycleBinFlush> recycle_empty_;
 };
 
 }  // namespace history

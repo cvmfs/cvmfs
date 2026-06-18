@@ -42,7 +42,7 @@ class T_Compressor : public ::testing::Test {
   }
 
   char *test_string, *ptr_test_string;
-  UniquePtr<Compressor> compressor;
+  std::unique_ptr<Compressor> compressor;
   unsigned char *buf;
   size_t buf_size;
   size_t size_input;
@@ -134,7 +134,7 @@ TEST_F(T_Compressor, EchoCompression) {
 
 TEST_F(T_Compressor, EchoCompressionLong) {
   compressor = zlib::Compressor::Construct(zlib::kNoCompression);
-  UniquePtr<unsigned char> compress_buf(reinterpret_cast<unsigned char *>(
+  std::unique_ptr<unsigned char> compress_buf(reinterpret_cast<unsigned char *>(
       smalloc(compressor->DeflateBound(long_size))));
   unsigned compress_pos = 0;
   bool deflate_finished = false;

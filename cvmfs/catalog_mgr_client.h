@@ -97,7 +97,7 @@ class ClientCatalogManager : public AbstractCatalogManager<Catalog> {
   std::map<PathString, shash::Any> loaded_catalogs_;
   std::map<PathString, shash::Any> mounted_catalogs_;
 
-  UniquePtr<manifest::Manifest> manifest_;
+  std::unique_ptr<manifest::Manifest> manifest_;
 
   std::string repo_name_;
   cvmfs::Fetcher *fetcher_;

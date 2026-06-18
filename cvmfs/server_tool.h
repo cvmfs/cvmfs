@@ -48,8 +48,8 @@ class ServerTool {
   const perf::Statistics *statistics() const { return &statistics_; }
 
  protected:
-  UniquePtr<download::DownloadManager> download_manager_;
-  UniquePtr<signature::SignatureManager> signature_manager_;
+  std::unique_ptr<download::DownloadManager> download_manager_;
+  std::unique_ptr<signature::SignatureManager> signature_manager_;
   perf::Statistics statistics_;
 
  private:

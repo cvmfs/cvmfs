@@ -80,7 +80,7 @@ bool EditTags(const RepositoryTag &repo_tag, const std::string &repo_name,
     args['c'].Reset(new std::string(StringifyInt(auto_tag_threshold)));
   }
 
-  const UniquePtr<swissknife::CommandEditTag> edit_cmd(
+  const std::unique_ptr<swissknife::CommandEditTag> edit_cmd(
       new swissknife::CommandEditTag());
   const int ret = edit_cmd->Main(args);
 
@@ -221,7 +221,7 @@ CommitProcessor::Result CommitProcessor::Process(
     return kError;
   }
 
-  const UniquePtr<ServerTool> server_tool(new ServerTool());
+  const std::unique_ptr<ServerTool> server_tool(new ServerTool());
 
   if (!server_tool->InitDownloadManager(true, params.proxy)) {
     LogCvmfs(
@@ -242,7 +242,7 @@ CommitProcessor::Result CommitProcessor::Process(
   }
 
   const shash::Any manifest_base_hash;
-  const UniquePtr<manifest::Manifest> manifest_tgt(
+  const std::unique_ptr<manifest::Manifest> manifest_tgt(
       server_tool->FetchRemoteManifest(params.stratum0, repo_name,
                                        manifest_base_hash));
 
@@ -422,7 +422,7 @@ CommitProcessor::Result CommitProcessor::Process(
     }
   }
 
-  const UniquePtr<RaiiTempDir> raii_temp_dir(
+  const std::unique_ptr<RaiiTempDir> raii_temp_dir(
       RaiiTempDir::Create(temp_dir_root));
   const std::string temp_dir = raii_temp_dir->dir();
 

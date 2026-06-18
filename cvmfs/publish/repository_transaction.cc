@@ -121,7 +121,7 @@ void Publisher::TransactionImpl() {
     }
   }
 
-  const UniquePtr<CheckoutMarker> marker(CheckoutMarker::CreateFrom(
+  const std::unique_ptr<CheckoutMarker> marker(CheckoutMarker::CreateFrom(
       settings_.transaction().spool_area().checkout_marker()));
 
   in_transaction_.Set();

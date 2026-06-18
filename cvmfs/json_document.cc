@@ -10,7 +10,7 @@
 using namespace std;  // NOLINT
 
 JsonDocument *JsonDocument::Create(const string &text) {
-  UniquePtr<JsonDocument> json(new JsonDocument());
+  std::unique_ptr<JsonDocument> json(new JsonDocument());
   if (!json->Parse(text))
     return NULL;
   return json.Release();

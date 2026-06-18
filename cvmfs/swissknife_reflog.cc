@@ -90,7 +90,7 @@ int CommandReconstructReflog::Main(const ArgumentList &args) {
   ObjectFetcher object_fetcher(repo_name, repo_url, tmp_dir, download_manager(),
                                signature_manager());
 
-  UniquePtr<manifest::Manifest> manifest;
+  std::unique_ptr<manifest::Manifest> manifest;
   const ObjectFetcher::Failures retval = object_fetcher.FetchManifest(
       &manifest);
   if (retval != ObjectFetcher::kFailOk) {
@@ -102,7 +102,7 @@ int CommandReconstructReflog::Main(const ArgumentList &args) {
   }
 
   const upload::SpoolerDefinition spooler_definition(spooler, shash::kAny);
-  const UniquePtr<upload::AbstractUploader> uploader(
+  const std::unique_ptr<upload::AbstractUploader> uploader(
       upload::AbstractUploader::Construct(spooler_definition));
 
   if (!uploader.IsValid()) {
@@ -111,7 +111,7 @@ int CommandReconstructReflog::Main(const ArgumentList &args) {
     return 1;
   }
 
-  UniquePtr<manifest::Reflog> reflog(CreateEmptyReflog(tmp_dir, repo_name));
+  std::unique_ptr<manifest::Reflog> reflog(CreateEmptyReflog(tmp_dir, repo_name));
   reflog->TakeDatabaseFileOwnership();
 
   reflog->BeginTransaction();
@@ -180,7 +180,7 @@ void RootChainWalker::FindObjectsAndPopulateReflog() {
 
 void RootChainWalker::WalkRootCatalogs(const shash::Any &root_catalog_hash) {
   shash::Any current_hash = root_catalog_hash;
-  UniquePtr<CatalogTN> current_catalog;
+  std::unique_ptr<CatalogTN> current_catalog;
 
   while (!current_hash.IsNull() && !reflog_->ContainsCatalog(current_hash)
          && (current_catalog = FetchCatalog(current_hash)).IsValid()) {
@@ -197,7 +197,7 @@ void RootChainWalker::WalkRootCatalogs(const shash::Any &root_catalog_hash) {
 
 void RootChainWalker::WalkHistories(const shash::Any &history_hash) {
   shash::Any current_hash = history_hash;
-  UniquePtr<HistoryTN> current_history;
+  std::unique_ptr<HistoryTN> current_history;
 
   while (!current_hash.IsNull() && !reflog_->ContainsHistory(current_hash)
          && (current_history = FetchHistory(current_hash)).IsValid()) {

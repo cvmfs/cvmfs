@@ -208,7 +208,7 @@ TEST_F(T_CatalogSql, SchemaMigration) {
 
   // Revision 1 --> 8
   {
-    UniquePtr<catalog::CatalogDatabase> db(
+    std::unique_ptr<catalog::CatalogDatabase> db(
         catalog::CatalogDatabase::Create(path));
     ASSERT_TRUE(db.IsValid());
     catalog::Counters counters;
@@ -216,7 +216,7 @@ TEST_F(T_CatalogSql, SchemaMigration) {
     RevertToRevision1(db.weak_ref());
   }
   {
-    UniquePtr<catalog::CatalogDatabase> db(catalog::CatalogDatabase::Open(
+    std::unique_ptr<catalog::CatalogDatabase> db(catalog::CatalogDatabase::Open(
         path, catalog::CatalogDatabase::kOpenReadWrite));
     sqlite::Sql sql1(db->sqlite_db(), "SELECT COUNT(xattr) FROM catalog;");
     ASSERT_TRUE(sql1.FetchRow());
@@ -255,13 +255,13 @@ TEST_F(T_CatalogSql, SchemaMigration) {
 
   // Revision 0 --> 8
   {
-    UniquePtr<catalog::CatalogDatabase> db(catalog::CatalogDatabase::Open(
+    std::unique_ptr<catalog::CatalogDatabase> db(catalog::CatalogDatabase::Open(
         path, catalog::CatalogDatabase::kOpenReadWrite));
     ASSERT_TRUE(db.IsValid());
     RevertToRevision0(db.weak_ref());
   }
   {
-    UniquePtr<catalog::CatalogDatabase> db(catalog::CatalogDatabase::Open(
+    std::unique_ptr<catalog::CatalogDatabase> db(catalog::CatalogDatabase::Open(
         path, catalog::CatalogDatabase::kOpenReadWrite));
     ASSERT_TRUE(db.IsValid());
     sqlite::Sql sql1(db->sqlite_db(), "SELECT COUNT(xattr) FROM catalog");

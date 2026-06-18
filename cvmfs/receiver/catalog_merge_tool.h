@@ -123,12 +123,12 @@ class CatalogMergeTool : public CatalogDiffTool<RoCatalogMgr> {
 
   manifest::Manifest *manifest_;
 
-  UniquePtr<RwCatalogMgr> output_catalog_mgr_;
+  std::unique_ptr<RwCatalogMgr> output_catalog_mgr_;
 
   const bool needs_setup_;
 
   perf::Statistics *statistics_;
-  UniquePtr<perf::FsCounters> counters_;
+  std::unique_ptr<perf::FsCounters> counters_;
 };
 
 }  // namespace receiver

@@ -98,14 +98,14 @@ class Reflog {
   void PrepareQueries();
 
  private:
-  UniquePtr<ReflogDatabase> database_;
+  std::unique_ptr<ReflogDatabase> database_;
 
-  UniquePtr<SqlInsertReference> insert_reference_;
-  UniquePtr<SqlCountReferences> count_references_;
-  UniquePtr<SqlListReferences> list_references_;
-  UniquePtr<SqlRemoveReference> remove_reference_;
-  UniquePtr<SqlContainsReference> contains_reference_;
-  UniquePtr<SqlGetTimestamp> get_timestamp_;
+  std::unique_ptr<SqlInsertReference> insert_reference_;
+  std::unique_ptr<SqlCountReferences> count_references_;
+  std::unique_ptr<SqlListReferences> list_references_;
+  std::unique_ptr<SqlRemoveReference> remove_reference_;
+  std::unique_ptr<SqlContainsReference> contains_reference_;
+  std::unique_ptr<SqlGetTimestamp> get_timestamp_;
 };
 
 }  // namespace manifest

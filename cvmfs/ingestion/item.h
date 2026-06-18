@@ -46,7 +46,7 @@ class FileItem : SingleCopy {
 
   static FileItem *CreateQuitBeacon() {
     const std::string quit_marker = std::string(1, kQuitBeaconMarker);
-    UniquePtr<FileIngestionSource> source(new FileIngestionSource(quit_marker));
+    std::unique_ptr<FileIngestionSource> source(new FileIngestionSource(quit_marker));
     return new FileItem(source.Release());
   }
   bool IsQuitBeacon() {
@@ -90,7 +90,7 @@ class FileItem : SingleCopy {
   static const uint64_t kSizeUnknown = uint64_t(-1);
   static const char kQuitBeaconMarker = '\0';
 
-  UniquePtr<IngestionSource> source_;
+  std::unique_ptr<IngestionSource> source_;
   const zlib::Algorithms compression_algorithm_;
   const shash::Algorithms hash_algorithm_;
   const shash::Suffix hash_suffix_;
@@ -166,7 +166,7 @@ class ChunkItem : SingleCopy {
    * Deleted by the uploader.
    */
   upload::UploadStreamHandle *upload_handle_;
-  UniquePtr<zlib::Compressor> compressor_;
+  std::unique_ptr<zlib::Compressor> compressor_;
   shash::ContextPtr hash_ctx_;
   shash::Any hash_value_;
   unsigned char hash_ctx_buffer_[shash::kMaxContextSize];

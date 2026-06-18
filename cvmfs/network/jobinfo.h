@@ -65,10 +65,10 @@ class JobInfo {
   static atomic_int64 next_uuid;
   int64_t id_;
   /// Pipe used for the return value
-  UniquePtr<Pipe<kPipeDownloadJobsResults> > pipe_job_results;
+  std::unique_ptr<Pipe<kPipeDownloadJobsResults> > pipe_job_results;
   /// Tube (bounded thread-safe queue) to transport data from CURL callback
   /// to be decompressed in Fetch() instead of MainDownload()
-  UniquePtr<Tube<DataTubeElement> > data_tube_;
+  std::unique_ptr<Tube<DataTubeElement> > data_tube_;
   const std::string *url_;
   bool compressed_;
   bool probe_hosts_;

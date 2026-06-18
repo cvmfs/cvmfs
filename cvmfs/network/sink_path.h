@@ -30,7 +30,7 @@ class PathSink : public Sink {
  public:
   explicit PathSink(const std::string &destination_path);
 
-  virtual ~PathSink() { }  // UniquePtr<FileSink> sink_ takes care of everything
+  virtual ~PathSink() { }  // std::unique_ptr<FileSink> sink_ takes care of everything
 
   /**
    * Appends data to the sink
@@ -99,7 +99,7 @@ class PathSink : public Sink {
 
  private:
   FILE *file_;  // owned by sink_
-  UniquePtr<FileSink> sink_;
+  std::unique_ptr<FileSink> sink_;
   const std::string path_;
 };
 

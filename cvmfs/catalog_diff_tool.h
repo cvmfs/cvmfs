@@ -141,11 +141,11 @@ class CatalogDiffTool {
   perf::Statistics stats_old_;
   perf::Statistics stats_new_;
 
-  UniquePtr<RaiiTempDir> old_raii_temp_dir_;
-  UniquePtr<RaiiTempDir> new_raii_temp_dir_;
+  std::unique_ptr<RaiiTempDir> old_raii_temp_dir_;
+  std::unique_ptr<RaiiTempDir> new_raii_temp_dir_;
 
-  UniquePtr<RoCatalogMgr> old_catalog_mgr_;
-  UniquePtr<RoCatalogMgr> new_catalog_mgr_;
+  std::unique_ptr<RoCatalogMgr> old_catalog_mgr_;
+  std::unique_ptr<RoCatalogMgr> new_catalog_mgr_;
 
   const bool needs_setup_;
 };

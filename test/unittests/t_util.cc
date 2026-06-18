@@ -622,7 +622,7 @@ TEST_F(T_Util, ReadHalfPipeTimeout) {
 
 TEST_F(T_Util, ClosePipe) {
   int fd[2];
-  UniquePtr<void> buffer_output(scalloc(20, sizeof(char)));
+  std::unique_ptr<void> buffer_output(scalloc(20, sizeof(char)));
   MakePipe(fd);
   ClosePipe(fd);
   ASSERT_DEATH(WritePipe(fd[1], to_write.c_str(), to_write.length()), ".*");
@@ -1791,7 +1791,7 @@ TEST_F(T_Util, ManagedExecCommandLine) {
   pid_t pid;
   int fd_stdout[2];
   int fd_stdin[2];
-  UniquePtr<unsigned char> buffer(
+  std::unique_ptr<unsigned char> buffer(
       static_cast<unsigned char *>(scalloc(100, 1)));
   MakePipe(fd_stdout);
   MakePipe(fd_stdin);
@@ -1824,7 +1824,7 @@ TEST_F(T_Util, ManagedExecClearEnv) {
   pid_t pid;
   int fd_stdout[2];
   int fd_stdin[2];
-  UniquePtr<unsigned char> buffer(
+  std::unique_ptr<unsigned char> buffer(
       static_cast<unsigned char *>(scalloc(100, 1)));
   MakePipe(fd_stdout);
   MakePipe(fd_stdin);

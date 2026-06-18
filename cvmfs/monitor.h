@@ -135,11 +135,11 @@ class Watchdog : SingleCopy {
   std::string crash_dump_path_;
   std::string exe_path_;
   pid_t watchdog_pid_;
-  UniquePtr<Pipe<kPipeWatchdog> > pipe_watchdog_;
+  std::unique_ptr<Pipe<kPipeWatchdog> > pipe_watchdog_;
   /// The supervisee makes sure its watchdog does not die
-  UniquePtr<Pipe<kPipeWatchdogSupervisor> > pipe_listener_;
+  std::unique_ptr<Pipe<kPipeWatchdogSupervisor> > pipe_listener_;
   /// Send the terminate signal to the listener
-  UniquePtr<Pipe<kPipeThreadTerminator> > pipe_terminate_;
+  std::unique_ptr<Pipe<kPipeThreadTerminator> > pipe_terminate_;
   pthread_t thread_listener_;
   FnOnExit on_exit_;
   platform_spinlock lock_handler_;

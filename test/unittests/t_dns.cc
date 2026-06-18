@@ -797,7 +797,7 @@ TEST_F(T_Dns, CaresResolverReadConfig) {
 
 
 TEST_F(T_Dns, CaresResolverBadResolver) {
-  UniquePtr<CaresResolver> quick_resolver(CaresResolver::Create(false, 0, 100));
+  std::unique_ptr<CaresResolver> quick_resolver(CaresResolver::Create(false, 0, 100));
   ASSERT_TRUE(quick_resolver.IsValid());
 
   vector<string> bad_resolvers;
@@ -817,7 +817,7 @@ TEST_F(T_Dns, CaresResolverTimeout) {
   // As of c-ares 1.15, the timeout algorithm changed to exponential backoff
   // without cutoff.  This should result in a total of 4 queries with timeouts
   // of 256, 256, 512, 1024, which sums up to a little over 2 seconds
-  UniquePtr<CaresResolver> quick_resolver(CaresResolver::Create(false, 3, 256));
+  std::unique_ptr<CaresResolver> quick_resolver(CaresResolver::Create(false, 3, 256));
   ASSERT_TRUE(quick_resolver.IsValid());
 
   vector<string> bad_address;
@@ -1079,7 +1079,7 @@ TEST_F(T_Dns, HostfileResolverBadFormat) {
 
 
 TEST_F(T_Dns, NormalResolverConstruct) {
-  UniquePtr<NormalResolver> resolver(NormalResolver::Create(false, 2, 2000));
+  std::unique_ptr<NormalResolver> resolver(NormalResolver::Create(false, 2, 2000));
   ASSERT_TRUE(resolver.IsValid());
   ASSERT_EQ(resolver->domains(), resolver->cares_resolver_->domains());
   ASSERT_EQ(resolver->resolvers(), resolver->cares_resolver_->resolvers());
@@ -1088,13 +1088,13 @@ TEST_F(T_Dns, NormalResolverConstruct) {
 
   int retval = setenv("HOST_ALIASES", "/no/such/file", 1);
   ASSERT_EQ(0, retval);
-  UniquePtr<NormalResolver> resolver2(NormalResolver::Create(false, 2, 2000));
+  std::unique_ptr<NormalResolver> resolver2(NormalResolver::Create(false, 2, 2000));
   ASSERT_FALSE(resolver2.IsValid());
 }
 
 
 TEST_F(T_Dns, NormalResolverSimple) {
-  UniquePtr<NormalResolver> resolver(NormalResolver::Create(false, 2, 2000));
+  std::unique_ptr<NormalResolver> resolver(NormalResolver::Create(false, 2, 2000));
   ASSERT_TRUE(resolver.IsValid());
 
   Host host = resolver->Resolve("localhost");
@@ -1108,7 +1108,7 @@ TEST_F(T_Dns, NormalResolverSimple) {
 
 
 TEST_F(T_Dns, NormalResolverLocalonly) {
-  UniquePtr<NormalResolver> resolver(NormalResolver::Create(false, 2, 2000));
+  std::unique_ptr<NormalResolver> resolver(NormalResolver::Create(false, 2, 2000));
   ASSERT_TRUE(resolver.IsValid());
 
   vector<string> no_resolvers;

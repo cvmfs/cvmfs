@@ -477,7 +477,7 @@ void Publisher::PushWhitelist() {
 
 
 Publisher *Publisher::Create(const SettingsPublisher &settings) {
-  UniquePtr<Publisher> publisher(new Publisher(settings, false));
+  std::unique_ptr<Publisher> publisher(new Publisher(settings, false));
 
   LogCvmfs(kLogCvmfs, publisher->llvl_ | kLogStdout | kLogNoLinebreak,
            "Creating Key Chain... ");

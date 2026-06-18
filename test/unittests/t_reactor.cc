@@ -138,7 +138,7 @@ TEST_F(T_Reactor, kGenerateToken_kQuit) {
   std::string reply;
   ASSERT_TRUE(Reactor::ReadReply(from_reactor_[0], &reply));
 
-  UniquePtr<JsonDocument> json_reply(JsonDocument::Create(reply));
+  std::unique_ptr<JsonDocument> json_reply(JsonDocument::Create(reply));
   ASSERT_TRUE(json_reply.IsValid());
 
   // Send kQuit request
@@ -164,7 +164,7 @@ TEST_F(T_Reactor, FullCycle) {
 
   std::string token, public_id, secret;
   {
-    UniquePtr<JsonDocument> json_reply(JsonDocument::Create(reply));
+    std::unique_ptr<JsonDocument> json_reply(JsonDocument::Create(reply));
     ASSERT_TRUE(json_reply.IsValid());
 
     // Extract the token, public_id and secret from the reply
@@ -191,7 +191,7 @@ TEST_F(T_Reactor, FullCycle) {
   reply.clear();
   ASSERT_TRUE(Reactor::ReadReply(from_reactor_[0], &reply));
   {
-    UniquePtr<JsonDocument> json_reply(JsonDocument::Create(reply));
+    std::unique_ptr<JsonDocument> json_reply(JsonDocument::Create(reply));
     ASSERT_TRUE(json_reply.IsValid());
 
     // Extract the token, public_id and secret from the reply
@@ -213,7 +213,7 @@ TEST_F(T_Reactor, FullCycle) {
   reply.clear();
   ASSERT_TRUE(Reactor::ReadReply(from_reactor_[0], &reply));
   {
-    UniquePtr<JsonDocument> json_reply(JsonDocument::Create(reply));
+    std::unique_ptr<JsonDocument> json_reply(JsonDocument::Create(reply));
     ASSERT_TRUE(json_reply.IsValid());
 
     // Extract the token, public_id and secret from the reply

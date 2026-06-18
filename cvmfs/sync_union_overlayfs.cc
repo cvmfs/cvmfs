@@ -150,7 +150,7 @@ bool SyncUnionOverlayfs::ReadlinkEquals(string const &path,
 bool SyncUnionOverlayfs::HasXattr(string const &path, string const &attr_name) {
   // TODO(reneme): it is quite heavy-weight to allocate an object that contains
   //               an std::map<> just to check if an xattr is there...
-  const UniquePtr<XattrList> xattrs(XattrList::CreateFromFile(path));
+  const std::unique_ptr<XattrList> xattrs(XattrList::CreateFromFile(path));
   assert(xattrs.IsValid());
 
   std::vector<std::string> attrs = xattrs->ListKeys();

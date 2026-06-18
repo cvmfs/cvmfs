@@ -328,9 +328,9 @@ class SyncMediator : public virtual AbstractSyncMediator {
    * By default, files have no extended attributes.
    */
   XattrList default_xattrs_;
-  UniquePtr<perf::FsCounters> counters_;
+  std::unique_ptr<perf::FsCounters> counters_;
 
-  UniquePtr<SyncDiffReporter> reporter_;
+  std::unique_ptr<SyncDiffReporter> reporter_;
 };  // class SyncMediator
 
 }  // namespace publish

@@ -298,7 +298,7 @@ PosixCacheManager *PosixCacheManager::Create(
     const string &cache_path, const bool alien_cache,
     const RenameWorkarounds rename_workaround, const bool do_refcount,
     const bool cleanup_unused_first) {
-  UniquePtr<PosixCacheManager> cache_manager(new PosixCacheManager(
+  std::unique_ptr<PosixCacheManager> cache_manager(new PosixCacheManager(
       cache_path, alien_cache, do_refcount, cleanup_unused_first));
   assert(cache_manager.IsValid());
 

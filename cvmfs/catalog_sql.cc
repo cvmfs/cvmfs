@@ -1455,7 +1455,7 @@ XattrList SqlLookupXattrs::GetXattrs() {
 
   const int size = RetrieveBytes(0);
   assert(size >= 0);
-  const UniquePtr<XattrList> xattrs(
+  const std::unique_ptr<XattrList> xattrs(
       XattrList::Deserialize(packed_xattrs, size));
   if (!xattrs.IsValid()) {
     LogCvmfs(kLogCatalog, kLogDebug, "corrupted xattr data");

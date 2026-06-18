@@ -231,7 +231,7 @@ bool CommandCheck::InspectReflog(const shash::Any &reflog_hash,
     return false;
   }
 
-  const UniquePtr<manifest::Reflog> reflog(manifest::Reflog::Open(reflog_path));
+  const std::unique_ptr<manifest::Reflog> reflog(manifest::Reflog::Open(reflog_path));
   assert(reflog.IsValid());
   reflog->TakeDatabaseFileOwnership();
 
@@ -1056,7 +1056,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
   }
 
   // Load Manifest
-  UniquePtr<manifest::Manifest> manifest;
+  std::unique_ptr<manifest::Manifest> manifest;
   bool successful = true;
 
   if (is_remote_) {
@@ -1126,7 +1126,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
   }
 
   // Load history
-  UniquePtr<history::History> tag_db;
+  std::unique_ptr<history::History> tag_db;
   if (!manifest->history().IsNull()) {
     string tmp_file;
     if (!is_remote_)

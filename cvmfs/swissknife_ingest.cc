@@ -166,7 +166,7 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
                                               &publish_statistics);
   if (NULL == params.spooler)
     return 3;
-  const UniquePtr<upload::Spooler> spooler_catalogs(upload::Spooler::Construct(
+  const std::unique_ptr<upload::Spooler> spooler_catalogs(upload::Spooler::Construct(
       spooler_definition_catalogs, &publish_statistics));
   if (!spooler_catalogs.IsValid())
     return 3;
@@ -187,7 +187,7 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
   // This may fail, in which case a warning is printed and the process continues
   ObtainDacReadSearchCapability();
 
-  UniquePtr<manifest::Manifest> manifest;
+  std::unique_ptr<manifest::Manifest> manifest;
   if (params.branched_catalog) {
     // Throw-away manifest
     manifest = new manifest::Manifest(shash::Any(), 0, "");

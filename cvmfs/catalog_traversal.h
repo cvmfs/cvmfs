@@ -235,7 +235,7 @@ class CatalogTraversalBase
       const TraversalType type = kBreadthFirst) {
     typedef std::vector<shash::Any> HashList;
 
-    UniquePtr<HistoryTN> tag_db;
+    std::unique_ptr<HistoryTN> tag_db;
     const typename ObjectFetcherT::Failures
         retval = object_fetcher_->FetchHistory(&tag_db);
     switch (retval) {
@@ -390,7 +390,7 @@ class CatalogTraversalBase
   shash::Any GetRepositoryRootCatalogHash() {
     // get the manifest of the repository to learn about the entry point or the
     // root catalog of the repository to be traversed
-    UniquePtr<manifest::Manifest> manifest;
+    std::unique_ptr<manifest::Manifest> manifest;
     const typename ObjectFetcherT::Failures
         retval = object_fetcher_->FetchManifest(&manifest);
     if (retval != ObjectFetcherT::kFailOk) {

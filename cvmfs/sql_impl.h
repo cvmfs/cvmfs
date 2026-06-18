@@ -29,7 +29,7 @@ Database<DerivedT>::Database(const std::string &filename,
 
 template<class DerivedT>
 DerivedT *Database<DerivedT>::Create(const std::string &filename) {
-  UniquePtr<DerivedT> database(new DerivedT(filename, kOpenReadWrite));
+  std::unique_ptr<DerivedT> database(new DerivedT(filename, kOpenReadWrite));
 
   if (!database.IsValid()) {
     LogCvmfs(kLogSql, kLogDebug, "Failed to create new database object");
@@ -73,7 +73,7 @@ DerivedT *Database<DerivedT>::Create(const std::string &filename) {
 template<class DerivedT>
 DerivedT *Database<DerivedT>::Open(const std::string &filename,
                                    const OpenMode open_mode) {
-  UniquePtr<DerivedT> database(new DerivedT(filename, open_mode));
+  std::unique_ptr<DerivedT> database(new DerivedT(filename, open_mode));
 
   if (!database.IsValid()) {
     LogCvmfs(kLogSql, kLogDebug,

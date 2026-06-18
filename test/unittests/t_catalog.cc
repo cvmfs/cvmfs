@@ -84,7 +84,7 @@ class T_Catalog : public ::testing::Test {
 
     const bool volatile_content = false;
     {
-      UniquePtr<catalog::CatalogDatabase> new_clg_db(
+      std::unique_ptr<catalog::CatalogDatabase> new_clg_db(
           catalog::CatalogDatabase::Create(db_file));
       EXPECT_TRUE(new_clg_db.IsValid());
       bool retval = new_clg_db->InsertInitialValues(root_path, volatile_content,

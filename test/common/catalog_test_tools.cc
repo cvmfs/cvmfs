@@ -383,7 +383,7 @@ bool CatalogTestTool::LookupNestedCatalogHash(const shash::Any &root_hash,
                                               const std::string &path,
                                               char **nc_hash) {
   perf::Statistics stats;
-  UniquePtr<catalog::WritableCatalogManager> catalog_mgr(
+  std::unique_ptr<catalog::WritableCatalogManager> catalog_mgr(
       CreateCatalogMgr(root_hash, "file://" + stratum0_, temp_dir_,
                        spooler_.weak_ref(), download_manager(), &stats));
   if (!catalog_mgr.IsValid()) {
@@ -418,7 +418,7 @@ bool CatalogTestTool::FindEntry(const shash::Any &root_hash,
                                 const std::string &path,
                                 catalog::DirectoryEntry *entry) {
   perf::Statistics stats;
-  UniquePtr<catalog::WritableCatalogManager> catalog_mgr(
+  std::unique_ptr<catalog::WritableCatalogManager> catalog_mgr(
       CreateCatalogMgr(root_hash, "file://" + stratum0_, temp_dir_,
                        spooler_.weak_ref(), download_manager(), &stats));
   if (!catalog_mgr.IsValid()) {
@@ -437,7 +437,7 @@ bool CatalogTestTool::FindEntry(const shash::Any &root_hash,
 bool CatalogTestTool::DirSpecAtRootHash(const shash::Any &root_hash,
                                         DirSpec *spec) {
   perf::Statistics stats;
-  UniquePtr<catalog::WritableCatalogManager> catalog_mgr(
+  std::unique_ptr<catalog::WritableCatalogManager> catalog_mgr(
       CreateCatalogMgr(root_hash, "file://" + stratum0_, temp_dir_,
                        spooler_.weak_ref(), download_manager(), &stats));
 
@@ -487,7 +487,7 @@ void CatalogTestTool::CreateHistory(string repo_path_,
                                     shash::Any *history_hash) {
   const string history_path = CreateTempPath(repo_path_ + "/history", 0600);
   {
-    UniquePtr<history::SqliteHistory> history(
+    std::unique_ptr<history::SqliteHistory> history(
         history::SqliteHistory::Create(history_path, "keys.cern.ch"));
     ASSERT_TRUE(history.IsValid());
     history::History::Tag tag;
@@ -505,7 +505,7 @@ void CatalogTestTool::CreateHistory(string repo_path_,
 
 void CatalogTestTool::CreateManifest(string repo_path_,
                                      manifest::Manifest *manifest) {
-  UniquePtr<signature::SignatureManager> signature_mgr(
+  std::unique_ptr<signature::SignatureManager> signature_mgr(
       new signature::SignatureManager());
   signature_mgr->Init();
   ASSERT_TRUE(signature_mgr->LoadCertificatePath(repo_path_ + "/testrepo.crt"));

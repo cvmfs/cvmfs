@@ -85,7 +85,7 @@ XattrList *XattrList::Deserialize(const unsigned char *inbuf,
   if (inbuf == NULL)
     return new XattrList();
 
-  UniquePtr<XattrList> result(new XattrList());
+  std::unique_ptr<XattrList> result(new XattrList());
   if (size < sizeof(XattrHeader))
     return NULL;
   XattrHeader header;

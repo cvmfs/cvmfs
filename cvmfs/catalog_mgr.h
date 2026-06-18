@@ -157,7 +157,7 @@ struct CatalogContext {
   // root catalog: location is mandatory for LoadCatalogByHash()
   RootCatalogLocation root_ctlg_location_;
   // root catalog: if location = server mandatory for LoadCatalogByHash()
-  UniquePtr<manifest::ManifestEnsemble> manifest_ensemble_;
+  std::unique_ptr<manifest::ManifestEnsemble> manifest_ensemble_;
 };
 
 inline const char *Code2Ascii(const LoadReturn error) {

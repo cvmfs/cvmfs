@@ -185,7 +185,7 @@ class PosixCacheManager : public CacheManager {
     /// posix cache manager
     char magic_number;
     unsigned int version;
-    UniquePtr<FdRefcountMgr> fd_mgr;
+    std::unique_ptr<FdRefcountMgr> fd_mgr;
   };
 
   /**
@@ -212,7 +212,7 @@ class PosixCacheManager : public CacheManager {
    * Refcount and return only unique file descriptors
    */
   bool do_refcount_;
-  UniquePtr<FdRefcountMgr> fd_mgr_;
+  std::unique_ptr<FdRefcountMgr> fd_mgr_;
 
   bool cleanup_unused_first_;
 };  // class PosixCacheManager

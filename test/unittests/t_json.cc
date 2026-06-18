@@ -11,15 +11,15 @@
 #include "util/pointer.h"
 
 TEST(T_Json, Empty) {
-  UniquePtr<JsonDocument> json(JsonDocument::Create("{}"));
+  std::unique_ptr<JsonDocument> json(JsonDocument::Create("{}"));
   EXPECT_TRUE(json.IsValid());
   EXPECT_EQ("{}", json->PrintCanonical());
-  UniquePtr<JsonDocument> json2(JsonDocument::Create(""));
+  std::unique_ptr<JsonDocument> json2(JsonDocument::Create(""));
   EXPECT_FALSE(json2.IsValid());
 }
 
 TEST(T_Json, Complex) {
-  UniquePtr<JsonDocument> json(JsonDocument::Create(
+  std::unique_ptr<JsonDocument> json(JsonDocument::Create(
       "{\"string\": \"a string with spaces\",\n"
       " \"number\": 42,\n"
       " \"float\": 0.1,\n"
@@ -39,7 +39,7 @@ TEST(T_Json, Complex) {
 }
 
 TEST(T_Json, StringEscape) {
-  UniquePtr<JsonDocument> json(JsonDocument::Create(
+  std::unique_ptr<JsonDocument> json(JsonDocument::Create(
       "{\"string\": \"a \\\"string\\\" with special chars\"}"));
   ASSERT_TRUE(json.IsValid());
   EXPECT_EQ("{\"string\":\"a \\\"string\\\" with special chars\"}",
@@ -47,7 +47,7 @@ TEST(T_Json, StringEscape) {
 }
 
 TEST(T_Json, SearchInObject) {
-  UniquePtr<JsonDocument> json(JsonDocument::Create(
+  std::unique_ptr<JsonDocument> json(JsonDocument::Create(
       "{\"string\": \"a \\\"string\\\" with special chars\"}"));
   ASSERT_TRUE(json.IsValid());
   const JSON *result = json->SearchInObject(
@@ -75,6 +75,6 @@ TEST(T_Json, GenerateValidJsonString) {
             "\"f4\":\"v\\n4\",\"integer\":12}",
             output);
 
-  UniquePtr<JsonDocument> json(JsonDocument::Create(output));
+  std::unique_ptr<JsonDocument> json(JsonDocument::Create(output));
   ASSERT_TRUE(json.IsValid());
 }

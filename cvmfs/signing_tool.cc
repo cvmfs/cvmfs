@@ -42,8 +42,8 @@ SigningTool::Result SigningTool::Run(
     }
   }
 
-  UniquePtr<upload::Spooler> spooler;
-  UniquePtr<manifest::Manifest> manifest;
+  std::unique_ptr<upload::Spooler> spooler;
+  std::unique_ptr<manifest::Manifest> manifest;
 
   if (!DirectoryExists(temp_dir)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "%s does not exist", temp_dir.c_str());
@@ -85,7 +85,7 @@ SigningTool::Result SigningTool::Run(
     return kInitError;
   }
 
-  UniquePtr<manifest::Reflog> reflog;
+  std::unique_ptr<manifest::Reflog> reflog;
   if (!reflog_hash.IsNull()) {
     reflog = server_tool_->FetchReflog(&object_fetcher, repo_name, reflog_hash);
     if (!reflog.IsValid()) {

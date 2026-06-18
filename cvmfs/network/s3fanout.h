@@ -108,7 +108,7 @@ struct JobInfo : SingleCopy {
 
   const std::string object_key;
   void *callback;  // Callback to be called when job is finished
-  UniquePtr<FileBackedBuffer> origin;
+  std::unique_ptr<FileBackedBuffer> origin;
 
   // One constructor per destination
   JobInfo(const std::string &object_key,

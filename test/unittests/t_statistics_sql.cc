@@ -90,13 +90,13 @@ TEST_F(T_StatisticsSql, SchemaMigration1To3) {
 
   // Revision 3 --> 1
   {
-    UniquePtr<StatisticsDatabase> db(StatisticsDatabase::Create(path));
+    std::unique_ptr<StatisticsDatabase> db(StatisticsDatabase::Create(path));
     ASSERT_TRUE(db.IsValid());
     RevertToRevision2(db.weak_ref());
     RevertToRevision1(db.weak_ref());
   }
   {
-    UniquePtr<StatisticsDatabase> db(
+    std::unique_ptr<StatisticsDatabase> db(
         StatisticsDatabase::Open(path, StatisticsDatabase::kOpenReadWrite));
     EXPECT_EQ(StatisticsDatabase::kLatestSchemaRevision, db->schema_revision());
 
@@ -122,12 +122,12 @@ TEST_F(T_StatisticsSql, SchemaMigration2To3) {
 
   // Revision 2 --> 3
   {
-    UniquePtr<StatisticsDatabase> db(StatisticsDatabase::Create(path));
+    std::unique_ptr<StatisticsDatabase> db(StatisticsDatabase::Create(path));
     ASSERT_TRUE(db.IsValid());
     RevertToRevision2(db.weak_ref());
   }
   {
-    UniquePtr<StatisticsDatabase> db(
+    std::unique_ptr<StatisticsDatabase> db(
         StatisticsDatabase::Open(path, StatisticsDatabase::kOpenReadWrite));
     EXPECT_EQ(StatisticsDatabase::kLatestSchemaRevision, db->schema_revision());
 

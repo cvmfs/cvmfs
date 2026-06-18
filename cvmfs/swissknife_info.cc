@@ -125,7 +125,7 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
   //       currently this is not possible, since Manifest::Fetch asks for the
   //       repository name... Which we want to figure out with the tool at hand.
   //       Possible Fix: Allow for a Manifest::Fetch with an empty name.
-  UniquePtr<manifest::Manifest> manifest;
+  std::unique_ptr<manifest::Manifest> manifest;
   if (IsRemote(repository)) {
     const string url = repository + "/.cvmfspublished";
     cvmfs::MemSink manifest_memsink;

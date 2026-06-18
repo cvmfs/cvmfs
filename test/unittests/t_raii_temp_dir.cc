@@ -18,7 +18,7 @@ static bool DirExists(const std::string &dir) {
 class T_RaiiTempDir : public ::testing::Test { };
 
 TEST_F(T_RaiiTempDir, Basic) {
-  UniquePtr<RaiiTempDir> temp_dir(
+  std::unique_ptr<RaiiTempDir> temp_dir(
       RaiiTempDir::Create(GetCurrentWorkingDirectory() + "/test_dir"));
   ASSERT_TRUE(temp_dir.IsValid());
 
@@ -30,7 +30,7 @@ TEST_F(T_RaiiTempDir, Basic) {
 }
 
 TEST_F(T_RaiiTempDir, DeletedExternally) {
-  UniquePtr<RaiiTempDir> temp_dir(
+  std::unique_ptr<RaiiTempDir> temp_dir(
       RaiiTempDir::Create(GetCurrentWorkingDirectory() + "/test_dir"));
   ASSERT_TRUE(temp_dir.IsValid());
 

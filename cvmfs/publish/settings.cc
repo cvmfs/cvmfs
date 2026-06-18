@@ -478,7 +478,7 @@ SettingsPublisher *SettingsBuilder::CreateSettingsPublisherFromSession() {
   std::map<std::string, std::string> session_env = GetSessionEnvironment();
   const std::string fqrn = session_env["CVMFS_FQRN"];
 
-  UniquePtr<SettingsPublisher> settings_publisher(
+  std::unique_ptr<SettingsPublisher> settings_publisher(
       new SettingsPublisher(SettingsRepository(fqrn)));
   // TODO(jblomer): work in progress
   settings_publisher->GetTransaction()->SetInEnterSession(true);
@@ -614,7 +614,7 @@ SettingsPublisher *SettingsBuilder::CreateSettingsPublisher(
                    EPublish::kFailRepositoryType);
   }
 
-  UniquePtr<SettingsPublisher> settings_publisher(
+  std::unique_ptr<SettingsPublisher> settings_publisher(
       new SettingsPublisher(settings_repository));
 
   try {

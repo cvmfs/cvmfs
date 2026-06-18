@@ -269,7 +269,7 @@ Watchdog *g_watchdog = NULL;
 
 struct cvmcache_context {
   explicit cvmcache_context(ForwardCachePlugin *p) : plugin(p) { }
-  UniquePtr<ForwardCachePlugin> plugin;
+  std::unique_ptr<ForwardCachePlugin> plugin;
 };
 
 

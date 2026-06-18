@@ -344,8 +344,8 @@ class Spooler : public Observable<SpoolerResult> {
   // Status Information
   const SpoolerDefinition spooler_definition_;
 
-  UniquePtr<IngestionPipeline> ingestion_pipeline_;
-  UniquePtr<AbstractUploader> uploader_;
+  std::unique_ptr<IngestionPipeline> ingestion_pipeline_;
+  std::unique_ptr<AbstractUploader> uploader_;
 };
 
 }  // namespace upload

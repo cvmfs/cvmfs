@@ -208,7 +208,7 @@ int ExternalCacheManager::ConnectLocator(const std::string &locator,
 ExternalCacheManager *ExternalCacheManager::Create(int fd_connection,
                                                    unsigned max_open_fds,
                                                    const string &ident) {
-  UniquePtr<ExternalCacheManager> cache_mgr(
+  std::unique_ptr<ExternalCacheManager> cache_mgr(
       new ExternalCacheManager(fd_connection, max_open_fds));
   assert(cache_mgr.IsValid());
 
@@ -257,7 +257,7 @@ ExternalCacheManager *ExternalCacheManager::Create(int fd_connection,
  */
 ExternalCacheManager::PluginHandle *ExternalCacheManager::CreatePlugin(
     const std::string &locator, const std::vector<std::string> &cmd_line) {
-  UniquePtr<PluginHandle> plugin_handle(new PluginHandle());
+  std::unique_ptr<PluginHandle> plugin_handle(new PluginHandle());
   unsigned num_attempts = 0;
   bool try_again = false;
   do {
@@ -904,7 +904,7 @@ bool ExternalQuotaManager::Cleanup(const uint64_t leave_size) {
 
 ExternalQuotaManager *ExternalQuotaManager::Create(
     ExternalCacheManager *cache_mgr) {
-  UniquePtr<ExternalQuotaManager> quota_mgr(
+  std::unique_ptr<ExternalQuotaManager> quota_mgr(
       new ExternalQuotaManager(cache_mgr));
   assert(quota_mgr.IsValid());
 
