@@ -26,7 +26,7 @@ Spooler::Spooler(const SpoolerDefinition &spooler_definition)
 
 Spooler::~Spooler() {
   FinalizeSession(false);
-  if (uploader_.IsValid()) {
+  if (uploader_.get() != nullptr) {
     uploader_->TearDown();
   }
 }
@@ -35,8 +35,8 @@ std::string Spooler::backend_name() const { return uploader_->name(); }
 
 bool Spooler::Initialize(perf::StatisticsTemplate *statistics) {
   // configure the uploader environment
-  uploader_ = AbstractUploader::Construct(spooler_definition_);
-  if (!uploader_.IsValid()) {
+  uploader_.reset(AbstractUploader::Construct(spooler_definition_));
+  if (uploader_.get() == nullptr) {
     LogCvmfs(kLogSpooler, kLogWarning,
              "Failed to initialize backend upload "
              "facility in Spooler.");
@@ -48,8 +48,8 @@ bool Spooler::Initialize(perf::StatisticsTemplate *statistics) {
   }
 
   // configure the file processor context
-  ingestion_pipeline_ = new IngestionPipeline(uploader_.get(),
-                                              spooler_definition_);
+  ingestion_pipeline_.reset(new IngestionPipeline(uploader_.get(),
+                                              spooler_definition_));
   ingestion_pipeline_->RegisterListener(&Spooler::ProcessingCallback, this);
   ingestion_pipeline_->Spawn();
 

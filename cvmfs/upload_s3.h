@@ -25,7 +25,7 @@ struct S3StreamHandle : public UploadStreamHandle {
                  uint64_t in_memory_threshold,
                  const std::string &tmp_dir = "/tmp/")
       : UploadStreamHandle(commit_callback) {
-    buffer = FileBackedBuffer::Create(in_memory_threshold, tmp_dir);
+    buffer.reset(FileBackedBuffer::Create(in_memory_threshold, tmp_dir));
   }
 
   // Ownership is later transferred to the S3 fanout

@@ -132,8 +132,8 @@ int main(int argc, char **argv) {
       return 1;
     }
     const std::string timestamp = GetGMTimestamp("%Y.%m.%d-%H.%M.%S");
-    watchdog = Watchdog::Create(NULL, false /* needs_read_environ */);
-    if (watchdog.IsValid() == false) {
+    watchdog.reset(Watchdog::Create(NULL, false /* needs_read_environ */));
+    if (watchdog.get() == nullptr) {
       LogCvmfs(kLogReceiver, kLogSyslogErr | kLogStderr,
                "Failed to initialize watchdog");
       return 1;

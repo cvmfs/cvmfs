@@ -87,8 +87,8 @@ SigningTool::Result SigningTool::Run(
 
   std::unique_ptr<manifest::Reflog> reflog;
   if (!reflog_hash.IsNull()) {
-    reflog = server_tool_->FetchReflog(&object_fetcher, repo_name, reflog_hash);
-    if (reflog.get()==nullptr) {
+    reflog.reset(server_tool_->FetchReflog(&object_fetcher, repo_name, reflog_hash));
+    if (reflog.get() == nullptr) {
       LogCvmfs(kLogCvmfs, kLogStderr, "reflog missing");
       return kReflogMissing;
     }

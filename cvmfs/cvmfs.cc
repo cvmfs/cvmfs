@@ -1290,7 +1290,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
       // Check again to avoid race
       if (!chunk_tables->inode2chunks.Contains(unique_inode)) {
         chunk_tables->inode2chunks.Insert(
-            unique_inode, FileChunkReflist(chunks.Release(), path,
+            unique_inode, FileChunkReflist(chunks.release(), path,
                                            dirent.compression_algorithm(),
                                            dirent.IsExternalFile()));
         chunk_tables->inode2references.Insert(unique_inode, 1);

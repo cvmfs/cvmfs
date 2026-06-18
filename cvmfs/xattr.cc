@@ -113,7 +113,7 @@ XattrList *XattrList::Deserialize(const unsigned char *inbuf,
     remain -= nbytes;
     bufpos += nbytes;
   }
-  return result.Release();
+  return result.release();
 }
 
 

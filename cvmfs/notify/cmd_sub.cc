@@ -98,7 +98,7 @@ class SwissknifeSubscriber : public notify::SubscriberSSE {
         reinterpret_cast<const unsigned char *>(msg.manifest_.data()),
         msg.manifest_.size()));
 
-    if (!manifest.IsValid()) {
+    if (manifest.get() == nullptr) {
       LogCvmfs(kLogCvmfs, kLogError,
                "SwissknifeSubscriber - could not parse manifest.");
       return notify::Subscriber::kError;

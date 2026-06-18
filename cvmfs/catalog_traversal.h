@@ -401,7 +401,7 @@ class CatalogTraversalBase
       return shash::Any();
     }
 
-    assert(manifest.IsValid());
+    assert(manifest.get() != nullptr);
     return manifest->catalog_hash();
   }
 

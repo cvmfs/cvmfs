@@ -131,21 +131,21 @@ CommandTag::Environment *CommandTag::InitializeEnvironment(
 
   // open the (yet unsigned) manifest file if it is there, otherwise load the
   // latest manifest from the server
-  env->manifest = (FileExists(env->manifest_path.path()))
+  env->manifest.reset((FileExists(env->manifest_path.path()))
                       ? OpenLocalManifest(env->manifest_path.path())
                       : FetchRemoteManifest(env->repository_url, repo_name,
-                                            base_hash);
+                                            base_hash));
 
-  if (!env->manifest.IsValid()) {
+  if (env->manifest.get() == nullptr) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to load manifest file");
     return NULL;
   }
 
   // figure out the hash of the history from the previous revision if needed
   if (read_write && env->manifest->history().IsNull() && !base_hash.IsNull()) {
-    env->previous_manifest = FetchRemoteManifest(env->repository_url, repo_name,
-                                                 base_hash);
-    if (!env->previous_manifest.IsValid()) {
+    env->previous_manifest.reset(FetchRemoteManifest(env->repository_url, repo_name,
+                                                 base_hash));
+    if (env->previous_manifest.get() == nullptr) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to load previous manifest");
       return NULL;
     }
@@ -161,9 +161,9 @@ CommandTag::Environment *CommandTag::InitializeEnvironment(
   }
 
   // download the history database referenced in the manifest
-  env->history = GetHistory(env->manifest.get(), env->repository_url,
-                            env->history_path.path(), read_write);
-  if (!env->history.IsValid()) {
+  env->history.reset(GetHistory(env->manifest.get(), env->repository_url,
+                            env->history_path.path(), read_write));
+  if (env->history.get() == nullptr) {
     return NULL;
   }
 
@@ -177,25 +177,25 @@ CommandTag::Environment *CommandTag::InitializeEnvironment(
         spl_definition, hash_algo, zlib::kZlibDefault,
         generate_legacy_bulk_chunks, use_file_chunking, 0, 0, 0,
         session_token_file);
-    env->spooler = upload::Spooler::Construct(sd);
-    if (!env->spooler.IsValid()) {
+    env->spooler.reset(upload::Spooler::Construct(sd));
+    if (env->spooler.get() == nullptr) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to initialize upload spooler");
       return NULL;
     }
   }
 
   // return the pointer of the Environment (passing the ownership along)
-  return env.Release();
+  return env.release();
 }
 
 bool CommandTag::CloseAndPublishHistory(Environment *env) {
-  assert(env->spooler.IsValid());
+  assert(env->spooler.get() != nullptr);
 
   // set the previous revision pointer of the history database
   env->history->SetPreviousRevision(env->manifest->history());
 
   // close the history database
-  history::History *weak_history = env->history.Release();
+  history::History *weak_history = env->history.release();
   delete weak_history;
 
   // compress and upload the new history database
@@ -232,7 +232,7 @@ bool CommandTag::CloseAndPublishHistory(Environment *env) {
 
 bool CommandTag::UploadCatalogAndUpdateManifest(
     CommandTag::Environment *env, catalog::WritableCatalog *catalog) {
-  assert(env->spooler.IsValid());
+  assert(env->spooler.get() != nullptr);
 
   // gather information about catalog to be uploaded and update manifest
   std::unique_ptr<catalog::WritableCatalog> wr_catalog(catalog);
@@ -242,7 +242,7 @@ bool CommandTag::UploadCatalogAndUpdateManifest(
   env->manifest->set_publish_timestamp(wr_catalog->GetLastModified());
 
   // close the catalog
-  catalog::WritableCatalog *weak_catalog = wr_catalog.Release();
+  catalog::WritableCatalog *weak_catalog = wr_catalog.release();
   delete weak_catalog;
 
   // upload the catalog
@@ -287,7 +287,7 @@ void CommandTag::UploadClosure(const upload::SpoolerResult &result,
 bool CommandTag::UpdateUndoTags(
     Environment *env, const history::History::Tag &current_head_template,
     const bool undo_rollback) {
-  assert(env->history.IsValid());
+  assert(env->history.get() != nullptr);
 
   history::History::Tag current_head;
   history::History::Tag current_old_head;
@@ -458,7 +458,7 @@ int CommandEditTag::Main(const ArgumentList &args) {
   const bool history_read_write = true;
   const std::unique_ptr<Environment> env(
       InitializeEnvironment(args, history_read_write));
-  if (!env.IsValid()) {
+  if (env.get() == nullptr) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to init environment");
     return 1;
   }
@@ -598,7 +598,7 @@ int CommandEditTag::AddNewTag(const ArgumentList &args, Environment *env) {
   const bool catalog_read_write = false;
   const std::unique_ptr<catalog::Catalog> catalog(GetCatalog(
       env->repository_url, root_hash, catalog_path.path(), catalog_read_write));
-  if (!catalog.IsValid()) {
+  if (catalog.get() == nullptr) {
     LogCvmfs(kLogCvmfs, kLogStderr, "catalog with hash '%s' does not exist",
              root_hash.ToString().c_str());
     return 1;
@@ -969,7 +969,7 @@ int CommandListTags::Main(const ArgumentList &args) {
   const bool history_read_write = false;
   const std::unique_ptr<Environment> env(
       InitializeEnvironment(args, history_read_write));
-  if (!env.IsValid()) {
+  if (env.get() == nullptr) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to init environment");
     return 1;
   }
@@ -1058,7 +1058,7 @@ int CommandInfoTag::Main(const ArgumentList &args) {
   const bool history_read_write = false;
   const std::unique_ptr<Environment> env(
       InitializeEnvironment(args, history_read_write));
-  if (!env.IsValid()) {
+  if (env.get() == nullptr) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to init environment");
     return 1;
   }
@@ -1099,7 +1099,7 @@ int CommandRollbackTag::Main(const ArgumentList &args) {
   const bool history_read_write = true;
   const std::unique_ptr<Environment> env(
       InitializeEnvironment(args, history_read_write));
-  if (!env.IsValid()) {
+  if (env.get() == nullptr) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to init environment");
     return 1;
   }
@@ -1151,7 +1151,7 @@ int CommandRollbackTag::Main(const ArgumentList &args) {
       dynamic_cast<catalog::WritableCatalog *>(
           GetCatalog(env->repository_url, target_tag.root_hash,
                      catalog_path.path(), catalog_read_write)));
-  if (!catalog.IsValid()) {
+  if (catalog.get() == nullptr) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to open catalog with hash '%s'",
              target_tag.root_hash.ToString().c_str());
     return 1;
@@ -1176,7 +1176,7 @@ int CommandRollbackTag::Main(const ArgumentList &args) {
   catalog->Commit();
 
   // Upload catalog (handing over ownership of catalog pointer)
-  if (!UploadCatalogAndUpdateManifest(env.get(), catalog.Release())) {
+  if (!UploadCatalogAndUpdateManifest(env.get(), catalog.release())) {
     LogCvmfs(kLogCvmfs, kLogStderr, "catalog upload failed");
     return 1;
   }
@@ -1241,7 +1241,7 @@ int CommandEmptyRecycleBin::Main(const ArgumentList &args) {
   const bool history_read_write = true;
   const std::unique_ptr<Environment> env(
       InitializeEnvironment(args, history_read_write));
-  if (!env.IsValid()) {
+  if (env.get() == nullptr) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to init environment");
     return 1;
   }

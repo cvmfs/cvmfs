@@ -211,7 +211,7 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
     manifest::Manifest *raw_manifest_ptr = NULL;
     Failures const failure = FetchManifest(&raw_manifest_ptr);
     if (failure == kFailOk)
-      *manifest = raw_manifest_ptr;
+      *manifest = std::unique_ptr<manifest::Manifest>(raw_manifest_ptr);
     return failure;
   }
 
@@ -220,7 +220,7 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
     HistoryTN *raw_history_ptr = NULL;
     Failures const failure = FetchHistory(&raw_history_ptr, history_hash);
     if (failure == kFailOk)
-      *history = raw_history_ptr;
+      *history = std::unique_ptr<HistoryTN>(raw_history_ptr);
     return failure;
   }
 
