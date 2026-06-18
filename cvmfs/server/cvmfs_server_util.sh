@@ -1285,8 +1285,7 @@ Supported Commands:
   mkfs            [-w stratum0 url] [-u upstream storage] [-o owner]
                   [-m replicable] [-f union filesystem type] [-s S3 config file]
                   [-g disable auto tags]
-                  [-G timespan for auto tags (default: "2 weeks ago",
-                   -G "" keeps all auto tags forever)]
+                  [-G timespan for auto tags (default: "2 weeks ago")]
                   [-a hash algorithm (default: SHA-1)]
                   [-z enable garbage collection] [-v volatile content]
                   [-Z compression algorithm (default: zlib)]
