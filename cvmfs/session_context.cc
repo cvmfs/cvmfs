@@ -13,7 +13,7 @@
 #include "json_document_write.h"
 #include "swissknife_lease_curl.h"
 #include "util/exception.h"
-#include "util/pointer.h"
+#include <memory>
 #include "util/string.h"
 
 namespace {

@@ -24,7 +24,7 @@
 #include "testutil.h"
 #include "upload_facility.h"
 #include "util/atomic.h"
-#include "util/pointer.h"
+#include <memory>
 #include "util/posix.h"
 #include "util/smalloc.h"
 

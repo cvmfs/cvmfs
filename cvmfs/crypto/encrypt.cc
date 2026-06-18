@@ -19,7 +19,7 @@
 #include "util/concurrency.h"
 #include "util/exception.h"
 #include "util/platform.h"
-#include "util/pointer.h"
+#include <memory>
 #include "util/smalloc.h"
 #include "util/string.h"
 #include "util/uuid.h"

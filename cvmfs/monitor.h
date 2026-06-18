@@ -15,7 +15,7 @@
 
 #include "util/pipe.h"
 #include "util/platform.h"
-#include "util/pointer.h"
+#include <memory>
 #include "util/single_copy.h"
 
 

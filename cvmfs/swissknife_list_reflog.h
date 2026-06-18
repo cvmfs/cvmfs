@@ -13,7 +13,7 @@
 #include "crypto/hash.h"
 #include "smallhash.h"
 #include "swissknife.h"
-#include "util/pointer.h"
+#include <memory>
 
 namespace swissknife {
 

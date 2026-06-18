@@ -10,7 +10,7 @@
 
 #include "repository_tag.h"
 #include "server_tool.h"
-#include "util/pointer.h"
+#include <memory>
 
 namespace receiver {
 

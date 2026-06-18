@@ -20,7 +20,7 @@
 #include "sync_union_tarball.h"
 #include "util/capabilities.h"
 #include "util/logging.h"
-#include "util/pointer.h"
+#include <memory>
 #include "util/posix.h"
 
 /*

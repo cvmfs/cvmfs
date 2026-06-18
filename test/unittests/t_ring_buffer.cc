@@ -7,7 +7,7 @@
 #include <cstring>
 
 #include "ring_buffer.h"
-#include "util/pointer.h"
+#include <memory>
 #include "util/prng.h"
 
 class T_RingBuffer : public ::testing::Test {

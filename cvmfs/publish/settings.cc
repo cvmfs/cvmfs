@@ -16,7 +16,7 @@
 #include "publish/except.h"
 #include "publish/repository.h"
 #include "sanitizer.h"
-#include "util/pointer.h"
+#include <memory>
 #include "util/posix.h"
 #include "util/string.h"
 

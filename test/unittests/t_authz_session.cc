@@ -11,7 +11,7 @@
 #include "authz/authz_session.h"
 #include "statistics.h"
 #include "util/platform.h"
-#include "util/pointer.h"
+#include <memory>
 
 
 class TestAuthzFetcher : public AuthzFetcher {

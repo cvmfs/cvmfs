@@ -69,7 +69,7 @@
 #include "telemetry_aggregator.h"
 #include "tracer.h"
 #include "util/logging.h"
-#include "util/pointer.h"
+#include <memory>
 #include "util/posix.h"
 #include "util/string.h"
 #include "util/uuid.h"

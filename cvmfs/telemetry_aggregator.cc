@@ -12,7 +12,7 @@
 #include "telemetry_aggregator_influx.h"
 #include "util/exception.h"
 #include "util/logging.h"
-#include "util/pointer.h"
+#include <memory>
 #include "util/posix.h"
 namespace perf {
 

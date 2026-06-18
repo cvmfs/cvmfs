@@ -14,7 +14,7 @@
 #include "network/sink_mem.h"
 #include "notify/messages.h"
 #include "notify/publisher_http.h"
-#include "util/pointer.h"
+#include <memory>
 #include "util/posix.h"
 #include "util/string.h"
 

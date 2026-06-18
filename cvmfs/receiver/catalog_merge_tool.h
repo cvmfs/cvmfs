@@ -11,7 +11,7 @@
 #include "file_chunk.h"
 #include "params.h"
 #include "statistics.h"
-#include "util/pointer.h"
+#include <memory>
 
 namespace catalog {
 class WritableCatalogManager;

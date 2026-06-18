@@ -10,7 +10,7 @@
 #include "publish/except.h"
 #include "publish/repository.h"
 #include "publish/repository_util.h"
-#include "util/pointer.h"
+#include <memory>
 #include "util/posix.h"
 #include "util/string.h"
 

@@ -22,7 +22,7 @@
 #include "util/concurrency.h"
 #include "util/logging.h"
 #include "util/platform.h"
-#include "util/pointer.h"
+#include <memory>
 #include "util/posix.h"
 #include "util/smalloc.h"
 #include "util/string.h"

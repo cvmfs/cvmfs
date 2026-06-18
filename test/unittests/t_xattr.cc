@@ -9,7 +9,7 @@
 
 #include "util/file_guard.h"
 #include "util/platform.h"
-#include "util/pointer.h"
+#include <memory>
 #include "util/posix.h"
 #include "util/string.h"
 #include "xattr.h"

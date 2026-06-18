@@ -19,7 +19,7 @@
 #include "network/network_errors.h"
 #include "network/sink.h"
 #include "util/pipe.h"
-#include "util/pointer.h"
+#include <memory>
 #include "util/tube.h"
 
 class InterruptCue;

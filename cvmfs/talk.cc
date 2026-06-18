@@ -50,7 +50,7 @@
 #include "statistics.h"
 #include "tracer.h"
 #include "util/logging.h"
-#include "util/pointer.h"
+#include <memory>
 #include "wpad.h"
 
 using namespace std;  // NOLINT

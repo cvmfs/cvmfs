@@ -14,7 +14,7 @@
 #include <cstring>
 
 #include "util/platform.h"
-#include "util/pointer.h"
+#include <memory>
 #include "util/smalloc.h"
 #include "util/string.h"
 

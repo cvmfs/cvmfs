@@ -7,7 +7,7 @@
 #include "json_document_write.h"
 #include "statistics.h"
 #include "util/platform.h"
-#include "util/pointer.h"
+#include <memory>
 
 using namespace std;  // NOLINT
 

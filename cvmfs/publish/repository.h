@@ -13,7 +13,7 @@
 #include "publish/settings.h"
 #include "repository_util.h"
 #include "upload_spooler_result.h"
-#include "util/pointer.h"
+#include <memory>
 #include "util/single_copy.h"
 
 namespace catalog {

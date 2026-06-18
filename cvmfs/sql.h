@@ -10,7 +10,7 @@
 
 #include "duplex_sqlite3.h"
 #include "util/file_guard.h"
-#include "util/pointer.h"
+#include <memory>
 
 namespace sqlite {
 

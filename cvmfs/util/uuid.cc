@@ -15,7 +15,7 @@
 #include <unistd.h>
 #include <uuid/uuid.h>
 
-#include "util/pointer.h"
+#include <memory>
 #include "util/posix.h"
 #include "util/string.h"
 

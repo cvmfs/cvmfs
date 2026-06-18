@@ -15,7 +15,7 @@
 #include "upload_facility.h"
 #include "util/atomic.h"
 #include "util/file_backed_buffer.h"
-#include "util/pointer.h"
+#include <memory>
 #include "util/single_copy.h"
 
 namespace upload {

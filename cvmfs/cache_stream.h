@@ -14,7 +14,7 @@
 #include "fd_table.h"
 #include "ring_buffer.h"
 #include "smallhash.h"
-#include "util/pointer.h"
+#include <memory>
 
 namespace download {
 class DownloadManager;

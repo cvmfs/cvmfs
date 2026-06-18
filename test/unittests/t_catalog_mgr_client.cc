@@ -36,7 +36,7 @@
 #include "testutil.h"
 #include "upload.h"
 #include "upload_spooler_definition.h"
-#include "util/pointer.h"
+#include <memory>
 #include "util/posix.h"
 #include "util/uuid.h"
 

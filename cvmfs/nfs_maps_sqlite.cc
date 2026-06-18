@@ -26,7 +26,7 @@
 #include "util/concurrency.h"
 #include "util/exception.h"
 #include "util/logging.h"
-#include "util/pointer.h"
+#include <memory>
 #include "util/posix.h"
 #include "util/prng.h"
 #include "util/smalloc.h"

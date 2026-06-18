@@ -12,7 +12,7 @@
 #include "json_document_write.h"
 #include "ssl.h"
 #include "util/logging.h"
-#include "util/pointer.h"
+#include <memory>
 #include "util/posix.h"
 #include "util/string.h"
 

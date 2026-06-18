@@ -9,7 +9,7 @@
 #include "file_watcher.h"
 #include "util/concurrency.h"
 #include "util/logging.h"
-#include "util/pointer.h"
+#include <memory>
 #include "util/posix.h"
 
 typedef std::map<file_watcher::Event, int> Counters;

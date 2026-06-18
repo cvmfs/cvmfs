@@ -33,7 +33,7 @@
 #include "upload.h"
 #include "upload_spooler_definition.h"
 #include "util/logging.h"
-#include "util/pointer.h"
+#include <memory>
 #include "whitelist.h"
 
 // TODO(jblomer): Remove Me

@@ -13,7 +13,7 @@
 #include "pack.h"
 #include "repository_tag.h"
 #include "util/future.h"
-#include "util/pointer.h"
+#include <memory>
 #include "util/tube.h"
 
 namespace upload {

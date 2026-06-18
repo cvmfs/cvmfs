@@ -29,7 +29,7 @@
 #include "statistics.h"
 #include "util/atomic.h"
 #include "util/pipe.h"
-#include "util/pointer.h"
+#include <memory>
 #include "util/prng.h"
 #include "util/shared_ptr.h"
 

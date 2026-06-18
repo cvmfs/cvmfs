@@ -18,7 +18,7 @@
 #include "ingestion/chunk_detector.h"
 #include "ingestion/ingestion_source.h"
 #include "util/atomic.h"
-#include "util/pointer.h"
+#include <memory>
 #include "util/single_copy.h"
 
 namespace upload {

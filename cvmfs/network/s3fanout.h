@@ -21,7 +21,7 @@
 #include "ssl.h"
 #include "util/concurrency.h"
 #include "util/file_backed_buffer.h"
-#include "util/pointer.h"
+#include <memory>
 #include "util/prng.h"
 #include "util/single_copy.h"
 #include "util/smalloc.h"

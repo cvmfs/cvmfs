@@ -13,7 +13,7 @@
 #include "sqlitemem.h"
 #include "util/algorithm.h"
 #include "util/murmur.hxx"
-#include "util/pointer.h"
+#include <memory>
 #include "util/prng.h"
 
 using namespace std;  // NOLINT

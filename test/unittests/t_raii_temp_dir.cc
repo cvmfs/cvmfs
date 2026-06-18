@@ -5,7 +5,7 @@
 #include <gtest/gtest.h>
 
 #include "util/platform.h"
-#include "util/pointer.h"
+#include <memory>
 #include "util/posix.h"
 #include "util/raii_temp_dir.h"
 

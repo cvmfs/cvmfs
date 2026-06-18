@@ -38,7 +38,7 @@
 #include "upload_spooler_definition.h"
 #include "upload_spooler_result.h"
 #include "util/logging.h"
-#include "util/pointer.h"
+#include <memory>
 #include "util/posix.h"
 #include "util/string.h"
 #include "xattr.h"

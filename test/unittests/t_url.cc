@@ -5,7 +5,7 @@
 #include <gtest/gtest.h>
 
 #include "url.h"
-#include "util/pointer.h"
+#include <memory>
 
 TEST(T_Url, Empty) {
   std::unique_ptr<Url> url(Url::Parse(""));

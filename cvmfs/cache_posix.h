@@ -12,7 +12,7 @@
 #include <string>
 
 #include "cache.h"
-#include "util/pointer.h"
+#include <memory>
 #include "duplex_testing.h"
 #include "fd_refcount_mgr.h"
 #include "manifest_fetch.h"

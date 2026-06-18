@@ -27,7 +27,7 @@
 #include "swissknife_history.h"
 #include "util/algorithm.h"
 #include "util/logging.h"
-#include "util/pointer.h"
+#include <memory>
 #include "util/posix.h"
 #include "util/raii_temp_dir.h"
 #include "util/string.h"

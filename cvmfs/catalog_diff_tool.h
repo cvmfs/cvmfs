@@ -11,7 +11,7 @@
 #include "file_chunk.h"
 #include "shortstring.h"
 #include "statistics.h"
-#include "util/pointer.h"
+#include <memory>
 #include "util/raii_temp_dir.h"
 #include "xattr.h"
 

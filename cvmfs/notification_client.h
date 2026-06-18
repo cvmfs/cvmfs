@@ -10,7 +10,7 @@
 #include "fuse_remount.h"
 #include "network/download.h"
 #include "notify/subscriber.h"
-#include "util/pointer.h"
+#include <memory>
 #include "util/single_copy.h"
 
 namespace signature {

@@ -12,7 +12,7 @@
 #include "ingestion/ingestion_source.h"
 #include "sync_item.h"
 #include "sync_mediator.h"
-#include "util/pointer.h"
+#include <memory>
 #include "util/shared_ptr.h"
 
 namespace publish {

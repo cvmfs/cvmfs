@@ -14,7 +14,7 @@
 #include "repository_tag.h"
 #include "util/concurrency.h"
 #include "util/logging.h"
-#include "util/pointer.h"
+#include <memory>
 #include "util/string.h"
 
 using namespace receiver;  // NOLINT

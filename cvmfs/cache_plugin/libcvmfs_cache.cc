@@ -19,7 +19,7 @@
 #include "crypto/hash.h"
 #include "manifest.h"
 #include "monitor.h"
-#include "util/pointer.h"
+#include <memory>
 
 using namespace std;  // NOLINT
 

@@ -12,7 +12,7 @@
 #include "json_document.h"
 #include "util/logging.h"
 #include "util/platform.h"
-#include "util/pointer.h"
+#include <memory>
 #include "util/string.h"
 
 namespace receiver {

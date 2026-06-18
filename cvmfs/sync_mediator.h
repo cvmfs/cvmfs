@@ -38,7 +38,7 @@
 #include "statistics.h"
 #include "swissknife_sync.h"
 #include "sync_item.h"
-#include "util/pointer.h"
+#include <memory>
 #include "util/shared_ptr.h"
 #include "xattr.h"
 

@@ -12,7 +12,7 @@
 #include "network/download.h"
 #include "reflog.h"
 #include "statistics.h"
-#include "util/pointer.h"
+#include <memory>
 
 class ServerTool {
  public:

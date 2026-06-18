@@ -4,7 +4,7 @@
 
 #include <gtest/gtest.h>
 
-#include "util/pointer.h"
+#include <memory>
 
 
 class Foo {

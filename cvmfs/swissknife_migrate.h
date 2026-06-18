@@ -22,7 +22,7 @@
 #include "util/concurrency.h"
 #include "util/future.h"
 #include "util/logging.h"
-#include "util/pointer.h"
+#include <memory>
 
 namespace catalog {
 class WritableCatalog;

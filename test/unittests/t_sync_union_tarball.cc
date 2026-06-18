@@ -12,7 +12,7 @@
 #include "mock/m_sync_mediator.h"
 #include "sync_item.h"
 #include "sync_union_tarball.h"
-#include "util/pointer.h"
+#include <memory>
 #include "util/posix.h"
 #include "util/string.h"
 

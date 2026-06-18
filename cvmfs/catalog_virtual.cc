@@ -14,7 +14,7 @@
 #include "swissknife_history.h"
 #include "swissknife_sync.h"
 #include "util/logging.h"
-#include "util/pointer.h"
+#include <memory>
 #include "util/posix.h"
 #include "util/string.h"
 #include "xattr.h"

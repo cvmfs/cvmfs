@@ -9,7 +9,7 @@
 #include <gtest/gtest.h>
 #include <network/download.h>
 #include <statistics.h>
-#include <util/pointer.h>
+#include <memory>
 #include <util/posix.h>
 
 class T_StreamingCacheManager : public ::testing::Test {

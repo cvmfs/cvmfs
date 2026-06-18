@@ -16,7 +16,7 @@
 #include "subscriber_supervisor.h"
 #include "supervisor.h"
 #include "util/logging.h"
-#include "util/pointer.h"
+#include <memory>
 #include "util/posix.h"
 #include "util/string.h"
 

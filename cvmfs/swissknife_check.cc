@@ -27,7 +27,7 @@
 #include "shortstring.h"
 #include "util/exception.h"
 #include "util/logging.h"
-#include "util/pointer.h"
+#include <memory>
 #include "util/posix.h"
 
 using namespace std;  // NOLINT

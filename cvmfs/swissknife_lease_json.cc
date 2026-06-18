@@ -6,7 +6,7 @@
 
 #include "json_document.h"
 #include "util/logging.h"
-#include "util/pointer.h"
+#include <memory>
 
 // TODO(@vvolkl): refactor
 LeaseReply ParseAcquireReplyWithRevision(const CurlBuffer &buffer,

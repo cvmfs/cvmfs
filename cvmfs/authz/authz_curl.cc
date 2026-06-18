@@ -14,7 +14,7 @@
 #include "duplex_curl.h"
 #include "util/concurrency.h"
 #include "util/logging.h"
-#include "util/pointer.h"
+#include <memory>
 
 using namespace std;  // NOLINT
 

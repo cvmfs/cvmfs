@@ -8,7 +8,7 @@
 
 #include "json_document.h"
 #include "json_document_write.h"
-#include "util/pointer.h"
+#include <memory>
 
 TEST(T_Json, Empty) {
   std::unique_ptr<JsonDocument> json(JsonDocument::Create("{}"));
