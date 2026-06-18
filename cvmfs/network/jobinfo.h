@@ -137,14 +137,16 @@ class JobInfo {
   static bool EscapeUrlChar(unsigned char input, char output[3]);
 
   void CreatePipeJobResults() {
-    pipe_job_results = new Pipe<kPipeDownloadJobsResults>();
+    pipe_job_results = std::unique_ptr<Pipe<kPipeDownloadJobsResults> >(
+        new Pipe<kPipeDownloadJobsResults>());
   }
 
   bool IsValidPipeJobResults() { return pipe_job_results.get() != nullptr; }
 
   void CreateDataTube() {
     // TODO(heretherebedragons) change to weighted queue
-    data_tube_ = new Tube<DataTubeElement>(500);
+    data_tube_ = std::unique_ptr<Tube<DataTubeElement> >(
+        new Tube<DataTubeElement>(500));
   }
 
   bool IsValidDataTube() { return data_tube_.get() != nullptr; }

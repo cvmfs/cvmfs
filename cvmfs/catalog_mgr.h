@@ -141,7 +141,8 @@ struct CatalogContext {
    * Gives ownership to CatalogContext
    */
   void TakeManifestEnsemble(manifest::ManifestEnsemble *manifest_ensemble) {
-    manifest_ensemble_ = manifest_ensemble;
+    manifest_ensemble_ = std::unique_ptr<manifest::ManifestEnsemble>(
+        manifest_ensemble);
   }
 
 

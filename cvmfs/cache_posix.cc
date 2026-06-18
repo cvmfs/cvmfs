@@ -33,6 +33,8 @@
 #include <pthread.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+
+#include <memory>
 #ifndef __APPLE__
 #include <sys/statfs.h>
 #endif
@@ -342,7 +344,7 @@ string PosixCacheManager::Describe() {
 void *PosixCacheManager::DoSaveState() {
   if (do_refcount_) {
     SavedState *state = new SavedState();
-    state->fd_mgr = fd_mgr_->Clone();
+    state->fd_mgr = std::unique_ptr<FdRefcountMgr>(fd_mgr_->Clone());
     return state;
   }
   char *c = reinterpret_cast<char *>(smalloc(1));

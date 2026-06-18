@@ -233,14 +233,17 @@ bool Database<DerivedT>::FileReadAhead() {
 template<class DerivedT>
 bool Database<DerivedT>::PrepareCommonQueries() {
   sqlite3 *db = sqlite_db();
-  begin_transaction_ = new Sql(db, "BEGIN;");
-  commit_transaction_ = new Sql(db, "COMMIT;");
-  has_property_ = new Sql(db, "SELECT count(*) FROM properties "
-                              "WHERE key = :key;");
-  get_property_ = new Sql(db, "SELECT value FROM properties "
-                              "WHERE key = :key;");
-  set_property_ = new Sql(db, "INSERT OR REPLACE INTO properties "
-                              "(key, value) VALUES (:key, :value);");
+  begin_transaction_ = std::unique_ptr<Sql>(new Sql(db, "BEGIN;"));
+  commit_transaction_ = std::unique_ptr<Sql>(new Sql(db, "COMMIT;"));
+  has_property_ = std::unique_ptr<Sql>(
+      new Sql(db, "SELECT count(*) FROM properties "
+                  "WHERE key = :key;"));
+  get_property_ = std::unique_ptr<Sql>(new Sql(db,
+                                               "SELECT value FROM properties "
+                                               "WHERE key = :key;"));
+  set_property_ = std::unique_ptr<Sql>(
+      new Sql(db, "INSERT OR REPLACE INTO properties "
+                  "(key, value) VALUES (:key, :value);"));
   return (begin_transaction_.get() != nullptr
           && commit_transaction_.get() != nullptr
           && has_property_.get() != nullptr && get_property_.get() != nullptr

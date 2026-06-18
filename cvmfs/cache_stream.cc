@@ -246,7 +246,7 @@ StreamingCacheManager::StreamingCacheManager(
   delete quota_mgr_;
   quota_mgr_ = cache_mgr_->quota_mgr();
 
-  buffer_ = new RingBuffer(buffer_size);
+  buffer_ =std::unique_ptr< RingBuffer>( new RingBuffer(buffer_size));
   buffered_objects_.Init(16, shash::Any(), hasher_any);
   lock_buffer_ = reinterpret_cast<pthread_mutex_t *>(
       smalloc(sizeof(pthread_mutex_t)));

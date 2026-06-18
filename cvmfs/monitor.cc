@@ -392,8 +392,8 @@ Watchdog::SigactionMap Watchdog::SetSignalHandlers(
  */
 void Watchdog::Fork(bool needs_read_environ) {
   Pipe<kPipeWatchdogPid> pipe_pid;
-  pipe_watchdog_ = new Pipe<kPipeWatchdog>();
-  pipe_listener_ = new Pipe<kPipeWatchdogSupervisor>();
+  pipe_watchdog_ = std::unique_ptr<Pipe<kPipeWatchdog> >(new Pipe<kPipeWatchdog>());
+  pipe_listener_ = std::unique_ptr<Pipe<kPipeWatchdogSupervisor> >(new Pipe<kPipeWatchdogSupervisor>());
 
   pid_t pid;
   int statloc;
@@ -576,7 +576,7 @@ void Watchdog::Spawn(const std::string &crash_dump_path) {
   }
   old_signal_handlers_ = SetSignalHandlers(signal_handlers);
 
-  pipe_terminate_ = new Pipe<kPipeThreadTerminator>();
+  pipe_terminate_ =std::unique_ptr< Pipe<kPipeThreadTerminator>>( new Pipe<kPipeThreadTerminator>());
   const int retval = pthread_create(&thread_listener_, NULL,
                                     MainWatchdogListener, this);
   assert(retval == 0);
@@ -697,8 +697,8 @@ void Watchdog::RestoreState(WatchdogState *saved_state) {
   if (!saved_state->spawned) {
     return;
   }
-  pipe_watchdog_ = new Pipe<kPipeWatchdog>(-1, saved_state->watchdog_write_fd);
-  pipe_listener_ = new Pipe<kPipeWatchdogSupervisor>(saved_state->listener_read_fd, -1);
+  pipe_watchdog_ =std::unique_ptr< Pipe<kPipeWatchdog>>( new Pipe<kPipeWatchdog>(-1, saved_state->watchdog_write_fd));
+  pipe_listener_ =std::unique_ptr< Pipe<kPipeWatchdogSupervisor>>( new Pipe<kPipeWatchdogSupervisor>(saved_state->listener_read_fd, -1));
   spawned_ = true;
 }
 
