@@ -873,6 +873,7 @@ if (BUILD_SERVER)
        publish/cmd_info.cc
        publish/cmd_lsof.cc
        publish/cmd_mkfs.cc
+       publish/cmd_tag.cc
        publish/cmd_transaction.cc
        publish/cmd_util.cc
        publish/cmd_zpipe.cc

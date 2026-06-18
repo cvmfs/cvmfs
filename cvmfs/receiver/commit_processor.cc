@@ -45,12 +45,12 @@ PathString RemoveRepoName(const PathString &lease_path) {
   }
 }
 
-bool CreateNewTag(const RepositoryTag &repo_tag, const std::string &repo_name,
-                  const receiver::Params &params, const std::string &temp_dir,
-                  const std::string &manifest_path,
-                  const std::string &public_key_path,
-                  const std::string &proxy,
-                  const time_t auto_tag_threshold) {
+bool EditTags(const RepositoryTag &repo_tag, const std::string &repo_name,
+              const receiver::Params &params, const std::string &temp_dir,
+              const std::string &manifest_path,
+              const std::string &public_key_path,
+              const std::string &proxy,
+              const time_t auto_tag_threshold) {
   swissknife::ArgumentList args;
   args['r'].Reset(new std::string(params.spooler_configuration));
   args['w'].Reset(new std::string(params.stratum0));
@@ -63,6 +63,12 @@ bool CreateNewTag(const RepositoryTag &repo_tag, const std::string &repo_name,
   args['D'].Reset(new std::string(repo_tag.description()));
   args['x'].Reset(new std::string());
   args['@'].Reset(new std::string(proxy));
+  // Remove the tags requested by `cvmfs_server tag -r` in the same history
+  // transaction as the (possibly empty) new tag, so a single new history
+  // database is published and registered in the reflog for this commit.
+  if (!repo_tag.delete_tags().empty()) {
+    args['d'].Reset(new std::string(repo_tag.delete_tags()));
+  }
   // Remove outdated auto-generated tags in the same history transaction as the
   // tag we are about to add, so that only a single new history database is
   // published (and registered in the reflog) for this commit.
@@ -75,8 +81,8 @@ bool CreateNewTag(const RepositoryTag &repo_tag, const std::string &repo_name,
   const int ret = edit_cmd->Main(args);
 
   if (ret) {
-    LogCvmfs(kLogReceiver, kLogSyslogErr, "Error %d creating tag: %s", ret,
-             repo_tag.name().c_str());
+    LogCvmfs(kLogReceiver, kLogSyslogErr, "Error %d editing tags (add: '%s')",
+             ret, repo_tag.name().c_str());
     return false;
   }
 
@@ -315,13 +321,14 @@ CommitProcessor::Result CommitProcessor::Process(
              lease_path.c_str(), static_cast<long>(auto_tag_threshold));
   }
 
-  // CreateNewTag adds the tag for the new revision and, when a cleanup
-  // threshold is set, removes the outdated auto tags in the same history
-  // transaction. A failure here is fatal: leaving the new revision untagged
-  // (or silently keeping stale tags) would be worse than aborting the commit.
-  if (!CreateNewTag(final_tag, repo_name, params, temp_dir, new_manifest_path,
-                    public_key, params.proxy, auto_tag_threshold)) {
-    LogCvmfs(kLogReceiver, kLogSyslogErr, "Error creating tag: %s",
+  // EditTags adds the tag for the new revision, removes any tags requested by
+  // `cvmfs_server tag -r`, and, when a cleanup threshold is set, removes the
+  // outdated auto tags -- all in the same history transaction. A failure here
+  // is fatal: leaving the new revision untagged (or silently keeping stale
+  // tags) would be worse than aborting the commit.
+  if (!EditTags(final_tag, repo_name, params, temp_dir, new_manifest_path,
+                public_key, params.proxy, auto_tag_threshold)) {
+    LogCvmfs(kLogReceiver, kLogSyslogErr, "Error editing tags (add: '%s')",
              final_tag.name().c_str());
     return kError;
   }

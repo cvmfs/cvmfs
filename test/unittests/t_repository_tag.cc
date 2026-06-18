@@ -14,7 +14,20 @@ TEST_F(T_RepositoryTag, DefaultConstructor) {
   RepositoryTag tag;
   EXPECT_EQ("", tag.name());
   EXPECT_EQ("", tag.description());
+  EXPECT_EQ("", tag.delete_tags());
   EXPECT_EQ(0, tag.auto_tag_threshold());
+}
+
+TEST_F(T_RepositoryTag, SetDeleteTags) {
+  RepositoryTag tag("tag1", "desc");
+  EXPECT_EQ("", tag.delete_tags());
+
+  tag.SetDeleteTags("old_tag1 old_tag2");
+  EXPECT_EQ("old_tag1 old_tag2", tag.delete_tags());
+
+  // Other fields are independent of the delete list
+  EXPECT_EQ("tag1", tag.name());
+  EXPECT_EQ("desc", tag.description());
 }
 
 TEST_F(T_RepositoryTag, NameDescriptionConstructor) {

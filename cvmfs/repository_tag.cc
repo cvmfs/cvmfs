@@ -12,7 +12,10 @@
 
 RepositoryTag::RepositoryTag(const std::string &name,
                              const std::string &description)
-    : name_(name), description_(description), auto_tag_threshold_(0) { }
+    : name_(name)
+    , description_(description)
+    , delete_tags_("")
+    , auto_tag_threshold_(0) { }
 
 /**
  * Check if tag name is of the form "generic-*"

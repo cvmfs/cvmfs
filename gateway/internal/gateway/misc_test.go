@@ -54,6 +54,47 @@ func TestRepositoryTagJSONOmitEmptyThreshold(t *testing.T) {
 	}
 }
 
+func TestRepositoryTagJSONDeleteTags(t *testing.T) {
+	tag := RepositoryTag{
+		DeleteTags: "tag1 tag2",
+	}
+
+	data, err := json.Marshal(tag)
+	if err != nil {
+		t.Fatalf("failed to marshal RepositoryTag: %v", err)
+	}
+
+	var decoded RepositoryTag
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("failed to unmarshal RepositoryTag: %v", err)
+	}
+	if decoded.DeleteTags != tag.DeleteTags {
+		t.Errorf("DeleteTags mismatch: got %q, want %q", decoded.DeleteTags, tag.DeleteTags)
+	}
+}
+
+func TestRepositoryTagJSONOmitEmptyDeleteTags(t *testing.T) {
+	tag := RepositoryTag{
+		Name:        "tag1",
+		Description: "a tag",
+	}
+
+	data, err := json.Marshal(tag)
+	if err != nil {
+		t.Fatalf("failed to marshal RepositoryTag: %v", err)
+	}
+
+	// delete_tags should be omitted when empty so older gateways/receivers are
+	// unaffected by regular (non-removal) commits
+	var raw map[string]interface{}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		t.Fatalf("failed to unmarshal to map: %v", err)
+	}
+	if _, exists := raw["delete_tags"]; exists {
+		t.Errorf("delete_tags should be omitted when empty, but was present")
+	}
+}
+
 func TestRepositoryTagJSONBackwardsCompatible(t *testing.T) {
 	// Simulate a message from an older publisher that doesn't send
 	// auto_tag_threshold
