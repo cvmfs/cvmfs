@@ -361,6 +361,13 @@ cvmfs_server_mkfs() {
     check_apache                    || die "Apache must be installed and running"
     ensure_enabled_apache_modules
   fi
+  # Apply the documented default auto tag timespan when auto tagging is enabled.
+  # Without a timespan, every publish is tagged forever and nothing is ever
+  # removed, so neither fresh stratum 1 snapshots nor garbage collection can
+  # free up space.
+  if [ x"$autotagging" = x"true" ] && [ x"$auto_tag_timespan" = x"" ]; then
+    auto_tag_timespan="2 weeks ago"
+  fi
   if [ "x$auto_tag_timespan" != "x" ]; then
     date --date "$auto_tag_timespan" +%s >/dev/null 2>&1 || die "Auto tags time span cannot be parsed"
     [ x"$autotagging" = x"false" ] &&
