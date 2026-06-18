@@ -386,7 +386,7 @@ bool AuthzExternalFetcher::ParseMsg(const std::string &json_msg,
   assert(binary_msg != NULL);
 
   const std::unique_ptr<JsonDocument> json_document(JsonDocument::Create(json_msg));
-  if (!json_document.IsValid()) {
+  if (json_document.get()==nullptr) {
     LogCvmfs(kLogAuthz, kLogSyslogErr | kLogDebug,
              "invalid json from authz helper %s: %s", progname_.c_str(),
              json_msg.c_str());

@@ -437,5 +437,5 @@ bool StreamingCacheManager::DoFreeState(void *data) {
 
 CacheManager *StreamingCacheManager::MoveOutBackingCacheMgr(int *root_fd) {
   *root_fd = fd_table_.GetHandle(0).fd_in_cache_mgr;
-  return cache_mgr_.Release();
+  return cache_mgr_.release();
 }

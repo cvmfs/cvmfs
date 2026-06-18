@@ -845,7 +845,7 @@ void ListOpenHashesMagicXattr::FinalizeValue() {
   std::string result;
   if (pcm != nullptr) {
     if (pcm->cleanup_unused_first()) {
-      if (pcm->fd_mgr_.IsValid()) {
+      if (pcm->fd_mgr_.get()!=nullptr) {
         const auto &hash_map = pcm->fd_mgr_->map_fd_;
         auto empty = hash_map.empty_key();
         auto *keys = hash_map.keys();

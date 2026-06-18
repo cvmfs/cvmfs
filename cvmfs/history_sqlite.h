@@ -143,7 +143,7 @@ class SqliteHistory : public History {
   void TakeDatabaseFileOwnership();
   void DropDatabaseFileOwnership();
   bool OwnsDatabaseFile() const {
-    return database_.IsValid() && database_->OwnsFile();
+    return database_.get() != nullptr && database_->OwnsFile();
   }
   std::string filename() const { return database_->filename(); }
 
@@ -180,3 +180,4 @@ class SqliteHistory : public History {
 }  // namespace history
 
 #endif  // CVMFS_HISTORY_SQLITE_H_
+

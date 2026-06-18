@@ -11,6 +11,7 @@
 #include <unistd.h>
 
 #include <cstdio>
+#include <memory>
 #include <string>
 
 #include "compression/compression.h"
@@ -19,7 +20,6 @@
 #include "network/network_errors.h"
 #include "network/sink.h"
 #include "util/pipe.h"
-#include <memory>
 #include "util/tube.h"
 
 class InterruptCue;
@@ -130,8 +130,8 @@ class JobInfo {
   JobInfo(const std::string *u, const bool ph);
 
   ~JobInfo() {
-    pipe_job_results.Destroy();
-    data_tube_.Destroy();
+    pipe_job_results.reset();
+    data_tube_.reset();
   }
 
   static bool EscapeUrlChar(unsigned char input, char output[3]);
@@ -140,14 +140,14 @@ class JobInfo {
     pipe_job_results = new Pipe<kPipeDownloadJobsResults>();
   }
 
-  bool IsValidPipeJobResults() { return pipe_job_results.IsValid(); }
+  bool IsValidPipeJobResults() { return pipe_job_results.get() != nullptr; }
 
   void CreateDataTube() {
     // TODO(heretherebedragons) change to weighted queue
     data_tube_ = new Tube<DataTubeElement>(500);
   }
 
-  bool IsValidDataTube() { return data_tube_.IsValid(); }
+  bool IsValidDataTube() { return data_tube_.get() != nullptr; }
 
   /**
    * Tells whether the error is because of a non-existing file. Should only
@@ -284,3 +284,4 @@ class JobInfo {
 }  // namespace download
 
 #endif  // CVMFS_NETWORK_JOBINFO_H_
+

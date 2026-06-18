@@ -9,6 +9,7 @@
 #include <stdint.h>
 
 #include <cassert>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -18,7 +19,6 @@
 #include "ingestion/chunk_detector.h"
 #include "ingestion/ingestion_source.h"
 #include "util/atomic.h"
-#include <memory>
 #include "util/single_copy.h"
 
 namespace upload {
@@ -46,8 +46,9 @@ class FileItem : SingleCopy {
 
   static FileItem *CreateQuitBeacon() {
     const std::string quit_marker = std::string(1, kQuitBeaconMarker);
-    std::unique_ptr<FileIngestionSource> source(new FileIngestionSource(quit_marker));
-    return new FileItem(source.Release());
+    std::unique_ptr<FileIngestionSource> source(
+        new FileIngestionSource(quit_marker));
+    return new FileItem(source.release());
   }
   bool IsQuitBeacon() {
     return (path().length() == 1) && (path()[0] == kQuitBeaconMarker);
@@ -257,3 +258,4 @@ class BlockItem : SingleCopy {
 };
 
 #endif  // CVMFS_INGESTION_ITEM_H_
+

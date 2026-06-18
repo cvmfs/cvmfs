@@ -94,14 +94,14 @@ struct CatalogContext {
       sqlite_path_("")
       , root_ctlg_revision_(-1ul)
       , root_ctlg_location_(kCtlgNoLocationNeeded)
-      , manifest_ensemble_(NULL) { }
+      , manifest_ensemble_(nullptr) { }
   CatalogContext(const shash::Any &hash, const PathString &mountpoint)
       : hash_(hash)
       , mountpoint_(mountpoint)
       , sqlite_path_("")
       , root_ctlg_revision_(-1ul)
       , root_ctlg_location_(kCtlgNoLocationNeeded)
-      , manifest_ensemble_(NULL) { }
+      , manifest_ensemble_(nullptr) { }
 
   CatalogContext(const shash::Any &hash, const PathString &mountpoint,
                  const RootCatalogLocation location)
@@ -110,7 +110,7 @@ struct CatalogContext {
       , sqlite_path_("")
       , root_ctlg_revision_(-1ul)
       , root_ctlg_location_(location)
-      , manifest_ensemble_(NULL) { }
+      , manifest_ensemble_(nullptr) { }
 
   bool IsRootCatalog() { return mountpoint_.IsEmpty(); }
 

@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cstdlib>
+#include <memory>
 
 #include "catalog_mgr_rw.h"
 #include "compression/compression.h"
@@ -14,7 +15,6 @@
 #include "swissknife_history.h"
 #include "swissknife_sync.h"
 #include "util/logging.h"
-#include <memory>
 #include "util/posix.h"
 #include "util/string.h"
 #include "xattr.h"
@@ -245,7 +245,7 @@ void VirtualCatalog::InsertSnapshot(TagId tag) {
            tag.name.c_str(), tag.hash.ToString().c_str());
   const std::unique_ptr<Catalog> catalog(
       assistant_.GetCatalog(tag.hash, swissknife::Assistant::kOpenReadOnly));
-  assert(catalog.IsValid());
+  assert(catalog.get() != nullptr);
   assert(catalog->root_prefix().IsEmpty());
   DirectoryEntry entry_root;
   const bool retval = catalog->LookupPath(PathString(""), &entry_root);
@@ -337,3 +337,4 @@ VirtualCatalog::VirtualCatalog(manifest::Manifest *m,
     : catalog_mgr_(c), assistant_(d, m, p->stratum0, p->dir_temp) { }
 
 }  // namespace catalog
+

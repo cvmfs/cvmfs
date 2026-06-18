@@ -127,7 +127,7 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   {
     const std::unique_ptr<CatalogDatabase> new_clg_db(
         CatalogDatabase::Create(file_path));
-    if (!new_clg_db.IsValid()
+    if (new_clg_db.get() == nullptr
         || !new_clg_db->InsertInitialValues(root_path, volatile_content,
                                             voms_authz, root_entry)) {
       LogCvmfs(kLogCatalog, kLogStderr, "creation of catalog '%s' failed",
@@ -999,7 +999,7 @@ void WritableCatalogManager::SwapNestedCatalog(const string &mountpoint,
     }
     const std::unique_ptr<Catalog> old_free_catalog(
         LoadFreeCatalog(nested_root_ps, old_hash));
-    if (!old_free_catalog.IsValid()) {
+    if (old_free_catalog.get()==nullptr) {
       SyncUnlock();
       PANIC(kLogStderr,
             "failed to swap nested catalog '%s': failed to load old catalog",
@@ -1011,7 +1011,7 @@ void WritableCatalogManager::SwapNestedCatalog(const string &mountpoint,
   // Load freely attached new catalog
   const std::unique_ptr<Catalog> new_catalog(
       LoadFreeCatalog(nested_root_ps, new_hash));
-  if (!new_catalog.IsValid()) {
+  if (new_catalog.get() == nullptr) {
     SyncUnlock();
     PANIC(kLogStderr,
           "failed to swap nested catalog '%s': failed to load new catalog",

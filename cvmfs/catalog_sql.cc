@@ -18,10 +18,10 @@ using namespace std;  // NOLINT
 
 namespace catalog {
 
-// Emergency fallback: if CVMFS_NO_IGNORE_LEGACY_BULKHASHES is set, revert to the
-// old behavior of including bulk hashes for chunked files.
-bool g_ignore_legacy_bulk_hashes =
-    (getenv("CVMFS_NO_IGNORE_LEGACY_BULKHASHES") == NULL);
+// Emergency fallback: if CVMFS_NO_IGNORE_LEGACY_BULKHASHES is set, revert to
+// the old behavior of including bulk hashes for chunked files.
+bool g_ignore_legacy_bulk_hashes = (getenv("CVMFS_NO_IGNORE_LEGACY_BULKHASHES")
+                                    == NULL);
 
 /**
  * NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE
@@ -1378,8 +1378,9 @@ SqlAllChunks::SqlAllChunks(const CatalogDatabase &database) {
                                    + ") " + "AS compression_algorithm ";
 
   if (!g_ignore_legacy_bulk_hashes)
-    LogCvmfs(kLogCatalog, kLogDebug, "CVMFS_NO_IGNORE_LEGACY_BULKHASHES is set, "
-		     "legacy bulk hashes won't be ignored in catalog operations");
+    LogCvmfs(kLogCatalog, kLogDebug,
+             "CVMFS_NO_IGNORE_LEGACY_BULKHASHES is set, "
+             "legacy bulk hashes won't be ignored in catalog operations");
 
   // TODO(reneme): this depends on shash::kSuffix* being a char!
   //               it should be more generic or replaced entirely
@@ -1394,10 +1395,11 @@ SqlAllChunks::SqlAllChunks(const CatalogDatabase &database) {
                + "AS chunk_type, " + flags2hash + "," + flags2compression
                + "FROM catalog WHERE (hash IS NOT NULL) AND "
                  " (flags & "
-               + StringifyInt(SqlDirent::kFlagFileExternal |
-                              (g_ignore_legacy_bulk_hashes
-                                   ? SqlDirent::kFlagFileChunk
-                                   : 0)) + " = 0)";
+               + StringifyInt(SqlDirent::kFlagFileExternal
+                              | (g_ignore_legacy_bulk_hashes
+                                     ? SqlDirent::kFlagFileChunk
+                                     : 0))
+               + " = 0)";
   if (database.schema_version() >= 2.4 - CatalogDatabase::kSchemaEpsilon) {
     sql += " UNION "
            "SELECT DISTINCT chunks.hash, "
@@ -1457,7 +1459,7 @@ XattrList SqlLookupXattrs::GetXattrs() {
   assert(size >= 0);
   const std::unique_ptr<XattrList> xattrs(
       XattrList::Deserialize(packed_xattrs, size));
-  if (!xattrs.IsValid()) {
+  if (xattrs.get() == nullptr) {
     LogCvmfs(kLogCatalog, kLogDebug, "corrupted xattr data");
     return XattrList();
   }
@@ -1465,3 +1467,4 @@ XattrList SqlLookupXattrs::GetXattrs() {
 }
 
 }  // namespace catalog
+

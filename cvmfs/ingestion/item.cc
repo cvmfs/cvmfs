@@ -86,7 +86,7 @@ void ChunkItem::MakeBulkChunk() {
 
 
 zlib::Compressor *ChunkItem::GetCompressor() {
-  if (!compressor_.IsValid()) {
+  if (compressor_.get()==nullptr) {
     compressor_ = zlib::Compressor::Construct(
         file_item_->compression_algorithm());
   }
@@ -94,7 +94,7 @@ zlib::Compressor *ChunkItem::GetCompressor() {
 }
 
 
-void ChunkItem::ReleaseCompressor() { compressor_.Destroy(); }
+void ChunkItem::ReleaseCompressor() { compressor_.reset(); }
 
 
 //------------------------------------------------------------------------------

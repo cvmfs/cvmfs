@@ -31,7 +31,7 @@ template<class DerivedT>
 DerivedT *Database<DerivedT>::Create(const std::string &filename) {
   std::unique_ptr<DerivedT> database(new DerivedT(filename, kOpenReadWrite));
 
-  if (!database.IsValid()) {
+  if (database.get() == nullptr) {
     LogCvmfs(kLogSql, kLogDebug, "Failed to create new database object");
     return NULL;
   }
@@ -66,7 +66,7 @@ DerivedT *Database<DerivedT>::Create(const std::string &filename) {
     return NULL;
   }
 
-  return database.Release();
+  return database.release();
 }
 
 
@@ -75,7 +75,7 @@ DerivedT *Database<DerivedT>::Open(const std::string &filename,
                                    const OpenMode open_mode) {
   std::unique_ptr<DerivedT> database(new DerivedT(filename, open_mode));
 
-  if (!database.IsValid()) {
+  if (database.get() == nullptr) {
     LogCvmfs(kLogSql, kLogDebug,
              "Failed to open database file '%s' - errno: %d", filename.c_str(),
              errno);
@@ -86,7 +86,7 @@ DerivedT *Database<DerivedT>::Open(const std::string &filename,
     return NULL;
   }
 
-  return database.Release();
+  return database.release();
 }
 
 
@@ -96,7 +96,7 @@ bool Database<DerivedT>::Initialize() {
                                   : SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_READONLY;
 
   bool const successful = OpenDatabase(flags) && Configure() && FileReadAhead()
-                    && PrepareCommonQueries();
+                          && PrepareCommonQueries();
   if (!successful) {
     LogCvmfs(kLogSql, kLogDebug, "failed to open database file '%s'",
              filename().c_str());
@@ -130,9 +130,9 @@ bool Database<DerivedT>::OpenDatabase(const int flags) {
   // Open database file (depending on the flags read-only or read-write)
   LogCvmfs(kLogSql, kLogDebug, "opening database file %s", filename().c_str());
   int const retval = sqlite3_open_v2(filename().c_str(),
-                               &database_.sqlite_db,
-                               flags | SQLITE_OPEN_EXRESCODE,
-                               NULL);
+                                     &database_.sqlite_db,
+                                     flags | SQLITE_OPEN_EXRESCODE,
+                                     NULL);
   if (retval != SQLITE_OK) {
     LogCvmfs(kLogSql, kLogDebug, "cannot open database file %s (%d - %d)",
              filename().c_str(), retval, errno);
@@ -241,9 +241,10 @@ bool Database<DerivedT>::PrepareCommonQueries() {
                               "WHERE key = :key;");
   set_property_ = new Sql(db, "INSERT OR REPLACE INTO properties "
                               "(key, value) VALUES (:key, :value);");
-  return (begin_transaction_.IsValid() && commit_transaction_.IsValid()
-          && has_property_.IsValid() && get_property_.IsValid()
-          && set_property_.IsValid());
+  return (begin_transaction_.get() != nullptr
+          && commit_transaction_.get() != nullptr
+          && has_property_.get() != nullptr && get_property_.get() != nullptr
+          && set_property_.get() != nullptr);
 }
 
 
@@ -288,7 +289,7 @@ bool Database<DerivedT>::CreatePropertiesTable() {
 
 template<class DerivedT>
 bool Database<DerivedT>::HasProperty(const std::string &key) const {
-  assert(has_property_.IsValid());
+  assert(has_property_.get() != nullptr);
   const bool retval = has_property_->BindText(1, key)
                       && has_property_->FetchRow();
   assert(retval);
@@ -300,7 +301,7 @@ bool Database<DerivedT>::HasProperty(const std::string &key) const {
 template<class DerivedT>
 template<typename T>
 T Database<DerivedT>::GetProperty(const std::string &key) const {
-  assert(get_property_.IsValid());
+  assert(get_property_.get() != nullptr);
   const bool retval = get_property_->BindText(1, key)
                       && get_property_->FetchRow();
   assert(retval);
@@ -319,7 +320,7 @@ T Database<DerivedT>::GetPropertyDefault(const std::string &key,
 template<class DerivedT>
 template<typename T>
 bool Database<DerivedT>::SetProperty(const std::string &key, const T value) {
-  assert(set_property_.IsValid());
+  assert(set_property_.get() != nullptr);
   return set_property_->BindText(1, key) && set_property_->Bind(2, value)
          && set_property_->Execute() && set_property_->Reset();
 }
@@ -513,3 +514,4 @@ inline double Sql::Retrieve(const int index) {
 }  // namespace sqlite
 
 #endif  // CVMFS_SQL_IMPL_H_
+

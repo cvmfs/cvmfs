@@ -1826,8 +1826,8 @@ DownloadManager::~DownloadManager() {
     pipe_terminate_->Write(kPipeTerminateSignal);
     pthread_join(thread_download_, NULL);
     // All handles are removed from the multi stack
-    pipe_terminate_.Destroy();
-    pipe_jobs_.Destroy();
+    pipe_terminate_.reset();
+    pipe_jobs_.reset();
   }
 
   for (set<CURL *>::iterator i = pool_handles_idle_->begin(),

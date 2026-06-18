@@ -1359,7 +1359,7 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
   }
 
   // Cleanup opened resources
-  info->origin.Destroy();
+  info->origin.reset();
 
   if ((info->error_code != kFailOk) && (info->http_error != 0)
       && (info->http_error != 404)) {

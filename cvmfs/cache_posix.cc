@@ -43,6 +43,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+
 #include "crypto/hash.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
@@ -300,7 +301,7 @@ PosixCacheManager *PosixCacheManager::Create(
     const bool cleanup_unused_first) {
   std::unique_ptr<PosixCacheManager> cache_manager(new PosixCacheManager(
       cache_path, alien_cache, do_refcount, cleanup_unused_first));
-  assert(cache_manager.IsValid());
+  assert(cache_manager.get() != nullptr);
 
   cache_manager->rename_workaround_ = rename_workaround;
 
@@ -309,7 +310,7 @@ PosixCacheManager *PosixCacheManager::Create(
     return NULL;
   }
 
-  return cache_manager.Release();
+  return cache_manager.release();
 }
 
 

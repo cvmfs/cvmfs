@@ -210,7 +210,7 @@ ExternalCacheManager *ExternalCacheManager::Create(int fd_connection,
                                                    const string &ident) {
   std::unique_ptr<ExternalCacheManager> cache_mgr(
       new ExternalCacheManager(fd_connection, max_open_fds));
-  assert(cache_mgr.IsValid());
+  assert(cache_mgr.get()!=nullptr);
 
   cvmfs::MsgHandshake msg_handshake;
   msg_handshake.set_protocol_version(kPbProtocolVersion);
@@ -245,7 +245,7 @@ ExternalCacheManager *ExternalCacheManager::Create(int fd_connection,
   }
   if (msg_ack->has_pid())
     cache_mgr->pid_plugin_ = msg_ack->pid();
-  return cache_mgr.Release();
+  return cache_mgr.release();
 }
 
 
@@ -286,7 +286,7 @@ ExternalCacheManager::PluginHandle *ExternalCacheManager::CreatePlugin(
     try_again = SpawnPlugin(cmd_line);
   } while (try_again);
 
-  return plugin_handle.Release();
+  return plugin_handle.release();
 }
 
 
@@ -906,9 +906,9 @@ ExternalQuotaManager *ExternalQuotaManager::Create(
     ExternalCacheManager *cache_mgr) {
   std::unique_ptr<ExternalQuotaManager> quota_mgr(
       new ExternalQuotaManager(cache_mgr));
-  assert(quota_mgr.IsValid());
+  assert(quota_mgr.get()!=nullptr);
 
-  return quota_mgr.Release();
+  return quota_mgr.release();
 }
 
 

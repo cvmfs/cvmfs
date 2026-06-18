@@ -58,12 +58,12 @@ SqliteHistory *SqliteHistory::Create(const std::string &file_name,
 
 bool SqliteHistory::OpenDatabase(const std::string &file_name,
                                  const bool read_write) {
-  assert(!database_.IsValid());
+  assert(database_.get()==nullptr);
   const HistoryDatabase::OpenMode mode = (read_write)
                                              ? HistoryDatabase::kOpenReadWrite
                                              : HistoryDatabase::kOpenReadOnly;
   database_ = HistoryDatabase::Open(file_name, mode);
-  if (!database_.IsValid()) {
+  if (database_.get()==nullptr) {
     return false;
   }
 
@@ -83,11 +83,11 @@ bool SqliteHistory::OpenDatabase(const std::string &file_name,
 
 bool SqliteHistory::CreateDatabase(const std::string &file_name,
                                    const std::string &repo_name) {
-  assert(!database_.IsValid());
+  assert(database_.get()==nullptr);
   assert(fqrn().empty());
   set_fqrn(repo_name);
   database_ = HistoryDatabase::Create(file_name);
-  if (!database_.IsValid() || !database_->InsertInitialValues(repo_name)) {
+  if (database_.get()==nullptr || !database_->InsertInitialValues(repo_name)) {
     LogCvmfs(kLogHistory, kLogDebug,
              "failed to initialize empty database '%s', for repository '%s'",
              file_name.c_str(), repo_name.c_str());
@@ -100,7 +100,7 @@ bool SqliteHistory::CreateDatabase(const std::string &file_name,
 
 
 void SqliteHistory::PrepareQueries() {
-  assert(database_.IsValid());
+  assert(database_.get()!=nullptr);
 
   find_tag_ = new SqlFindTag(database_.get());
   find_tag_by_date_ = new SqlFindTagByDate(database_.get());
@@ -136,14 +136,14 @@ bool SqliteHistory::CommitTransaction() const {
 
 
 bool SqliteHistory::SetPreviousRevision(const shash::Any &history_hash) {
-  assert(database_.IsValid());
+  assert(database_.get()!=nullptr);
   assert(IsWritable());
   return database_->SetProperty(kPreviousRevisionKey, history_hash.ToString());
 }
 
 
 shash::Any SqliteHistory::previous_revision() const {
-  assert(database_.IsValid());
+  assert(database_.get()!=nullptr);
   const std::string hash_str = database_->GetProperty<std::string>(
       kPreviousRevisionKey);
   return shash::MkFromHexPtr(shash::HexPtr(hash_str), shash::kSuffixHistory);
@@ -151,13 +151,13 @@ shash::Any SqliteHistory::previous_revision() const {
 
 
 bool SqliteHistory::IsWritable() const {
-  assert(database_.IsValid());
+  assert(database_.get()!=nullptr);
   return database_->read_write();
 }
 
 unsigned SqliteHistory::GetNumberOfTags() const {
-  assert(database_.IsValid());
-  assert(count_tags_.IsValid());
+  assert(database_.get()!=nullptr);
+  assert(count_tags_.get()!=nullptr);
   bool retval = count_tags_->FetchRow();
   assert(retval);
   const unsigned count = count_tags_->RetrieveCount();
@@ -168,8 +168,8 @@ unsigned SqliteHistory::GetNumberOfTags() const {
 
 
 bool SqliteHistory::Insert(const History::Tag &tag) {
-  assert(database_.IsValid());
-  assert(insert_tag_.IsValid());
+  assert(database_.get()!=nullptr);
+  assert(insert_tag_.get()!=nullptr);
 
   return insert_tag_->BindTag(tag) && insert_tag_->Execute()
          && insert_tag_->Reset();
@@ -177,8 +177,8 @@ bool SqliteHistory::Insert(const History::Tag &tag) {
 
 
 bool SqliteHistory::Remove(const std::string &name) {
-  assert(database_.IsValid());
-  assert(remove_tag_.IsValid());
+  assert(database_.get()!=nullptr);
+  assert(remove_tag_.get()!=nullptr);
 
   Tag condemned_tag;
   if (!GetByName(name, &condemned_tag)) {
@@ -197,8 +197,8 @@ bool SqliteHistory::Exists(const std::string &name) const {
 
 
 bool SqliteHistory::GetByName(const std::string &name, Tag *tag) const {
-  assert(database_.IsValid());
-  assert(find_tag_.IsValid());
+  assert(database_.get()!=nullptr);
+  assert(find_tag_.get()!=nullptr);
   assert(NULL != tag);
 
   if (!find_tag_->BindName(name) || !find_tag_->FetchRow()) {
@@ -212,8 +212,8 @@ bool SqliteHistory::GetByName(const std::string &name, Tag *tag) const {
 
 
 bool SqliteHistory::GetByDate(const time_t timestamp, Tag *tag) const {
-  assert(database_.IsValid());
-  assert(find_tag_by_date_.IsValid());
+  assert(database_.get()!=nullptr);
+  assert(find_tag_by_date_.get()!=nullptr);
   assert(NULL != tag);
 
   if (!find_tag_by_date_->BindTimestamp(timestamp)
@@ -228,14 +228,14 @@ bool SqliteHistory::GetByDate(const time_t timestamp, Tag *tag) const {
 
 
 bool SqliteHistory::List(std::vector<Tag> *tags) const {
-  assert(list_tags_.IsValid());
+  assert(list_tags_.get()!=nullptr);
   return RunListing(tags, list_tags_.get());
 }
 
 
 template<class SqlListingT>
 bool SqliteHistory::RunListing(std::vector<Tag> *list, SqlListingT *sql) const {
-  assert(database_.IsValid());
+  assert(database_.get()!=nullptr);
   assert(NULL != list);
 
   while (sql->FetchRow()) {
@@ -247,8 +247,8 @@ bool SqliteHistory::RunListing(std::vector<Tag> *list, SqlListingT *sql) const {
 
 
 bool SqliteHistory::GetBranchHead(const string &branch_name, Tag *tag) const {
-  assert(database_.IsValid());
-  assert(find_branch_head_.IsValid());
+  assert(database_.get()!=nullptr);
+  assert(find_branch_head_.get()!=nullptr);
   assert(tag != NULL);
 
   if (!find_branch_head_->BindBranchName(branch_name)
@@ -275,8 +275,8 @@ bool SqliteHistory::ExistsBranch(const string &branch_name) const {
 
 
 bool SqliteHistory::InsertBranch(const Branch &branch) {
-  assert(database_.IsValid());
-  assert(insert_branch_.IsValid());
+  assert(database_.get()!=nullptr);
+  assert(insert_branch_.get()!=nullptr);
 
   return insert_branch_->BindBranch(branch) && insert_branch_->Execute()
          && insert_branch_->Reset();
@@ -345,7 +345,7 @@ bool SqliteHistory::ListBranches(vector<Branch> *branches) const {
 
 
 bool SqliteHistory::ListRecycleBin(std::vector<shash::Any> *hashes) const {
-  assert(database_.IsValid());
+  assert(database_.get()!=nullptr);
 
   if (!database_->ContainsRecycleBin()) {
     return false;
@@ -362,17 +362,17 @@ bool SqliteHistory::ListRecycleBin(std::vector<shash::Any> *hashes) const {
 
 
 bool SqliteHistory::EmptyRecycleBin() {
-  assert(database_.IsValid());
+  assert(database_.get()!=nullptr);
   assert(IsWritable());
-  assert(recycle_empty_.IsValid());
+  assert(recycle_empty_.get()!=nullptr);
   return recycle_empty_->Execute() && recycle_empty_->Reset();
 }
 
 
 bool SqliteHistory::Rollback(const Tag &updated_target_tag) {
-  assert(database_.IsValid());
+  assert(database_.get()!=nullptr);
   assert(IsWritable());
-  assert(rollback_tag_.IsValid());
+  assert(rollback_tag_.get()!=nullptr);
 
   Tag old_target_tag;
   bool success = false;
@@ -444,7 +444,7 @@ bool SqliteHistory::ListTagsAffectedByRollback(
 
 
 bool SqliteHistory::GetHashes(std::vector<shash::Any> *hashes) const {
-  assert(database_.IsValid());
+  assert(database_.get()!=nullptr);
   assert(NULL != hashes);
 
   while (get_hashes_->FetchRow()) {
@@ -456,13 +456,13 @@ bool SqliteHistory::GetHashes(std::vector<shash::Any> *hashes) const {
 
 
 void SqliteHistory::TakeDatabaseFileOwnership() {
-  assert(database_.IsValid());
+  assert(database_.get()!=nullptr);
   database_->TakeFileOwnership();
 }
 
 
 void SqliteHistory::DropDatabaseFileOwnership() {
-  assert(database_.IsValid());
+  assert(database_.get()!=nullptr);
   database_->DropFileOwnership();
 }
 

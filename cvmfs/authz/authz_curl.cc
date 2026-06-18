@@ -8,13 +8,13 @@
 #include <pthread.h>
 
 #include <cassert>
+#include <memory>
 
 #include "authz/authz_session.h"
 #include "crypto/openssl_version.h"
 #include "duplex_curl.h"
 #include "util/concurrency.h"
 #include "util/logging.h"
-#include <memory>
 
 using namespace std;  // NOLINT
 
@@ -162,7 +162,7 @@ bool AuthzAttachment::ConfigureCurlHandle(CURL *curl_handle,
 
   const std::unique_ptr<AuthzToken> token(
       authz_session_manager_->GetTokenCopy(pid, membership_));
-  if (!token.IsValid()) {
+  if (token.get() == nullptr) {
     LogCvmfs(kLogAuthz, kLogDebug, "failed to get authz token for pid %d", pid);
     return false;
   }
@@ -278,7 +278,7 @@ bool AuthzAttachment::ConfigureCurlHandle(CURL *curl_handle,
 
   AuthzToken *to_return = new AuthzToken();
   to_return->type = kTokenX509;
-  to_return->data = static_cast<void *>(parm.Release());
+  to_return->data = static_cast<void *>(parm.release());
   curl_easy_setopt(curl_handle, CURLOPT_SSL_CTX_DATA,
                    static_cast<sslctx_info *>(to_return->data));
   *info_data = to_return;
@@ -328,3 +328,4 @@ void AuthzAttachment::ReleaseCurlHandle(CURL *curl_handle, void *info_data) {
     curl_easy_setopt(curl_handle, CURLOPT_SSL_CTX_DATA, 0);
   }
 }
+

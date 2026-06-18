@@ -9,10 +9,10 @@
 #include <stdint.h>
 #include <sys/types.h>
 
+#include <memory>
 #include <string>
 
 #include "cache.h"
-#include <memory>
 #include "duplex_testing.h"
 #include "fd_refcount_mgr.h"
 #include "manifest_fetch.h"
@@ -180,7 +180,7 @@ class PosixCacheManager : public CacheManager {
   static const char kMagicRefcount = 123;
   static const char kMagicNoRefcount = '\0';
   struct SavedState {
-    SavedState() : magic_number(kMagicRefcount), version(0), fd_mgr(NULL) { }
+    SavedState() : magic_number(kMagicRefcount), version(0), fd_mgr(nullptr) { }
     /// this helps to distinguish from the SavedState of the normal
     /// posix cache manager
     char magic_number;

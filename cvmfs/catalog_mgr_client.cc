@@ -229,7 +229,7 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
       fixed_alt_root_catalog_ = ensemble->manifest->has_alt_catalog_path();
 
       result->TakeManifestEnsemble(
-          static_cast<manifest::ManifestEnsemble *>(ensemble.Release()));
+          static_cast<manifest::ManifestEnsemble *>(ensemble.release()));
       offline_mode_ = false;
 
       return catalog::kLoadNew;

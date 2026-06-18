@@ -76,7 +76,7 @@ Key *Key::CreateFromString(const string &key) {
   result->size_ = size;
   result->data_ = reinterpret_cast<unsigned char *>(smalloc(size));
   memcpy(result->data_, key.data(), size);
-  return result.Release();
+  return result.release();
 }
 
 
@@ -290,7 +290,7 @@ shash::Md5 CipherAes256Cbc::GenerateIv(const Key &key) {
   // The UUID is random but not necessarily cryptographically random.  That
   // saves the entropy pool.
   const std::unique_ptr<cvmfs::Uuid> uuid(cvmfs::Uuid::Create(""));
-  assert(uuid.IsValid());
+  assert(uuid.get()!=nullptr);
 
   // Now make it unpredictable, using an HMAC with the encryption key.
   shash::Any hmac(shash::kMd5);

@@ -244,3 +244,4 @@ class SqlRecycleBinFlush : public SqlRecycleBin {
 }  // namespace history
 
 #endif  // CVMFS_HISTORY_SQL_H_
+

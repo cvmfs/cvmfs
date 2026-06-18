@@ -747,8 +747,8 @@ Watchdog::~Watchdog() {
     pipe_listener_->CloseReadFd();
   } else {
     // Release the references to the watchdog pipes without closing them
-    pipe_watchdog_.Release();
-    pipe_listener_.Release();
+    pipe_watchdog_.release();
+    pipe_listener_.release();
   }
 
   platform_spinlock_destroy(&lock_handler_);

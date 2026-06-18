@@ -13,7 +13,7 @@ JsonDocument *JsonDocument::Create(const string &text) {
   std::unique_ptr<JsonDocument> json(new JsonDocument());
   if (!json->Parse(text))
     return NULL;
-  return json.Release();
+  return json.release();
 }
 
 JsonDocument::JsonDocument() : root_(JSON::value_t::null) { }

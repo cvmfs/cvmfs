@@ -74,7 +74,7 @@ class Reflog {
   void TakeDatabaseFileOwnership();
   void DropDatabaseFileOwnership();
   bool OwnsDatabaseFile() const {
-    return database_.IsValid() && database_->OwnsFile();
+    return database_.get() != nullptr && database_->OwnsFile();
   }
   bool Vacuum() { return database_->Vacuum(); }
 
@@ -111,3 +111,4 @@ class Reflog {
 }  // namespace manifest
 
 #endif  // CVMFS_REFLOG_H_
+
