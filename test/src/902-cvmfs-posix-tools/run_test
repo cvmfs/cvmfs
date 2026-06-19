@@ -213,9 +213,9 @@ revision() {
 }
 
 revision_compare() {
-    SAYS_S3=$(       curl --fail --no-progress-meter -H 'Cache-Control: no-cache, max-age=0, must-revalidate'                        http://$S3_HOST:9000/mybucket/"$CVMFS_TEST_REPO"/.cvmfspublished | grep --text ^S | sed s/^S//)
+    SAYS_S3=$(       curl --fail --silent --show-error -H 'Cache-Control: no-cache, max-age=0, must-revalidate'                        http://$S3_HOST:9000/mybucket/"$CVMFS_TEST_REPO"/.cvmfspublished | grep --text ^S | sed s/^S//)
     if [[ "$PROXY_SPEC" != DIRECT ]]; then
-	SAYS_PROXY=$(curl --fail --no-progress-meter -H 'Cache-Control: no-cache, max-age=0, must-revalidate' --proxy "$PROXY_SPEC"  http://$S3_HOST:9000/mybucket/"$CVMFS_TEST_REPO"/.cvmfspublished | grep --text ^S | sed s/^S//)
+	SAYS_PROXY=$(curl --fail --silent --show-error -H 'Cache-Control: no-cache, max-age=0, must-revalidate' --proxy "$PROXY_SPEC"  http://$S3_HOST:9000/mybucket/"$CVMFS_TEST_REPO"/.cvmfspublished | grep --text ^S | sed s/^S//)
     else
 	SAYS_PROXY=
     fi
@@ -247,11 +247,11 @@ check_ingestsql_works() {
 
     which s3cmd || dnf install -y s3cmd
     s3cmd put "$SOME_FILE" s3://mybucket/"$CVMFS_TEST_REPO"/external/"$SOME_FILE_NAME"
-    curl --fail --no-progress-meter -H 'Cache-Control: no-cache' http://$S3_HOST:9000/mybucket/"$CVMFS_TEST_REPO"/external/"$SOME_FILE_NAME" | sha1sum | grep "^$SHA1SUM  -$"
+    curl --fail --silent --show-error -H 'Cache-Control: no-cache' http://$S3_HOST:9000/mybucket/"$CVMFS_TEST_REPO"/external/"$SOME_FILE_NAME" | sha1sum | grep "^$SHA1SUM  -$"
     if [[ "$PROXY_SPEC" != DIRECT ]]; then
 	# sudo ngrep -t -e -d any -W byline -O /tmp/9000.$(date +%F_%T).pcap port 9000 &
 	sleep 1
-	curl --verbose --fail --no-progress-meter -H 'Cache-Control: no-cache' --proxy "$PROXY_SPEC"  http://$S3_HOST:9000/mybucket/"$CVMFS_TEST_REPO"/external/"$SOME_FILE_NAME" | sha1sum | grep "^$SHA1SUM  -$"
+	curl --verbose --fail --silent --show-error -H 'Cache-Control: no-cache' --proxy "$PROXY_SPEC"  http://$S3_HOST:9000/mybucket/"$CVMFS_TEST_REPO"/external/"$SOME_FILE_NAME" | sha1sum | grep "^$SHA1SUM  -$"
 	# sudo killall ngrep || true
 	sleep 1
     fi
@@ -285,9 +285,9 @@ check_ingestsql_works() {
 	    fi
 	    # drop cache:
 	    if [[ "$PROXY_SPEC" != DIRECT ]]; then
-		curl --fail --no-progress-meter -o /dev/null -H 'Cache-Control: no-cache' --proxy "$PROXY_SPEC"  http://$S3_HOST:9000/mybucket/"$CVMFS_TEST_REPO"/.cvmfspublished
+		curl --fail --silent --show-error -o /dev/null -H 'Cache-Control: no-cache' --proxy "$PROXY_SPEC"  http://$S3_HOST:9000/mybucket/"$CVMFS_TEST_REPO"/.cvmfspublished
 	    fi
-	    curl --fail --no-progress-meter -o /dev/null -H 'Cache-Control: no-cache'  http://$S3_HOST:9000/mybucket/"$CVMFS_TEST_REPO"/.cvmfspublished
+	    curl --fail --silent --show-error -o /dev/null -H 'Cache-Control: no-cache'  http://$S3_HOST:9000/mybucket/"$CVMFS_TEST_REPO"/.cvmfspublished
 	    if [[ "$REMOUNT_WHILE_WAITING" == 1 ]]; then
 		sudo mount "$CVMFS_TEST_MOUNTPOINT"
 	    fi
@@ -347,9 +347,9 @@ check_tools() {
 	while pgrep cvmfs2 >/dev/null; do sleep 1; done
 	# drop cache:
 	if [[ "$PROXY_SPEC" != DIRECT ]]; then
-	    curl --fail --no-progress-meter -o /dev/null -H 'Cache-Control: no-cache' --proxy "$PROXY_SPEC"  http://$S3_HOST:9000/mybucket/"$CVMFS_TEST_REPO"/.cvmfspublished
+	    curl --fail --silent --show-error -o /dev/null -H 'Cache-Control: no-cache' --proxy "$PROXY_SPEC"  http://$S3_HOST:9000/mybucket/"$CVMFS_TEST_REPO"/.cvmfspublished
 	fi
-	curl --fail --no-progress-meter -o /dev/null -H 'Cache-Control: no-cache'  http://$S3_HOST:9000/mybucket/"$CVMFS_TEST_REPO"/.cvmfspublished
+	curl --fail --silent --show-error -o /dev/null -H 'Cache-Control: no-cache'  http://$S3_HOST:9000/mybucket/"$CVMFS_TEST_REPO"/.cvmfspublished
 	sudo mount "$CVMFS_TEST_MOUNTPOINT"
     done
     echo Revision incremented after $(( "$(date +%s)" - TIME_START )) seconds
@@ -366,9 +366,9 @@ check_tools() {
 	while pgrep cvmfs2 >/dev/null; do sleep 1; done
 	# drop cache:
 	if [[ "$PROXY_SPEC" != DIRECT ]]; then
-	    curl --fail --no-progress-meter -o /dev/null -H 'Cache-Control: no-cache' --proxy "$PROXY_SPEC"  http://$S3_HOST:9000/mybucket/"$CVMFS_TEST_REPO"/.cvmfspublished
+	    curl --fail --silent --show-error -o /dev/null -H 'Cache-Control: no-cache' --proxy "$PROXY_SPEC"  http://$S3_HOST:9000/mybucket/"$CVMFS_TEST_REPO"/.cvmfspublished
 	fi
-	curl --fail --no-progress-meter -o /dev/null -H 'Cache-Control: no-cache'  http://$S3_HOST:9000/mybucket/"$CVMFS_TEST_REPO"/.cvmfspublished
+	curl --fail --silent --show-error -o /dev/null -H 'Cache-Control: no-cache'  http://$S3_HOST:9000/mybucket/"$CVMFS_TEST_REPO"/.cvmfspublished
 	sudo mount "$CVMFS_TEST_MOUNTPOINT"
     done
     echo Revision incremented after $(( "$(date +%s)" - TIME_START )) seconds
@@ -404,9 +404,9 @@ wipe_repo() {
 	while pgrep cvmfs2 >/dev/null; do sleep 1; done
 	# drop cache:
 	if [[ "$PROXY_SPEC" != DIRECT ]]; then
-	    curl --fail --no-progress-meter -o /dev/null -H 'Cache-Control: no-cache' --proxy "$PROXY_SPEC"  http://$S3_HOST:9000/mybucket/"$CVMFS_TEST_REPO"/.cvmfspublished
+	    curl --fail --silent --show-error -o /dev/null -H 'Cache-Control: no-cache' --proxy "$PROXY_SPEC"  http://$S3_HOST:9000/mybucket/"$CVMFS_TEST_REPO"/.cvmfspublished
 	fi
-	curl --fail --no-progress-meter -o /dev/null -H 'Cache-Control: no-cache'  http://$S3_HOST:9000/mybucket/"$CVMFS_TEST_REPO"/.cvmfspublished
+	curl --fail --silent --show-error -o /dev/null -H 'Cache-Control: no-cache'  http://$S3_HOST:9000/mybucket/"$CVMFS_TEST_REPO"/.cvmfspublished
 	sudo mount "$CVMFS_TEST_MOUNTPOINT"
     done
     echo Wipe: Revision incremented after $(( "$(date +%s)" - TIME_START )) seconds
