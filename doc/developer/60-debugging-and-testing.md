@@ -105,14 +105,15 @@ Writing your own integration tests is done the following way:
 - Your test can be executed like all the other tests. No compilation of the `cvmfs` source code needed.
 
 
-> **_Tips_** &nbsp;
-> - `return` values must be handed up to the parent function `my_sub_func || return $?`
-> - For readability it might be nice to split the test routines in multiple files
->     - Use the line `source ./src/701-xattr-catalog_counters/<filename>` to include another file in the file `main`. It should be positioned after the `cvmfs_test_suites` parameter
-> - For `cvmfs_talk` when interacting with locally mounted repository (= *server test*) you have to use the socket of the repository and not the repository name
->   ```bash
->   sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO internal affairs
->   ```        
+#### Tips
+
+- `return` values must be handed up to the parent function `my_sub_func || return $?`
+- For readability it might be nice to split the test routines in multiple files
+    - Use the line `source ./src/701-xattr-catalog_counters/<filename>` to include another file in the file `main`. It should be positioned after the `cvmfs_test_suites` parameter
+- For `cvmfs_talk` when interacting with locally mounted repository (= *server test*) you have to use the socket of the repository and not the repository name
+  ```bash
+  sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO internal affairs
+  ```
 
 ## Unit Tests
 
