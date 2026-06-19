@@ -60,7 +60,7 @@ EOF
   # succeed.  (A retry here would mask the parallel-decompress fail-over bug
   # that this test guards against.)
   for f in $(find $mnt_point -maxdepth 1 -type f); do
-    cat $f > /dev/null || { desaster_cleanup $mnt_point $replica_name; return 7; }
+    cat $f > /dev/null || { desaster_cleanup $mnt_point $replica_name; cat cvmfs2_output.log; return 7; }
   done
 
   echo "clean up"
