@@ -1129,17 +1129,16 @@ string TalkManager::FormatPrometheusMetrics(MountPoint &mount_point,
                 "Shows the number of currently loaded nested catalogs.",
                 "repo=\"" + fqrn + "\"", StringifyInt(n_catalogs));
 
-  // Absolute number of cache cleanups since mounting.  Reported as a counter
-  // for ingestion into time series databases; use rate()/increase() to derive
-  // the cleanups over an arbitrary window.
+  // Cleanup rate (24 hours)
   if (quota_mgr->HasCapability(QuotaManager::kCapIntrospectCleanupRate)) {
-    const uint64_t cleanup_count = quota_mgr->GetCleanupCount();
-    format_metric("cvmfs_cache_ncleanup_total", "counter",
-                  "Shows the total number of cache cleanups since mounting.",
-                  "repo=\"" + fqrn + "\"", StringifyUint(cleanup_count));
+    const uint64_t period_s = 24 * 60 * 60;
+    const uint64_t cleanup_rate = quota_mgr->GetCleanupRate(period_s);
+    format_metric("cvmfs_cache_ncleanup24", "gauge",
+                  "Shows the number of cache cleanups in the last 24 hours.",
+                  "repo=\"" + fqrn + "\"", StringifyUint(cleanup_rate));
   } else {
-    format_metric("cvmfs_cache_ncleanup_total", "counter",
-                  "Shows the total number of cache cleanups since mounting.",
+    format_metric("cvmfs_cache_ncleanup24", "gauge",
+                  "Shows the number of cache cleanups in the last 24 hours.",
                   "repo=\"" + fqrn + "\"", "-1");
   }
 
