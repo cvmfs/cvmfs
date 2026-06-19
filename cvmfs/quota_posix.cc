@@ -502,6 +502,7 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
            "clean up cache until at most %lu KB is used", leave_size / 1024);
   LogCvmfs(kLogQuota, kLogDebug, "gauge %" PRIu64, gauge_);
   cleanup_recorder_.Tick();
+  cleanup_count_++;
 
   bool result;
   vector<string> trash;
@@ -957,6 +958,25 @@ uint64_t PosixQuotaManager::GetCleanupRate(uint64_t period_s) {
   CloseReturnPipe(pipe_cleanup_rate);
 
   return cleanup_rate;
+}
+
+
+uint64_t PosixQuotaManager::GetCleanupCount() {
+  if (!spawned_ || (protocol_revision_ < 4))
+    return 0;
+  uint64_t cleanup_count;
+
+  int pipe_cleanup_count[2];
+  MakeReturnPipe(pipe_cleanup_count);
+  LruCommand cmd;
+  cmd.command_type = kCleanupCount;
+  cmd.return_pipe = pipe_cleanup_count[1];
+  WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
+  ManagedReadHalfPipe(pipe_cleanup_count[0], &cleanup_count,
+                      sizeof(cleanup_count));
+  CloseReturnPipe(pipe_cleanup_count);
+
+  return cleanup_count;
 }
 
 
@@ -1465,6 +1485,18 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
       continue;
     }
 
+    // The absolute cleanup count is returned immediately
+    if (command_type == kCleanupCount) {
+      const int return_pipe = quota_mgr->BindReturnPipe(
+          command_buffer[num_commands].return_pipe);
+      if (return_pipe < 0)
+        continue;
+      const uint64_t count = quota_mgr->cleanup_count_;
+      WritePipe(return_pipe, &count, sizeof(count));
+      quota_mgr->UnbindReturnPipe(return_pipe);
+      continue;
+    }
+
     if (command_type == kSetLimit) {
       const int return_pipe = quota_mgr->BindReturnPipe(
           command_buffer[num_commands].return_pipe);
@@ -1897,6 +1929,7 @@ PosixQuotaManager::PosixQuotaManager(const uint64_t limit,
     , fd_lock_cachedb_(-1)
     , async_delete_(true)
     , cachemgr_pid_(0)
+    , cleanup_count_(0)
     , database_(NULL)
     , stmt_touch_(NULL)
     , stmt_unpin_(NULL)

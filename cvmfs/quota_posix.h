@@ -83,6 +83,7 @@ class PosixQuotaManager : public QuotaManager {
   virtual uint64_t GetSizePinned();
   virtual bool SetLimit(uint64_t limit);
   virtual uint64_t GetCleanupRate(uint64_t period_s);
+  virtual uint64_t GetCleanupCount();
 
   virtual void Spawn();
   virtual pid_t GetPid();
@@ -136,6 +137,8 @@ class PosixQuotaManager : public QuotaManager {
     kGetMountpoints,
     kGetGroupHashes,
     kSetCleanupPolicy,
+    // as of protocol revision 4
+    kCleanupCount,
   };
 
   /**
@@ -366,6 +369,12 @@ class PosixQuotaManager : public QuotaManager {
    * `cvmfs_talk cleanup rate`
    */
   perf::MultiRecorder cleanup_recorder_;
+
+  /**
+   * Monotonic count of cache cleanups since the cache manager was started.
+   * Reported as an absolute counter via GetCleanupCount().
+   */
+  uint64_t cleanup_count_;
 
   sqlite3 *database_;
   sqlite3_stmt *stmt_touch_;

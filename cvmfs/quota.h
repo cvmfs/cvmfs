@@ -44,6 +44,8 @@ class QuotaManager : SingleCopy {
    * Revision 3:
    *  - add kRegisterMountpoint, kGetMountpoints, kGetGroupHashes, and
    *    kSetCleanupPolicy commands
+   * Revision 4:
+   *  - add kCleanupCount command
    */
   static const uint32_t kProtocolRevision;
 
@@ -80,6 +82,12 @@ class QuotaManager : SingleCopy {
   virtual uint64_t GetSizePinned() = 0;
   virtual bool SetLimit(uint64_t limit) = 0;
   virtual uint64_t GetCleanupRate(uint64_t period_s) = 0;
+  /**
+   * Total number of cache cleanups since the cache manager was started.  Unlike
+   * GetCleanupRate(), this is a monotonic counter suitable for ingestion into a
+   * time series database.  Returns 0 for managers that don't track cleanups.
+   */
+  virtual uint64_t GetCleanupCount() { return 0; }
 
   virtual void Spawn() = 0;
   virtual pid_t GetPid() = 0;
