@@ -50,7 +50,8 @@ bool EditTags(const RepositoryTag &repo_tag, const std::string &repo_name,
               const std::string &manifest_path,
               const std::string &public_key_path,
               const std::string &proxy,
-              const time_t auto_tag_threshold) {
+              const time_t auto_tag_threshold,
+              const bool maintain_undo_tags) {
   swissknife::ArgumentList args;
   args['r'].Reset(new std::string(params.spooler_configuration));
   args['w'].Reset(new std::string(params.stratum0));
@@ -61,7 +62,9 @@ bool EditTags(const RepositoryTag &repo_tag, const std::string &repo_name,
   args['e'].Reset(new std::string(params.hash_alg_str));
   args['a'].Reset(new std::string(repo_tag.name()));
   args['D'].Reset(new std::string(repo_tag.description()));
-  args['x'].Reset(new std::string());
+  if (maintain_undo_tags) {
+    args['x'].Reset(new std::string());
+  }
   args['@'].Reset(new std::string(proxy));
   // Remove the tags requested by `cvmfs_server tag -r` in the same history
   // transaction as the (possibly empty) new tag, so a single new history
@@ -326,8 +329,15 @@ CommitProcessor::Result CommitProcessor::Process(
   // outdated auto tags -- all in the same history transaction. A failure here
   // is fatal: leaving the new revision untagged (or silently keeping stale
   // tags) would be worse than aborting the commit.
+  //
+  // Only real publish commits should rotate the undo tags (`trunk` and
+  // `trunk-previous`). Pure gateway tag edits reuse the current root hash as
+  // both old and new hash, so updating undo tags there would incorrectly make
+  // `trunk-previous` point at the current HEAD.
+  const bool maintain_undo_tags = (old_root_hash != new_root_hash);
   if (!EditTags(final_tag, repo_name, params, temp_dir, new_manifest_path,
-                public_key, params.proxy, auto_tag_threshold)) {
+                public_key, params.proxy, auto_tag_threshold,
+                maintain_undo_tags)) {
     LogCvmfs(kLogReceiver, kLogSyslogErr, "Error editing tags (add: '%s')",
              final_tag.name().c_str());
     return kError;
