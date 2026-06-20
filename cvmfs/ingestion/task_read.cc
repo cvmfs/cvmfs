@@ -44,7 +44,7 @@ void TaskRead::Process(FileItem *item) {
         item->chunk_detector()->MightFindChunks(item->size()));
   }
 
-  unsigned char *buffer[kBlockSize];
+  unsigned char buffer[kBlockSize];
   const uint64_t tag = atomic_xadd64(&tag_seq_, 1);
   ssize_t nbytes = -1;
   unsigned cnt = 0;

@@ -245,6 +245,12 @@ inline void platform_invalidate_kcache(const int fd, const off_t offset,
   // TODO(rmeusel): implement
 }
 
+inline void platform_fadvise_sequential(int filedes) {
+  // macOS does not have posix_fadvise; fcntl(F_RDAHEAD) is the closest
+  // equivalent but applies globally per-fd. No-op for now.
+  (void)filedes;
+}
+
 inline ssize_t platform_readahead(int filedes) {
   // TODO(jblomer): is there a readahead equivalent?
   return 0;

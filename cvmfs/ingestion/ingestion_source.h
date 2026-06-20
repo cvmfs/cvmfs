@@ -63,6 +63,10 @@ class FileIngestionSource : public IngestionSource {
                errno, strerror(errno));
       return false;
     }
+    // Hint to the kernel that this file will be read linearly front-to-back.
+    // The kernel doubles its read-ahead window, reducing I/O stalls for the
+    // ingestion pipeline's read workers on large files.
+    platform_fadvise_sequential(fd_);
     return true;
   }
 
