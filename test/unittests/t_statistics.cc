@@ -178,7 +178,7 @@ TEST(T_Statistics, GenerateCorrectJsonEvenWithoutInput) {
   std::string output = stats.PrintJSON();
 
   std::unique_ptr<JsonDocument> json(JsonDocument::Create(output));
-  ASSERT_TRUE(json.IsValid());
+  ASSERT_TRUE(json.get()!=nullptr);
 }
 
 TEST(T_Statistics, GenerateJSONStatisticsTemplates) {
