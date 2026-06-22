@@ -47,8 +47,8 @@ int CmdAbort::Main(const Options &options) {
     // to cvmfs_server abort repo.cern.ch
     const std::string repository_ident = StripTrailingPath(
         options.plain_args().empty() ? "" : options.plain_args()[0].value_str);
-    settings = builder.CreateSettingsPublisher(repository_ident,
-                                               true /* needs_managed */);
+    settings .reset(  builder.CreateSettingsPublisher(repository_ident,
+          true /* needs_managed */) );
   } catch (const EPublish &e) {
     if ((e.failure() == EPublish::kFailRepositoryNotFound)
         || (e.failure() == EPublish::kFailRepositoryType)) {
@@ -136,7 +136,7 @@ int CmdAbort::Main(const Options &options) {
   // Pass exists=false to skip downloading the whitelist and manifest, which
   // would fail under disk-full conditions. Abort only needs the session (to
   // drop any gateway lease) and the managed node (to repair mount points).
-  publisher = new Publisher(*settings, false /* exists */);
+  publisher .reset(  new Publisher(*settings, false /* exists */) );
 
   LogCvmfs(kLogCvmfs, kLogSyslog, "(%s) aborting transaction",
            settings->fqrn().c_str());

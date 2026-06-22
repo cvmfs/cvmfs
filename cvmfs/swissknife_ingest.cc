@@ -168,7 +168,7 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
     return 3;
   const std::unique_ptr<upload::Spooler> spooler_catalogs(upload::Spooler::Construct(
       spooler_definition_catalogs, &publish_statistics));
-  if (!spooler_catalogs.IsValid())
+  if (spooler_catalogs.get()==nullptr)
     return 3;
 
   const bool follow_redirects = (args.count('L') > 0);
@@ -190,17 +190,17 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
   std::unique_ptr<manifest::Manifest> manifest;
   if (params.branched_catalog) {
     // Throw-away manifest
-    manifest = new manifest::Manifest(shash::Any(), 0, "");
+    manifest .reset(  new manifest::Manifest(shash::Any(), 0, "") );
   } else {
     if (with_gateway) {
-      manifest = FetchRemoteManifest(params.stratum0, params.repo_name,
-                                     shash::Any());
+      manifest .reset(  FetchRemoteManifest(params.stratum0, params.repo_name,
+            shash::Any()) );
     } else {
-      manifest = FetchRemoteManifest(params.stratum0, params.repo_name,
-                                     params.base_hash);
+      manifest .reset(  FetchRemoteManifest(params.stratum0, params.repo_name,
+            params.base_hash) );
     }
   }
-  if (!manifest.IsValid()) {
+  if (manifest.get()==nullptr) {
     return 3;
   }
 

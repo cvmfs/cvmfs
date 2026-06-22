@@ -105,7 +105,7 @@ int CommandReconstructReflog::Main(const ArgumentList &args) {
   const std::unique_ptr<upload::AbstractUploader> uploader(
       upload::AbstractUploader::Construct(spooler_definition));
 
-  if (!uploader.IsValid()) {
+  if (uploader.get()==nullptr) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to initialize spooler for '%s'",
              spooler.c_str());
     return 1;
@@ -125,7 +125,7 @@ int CommandReconstructReflog::Main(const ArgumentList &args) {
 
   reflog->DropDatabaseFileOwnership();
   const std::string reflog_db = reflog->database_file();
-  reflog.Destroy();
+  reflog.reset();
   uploader->UploadFile(reflog_db, ".cvmfsreflog");
   shash::Any reflog_hash(manifest->GetHashAlgorithm());
   manifest::Reflog::HashDatabase(reflog_db, &reflog_hash);
@@ -183,7 +183,7 @@ void RootChainWalker::WalkRootCatalogs(const shash::Any &root_catalog_hash) {
   std::unique_ptr<CatalogTN> current_catalog;
 
   while (!current_hash.IsNull() && !reflog_->ContainsCatalog(current_hash)
-         && (current_catalog = FetchCatalog(current_hash)).IsValid()) {
+         && (current_catalog = std::unique_ptr<CatalogTN>( FetchCatalog(current_hash)) ).get()!=nullptr) {
     LogCvmfs(kLogCvmfs, kLogStdout, "Catalog: %s Revision: %" PRIu64,
              current_hash.ToString().c_str(), current_catalog->GetRevision());
 
@@ -200,7 +200,7 @@ void RootChainWalker::WalkHistories(const shash::Any &history_hash) {
   std::unique_ptr<HistoryTN> current_history;
 
   while (!current_hash.IsNull() && !reflog_->ContainsHistory(current_hash)
-         && (current_history = FetchHistory(current_hash)).IsValid()) {
+         && (current_history = std::unique_ptr<HistoryTN>( FetchHistory(current_hash) )).get()!=nullptr) {
     LogCvmfs(kLogCvmfs, kLogStdout, "History: %s",
              current_hash.ToString().c_str());
 

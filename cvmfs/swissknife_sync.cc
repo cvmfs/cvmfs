@@ -130,25 +130,25 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
   const upload::SpoolerDefinition sd(spooler_definition, hash_algorithm,
                                      zlib::kZlibDefault);
   const std::unique_ptr<upload::Spooler> spooler(upload::Spooler::Construct(sd));
-  assert(spooler.IsValid());
+  assert(spooler.get()!=nullptr);
 
   const std::unique_ptr<manifest::Manifest> manifest(
       catalog::WritableCatalogManager::CreateRepository(
           dir_temp, volatile_content, voms_authz, spooler.get()));
-  if (!manifest.IsValid()) {
+  if (manifest.get()==nullptr) {
     PrintError("Swissknife Sync: Failed to create new repository");
     return 1;
   }
 
   std::unique_ptr<manifest::Reflog> reflog(CreateEmptyReflog(dir_temp, repo_name));
-  if (!reflog.IsValid()) {
+  if (reflog.get()==nullptr) {
     PrintError("Swissknife Sync: Failed to create fresh Reflog");
     return 1;
   }
 
   reflog->DropDatabaseFileOwnership();
   const string reflog_path = reflog->database_file();
-  reflog.Destroy();
+  reflog.reset();
   shash::Any reflog_hash(hash_algorithm);
   manifest::Reflog::HashDatabase(reflog_path, &reflog_hash);
   spooler->UploadReflog(reflog_path);
@@ -784,7 +784,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     return 3;
   const std::unique_ptr<upload::Spooler> spooler_catalogs(upload::Spooler::Construct(
       spooler_definition_catalogs, &publish_statistics));
-  if (!spooler_catalogs.IsValid())
+  if (spooler_catalogs.get()==nullptr)
     return 3;
 
   const bool follow_redirects = (args.count('L') > 0);
@@ -806,18 +806,18 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   std::unique_ptr<manifest::Manifest> manifest;
   if (params.branched_catalog) {
     // Throw-away manifest
-    manifest = new manifest::Manifest(shash::Any(), 0, "");
+    manifest .reset(  new manifest::Manifest(shash::Any(), 0, "") );
   } else if (params.virtual_dir_actions
              != catalog::VirtualCatalog::kActionNone) {
-    manifest = this->OpenLocalManifest(params.manifest_path);
+    manifest .reset(  this->OpenLocalManifest(params.manifest_path) );
     params.base_hash = manifest->catalog_hash();
   } else {
     // TODO(jblomer): revert to params.base_hash if spooler driver type is not
     // upload::SpoolerDefinition::Gateway
-    manifest = FetchRemoteManifest(params.stratum0, params.repo_name,
-                                   shash::Any());
+    manifest .reset(  FetchRemoteManifest(params.stratum0, params.repo_name,
+          shash::Any()) );
   }
-  if (!manifest.IsValid()) {
+  if (manifest.get()==nullptr) {
     return 3;
   }
 

@@ -233,7 +233,7 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
     Failures failure = FetchCatalog(catalog_hash, catalog_path,
                                     &raw_catalog_ptr, is_nested, parent);
     if (failure == kFailOk)
-      *catalog = raw_catalog_ptr;
+      catalog->reset(raw_catalog_ptr);
     return failure;
   }
 
@@ -242,7 +242,7 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
     ReflogTN *raw_reflog_ptr = NULL;
     Failures failure = FetchReflog(reflog_hash, &raw_reflog_ptr);
     if (failure == kFailOk)
-      *reflog = raw_reflog_ptr;
+      reflog->reset(raw_reflog_ptr);
     return failure;
   }
 

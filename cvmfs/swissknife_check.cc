@@ -232,7 +232,7 @@ bool CommandCheck::InspectReflog(const shash::Any &reflog_hash,
   }
 
   const std::unique_ptr<manifest::Reflog> reflog(manifest::Reflog::Open(reflog_path));
-  assert(reflog.IsValid());
+  assert(reflog.get()!=nullptr);
   reflog->TakeDatabaseFileOwnership();
 
   if (!reflog->ContainsCatalog(manifest->catalog_hash())) {
@@ -1060,17 +1060,17 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
   bool successful = true;
 
   if (is_remote_) {
-    manifest = FetchRemoteManifest(repo_base_path_, repo_name);
+    manifest .reset(  FetchRemoteManifest(repo_base_path_, repo_name) );
   } else {
     if (chdir(repo_base_path_.c_str()) != 0) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to switch to directory %s",
                repo_base_path_.c_str());
       return 1;
     }
-    manifest = OpenLocalManifest(".cvmfspublished");
+    manifest .reset(  OpenLocalManifest(".cvmfspublished") );
   }
 
-  if (!manifest.IsValid()) {
+  if (manifest.get()==nullptr) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to load repository manifest");
     return 1;
   }
@@ -1138,8 +1138,8 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
                manifest->history().ToString().c_str());
       return 1;
     }
-    tag_db = history::SqliteHistory::Open(tmp_file);
-    if (!tag_db.IsValid()) {
+    tag_db .reset(  history::SqliteHistory::Open(tmp_file) );
+    if (tag_db.get()==nullptr) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to open history database %s",
                manifest->history().ToString().c_str());
       return 1;
@@ -1166,7 +1166,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
   shash::Any root_hash = manifest->catalog_hash();
   uint64_t root_size = manifest->catalog_size();
   if (tag_name != "") {
-    if (!tag_db.IsValid()) {
+    if (tag_db.get()==nullptr) {
       LogCvmfs(kLogCvmfs, kLogStderr, "no history");
       return 1;
     }

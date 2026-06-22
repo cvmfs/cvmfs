@@ -97,7 +97,7 @@ bool CommandListReflog::Run(ObjectFetcherT *object_fetcher, string repo_name,
   reflog = FetchReflog(object_fetcher, repo_name, reflog_hash);
 
   const shash::Any null_hash = shash::Any(reflog_hash.algorithm);
-  objects_ = new SmallHashDynamic<shash::Any, bool>;
+  objects_ .reset(  new SmallHashDynamic<shash::Any, bool> );
   objects_->Init(1024, null_hash, hasher);
 
   // Traverse through catalogs and regular objects

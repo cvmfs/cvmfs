@@ -767,7 +767,7 @@ int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
   std::unique_ptr<upload::Spooler> const spooler_catalogs(
       upload::Spooler::Construct(spooler_definition_catalogs, nullptr));
 
-  if (!spooler_catalogs.IsValid()) {
+  if (spooler_catalogs.get()==nullptr) {
     LogCvmfs(kLogCvmfs, kLogStderr, "spooler_catalogs invalid");
     cancel_lease();
     return 1;
@@ -785,9 +785,9 @@ int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
 
   std::unique_ptr<manifest::Manifest> manifest;
 
-  manifest = FetchRemoteManifest(stratum0, repo_name, shash::Any());
+  manifest .reset(  FetchRemoteManifest(stratum0, repo_name, shash::Any()) );
 
-  if (!manifest.IsValid()) {
+  if (manifest.get()==nullptr) {
     LogCvmfs(kLogCvmfs, kLogStderr, "manifest invalid");
     cancel_lease();
     return 1;

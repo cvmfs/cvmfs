@@ -154,14 +154,14 @@ int CommandGc::Main(const ArgumentList &args) {
   }
 
   std::unique_ptr<manifest::Reflog> reflog;
-  reflog = FetchReflog(&object_fetcher, repo_name, reflog_hash);
-  assert(reflog.IsValid());
+  reflog .reset(  FetchReflog(&object_fetcher, repo_name, reflog_hash) );
+  assert(reflog.get()!=nullptr);
 
   const upload::SpoolerDefinition spooler_definition(spooler, shash::kAny);
   const std::unique_ptr<upload::AbstractUploader> uploader(
       upload::AbstractUploader::Construct(spooler_definition));
 
-  if (!uploader.IsValid()) {
+  if (uploader.get()==nullptr) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to initialize spooler for '%s'",
              spooler.c_str());
     return 1;
@@ -267,7 +267,7 @@ int CommandGc::Main(const ArgumentList &args) {
   assert(success);
   reflog->DropDatabaseFileOwnership();
   const std::string reflog_db = reflog->database_file();
-  reflog.Destroy();
+  reflog.reset();
 
   if (!dry_run) {
     uploader->UploadFile(reflog_db, ".cvmfsreflog");
