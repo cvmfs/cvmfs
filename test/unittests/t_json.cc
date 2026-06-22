@@ -12,10 +12,10 @@
 
 TEST(T_Json, Empty) {
   std::unique_ptr<JsonDocument> json(JsonDocument::Create("{}"));
-  EXPECT_TRUE(json.IsValid());
+  EXPECT_TRUE(json.get()!=nullptr);
   EXPECT_EQ("{}", json->PrintCanonical());
   std::unique_ptr<JsonDocument> json2(JsonDocument::Create(""));
-  EXPECT_FALSE(json2.IsValid());
+  EXPECT_FALSE(json2.get()!=nullptr);
 }
 
 TEST(T_Json, Complex) {
@@ -27,7 +27,7 @@ TEST(T_Json, Complex) {
       " \"void\": null,\n"
       " \"vector\": [true, false, null, 0.0, 7, \"foo\", [1, 2], {}, []],\n"
       " \"compound\": {\"a\": 2, \"b\": [1, 2, 3], \"c\": {}}}"));
-  EXPECT_TRUE(json.IsValid());
+  EXPECT_TRUE(json.get()!=nullptr);
   EXPECT_EQ("{\"compound\":{\"a\":2,\"b\":[1,2,3],\"c\":{}},"
             "\"float\":0.1,"
             "\"number\":42,"
@@ -41,7 +41,7 @@ TEST(T_Json, Complex) {
 TEST(T_Json, StringEscape) {
   std::unique_ptr<JsonDocument> json(JsonDocument::Create(
       "{\"string\": \"a \\\"string\\\" with special chars\"}"));
-  ASSERT_TRUE(json.IsValid());
+  ASSERT_TRUE(json.get()!=nullptr);
   EXPECT_EQ("{\"string\":\"a \\\"string\\\" with special chars\"}",
             json->PrintCanonical());
 }
@@ -49,7 +49,7 @@ TEST(T_Json, StringEscape) {
 TEST(T_Json, SearchInObject) {
   std::unique_ptr<JsonDocument> json(JsonDocument::Create(
       "{\"string\": \"a \\\"string\\\" with special chars\"}"));
-  ASSERT_TRUE(json.IsValid());
+  ASSERT_TRUE(json.get()!=nullptr);
   const JSON *result = json->SearchInObject(
       json->root(), "string", JSON_STRING);
   EXPECT_TRUE(result != NULL);
@@ -76,5 +76,5 @@ TEST(T_Json, GenerateValidJsonString) {
             output);
 
   std::unique_ptr<JsonDocument> json(JsonDocument::Create(output));
-  ASSERT_TRUE(json.IsValid());
+  ASSERT_TRUE(json.get()!=nullptr);
 }

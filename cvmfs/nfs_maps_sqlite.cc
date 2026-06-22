@@ -156,7 +156,7 @@ NfsMapsSqlite *NfsMapsSqlite::Create(const string &db_dir,
     sqlite3_finalize(stmt);
   }
 
-  return maps.Release();
+  return maps.release();
 }
 
 

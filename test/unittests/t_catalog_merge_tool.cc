@@ -135,7 +135,7 @@ TEST_F(T_CatalogMergeTool, CRUD) {
   std::unique_ptr<manifest::Manifest> output_manifest(
       manifest::Manifest::LoadFile(output_manifest_path));
 
-  EXPECT_TRUE(output_manifest.IsValid());
+  EXPECT_TRUE(output_manifest.get()!=nullptr);
 
   DirSpec output_spec;
   EXPECT_TRUE(
@@ -225,7 +225,7 @@ TEST_F(T_CatalogMergeTool, Symlink) {
   std::unique_ptr<manifest::Manifest> output_manifest(
       manifest::Manifest::LoadFile(output_manifest_path));
 
-  EXPECT_TRUE(output_manifest.IsValid());
+  EXPECT_TRUE(output_manifest.get()!=nullptr);
 
   DirSpec output_spec;
   EXPECT_TRUE(

@@ -798,7 +798,7 @@ TEST_F(T_Dns, CaresResolverReadConfig) {
 
 TEST_F(T_Dns, CaresResolverBadResolver) {
   std::unique_ptr<CaresResolver> quick_resolver(CaresResolver::Create(false, 0, 100));
-  ASSERT_TRUE(quick_resolver.IsValid());
+  ASSERT_TRUE(quick_resolver.get()!=nullptr);
 
   vector<string> bad_resolvers;
   bad_resolvers.push_back("127.0.0.2");
@@ -818,7 +818,7 @@ TEST_F(T_Dns, CaresResolverTimeout) {
   // without cutoff.  This should result in a total of 4 queries with timeouts
   // of 256, 256, 512, 1024, which sums up to a little over 2 seconds
   std::unique_ptr<CaresResolver> quick_resolver(CaresResolver::Create(false, 3, 256));
-  ASSERT_TRUE(quick_resolver.IsValid());
+  ASSERT_TRUE(quick_resolver.get()!=nullptr);
 
   vector<string> bad_address;
   bad_address.push_back("127.0.0.2");
@@ -1080,7 +1080,7 @@ TEST_F(T_Dns, HostfileResolverBadFormat) {
 
 TEST_F(T_Dns, NormalResolverConstruct) {
   std::unique_ptr<NormalResolver> resolver(NormalResolver::Create(false, 2, 2000));
-  ASSERT_TRUE(resolver.IsValid());
+  ASSERT_TRUE(resolver.get()!=nullptr);
   ASSERT_EQ(resolver->domains(), resolver->cares_resolver_->domains());
   ASSERT_EQ(resolver->resolvers(), resolver->cares_resolver_->resolvers());
   ASSERT_EQ(resolver->timeout_ms(), resolver->cares_resolver_->timeout_ms());
@@ -1089,13 +1089,13 @@ TEST_F(T_Dns, NormalResolverConstruct) {
   int retval = setenv("HOST_ALIASES", "/no/such/file", 1);
   ASSERT_EQ(0, retval);
   std::unique_ptr<NormalResolver> resolver2(NormalResolver::Create(false, 2, 2000));
-  ASSERT_FALSE(resolver2.IsValid());
+  ASSERT_FALSE(resolver2.get()!=nullptr);
 }
 
 
 TEST_F(T_Dns, NormalResolverSimple) {
   std::unique_ptr<NormalResolver> resolver(NormalResolver::Create(false, 2, 2000));
-  ASSERT_TRUE(resolver.IsValid());
+  ASSERT_TRUE(resolver.get()!=nullptr);
 
   Host host = resolver->Resolve("localhost");
   EXPECT_EQ(kFailOk, host.status());
@@ -1109,7 +1109,7 @@ TEST_F(T_Dns, NormalResolverSimple) {
 
 TEST_F(T_Dns, NormalResolverLocalonly) {
   std::unique_ptr<NormalResolver> resolver(NormalResolver::Create(false, 2, 2000));
-  ASSERT_TRUE(resolver.IsValid());
+  ASSERT_TRUE(resolver.get()!=nullptr);
 
   vector<string> no_resolvers;
   no_resolvers.push_back("127.0.0.2");

@@ -48,7 +48,7 @@ class T_FileWatcher : public ::testing::Test {
  protected:
   void SetUp() {
     counters_.clear();
-    channel_ = new FifoChannel<bool>(10, 1);
+    channel_ .reset(  new FifoChannel<bool>(10, 1) );
   }
 
   Counters counters_;
@@ -62,7 +62,7 @@ TEST_F(T_FileWatcher, NoEventStop) {
 
   std::unique_ptr<file_watcher::FileWatcher> watcher(
       file_watcher::FileWatcher::Create());
-  EXPECT_TRUE(watcher.IsValid());
+  EXPECT_TRUE(watcher.get()!=nullptr);
 
   TestEventHandler *hd(new TestEventHandler(&counters_, channel_.get()));
   watcher->RegisterHandler(watched_file_name, hd);
@@ -79,7 +79,7 @@ TEST_F(T_FileWatcher, ModifiedEvent) {
 
   std::unique_ptr<file_watcher::FileWatcher> watcher(
       file_watcher::FileWatcher::Create());
-  EXPECT_TRUE(watcher.IsValid());
+  EXPECT_TRUE(watcher.get()!=nullptr);
 
   TestEventHandler *hd(new TestEventHandler(&counters_, channel_.get()));
   TestEventHandler::EventMask mask;
@@ -107,7 +107,7 @@ TEST_F(T_FileWatcher, DeletedEvent) {
 
   std::unique_ptr<file_watcher::FileWatcher> watcher(
       file_watcher::FileWatcher::Create());
-  EXPECT_TRUE(watcher.IsValid());
+  EXPECT_TRUE(watcher.get()!=nullptr);
 
   TestEventHandler *hd(new TestEventHandler(&counters_, channel_.get()));
   TestEventHandler::EventMask mask;
@@ -135,7 +135,7 @@ TEST_F(T_FileWatcher, ModifiedThenDeletedEvent) {
 
   std::unique_ptr<file_watcher::FileWatcher> watcher(
       file_watcher::FileWatcher::Create());
-  EXPECT_TRUE(watcher.IsValid());
+  EXPECT_TRUE(watcher.get()!=nullptr);
 
   TestEventHandler *hd(new TestEventHandler(&counters_, channel_.get()));
   TestEventHandler::EventMask mask;

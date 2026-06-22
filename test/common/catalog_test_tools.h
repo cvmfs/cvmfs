@@ -156,13 +156,13 @@ class CatalogTestTool : public ServerTool {
   std::string repo_name() { return stratum0_; }
   std::string public_key() { return public_key_; }
   catalog::WritableCatalogManager *catalog_mgr() {
-    assert(catalog_mgr_.IsValid());
+    assert(catalog_mgr_.get() != nullptr);
     return catalog_mgr_.get();
   }
 
   // Necessary for libcvmfs unit tests in order to avoid clash of sqlite
   // configurations
-  void DestroyCatalogManager() { catalog_mgr_.Destroy(); }
+  void DestroyCatalogManager() { catalog_mgr_.reset(); }
 
   // ApplyAtRootHash creates the new catalog but does not write out the
   // updated manifest
@@ -203,3 +203,4 @@ void CreateMiniRepository(SimpleOptionsParser *options_mgr_,
                           string *repo_path_);
 
 #endif  //  TEST_COMMON_CATALOG_TEST_TOOLS_H_
+

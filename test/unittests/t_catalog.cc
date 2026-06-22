@@ -86,7 +86,7 @@ class T_Catalog : public ::testing::Test {
     {
       std::unique_ptr<catalog::CatalogDatabase> new_clg_db(
           catalog::CatalogDatabase::Create(db_file));
-      EXPECT_TRUE(new_clg_db.IsValid());
+      EXPECT_TRUE(new_clg_db.get()!=nullptr);
       bool retval = new_clg_db->InsertInitialValues(root_path, volatile_content,
                                                     "");
       EXPECT_TRUE(retval);

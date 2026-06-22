@@ -87,7 +87,7 @@ TalkManager *TalkManager::Create(const string &socket_path,
   LogCvmfs(kLogTalk, kLogDebug, "socket created at %s (fd %d)",
            socket_path.c_str(), talk_manager->socket_fd_);
 
-  return talk_manager.Release();
+  return talk_manager.release();
 }
 
 

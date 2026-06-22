@@ -169,7 +169,7 @@ NfsMapsLeveldb *NfsMapsLeveldb::Create(const string &leveldb_dir,
 
   maps->fork_aware_env_->WaitForBGThreads();
 
-  return maps.Release();
+  return maps.release();
 }
 
 void NfsMapsLeveldb::SetInodeResidue(unsigned residue_class,

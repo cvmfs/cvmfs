@@ -26,15 +26,15 @@ class T_StreamingCacheManager : public ::testing::Test {
   }
 
   virtual void SetUp() {
-    statistics_ = new perf::Statistics();
-    download_mgr_ = new download::DownloadManager(
-        16, perf::StatisticsTemplate("download", statistics_.get()));
+    statistics_ .reset(  new perf::Statistics() );
+    download_mgr_ .reset(  new download::DownloadManager(
+          16, perf::StatisticsTemplate("download", statistics_.get())) );
     download_mgr_->SetHostChain("file://" + GetCurrentWorkingDirectory());
-    backing_cache_ = PosixCacheManager::Create("cache", true /* alien_cache */);
+    backing_cache_ .reset(  PosixCacheManager::Create("cache", true /* alien_cache */) );
     backing_cache_ref_ = backing_cache_.get();
-    streaming_cache_ = new StreamingCacheManager(32, backing_cache_.Release(),
-                                                 download_mgr_.get(), NULL,
-                                                 1000, statistics_.get());
+    streaming_cache_ .reset(  new StreamingCacheManager(32, backing_cache_.release(),
+          download_mgr_.get(), NULL,
+          1000, statistics_.get()) );
 
     EXPECT_TRUE(MkdirDeep("data", 0700));
     EXPECT_TRUE(MakeCacheDirectories("data", 0700));
@@ -44,9 +44,9 @@ class T_StreamingCacheManager : public ::testing::Test {
   }
 
   virtual void TearDown() {
-    streaming_cache_.Destroy();
-    download_mgr_.Destroy();
-    statistics_.Destroy();
+    streaming_cache_.reset();
+    download_mgr_.reset();
+    statistics_.reset();
   }
 
   std::unique_ptr<perf::Statistics> statistics_;

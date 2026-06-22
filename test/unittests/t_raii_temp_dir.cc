@@ -20,11 +20,11 @@ class T_RaiiTempDir : public ::testing::Test { };
 TEST_F(T_RaiiTempDir, Basic) {
   std::unique_ptr<RaiiTempDir> temp_dir(
       RaiiTempDir::Create(GetCurrentWorkingDirectory() + "/test_dir"));
-  ASSERT_TRUE(temp_dir.IsValid());
+  ASSERT_TRUE(temp_dir.get()!=nullptr);
 
   const std::string temp_path = temp_dir->dir();
 
-  temp_dir.Destroy();
+  temp_dir.reset();
 
   ASSERT_FALSE(DirExists(temp_path));
 }
@@ -32,7 +32,7 @@ TEST_F(T_RaiiTempDir, Basic) {
 TEST_F(T_RaiiTempDir, DeletedExternally) {
   std::unique_ptr<RaiiTempDir> temp_dir(
       RaiiTempDir::Create(GetCurrentWorkingDirectory() + "/test_dir"));
-  ASSERT_TRUE(temp_dir.IsValid());
+  ASSERT_TRUE(temp_dir.get()!=nullptr);
 
   const std::string temp_path = temp_dir->dir();
 

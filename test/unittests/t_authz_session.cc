@@ -174,7 +174,7 @@ TEST_F(T_AuthzSession, GetTokenCopy) {
   authz_fetcher_.next_token = fetched_token;
 
   std::unique_ptr<AuthzToken> tokenX(authz_session_mgr_->GetTokenCopy(1, "A"));
-  ASSERT_TRUE(tokenX.IsValid());
+  ASSERT_TRUE(tokenX.get()!=nullptr);
   EXPECT_EQ(kTokenX509, tokenX->type);
   EXPECT_EQ(1U, tokenX->size);
   EXPECT_EQ('X', reinterpret_cast<char *>(tokenX->data)[0]);
@@ -182,7 +182,7 @@ TEST_F(T_AuthzSession, GetTokenCopy) {
 
   reinterpret_cast<char *>(fetched_token.data)[0] = 'Y';
   std::unique_ptr<AuthzToken> tokenY(authz_session_mgr_->GetTokenCopy(1, "A"));
-  ASSERT_TRUE(tokenY.IsValid());
+  ASSERT_TRUE(tokenY.get()!=nullptr);
   EXPECT_EQ(kTokenX509, tokenY->type);
   EXPECT_EQ(1U, tokenY->size);
   EXPECT_EQ('Y', reinterpret_cast<char *>(tokenY->data)[0]);
