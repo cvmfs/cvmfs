@@ -118,14 +118,14 @@ class Fetcher : SingleCopy {
   }
 
   /**
-   * Set a fallback download manager used for partial replica failover.
+   * Set the full-replica download manager used for partial replica failover.
    * When the primary download fails with an HTTP error (404 from a partial
    * Stratum-1), the download is retried using this manager whose host chain
    * points to a full Stratum-1.  Ownership is NOT transferred.
    */
-  void SetFallbackDownloadManager(
-      download::DownloadManager *fallback_mgr) {
-    fallback_download_mgr_ = fallback_mgr;
+  void SetFullReplicaDownloadManager(
+      download::DownloadManager *full_replica_mgr) {
+    full_replica_download_mgr_ = full_replica_mgr;
   }
 
   CacheManager *cache_mgr() { return cache_mgr_; }
@@ -197,10 +197,10 @@ class Fetcher : SingleCopy {
   CacheManager *cache_mgr_;
   download::DownloadManager *download_mgr_;
   /**
-   * Optional fallback download manager for partial replica failover mode.
+   * Optional full-replica download manager for partial replica failover mode.
    * Not owned by this Fetcher.
    */
-  download::DownloadManager *fallback_download_mgr_;
+  download::DownloadManager *full_replica_download_mgr_;
   BackoffThrottle *backoff_throttle_;
   perf::Counter *n_downloads;
   perf::Counter *n_invocations;

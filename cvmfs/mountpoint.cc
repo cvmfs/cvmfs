@@ -1624,30 +1624,18 @@ void MountPoint::SetupPartialReplica() {
   LogCvmfs(kLogCvmfs, kLogDebug,
            "partial replica mode: failover to %s", optarg.c_str());
 
-  full_replica_download_mgr_ = new download::DownloadManager(
-      1,  // single connection for fallback
-      perf::StatisticsTemplate("download-full-replica", statistics_));
+  // Clone the primary download manager so proxy, DNS, timeout, certificate and
+  // sharding settings carry over unchanged; only the host chain is repointed at
+  // the full Stratum-1.  This avoids the configuration drift of re-reading a
+  // hand-picked subset of options.
+  full_replica_download_mgr_ = download_mgr_->Clone(
+      perf::StatisticsTemplate("download-full-replica", statistics_),
+      "download-full-replica");
   full_replica_download_mgr_->SetHostChain(optarg);
+  full_replica_download_mgr_->Spawn();
 
-  // Re-apply proxy and timeout settings from the primary download manager
-  // by reading the original options (simplest approach)
-  string proxies;
-  if (options_mgr_->GetValue("CVMFS_HTTP_PROXY", &optarg))
-    proxies = optarg;
-  string fallback_proxies;
-  if (options_mgr_->GetValue("CVMFS_FALLBACK_PROXY", &optarg))
-    fallback_proxies = optarg;
-  full_replica_download_mgr_->SetProxyChain(
-      proxies, fallback_proxies,
-      download::DownloadManager::kSetProxyBoth);
-
-  unsigned timeout = 10;
-  if (options_mgr_->GetValue("CVMFS_HTTP_TIMEOUT", &optarg))
-    timeout = String2Uint64(optarg);
-  full_replica_download_mgr_->SetTimeout(timeout, timeout);
-
-  // Wire fallback into the primary fetcher
-  fetcher_->SetFallbackDownloadManager(full_replica_download_mgr_);
+  // Wire the full replica into the primary fetcher
+  fetcher_->SetFullReplicaDownloadManager(full_replica_download_mgr_);
 }
 
 
