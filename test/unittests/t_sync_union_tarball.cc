@@ -20,7 +20,7 @@ namespace {
 
 class T_SyncUnionTarball : public ::testing::Test {
  protected:
-  void SetUp() { m_sync_mediator_ = new publish::MockSyncMediator(); }
+  void SetUp() { m_sync_mediator_ .reset(  new publish::MockSyncMediator() ); }
 
   std::string CreateTarFile(const std::string &tar_filename,
                             const std::string &base64_data) {

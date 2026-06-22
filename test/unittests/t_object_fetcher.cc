@@ -903,12 +903,12 @@ TYPED_TEST(T_ObjectFetcher, AutoCleanupFetchedFilesSlow) {
 
   retval = object_fetcher->FetchHistory(&history);
   EXPECT_EQ(TypeParam::kFailOk, retval);
-  ASSERT_TRUE(history.IsValid());
+  ASSERT_TRUE(history.get()!=nullptr);
 
   EXPECT_LT(files, TestFixture::CountTemporaryFiles());
   files = TestFixture::CountTemporaryFiles();
 
-  delete object_fetcher.Release();
+  delete object_fetcher.release();
   EXPECT_EQ(files, TestFixture::CountTemporaryFiles());
 
   delete history.release();

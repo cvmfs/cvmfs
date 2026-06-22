@@ -14,9 +14,9 @@ class T_RingBuffer : public ::testing::Test {
  protected:
   static const size_t kSize;
 
-  virtual void SetUp() { ring = new RingBuffer(kSize); }
+  virtual void SetUp() { ring .reset(  new RingBuffer(kSize) ); }
 
-  virtual void TearDown() { ring.Destroy(); }
+  virtual void TearDown() { ring.reset(); }
 
   std::unique_ptr<RingBuffer> ring;
 };

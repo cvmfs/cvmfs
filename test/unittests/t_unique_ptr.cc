@@ -58,15 +58,15 @@ class T_UniquePtr : public ::testing::Test {
 TEST_F(T_UniquePtr, NullInitialisation) {
   {
     std::unique_ptr<Foo> foo;
-    EXPECT_FALSE(foo.IsValid());
+    EXPECT_FALSE(foo.get()!=nullptr);
     EXPECT_EQ(0u, Foo::global_constructor_calls);
     EXPECT_EQ(0u, Foo::global_destructor_calls);
 
     Foo *object = new Foo(42);
     EXPECT_EQ(1u, object->local_constructor_calls);
 
-    foo = object;
-    EXPECT_TRUE(foo.IsValid());
+    foo .reset(  object );
+    EXPECT_TRUE(foo.get()!=nullptr);
     EXPECT_EQ(1u, Foo::global_constructor_calls);
     EXPECT_EQ(0u, Foo::global_destructor_calls);
   }
@@ -79,7 +79,7 @@ TEST_F(T_UniquePtr, NullInitialisation) {
 TEST_F(T_UniquePtr, DirectInitialisation) {
   {
     std::unique_ptr<Foo> foo(new Foo(1337));
-    EXPECT_TRUE(foo.IsValid());
+    EXPECT_TRUE(foo.get()!=nullptr);
     EXPECT_EQ(1u, Foo::global_constructor_calls);
     EXPECT_EQ(0u, Foo::global_destructor_calls);
   }
@@ -92,7 +92,7 @@ TEST_F(T_UniquePtr, DirectInitialisation) {
 TEST_F(T_UniquePtr, WeakReference) {
   {
     std::unique_ptr<Foo> foo;
-    EXPECT_FALSE(foo.IsValid());
+    EXPECT_FALSE(foo.get()!=nullptr);
     EXPECT_EQ(0u, Foo::global_constructor_calls);
     EXPECT_EQ(0u, Foo::global_destructor_calls);
 
@@ -250,17 +250,17 @@ TEST_F(T_UniquePtr, SelfAssignment) {
   bare_foo = NULL;
   EXPECT_EQ(0u, Foo::global_destructor_calls);
 
-  foo = bare_foo;
+  foo .reset(  bare_foo );
   EXPECT_EQ(1u, Foo::global_constructor_calls);
   EXPECT_EQ(1u, Foo::global_destructor_calls);
 }
 
 TEST_F(T_UniquePtr, VoidPtr) {
   std::unique_ptr<void> p(malloc(1024));
-  EXPECT_TRUE(p.IsValid());
+  EXPECT_TRUE(p.get()!=nullptr);
   EXPECT_NE(static_cast<void *>(NULL), p.get());
 
   std::unique_ptr<void> p2;
-  EXPECT_FALSE(p2.IsValid());
+  EXPECT_FALSE(p2.get()!=nullptr);
   EXPECT_EQ(static_cast<void *>(NULL), p2.get());
 }
