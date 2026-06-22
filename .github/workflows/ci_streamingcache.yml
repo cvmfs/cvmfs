@@ -31,6 +31,7 @@ jobs:
           docker exec -u sftnight -t cvmfs-dev bash -c \
             "cd /home/sftnight/cvmfs/test && \
              CVMFS_TEST_PROXY=DIRECT \
+             CVMFS_TEST_USE_CDN=yes \
              ./run.sh /tmp/cvmfs-streamingcache-test.log \
                       -o /tmp/cvmfs-streamingcache-test.log.xunit.xml \
                       -p streamingcache \
