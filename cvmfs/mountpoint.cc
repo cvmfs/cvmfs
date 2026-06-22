@@ -1562,6 +1562,25 @@ void MountPoint::SetupPartialReplica() {
     return;
   }
 
+  // Validate the mode before doing any network I/O, so that an off/false/empty
+  // (or otherwise invalid) value never adds a request to a normal mount.  Only
+  // "fail" and "failover" enable partial replica handling.
+  const string mode_norm = ToUpper(Trim(mode));
+  bool fail_mode;
+  if (mode_norm == "FAIL") {
+    fail_mode = true;
+  } else if (mode_norm == "FAILOVER") {
+    fail_mode = false;
+  } else {
+    // Disabled (empty/off/false) is silent; anything else is a config error.
+    if (!mode_norm.empty() && !options_mgr_->IsOff(mode_norm)) {
+      LogCvmfs(kLogCvmfs, kLogSyslogWarn | kLogDebug,
+               "ignoring invalid CVMFS_PARTIAL_REPLICA_MODE='%s' "
+               "(expected 'fail' or 'failover')", mode.c_str());
+    }
+    return;
+  }
+
   // Get primary server URL from the host chain
   vector<string> host_chain;
   download_mgr_->GetHostInfo(&host_chain, NULL, NULL);
@@ -1601,16 +1620,14 @@ void MountPoint::SetupPartialReplica() {
            "connected to partial Stratum-1 at %s (spec version %d)",
            primary_url.c_str(), partial_inclusion_spec_->version());
 
-  // Determine the mode
+  // Apply the mode validated above
   string optarg;
-  if (mode == "fail") {
-    partial_replica_fail_mode_ = true;
+  partial_replica_fail_mode_ = fail_mode;
+  if (fail_mode) {
     LogCvmfs(kLogCvmfs, kLogDebug,
              "partial replica mode: fail (EIO for missing objects)");
-    return;  // No fallback manager needed in fail mode
+    return;  // No full replica manager needed in fail mode
   }
-  // Default: failover mode
-  partial_replica_fail_mode_ = false;
 
   // Create the full replica download manager for failover
   if (!options_mgr_->GetValue("CVMFS_FULL_STRATUM1_URL", &optarg)
@@ -1632,7 +1649,9 @@ void MountPoint::SetupPartialReplica() {
       perf::StatisticsTemplate("download-full-replica", statistics_),
       "download-full-replica");
   full_replica_download_mgr_->SetHostChain(optarg);
-  full_replica_download_mgr_->Spawn();
+  // Not spawned here: like download_mgr_ and external_download_mgr_, the worker
+  // thread is started later by the application's Init (cvmfs.cc, after the FUSE
+  // fork; threads do not survive fork()).  libcvmfs leaves it synchronous.
 
   // Wire the full replica into the primary fetcher
   fetcher_->SetFullReplicaDownloadManager(full_replica_download_mgr_);
