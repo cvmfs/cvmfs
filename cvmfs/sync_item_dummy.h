@@ -59,6 +59,73 @@ class SyncItemDummyCatalog : public SyncItem {
   void MakePlaceholderDirectory() const { }
 };
 
+/**
+ * Represents an empty regular file that is materialized on the fly, without a
+ * backing entry in the tarball.  It is used by the tarball engine to stand in
+ * for a hardlink whose target is not part of the archive (e.g. a cross-layer
+ * hardlink in an OCI image layer): instead of cloning a non-existent source we
+ * create an empty file with the link's own ownership and permissions.  The
+ * content (and therefore the content hash) is the empty string, pushed through
+ * the normal ingestion pipeline so that the empty object is uploaded and
+ * compressed/hashed consistently with the spooler configuration.
+ */
+class SyncItemDummyFile : public SyncItem {
+  friend class SyncUnionTarball;
+
+ protected:
+  SyncItemDummyFile(const std::string &relative_parent_path,
+                    const std::string &filename, const SyncUnion *union_engine,
+                    const unsigned int mode, const uid_t uid, const gid_t gid,
+                    const time_t mtime)
+      : SyncItem(relative_parent_path, filename, union_engine, kItemFile)
+      , mode_(mode)
+      , uid_(uid)
+      , gid_(gid)
+      , mtime_(mtime) { }
+
+ public:
+  bool IsType(const SyncItemType expected_type) const {
+    return expected_type == kItemFile;
+  }
+
+  catalog::DirectoryEntryBase CreateBasicCatalogDirent(
+      bool /* enable_mtime_ns */) const {
+    catalog::DirectoryEntryBase dirent;
+    dirent.inode_ = catalog::DirectoryEntry::kInvalidInode;
+    dirent.linkcount_ = 1;
+    // Force a regular file type, keeping only the permission bits of the
+    // original hardlink entry.
+    dirent.mode_ = (mode_ & 07777) | S_IFREG;
+    dirent.uid_ = uid_;
+    dirent.gid_ = gid_;
+    dirent.size_ = 0;
+    dirent.mtime_ = mtime_;
+    dirent.checksum_ = this->GetContentHash();
+    dirent.is_external_file_ = false;
+    dirent.compression_algorithm_ = this->GetCompressionAlgorithm();
+
+    dirent.name_.Assign(this->filename().data(), this->filename().length());
+
+    return dirent;
+  }
+
+  IngestionSource *CreateIngestionSource() const {
+    return new StringIngestionSource("", GetUnionPath());
+  }
+
+  void StatScratch(const bool /* refresh */) const { return; }
+
+  SyncItemType GetScratchFiletype() const { return kItemFile; }
+
+  void MakePlaceholderDirectory() const { }
+
+ private:
+  const unsigned int mode_;
+  const uid_t uid_;
+  const gid_t gid_;
+  const time_t mtime_;
+};
+
 /*
  * This class represents dummy directories that we know are going to be there
  * but we still haven't found yet. This is possible in the extraction of

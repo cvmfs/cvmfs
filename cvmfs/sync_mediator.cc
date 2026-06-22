@@ -241,8 +241,9 @@ void SyncMediator::Replace(SharedPtr<SyncItem> entry) {
   Add(entry);
 }
 
-void SyncMediator::Clone(const std::string from, const std::string to) {
-  catalog_manager_->Clone(from, to);
+bool SyncMediator::Clone(const std::string from, const std::string to,
+                         bool fail_if_source_missing) {
+  return catalog_manager_->Clone(from, to, fail_if_source_missing);
 }
 
 void SyncMediator::EnterDirectory(SharedPtr<SyncItem> entry) {
@@ -333,6 +334,13 @@ bool SyncMediator::Commit(manifest::Manifest *manifest) {
 
   if (union_engine_)
     union_engine_->PostUpload();
+
+  // PostUpload may have spooled additional files (the tarball engine
+  // materializes empty files for hardlinks whose target is missing from the
+  // archive).  Wait for those uploads so their catalog entries are added by
+  // the file callback before the listeners are unregistered below.
+  if (!params_->dry_run)
+    params_->spooler->WaitForUpload();
 
   params_->spooler->UnregisterListeners();
 
