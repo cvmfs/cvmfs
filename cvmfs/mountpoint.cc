@@ -52,6 +52,7 @@
 #include "manifest.h"
 #include "manifest_fetch.h"
 #include "network/download.h"
+#include "network/sink_mem.h"
 #include "nfs_maps.h"
 #ifdef CVMFS_NFS_SUPPORT
 #include "nfs_maps_leveldb.h"
@@ -1265,6 +1266,7 @@ MountPoint *MountPoint::Create(const string &fqrn,
     return mountpoint.Release();
   }
   mountpoint->CreateFetchers();
+  mountpoint->SetupPartialReplica();
   if (!mountpoint->CreateCatalogManager())
     return mountpoint.Release();
   if (!mountpoint->CreateTracer())
@@ -1536,6 +1538,123 @@ void MountPoint::CreateFetchers() {
       external_download_mgr_,
       backoff_throttle_,
       perf::StatisticsTemplate("fetch-external", statistics_));
+}
+
+
+/**
+ * Sets up partial replica handling for the primary Stratum-1.  This is opt-in:
+ * unless CVMFS_PARTIAL_REPLICA_MODE is set, the function returns immediately so
+ * that regular (full-replica) mounts incur no extra requests.  When opted in:
+ *  - Probes for the .cvmfs_partial_replication file on the primary server.
+ *  - Parses the inclusion spec and stores it in partial_inclusion_spec_.
+ *  - Honours CVMFS_PARTIAL_REPLICA_MODE ("failover" [default] or "fail").
+ *  - In failover mode, creates a full_replica_download_mgr_ from
+ *    CVMFS_FULL_STRATUM1_URL and wires it as the fetcher's fallback.
+ */
+void MountPoint::SetupPartialReplica() {
+  // Partial replica handling is opt-in on the client: only probe for and act
+  // on a partial Stratum-1 when CVMFS_PARTIAL_REPLICA_MODE is explicitly set.
+  // Auto-detection would buy nothing (failover still needs
+  // CVMFS_FULL_STRATUM1_URL, fail mode is a client choice) while taxing every
+  // regular mount with an extra request.
+  string mode;
+  if (!options_mgr_->GetValue("CVMFS_PARTIAL_REPLICA_MODE", &mode)) {
+    return;
+  }
+
+  // Validate the mode before doing any network I/O, so that an off/false/empty
+  // (or otherwise invalid) value never adds a request to a normal mount.  Only
+  // "fail" and "failover" enable partial replica handling.
+  const string mode_norm = ToUpper(Trim(mode));
+  bool fail_mode;
+  if (mode_norm == "FAIL") {
+    fail_mode = true;
+  } else if (mode_norm == "FAILOVER") {
+    fail_mode = false;
+  } else {
+    // Disabled (empty/off/false) is silent; anything else is a config error.
+    if (!mode_norm.empty() && !options_mgr_->IsOff(mode_norm)) {
+      LogCvmfs(kLogCvmfs, kLogSyslogWarn | kLogDebug,
+               "ignoring invalid CVMFS_PARTIAL_REPLICA_MODE='%s' "
+               "(expected 'fail' or 'failover')", mode.c_str());
+    }
+    return;
+  }
+
+  // Get primary server URL from the host chain
+  vector<string> host_chain;
+  download_mgr_->GetHostInfo(&host_chain, NULL, NULL);
+  if (host_chain.empty()) {
+    return;
+  }
+  const string primary_url = host_chain[0];
+
+  // Probe for the partial replication spec file
+  const string spec_url = primary_url + "/.cvmfs_partial_replication";
+  cvmfs::MemSink spec_memsink;
+  download::JobInfo probe_job(&spec_url, false, false, NULL, &spec_memsink);
+  const download::Failures probe_result = download_mgr_->Fetch(&probe_job);
+
+  if (probe_result != download::kFailOk) {
+    // Not a partial replica (or not reachable — ignore silently)
+    LogCvmfs(kLogCvmfs, kLogDebug,
+             "no .cvmfs_partial_replication found at %s (result %d)",
+             primary_url.c_str(), probe_result);
+    return;
+  }
+
+  // Parse the spec
+  const string spec_content(
+      reinterpret_cast<char *>(spec_memsink.data()), spec_memsink.pos());
+  partial_inclusion_spec_ = new catalog::InclusionSpec();
+  if (!partial_inclusion_spec_->Parse(spec_content)) {
+    LogCvmfs(kLogCvmfs, kLogSyslogErr | kLogDebug,
+             "failed to parse .cvmfs_partial_replication from %s",
+             primary_url.c_str());
+    delete partial_inclusion_spec_;
+    partial_inclusion_spec_ = NULL;
+    return;
+  }
+
+  LogCvmfs(kLogCvmfs, kLogSyslog | kLogDebug,
+           "connected to partial Stratum-1 at %s (spec version %d)",
+           primary_url.c_str(), partial_inclusion_spec_->version());
+
+  // Apply the mode validated above
+  string optarg;
+  partial_replica_fail_mode_ = fail_mode;
+  if (fail_mode) {
+    LogCvmfs(kLogCvmfs, kLogDebug,
+             "partial replica mode: fail (EIO for missing objects)");
+    return;  // No full replica manager needed in fail mode
+  }
+
+  // Create the full replica download manager for failover
+  if (!options_mgr_->GetValue("CVMFS_FULL_STRATUM1_URL", &optarg)
+      || optarg.empty()) {
+    LogCvmfs(kLogCvmfs, kLogSyslogWarn | kLogDebug,
+             "partial replica mode is failover but CVMFS_FULL_STRATUM1_URL "
+             "is not set; failover disabled");
+    return;
+  }
+
+  LogCvmfs(kLogCvmfs, kLogDebug,
+           "partial replica mode: failover to %s", optarg.c_str());
+
+  // Clone the primary download manager so proxy, DNS, timeout, certificate and
+  // sharding settings carry over unchanged; only the host chain is repointed at
+  // the full Stratum-1.  This avoids the configuration drift of re-reading a
+  // hand-picked subset of options.
+  full_replica_download_mgr_ = download_mgr_->Clone(
+      perf::StatisticsTemplate("download-full-replica", statistics_),
+      "download-full-replica");
+  full_replica_download_mgr_->SetHostChain(optarg);
+  // Not spawned here: like download_mgr_ and external_download_mgr_, the worker
+  // thread is started later by the application's Init (cvmfs.cc, after the FUSE
+  // fork; threads do not survive fork()).  libcvmfs leaves it synchronous.
+
+  // Wire the full replica into the primary fetcher
+  fetcher_->SetFullReplicaDownloadManager(full_replica_download_mgr_);
 }
 
 
@@ -1830,8 +1949,11 @@ MountPoint::MountPoint(const string &fqrn,
     , signature_mgr_(NULL)
     , download_mgr_(NULL)
     , external_download_mgr_(NULL)
+    , full_replica_download_mgr_(NULL)
     , fetcher_(NULL)
     , external_fetcher_(NULL)
+    , partial_inclusion_spec_(NULL)
+    , partial_replica_fail_mode_(false)
     , inode_annotation_(NULL)
     , catalog_mgr_(NULL)
     , chunk_tables_(NULL)
@@ -1879,7 +2001,9 @@ MountPoint::~MountPoint() {
   delete fetcher_;
 
   delete external_download_mgr_;
+  delete full_replica_download_mgr_;
   delete download_mgr_;
+  delete partial_inclusion_spec_;
 
   if (signature_mgr_ != NULL) {
     signature_mgr_->Fini();

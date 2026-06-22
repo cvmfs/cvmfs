@@ -839,7 +839,26 @@ static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
     return;
   }
 
-  struct stat const info = dirent.GetStatStructure();
+  struct stat info = dirent.GetStatStructure();
+
+  // Partial replica in fail mode: mark excluded entries as unreadable so
+  // users get a clear indication rather than a confusing EIO at read time.
+  if (mount_point_->partial_replica_fail_mode()
+      && mount_point_->partial_inclusion_spec() != NULL) {
+    // Find the path for this inode to check against the inclusion spec.
+    glue::InodeEx inode_ex(ino, glue::InodeEx::kUnknownType);
+    PathString inode_path;
+    if (mount_point_->inode_tracker()->FindPath(&inode_ex, &inode_path)) {
+      const string path_str(inode_path.GetChars(), inode_path.GetLength());
+      if (mount_point_->partial_inclusion_spec()->IsExcluded(path_str)) {
+        // Present the entry with no permissions and a special uid/gid
+        // (65534 = traditional "nobody"/"nogroup").
+        info.st_mode &= ~static_cast<mode_t>(S_IRWXU | S_IRWXG | S_IRWXO);
+        info.st_uid = 65534;
+        info.st_gid = 65534;
+      }
+    }
+  }
 
   fuse_reply_attr(req, &info, GetKcacheTimeout());
 }
@@ -2657,6 +2676,8 @@ static void Spawn() {
 
   cvmfs::mount_point_->download_mgr()->Spawn();
   cvmfs::mount_point_->external_download_mgr()->Spawn();
+  if (cvmfs::mount_point_->full_replica_download_mgr() != NULL)
+    cvmfs::mount_point_->full_replica_download_mgr()->Spawn();
   if (cvmfs::mount_point_->resolv_conf_watcher() != NULL) {
     cvmfs::mount_point_->resolv_conf_watcher()->Spawn();
   }

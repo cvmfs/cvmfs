@@ -452,6 +452,13 @@ __run_gc() {
     fi
   fi
 
+  local partial_replication_param=""
+  if [ x"$CVMFS_PARTIAL_REPLICATION" = x"true" ] && \
+     [ -n "$CVMFS_PARTIAL_REPLICATION_SPEC" ] && \
+     [ -f "$CVMFS_PARTIAL_REPLICATION_SPEC" ]; then
+    partial_replication_param="-E $CVMFS_PARTIAL_REPLICATION_SPEC"
+  fi
+
   [ $dry_run -ne 0 ] || to_syslog_for_repo $name "started garbage collection"
   local gc_command="$(__swissknife_cmd dbg) gc                              \
                                             -r $repository_url              \
@@ -461,6 +468,7 @@ __run_gc() {
                                             -k $CVMFS_PUBLIC_KEY            \
                                             -t ${CVMFS_SPOOL_DIR}/tmp/      \
                                             -R $(get_reflog_checksum $name) \
+                                            $partial_replication_param       \
                                             $additional_switches"
 
   if ! $user_shell "$gc_command"; then
