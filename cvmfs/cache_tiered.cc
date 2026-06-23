@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 
+#include "quota.h"  // IWYU pragma: keep - complete type needed for delete
 #include "util/posix.h"  // IWYU pragma: keep
 
 
