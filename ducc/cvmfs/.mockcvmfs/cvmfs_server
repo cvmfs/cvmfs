@@ -174,9 +174,10 @@ if [ "$1" == "ingest" ]; then
     esac
   done
 
-  # Only the tarball-ingest form is mocked here; the --delete / --fast-delete
-  # forms are handled by their own blocks above.
-  if [ "$saw_ingest_opts" == true ] && [ -n "$base_dir" ] && [ -n "$ingest_tar" ]; then
+  # Only the tarball-ingest form is mocked here (it always carries -t); the
+  # --delete / --fast-delete forms have no tar and are handled above.  An empty
+  # base_dir is valid and means "extract at the repository root".
+  if [ "$saw_ingest_opts" == true ] && [ -n "$ingest_tar" ]; then
     # Extract repo name and subdir
     repo_name=$(get_repo_name "$repo_arg")
     subdir=$(get_subdir "$repo_arg")
