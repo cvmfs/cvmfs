@@ -27,6 +27,7 @@ class SyncItemNative;
 class SyncItemTar;
 class SyncItemDummyDir;
 class SyncItemDummyCatalog;
+class SyncItemDummyFile;
 }  // namespace publish
 namespace swissknife {
 class CommandMigrate;
@@ -69,6 +70,7 @@ class DirectoryEntryBase {
   friend class publish::SyncItemTar;
   friend class publish::SyncItemDummyDir;
   friend class publish::SyncItemDummyCatalog;
+  friend class publish::SyncItemDummyFile;
   friend class swissknife::CommandOverlay;
   friend class swissknife::IngestSQL;  // TODO(vvolkl): can probably avoided
                                        // with new setters

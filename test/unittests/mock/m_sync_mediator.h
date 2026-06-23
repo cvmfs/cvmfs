@@ -43,7 +43,9 @@ class MockSyncMediator : public AbstractSyncMediator {
     last_fast_delete = fast_delete;
   }
   virtual void Replace(SharedPtr<SyncItem> /* entry */) { }
-  virtual void Clone(const std::string /* from */, const std::string /* to */) {
+  virtual bool Clone(const std::string /* from */, const std::string /* to */,
+                     bool /* fail_if_source_missing */) {
+    return true;
   }
 
   virtual void AddUnmaterializedDirectory(SharedPtr<SyncItem> /* entry */) {

@@ -101,6 +101,9 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
   if (args.find('f') != args.end()) {
     params.fast_delete = true;
   }
+  if (args.find('m') != args.end()) {
+    params.tolerate_missing_hardlinks = true;
+  }
   shash::Algorithms hash_algorithm = shash::kSha1;
   if (args.find('e') != args.end()) {
     hash_algorithm = shash::ParseHashAlgorithm(*args.find('e')->second);
@@ -217,7 +220,7 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
   publish::SyncUnion *sync = new publish::SyncUnionTarball(
       &mediator, params.dir_rdonly, params.tar_file, params.base_directory,
       params.uid, params.gid, params.to_delete, create_catalog,
-      params.fast_delete, "///");
+      params.fast_delete, "///", params.tolerate_missing_hardlinks);
 
   if (!sync->Initialize()) {
     LogCvmfs(kLogCvmfs, kLogStderr,

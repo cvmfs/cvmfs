@@ -120,7 +120,8 @@ class WritableCatalogManager : public SimpleCatalogManager {
                       const std::string &directory_path);
   void RemoveDirectory(const std::string &directory_path);
 
-  void Clone(const std::string from, const std::string to);
+  bool Clone(const std::string from, const std::string to,
+             const bool fail_if_source_missing = true);
   void CloneTree(const std::string &from_dir, const std::string &to_dir);
 
   // Hardlink group handling

@@ -904,6 +904,7 @@ func (d *downloadedLayer) IngestIntoCVMFSWithLogger(logger *log.Entry, CVMFSRepo
 
 	err := cvmfs.IngestWithLogger(logger, CVMFSRepo, d.Path,
 		"--catalog", "-t", "-",
+		"--tolerate-missing-hardlinks",
 		"-b", ingestPath)
 	if err != nil {
 		logger.WithFields(log.Fields{"layer": d.Name, "error": err}).

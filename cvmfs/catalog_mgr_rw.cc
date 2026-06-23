@@ -291,16 +291,33 @@ void WritableCatalogManager::RemoveDirectory(const std::string &path) {
  * @params destination, the name of the new file, complete path
  * @params source, the name of the file to clone, which must be already in the
  * repository
- * @return void
+ * @params fail_if_source_missing, when true (default) abort if the source is
+ * not in the catalog; when false, skip the clone and return false instead.
+ * This is used by the tarball ingestion engine to tolerate hardlinks whose
+ * target is not part of the same archive (e.g. cross-layer hardlinks in OCI
+ * image layers).
+ * @return true if the file was cloned, false if the source was missing and
+ * fail_if_source_missing was false
  */
-void WritableCatalogManager::Clone(const std::string destination,
-                                   const std::string source) {
+bool WritableCatalogManager::Clone(const std::string destination,
+                                   const std::string source,
+                                   const bool fail_if_source_missing) {
   const std::string relative_source = MakeRelativePath(source);
 
   DirectoryEntry source_dirent;
   if (!LookupPath(relative_source, kLookupDefault, &source_dirent)) {
-    PANIC(kLogStderr, "catalog for file '%s' cannot be found, aborting",
-          source.c_str());
+    if (fail_if_source_missing) {
+      PANIC(kLogStderr, "catalog for file '%s' cannot be found, aborting",
+            source.c_str());
+    }
+    // The caller opted out of aborting and is expected to handle the missing
+    // source (e.g. by materializing a replacement file), so only log at debug
+    // level here to avoid duplicate user-facing warnings.
+    LogCvmfs(kLogCatalog, kLogDebug,
+             "catalog for clone source '%s' cannot be found, not cloning "
+             "to '%s'",
+             source.c_str(), destination.c_str());
+    return false;
   }
   if (source_dirent.IsDirectory()) {
     PANIC(kLogStderr, "Trying to clone a directory: '%s', aborting",
@@ -326,6 +343,7 @@ void WritableCatalogManager::Clone(const std::string destination,
   // TODO(jblomer): clone is used by tarball engine and should eventually
   // support extended attributes
   this->AddFile(destination_dirent, empty_xattrs, destination_dirname);
+  return true;
 }
 
 

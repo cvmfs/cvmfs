@@ -118,6 +118,7 @@ cvmfs_server_ingest() {
   local keep_ownership=false
   local create_catalog=false
   local fast_delete=false
+  local tolerate_missing_hardlinks=false
   local gc_db=""
 
   local force_native=0
@@ -174,6 +175,9 @@ cvmfs_server_ingest() {
       --gc-db )
         gc_db=$2
         fast_delete=true
+        ;;
+      -m | --tolerate-missing-hardlinks )
+        tolerate_missing_hardlinks=true
         ;;
     esac
     shift
@@ -500,6 +504,10 @@ cvmfs_server_ingest() {
 
   if [ "$fast_delete" = true ]; then
     ingest_command="$ingest_command -f"
+  fi
+
+  if [ "$tolerate_missing_hardlinks" = true ]; then
+    ingest_command="$ingest_command -m"
   fi
 
   if [ ! x"$gc_db" = "x" ]; then

@@ -99,6 +99,13 @@ __do_check() {
     scratch_dir=$default_scratch_dir
   fi
 
+  local partial_replication_param=""
+  if [ x"$CVMFS_PARTIAL_REPLICATION" = x"true" ] && \
+     [ -n "$CVMFS_PARTIAL_REPLICATION_SPEC" ] && \
+     [ -f "$CVMFS_PARTIAL_REPLICATION_SPEC" ]; then
+    partial_replication_param="-E $CVMFS_PARTIAL_REPLICATION_SPEC"
+  fi
+
   local user_shell="$(get_user_shell $name)"
   local check_cmd
   check_cmd="$(__swissknife_cmd dbg) check $tag        \
@@ -111,7 +118,8 @@ __do_check() {
                      -N ${CVMFS_REPOSITORY_NAME}       \
                      $(get_swissknife_proxy)           \
                      $(get_follow_http_redirects_flag) \
-                     $with_reflog"
+                     $with_reflog                      \
+                     $partial_replication_param"
 
   # Set CVMFS_SERVER_CHECK_SUMMARY=0 to restore the previous behavior.
   if [ "${CVMFS_SERVER_CHECK_SUMMARY:-1}" = "0" ]; then
