@@ -289,7 +289,7 @@ if (BUILD_CVMFS)
     )
     set_target_properties (cvmfs_fuse_debug PROPERTIES
       VERSION ${CernVM-FS_VERSION_STRING}
-      COMPILE_FLAGS "-DCVMFS_USE_LIBFUSE=2 ${CVMFS_FUSE_CFLAGS} -O0 -U_FORTIFY_SOURCE -DDEBUGMSG"
+      COMPILE_FLAGS "-DCVMFS_USE_LIBFUSE=2 ${CVMFS_FUSE_CFLAGS} -O0 -Wp,-U_FORTIFY_SOURCE -DDEBUGMSG"
       LINK_FLAGS "${CVMFS_FUSE_LDFLAGS}"
     )
     target_link_libraries (cvmfs_fuse
@@ -316,7 +316,7 @@ if (BUILD_CVMFS)
     )
     set_target_properties (cvmfs_fuse3_debug PROPERTIES
       VERSION ${CernVM-FS_VERSION_STRING}
-      COMPILE_FLAGS "-DCVMFS_USE_LIBFUSE=3 ${CVMFS_FUSE_CFLAGS} -O0 -U_FORTIFY_SOURCE -DDEBUGMSG"
+      COMPILE_FLAGS "-DCVMFS_USE_LIBFUSE=3 ${CVMFS_FUSE_CFLAGS} -O0 -Wp,-U_FORTIFY_SOURCE -DDEBUGMSG"
       LINK_FLAGS "${CVMFS_FUSE_LDFLAGS}"
     )
     target_link_libraries (cvmfs_fuse3
@@ -722,7 +722,7 @@ if (BUILD_SERVER)
   if (BUILD_SERVER_DEBUG)
     add_executable (cvmfs_swissknife_debug ${CVMFS_SWISSKNIFE_SOURCES})
     set_target_properties (cvmfs_swissknife_debug PROPERTIES
-      COMPILE_FLAGS "-O0 -U_FORTIFY_SOURCE -DDEBUGMSG"
+      COMPILE_FLAGS "-O0 -Wp,-U_FORTIFY_SOURCE -DDEBUGMSG"
     )
     target_link_libraries (cvmfs_swissknife_debug
                            cvmfs_crypto_debug
@@ -840,7 +840,7 @@ if (BUILD_SERVER)
     add_library (cvmfs_server_debug SHARED ${LIBCVMFS_SERVER_SOURCES})
     set_target_properties (cvmfs_server_debug PROPERTIES
       VERSION ${CernVM-FS_VERSION_STRING}
-      COMPILE_FLAGS "${LIBCVMFS_SERVER_CFLAGS} -O0 -U_FORTIFY_SOURCE -DDEBUGMSG")
+      COMPILE_FLAGS "${LIBCVMFS_SERVER_CFLAGS} -O0 -Wp,-U_FORTIFY_SOURCE -DDEBUGMSG")
     target_link_libraries (cvmfs_server_debug
                            cvmfs_crypto_debug
                            cvmfs_util_debug
@@ -900,7 +900,7 @@ if (BUILD_SERVER)
   if (BUILD_SERVER_DEBUG)
     add_executable (cvmfs_publish_debug ${CVMFS_PUBLISH_SOURCES})
     set_target_properties (cvmfs_publish_debug PROPERTIES
-      COMPILE_FLAGS "${CVMFS_PUBLISH_CFLAGS} -O0 -U_FORTIFY_SOURCE -DDEBUGMSG"
+      COMPILE_FLAGS "${CVMFS_PUBLISH_CFLAGS} -O0 -Wp,-U_FORTIFY_SOURCE -DDEBUGMSG"
     )
     target_link_libraries (cvmfs_publish_debug
                            cvmfs_crypto_debug
@@ -1127,7 +1127,7 @@ if(BUILD_RECEIVER)
   if (BUILD_RECEIVER_DEBUG)
     add_executable(cvmfs_receiver_debug ${CVMFS_RECEIVER_SOURCES})
     set_target_properties (cvmfs_receiver_debug PROPERTIES
-      COMPILE_FLAGS "${CVMFS_RECEIVER_CFLAGS} -O0 -U_FORTIFY_SOURCE -DDEBUGMSG")
+      COMPILE_FLAGS "${CVMFS_RECEIVER_CFLAGS} -O0 -Wp,-U_FORTIFY_SOURCE -DDEBUGMSG")
     target_link_libraries(cvmfs_receiver_debug
                           cvmfs_crypto_debug
                           cvmfs_util_debug
