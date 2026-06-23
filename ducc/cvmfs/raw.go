@@ -243,6 +243,11 @@ func IngestDelete(CVMFSRepo string, path string) error {
 
 func IngestDeleteWithLogger(logger *log.Entry, CVMFSRepo string, path string) error {
 	logger = l.Ensure(logger)
+	// Mountless gateway publishing supports only --fast-delete: regular
+	// --delete needs the rdonly mount for filesystem traversal.
+	if MountlessPublishing() {
+		return IngestFastDeleteWithLogger(logger, CVMFSRepo, path)
+	}
 	ingestLogger := logger.WithFields(log.Fields{"repo": CVMFSRepo, "action": "ingest delete", "path": path})
 	repoName, _ := GetRepoAndSubdir(CVMFSRepo)
 	path = PrefixRepoSubdirOnce(CVMFSRepo, path)

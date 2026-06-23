@@ -50,9 +50,12 @@ class CommitProcessor {
   CommitProcessor();
   virtual ~CommitProcessor();
 
-  Result Process(const std::string &lease_path, const shash::Any &old_root_hash,
-                 const shash::Any &new_root_hash, const RepositoryTag &tag,
-                 uint64_t *final_revision);
+  // virtual so the reactor's MakeCommitProcessor() factory can inject a mock
+  // in unit tests
+  virtual Result Process(const std::string &lease_path,
+                         const shash::Any &old_root_hash,
+                         const shash::Any &new_root_hash,
+                         const RepositoryTag &tag, uint64_t *final_revision);
 
   int GetNumErrors() const { return num_errors_; }
 

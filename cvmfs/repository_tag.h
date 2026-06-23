@@ -10,12 +10,20 @@
 
 class RepositoryTag {
  public:
-  RepositoryTag() : name_(""), description_(""), auto_tag_threshold_(0) { }
+  RepositoryTag()
+      : name_(""), description_(""), delete_tags_(""), auto_tag_threshold_(0) { }
   RepositoryTag(const std::string &name, const std::string &description);
 
   void SetName(const std::string &name) { name_ = name; }
   void SetDescription(const std::string &description) {
     description_ = description;
+  }
+  // Space-separated list of existing tag names to remove on commit (empty
+  // disables removal). Used by `cvmfs_server tag -r` on gateway repositories,
+  // where the publisher cannot edit the tag database directly, so the receiver
+  // performs the removal in the same history transaction as the commit.
+  void SetDeleteTags(const std::string &delete_tags) {
+    delete_tags_ = delete_tags;
   }
   // Unix timestamp: auto-generated tags older than this are removed on commit.
   // 0 disables the cleanup. The publisher resolves CVMFS_AUTO_TAG_TIMESPAN to
@@ -37,11 +45,13 @@ class RepositoryTag {
 
   std::string name() const { return name_; }
   std::string description() const { return description_; }
+  std::string delete_tags() const { return delete_tags_; }
   time_t auto_tag_threshold() const { return auto_tag_threshold_; }
 
  private:
   std::string name_;
   std::string description_;
+  std::string delete_tags_;
   time_t auto_tag_threshold_;
 };
 

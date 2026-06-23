@@ -411,6 +411,8 @@ bool Reactor::HandleCommit(const std::string &req, std::string *reply) {
       req_json->root(), "tag_description", JSON_STRING);
   const JSON *auto_tag_threshold_json = JsonDocument::SearchInObject(
       req_json->root(), "auto_tag_threshold", JSON_INT);
+  const JSON *delete_tags_json = JsonDocument::SearchInObject(
+      req_json->root(), "delete_tags", JSON_STRING);
 
   if (lease_path_json == NULL || old_root_hash_json == NULL
       || new_root_hash_json == NULL) {
@@ -441,6 +443,9 @@ bool Reactor::HandleCommit(const std::string &req, std::string *reply) {
   if (auto_tag_threshold_json != NULL) {
     repo_tag.SetAutoTagThreshold(
         static_cast<time_t>(auto_tag_threshold_json->get<int64_t>()));
+  }
+  if (delete_tags_json != NULL) {
+    repo_tag.SetDeleteTags(delete_tags_json->get<std::string>());
   }
   const CommitProcessor::Result res = proc->Process(
       lease_path_json->get<std::string>(), old_root_hash, new_root_hash,

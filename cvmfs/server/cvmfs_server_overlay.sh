@@ -10,6 +10,101 @@
 # - cvmfs_server_common.sh
 
 
+# Mountless gateway overlay helpers.  These mirror the equivalents in
+# cvmfs_server_ingest.sh: a mountless publisher has no FUSE overlay to
+# open/close, so the transaction is just a gateway lease that is acquired up
+# front and dropped (or committed by the merge) at the end.
+# TODO: these are duplicated from cvmfs_server_ingest.sh; both should move to
+# cvmfs_server_common.sh (see the refactor TODO at the top of that script).
+cvmfs_server_overlay_release_gateway_lease() {
+  local name="$1"
+  local gateway_api_url="$2"
+  local gw_key_file="$3"
+  local lease_path="$4"
+  local session_token_file="/var/spool/cvmfs/${name}/session_token"
+
+  cvmfs_sys_file_is_regular "$session_token_file" || return 0
+  cvmfs_swissknife lease -u "$gateway_api_url" -a drop \
+    -k "$gw_key_file" -p "$lease_path"
+}
+
+
+cvmfs_server_overlay_abort_transaction() {
+  local name="$1"
+  local mountless_gateway_overlay="$2"
+  local gateway_api_url="$3"
+  local gw_key_file="$4"
+  local lease_path="$5"
+
+  if [ $mountless_gateway_overlay -eq 1 ]; then
+    cvmfs_server_overlay_release_gateway_lease \
+      "$name" "$gateway_api_url" "$gw_key_file" "$lease_path" \
+      >/dev/null 2>&1 || true
+  else
+    cvmfs_server_abort -f "$name"
+  fi
+}
+
+
+# Failure handler for the mountless gateway overlay path.  Mirrors
+# publish_failed but skips the run_suid_helper open/close calls that require a
+# FUSE overlay.
+cvmfs_server_overlay_publish_failed_mountless() {
+  local name="$1"
+  local gateway_api_url="$2"
+  local gw_key_file="$3"
+  local lease_path="$4"
+  load_repo_config $name
+  local pub_lock="${CVMFS_SPOOL_DIR}/is_publishing"
+  trap - EXIT HUP INT TERM
+  cvmfs_server_overlay_release_gateway_lease \
+    "$name" "$gateway_api_url" "$gw_key_file" "$lease_path" \
+    >/dev/null 2>&1 || true
+  release_lock $pub_lock
+  to_syslog_for_repo $name "failed to publish"
+}
+
+
+# Like publish_starting but for the mountless gateway overlay path: acquire the
+# publishing lock and set an EXIT trap that includes gateway lease cleanup,
+# omitting the run_suid_helper lock call that needs a FUSE overlay.
+cvmfs_server_overlay_publish_starting_mountless() {
+  local name="$1"
+  local gateway_api_url="$2"
+  local gw_key_file="$3"
+  local lease_path="$4"
+  load_repo_config $name
+  local pub_lock="${CVMFS_SPOOL_DIR}/is_publishing"
+  acquire_lock "$pub_lock" || {
+    cvmfs_server_overlay_release_gateway_lease \
+      "$name" "$gateway_api_url" "$gw_key_file" "$lease_path" \
+      >/dev/null 2>&1 || true
+    die "Failed to acquire publishing lock"
+  }
+  trap "cvmfs_server_overlay_publish_failed_mountless '$name' '$gateway_api_url' '$gw_key_file' '$lease_path'" EXIT HUP INT TERM
+  to_syslog_for_repo $name "started publishing"
+}
+
+
+# Combined failure handler called from error blocks AFTER publish_starting (or
+# its mountless variant).  Drops the gateway lease for mountless, aborts the
+# FUSE-backed transaction otherwise.
+cvmfs_server_overlay_fail() {
+  local name="$1"
+  local mountless_gateway_overlay="$2"
+  local gateway_api_url="$3"
+  local gw_key_file="$4"
+  local lease_path="$5"
+  if [ $mountless_gateway_overlay -eq 1 ]; then
+    cvmfs_server_overlay_publish_failed_mountless \
+      "$name" "$gateway_api_url" "$gw_key_file" "$lease_path"
+  else
+    publish_failed "$name"
+    cvmfs_server_abort -f "$name"
+  fi
+}
+
+
 cvmfs_server_overlay() {
   local layers=""
   local dest_path=""
@@ -63,20 +158,57 @@ cvmfs_server_overlay() {
   local upstream=$CVMFS_UPSTREAM_STORAGE
   local upstream_type=$(get_upstream_type $upstream)
 
-  # Open a transaction for the overlay operation
+  local spool_dir=$CVMFS_SPOOL_DIR
+  local gw_key_file=/etc/cvmfs/keys/${name}.gw
+  local mountless_gateway_overlay=0
+  local gateway_api_url=""
+  local gateway_lease_path=""
+
+  # Open a transaction for the overlay operation.  When the upstream is a
+  # gateway and there is no FUSE mount (mountless publisher), acquire the
+  # gateway lease directly instead of going through cvmfs_server_transaction,
+  # which would try to (re)mount the publisher overlay.
   if [ x"$upstream_type" = xgw ]; then
-    cvmfs_server_transaction "$name/$dest_path" || die "Impossible to start a transaction"
+    gateway_lease_path="$name/$dest_path"
+    if ! is_mounted "/cvmfs/$name" && ! is_mounted "${CVMFS_SPOOL_DIR}/rdonly"; then
+      mountless_gateway_overlay=1
+      if is_checked_out $name; then
+        die "Mountless gateway overlay requires a mounted publisher for checked-out repositories."
+      fi
+      gateway_api_url=$(get_upstream_config "$upstream")
+      cvmfs_swissknife lease -u "$gateway_api_url" -a acquire \
+        -k "$gw_key_file" -p "$gateway_lease_path" || \
+        die "Impossible to start a transaction"
+    else
+      cvmfs_server_transaction "$gateway_lease_path" || die "Impossible to start a transaction"
+    fi
   else
     cvmfs_server_transaction $name || die "Impossible to start a transaction"
   fi
 
-  local spool_dir=$CVMFS_SPOOL_DIR
+  # Abort/fail helpers, defined once the gateway variables are known.
+  _abort() {
+    cvmfs_server_overlay_abort_transaction \
+      "$name" "$mountless_gateway_overlay" "$gateway_api_url" \
+      "$gw_key_file" "$gateway_lease_path"
+  }
+  _fail() {
+    cvmfs_server_overlay_fail \
+      "$name" "$mountless_gateway_overlay" "$gateway_api_url" \
+      "$gw_key_file" "$gateway_lease_path"
+  }
+
   local stratum0=$CVMFS_STRATUM0
   local hash_algorithm="${CVMFS_HASH_ALGORITHM-sha1}"
   local compression_alg="${CVMFS_COMPRESSION_ALGORITHM-default}"
 
   local user_shell="$(get_user_shell $name)"
-  local base_hash=$(get_mounted_root_hash $name)
+  local base_hash=
+  if [ $mountless_gateway_overlay -eq 1 ]; then
+    base_hash=$(get_published_root_hash $name) || { _abort; die "Failed to get published root hash for $name"; }
+  else
+    base_hash=$(get_mounted_root_hash $name)
+  fi
   local manifest="${spool_dir}/tmp/manifest"
 
   # Build the swissknife overlay command
@@ -98,23 +230,45 @@ cvmfs_server_overlay() {
     $([ -n "$oci_config" ] && echo "-c $oci_config") \
     $([ $skip_singularity -eq 1 ] && echo "-S")"
 
+  # For a gateway upstream the merge is committed through the lease, so pass
+  # the gateway key and session token (mirrors cvmfs_server ingest).  The
+  # session token file is created by the lease acquire above (mountless) or by
+  # cvmfs_server_transaction (mounted gateway).
+  if [ x"$upstream_type" = xgw ]; then
+    overlay_command="$overlay_command -H $gw_key_file -P ${spool_dir}/session_token"
+  fi
+
   # ---> do it!
   publish_before_hook $name
 
-  # check if we have open file descriptors on /cvmfs/<name>
-  [ $(count_wr_fds /cvmfs/$name) -eq 0 ] || { cvmfs_server_abort -f $name; die "Open writable file descriptors on $name"; }
+  # check if we have open file descriptors on /cvmfs/<name> (only meaningful
+  # when there is a FUSE mount, i.e. not in the mountless gateway path)
   local use_fd_fallback=0
-  handle_read_only_file_descriptors_on_mount_point $name $open_fd_dialog || use_fd_fallback=1
+  if [ $mountless_gateway_overlay -ne 1 ]; then
+    [ $(count_wr_fds /cvmfs/$name) -eq 0 ] || { _abort; die "Open writable file descriptors on $name"; }
+    handle_read_only_file_descriptors_on_mount_point $name $open_fd_dialog || use_fd_fallback=1
+  fi
 
-  publish_starting $name
+  if [ $mountless_gateway_overlay -eq 1 ]; then
+    cvmfs_server_overlay_publish_starting_mountless \
+      "$name" "$gateway_api_url" "$gw_key_file" "$gateway_lease_path"
+  else
+    publish_starting $name
+  fi
 
-  $user_shell "$overlay_command" || { publish_failed $name; cvmfs_server_abort -f $name; die "Overlay merge failed\n\nExecuted Command:\n$overlay_command"; }
-  cvmfs_sys_file_is_regular $manifest || { publish_failed $name; cvmfs_server_abort -f $name; die "Manifest creation failed"; }
+  $user_shell "$overlay_command" || { _fail; die "Overlay merge failed\n\nExecuted Command:\n$overlay_command"; }
+  cvmfs_sys_file_is_regular $manifest || { _fail; die "Manifest creation failed"; }
 
   local trunk_hash=$(grep "^C" $manifest | tr -d C)
 
   if [ x"$upstream_type" = xgw ]; then
-    close_transaction $name $use_fd_fallback
+    if [ $mountless_gateway_overlay -ne 1 ]; then
+      close_transaction $name $use_fd_fallback
+    else
+      # No FUSE overlay to close; the merge already committed the gateway lease
+      # (FinalizeSession(true)).  Only the local session_token file remains.
+      rm -f "${spool_dir}/session_token"
+    fi
     publish_after_hook $name
     publish_succeeded $name
     echo "Changes submitted to repository gateway"

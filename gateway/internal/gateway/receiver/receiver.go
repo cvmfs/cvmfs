@@ -234,6 +234,7 @@ func (r *CvmfsReceiver) Commit(leasePath, oldRootHash, newRootHash string, tag g
 		"tag_name":           tag.Name,
 		"tag_description":    tag.Description,
 		"auto_tag_threshold": tag.AutoTagThreshold,
+		"delete_tags":        tag.DeleteTags,
 		"statistics":         stats,
 	}
 	buf, err := json.Marshal(&req)
