@@ -298,7 +298,7 @@ if (BUILD_SERVER)
   if (BUILD_UNITTESTS_DEBUG)
   add_executable (cvmfs_test_publish_debug ${CVMFS_UNITTEST_SERVER_SOURCES})
   set_target_properties (cvmfs_test_publish_debug PROPERTIES
-                         COMPILE_FLAGS "${CVMFS_UNITTEST_COMMON_CFLAGS} -O0 -DDEBUGMSG"
+                         COMPILE_FLAGS "${CVMFS_UNITTEST_COMMON_CFLAGS} -O0 -U_FORTIFY_SOURCE -DDEBUGMSG"
   )
   target_link_libraries (cvmfs_test_publish_debug
                          cvmfs_crypto_debug
@@ -801,7 +801,7 @@ if (BUILD_UNITTESTS_DEBUG)
   add_executable (cvmfs_unittests_debug ${CVMFS_UNITTEST_SOURCES})
   add_dependencies (cvmfs_unittests_debug cache.pb.generated-unittests)
   set_target_properties (cvmfs_unittests_debug PROPERTIES
-                         COMPILE_FLAGS "${CVMFS_UNITTEST_COMMON_CFLAGS} -O0 -DDEBUGMSG"
+                         COMPILE_FLAGS "${CVMFS_UNITTEST_COMMON_CFLAGS} -O0 -U_FORTIFY_SOURCE -DDEBUGMSG"
   )
   target_link_libraries (cvmfs_unittests_debug
                          cvmfs_crypto_debug
