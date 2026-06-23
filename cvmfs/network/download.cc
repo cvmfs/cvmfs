@@ -1666,21 +1666,34 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
              "error code %d no-cache %d",
              name_.c_str(), info->id(), same_url_retry, info->error_code(),
              info->nocache());
-    // Reset internal state and destination
-    if (info->sink() != NULL && info->sink()->Reset() != 0) {
-      info->SetErrorCode(kFailLocalIO);
-      goto verify_and_finalize_stop;
+    // Reset internal state and destination. In parallel-decompress mode the
+    // sink and zstream are owned by the caller thread (it pops and decompresses
+    // the queued chunks). Resetting them here would race the caller and, worse,
+    // leave the bytes of this failed attempt in the tube to be decompressed
+    // into the output. Defer the reset by enqueuing an ordered marker; the
+    // caller discards this attempt's bytes when it pops it (see below).
+    const bool defer_reset = info->IsValidDataTube();
+    if (!defer_reset) {
+      if (info->sink() != NULL && info->sink()->Reset() != 0) {
+        info->SetErrorCode(kFailLocalIO);
+        goto verify_and_finalize_stop;
+      }
     }
     if (info->interrupt_cue() && info->interrupt_cue()->IsCanceled()) {
       info->SetErrorCode(kFailCanceled);
       goto verify_and_finalize_stop;
     }
 
+    // The hash context is updated on this (MainDownload) thread in
+    // CallbackCurlData(), so it is reset here regardless of the decompress mode.
     if (info->expected_hash()) {
       shash::Init(info->hash_context());
     }
-    if (info->compressed()) {
+    if (info->compressed() && !defer_reset) {
       zlib::DecompressInit(info->GetZstreamPtr());
+    }
+    if (defer_reset) {
+      info->GetDataTubePtr()->EnqueueBack(new DataTubeElement(kActionReset));
     }
 
     if (sharding_policy_.UseCount() > 0) {  // sharding policy
@@ -2029,6 +2042,24 @@ Failures DownloadManager::Fetch(JobInfo *info) {
       if (ele->action == kActionStop) {
         delete ele;
         break;
+      }
+
+      if (ele->action == kActionReset) {
+        // The chunks popped so far belonged to a download attempt that was
+        // superseded by a retry / host fail-over (VerifyAndFinalize enqueued
+        // this marker). Discard their — possibly corrupt — decompressed output
+        // and start fresh so the next attempt's bytes are processed cleanly.
+        if (info->compressed()) {
+          zlib::DecompressFini(info->GetZstreamPtr());
+          zlib::DecompressInit(info->GetZstreamPtr());
+        }
+        if (info->sink() != NULL && info->sink()->Reset() != 0) {
+          decompress_err = kFailLocalIO;
+        } else {
+          decompress_err = kFailOk;
+        }
+        delete ele;
+        continue;
       }
 
       if (decompress_err == kFailOk && ele->size > 0) {
