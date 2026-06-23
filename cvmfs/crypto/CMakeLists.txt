@@ -50,7 +50,7 @@ if (BUILD_CVMFS OR BUILD_SERVER_DEBUG OR BUILD_RECEIVER_DEBUG OR BUILD_UNITTESTS
   add_library (cvmfs_crypto_debug SHARED ${LIBCVMFS_CRYPTO_SOURCES})
   set_target_properties (cvmfs_crypto_debug PROPERTIES
       VERSION ${CernVM-FS_VERSION_STRING}
-      COMPILE_FLAGS "${LIBCVMFS_CRYPTO_CFLAGS} -O0 -DDEBUGMSG"
+      COMPILE_FLAGS "${LIBCVMFS_CRYPTO_CFLAGS} -O0 -Wno-cpp -DDEBUGMSG"
       LINK_FLAGS "${LIBCVMFS_CRYPTO_LINK_FLAGS}")
   target_include_directories (cvmfs_crypto_debug PRIVATE ${Libcrypto_INCLUDE_DIRS})
   target_link_libraries (cvmfs_crypto_debug
