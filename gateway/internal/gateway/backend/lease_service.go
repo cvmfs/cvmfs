@@ -267,31 +267,49 @@ func (s *Services) CancelLease(ctx context.Context, token string) error {
 
 // CommitLease associated with the token (transaction commit)
 func (s *Services) CommitLease(ctx context.Context, token, oldRootHash, newRootHash string, tag gw.RepositoryTag) (uint64, error) {
-	leaseMutex.Lock()
-	defer leaseMutex.Unlock()
 	t0 := time.Now()
 
 	outcome := "success"
 	defer logAction(ctx, "commit_lease", &outcome, t0)
 
-	tx, err := s.DB.SQL.BeginTx(ctx, nil)
-	if err != nil {
-		return 0, fmt.Errorf("could not begin transaction: %w", err)
-	}
-	defer tx.Rollback()
+	// Look up and validate the lease. leaseMutex is only held for this short
+	// SQLite read, not for the (potentially very slow) commit below, so that
+	// concurrent lease listing/acquisition is not blocked behind a commit.
+	lease, err := func() (*Lease, error) {
+		leaseMutex.Lock()
+		defer leaseMutex.Unlock()
 
-	lease, err := FindLeaseByToken(ctx, tx, token)
+		tx, err := s.DB.SQL.BeginTx(ctx, nil)
+		if err != nil {
+			return nil, fmt.Errorf("could not begin transaction: %w", err)
+		}
+		defer tx.Rollback()
+
+		lease, err := FindLeaseByToken(ctx, tx, token)
+		if err != nil {
+			outcome = err.Error()
+			return nil, err
+		}
+
+		if lease == nil || lease.Expiration.Before(time.Now()) {
+			err := InvalidLeaseError{}
+			outcome = err.Error()
+			return nil, err
+		}
+
+		if err := tx.Commit(); err != nil {
+			return nil, fmt.Errorf("could not commit transaction: %w", err)
+		}
+
+		return lease, nil
+	}()
 	if err != nil {
-		outcome = err.Error()
 		return 0, err
 	}
 
-	if lease == nil || lease.Expiration.Before(time.Now()) {
-		err := InvalidLeaseError{}
-		outcome = err.Error()
-		return 0, err
-	}
-
+	// Perform the actual commit through the receiver. This can take a long
+	// time, so it must run without holding leaseMutex. The per-repository
+	// commit lock still serialises commits (and GC) for the same repository.
 	var finalRev uint64
 	if err := s.DB.WithLock(ctx, lease.Repository, func() error {
 		var err error
@@ -310,13 +328,30 @@ func (s *Services) CommitLease(ctx context.Context, token, oldRootHash, newRootH
 		}
 	}()
 
-	if err := DeleteLeaseByToken(ctx, tx, token); err != nil {
-		outcome = err.Error()
-		return finalRev, err
-	}
+	// Remove the now-committed lease. Again only a short SQLite write under
+	// leaseMutex.
+	if err := func() error {
+		leaseMutex.Lock()
+		defer leaseMutex.Unlock()
 
-	if err := tx.Commit(); err != nil {
-		return 0, fmt.Errorf("could not commit transaction: %w", err)
+		tx, err := s.DB.SQL.BeginTx(ctx, nil)
+		if err != nil {
+			return fmt.Errorf("could not begin transaction: %w", err)
+		}
+		defer tx.Rollback()
+
+		if err := DeleteLeaseByToken(ctx, tx, token); err != nil {
+			outcome = err.Error()
+			return err
+		}
+
+		if err := tx.Commit(); err != nil {
+			return fmt.Errorf("could not commit transaction: %w", err)
+		}
+
+		return nil
+	}(); err != nil {
+		return finalRev, err
 	}
 
 	return finalRev, nil

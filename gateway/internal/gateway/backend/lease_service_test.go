@@ -9,6 +9,7 @@ import (
 	"time"
 
 	gw "github.com/cvmfs/gateway/internal/gateway"
+	"github.com/cvmfs/gateway/internal/gateway/receiver"
 )
 
 func TestLeaseServiceNewLease(t *testing.T) {
@@ -280,4 +281,62 @@ func TestLeaseServiceCommitLease(t *testing.T) {
 			t.Fatalf("expired lease should not have been accepted for commit")
 		}
 	})
+}
+
+// TestCommitLeaseDoesNotBlockGetLeases is a regression test for issue #4103: a
+// slow commit must not hold leaseMutex while the external receiver is running,
+// otherwise lease listing blocks for the whole commit duration.
+func TestCommitLeaseDoesNotBlockGetLeases(t *testing.T) {
+	backend, tmp := StartTestBackend("lease_concurrency_test", 10*time.Second)
+	defer func() {
+		backend.Stop()
+		os.RemoveAll(tmp)
+	}()
+
+	keyID := "keyid1"
+	leasePath := "test2.repo.org/some/path"
+	token, err := backend.NewLease(context.TODO(), keyID, leasePath, "host", 3)
+	if err != nil {
+		t.Fatalf("could not obtain new lease: %v", err)
+	}
+
+	// Gate the mock receiver so the commit parks in flight, holding only the
+	// per-repository lock (not leaseMutex).
+	gate := make(chan struct{})
+	entered := receiver.SetMockCommitGate(gate)
+	defer receiver.SetMockCommitGate(nil)
+
+	commitDone := make(chan struct{})
+	go func() {
+		backend.CommitLease(context.TODO(), token, "old_hash", "new_hash", gw.RepositoryTag{Name: "mytag"})
+		close(commitDone)
+	}()
+
+	// Wait until the commit is actually parked inside the receiver, so that on
+	// the buggy code leaseMutex is provably held while we time GetLeases.
+	select {
+	case <-entered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("commit never reached the receiver")
+	}
+
+	// GetLeases must return promptly even while the commit is parked, since it
+	// no longer waits on leaseMutex held across the external commit.
+	getLeasesDone := make(chan struct{})
+	go func() {
+		if _, err := backend.GetLeases(context.TODO()); err != nil {
+			t.Errorf("GetLeases failed: %v", err)
+		}
+		close(getLeasesDone)
+	}()
+
+	select {
+	case <-getLeasesDone:
+	case <-time.After(2 * time.Second):
+		t.Fatal("GetLeases blocked behind an in-flight CommitLease (issue #4103 regression)")
+	}
+
+	// Release the parked commit and let it finish cleanly.
+	close(gate)
+	<-commitDone
 }
