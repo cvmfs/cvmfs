@@ -99,17 +99,19 @@ cvmfs_server_refresh_lease() {
       die "Could not reach gateway at ${gateway_api_url}/leases"
   fi
 
+  has_jq || die "refresh-lease requires 'jq' to parse the gateway response"
+
   local status
-  status=$(echo "$response" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status',''))" 2>/dev/null) || \
+  status=$(echo "$response" | jq -r '.status // empty' 2>/dev/null) || \
     die "Could not parse gateway response: $response"
 
   if [ x"$status" != x"ok" ]; then
     local reason
-    reason=$(echo "$response" | python3 -c "import sys,json; print(json.load(sys.stdin).get('reason','unknown'))" 2>/dev/null)
+    reason=$(echo "$response" | jq -r '.reason // "unknown"' 2>/dev/null)
     die "Gateway refused to refresh the lease: $reason"
   fi
 
   local expires
-  expires=$(echo "$response" | python3 -c "import sys,json; print(json.load(sys.stdin).get('data',{}).get('expires',''))" 2>/dev/null)
+  expires=$(echo "$response" | jq -r '.data.expires // empty' 2>/dev/null)
   echo "Lease for $name refreshed; new expiration: $expires"
 }
