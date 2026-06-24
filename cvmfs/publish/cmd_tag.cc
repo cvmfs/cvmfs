@@ -9,6 +9,7 @@
 
 #include <string>
 #include <vector>
+#include <memory>
 
 #include "history.h"
 #include "publish/except.h"
@@ -32,9 +33,9 @@ int CmdTag::Main(const Options &options) {
                    EPublish::kFailInvocation);
 
   SettingsBuilder builder;
-  UniquePtr<SettingsPublisher> settings;
+  std::unique_ptr<SettingsPublisher> settings;
   try {
-    settings = builder.CreateSettingsPublisher(fqrn, true /* needs_managed */);
+    settings .reset(  builder.CreateSettingsPublisher(fqrn, true /* needs_managed */) );
   } catch (const EPublish &e) {
     if (e.failure() == EPublish::kFailRepositoryNotFound) {
       LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "CernVM-FS error: %s",
@@ -55,9 +56,9 @@ int CmdTag::Main(const Options &options) {
                    EPublish::kFailPermission);
   }
 
-  UniquePtr<Publisher> publisher;
+  std::unique_ptr<Publisher> publisher;
   try {
-    publisher = new Publisher(*settings);
+    publisher .reset(  new Publisher(*settings) );
     if (publisher->whitelist()->IsExpired()) {
       throw EPublish("Repository whitelist for " + fqrn + " is expired",
                      EPublish::kFailWhitelistExpired);

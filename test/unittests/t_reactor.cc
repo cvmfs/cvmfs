@@ -296,8 +296,8 @@ TEST_F(T_Reactor, CommitForwardsDeleteTags) {
   std::string reply;
   ASSERT_TRUE(Reactor::ReadReply(from_reactor_[0], &reply));
   {
-    UniquePtr<JsonDocument> json_reply(JsonDocument::Create(reply));
-    ASSERT_TRUE(json_reply.IsValid());
+    std::unique_ptr<JsonDocument> json_reply(JsonDocument::Create(reply));
+    ASSERT_TRUE(json_reply.get()!=nullptr);
     const JSON *status_json = JsonDocument::SearchInObject(
         json_reply->root(), "status", JSON_STRING);
     ASSERT_TRUE(status_json);
