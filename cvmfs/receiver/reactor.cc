@@ -413,9 +413,11 @@ bool Reactor::HandleCommit(const std::string &req, std::string *reply) {
       req_json->root(), "auto_tag_threshold", JSON_INT);
   const JSON *delete_tags_json = JsonDocument::SearchInObject(
       req_json->root(), "delete_tags", JSON_STRING);
+  const JSON *lease_expiration_json = JsonDocument::SearchInObject(
+      req_json->root(), "lease_expiration", JSON_INT);
 
   if (lease_path_json == NULL || old_root_hash_json == NULL
-      || new_root_hash_json == NULL) {
+      || new_root_hash_json == NULL || lease_expiration_json == NULL) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
              "HandleCommit: Missing fields in request.");
     return false;
@@ -449,7 +451,7 @@ bool Reactor::HandleCommit(const std::string &req, std::string *reply) {
   }
   const CommitProcessor::Result res = proc->Process(
       lease_path_json->get<std::string>(), old_root_hash, new_root_hash,
-      repo_tag, &final_revision);
+      repo_tag, lease_expiration_json->get<int64_t>(), &final_revision);
 
   JsonStringGenerator reply_input;
   switch (res) {
@@ -468,6 +470,10 @@ bool Reactor::HandleCommit(const std::string &req, std::string *reply) {
     case CommitProcessor::kMissingReflog:
       reply_input.Add("status", "error");
       reply_input.Add("reason", "missing_reflog");
+      break;
+    case CommitProcessor::kLeaseExpired:
+      reply_input.Add("status", "error");
+      reply_input.Add("reason", "lease_expired");
       break;
     default:
       PANIC(kLogSyslogErr,

@@ -370,11 +370,19 @@ func (s *Services) CommitLease(ctx context.Context, token, oldRootHash, newRootH
 	// Perform the actual commit through the receiver. This can take a long
 	// time, so it must run without holding leaseMutex. The per-repository
 	// commit lock still serialises commits (and GC) for the same repository.
+	//
+	// The commit deadline is passed to the receiver, which re-checks it just
+	// before publishing: if the lease expired while this (slow) commit was
+	// running, the receiver does not modify the repository, so an overlapping
+	// lease granted to another publisher in the meantime cannot be overwritten.
+	// The configured safety margin is subtracted from the lease expiration so the
+	// commit is refused slightly before the lease actually expires.
+	commitDeadline := lease.Expiration.Add(-s.Config.CommitLeaseExpiryMargin)
 	var finalRev uint64
 	if err := s.DB.WithLock(ctx, lease.Repository, func() error {
 		var err error
 		leasePath := lease.CombinedLeasePath()
-		finalRev, err = s.Pool.CommitLease(ctx, leasePath, oldRootHash, newRootHash, tag)
+		finalRev, err = s.Pool.CommitLease(ctx, leasePath, oldRootHash, newRootHash, tag, commitDeadline)
 		return err
 	}); err != nil {
 		outcome = err.Error()
