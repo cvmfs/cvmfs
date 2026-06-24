@@ -30,7 +30,9 @@ class MockedCommitProcessor : public CommitProcessor {
   virtual Result Process(const std::string & /*lease_path*/,
                          const shash::Any & /*old_root_hash*/,
                          const shash::Any & /*new_root_hash*/,
-                         const RepositoryTag &tag, uint64_t *final_revision) {
+                         const RepositoryTag &tag,
+                         int64_t /*lease_expiration*/,
+                         uint64_t *final_revision) {
     g_committed_delete_tags = tag.delete_tags();
     *final_revision = 1;
     return kSuccess;
@@ -282,6 +284,9 @@ TEST_F(T_Reactor, CommitForwardsDeleteTags) {
   request_terms.Add("tag_name", "");
   request_terms.Add("tag_description", "");
   request_terms.Add("delete_tags", "old_tag1 old_tag2");
+  // HandleCommit now requires a lease_expiration field; use a far-future
+  // deadline (year 2100) so the re-check in Process() does not trip in the mock.
+  request_terms.Add("lease_expiration", static_cast<int64_t>(4102444800LL));
   const std::string request = request_terms.GenerateString();
 
   ASSERT_TRUE(
