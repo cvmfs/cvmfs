@@ -327,10 +327,28 @@ func (s *Services) CancelLease(ctx context.Context, token string) error {
 
 // CommitLease associated with the token (transaction commit)
 func (s *Services) CommitLease(ctx context.Context, token, oldRootHash, newRootHash string, tag gw.RepositoryTag) (uint64, error) {
+	return s.commitLease(ctx, token, oldRootHash, newRootHash, tag, false)
+}
+
+// GraftLease commits the lease using the experimental dedicated DirectGraft
+// path: the pre-built subtree catalog is grafted into the parent catalog,
+// skipping the DiffRec catalog merge.  This is intentionally kept separate from
+// CommitLease until the endpoint is promoted to a stable API.
+func (s *Services) GraftLease(ctx context.Context, token, oldRootHash, newRootHash string, tag gw.RepositoryTag) (uint64, error) {
+	return s.commitLease(ctx, token, oldRootHash, newRootHash, tag, true)
+}
+
+// commitLease is the shared implementation behind CommitLease and GraftLease.
+func (s *Services) commitLease(ctx context.Context, token, oldRootHash, newRootHash string, tag gw.RepositoryTag, directGraft bool) (uint64, error) {
 	t0 := time.Now()
 
+	action := "commit_lease"
+	if directGraft {
+		action = "graft_lease"
+	}
+
 	outcome := "success"
-	defer logAction(ctx, "commit_lease", &outcome, t0)
+	defer logAction(ctx, action, &outcome, t0)
 
 	// Look up and validate the lease. leaseMutex is only held for this short
 	// SQLite read, not for the (potentially very slow) commit below, so that
@@ -382,7 +400,11 @@ func (s *Services) CommitLease(ctx context.Context, token, oldRootHash, newRootH
 	if err := s.DB.WithLock(ctx, lease.Repository, func() error {
 		var err error
 		leasePath := lease.CombinedLeasePath()
-		finalRev, err = s.Pool.CommitLease(ctx, leasePath, oldRootHash, newRootHash, tag, commitDeadline)
+		if directGraft {
+			finalRev, err = s.Pool.GraftLease(ctx, leasePath, oldRootHash, newRootHash, tag, commitDeadline)
+		} else {
+			finalRev, err = s.Pool.CommitLease(ctx, leasePath, oldRootHash, newRootHash, tag, commitDeadline)
+		}
 		return err
 	}); err != nil {
 		outcome = err.Error()

@@ -39,6 +39,11 @@ const (
 	receiverCommit
 	receiverError     // Unused
 	receiverTestCrash // Used only in testing
+	// receiverCommitGraft is an experimental dedicated commit variant that
+	// triggers the DirectGraft fast path in the worker (graft a pre-built subtree
+	// catalog into the parent, skipping DiffRec).  It must stay at the end so the
+	// numbering keeps matching enum receiver::Request in reactor.h.
+	receiverCommitGraft
 )
 
 // Receiver contains the operations that "receiver" worker processes perform
@@ -47,6 +52,7 @@ type Receiver interface {
 	Echo() error
 	SubmitPayload(leasePath string, payload io.Reader, digest string, headerSize int) error
 	Commit(leasePath, oldRootHash, newRootHash string, tag gw.RepositoryTag, leaseExpiration time.Time) (uint64, error)
+	Graft(leasePath, oldRootHash, newRootHash string, tag gw.RepositoryTag, leaseExpiration time.Time) (uint64, error)
 	Interrupt() error // like Ctrl-C SIGTERM -2
 	// Kill() error // like Crtl-D SIGKILL -9
 	TestCrash() error
@@ -224,6 +230,21 @@ func (r *CvmfsReceiver) SubmitPayload(leasePath string, payload io.Reader, diges
 
 // Commit command is sent to the worker
 func (r *CvmfsReceiver) Commit(leasePath, oldRootHash, newRootHash string, tag gw.RepositoryTag, leaseExpiration time.Time) (uint64, error) {
+	return r.commit(receiverCommit, "commit", leasePath, oldRootHash, newRootHash, tag, leaseExpiration)
+}
+
+// Graft is an experimental dedicated commit variant: it sends the
+// receiverCommitGraft request so the worker takes the DirectGraft fast path
+// (graft a pre-built subtree catalog into the parent, skipping DiffRec).  The
+// request body is identical to an ordinary commit; only the request type
+// differs.
+func (r *CvmfsReceiver) Graft(leasePath, oldRootHash, newRootHash string, tag gw.RepositoryTag, leaseExpiration time.Time) (uint64, error) {
+	return r.commit(receiverCommitGraft, "graft", leasePath, oldRootHash, newRootHash, tag, leaseExpiration)
+}
+
+// commit is the shared implementation behind Commit and Graft.  op selects the
+// worker request type and cmdName is used only for logging.
+func (r *CvmfsReceiver) commit(op receiverOp, cmdName, leasePath, oldRootHash, newRootHash string, tag gw.RepositoryTag, leaseExpiration time.Time) (uint64, error) {
 	stats, err := r.statsMgr.PopLease(leasePath)
 	if err != nil {
 		return 0, fmt.Errorf("could not obtain statistics counters: %w", err)
@@ -244,15 +265,15 @@ func (r *CvmfsReceiver) Commit(leasePath, oldRootHash, newRootHash string, tag g
 		return 0, fmt.Errorf("request encoding failed: %w", err)
 	}
 
-	reply, err := r.call(receiverCommit, buf, nil)
+	reply, err := r.call(op, buf, nil)
 	if err != nil {
-		return 0, fmt.Errorf("worker 'commit' call failed: %w", err)
+		return 0, fmt.Errorf("worker '%s' call failed: %w", cmdName, err)
 	}
 
 	parsedReply, result := parseReceiverReply(reply)
 
 	gw.LogC(r.ctx, "receiver", gw.LogDebug).
-		Str("command", "commit").
+		Str("command", cmdName).
 		Str("lease_path", leasePath).
 		Msgf("result: %v", result)
 

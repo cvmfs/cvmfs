@@ -84,6 +84,23 @@ func (r *MockReceiver) Commit(leasePath, oldRootHash, newRootHash string, tag gw
 	return 1, nil
 }
 
+func (r *MockReceiver) Graft(leasePath, oldRootHash, newRootHash string, tag gw.RepositoryTag, leaseExpiration time.Time) (uint64, error) {
+	// Mirror the real receiver: refuse to publish once the commit deadline (the
+	// lease expiration minus the gateway's configured margin) has passed.
+	if !leaseExpiration.IsZero() && time.Now().After(leaseExpiration) {
+		gw.LogC(r.ctx, "mock_receiver", gw.LogDebug).
+			Str("command", "graft").
+			Str("lease_path", leasePath).
+			Msgf("lease expired during commit")
+		return 0, Error("lease_expired")
+	}
+	gw.LogC(r.ctx, "mock_receiver", gw.LogDebug).
+		Str("command", "graft").
+		Str("lease_path", leasePath).
+		Msgf("new revision grafted")
+	return 1, nil
+}
+
 func (r *MockReceiver) SubmitPayload(leasePath string, payload io.Reader, digest string, headerSize int) error {
 	gw.LogC(r.ctx, "mock_receiver", gw.LogDebug).
 		Str("command", "submit payload").

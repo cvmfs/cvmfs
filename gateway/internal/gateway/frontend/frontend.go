@@ -61,6 +61,8 @@ func NewFrontend(services be.ActionController, port int, timeout time.Duration, 
 	router.POST(APIRoot+"/leases", mw(MakeLeasesHandler(services)))
 	router.POST(APIRoot+"/leases/:token", mw(MakeLeasesHandler(services)))
 	router.PATCH(APIRoot+"/leases/:token", mw(MakeLeasesHandler(services)))
+	// EXPERIMENTAL DirectGraft endpoint; keep separate from stable commits.
+	router.POST(APIRoot+"/leases/:token/graft", mw(MakeGraftHandler(services)))
 	router.DELETE(APIRoot+"/leases/:token", mw(MakeLeasesHandler(services)))
 
 	// Payloads (legacy endpoint)

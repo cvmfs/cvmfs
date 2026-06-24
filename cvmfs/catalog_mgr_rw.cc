@@ -1063,25 +1063,41 @@ void WritableCatalogManager::SwapNestedCatalog(const string &mountpoint,
 void WritableCatalogManager::GraftNestedCatalog(const string &mountpoint,
                                                 const shash::Any &new_hash,
                                                 const uint64_t new_size) {
+  if (!TryGraftNestedCatalog(mountpoint, new_hash, new_size)) {
+    PANIC(kLogStderr, "failed to graft nested catalog '%s'",
+          mountpoint.c_str());
+  }
+}
+
+bool WritableCatalogManager::TryGraftNestedCatalog(const string &mountpoint,
+                                                   const shash::Any &new_hash,
+                                                   const uint64_t new_size) {
   const string nested_root_path = MakeRelativePath(mountpoint);
   const string parent_path = GetParentPath(nested_root_path);
   const PathString nested_root_ps = PathString(nested_root_path);
 
-  assert(!nested_root_path.empty());
+  if (nested_root_path.empty()) {
+    LogCvmfs(kLogCatalog, kLogStderr,
+             "failed to graft nested catalog: empty mountpoint");
+    return false;
+  }
 
   // Load freely attached new catalog
   const UniquePtr<Catalog> new_catalog(
       LoadFreeCatalog(nested_root_ps, new_hash));
   if (!new_catalog.IsValid()) {
-    PANIC(kLogStderr,
-          "failed to graft nested catalog '%s': failed to load new catalog",
-          nested_root_path.c_str());
+    LogCvmfs(kLogCatalog, kLogStderr,
+             "failed to graft nested catalog '%s': failed to load new catalog",
+             nested_root_path.c_str());
+    return false;
   }
   if (new_catalog->root_prefix() != nested_root_ps) {
-    PANIC(kLogStderr,
-          "invalid nested catalog for grafting at '%s': catalog rooted at '%s'",
-          nested_root_path.c_str(),
-          new_catalog->root_prefix().ToString().c_str());
+    LogCvmfs(kLogCatalog, kLogStderr,
+             "invalid nested catalog for grafting at '%s': catalog rooted at "
+             "'%s'",
+             nested_root_path.c_str(),
+             new_catalog->root_prefix().ToString().c_str());
+    return false;
   }
 
   // Get new catalog root directory entry
@@ -1089,17 +1105,28 @@ void WritableCatalogManager::GraftNestedCatalog(const string &mountpoint,
   XattrList xattrs;
   const bool dirent_found = new_catalog->LookupPath(nested_root_ps, &dirent);
   if (!dirent_found) {
-    PANIC(kLogStderr,
-          "failed to swap nested catalog '%s': missing dirent in new catalog",
-          nested_root_path.c_str());
+    LogCvmfs(kLogCatalog, kLogStderr,
+             "failed to graft nested catalog '%s': missing dirent in new "
+             "catalog",
+             nested_root_path.c_str());
+    return false;
+  }
+  if (!dirent.IsDirectory()) {
+    LogCvmfs(kLogCatalog, kLogStderr,
+             "failed to graft nested catalog '%s': root entry is not a "
+             "directory",
+             nested_root_path.c_str());
+    return false;
   }
   if (dirent.HasXattrs()) {
     const bool xattrs_found = new_catalog->LookupXattrsPath(nested_root_ps,
                                                             &xattrs);
     if (!xattrs_found) {
-      PANIC(kLogStderr,
-            "failed to swap nested catalog '%s': missing xattrs in new catalog",
-            nested_root_path.c_str());
+      LogCvmfs(kLogCatalog, kLogStderr,
+               "failed to graft nested catalog '%s': missing xattrs in new "
+               "catalog",
+               nested_root_path.c_str());
+      return false;
     }
   }
   // Transform the nested catalog root into a transition point to be inserted
@@ -1114,15 +1141,23 @@ void WritableCatalogManager::GraftNestedCatalog(const string &mountpoint,
   DirectoryEntry parent_entry;
   if (!FindCatalog(parent_path, &parent_catalog, &parent_entry)) {
     SyncUnlock();
-    PANIC(kLogStderr, "catalog for directory '%s' cannot be found",
-          parent_path.c_str());
+    LogCvmfs(kLogCatalog, kLogStderr,
+             "catalog for directory '%s' cannot be found", parent_path.c_str());
+    return false;
+  }
+  if (!parent_entry.IsDirectory()) {
+    SyncUnlock();
+    LogCvmfs(kLogCatalog, kLogStderr,
+             "parent path '%s' is not a directory", parent_path.c_str());
+    return false;
   }
   if (parent_catalog->LookupPath(nested_root_ps, NULL)) {
     SyncUnlock();
-    PANIC(kLogStderr,
-          "invalid attempt to graft nested catalog into existing "
-          "directory '%s'",
-          nested_root_path.c_str());
+    LogCvmfs(kLogCatalog, kLogStderr,
+             "invalid attempt to graft nested catalog into existing directory "
+             "'%s'",
+             nested_root_path.c_str());
+    return false;
   }
   parent_catalog->AddEntry(dirent, xattrs, nested_root_path, parent_path);
   parent_entry.set_linkcount(parent_entry.linkcount() + 1);
@@ -1145,6 +1180,7 @@ void WritableCatalogManager::GraftNestedCatalog(const string &mountpoint,
   delta.PopulateToParent(&parent_catalog->delta_counters_);
 
   SyncUnlock();
+  return true;
 }
 
 /**
