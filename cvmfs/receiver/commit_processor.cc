@@ -33,11 +33,6 @@
 
 namespace {
 
-// Refuse to publish a commit when the lease is within this many seconds of
-// expiring. Being strict here ensures the (short but non-instantaneous) publish
-// step cannot race an overlapping lease being granted as the lease expires.
-const int64_t kLeaseExpiryMarginSec = 1;
-
 PathString RemoveRepoName(const PathString &lease_path) {
   std::string abs_path = lease_path.ToString();
   const std::string::const_iterator it = std::find(abs_path.begin(),
@@ -351,11 +346,11 @@ CommitProcessor::Result CommitProcessor::Process(
   // Re-check the lease right before the final, repository-modifying step. The
   // catalog merge and object upload above can be slow, during which the lease
   // may have expired and an overlapping lease may have been granted to another
-  // publisher. If the lease has expired (or is within the safety margin of
-  // expiring) we must not publish: the objects uploaded above stay unreferenced
-  // and are reclaimed by garbage collection.
-  if (static_cast<int64_t>(time(NULL)) + kLeaseExpiryMarginSec
-      >= lease_expiration) {
+  // publisher. If the deadline has passed we must not publish: the objects
+  // uploaded above stay unreferenced and are reclaimed by garbage collection.
+  // lease_expiration already has the gateway's configured safety margin
+  // subtracted, so this is a plain comparison against the current time.
+  if (static_cast<int64_t>(time(NULL)) >= lease_expiration) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
              "CommitProcessor - lease_path: %s, lease expired during commit; "
              "skipping publication, uploaded objects will be "

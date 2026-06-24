@@ -9,10 +9,6 @@ import (
 	gw "github.com/cvmfs/gateway/internal/gateway"
 )
 
-// mockLeaseExpiryMargin mirrors the kLeaseExpiryMarginSec safety margin applied
-// by the real receiver before publishing a commit.
-const mockLeaseExpiryMargin = 1 * time.Second
-
 // MockReceiver is a mocked implementation of the Receiver interface, for testing
 // Can implement fault injection
 type MockReceiver struct {
@@ -72,10 +68,9 @@ func (r *MockReceiver) Commit(leasePath, oldRootHash, newRootHash string, tag gw
 	if gate := mockCommitGate; gate != nil {
 		<-gate
 	}
-	// Mirror the real receiver: refuse to publish on an expired (or about to
-	// expire) lease.
-	if !leaseExpiration.IsZero() &&
-		time.Now().Add(mockLeaseExpiryMargin).After(leaseExpiration) {
+	// Mirror the real receiver: refuse to publish once the commit deadline (the
+	// lease expiration minus the gateway's configured margin) has passed.
+	if !leaseExpiration.IsZero() && time.Now().After(leaseExpiration) {
 		gw.LogC(r.ctx, "mock_receiver", gw.LogDebug).
 			Str("command", "commit").
 			Str("lease_path", leasePath).

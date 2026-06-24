@@ -51,10 +51,10 @@ class CommitProcessor {
   CommitProcessor();
   virtual ~CommitProcessor();
 
-  // lease_expiration is the Unix timestamp (seconds) at which the lease for
-  // this commit expires. It is re-checked just before the repository is
-  // modified: if the lease has expired (or is about to), the commit is not
-  // published and kLeaseExpired is returned.
+  // lease_expiration is the Unix timestamp (seconds) of the commit deadline:
+  // the lease expiration minus the gateway's configured safety margin. It is
+  // re-checked just before the repository is modified: if the deadline has
+  // passed, the commit is not published and kLeaseExpired is returned.
   // virtual so the reactor's MakeCommitProcessor() factory can inject a mock
   // in unit tests
   virtual Result Process(const std::string &lease_path,
