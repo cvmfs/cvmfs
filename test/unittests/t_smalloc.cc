@@ -37,7 +37,7 @@ TEST(T_Smalloc, SmallRealloc) {
 }
 
 TEST(T_Smalloc, BigRealloc) {
-  std::unique_ptr<void> mem(smalloc(kSmallAllocation));
+  std::unique_ptr<void,decltype(&free)> mem(smalloc(kSmallAllocation),free);
   ASSERT_DEATH(mem.reset(srealloc(mem.get(), kBigAllocation)), ".*");
   EXPECT_NE(static_cast<void *>(NULL), mem.get());
 }

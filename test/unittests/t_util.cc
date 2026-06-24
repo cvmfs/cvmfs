@@ -622,7 +622,7 @@ TEST_F(T_Util, ReadHalfPipeTimeout) {
 
 TEST_F(T_Util, ClosePipe) {
   int fd[2];
-  std::unique_ptr<void> buffer_output(scalloc(20, sizeof(char)));
+  std::unique_ptr<void,decltype(&free)> buffer_output(scalloc(20, sizeof(char)),free);
   MakePipe(fd);
   ClosePipe(fd);
   ASSERT_DEATH(WritePipe(fd[1], to_write.c_str(), to_write.length()), ".*");
