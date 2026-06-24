@@ -298,16 +298,16 @@ CommitProcessor::Result CommitProcessor::Process(
     // CatalogMergeTool::Run(); DirectGraft bypasses that, so we register them
     // here.  The values stay 0 -- accurate for a graft that adds a whole
     // subtree atomically rather than individual file-level diffs.
-    perf::FsCounters fs_counters(stats_tmpl);
-    upload::SpoolerDefinition definition(
+    const perf::FsCounters fs_counters(stats_tmpl);
+    const upload::SpoolerDefinition definition(
         params.spooler_configuration, params.hash_alg, params.compression_alg,
         params.generate_legacy_bulk_chunks, params.use_file_chunking,
         params.min_chunk_size, params.avg_chunk_size, params.max_chunk_size,
         "dummy_token", "dummy_key");
-    UniquePtr<upload::Spooler> spooler(
+    const UniquePtr<upload::Spooler> spooler(
         upload::Spooler::Construct(definition, &stats_tmpl));
 
-    UniquePtr<catalog::WritableCatalogManager> output_mgr(
+    const UniquePtr<catalog::WritableCatalogManager> output_mgr(
         new catalog::WritableCatalogManager(
             manifest_tgt->catalog_hash(), params.stratum0, graft_temp,
             spooler.weak_ref(), server_tool->download_manager(),
@@ -338,7 +338,7 @@ CommitProcessor::Result CommitProcessor::Process(
     const std::string catalog_tmp = graft_temp + "/catalog_size";
     {
       cvmfs::PathSink catalog_sink(catalog_tmp);
-      shash::Any expected = new_root_hash;
+      const shash::Any expected = new_root_hash;
       // Fetch the compressed object verbatim: the nested catalog reference
       // stores the compressed CAS object size, while DownloadManager's normal
       // catalog path (compressed=true) writes the decompressed SQLite file.
