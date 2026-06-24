@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	gw "github.com/cvmfs/gateway/internal/gateway"
 	stats "github.com/cvmfs/gateway/internal/gateway/statistics"
@@ -45,7 +46,7 @@ type Receiver interface {
 	Quit() error
 	Echo() error
 	SubmitPayload(leasePath string, payload io.Reader, digest string, headerSize int) error
-	Commit(leasePath, oldRootHash, newRootHash string, tag gw.RepositoryTag) (uint64, error)
+	Commit(leasePath, oldRootHash, newRootHash string, tag gw.RepositoryTag, leaseExpiration time.Time) (uint64, error)
 	Interrupt() error // like Ctrl-C SIGTERM -2
 	// Kill() error // like Crtl-D SIGKILL -9
 	TestCrash() error
@@ -222,7 +223,7 @@ func (r *CvmfsReceiver) SubmitPayload(leasePath string, payload io.Reader, diges
 }
 
 // Commit command is sent to the worker
-func (r *CvmfsReceiver) Commit(leasePath, oldRootHash, newRootHash string, tag gw.RepositoryTag) (uint64, error) {
+func (r *CvmfsReceiver) Commit(leasePath, oldRootHash, newRootHash string, tag gw.RepositoryTag, leaseExpiration time.Time) (uint64, error) {
 	stats, err := r.statsMgr.PopLease(leasePath)
 	if err != nil {
 		return 0, fmt.Errorf("could not obtain statistics counters: %w", err)
@@ -236,6 +237,7 @@ func (r *CvmfsReceiver) Commit(leasePath, oldRootHash, newRootHash string, tag g
 		"auto_tag_threshold": tag.AutoTagThreshold,
 		"delete_tags":        tag.DeleteTags,
 		"statistics":         stats,
+		"lease_expiration":   leaseExpiration.Unix(),
 	}
 	buf, err := json.Marshal(&req)
 	if err != nil {

@@ -44,18 +44,24 @@ class CommitProcessor {
     kSuccess,
     kError,
     kMergeFailure,
-    kMissingReflog
+    kMissingReflog,
+    kLeaseExpired
   };
 
   CommitProcessor();
   virtual ~CommitProcessor();
 
+  // lease_expiration is the Unix timestamp (seconds) at which the lease for
+  // this commit expires. It is re-checked just before the repository is
+  // modified: if the lease has expired (or is about to), the commit is not
+  // published and kLeaseExpired is returned.
   // virtual so the reactor's MakeCommitProcessor() factory can inject a mock
   // in unit tests
   virtual Result Process(const std::string &lease_path,
                          const shash::Any &old_root_hash,
                          const shash::Any &new_root_hash,
-                         const RepositoryTag &tag, uint64_t *final_revision);
+                         const RepositoryTag &tag, int64_t lease_expiration,
+                         uint64_t *final_revision);
 
   int GetNumErrors() const { return num_errors_; }
 

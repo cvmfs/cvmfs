@@ -4,9 +4,14 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"time"
 
 	gw "github.com/cvmfs/gateway/internal/gateway"
 )
+
+// mockLeaseExpiryMargin mirrors the kLeaseExpiryMarginSec safety margin applied
+// by the real receiver before publishing a commit.
+const mockLeaseExpiryMargin = 1 * time.Second
 
 // MockReceiver is a mocked implementation of the Receiver interface, for testing
 // Can implement fault injection
@@ -57,7 +62,7 @@ func (r *MockReceiver) Echo() error {
 	return nil
 }
 
-func (r *MockReceiver) Commit(leasePath, oldRootHash, newRootHash string, tag gw.RepositoryTag) (uint64, error) {
+func (r *MockReceiver) Commit(leasePath, oldRootHash, newRootHash string, tag gw.RepositoryTag, leaseExpiration time.Time) (uint64, error) {
 	if entered := mockCommitEntered; entered != nil {
 		select {
 		case entered <- struct{}{}:
@@ -66,6 +71,16 @@ func (r *MockReceiver) Commit(leasePath, oldRootHash, newRootHash string, tag gw
 	}
 	if gate := mockCommitGate; gate != nil {
 		<-gate
+	}
+	// Mirror the real receiver: refuse to publish on an expired (or about to
+	// expire) lease.
+	if !leaseExpiration.IsZero() &&
+		time.Now().Add(mockLeaseExpiryMargin).After(leaseExpiration) {
+		gw.LogC(r.ctx, "mock_receiver", gw.LogDebug).
+			Str("command", "commit").
+			Str("lease_path", leasePath).
+			Msgf("lease expired during commit")
+		return 0, Error("lease_expired")
 	}
 	gw.LogC(r.ctx, "mock_receiver", gw.LogDebug).
 		Str("command", "commit").
