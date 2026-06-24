@@ -1241,7 +1241,8 @@ is_subcommand() {
     resign list info tag list-tags lstags check transaction enter abort snapshot    \
     skeleton migrate list-catalogs diff checkout update-geodb gc catalog-chown      \
     eliminate-hardlinks eliminate-bulk-hashes fix-stats update-info update-repoinfo \
-    mount fix-permissions masterkeycard ingest ingestsql overlay merge-stats print-stats"
+    mount fix-permissions masterkeycard ingest ingestsql overlay merge-stats print-stats \
+    refresh-lease"
 
   for possible_command in $supported_commands; do
     if [ x"$possible_command" = x"$subcommand" ]; then
@@ -1311,6 +1312,12 @@ Supported Commands:
                   without mounting the repository via FUSE. This is intended
                   for use with cvmfs_server ingest, which supports mountless
                   gateway publishing.
+  refresh-lease   [-t requested extension in seconds]
+                  <fully qualified repository name>
+                  Renew the gateway lease of the repository's open transaction
+                  so it does not expire while a long-running publish is in
+                  progress. Without -t the gateway applies its configured
+                  default extension (capped by max_lease_time).
   add-replica     [-u stratum1 upstream storage] [-o owner] [-w stratum1 url]
                   [-a silence apache warning] [-z enable garbage collection]
                   [-n alias name] [-s S3 config file] [-p no apache config]
