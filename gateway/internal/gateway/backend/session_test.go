@@ -12,7 +12,8 @@ import (
 
 func TestSessionValid(t *testing.T) {
 	lastProtocolVersion := 3
-	backend, tmp := StartTestBackend("session_test", 1*time.Second)
+	// Lease time must exceed the receiver's pre-publish safety margin (1s).
+	backend, tmp := StartTestBackend("session_test", 60*time.Second)
 	defer func() {
 		backend.Stop()
 		os.RemoveAll(tmp)
@@ -184,7 +185,8 @@ func TestSessionCommitWithExpiredToken(t *testing.T) {
 
 func TestSessionTwoConcurrentValid(t *testing.T) {
 	lastProtocolVersion := 3
-	backend, tmp := StartTestBackend("session_test", 1*time.Second)
+	// Lease time must exceed the receiver's pre-publish safety margin (1s).
+	backend, tmp := StartTestBackend("session_test", 60*time.Second)
 	defer func() {
 		backend.Stop()
 		os.RemoveAll(tmp)

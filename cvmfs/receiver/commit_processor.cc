@@ -193,7 +193,7 @@ CommitProcessor::~CommitProcessor() { }
 CommitProcessor::Result CommitProcessor::Process(
     const std::string &lease_path, const shash::Any &old_root_hash,
     const shash::Any &new_root_hash, const RepositoryTag &tag,
-    uint64_t *final_revision) {
+    int64_t lease_expiration, uint64_t *final_revision) {
   RepositoryTag final_tag = tag;
   // If tag_name is a generic tag, update the time stamp
   if (final_tag.HasGenericName()) {
@@ -341,6 +341,22 @@ CommitProcessor::Result CommitProcessor::Process(
     LogCvmfs(kLogReceiver, kLogSyslogErr, "Error editing tags (add: '%s')",
              final_tag.name().c_str());
     return kError;
+  }
+
+  // Re-check the lease right before the final, repository-modifying step. The
+  // catalog merge and object upload above can be slow, during which the lease
+  // may have expired and an overlapping lease may have been granted to another
+  // publisher. If the deadline has passed we must not publish: the objects
+  // uploaded above stay unreferenced and are reclaimed by garbage collection.
+  // lease_expiration already has the gateway's configured safety margin
+  // subtracted, so this is a plain comparison against the current time.
+  if (static_cast<int64_t>(time(NULL)) >= lease_expiration) {
+    LogCvmfs(kLogReceiver, kLogSyslogErr,
+             "CommitProcessor - lease_path: %s, lease expired during commit; "
+             "skipping publication, uploaded objects will be "
+             "garbage-collected",
+             lease_path.c_str());
+    return kLeaseExpired;
   }
 
   LogCvmfs(kLogReceiver, kLogSyslog,

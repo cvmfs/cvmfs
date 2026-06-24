@@ -234,7 +234,9 @@ func TestLeaseServiceCommitLease(t *testing.T) {
 	}()
 
 	t.Run("commit valid lease", func(t *testing.T) {
-		backend.Config.MaxLeaseTime = 1 * time.Second
+		// Must exceed the receiver's pre-publish lease safety margin (1s) so the
+		// commit is not rejected as (about to be) expired.
+		backend.Config.MaxLeaseTime = 60 * time.Second
 		keyID := "keyid1"
 		leasePath := "test2.repo.org/some/path"
 		token, err := backend.NewLease(context.TODO(), keyID, leasePath, "host", lastProtocolVersion)
@@ -339,4 +341,57 @@ func TestCommitLeaseDoesNotBlockGetLeases(t *testing.T) {
 	// Release the parked commit and let it finish cleanly.
 	close(gate)
 	<-commitDone
+}
+
+// TestCommitLeaseRejectedWhenLeaseExpiresDuringCommit checks that a commit
+// whose lease expires while the (slow) receiver commit is in flight is not
+// published: the receiver re-checks the lease expiration passed to it and
+// refuses to modify the repository, so CommitLease returns an error.
+func TestCommitLeaseRejectedWhenLeaseExpiresDuringCommit(t *testing.T) {
+	backend, tmp := StartTestBackend("lease_expiry_commit_test", 10*time.Second)
+	defer func() {
+		backend.Stop()
+		os.RemoveAll(tmp)
+	}()
+
+	// Lease long enough to be valid when the commit starts, but short enough to
+	// expire while the commit is parked in flight below.
+	backend.Config.MaxLeaseTime = 1500 * time.Millisecond
+	keyID := "keyid1"
+	leasePath := "test2.repo.org/some/path"
+	token, err := backend.NewLease(context.TODO(), keyID, leasePath, "host", 3)
+	if err != nil {
+		t.Fatalf("could not obtain new lease: %v", err)
+	}
+
+	gate := make(chan struct{})
+	entered := receiver.SetMockCommitGate(gate)
+	defer receiver.SetMockCommitGate(nil)
+
+	commitErr := make(chan error, 1)
+	go func() {
+		_, err := backend.CommitLease(context.TODO(), token, "old_hash", "new_hash", gw.RepositoryTag{Name: "mytag"})
+		commitErr <- err
+	}()
+
+	select {
+	case <-entered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("commit never reached the receiver")
+	}
+
+	// Let the lease expire while the commit is parked.
+	time.Sleep(2 * time.Second)
+
+	// Release the parked commit; the receiver's pre-publish check must reject it.
+	close(gate)
+
+	select {
+	case err := <-commitErr:
+		if err == nil {
+			t.Fatal("commit on a lease that expired mid-commit should have failed")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("CommitLease did not return after the gate was released")
+	}
 }
