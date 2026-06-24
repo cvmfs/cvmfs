@@ -2747,3 +2747,13 @@ lockfile() {
   fi
   ./lockfile $1
 }
+
+# Run a command and assert it exits with an expected status.
+#   expect_exit_code <expected> <command> [args...]
+expect_exit_code() {
+  local expected="$1"
+  shift
+  local rc=0
+  "$@" || rc=$?
+  [[ "$rc" == "$expected" ]]
+}

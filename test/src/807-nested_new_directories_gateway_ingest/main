@@ -25,13 +25,8 @@ cvmfs_run_test() {
     set_up_repository_gateway || return 1
 
     echo "  Getting lease on subdirectory that does not exists yet should not work"
-    local retval=$(
-        set +e
-        cvmfs_server transaction test.repo.org/foo/bar/ >/dev/null
-        echo $?
-    )
     # Expect ENOENT
-    if [ $retval -ne 2 ]; then
+    if ! expect_exit_code 2 cvmfs_server transaction test.repo.org/foo/bar/ >/dev/null; then
         echo "  Error should not be possible to open a transaction on a directory that does not exists"
         return 10
     fi

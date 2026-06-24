@@ -135,6 +135,7 @@ Writing your own integration tests is done the following way:
     - [Strict mode is not inherited in subshells, be careful to reenable it there if needed](https://fosstodon.org/@autkin/116612829870054231).
     - Strict mode bits like `set -e` cannot be enabled from a function, must be initiated in outer context.
     - When failure of a particular line of code doesn't matter, append `|| true`, this is an idiomatic way to express that.
+    - When expecting the command to fail with a specific exitcode, use `expect_exit_code <expected> <command> [args...]`
     - To get hold of exit code for expressions, you can disable parts of strict mode in subshells for readability:
       ```bash
       RC=$(

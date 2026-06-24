@@ -20,13 +20,7 @@ cvmfs_run_test() {
   for f in $(sudo find "$cms_cachedir" -mindepth 2 -type f); do
     sudo truncate -s0 "$f"
   done
-  (
-    set +e
-    sudo cvmfs_config fsck -j8 -p
-    if [ $? -ne 1 ]; then
-      return 12
-    fi
-  )
+  expect_exit_code 1 sudo cvmfs_config fsck -j8 -p || return 12
   sudo mkdir -p "$cms_cachedir"/aa
   sudo touch "$cms_cachedir"/aa/aaaaaaaa # made-up, too short hash
   sudo cvmfs_config fsck -q && return 13

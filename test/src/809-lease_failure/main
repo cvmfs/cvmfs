@@ -21,12 +21,8 @@ cvmfs_run_test() {
     echo "New file" > /cvmfs/test.repo.org/new/c/d/new_file.txt || return 12
 
     echo "  *** Checking that we cannot open a transaction again"
-    local retval=$(
-      set +e
-      cvmfs_server transaction test.repo.org >/dev/null
-      echo $?
-    )
-    if [ $retval -ne 17 ]; then
+    # Expect EEXIST
+    if ! expect_exit_code 17 cvmfs_server transaction test.repo.org >/dev/null; then
         echo "cvmfs_server transaction should tell us that we have a transaction already"
         return 20
     fi
@@ -45,12 +41,8 @@ cvmfs_run_test() {
       /var/spool/cvmfs/test.repo.org/session_token.save || return 41
 
     echo "  *** Checking that the lease is taken and that cvmfs_transaction fails"
-    retcode=$(
-      set +e
-      cvmfs_server transaction test.repo.org/new/c >&2
-      echo $?
-    )
-    if [ $retcode -ne 16 ]; then
+    # Expect EBUSY
+    if ! expect_exit_code 16 cvmfs_server transaction test.repo.org/new/c >&2; then
         echo "Return code should be 16 EBUSY instead of ${retcode}"
         return 50
     fi
