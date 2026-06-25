@@ -1094,7 +1094,7 @@ bool WritableCatalogManager::TryGraftNestedCatalog(const string &mountpoint,
   // Load freely attached new catalog
   const std::unique_ptr<Catalog> new_catalog(
       LoadFreeCatalog(nested_root_ps, new_hash));
-  if (!new_catalog.IsValid()) {
+  if (new_catalog.get()==nullptr) {
     LogCvmfs(kLogCatalog, kLogStderr,
              "failed to graft nested catalog '%s': failed to load new catalog",
              nested_root_path.c_str());

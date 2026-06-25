@@ -288,7 +288,7 @@ CommitProcessor::Result CommitProcessor::Process(
              "(skipping DiffRec)",
              lease_path.c_str());
 
-    const UniquePtr<RaiiTempDir> graft_temp_dir(
+    const std::unique_ptr<RaiiTempDir> graft_temp_dir(
         RaiiTempDir::Create(temp_dir_root));
     const std::string graft_temp = graft_temp_dir->dir();
 
@@ -304,13 +304,13 @@ CommitProcessor::Result CommitProcessor::Process(
         params.generate_legacy_bulk_chunks, params.use_file_chunking,
         params.min_chunk_size, params.avg_chunk_size, params.max_chunk_size,
         "dummy_token", "dummy_key");
-    const UniquePtr<upload::Spooler> spooler(
+    const std::unique_ptr<upload::Spooler> spooler(
         upload::Spooler::Construct(definition, &stats_tmpl));
 
-    const UniquePtr<catalog::WritableCatalogManager> output_mgr(
+    const std::unique_ptr<catalog::WritableCatalogManager> output_mgr(
         new catalog::WritableCatalogManager(
             manifest_tgt->catalog_hash(), params.stratum0, graft_temp,
-            spooler.weak_ref(), server_tool->download_manager(),
+            spooler.get(), server_tool->download_manager(),
             params.enforce_limits, params.nested_kcatalog_limit,
             params.root_kcatalog_limit, params.file_mbyte_limit,
             statistics_, params.use_autocatalogs, params.max_weight,
@@ -381,7 +381,7 @@ CommitProcessor::Result CommitProcessor::Process(
     }
 
     // Commit updates manifest_tgt in-place (new root hash, revision++, etc.)
-    if (!output_mgr->Commit(false, 0, manifest_tgt.weak_ref())) {
+    if (!output_mgr->Commit(false, 0, manifest_tgt.get())) {
       LogCvmfs(kLogReceiver, kLogSyslogErr,
                "CommitProcessor - error: Could not commit grafted catalog");
       return kMergeFailure;
@@ -407,7 +407,7 @@ CommitProcessor::Result CommitProcessor::Process(
                      catalog::SimpleCatalogManager>
         merge_tool(params.stratum0, old_root_hash, new_root_hash,
                    relative_lease_path, temp_dir_root,
-                   server_tool->download_manager(), manifest_tgt.weak_ref(),
+                   server_tool->download_manager(), manifest_tgt.get(),
                    statistics_, cache_dir_);
     if (!merge_tool.Init()) {
       LogCvmfs(kLogReceiver, kLogSyslogErr,
