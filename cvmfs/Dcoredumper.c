@@ -2,13 +2,12 @@
  * This file is part of the CernVM File System.
  *
  * Constructs an ELF core dump from a D-state (TASK_UNINTERRUPTIBLE)
- * process by reading /proc/<pid>/ interfaces directly.  Does not
- * require ptrace, signals, or process cooperation.
+ * process by reading /proc/<pid>/ interfaces directly.
  *
- * Requires root on kernel 6.x (tightened /proc/pid/syscall access).
+ * Requires root (tightened /proc/pid/syscall access).
  *
  * Usage:
- *   cvmfs_debug_rescue <pid> <output.core>
+ *   dcoredumper <pid> <output.core>
  *   gdb /path/to/binary <output.core>
  *   (gdb) thread apply all bt
  */
@@ -82,14 +81,14 @@ int parse_maps(int pid, mem_region_t **regions_out) {
 
     int cap = 256;
     int count = 0;
-    mem_region_t *regions = malloc(cap * sizeof(mem_region_t));
+    mem_region_t *regions = (mem_region_t *)malloc(cap * sizeof(mem_region_t));
     if (!regions) { fclose(f); return -1; }
 
     char line[512];
     while (fgets(line, sizeof(line), f)) {
         if (count == cap) {
             cap *= 2;
-            mem_region_t *tmp = realloc(regions,
+            mem_region_t *tmp = (mem_region_t *)realloc(regions,
                                         cap * sizeof(mem_region_t));
             if (!tmp) { free(regions); fclose(f); return -1; }
             regions = tmp;
@@ -215,7 +214,7 @@ int enumerate_threads(int pid, thread_info_t **threads_out) {
 
     int cap = 64;
     int count = 0;
-    thread_info_t *threads = malloc(cap * sizeof(thread_info_t));
+    thread_info_t *threads = (thread_info_t *)malloc(cap * sizeof(thread_info_t));
     if (!threads) { closedir(dir); return -1; }
 
     struct dirent *entry;
@@ -224,7 +223,7 @@ int enumerate_threads(int pid, thread_info_t **threads_out) {
 
         if (count == cap) {
             cap *= 2;
-            thread_info_t *tmp = realloc(threads,
+            thread_info_t *tmp = (thread_info_t *)realloc(threads,
                                          cap * sizeof(thread_info_t));
             if (!tmp) { free(threads); closedir(dir); return -1; }
             threads = tmp;
@@ -276,7 +275,7 @@ int read_auxv(int pid, char **data_out, size_t *sz_out) {
     if (fd < 0) return -1;
 
     size_t cap = 4096;
-    char *data = malloc(cap);
+    char *data = (char *)malloc(cap);
     size_t sz = 0;
     ssize_t n;
 
@@ -284,7 +283,7 @@ int read_auxv(int pid, char **data_out, size_t *sz_out) {
         sz += n;
         if (sz == cap) {
             cap *= 2;
-            char *tmp = realloc(data, cap);
+            char *tmp = (char *)realloc(data, cap);
             if (!tmp) { free(data); close(fd); return -1; }
             data = tmp;
         }
@@ -383,7 +382,7 @@ static unsigned long recover_rbp(int mem_fd,
     size_t scan_size = stack_hi - rsp;
     if (scan_size > 4096) scan_size = 4096;
 
-    unsigned char *stack_buf = malloc(scan_size);
+    unsigned char *stack_buf = (unsigned char *)malloc(scan_size);
     if (!stack_buf) return 0;
 
     ssize_t nr = pread(mem_fd, stack_buf, scan_size, (off_t)rsp);
@@ -583,7 +582,8 @@ int build_core(int pid, const char *output_path) {
     size_t data_offset = note_offset + all_notes_sz;
 
     // PT_NOTE program header
-    Elf64_Phdr note_phdr = {0};
+    Elf64_Phdr note_phdr;
+    memset(&note_phdr, 0, sizeof(note_phdr));
     note_phdr.p_type   = PT_NOTE;
     note_phdr.p_offset = note_offset;
     note_phdr.p_filesz = all_notes_sz;
@@ -596,7 +596,8 @@ int build_core(int pid, const char *output_path) {
 
         size_t seg_size = regions[i].end - regions[i].start;
 
-        Elf64_Phdr phdr = {0};
+        Elf64_Phdr phdr;
+        memset(&phdr, 0, sizeof(phdr));
         phdr.p_type   = PT_LOAD;
         phdr.p_offset = cur_offset;
         phdr.p_vaddr  = regions[i].start;
@@ -613,7 +614,7 @@ int build_core(int pid, const char *output_path) {
 
     // NT_PRSTATUS (one per thread)
     for (int i = 0; i < num_threads; i++) {
-        unsigned char *prstatus = calloc(1, X86_64_PRSTATUS_SIZE);
+        unsigned char *prstatus = (unsigned char *)calloc(1, X86_64_PRSTATUS_SIZE);
         if (!prstatus) { fclose(core); return -1; }
 
         *(pid_t *)(prstatus + X86_64_PRSTATUS_PID)
@@ -630,7 +631,7 @@ int build_core(int pid, const char *output_path) {
 
     // NT_PRPSINFO
     {
-        unsigned char *prpsinfo = calloc(1, X86_64_PRPSINFO_SIZE);
+        unsigned char *prpsinfo = (unsigned char *)calloc(1, X86_64_PRPSINFO_SIZE);
         if (!prpsinfo) { fclose(core); return -1; }
 
         prpsinfo[0] = 2;    // pr_state = TASK_UNINTERRUPTIBLE
@@ -665,9 +666,7 @@ int build_core(int pid, const char *output_path) {
         if (nlen > 15) nlen = 15;
         memcpy(prpsinfo + X86_64_PRPSINFO_FNAME, bn, nlen);
 
-        // pr_psargs: full cmdline (up to 79 chars)
-        strncpy((char *)(prpsinfo + X86_64_PRPSINFO_ARGS),
-                cmdline, 79);
+        memcpy(prpsinfo + X86_64_PRPSINFO_ARGS, cmdline, 80);
 
         write_note(core, 3 /* NT_PRPSINFO */,
                    prpsinfo, X86_64_PRPSINFO_SIZE);
@@ -676,7 +675,7 @@ int build_core(int pid, const char *output_path) {
 
     // NT_FILE: file-to-address mappings so GDB can load .text from disk
     {
-        char *file_desc = calloc(1, file_desc_sz);
+        char *file_desc = (char *)calloc(1, file_desc_sz);
         if (!file_desc) { fclose(core); return -1; }
 
         uint64_t *hdr = (uint64_t *)file_desc;
