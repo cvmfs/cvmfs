@@ -164,26 +164,29 @@ cvmfs_server_connect_gw() {
       die "fail! Could not reach gateway key endpoint at ${gateway_url}/repos/${name}/keys
   Make sure the gateway has 'enable_key_endpoint: true' in its configuration."
 
+    has_jq || die "fail! connect-gw requires 'jq' to parse the gateway response"
+
     local status
-    status=$(echo "$keys_response" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status',''))" 2>/dev/null) || \
+    status=$(echo "$keys_response" | jq -r '.status // empty' 2>/dev/null) || \
       die "fail! Could not parse gateway response"
 
     if [ x"$status" != x"ok" ]; then
       local reason
-      reason=$(echo "$keys_response" | python3 -c "import sys,json; print(json.load(sys.stdin).get('reason','unknown'))" 2>/dev/null)
+      reason=$(echo "$keys_response" | jq -r '.reason // "unknown"' 2>/dev/null)
       die "fail! Gateway returned error: $reason"
     fi
 
-    # Decode and write the keys
+    # Decode and write the keys (the gateway returns them base64-encoded)
     mkdir -p "$keys_import_location"
-    echo "$keys_response" | python3 -c "
-import sys, json, base64
-data = json.load(sys.stdin)['data']
-for ext in ('pub', 'crt'):
-    if ext in data:
-        with open(sys.argv[1] + '/${name}.' + ext, 'wb') as f:
-            f.write(base64.b64decode(data[ext]))
-" "$keys_import_location" || die "fail! Could not write key files"
+    local ext
+    local encoded
+    for ext in pub crt; do
+      encoded=$(echo "$keys_response" | jq -r ".data.${ext} // empty" 2>/dev/null)
+      if [ x"$encoded" != x"" ]; then
+        echo "$encoded" | base64 -d > "${keys_import_location}/${name}.${ext}" || \
+          die "fail! Could not write key files"
+      fi
+    done
     echo "done"
     echo "  -> ${keys_import_location}/${name}.pub"
     echo "  -> ${keys_import_location}/${name}.crt"

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	gw "github.com/cvmfs/gateway/internal/gateway"
 	be "github.com/cvmfs/gateway/internal/gateway/backend"
@@ -27,6 +28,8 @@ func MakeLeasesHandler(services be.ActionController) httprouter.Handle {
 				// Requesting a new lease
 				handleNewLease(services, w, h)
 			}
+		case "PATCH":
+			handleRefreshLease(services, token, w, h)
 		case "DELETE":
 			handleCancelLease(services, token, w, h)
 		default:
@@ -137,6 +140,41 @@ func handleCommitLease(services be.ActionController, token string, w http.Respon
 	} else {
 		msg["status"] = "ok"
 		msg["final_revision"] = finalRev
+	}
+
+	replyJSON(ctx, w, msg)
+}
+
+func handleRefreshLease(services be.ActionController, token string, w http.ResponseWriter, h *http.Request) {
+	if token == "" {
+		http.Error(w, "missing token", http.StatusBadRequest)
+		return
+	}
+
+	ctx := h.Context()
+
+	// The request body is optional: when omitted (or expires_in_sec <= 0) the
+	// gateway applies its configured default refresh extension. A requested
+	// value is capped by the backend at the configured maximum.
+	var reqMsg struct {
+		ExpiresInSec int `json:"expires_in_sec"`
+	}
+	if h.Body != nil && h.ContentLength != 0 {
+		if err := json.NewDecoder(h.Body).Decode(&reqMsg); err != nil {
+			httpWrapError(ctx, err, "invalid request body", w, http.StatusBadRequest)
+			return
+		}
+	}
+
+	msg := make(map[string]interface{})
+
+	lease, err := services.RefreshLease(ctx, token, time.Duration(reqMsg.ExpiresInSec)*time.Second)
+	if err != nil {
+		msg["status"] = "error"
+		msg["reason"] = err.Error()
+	} else {
+		msg["status"] = "ok"
+		msg["data"] = lease
 	}
 
 	replyJSON(ctx, w, msg)
