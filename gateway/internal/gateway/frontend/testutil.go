@@ -93,6 +93,10 @@ func (b *mockBackend) CommitLease(ctx context.Context, tokenStr, oldRootHash, ne
 	return 1, nil
 }
 
+func (b *mockBackend) GraftLease(ctx context.Context, tokenStr, oldRootHash, newRootHash string, tag gw.RepositoryTag) (uint64, error) {
+	return 1, nil
+}
+
 func (b *mockBackend) SubmitPayload(ctx context.Context, token string, payload io.Reader, digest string, headerSize int) error {
 	return nil
 }

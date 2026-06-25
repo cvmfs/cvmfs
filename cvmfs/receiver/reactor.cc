@@ -388,6 +388,18 @@ bool Reactor::HandleSubmitPayload(int fdin, const std::string &req,
 }
 
 bool Reactor::HandleCommit(const std::string &req, std::string *reply) {
+  return DoCommit(req, reply, /* direct_graft = */ false);
+}
+
+bool Reactor::HandleCommitGraft(const std::string &req, std::string *reply) {
+  return DoCommit(req, reply, /* direct_graft = */ true);
+}
+
+// Shared body for kCommit and the experimental kCommitGraft.  The request
+// payload is identical for both; direct_graft selects the DirectGraft fast path
+// in CommitProcessor.
+bool Reactor::DoCommit(const std::string &req, std::string *reply,
+                       bool direct_graft) {
   if (!reply) {
     PANIC(kLogSyslogErr, "HandleCommit: Invalid reply pointer.");
   }
@@ -451,7 +463,8 @@ bool Reactor::HandleCommit(const std::string &req, std::string *reply) {
   }
   const CommitProcessor::Result res = proc->Process(
       lease_path_json->get<std::string>(), old_root_hash, new_root_hash,
-      repo_tag, lease_expiration_json->get<int64_t>(), &final_revision);
+      repo_tag, lease_expiration_json->get<int64_t>(), &final_revision,
+      direct_graft);
 
   JsonStringGenerator reply_input;
   switch (res) {
@@ -524,6 +537,10 @@ bool Reactor::HandleRequest(Request req, const std::string &data) {
         break;
       case kCommit:
         ok &= HandleCommit(data, &reply);
+        ok &= WriteReply(fdout_, reply);
+        break;
+      case kCommitGraft:
+        ok &= HandleCommitGraft(data, &reply);
         ok &= WriteReply(fdout_, reply);
         break;
       case kTestCrash:

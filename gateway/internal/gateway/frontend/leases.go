@@ -180,6 +180,61 @@ func handleRefreshLease(services be.ActionController, token string, w http.Respo
 	replyJSON(ctx, w, msg)
 }
 
+// MakeGraftHandler creates an HTTP handler for the experimental dedicated
+// DirectGraft commit endpoint (POST /leases/:token/graft).  It is a commit
+// variant that grafts a pre-built subtree catalog into the parent catalog,
+// skipping the DiffRec catalog merge.  The request body is identical to a
+// normal commit; the dedicated endpoint -- rather than a flag in the body --
+// selects the fast path.
+//
+// EXPERIMENTAL: this endpoint is intentionally separate from the stable commit
+// endpoint while the DirectGraft semantics and safety checks are still being
+// validated.  Do not treat it as a stable public API yet.
+func MakeGraftHandler(services be.ActionController) httprouter.Handle {
+	return func(w http.ResponseWriter, h *http.Request, ps httprouter.Params) {
+		token := ps.ByName("token")
+		if h.Method != "POST" {
+			gw.LogC(h.Context(), "http", gw.LogError).
+				Msgf("invalid HTTP method: %v", h.Method)
+			http.Error(w, "invalid method", http.StatusNotFound)
+			return
+		}
+		handleGraftLease(services, token, w, h)
+		gw.LogC(h.Context(), "http", gw.LogInfo).Msg("request processed")
+	}
+}
+
+func handleGraftLease(services be.ActionController, token string, w http.ResponseWriter, h *http.Request) {
+	ctx := h.Context()
+
+	if token == "" {
+		http.Error(w, "missing token", http.StatusBadRequest)
+		return
+	}
+
+	var reqMsg struct {
+		OldRootHash string `json:"old_root_hash"`
+		NewRootHash string `json:"new_root_hash"`
+		gw.RepositoryTag
+	}
+	if err := json.NewDecoder(h.Body).Decode(&reqMsg); err != nil {
+		httpWrapError(ctx, err, "invalid request body", w, http.StatusBadRequest)
+		return
+	}
+
+	msg := make(map[string]interface{})
+	if finalRev, err := services.GraftLease(
+		ctx, token, reqMsg.OldRootHash, reqMsg.NewRootHash, reqMsg.RepositoryTag); err != nil {
+		msg["status"] = "error"
+		msg["reason"] = err.Error()
+	} else {
+		msg["status"] = "ok"
+		msg["final_revision"] = finalRev
+	}
+
+	replyJSON(ctx, w, msg)
+}
+
 func handleCancelLease(services be.ActionController, token string, w http.ResponseWriter, h *http.Request) {
 	if token == "" {
 		http.Error(w, "missing token", http.StatusBadRequest)

@@ -18,6 +18,7 @@
 #include "manifest.h"
 #include "manifest_fetch.h"
 #include "network/download.h"
+#include "network/sink_path.h"
 #include "params.h"
 #include "signing_tool.h"
 #include "statistics.h"
@@ -193,7 +194,7 @@ CommitProcessor::~CommitProcessor() { }
 CommitProcessor::Result CommitProcessor::Process(
     const std::string &lease_path, const shash::Any &old_root_hash,
     const shash::Any &new_root_hash, const RepositoryTag &tag,
-    int64_t lease_expiration, uint64_t *final_revision) {
+    int64_t lease_expiration, uint64_t *final_revision, bool direct_graft) {
   RepositoryTag final_tag = tag;
   // If tag_name is a generic tag, update the time stamp
   if (final_tag.HasGenericName()) {
@@ -272,29 +273,149 @@ CommitProcessor::Result CommitProcessor::Process(
 
   const PathString relative_lease_path = RemoveRepoName(PathString(lease_path));
 
-  LogCvmfs(kLogReceiver, kLogSyslog,
-           "CommitProcessor - lease_path: %s, merging catalogs",
-           lease_path.c_str());
-
-  CatalogMergeTool<catalog::WritableCatalogManager,
-                   catalog::SimpleCatalogManager>
-      merge_tool(params.stratum0, old_root_hash, new_root_hash,
-                 relative_lease_path, temp_dir_root,
-                 server_tool->download_manager(), manifest_tgt.weak_ref(),
-                 statistics_, cache_dir_);
-  if (!merge_tool.Init()) {
-    LogCvmfs(kLogReceiver, kLogSyslogErr,
-             "Error: Could not initialize the catalog merge tool");
-    return kError;
-  }
-
   std::string new_manifest_path;
   shash::Any new_manifest_hash;
-  if (!merge_tool.Run(params, &new_manifest_path, &new_manifest_hash,
-                      final_revision)) {
-    LogCvmfs(kLogReceiver, kLogSyslogErr,
-             "CommitProcessor - error: Catalog merge failed");
-    return kMergeFailure;
+
+  if (direct_graft) {
+    // -- Experimental DirectGraft fast path ----------------------------------
+    // Grafts new_root_hash directly into the parent catalog at
+    // relative_lease_path via WritableCatalogManager::TryGraftNestedCatalog,
+    // bypassing DiffRec entirely.  Only valid when lease_path points to a
+    // brand-new directory subtree.  Reached only via the experimental dedicated
+    // kCommitGraft reactor request.
+    LogCvmfs(kLogReceiver, kLogSyslog,
+             "CommitProcessor - lease_path: %s, direct-graft path "
+             "(skipping DiffRec)",
+             lease_path.c_str());
+
+    const UniquePtr<RaiiTempDir> graft_temp_dir(
+        RaiiTempDir::Create(temp_dir_root));
+    const std::string graft_temp = graft_temp_dir->dir();
+
+    perf::StatisticsTemplate stats_tmpl("publish", statistics_);
+    // Register the FsCounters (n_files_added, n_directories_added, etc.) that
+    // StorePublishStatistics expects.  In the DiffRec path these are created by
+    // CatalogMergeTool::Run(); DirectGraft bypasses that, so we register them
+    // here.  The values stay 0 -- accurate for a graft that adds a whole
+    // subtree atomically rather than individual file-level diffs.
+    const perf::FsCounters fs_counters(stats_tmpl);
+    const upload::SpoolerDefinition definition(
+        params.spooler_configuration, params.hash_alg, params.compression_alg,
+        params.generate_legacy_bulk_chunks, params.use_file_chunking,
+        params.min_chunk_size, params.avg_chunk_size, params.max_chunk_size,
+        "dummy_token", "dummy_key");
+    const UniquePtr<upload::Spooler> spooler(
+        upload::Spooler::Construct(definition, &stats_tmpl));
+
+    const UniquePtr<catalog::WritableCatalogManager> output_mgr(
+        new catalog::WritableCatalogManager(
+            manifest_tgt->catalog_hash(), params.stratum0, graft_temp,
+            spooler.weak_ref(), server_tool->download_manager(),
+            params.enforce_limits, params.nested_kcatalog_limit,
+            params.root_kcatalog_limit, params.file_mbyte_limit,
+            statistics_, params.use_autocatalogs, params.max_weight,
+            params.min_weight, cache_dir_));
+    if (!output_mgr->Init()) {
+      LogCvmfs(kLogReceiver, kLogSyslogErr,
+               "CommitProcessor - error: Could not initialize catalog manager "
+               "for direct-graft");
+      return kError;
+    }
+
+    if (new_root_hash.IsNull()
+        || new_root_hash.suffix != shash::kSuffixCatalog) {
+      LogCvmfs(kLogReceiver, kLogSyslogErr,
+               "CommitProcessor - error: DirectGraft requires a catalog hash");
+      return kMergeFailure;
+    }
+
+    // Download new_root_hash to a temp file to obtain its compressed size.
+    // TryGraftNestedCatalog will download it again internally via
+    // LoadFreeCatalog; with a local cache that second fetch is a cheap cache
+    // hit.
+    const std::string catalog_url =
+        params.stratum0 + "/data/" + new_root_hash.MakePath();
+    const std::string catalog_tmp = graft_temp + "/catalog_size";
+    {
+      cvmfs::PathSink catalog_sink(catalog_tmp);
+      const shash::Any expected = new_root_hash;
+      // Fetch the compressed object verbatim: the nested catalog reference
+      // stores the compressed CAS object size, while DownloadManager's normal
+      // catalog path (compressed=true) writes the decompressed SQLite file.
+      download::JobInfo dl_job(&catalog_url, false, false, &expected,
+                               &catalog_sink);
+      const download::Failures dl_ret =
+          server_tool->download_manager()->Fetch(&dl_job);
+      if (dl_ret != download::kFailOk) {
+        LogCvmfs(kLogReceiver, kLogSyslogErr,
+                 "CommitProcessor - error: failed to download catalog %s "
+                 "for size probe (%d)",
+                 catalog_url.c_str(), static_cast<int>(dl_ret));
+        unlink(catalog_tmp.c_str());
+        return kError;
+      }
+    }  // PathSink destructor closes the file here
+    const int64_t catalog_size = GetFileSize(catalog_tmp);
+    unlink(catalog_tmp.c_str());
+    if (catalog_size < 0) {
+      LogCvmfs(kLogReceiver, kLogSyslogErr,
+               "CommitProcessor - error: cannot stat downloaded catalog %s",
+               catalog_url.c_str());
+      return kError;
+    }
+
+    // Graft: inserts the nested catalog reference into the parent catalog
+    // and propagates the directory entry + counters upward.
+    if (!output_mgr->TryGraftNestedCatalog(
+            relative_lease_path.ToString(), new_root_hash,
+            static_cast<uint64_t>(catalog_size))) {
+      LogCvmfs(kLogReceiver, kLogSyslogErr,
+               "CommitProcessor - error: DirectGraft validation failed for "
+               "lease_path: %s",
+               lease_path.c_str());
+      return kMergeFailure;
+    }
+
+    // Commit updates manifest_tgt in-place (new root hash, revision++, etc.)
+    if (!output_mgr->Commit(false, 0, manifest_tgt.weak_ref())) {
+      LogCvmfs(kLogReceiver, kLogSyslogErr,
+               "CommitProcessor - error: Could not commit grafted catalog");
+      return kMergeFailure;
+    }
+
+    // Export the updated manifest to a temp file for CreateNewTag/SigningTool.
+    new_manifest_path = CreateTempPath(temp_dir_root, 0600);
+    if (!manifest_tgt->Export(new_manifest_path)) {
+      LogCvmfs(kLogReceiver, kLogSyslogErr,
+               "CommitProcessor - error: Could not export manifest after graft");
+      return kError;
+    }
+    new_manifest_hash = manifest_tgt->catalog_hash();
+    *final_revision = manifest_tgt->revision();
+
+  } else {
+    // -- Standard DiffRec path via CatalogMergeTool --------------------------
+    LogCvmfs(kLogReceiver, kLogSyslog,
+             "CommitProcessor - lease_path: %s, merging catalogs",
+             lease_path.c_str());
+
+    CatalogMergeTool<catalog::WritableCatalogManager,
+                     catalog::SimpleCatalogManager>
+        merge_tool(params.stratum0, old_root_hash, new_root_hash,
+                   relative_lease_path, temp_dir_root,
+                   server_tool->download_manager(), manifest_tgt.weak_ref(),
+                   statistics_, cache_dir_);
+    if (!merge_tool.Init()) {
+      LogCvmfs(kLogReceiver, kLogSyslogErr,
+               "Error: Could not initialize the catalog merge tool");
+      return kError;
+    }
+    if (!merge_tool.Run(params, &new_manifest_path, &new_manifest_hash,
+                        final_revision)) {
+      LogCvmfs(kLogReceiver, kLogSyslogErr,
+               "CommitProcessor - error: Catalog merge failed");
+      return kMergeFailure;
+    }
   }
 
   const UniquePtr<RaiiTempDir> raii_temp_dir(
