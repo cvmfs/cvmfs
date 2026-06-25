@@ -17,30 +17,12 @@ fi
 
 CVMFS_SOURCE_LOCATION="$1"
 CVMFS_RESULT_LOCATION="$2"
-CVMFS_BUSYBOX=/usr/bin/busybox
 CVMFS_NIGHTLY_BUILD_NUMBER="${3-0}"
 
-# For the time being, build with the host's docker until the builder nodes are
-# new enough to support fuse in user namespaces.  That's a precondition to
-# using buildah
-
+# The build itself runs inside the multi-stage Dockerfile, so all the host
+# needs is a working docker with BuildKit support.
 if ! docker version; then
   echo "docker required to build container image"
-  exit 1
-fi
-
-# if ! buildah version; then
-#   echo "buildah required to build container image"
-#   exit 1
-# fi
-
-if ! $CVMFS_BUSYBOX --help | head -5; then
-  echo "functional busybox is required"
-  exit 1
-fi
-
-if [ ! -f /etc/os-release ]; then
-  echo "/etc/os-release required to build container image"
   exit 1
 fi
 
@@ -65,7 +47,7 @@ else
 fi
 
 ${CVMFS_SOURCE_LOCATION}/packaging/container/build.sh \
-  ${CVMFS_SOURCE_LOCATION} ${CVMFS_RESULT_LOCATION} ${CVMFS_BUSYBOX} ${CVMFS_TAG} \
+  ${CVMFS_SOURCE_LOCATION} ${CVMFS_RESULT_LOCATION} ${CVMFS_TAG} \
   || die "failed building service container"
 
 
