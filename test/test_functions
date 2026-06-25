@@ -534,7 +534,7 @@ cvmfs_mount() {
   # Route the cern.ch / egi.eu stratum 1s through the OpenHTC CDN to reduce
   # network flakiness in CI. Written before the per-mount parameters below so
   # that an individual test can still override it (e.g. CVMFS_USE_CDN=no).
-  if [ "x$CVMFS_TEST_USE_CDN" = "xyes" ]; then
+  if [ "x${CVMFS_TEST_USE_CDN:-}" = "xyes" ]; then
     sudo sh -c 'echo "CVMFS_USE_CDN=yes" >> /etc/cvmfs/default.local' || return 100
   fi
 
