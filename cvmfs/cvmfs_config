@@ -287,6 +287,8 @@ cvmfs_config_usage() {
   echo "  killall [-r(reset fuse) ] [-s(reset stuck fuse)]"
   echo ""
   echo "  bugreport [timeout_in_sec_per_command (default = 90)]"
+  echo ""
+  echo "  dcoredump [<pid> <output.core> | <output.core>]"
 }
 
 has_selinux() {
