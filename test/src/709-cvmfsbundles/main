@@ -4,62 +4,105 @@ cvmfs_test_autofs_on_startup=false
 cvmfs_test_suites="quick"
 
 
+produce_dependency_files() {
+  local working_dir=$1
+  pushd "$working_dir" >/dev/null || return 1
+
+  printf "This is dependency 1\n" > dep1.txt
+  printf "This is dependency 2\n" > dep2.txt
+  printf "This is a trigger\n" > trigger.txt
+
+  cat > .cvmfsbundle.trigger.txt <<-EOF
+{
+  "name": "CVMFS_BUNDLE",
+  "version": "1.0.0",
+  "encoding": "UTF-8",
+  "dependencies": ["./dep1.txt", "./dep2.txt"]
+}
+EOF
+
+  popd >/dev/null || return 1
+}
+
 cvmfs_run_test() {
   logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
 
-  echo "*** Create a new repository"
-  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return 1
+  local scratch_dir=$(mktemp -d)
+  mkdir -p  $scratch_dir/reference_dir
+  local reference_dir=$scratch_dir/reference_dir
 
-  echo "*** Create and edit a .cvmfsbundles file"
-  start_transaction $CVMFS_TEST_REPO || return 2
-  touch /cvmfs/$CVMFS_TEST_REPO/.cvmfsbundles || return 3
-  echo "{}" > /cvmfs/$CVMFS_TEST_REPO/.cvmfsbundles || return 4
-  publish_repo $CVMFS_TEST_REPO || return 5
+  local mnt_point="$scratch_dir/mountpoint"
+  local cache="$(get_cache_directory $mnt_point)"/$CVMFS_TEST_REPO
 
-  echo "*** Remove a .cvmfsbundles file"
-  start_transaction $CVMFS_TEST_REPO || return 6
-  rm -f /cvmfs/$CVMFS_TEST_REPO/.cvmfsbundles || return 7
-  publish_repo $CVMFS_TEST_REPO || return 8
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
 
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
 
-  # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-  # Test for failure in case a .cvmfsbundles file is found in a subdirectory
-  # of a repository
+  echo "putting some stuff in the new repository"
+  produce_dependency_files $repo_dir || return 3
 
-  echo "*** Create a .cvmfsbundles file in a subdirectory"
-  start_transaction $CVMFS_TEST_REPO || return 9
-  mkdir /cvmfs/$CVMFS_TEST_REPO/test_dir || return 10
-  touch /cvmfs/$CVMFS_TEST_REPO/test_dir/.cvmfsbundles || return 11
-  echo "{}" > /cvmfs/$CVMFS_TEST_REPO/test_dir/.cvmfsbundles || return 12
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
 
-  echo "*** Publish repository"
-  publish_repo $CVMFS_TEST_REPO
-  if [ $? -eq 0 ]
-  then
-    return 13
+  echo "putting exactly the same stuff in the scratch space for comparison"
+  produce_dependency_files $reference_dir || return 4
+
+  echo "compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir || return $?
+
+  echo "putting some stuff in the new repository"
+  produce_dependency_files $repo_dir || return 3
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  echo "mount the repository on a local mountpoint"
+  do_local_mount $mnt_point $CVMFS_TEST_REPO $(get_repo_url $CVMFS_TEST_REPO) || { desaster_cleanup $mnt_point $CVMFS_TEST_REPO; return 10; }
+
+  echo "check if the Stratum1 repository contains exactly the same as the reference copy"
+  compare_directories $mnt_point $reference_dir || { desaster_cleanup $mnt_point $CVMFS_TEST_REPO; return 11; }
+
+  dep1_hash=$(attr -g hash "$mnt_point/dep1.txt" | cut -d: -f2 | xargs)
+  trigger_hash=$(attr -g hash "$mnt_point/trigger.txt" | cut -d: -f2 | xargs)
+
+  dep1_location=$cache/"$(echo $dep1_hash | cut -c 1-2)"
+  trigger_location=$cache/"$(echo $trigger_hash | cut -c 1-2)"
+
+  trigger_in_cas=$(echo $trigger_hash | cut -c 3- )
+  dep1_in_cas=$(echo $dep1_hash | cut -c 3- )
+
+  # core testing here
+  echo "Opening trigger file"
+  cat $mnt_point/trigger.txt
+
+  echo "Cache location"
+  echo $cache
+
+  echo "Trigger expected location"
+  echo $trigger_location/$trigger_in_cas
+
+  if [ -f "$trigger_location/$trigger_in_cas" ]; then
+      echo "Trigger FOUND inside the cache in the expected location"
   else
-    echo "*** Abort transaction"
-    abort_transaction $CVMFS_TEST_REPO || return 14
+      echo "Trigger NOT FOUND inside the cache in the expected location"
+      return 55
   fi
 
-
-  # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-  # Test for failure in case a .cvmfsbundles directory is found in the
-  # repository
-
-  echo "*** Create a .cvmfsbundles directory in the repository"
-  start_transaction $CVMFS_TEST_REPO || return 15
-  mkdir /cvmfs/$CVMFS_TEST_REPO/.cvmfsbundles || return 16
-
-  echo "*** Publish repository"
-  publish_repo $CVMFS_TEST_REPO
-  if [ $? -eq 0 ]
-  then
-    return 17
+  if [ -f "$dep1_location/$dep1_in_cas" ]; then
+      echo "Dep1 FOUND inside the cache in the expected location"
   else
-    echo "*** Abort transaction"
-    abort_transaction $CVMFS_TEST_REPO || return 18
+      echo "Dep1 NOT FOUND inside the cache in the expected location"
+      return 56
   fi
+
+  echo "unmount the Stratum1 repository"
+  sudo umount $mnt_point || { desaster_cleanup $mnt_point; return 12; }
+
+  echo "clean up"
+  sudo cvmfs_server rmfs -f $CVMFS_TEST_REPO
 
   return 0
 }

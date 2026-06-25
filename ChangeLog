@@ -1,5 +1,16 @@
 
 2.14.0:
+  * [client] Reduce client capabilities to minimum (#3730)
+  * [server] never publish a snapshot with a missing root catalog (#4272)
+  * [client] fix bug when using libcurl 8.20+ (#4252)
+  * [client] add CVMFS_REPOSITORIES_NOMOUNT param to help with syslog noise (#4181)
+  * [client] Allow rootless cvmfs_config chksetup (#4214)
+  * [server] convenience features: mkfs -P (mountless publisher), cvmfs_server connect-gw (#4182)
+  * [client] Add a revision_timestamp magic xattr (4183)
+  * [server] Graceful abort of a transaction under out-of-diskspace conditions (#4158)
+  * [server] Add cvmfs_swissknife rotate-statsdb (#4163)
+  * [server] Add CVMFS_INFO_HEADER (#3735)
+  * Replace vjson dependency with nlohmann-json
   * [server] s3fanout: Add 507 s3 error (#3997)
   * [client] Skip open files on cache cleanup when possible (#4029)
   * [client] Use short hashes in open-file-aware cleanup (#4059)

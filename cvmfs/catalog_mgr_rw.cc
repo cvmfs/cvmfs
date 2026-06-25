@@ -201,6 +201,8 @@ bool WritableCatalogManager::FindCatalog(const string &path,
   if (!retval)
     return false;
 
+  *result = static_cast<WritableCatalog *>(catalog);
+
   catalog::DirectoryEntry dummy;
   if (NULL == dirent) {
     dirent = &dummy;
@@ -209,7 +211,6 @@ bool WritableCatalogManager::FindCatalog(const string &path,
   if (!found || !catalog->IsWritable())
     return false;
 
-  *result = static_cast<WritableCatalog *>(catalog);
   return true;
 }
 
@@ -231,17 +232,23 @@ WritableCatalog *WritableCatalogManager::GetHostingCatalog(
  */
 void WritableCatalogManager::RemoveFile(const std::string &path) {
   const string file_path = MakeRelativePath(path);
-  const string parent_path = GetParentPath(file_path);
 
   SyncLock();
-  WritableCatalog *catalog;
-  if (!FindCatalog(parent_path, &catalog)) {
+  WritableCatalog *catalog = NULL;
+  DirectoryEntry entry;
+  if (FindCatalog(file_path, &catalog, &entry)) {
+    if (entry.IsBundleTrigger()) {
+      catalog->RemoveEntry(
+        GetParentPath(file_path) + "/.cvmfsbundle-" + GetFileName(file_path));
+    }
+    catalog->RemoveEntry(file_path);
+  }
+  SyncUnlock();
+
+  if (catalog == NULL) {
     PANIC(kLogStderr, "catalog for file '%s' cannot be found",
           file_path.c_str());
   }
-
-  catalog->RemoveEntry(file_path);
-  SyncUnlock();
 }
 
 
@@ -284,16 +291,33 @@ void WritableCatalogManager::RemoveDirectory(const std::string &path) {
  * @params destination, the name of the new file, complete path
  * @params source, the name of the file to clone, which must be already in the
  * repository
- * @return void
+ * @params fail_if_source_missing, when true (default) abort if the source is
+ * not in the catalog; when false, skip the clone and return false instead.
+ * This is used by the tarball ingestion engine to tolerate hardlinks whose
+ * target is not part of the same archive (e.g. cross-layer hardlinks in OCI
+ * image layers).
+ * @return true if the file was cloned, false if the source was missing and
+ * fail_if_source_missing was false
  */
-void WritableCatalogManager::Clone(const std::string destination,
-                                   const std::string source) {
+bool WritableCatalogManager::Clone(const std::string destination,
+                                   const std::string source,
+                                   const bool fail_if_source_missing) {
   const std::string relative_source = MakeRelativePath(source);
 
   DirectoryEntry source_dirent;
   if (!LookupPath(relative_source, kLookupDefault, &source_dirent)) {
-    PANIC(kLogStderr, "catalog for file '%s' cannot be found, aborting",
-          source.c_str());
+    if (fail_if_source_missing) {
+      PANIC(kLogStderr, "catalog for file '%s' cannot be found, aborting",
+            source.c_str());
+    }
+    // The caller opted out of aborting and is expected to handle the missing
+    // source (e.g. by materializing a replacement file), so only log at debug
+    // level here to avoid duplicate user-facing warnings.
+    LogCvmfs(kLogCatalog, kLogDebug,
+             "catalog for clone source '%s' cannot be found, not cloning "
+             "to '%s'",
+             source.c_str(), destination.c_str());
+    return false;
   }
   if (source_dirent.IsDirectory()) {
     PANIC(kLogStderr, "Trying to clone a directory: '%s', aborting",
@@ -319,6 +343,7 @@ void WritableCatalogManager::Clone(const std::string destination,
   // TODO(jblomer): clone is used by tarball engine and should eventually
   // support extended attributes
   this->AddFile(destination_dirent, empty_xattrs, destination_dirname);
+  return true;
 }
 
 
@@ -557,6 +582,43 @@ void WritableCatalogManager::AddChunkedFile(const DirectoryEntryBase &entry,
   for (unsigned i = 0; i < file_chunks.size(); ++i) {
     catalog->AddFileChunk(file_path, *file_chunks.AtPtr(i));
   }
+  SyncUnlock();
+}
+
+/**
+ * Reads the entry given by file_path and sets the bundle trigger flag
+ * accordingly. If new_value is true, the regular file at file_path must exist.
+ * If new_value is false, a missing file_path is ignored (otherwise it would
+ * be hard to get rid of dangling bundle trigger markers).
+ */
+void WritableCatalogManager::UpdateBundleTrigger(const std::string &file_path,
+                                                 bool new_value)
+{
+  SyncLock();
+
+  WritableCatalog *catalog = NULL;
+  DirectoryEntry entry;
+  if (!FindCatalog(file_path, &catalog, &entry)) {
+    SyncUnlock();
+
+    if (new_value) {
+      PANIC(kLogStderr, "failed to find catalog of %s", file_path.c_str());
+    }
+
+    LogCvmfs(kLogCatalog, kLogDebug, "dangling bundle trigger %s",
+             file_path.c_str());
+    return;
+  }
+
+  if (new_value && !entry.IsRegular()) {
+    SyncUnlock();
+    PANIC(kLogStderr, "failed to set bundle trigger on non-regular file %s",
+          file_path.c_str());
+  }
+
+  entry.set_is_bundle_trigger(new_value);
+  catalog->UpdateEntry(entry, file_path);
+
   SyncUnlock();
 }
 
@@ -1001,25 +1063,41 @@ void WritableCatalogManager::SwapNestedCatalog(const string &mountpoint,
 void WritableCatalogManager::GraftNestedCatalog(const string &mountpoint,
                                                 const shash::Any &new_hash,
                                                 const uint64_t new_size) {
+  if (!TryGraftNestedCatalog(mountpoint, new_hash, new_size)) {
+    PANIC(kLogStderr, "failed to graft nested catalog '%s'",
+          mountpoint.c_str());
+  }
+}
+
+bool WritableCatalogManager::TryGraftNestedCatalog(const string &mountpoint,
+                                                   const shash::Any &new_hash,
+                                                   const uint64_t new_size) {
   const string nested_root_path = MakeRelativePath(mountpoint);
   const string parent_path = GetParentPath(nested_root_path);
   const PathString nested_root_ps = PathString(nested_root_path);
 
-  assert(!nested_root_path.empty());
+  if (nested_root_path.empty()) {
+    LogCvmfs(kLogCatalog, kLogStderr,
+             "failed to graft nested catalog: empty mountpoint");
+    return false;
+  }
 
   // Load freely attached new catalog
   const UniquePtr<Catalog> new_catalog(
       LoadFreeCatalog(nested_root_ps, new_hash));
   if (!new_catalog.IsValid()) {
-    PANIC(kLogStderr,
-          "failed to graft nested catalog '%s': failed to load new catalog",
-          nested_root_path.c_str());
+    LogCvmfs(kLogCatalog, kLogStderr,
+             "failed to graft nested catalog '%s': failed to load new catalog",
+             nested_root_path.c_str());
+    return false;
   }
   if (new_catalog->root_prefix() != nested_root_ps) {
-    PANIC(kLogStderr,
-          "invalid nested catalog for grafting at '%s': catalog rooted at '%s'",
-          nested_root_path.c_str(),
-          new_catalog->root_prefix().ToString().c_str());
+    LogCvmfs(kLogCatalog, kLogStderr,
+             "invalid nested catalog for grafting at '%s': catalog rooted at "
+             "'%s'",
+             nested_root_path.c_str(),
+             new_catalog->root_prefix().ToString().c_str());
+    return false;
   }
 
   // Get new catalog root directory entry
@@ -1027,17 +1105,28 @@ void WritableCatalogManager::GraftNestedCatalog(const string &mountpoint,
   XattrList xattrs;
   const bool dirent_found = new_catalog->LookupPath(nested_root_ps, &dirent);
   if (!dirent_found) {
-    PANIC(kLogStderr,
-          "failed to swap nested catalog '%s': missing dirent in new catalog",
-          nested_root_path.c_str());
+    LogCvmfs(kLogCatalog, kLogStderr,
+             "failed to graft nested catalog '%s': missing dirent in new "
+             "catalog",
+             nested_root_path.c_str());
+    return false;
+  }
+  if (!dirent.IsDirectory()) {
+    LogCvmfs(kLogCatalog, kLogStderr,
+             "failed to graft nested catalog '%s': root entry is not a "
+             "directory",
+             nested_root_path.c_str());
+    return false;
   }
   if (dirent.HasXattrs()) {
     const bool xattrs_found = new_catalog->LookupXattrsPath(nested_root_ps,
                                                             &xattrs);
     if (!xattrs_found) {
-      PANIC(kLogStderr,
-            "failed to swap nested catalog '%s': missing xattrs in new catalog",
-            nested_root_path.c_str());
+      LogCvmfs(kLogCatalog, kLogStderr,
+               "failed to graft nested catalog '%s': missing xattrs in new "
+               "catalog",
+               nested_root_path.c_str());
+      return false;
     }
   }
   // Transform the nested catalog root into a transition point to be inserted
@@ -1052,15 +1141,23 @@ void WritableCatalogManager::GraftNestedCatalog(const string &mountpoint,
   DirectoryEntry parent_entry;
   if (!FindCatalog(parent_path, &parent_catalog, &parent_entry)) {
     SyncUnlock();
-    PANIC(kLogStderr, "catalog for directory '%s' cannot be found",
-          parent_path.c_str());
+    LogCvmfs(kLogCatalog, kLogStderr,
+             "catalog for directory '%s' cannot be found", parent_path.c_str());
+    return false;
+  }
+  if (!parent_entry.IsDirectory()) {
+    SyncUnlock();
+    LogCvmfs(kLogCatalog, kLogStderr,
+             "parent path '%s' is not a directory", parent_path.c_str());
+    return false;
   }
   if (parent_catalog->LookupPath(nested_root_ps, NULL)) {
     SyncUnlock();
-    PANIC(kLogStderr,
-          "invalid attempt to graft nested catalog into existing "
-          "directory '%s'",
-          nested_root_path.c_str());
+    LogCvmfs(kLogCatalog, kLogStderr,
+             "invalid attempt to graft nested catalog into existing directory "
+             "'%s'",
+             nested_root_path.c_str());
+    return false;
   }
   parent_catalog->AddEntry(dirent, xattrs, nested_root_path, parent_path);
   parent_entry.set_linkcount(parent_entry.linkcount() + 1);
@@ -1083,6 +1180,7 @@ void WritableCatalogManager::GraftNestedCatalog(const string &mountpoint,
   delta.PopulateToParent(&parent_catalog->delta_counters_);
 
   SyncUnlock();
+  return true;
 }
 
 /**

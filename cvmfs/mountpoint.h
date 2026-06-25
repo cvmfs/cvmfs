@@ -18,6 +18,7 @@
 
 #include "cache.h"
 #include "crypto/hash.h"
+#include "path_filters/inclusion_spec.h"
 #include "duplex_testing.h"
 #include "file_watcher.h"
 #include "loader.h"
@@ -489,6 +490,8 @@ class StatfsCache : SingleCopy {
  * destruction explicit and also to keep the include list for this header small.
  */
 class MountPoint : SingleCopy, public BootFactory {
+  friend class T_BundleMgr;
+
  public:
   /**
    * If catalog reload fails, try again in 3 minutes
@@ -517,6 +520,9 @@ class MountPoint : SingleCopy, public BootFactory {
   download::DownloadManager *download_mgr() { return download_mgr_; }
   download::DownloadManager *external_download_mgr() {
     return external_download_mgr_;
+  }
+  download::DownloadManager *full_replica_download_mgr() {
+    return full_replica_download_mgr_;
   }
   file_watcher::FileWatcher *resolv_conf_watcher() {
     return resolv_conf_watcher_;
@@ -553,6 +559,20 @@ class MountPoint : SingleCopy, public BootFactory {
   Tracer *tracer() { return tracer_; }
   cvmfs::Uuid *uuid() { return uuid_; }
   StatfsCache *statfs_cache() { return statfs_cache_; }
+
+  /**
+   * Returns the partial replication inclusion spec if this mount point is
+   * connected to a partial Stratum-1, or NULL otherwise.  Not owned by caller.
+   */
+  catalog::InclusionSpec *partial_inclusion_spec() const {
+    return partial_inclusion_spec_;
+  }
+
+  /**
+   * Returns true if the partial replica mode is "fail" (return EIO for missing
+   * objects instead of failing over to a full replica).
+   */
+  bool partial_replica_fail_mode() const { return partial_replica_fail_mode_; }
 
   bool ReloadBlacklists();
   void DisableCacheSymlinks();
@@ -619,6 +639,7 @@ class MountPoint : SingleCopy, public BootFactory {
   bool CreateDownloadManagers();
   bool CreateResolvConfWatcher();
   void CreateFetchers();
+  void SetupPartialReplica();
   bool CreateCatalogManager();
   void CreateTables();
   bool CreateTracer();
@@ -653,8 +674,19 @@ class MountPoint : SingleCopy, public BootFactory {
   signature::SignatureManager *signature_mgr_;
   download::DownloadManager *download_mgr_;
   download::DownloadManager *external_download_mgr_;
+  /**
+   * Optional download manager targeting a full Stratum-1, used as a fallback
+   * when this mount point's primary server is a partial replica.  Owned.
+   */
+  download::DownloadManager *full_replica_download_mgr_;
   cvmfs::Fetcher *fetcher_;
   cvmfs::Fetcher *external_fetcher_;
+  /**
+   * Parsed inclusion spec downloaded from the partial Stratum-1, or NULL.
+   */
+  catalog::InclusionSpec *partial_inclusion_spec_;
+  /** True when partial replica mode is "fail" (vs. "failover"). */
+  bool partial_replica_fail_mode_;
   catalog::InodeAnnotation *inode_annotation_;
   catalog::ClientCatalogManager *catalog_mgr_;
   ChunkTables *chunk_tables_;

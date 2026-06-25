@@ -174,6 +174,31 @@ int Fetcher::Fetch(const CacheManager::LabeledObject &object,
   tls->download_job.SetRangeSize(static_cast<int64_t>(object.label.size));
   download_mgr_->Fetch(&tls->download_job);
 
+  // Partial replica failover: a partial Stratum-1 serves a 404 for objects it
+  // did not replicate.  Retry once against the full replica and let the common
+  // success/error paths below handle the result.  Only 404 triggers failover:
+  // other HTTP errors (403, 5xx, ...) also map to kFailHostHttp but indicate a
+  // server problem rather than an unreplicated object, so they must not be
+  // masked by silently fetching from elsewhere.  The txn buffer is reused in
+  // place by StartTxn, so `sink` keeps pointing at the fresh transaction and
+  // needs no reconstruction.
+  if (tls->download_job.error_code() == download::kFailHostHttp
+      && tls->download_job.http_code() == 404
+      && full_replica_download_mgr_ != NULL) {
+    LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
+             "partial replica: %s not available on primary, "
+             "retrying from full replica",
+             object.label.path.c_str());
+    cache_mgr_->AbortTxn(txn);
+    retval = cache_mgr_->StartTxn(object.id, object.label.size, txn);
+    if (retval < 0) {
+      SignalWaitingThreads(retval, object.id, tls);
+      return retval;
+    }
+    cache_mgr_->CtrlTxn(object.label, 0, txn);
+    full_replica_download_mgr_->Fetch(&tls->download_job);
+  }
+
   if (tls->download_job.error_code() == download::kFailOk) {
     LogCvmfs(kLogCache, kLogDebug, "finished downloading of %s", url.c_str());
 
@@ -194,7 +219,7 @@ int Fetcher::Fetch(const CacheManager::LabeledObject &object,
     return fd_return;
   }
 
-  // Download failed
+  // Download failed (primary, and full replica if configured)
   LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
            "failed to fetch %s (hash: %s, error %d [%s])",
            object.label.path.c_str(), object.id.ToString().c_str(),
@@ -215,6 +240,7 @@ Fetcher::Fetcher(CacheManager *cache_mgr,
     , lock_tls_blocks_(NULL)
     , cache_mgr_(cache_mgr)
     , download_mgr_(download_mgr)
+    , full_replica_download_mgr_(NULL)
     , backoff_throttle_(backoff_throttle) {
   int retval;
   retval = pthread_key_create(&thread_local_storage_, TLSDestructor);

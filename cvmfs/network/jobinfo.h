@@ -29,7 +29,12 @@ namespace download {
 enum DataTubeAction {
   kActionStop = 0,
   kActionContinue,
-  kActionDecompress
+  kActionDecompress,
+  // Marks the boundary of a superseded download attempt (retry / host
+  // fail-over). When the caller pops this it must discard the bytes it has
+  // decompressed so far, reset its sink and zstream, and clear any
+  // decompression error before processing the bytes of the next attempt.
+  kActionReset
 };
 
 /**
@@ -49,7 +54,7 @@ struct DataTubeElement : SingleCopy {
   DataTubeElement(char *mov_data, size_t xsize, DataTubeAction xact)
       : data(mov_data), size(xsize), action(xact) { }
 
-  ~DataTubeElement() { delete data; }
+  ~DataTubeElement() { delete[] data; }
 };
 
 /**

@@ -6,7 +6,7 @@ cvmfs_run_test() {
   logfile=$1
 
   echo "*** check availability of default cvmfs-config.cern.ch repository"
-  cvmfs_mount cms.cern.ch || return 1
+  cvmfs_mount cms.cern.ch CVMFS_USE_CDN=no || return 1
   cvmfs_config showconfig cms.cern.ch | grep ^CVMFS_CONFIG_REPOSITORY= \
     | grep cvmfs-config.cern.ch || return 2
   ls /cvmfs/cvmfs-config.cern.ch || return 3

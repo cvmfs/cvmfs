@@ -189,6 +189,66 @@ func (s *Services) GetLease(ctx context.Context, token string) (*LeaseDTO, error
 	return ret, nil
 }
 
+// RefreshLease extends the expiration of an active lease identified by token.
+// The new expiration is set to now + extension, where extension defaults to
+// Config.LeaseRefreshTime when the caller passes 0 (requestedExtension). The
+// extension is capped at Config.MaxLeaseTime. An expired (or non-existent)
+// lease cannot be refreshed, as its path may already have been granted to
+// another publisher.
+func (s *Services) RefreshLease(ctx context.Context, token string, requestedExtension time.Duration) (*LeaseDTO, error) {
+	leaseMutex.Lock()
+	defer leaseMutex.Unlock()
+	t0 := time.Now()
+
+	outcome := "success"
+	defer logAction(ctx, "refresh_lease", &outcome, t0)
+
+	tx, err := s.DB.SQL.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("could not begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	lease, err := FindLeaseByToken(ctx, tx, token)
+	if err != nil {
+		outcome = err.Error()
+		return nil, err
+	}
+
+	if lease == nil || lease.Expiration.Before(time.Now()) {
+		err := InvalidLeaseError{}
+		outcome = err.Error()
+		return nil, err
+	}
+
+	extension := requestedExtension
+	if extension <= 0 {
+		extension = s.Config.LeaseRefreshTime
+	}
+	if extension > s.Config.MaxLeaseTime {
+		extension = s.Config.MaxLeaseTime
+	}
+
+	newExpiration := time.Now().Add(extension)
+	if _, err := UpdateLeaseExpirationByToken(ctx, tx, token, newExpiration); err != nil {
+		outcome = err.Error()
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("could not commit transaction: %w", err)
+	}
+
+	lease.Expiration = newExpiration
+	ret := &LeaseDTO{
+		KeyID:     lease.KeyID,
+		LeasePath: lease.CombinedLeasePath(),
+		Expires:   lease.Expiration.String(),
+		Hostname:  lease.Hostname,
+	}
+	return ret, nil
+}
+
 // CancelLeases cancels all the active leases below a repository path
 func (s *Services) CancelLeases(ctx context.Context, repoPath string) error {
 	leaseMutex.Lock()
@@ -267,36 +327,84 @@ func (s *Services) CancelLease(ctx context.Context, token string) error {
 
 // CommitLease associated with the token (transaction commit)
 func (s *Services) CommitLease(ctx context.Context, token, oldRootHash, newRootHash string, tag gw.RepositoryTag) (uint64, error) {
-	leaseMutex.Lock()
-	defer leaseMutex.Unlock()
+	return s.commitLease(ctx, token, oldRootHash, newRootHash, tag, false)
+}
+
+// GraftLease commits the lease using the experimental dedicated DirectGraft
+// path: the pre-built subtree catalog is grafted into the parent catalog,
+// skipping the DiffRec catalog merge.  This is intentionally kept separate from
+// CommitLease until the endpoint is promoted to a stable API.
+func (s *Services) GraftLease(ctx context.Context, token, oldRootHash, newRootHash string, tag gw.RepositoryTag) (uint64, error) {
+	return s.commitLease(ctx, token, oldRootHash, newRootHash, tag, true)
+}
+
+// commitLease is the shared implementation behind CommitLease and GraftLease.
+func (s *Services) commitLease(ctx context.Context, token, oldRootHash, newRootHash string, tag gw.RepositoryTag, directGraft bool) (uint64, error) {
 	t0 := time.Now()
 
+	action := "commit_lease"
+	if directGraft {
+		action = "graft_lease"
+	}
+
 	outcome := "success"
-	defer logAction(ctx, "commit_lease", &outcome, t0)
+	defer logAction(ctx, action, &outcome, t0)
 
-	tx, err := s.DB.SQL.BeginTx(ctx, nil)
-	if err != nil {
-		return 0, fmt.Errorf("could not begin transaction: %w", err)
-	}
-	defer tx.Rollback()
+	// Look up and validate the lease. leaseMutex is only held for this short
+	// SQLite read, not for the (potentially very slow) commit below, so that
+	// concurrent lease listing/acquisition is not blocked behind a commit.
+	lease, err := func() (*Lease, error) {
+		leaseMutex.Lock()
+		defer leaseMutex.Unlock()
 
-	lease, err := FindLeaseByToken(ctx, tx, token)
+		tx, err := s.DB.SQL.BeginTx(ctx, nil)
+		if err != nil {
+			return nil, fmt.Errorf("could not begin transaction: %w", err)
+		}
+		defer tx.Rollback()
+
+		lease, err := FindLeaseByToken(ctx, tx, token)
+		if err != nil {
+			outcome = err.Error()
+			return nil, err
+		}
+
+		if lease == nil || lease.Expiration.Before(time.Now()) {
+			err := InvalidLeaseError{}
+			outcome = err.Error()
+			return nil, err
+		}
+
+		if err := tx.Commit(); err != nil {
+			return nil, fmt.Errorf("could not commit transaction: %w", err)
+		}
+
+		return lease, nil
+	}()
 	if err != nil {
-		outcome = err.Error()
 		return 0, err
 	}
 
-	if lease == nil || lease.Expiration.Before(time.Now()) {
-		err := InvalidLeaseError{}
-		outcome = err.Error()
-		return 0, err
-	}
-
+	// Perform the actual commit through the receiver. This can take a long
+	// time, so it must run without holding leaseMutex. The per-repository
+	// commit lock still serialises commits (and GC) for the same repository.
+	//
+	// The commit deadline is passed to the receiver, which re-checks it just
+	// before publishing: if the lease expired while this (slow) commit was
+	// running, the receiver does not modify the repository, so an overlapping
+	// lease granted to another publisher in the meantime cannot be overwritten.
+	// The configured safety margin is subtracted from the lease expiration so the
+	// commit is refused slightly before the lease actually expires.
+	commitDeadline := lease.Expiration.Add(-s.Config.CommitLeaseExpiryMargin)
 	var finalRev uint64
 	if err := s.DB.WithLock(ctx, lease.Repository, func() error {
 		var err error
 		leasePath := lease.CombinedLeasePath()
-		finalRev, err = s.Pool.CommitLease(ctx, leasePath, oldRootHash, newRootHash, tag)
+		if directGraft {
+			finalRev, err = s.Pool.GraftLease(ctx, leasePath, oldRootHash, newRootHash, tag, commitDeadline)
+		} else {
+			finalRev, err = s.Pool.CommitLease(ctx, leasePath, oldRootHash, newRootHash, tag, commitDeadline)
+		}
 		return err
 	}); err != nil {
 		outcome = err.Error()
@@ -310,13 +418,30 @@ func (s *Services) CommitLease(ctx context.Context, token, oldRootHash, newRootH
 		}
 	}()
 
-	if err := DeleteLeaseByToken(ctx, tx, token); err != nil {
-		outcome = err.Error()
-		return finalRev, err
-	}
+	// Remove the now-committed lease. Again only a short SQLite write under
+	// leaseMutex.
+	if err := func() error {
+		leaseMutex.Lock()
+		defer leaseMutex.Unlock()
 
-	if err := tx.Commit(); err != nil {
-		return 0, fmt.Errorf("could not commit transaction: %w", err)
+		tx, err := s.DB.SQL.BeginTx(ctx, nil)
+		if err != nil {
+			return fmt.Errorf("could not begin transaction: %w", err)
+		}
+		defer tx.Rollback()
+
+		if err := DeleteLeaseByToken(ctx, tx, token); err != nil {
+			outcome = err.Error()
+			return err
+		}
+
+		if err := tx.Commit(); err != nil {
+			return fmt.Errorf("could not commit transaction: %w", err)
+		}
+
+		return nil
+	}(); err != nil {
+		return finalRev, err
 	}
 
 	return finalRev, nil

@@ -7,6 +7,7 @@
 
 #include <sys/types.h>
 
+#include <cassert>
 #include <cerrno>
 #include <map>
 #include <string>
@@ -152,13 +153,13 @@ class IntegerMap {
         return false;
       }
 
-      value_type to = String2Uint64(components[1]);
+      value_type const to = String2Uint64(components[1]);
       if (components[0] == "*") {
         SetDefault(to);
         continue;
       }
 
-      key_type from = String2Uint64(components[0]);
+      key_type const from = String2Uint64(components[0]);
       Set(from, to);
     }
 

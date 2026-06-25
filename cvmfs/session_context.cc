@@ -295,6 +295,16 @@ bool SessionContext::Commit(const std::string &old_root_hash,
   //
   request_input.Add("tag_channel", 0);
   request_input.Add("tag_description", tag.description());
+  // Space-separated list of tags the receiver should remove in the same history
+  // transaction as this commit. Only sent for tag-removal commits; omitted
+  // otherwise for backwards compatibility with older gateways.
+  if (!tag.delete_tags().empty()) {
+    request_input.Add("delete_tags", tag.delete_tags());
+  }
+  if (tag.auto_tag_threshold() > 0) {
+    request_input.Add("auto_tag_threshold",
+                      static_cast<int64_t>(tag.auto_tag_threshold()));
+  }
   const std::string request = request_input.GenerateString();
   CurlBuffer buffer;
   return MakeEndRequest("POST", key_id_, secret_, session_token_, api_url_,

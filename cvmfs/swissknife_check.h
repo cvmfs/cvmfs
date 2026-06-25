@@ -10,6 +10,7 @@
 
 #include "catalog.h"
 #include "crypto/hash.h"
+#include "path_filters/inclusion_spec.h"
 #include "smallhash.h"
 #include "swissknife.h"
 
@@ -53,6 +54,8 @@ class CommandCheck : public Command {
                                        " lookups. Note that this is a fallback"
                                        " option that may be removed."));
     r.push_back(Parameter::Switch('L', "follow HTTP redirects"));
+    r.push_back(Parameter::Optional('E',
+        "inclusion spec for partial replication"));
     return r;
   }
   int Main(const ArgumentList &args);
@@ -63,7 +66,8 @@ class CommandCheck : public Command {
                    const uint64_t catalog_size,
                    const bool is_nested_catalog,
                    const catalog::DirectoryEntry *transition_point,
-                   catalog::DeltaCounters *computed_counters);
+                   catalog::DeltaCounters *computed_counters,
+                   bool *pruned_subtree = NULL);
   catalog::Catalog *FetchCatalog(const std::string &path,
                                  const shash::Any &catalog_hash,
                                  const uint64_t catalog_size = 0);
@@ -94,6 +98,7 @@ class CommandCheck : public Command {
   bool check_chunks_;
   bool no_duplicates_map_;
   bool is_remote_;
+  catalog::InclusionSpec *inclusion_spec_;
   SmallHashDynamic<shash::Any, char> duplicates_map_;
 };
 

@@ -37,15 +37,19 @@ func (p payloadTask) Context() context.Context {
 	return p.ctx
 }
 
-// commitTask is the input data for a commit task
+// commitTask is the input data for a commit task.  directGraft selects the
+// experimental dedicated DirectGraft path (receiver.Graft) instead of an
+// ordinary commit.
 type commitTask struct {
-	ctx          context.Context
-	leasePath    string
-	oldRootHash  string
-	newRootHash  string
-	tag          gw.RepositoryTag
-	replyChan    chan<- error
-	finalRevChan chan<- uint64
+	ctx             context.Context
+	leasePath       string
+	oldRootHash     string
+	newRootHash     string
+	tag             gw.RepositoryTag
+	leaseExpiration time.Time
+	directGraft     bool
+	replyChan       chan<- error
+	finalRevChan    chan<- uint64
 }
 
 // Reply returns the reply channel
@@ -119,10 +123,21 @@ func (p *Pool) SubmitPayload(ctx context.Context, leasePath string, payload io.R
 
 // CommitLease associated with the token (transaction commit)
 // TODO: implement timeout or context?
-func (p *Pool) CommitLease(ctx context.Context, leasePath, oldRootHash, newRootHash string, tag gw.RepositoryTag) (uint64, error) {
+func (p *Pool) CommitLease(ctx context.Context, leasePath, oldRootHash, newRootHash string, tag gw.RepositoryTag, leaseExpiration time.Time) (uint64, error) {
+	return p.commitLease(ctx, leasePath, oldRootHash, newRootHash, tag, leaseExpiration, false)
+}
+
+// GraftLease commits the lease using the experimental dedicated DirectGraft
+// path: the pre-built subtree catalog at leasePath is grafted into the parent
+// catalog, skipping DiffRec.
+func (p *Pool) GraftLease(ctx context.Context, leasePath, oldRootHash, newRootHash string, tag gw.RepositoryTag, leaseExpiration time.Time) (uint64, error) {
+	return p.commitLease(ctx, leasePath, oldRootHash, newRootHash, tag, leaseExpiration, true)
+}
+
+func (p *Pool) commitLease(ctx context.Context, leasePath, oldRootHash, newRootHash string, tag gw.RepositoryTag, leaseExpiration time.Time, directGraft bool) (uint64, error) {
 	reply := make(chan error, 1)
 	finalRevChan := make(chan uint64, 1)
-	p.tasks <- commitTask{ctx, leasePath, oldRootHash, newRootHash, tag, reply, finalRevChan}
+	p.tasks <- commitTask{ctx, leasePath, oldRootHash, newRootHash, tag, leaseExpiration, directGraft, reply, finalRevChan}
 	result := <-reply
 	if result == nil {
 		return <-finalRevChan, nil
@@ -167,8 +182,13 @@ M:
 				result = receiver.SubmitPayload(t.leasePath, t.payload, t.digest, t.headerSize)
 				taskType = "payload"
 			case commitTask:
-				finalRev, result = receiver.Commit(t.leasePath, t.oldRootHash, t.newRootHash, t.tag)
-				taskType = "commit"
+				if t.directGraft {
+					finalRev, result = receiver.Graft(t.leasePath, t.oldRootHash, t.newRootHash, t.tag, t.leaseExpiration)
+					taskType = "graft"
+				} else {
+					finalRev, result = receiver.Commit(t.leasePath, t.oldRootHash, t.newRootHash, t.tag, t.leaseExpiration)
+					taskType = "commit"
+				}
 				t.finalRevChan <- finalRev
 				close(t.finalRevChan)
 			case testCrashTask:

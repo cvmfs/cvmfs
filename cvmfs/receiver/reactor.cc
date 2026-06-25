@@ -388,6 +388,18 @@ bool Reactor::HandleSubmitPayload(int fdin, const std::string &req,
 }
 
 bool Reactor::HandleCommit(const std::string &req, std::string *reply) {
+  return DoCommit(req, reply, /* direct_graft = */ false);
+}
+
+bool Reactor::HandleCommitGraft(const std::string &req, std::string *reply) {
+  return DoCommit(req, reply, /* direct_graft = */ true);
+}
+
+// Shared body for kCommit and the experimental kCommitGraft.  The request
+// payload is identical for both; direct_graft selects the DirectGraft fast path
+// in CommitProcessor.
+bool Reactor::DoCommit(const std::string &req, std::string *reply,
+                       bool direct_graft) {
   if (!reply) {
     PANIC(kLogSyslogErr, "HandleCommit: Invalid reply pointer.");
   }
@@ -409,9 +421,15 @@ bool Reactor::HandleCommit(const std::string &req, std::string *reply) {
       req_json->root(), "tag_name", JSON_STRING);
   const JSON *tag_description_json = JsonDocument::SearchInObject(
       req_json->root(), "tag_description", JSON_STRING);
+  const JSON *auto_tag_threshold_json = JsonDocument::SearchInObject(
+      req_json->root(), "auto_tag_threshold", JSON_INT);
+  const JSON *delete_tags_json = JsonDocument::SearchInObject(
+      req_json->root(), "delete_tags", JSON_STRING);
+  const JSON *lease_expiration_json = JsonDocument::SearchInObject(
+      req_json->root(), "lease_expiration", JSON_INT);
 
   if (lease_path_json == NULL || old_root_hash_json == NULL
-      || new_root_hash_json == NULL) {
+      || new_root_hash_json == NULL || lease_expiration_json == NULL) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
              "HandleCommit: Missing fields in request.");
     return false;
@@ -434,11 +452,19 @@ bool Reactor::HandleCommit(const std::string &req, std::string *reply) {
       shash::HexPtr(old_root_hash_json->get<std::string>()));
   const shash::Any new_root_hash = shash::MkFromSuffixedHexPtr(
       shash::HexPtr(new_root_hash_json->get<std::string>()));
-  const RepositoryTag repo_tag(tag_name_json->get<std::string>(),
-                               tag_description_json->get<std::string>());
+  RepositoryTag repo_tag(tag_name_json->get<std::string>(),
+                         tag_description_json->get<std::string>());
+  if (auto_tag_threshold_json != NULL) {
+    repo_tag.SetAutoTagThreshold(
+        static_cast<time_t>(auto_tag_threshold_json->get<int64_t>()));
+  }
+  if (delete_tags_json != NULL) {
+    repo_tag.SetDeleteTags(delete_tags_json->get<std::string>());
+  }
   const CommitProcessor::Result res = proc->Process(
       lease_path_json->get<std::string>(), old_root_hash, new_root_hash,
-      repo_tag, &final_revision);
+      repo_tag, lease_expiration_json->get<int64_t>(), &final_revision,
+      direct_graft);
 
   JsonStringGenerator reply_input;
   switch (res) {
@@ -457,6 +483,10 @@ bool Reactor::HandleCommit(const std::string &req, std::string *reply) {
     case CommitProcessor::kMissingReflog:
       reply_input.Add("status", "error");
       reply_input.Add("reason", "missing_reflog");
+      break;
+    case CommitProcessor::kLeaseExpired:
+      reply_input.Add("status", "error");
+      reply_input.Add("reason", "lease_expired");
       break;
     default:
       PANIC(kLogSyslogErr,
@@ -507,6 +537,10 @@ bool Reactor::HandleRequest(Request req, const std::string &data) {
         break;
       case kCommit:
         ok &= HandleCommit(data, &reply);
+        ok &= WriteReply(fdout_, reply);
+        break;
+      case kCommitGraft:
+        ok &= HandleCommitGraft(data, &reply);
         ok &= WriteReply(fdout_, reply);
         break;
       case kTestCrash:

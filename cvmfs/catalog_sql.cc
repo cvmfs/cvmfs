@@ -86,7 +86,9 @@ const float CatalogDatabase::kLatestSupportedSchema = 2.5;  // + 1.X (r/o)
 //            * Store nanosecond timestamps (mtimens column) in catalog table.
 //              The mtimens column has only the nanosecond part of the timestamp
 //              and may be NULL
-const unsigned CatalogDatabase::kLatestSchemaRevision = 7;
+//   7 --> 8: (Sep 30 2025):
+//            * add kFlagBundleTrigger
+const unsigned CatalogDatabase::kLatestSchemaRevision = 8;
 
 bool CatalogDatabase::CheckSchemaCompatibility() {
   return !((schema_version() >= 2.0 - kSchemaEpsilon)
@@ -229,6 +231,16 @@ bool CatalogDatabase::LiveSchemaUpgradeIfNecessary() {
     }
 
     set_schema_revision(7);
+    if (!StoreSchemaRevision()) {
+      LogCvmfs(kLogCatalog, kLogDebug, "failed to upgrade schema revision");
+      return false;
+    }
+  }
+
+  if (IsEqualSchema(schema_version(), 2.5) && (schema_revision() == 7)) {
+    LogCvmfs(kLogCatalog, kLogDebug, "upgrading schema revision (7 --> 8)");
+
+    set_schema_revision(8);
     if (!StoreSchemaRevision()) {
       LogCvmfs(kLogCatalog, kLogDebug, "failed to upgrade schema revision");
       return false;
@@ -480,6 +492,8 @@ unsigned SqlDirent::CreateDatabaseFlags(const DirectoryEntry &entry) const {
       database_flags |= kFlagFileExternal;
     if (entry.IsDirectIo())
       database_flags |= kFlagDirectIo;
+    if (entry.IsBundleTrigger())
+      database_flags |= kFlagBundleTrigger;
   }
 
   if (!entry.checksum_ptr()->IsNull() || entry.IsChunkedFile())
@@ -773,6 +787,7 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog,
     result.is_hidden_ = (database_flags & kFlagHidden);
     result.is_direct_io_ = (database_flags & kFlagDirectIo);
     result.is_external_file_ = (database_flags & kFlagFileExternal);
+    result.is_bundle_trigger_ = (database_flags & kFlagBundleTrigger);
     result.has_xattrs_ = RetrieveInt(15) != 0;
     result.mtime_ns_ = RetrieveNullableInt(16, -1);
     result.checksum_ = RetrieveHashBlob(0,

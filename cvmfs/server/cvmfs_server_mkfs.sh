@@ -361,6 +361,13 @@ cvmfs_server_mkfs() {
     check_apache                    || die "Apache must be installed and running"
     ensure_enabled_apache_modules
   fi
+  # Apply the documented default auto tag timespan when auto tagging is enabled.
+  # Without a timespan, every publish is tagged forever and nothing is ever
+  # removed, so neither fresh stratum 1 snapshots nor garbage collection can
+  # free up space.
+  if [ x"$autotagging" = x"true" ] && [ x"$auto_tag_timespan" = x"" ]; then
+    auto_tag_timespan="2 weeks ago"
+  fi
   if [ "x$auto_tag_timespan" != "x" ]; then
     date --date "$auto_tag_timespan" +%s >/dev/null 2>&1 || die "Auto tags time span cannot be parsed"
     [ x"$autotagging" = x"false" ] &&
@@ -471,7 +478,7 @@ cvmfs_server_mkfs() {
   create_repometa_skeleton $repoinfo_file
   if is_local_upstream $upstream && [ $configure_apache -eq 1 ]; then
     reload_apache > /dev/null
-    wait_for_apache "${stratum0}/.cvmfswhitelist" || die "fail (Apache configuration)"
+    wait_for_apache "${stratum0}/.cvmfswhitelist" || die "Stratum0: ${stratum0}. fail (Apache configuration)"
   fi
 
   local volatile_opt=

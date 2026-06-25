@@ -37,7 +37,8 @@ SyncUnionTarball::SyncUnionTarball(AbstractSyncMediator *mediator,
                                    const std::string &to_delete,
                                    const bool create_catalog_on_root,
                                    const bool fast_delete,
-                                   const std::string &path_delimiter)
+                                   const std::string &path_delimiter,
+                                   const bool tolerate_missing_hardlinks)
     : SyncUnion(mediator, rdonly_path, "", "")
     , src(NULL)
     , tarball_path_(tarball_path)
@@ -48,6 +49,7 @@ SyncUnionTarball::SyncUnionTarball(AbstractSyncMediator *mediator,
     , create_catalog_on_root_(create_catalog_on_root)
     , fast_delete_(fast_delete)
     , path_delimiter_(path_delimiter)
+    , tolerate_missing_hardlinks_(tolerate_missing_hardlinks)
     , read_archive_signal_(new Signal) { }
 
 SyncUnionTarball::~SyncUnionTarball() { delete read_archive_signal_; }
@@ -230,11 +232,21 @@ void SyncUnionTarball::ProcessArchiveEntry(struct archive_entry *entry) {
                                      ? base_directory_ + "/" + hardlink_name
                                      : hardlink_name;
 
+    // Capture the link's own ownership/permissions so that, if the target is
+    // not part of this archive, an empty file can be materialized in its place
+    // (see PostUpload and tolerate_missing_hardlinks_).  Read directly from the
+    // tar header, applying the same uid/gid override as SyncItemTar.
+    const struct stat *link_stat = archive_entry_stat(entry);
+    const uid_t link_uid = (uid_ != -1u) ? uid_ : link_stat->st_uid;
+    const gid_t link_gid = (gid_ != -1u) ? gid_ : link_stat->st_gid;
+    const HardlinkDestination destination(complete_path, link_stat->st_mode,
+                                          link_uid, link_gid,
+                                          link_stat->st_mtime);
     if (hardlinks_.find(hardlink) != hardlinks_.end()) {
-      hardlinks_.find(hardlink)->second.push_back(complete_path);
+      hardlinks_.find(hardlink)->second.push_back(destination);
     } else {
-      std::list<std::string> to_hardlink;
-      to_hardlink.push_back(complete_path);
+      std::list<HardlinkDestination> to_hardlink;
+      to_hardlink.push_back(destination);
       hardlinks_[hardlink] = to_hardlink;
     }
     if (filename == ".cvmfscatalog") {
@@ -306,13 +318,39 @@ std::string SyncUnionTarball::SanitizePath(const std::string &path) {
 }
 
 void SyncUnionTarball::PostUpload() {
-  std::map<const std::string, std::list<std::string> >::iterator hardlink;
+  // When tolerating missing hardlink targets we ask Clone not to abort on a
+  // missing source; it returns false instead and we materialize an empty file.
+  const bool fail_if_target_missing = !tolerate_missing_hardlinks_;
+  std::map<const std::string, std::list<HardlinkDestination> >::iterator
+      hardlink;
   for (hardlink = hardlinks_.begin(); hardlink != hardlinks_.end();
        ++hardlink) {
-    std::list<std::string>::iterator entry;
+    const std::string &target = hardlink->first;
+    std::list<HardlinkDestination>::iterator entry;
     for (entry = hardlink->second.begin(); entry != hardlink->second.end();
          ++entry) {
-      mediator_->Clone(*entry, hardlink->first);
+      const bool cloned = mediator_->Clone(entry->path, target,
+                                           fail_if_target_missing);
+      if (cloned)
+        continue;
+
+      // The hardlink target is not part of this archive (e.g. a cross-layer
+      // hardlink in an OCI image layer).  Materialize an empty regular file at
+      // the link's path, preserving its ownership and permissions, and push it
+      // through the normal ingestion pipeline so the empty object is stored.
+      std::string parent_path;
+      std::string filename;
+      SplitPath(entry->path, &parent_path, &filename);
+      if (parent_path == ".")
+        parent_path.clear();
+      const SharedPtr<SyncItem> empty_file = SharedPtr<SyncItem>(
+          new SyncItemDummyFile(parent_path, filename, this, entry->mode,
+                                entry->uid, entry->gid, entry->mtime));
+      ProcessFile(empty_file);
+      LogCvmfs(kLogUnionFs, kLogStderr | kLogSyslogWarn,
+               "hardlink target '%s' is not present in the tarball; "
+               "materialized an empty file at '%s'",
+               target.c_str(), entry->path.c_str());
     }
   }
 }
