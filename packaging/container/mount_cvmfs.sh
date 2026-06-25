@@ -63,10 +63,21 @@ if [ -z "$CVMFS_REPOSITORIES" ]; then
   exec /usr/sbin/automount-cvmfs --foreground --verbose
 else
   # ---- explicit mode (legacy) ----
-  CVMFS_REPOSITORIES="cvmfs-config.cern.ch,$CVMFS_REPOSITORIES"
+  # cvmfs-config.cern.ch supplies the public configuration and is always
+  # mounted; prepend it. Deduplicate the list so a user who also lists it (or
+  # repeats any repo) in CVMFS_REPOSITORIES does not trigger a fatal double
+  # mount of the same repository on the same mountpoint (grab_mountpoint fails
+  # on the second attempt and cvmfs2 exits non-zero).
+  repos=""
+  for r in cvmfs-config.cern.ch $(echo "$CVMFS_REPOSITORIES" | tr , ' '); do
+    case " $repos " in
+      *" $r "*) continue ;;
+    esac
+    repos="${repos:+$repos }$r"
+  done
   trap cleanup SIGTERM SIGINT SIGQUIT SIGHUP
-  echo "[INF] mounting $(echo $CVMFS_REPOSITORIES | tr , ' ')" | tee -a $BOOT_LOG
-  for r in $(echo $CVMFS_REPOSITORIES | tr , ' '); do
+  echo "[INF] mounting $repos" | tee -a $BOOT_LOG
+  for r in $repos; do
     mkdir -p /cvmfs/$r 2>/dev/null
     # Gracefully recover from ungraceful previous shutdowns
     if ls /cvmfs/$r 2>&1 | grep -q "not connected$"; then
