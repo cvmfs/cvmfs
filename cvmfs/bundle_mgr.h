@@ -26,6 +26,7 @@ class BundleMgr : SingleCopy {
   friend class T_BundleMgr;
   FRIEND_TEST(T_BundleMgr, ExchangeCT);
   FRIEND_TEST(T_BundleMgr, ExchangePathString);
+  FRIEND_TEST(T_BundleMgr, Fetch);
 
  public:
   BundleMgr(MountPoint *mp, const PathString &path);
