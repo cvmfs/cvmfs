@@ -11,6 +11,7 @@
 #include "crypto/hash.h"
 #include "history.h"
 #include "swissknife.h"
+#include "upload.h"
 #include "util/future.h"
 
 namespace manifest {
@@ -25,7 +26,6 @@ class WritableCatalog;
 namespace upload {
 struct SpoolerDefinition;
 struct SpoolerResult;
-class Spooler;
 }  // namespace upload
 
 namespace swissknife {
@@ -218,3 +218,4 @@ class CommandEmptyRecycleBin : public CommandTag {
 }  // namespace swissknife
 
 #endif  // CVMFS_SWISSKNIFE_HISTORY_H_
+
