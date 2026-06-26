@@ -530,7 +530,7 @@ endif ()
 
 # Server only: python, unzip, libacl
 if (BUILD_SERVER OR BUILD_SERVER_DEBUG)
-  find_package(PythonLibs REQUIRED)
+  find_package(Python COMPONENTS Interpreter REQUIRED)
   if (BUILD_COMPARE_TO_LIBACL)
     add_definitions(-DCOMPARE_TO_LIBACL)
     find_package(LibACL REQUIRED)
