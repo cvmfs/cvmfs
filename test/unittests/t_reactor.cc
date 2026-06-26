@@ -32,7 +32,8 @@ class MockedCommitProcessor : public CommitProcessor {
                          const shash::Any & /*new_root_hash*/,
                          const RepositoryTag &tag,
                          int64_t /*lease_expiration*/,
-                         uint64_t *final_revision) {
+                         uint64_t *final_revision,
+                         bool /*direct_graft*/ = false) {
     g_committed_delete_tags = tag.delete_tags();
     *final_revision = 1;
     return kSuccess;

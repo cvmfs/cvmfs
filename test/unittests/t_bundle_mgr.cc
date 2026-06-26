@@ -128,7 +128,7 @@ class T_BundleMgr : public ::testing::Test {
     delete mount_point_;
     delete file_system_;
     ClosePipe(common_pipe_);
-    chdir("../..");
+    EXPECT_EQ(0, chdir("../.."));
     if (not tmp_path_.empty()) {
       EXPECT_TRUE(RemoveTree(tmp_path_));
     }

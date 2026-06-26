@@ -45,12 +45,12 @@ TEST_F(T_Namespace, Check) {
 
 TEST_F(T_Namespace, User) {
   if (!(ns_features_ & kNsFeatureUserEnabled))
-    return;
+    GTEST_SKIP() << "unprivileged user namespaces not available";
 
   int pid = fork();
   ASSERT_GE(pid, 0);
   if (pid > 0) {
-    EXPECT_EQ(0, WaitForChild(0));
+    EXPECT_EQ(0, WaitForChild(pid));
     return;
   }
 
@@ -64,21 +64,21 @@ TEST_F(T_Namespace, User) {
   EXPECT_EQ(gid_t(0), getgid());
   EXPECT_EQ(kFailNsOk, CreateUserNamespace(uid, gid));
   EXPECT_EQ(uid, geteuid());
-  EXPECT_EQ(gid, getuid());
+  EXPECT_EQ(gid, getegid());
   exit(testing::Test::HasFailure());
 }
 
 
 TEST_F(T_Namespace, UserMount) {
   if (!(ns_features_ & kNsFeatureUserEnabled))
-    return;
+    GTEST_SKIP() << "unprivileged user namespaces not available";
   if (!(ns_features_ & kNsFeatureMount))
-    return;
+    GTEST_SKIP() << "mount namespaces not available";
 
   int pid = fork();
   ASSERT_GE(pid, 0);
   if (pid > 0) {
-    EXPECT_EQ(0, WaitForChild(0));
+    EXPECT_EQ(0, WaitForChild(pid));
     return;
   }
 
@@ -99,11 +99,11 @@ TEST_F(T_Namespace, UserMount) {
 
 TEST_F(T_Namespace, UserMountPid) {
   if (!(ns_features_ & kNsFeatureUserEnabled))
-    return;
+    GTEST_SKIP() << "unprivileged user namespaces not available";
   if (!(ns_features_ & kNsFeatureMount))
-    return;
+    GTEST_SKIP() << "mount namespaces not available";
   if (!(ns_features_ & kNsFeaturePid))
-    return;
+    GTEST_SKIP() << "pid namespaces not available";
 
   pid_t pid = fork();
   ASSERT_GE(pid, 0);
