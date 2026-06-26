@@ -25,6 +25,12 @@ CVMFS_XATTR_PROTECTED_XATTRS=user.fqrn" || return 3
   cvmfs_umount grid.cern.ch || return 2
   echo "  ...Success"
 
+  if [ $(id -u) -eq 0 ]; then
+    echo "  Warning: running as root, cannot verify non-root denial of protected xattrs, skipping"
+    CVMFS_GENERAL_WARNING_FLAG=1
+    return 0
+  fi
+
   echo "  Only root access"
   cvmfs_mount grid.cern.ch "CVMFS_MAGIC_XATTRS_VISIBILITY=always
 CVMFS_XATTR_PROTECTED_XATTRS=user.fqrn" || return 3
