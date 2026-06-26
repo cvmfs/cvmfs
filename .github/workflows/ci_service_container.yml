@@ -1,0 +1,166 @@
+name: CI_service_container
+
+on:
+  push:
+    branches: ['devel', 'cvmfs*']
+  pull_request:
+    paths:
+      - 'packaging/container/**'
+      - 'ci/cvmfs/container.sh'
+      - 'ci/common.sh'
+      - '.github/workflows/ci_service_container.yml'
+    branches: ['devel', 'cvmfs*']
+  workflow_dispatch:
+
+jobs:
+  build_and_test:
+    name: "Service container build & runtime test"
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    env:
+      # A fixed test tag keeps logs/artifacts predictable across runs.
+      CVMFS_TAG: ci-${{ github.run_id }}
+      IMAGE_NAME: cvmfs/service:ci-${{ github.run_id }}
+      # cvmfs-config.cern.ch is small, public, and always available — used as
+      # the smoke-test repository for both runtime modes.
+      TEST_REPO: cvmfs-config.cern.ch
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build service container via packaging/container/build.sh
+        run: |
+          mkdir -p /tmp/container-out
+          ./packaging/container/build.sh "$PWD" /tmp/container-out "$CVMFS_TAG"
+
+      - name: Load image archive into local docker
+        run: |
+          arch=$(uname -m)
+          archive=/tmp/container-out/cvmfs-service-${CVMFS_TAG}.${arch}.docker.tar.gz
+          ls -la /tmp/container-out
+          gunzip -f "$archive"
+          docker load -i "${archive%.gz}"
+          docker image ls "$IMAGE_NAME"
+
+      - name: Test automount mode (CVMFS_REPOSITORIES unset)
+        run: |
+          set -uxo pipefail
+          # SYS_RESOURCE lets cvmfs2 raise RLIMIT_NOFILE to CVMFS_NFILES
+          # (131072). Without it the autofs-spawned mount, which always uses
+          # the system_mount option, fails fatally when it cannot raise the
+          # open-files hard limit above the container's inherited value.
+          docker run -d --name cvmfs-automount \
+            -e CVMFS_CLIENT_PROFILE=single \
+            --cap-add SYS_ADMIN \
+            --cap-add SYS_RESOURCE \
+            --device /dev/fuse \
+            --security-opt apparmor=unconfined \
+            "$IMAGE_NAME"
+
+          # Always dump the daemon log + the in-container cvmfs.log on exit.
+          # cvmfs2 writes its own diagnostics to /var/log/cvmfs.log inside the
+          # container; the autofs spawn helper only forwards captured child
+          # output to its own log at debug level, which is hidden from
+          # --verbose runs, so without this dump we never see why a mount
+          # actually failed.
+          trap 'docker logs cvmfs-automount > /tmp/automount.log 2>&1 || true; \
+                docker exec cvmfs-automount cat /var/log/cvmfs.log \
+                  > /tmp/automount.cvmfs.log 2>&1 || true; \
+                echo "=== /var/log/cvmfs.log inside container ==="; \
+                cat /tmp/automount.cvmfs.log; \
+                docker rm -f cvmfs-automount >/dev/null 2>&1 || true' EXIT
+
+          # Wait for the autofs indirect mount on /cvmfs (the daemon logs
+          # "mounted indirect on /cvmfs" *before* it enters its packet-handler
+          # loop, so use that only as a coarse signal).
+          for i in $(seq 1 30); do
+            if docker logs cvmfs-automount 2>&1 \
+                 | grep -q "mounted indirect on /cvmfs"; then
+              break
+            fi
+            sleep 1
+          done
+
+          echo "=== automount-cvmfs startup log ==="
+          docker logs cvmfs-automount
+
+          # The kernel autofs queue may briefly reject lookups between the
+          # "mounted indirect" log line and the daemon's first handle_packet()
+          # iteration. Probe with a retry loop instead of asserting on the
+          # first attempt.
+          rc=1
+          for i in $(seq 1 30); do
+            if docker exec cvmfs-automount ls -la "/cvmfs/${TEST_REPO}/" \
+                 >/tmp/ls.out 2>&1; then
+              rc=0; break
+            fi
+            sleep 1
+          done
+
+          echo "=== ls output (last attempt) ==="
+          cat /tmp/ls.out
+          echo "=== daemon log after probe ==="
+          docker logs cvmfs-automount
+
+          if [ "$rc" -ne 0 ]; then
+            echo "automount probe failed after retries" >&2
+            exit 1
+          fi
+
+          docker exec cvmfs-automount mountpoint "/cvmfs/${TEST_REPO}"
+
+          # The cvmfs2 process should now own that mount
+          docker exec cvmfs-automount sh -c \
+            "grep -E ' /cvmfs/${TEST_REPO} ' /proc/mounts | grep -q fuse"
+
+      - name: Test explicit mode (CVMFS_REPOSITORIES set)
+        run: |
+          set -uxo pipefail
+          docker run -d --name cvmfs-explicit \
+            -e CVMFS_CLIENT_PROFILE=single \
+            -e "CVMFS_REPOSITORIES=${TEST_REPO}" \
+            --cap-add SYS_ADMIN \
+            --cap-add SYS_RESOURCE \
+            --device /dev/fuse \
+            --security-opt apparmor=unconfined \
+            "$IMAGE_NAME"
+
+          trap 'docker logs cvmfs-explicit > /tmp/explicit.log 2>&1 || true; \
+                docker exec cvmfs-explicit cat /var/log/cvmfs.log \
+                  > /tmp/explicit.cvmfs.log 2>&1 || true; \
+                echo "=== /var/log/cvmfs.log inside container ==="; \
+                cat /tmp/explicit.cvmfs.log; \
+                docker rm -f cvmfs-explicit >/dev/null 2>&1 || true' EXIT
+
+          # Wait for the pre-mount loop to finish
+          for i in $(seq 1 60); do
+            if docker logs cvmfs-explicit 2>&1 \
+                 | grep -q "entering service life cycle"; then
+              break
+            fi
+            sleep 1
+          done
+
+          echo "=== explicit-mode startup log ==="
+          docker logs cvmfs-explicit
+
+          docker exec cvmfs-explicit mountpoint "/cvmfs/${TEST_REPO}" || exit 1
+          docker exec cvmfs-explicit ls -la "/cvmfs/${TEST_REPO}/" || exit 1
+          docker exec cvmfs-explicit /usr/bin/check_cvmfs.sh liveness || exit 1
+
+      - name: Upload container logs on failure
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: service-container-logs-${{ github.run_id }}
+          if-no-files-found: warn
+          path: |
+            /tmp/automount.log
+            /tmp/automount.cvmfs.log
+            /tmp/explicit.log
+            /tmp/explicit.cvmfs.log

@@ -74,7 +74,7 @@
 
 Summary: CernVM File System
 Name: cvmfs
-Version: 2.14.0~pre4
+Version: 2.14.0~pre5
 %global base_version %(echo %{version} | cut -d'~' -f1)
 Release: 2%{?dist}
 URL: https://cernvm.cern.ch/fs/

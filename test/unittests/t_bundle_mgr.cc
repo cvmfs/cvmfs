@@ -5,6 +5,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <atomic>
 #include <string>
 #include <vector>
 
@@ -42,12 +43,19 @@ class MockFetcher : public cvmfs::Fetcher {
       , statistics_(statistics.statistics()) { };
   int Fetch(const CacheManager::LabeledObject &object,
             const std::string &alt_url = "") override {
-    return ++counter_;
+    ++counter_;
+    // Return an invalid file descriptor on purpose. The mock does not place
+    // anything in the cache, so handing back a small fabricated fd (e.g. 1)
+    // would make the production code perform a real Pread()/Close() on an
+    // unrelated process file descriptor such as stdout.
+    return -1;
   }
   virtual ~MockFetcher() { delete statistics_; }
   void Reset() { counter_ = 0; }
 
-  inline static size_t counter_ = 0;
+  // Shared across all fetcher instances and incremented from several worker
+  // threads concurrently, hence atomic.
+  inline static std::atomic<size_t> counter_{0};
   perf::Statistics *statistics_;
 };
 
@@ -98,17 +106,29 @@ class T_BundleMgr : public ::testing::Test {
 
     delete bundle_mgr_->bfm_;
     bundle_mgr_->bfm_ = bfm_;
+    // Under the mocked fetcher the constructor cannot load the real bundle
+    // file, so it leaves the manager invalid and without a worker pool. Put
+    // it into a valid state around the injected bfm_ and start the pool so
+    // that Fetch() actually dispatches work.
+    bundle_mgr_->is_valid_ = true;
+    bundle_mgr_->SpawnFetcherPool();
+    // Count only the dependency fetches triggered by Fetch(), not the single
+    // probe the constructor performed while trying to load the bundle file.
+    MockFetcher::counter_ = 0;
     EXPECT_TRUE(bundle_mgr_);
     EXPECT_EQ(bundle_mgr_->bfm_, bfm_);
     MakePipe(common_pipe_);
   }
 
   virtual void TearDown() {
-    delete file_system_;
-    delete mount_point_;
+    // Destroy the BundleMgr first: its destructor joins the worker threads,
+    // which may still dereference mount_point_/file_system_ while draining
+    // the queue.
     delete bundle_mgr_;
+    delete mount_point_;
+    delete file_system_;
     ClosePipe(common_pipe_);
-    chdir("../..");
+    EXPECT_EQ(0, chdir("../.."));
     if (not tmp_path_.empty()) {
       EXPECT_TRUE(RemoveTree(tmp_path_));
     }
@@ -190,6 +210,10 @@ TEST_F(T_BundleMgr, ExchangePathString) {
 
 TEST_F(T_BundleMgr, Fetch) {
   bundle_mgr_->Fetch();
-  EXPECT_EQ(mock_fetcher_->counter_, MockFetcher::counter_);
+  // JoinFetcherPool() drains the work queue: every dependency is fetched
+  // before the workers reach their terminate command, so the resulting count
+  // is deterministic.
+  bundle_mgr_->JoinFetcherPool();
+  EXPECT_EQ(MockFetcher::counter_.load(), dependencies_.size());
 }
 

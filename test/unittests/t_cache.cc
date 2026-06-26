@@ -843,7 +843,7 @@ TEST_F(T_CacheManager, TearDown2ReadOnly) {
     pthread_join(thread_teardown, NULL);
   else
     pthread_cancel(thread_teardown);
-    pthread_join(thread_teardown, NULL);
+  pthread_join(thread_teardown, NULL);
 }
 
 

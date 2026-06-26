@@ -7,6 +7,7 @@
 #include <sys/types.h>
 
 #include <cassert>
+#include <climits>
 #include <string>
 #include <vector>
 
@@ -108,6 +109,14 @@ bool SyncUnionOverlayfs::ReadlinkEquals(string const &path,
                                         string const &compare_value) {
   char *buf;
   size_t compare_len;
+
+  // A readlink target can never exceed PATH_MAX; bounding the length here also
+  // lets the compiler prove the size passed to readlink() is sane (otherwise
+  // the value range derived from std::string::length() triggers a spurious
+  // -Wstringop-overflow warning from the fortified readlink wrapper).
+  if (compare_value.length() >= PATH_MAX) {
+    return false;
+  }
 
   // Compare to one more than compare_value length in case the link value
   // begins with compare_value but ends with something else

@@ -45,7 +45,7 @@ if (BUILD_CVMFS OR BUILD_SERVER_DEBUG OR BUILD_RECEIVER_DEBUG OR
   add_library(cvmfs_util_debug SHARED ${LIBCVMFS_UTIL_SOURCES})
   set_target_properties (cvmfs_util_debug PROPERTIES
       VERSION ${CernVM-FS_VERSION_STRING}
-      COMPILE_FLAGS "${LIBCVMFS_UTIL_CFLAGS} -DDEBUGMSG -g -O0")
+      COMPILE_FLAGS "${LIBCVMFS_UTIL_CFLAGS} -DDEBUGMSG -g -O0 -Wno-cpp")
   target_link_libraries (cvmfs_util_debug ${LIBCVMFS_UTIL_LINK_LIBRARIES})
   install (TARGETS cvmfs_util_debug LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
 

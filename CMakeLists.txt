@@ -21,7 +21,7 @@ message ("Running CMake version ${CMAKE_VERSION}")
 #
 # DON'T DELETE
 ## CVMFS_VERSION 2.14.0
-## CVMFS_PRERELEASE ~pre4
+## CVMFS_PRERELEASE ~pre5
 #---------------------
 set (CernVM-FS_VERSION_MAJOR 2)
 set (CernVM-FS_VERSION_MINOR 14)
@@ -520,10 +520,17 @@ if (BUILD_CVMFS)
   endif (MACOSX)
 endif ()
 
-# Server only: unzip, libcap
-if (BUILD_SERVER OR BUILD_SERVER_DEBUG)
-  find_package(PythonLibs REQUIRED)
+# libcap is needed by cvmfs2, cvmfs_fuse*_stub, mount.cvmfs, and the
+# server-side swissknife — every target that links cvmfs/util/capabilities.cc.
+# macOS has stubbed-out implementations in capabilities.{cc,h} that don't
+# reference libcap symbols, so the lookup is skipped there.
+if (NOT MACOSX AND (BUILD_CVMFS OR BUILD_SERVER OR BUILD_SERVER_DEBUG OR INSTALL_MOUNT_SCRIPTS))
   find_package(LibCAP REQUIRED)
+endif ()
+
+# Server only: python, unzip, libacl
+if (BUILD_SERVER OR BUILD_SERVER_DEBUG)
+  find_package(Python COMPONENTS Interpreter REQUIRED)
   if (BUILD_COMPARE_TO_LIBACL)
     add_definitions(-DCOMPARE_TO_LIBACL)
     find_package(LibACL REQUIRED)

@@ -169,7 +169,12 @@ void BundleMgr::JoinFetcherPool() {
   for (auto &t : fetcher_threads_) {
     pthread_join(*t, nullptr);
   }
+  fetcher_threads_.clear();
   ClosePipe(pipe_bm_);
+  // Mark the pool as gone so that a subsequent call (e.g. the destructor
+  // running after an explicit JoinFetcherPool()) is a no-op instead of a
+  // double close/join.
+  pipe_bm_[0] = pipe_bm_[1] = -1;
 }
 
 void BundleMgr::SpawnFetcherPool() {
