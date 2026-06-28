@@ -32,6 +32,7 @@ cvmfs_run_test() {
     return 2
   fi
 
+  #TODO(vavolkl): use cvmfs tooling ( showconfig ) to set CVMFS_USER
   CVMFS_USER=$(
     source /etc/cvmfs/default.conf >/dev/null
     printf %s "$CVMFS_USER"
