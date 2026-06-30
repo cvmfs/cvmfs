@@ -401,7 +401,8 @@ wipe_repo() {
     while [[ "$(revision)" == "$LAST_REPO_REVISION" ]]; do
 	sleep 1
 	sudo umount "$CVMFS_TEST_MOUNTPOINT"
-	while pgrep cvmfs2 >/dev/null; do sleep 1; done
+	# the processes linger forever on Debian and Ubuntu, help them along
+	while pgrep cvmfs2 >/dev/null; do sudo pkill cvmfs2 || true; sleep 1; done
 	# drop cache:
 	if [[ "$PROXY_SPEC" != DIRECT ]]; then
 	    curl --fail --silent --show-error -o /dev/null -H 'Cache-Control: no-cache' --proxy "$PROXY_SPEC"  http://$S3_HOST:9000/mybucket/"$CVMFS_TEST_REPO"/.cvmfspublished
