@@ -450,7 +450,7 @@ size_t write_note(FILE *out, uint32_t type,
  * performs heuristic RBP recovery, then writes a GDB-compatible core file.
  */
 int build_core(int pid, const char *output_path) {
-    printf("=== cvmfs-debug-rescue ===\n");
+    printf("=== dcoredumper ===\n");
     printf("Target PID:   %d\n", pid);
     printf("Output:       %s\n", output_path);
     printf("Architecture: x86_64\n");
@@ -794,7 +794,7 @@ int main(int argc, char *argv[]) {
         if (!strcmp(argv[argi], "--help") ||
                    !strcmp(argv[argi], "-h")) {
             printf(
-"Usage: cvmfs_debug_rescue [OPTIONS] <pid> <output.core>\n"
+"Usage: dcoredumper [OPTIONS] <pid> <output.core>\n"
 "\n"
 "Constructs an ELF core dump from a D-state process\n"
 "without ptrace. Reads /proc/<pid>/ interfaces directly.\n"
@@ -806,7 +806,7 @@ int main(int argc, char *argv[]) {
 "Requires root on kernel 6.x (for /proc/pid/syscall access).\n"
 "\n"
 "Example:\n"
-"  sudo cvmfs_debug_rescue 1234 /tmp/hung.core\n"
+"  sudo dcoredumper 1234 /tmp/hung.core\n"
 "  gdb /usr/bin/cvmfs2 /tmp/hung.core\n"
 "  (gdb) thread apply all bt\n"
             );
