@@ -367,7 +367,7 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   void CheckTagName(const std::string &name);
 
   void TransactionRetry();
-  void TransactionImpl(bool waiting_on_lease = false);
+  void TransactionImpl();
 
   SettingsPublisher settings_;
   UniquePtr<perf::StatisticsTemplate> statistics_publish_;
