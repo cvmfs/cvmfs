@@ -264,8 +264,8 @@ if (BUILD_SERVER)
   list (APPEND CVMFS_UNITTEST_SERVER_LINK_LIBRARIES
         GTest::gtest
         ${OPENSSL_LIBRARIES}
-        ${CURL_LIBRARIES}
-        ${CARES_LIBRARIES} ${CARES_LDFLAGS}
+        CURL::libcurl
+        c-ares::cares
         ${OPENSSL_LIBRARIES}
         SQLite::SQLite3
         ${ZLIB_LIBRARIES}
@@ -599,8 +599,8 @@ list (APPEND CVMFS_UNITTESTS_LINK_LIBRARIES
       GTest::gtest
       GTest::gmock
       ${OPENSSL_LIBRARIES}
-      ${CURL_LIBRARIES}
-      ${CARES_LIBRARIES} ${CARES_LDFLAGS}
+      CURL::libcurl
+      c-ares::cares
       ${OPENSSL_LIBRARIES}
       SQLite::SQLite3
       ${ZLIB_LIBRARIES}

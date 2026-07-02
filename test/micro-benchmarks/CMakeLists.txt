@@ -130,8 +130,8 @@ set_target_properties (${PROJECT_UBENCHMARKS_NAME} PROPERTIES
 
 set (UBENCHMARKS_LINK_LIBRARIES ${GOOGLEBENCH_LIBRARIES}
                                 ${GTEST_LIBRARIES}
-                                ${CURL_LIBRARIES}
-                                ${CARES_LIBRARIES} ${CARES_LDFLAGS}
+                                CURL::libcurl
+                                c-ares::cares
                                 ${OPENSSL_LIBRARIES}
                                 ${Libcrypto_LIBRARIES}
                                 ${SHA3_LIBRARIES}

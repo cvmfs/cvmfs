@@ -267,8 +267,8 @@ if (BUILD_CVMFS)
   set (CVMFS_FUSE_LDFLAGS "-ldl -lm")
   set (CVMFS_FUSE_LINK_LIBRARIES "")
   list(APPEND CVMFS_FUSE_LINK_LIBRARIES
-       ${CURL_LIBRARIES}
-       ${CARES_LIBRARIES} ${CARES_LDFLAGS}
+       CURL::libcurl
+       c-ares::cares
        ${OPENSSL_LIBRARIES}
        pacparser::pacparser
        SQLite::SQLite3
@@ -420,19 +420,16 @@ if (BUILD_LIBCVMFS)
   set_property (TARGET cvmfs_client APPEND PROPERTY INCLUDE_DIRECTORIES "${CMAKE_CURRENT_BINARY_DIR}")
   target_include_directories (cvmfs_client PRIVATE ${GTEST_INCLUDE_DIRS})
   target_include_directories (cvmfs_client PRIVATE ${SQLITE3_INCLUDE_DIR})
-  target_include_directories (cvmfs_client PRIVATE ${CARES_INCLUDE_DIRS})
-  target_include_directories (cvmfs_client PRIVATE ${CURL_INCLUDE_DIRS})
   target_include_directories (cvmfs_client PRIVATE ${ZLIB_INCLUDE_DIRS})
   target_include_directories (cvmfs_client PRIVATE ${PROTOBUF_INCLUDE_DIRS})
 
   target_link_libraries (cvmfs_client
                          PUBLIC cvmfs_crypto
                                 cvmfs_util
-                                ${CARES_LDFLAGS}
                                 ${OPENSSL_LIBRARIES}
                          PRIVATE SQLite::SQLite3
-                                 ${CURL_LIBRARIES}
-                                 ${CARES_LIBRARIES}
+                                 CURL::libcurl
+                                 c-ares::cares
                                  leveldb::leveldb
                                  pacparser::pacparser
                                  ${ZLIB_LIBRARIES}
@@ -708,8 +705,8 @@ if (BUILD_SERVER)
   set (CVMFS_SWISSKNIFE_LINK_LIBRARIES "")
   list (APPEND CVMFS_SWISSKNIFE_LINK_LIBRARIES
         SQLite::SQLite3
-        ${CURL_LIBRARIES}
-        ${CARES_LIBRARIES} ${CARES_LDFLAGS}
+        CURL::libcurl
+        c-ares::cares
         ${ZLIB_LIBRARIES}
         ${OPENSSL_LIBRARIES}
         ${RT_LIBRARY}
@@ -821,8 +818,8 @@ if (BUILD_SERVER)
   set (LIBCVMFS_SERVER_CFLAGS "-D_FILE_OFFSET_BITS=64 -DCVMFS_RAISE_EXCEPTIONS -fexceptions")
   set (LIBCVMFS_SERVER_LINK_LIBRARIES "")
   list (APPEND LIBCVMFS_SERVER_LINK_LIBRARIES
-        ${CURL_LIBRARIES}
-        ${CARES_LIBRARIES} ${CARES_LDFLAGS}
+        CURL::libcurl
+        c-ares::cares
         ${OPENSSL_LIBRARIES}
         SQLite::SQLite3
         ${ZLIB_LIBRARIES}
@@ -1109,8 +1106,8 @@ if(BUILD_RECEIVER)
   set (CVMFS_RECEIVER_CFLAGS "-D_FILE_OFFSET_BITS=64 -DCVMFS_RAISE_EXCEPTIONS -fexceptions")
   set (CVMFS_RECEIVER_LINK_LIBRARIES "")
   list (APPEND CVMFS_RECEIVER_LINK_LIBRARIES
-        ${CURL_LIBRARIES}
-        ${CARES_LIBRARIES} ${CARES_LDFLAGS}
+        CURL::libcurl
+        c-ares::cares
         SQLite::SQLite3
         nlohmann_json::nlohmann_json
         ${OPENSSL_LIBRARIES}
@@ -1271,8 +1268,8 @@ if (BUILD_PRELOADER)
                         cvmfs_crypto
                         cvmfs_util
                         SQLite::SQLite3
-                        ${CURL_LIBRARIES}
-                        ${CARES_LIBRARIES} ${CARES_LDFLAGS}
+                        CURL::libcurl
+                        c-ares::cares
                         ${ZLIB_LIBRARIES}
                         ${OPENSSL_LIBRARIES}
                         ${RT_LIBRARY}
