@@ -6,7 +6,6 @@ cvmfs_test_suites="quick"
 
 produce_tarball() {
   local tarball_name=$1
-  local script_location=$2
 
   mkdir tarball_foo
   mkdir -p tarball_foo/a/b/c
@@ -34,6 +33,7 @@ produce_tarball() {
 
 cvmfs_run_test() {
   logfile=$1
+  local script_location=$2
   local scratch_dir=$(pwd)
   local tarfile=$scratch_dir/tarball.tar
   local dir=tar_dir

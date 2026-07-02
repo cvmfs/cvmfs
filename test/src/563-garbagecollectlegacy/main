@@ -122,7 +122,7 @@ e1db87c42de2501a3999b6fbbfdf9674ad968e71
   local all_reflog_entries_found=1
   for clg in $cvmfs20_root_clgs $cvmfs21_root_clgs; do
     echo -n "looking for ${clg}... "
-    cat $gc_log_1 | grep -q "Catalog: $clg" && echo "found" || { echo "not found"; all_reflog_entries_found=0; }
+    grep -q "Catalog: $clg" "$gc_log_1" && echo "found" || { echo "not found"; all_reflog_entries_found=0; }
   done
   [ $all_reflog_entries_found -eq 1 ] || return 103
 

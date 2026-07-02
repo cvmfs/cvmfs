@@ -18,6 +18,7 @@
 #include "file_bundle.h"
 #include "mountpoint.h"
 #include "shortstring.h"
+#include "util/posix.h"
 #include "util/single_copy.h"
 
 class MockFetcher;
@@ -26,6 +27,7 @@ class BundleMgr : SingleCopy {
   friend class T_BundleMgr;
   FRIEND_TEST(T_BundleMgr, ExchangeCT);
   FRIEND_TEST(T_BundleMgr, ExchangePathString);
+  FRIEND_TEST(T_BundleMgr, Fetch);
 
  public:
   BundleMgr(MountPoint *mp, const PathString &path);
@@ -61,27 +63,19 @@ class BundleMgr : SingleCopy {
         "Type too big to be guaranteed atomic transmission over a pipe");
 
     const T *ptr = reinterpret_cast<const T *>(&obj);
-    while ((::write(fd, ptr, size)) != static_cast<ssize_t>(size)) {
-      // Percist until succesfful write
-    }
+    WritePipe(fd, ptr, size);
   }
 
   void BlockingSend(int fd, const PathString &path) const {
     const size_t size = path.GetLength();
     BlockingSend(fd, size);
-    while ((::write(fd, path.GetChars(), size * sizeof(char)))
-           != static_cast<ssize_t>(size * sizeof(char))) {
-      // Percist until succesfful write
-    }
+    WritePipe(fd, path.GetChars(), size * sizeof(char));
   }
 
   void BlockingSend(int fd, const std::string &string) const {
     const size_t size = string.size();
     BlockingSend(fd, size);
-    while ((::write(fd, string.data(), size * sizeof(char)))
-           != static_cast<ssize_t>(size * sizeof(char))) {
-      // Percist until succesfful write
-    }
+    WritePipe(fd, string.data(), size * sizeof(char));
   }
 
   template<typename CT,
@@ -93,7 +87,7 @@ class BundleMgr : SingleCopy {
         sizeof(T) <= PIPE_BUF,
         "Type too big to be guaranteed atomic transmission over a pipe");
     CT item;
-    ::read(fd, static_cast<void *>(&item), sizeof(CT));
+    ReadPipe(fd, static_cast<void *>(&item), sizeof(CT));
     return item;
   }
 
@@ -101,7 +95,7 @@ class BundleMgr : SingleCopy {
     const size_t size = BlockingReceive<size_t>(fd);
     assert(size * sizeof(char) < PIPE_BUF);
     std::string result(size, '\t');
-    ::read(fd, static_cast<void *>(&result[0]), size * sizeof(char));
+    ReadPipe(fd, static_cast<void *>(&result[0]), size * sizeof(char));
     return result;
   }
 

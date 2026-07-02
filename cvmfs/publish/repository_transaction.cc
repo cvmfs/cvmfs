@@ -23,7 +23,6 @@ namespace publish {
 
 
 void Publisher::TransactionRetry() {
-  bool waiting_on_lease = false;
   if (managed_node_.IsValid()) {
     const int rvi = managed_node_->Check(false /* is_quiet */);
     if (rvi != 0)
@@ -40,7 +39,7 @@ void Publisher::TransactionRetry() {
 
   while (true) {
     try {
-      TransactionImpl(waiting_on_lease);
+      TransactionImpl();
       break;
     } catch (const publish::EPublish &e) {
       if (e.failure() != EPublish::kFailTransactionState) {
@@ -53,7 +52,6 @@ void Publisher::TransactionRetry() {
         if (platform_monotonic_time() > deadline)
           throw;
 
-        waiting_on_lease = true;
         LogCvmfs(kLogCvmfs, kLogStdout, "repository busy, retrying");
         throttle.Throttle();
         continue;
@@ -68,7 +66,7 @@ void Publisher::TransactionRetry() {
 }
 
 
-void Publisher::TransactionImpl(bool waiting_on_lease) {
+void Publisher::TransactionImpl() {
   if (in_transaction_.IsSet()) {
     throw EPublish("another transaction is already open",
                    EPublish::kFailTransactionState);
@@ -79,6 +77,28 @@ void Publisher::TransactionImpl(bool waiting_on_lease) {
   // On error, Transaction() will release the transaction lock and drop
   // the session
   session_->Acquire();
+
+  // Now that the lease is held (the lease subtree is frozen) refresh to the
+  // current HEAD before any HEAD-dependent step. The manifest fetched when this
+  // process started can be stale: another release manager may have advanced HEAD
+  // in the meantime. Refreshing here makes both the lease-path validation below
+  // and the catalog diff at publish time see post-lease HEAD. Without it, a
+  // parent path another publisher just created looks absent (spurious
+  // kFailLeaseNoEntry), and concurrently-added content looks deleted and gets
+  // dropped (#3867). Done on every gateway transaction, not only when waiting on
+  // a busy lease -- staleness is independent of contention. DownloadRootObjects
+  // also invalidates the cached read-only catalog manager; Check() remounts the
+  // read-only layer only if outdated; managed_node_ is absent for mount-less
+  // publishing.
+  if (settings_.storage().type() == upload::SpoolerDefinition::Gateway) {
+    DownloadRootObjects(settings_.url(), settings_.fqrn(),
+                        settings_.transaction().spool_area().tmp_dir());
+    if (managed_node_.IsValid()) {
+      const int rvi = managed_node_->Check(true /* is_quiet */);
+      if (rvi != 0)
+        throw EPublish("cannot establish writable mountpoint");
+    }
+  }
 
   // We might have a valid lease for a non-existing path. Nevertheless, we run
   // run into problems when merging catalogs later, so for the time being we
@@ -103,17 +123,6 @@ void Publisher::TransactionImpl(bool waiting_on_lease) {
 
   const UniquePtr<CheckoutMarker> marker(CheckoutMarker::CreateFrom(
       settings_.transaction().spool_area().checkout_marker()));
-  // TODO(jblomer): take root hash from r/o mountpoint?
-
-
-  if (settings_.storage().type() == upload::SpoolerDefinition::Gateway
-      && waiting_on_lease) {
-    DownloadRootObjects(settings_.url(), settings_.fqrn(),
-                        settings_.transaction().spool_area().tmp_dir());
-    const int rvi = managed_node_->Check(true /* is_quiet */);
-    if (rvi != 0)
-      throw EPublish("cannot establish writable mountpoint");
-  }
 
   in_transaction_.Set();
   // Pre-create the publishing lock file so that Abort() can acquire it even

@@ -13,8 +13,11 @@ cvmfs_run_test() {
   echo "*** root hash is $root_hash"
 
   local nfiles=100
-  find /cvmfs/alice.cern.ch/el9-x86_64/Packages/AEGIS -type f -size +100k -size -10M | head -n $nfiles \
-    > filelist || return 10
+  (
+    set +o pipefail
+    find /cvmfs/alice.cern.ch/el9-x86_64/Packages/AEGIS -type f -size +100k -size -10M | head -n $nfiles \
+      > filelist || return 10
+  )
 
   echo "*** Checksuming reference file set"
   cat filelist | while read LINE; do

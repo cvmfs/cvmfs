@@ -189,6 +189,66 @@ func (s *Services) GetLease(ctx context.Context, token string) (*LeaseDTO, error
 	return ret, nil
 }
 
+// RefreshLease extends the expiration of an active lease identified by token.
+// The new expiration is set to now + extension, where extension defaults to
+// Config.LeaseRefreshTime when the caller passes 0 (requestedExtension). The
+// extension is capped at Config.MaxLeaseTime. An expired (or non-existent)
+// lease cannot be refreshed, as its path may already have been granted to
+// another publisher.
+func (s *Services) RefreshLease(ctx context.Context, token string, requestedExtension time.Duration) (*LeaseDTO, error) {
+	leaseMutex.Lock()
+	defer leaseMutex.Unlock()
+	t0 := time.Now()
+
+	outcome := "success"
+	defer logAction(ctx, "refresh_lease", &outcome, t0)
+
+	tx, err := s.DB.SQL.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("could not begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	lease, err := FindLeaseByToken(ctx, tx, token)
+	if err != nil {
+		outcome = err.Error()
+		return nil, err
+	}
+
+	if lease == nil || lease.Expiration.Before(time.Now()) {
+		err := InvalidLeaseError{}
+		outcome = err.Error()
+		return nil, err
+	}
+
+	extension := requestedExtension
+	if extension <= 0 {
+		extension = s.Config.LeaseRefreshTime
+	}
+	if extension > s.Config.MaxLeaseTime {
+		extension = s.Config.MaxLeaseTime
+	}
+
+	newExpiration := time.Now().Add(extension)
+	if _, err := UpdateLeaseExpirationByToken(ctx, tx, token, newExpiration); err != nil {
+		outcome = err.Error()
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("could not commit transaction: %w", err)
+	}
+
+	lease.Expiration = newExpiration
+	ret := &LeaseDTO{
+		KeyID:     lease.KeyID,
+		LeasePath: lease.CombinedLeasePath(),
+		Expires:   lease.Expiration.String(),
+		Hostname:  lease.Hostname,
+	}
+	return ret, nil
+}
+
 // CancelLeases cancels all the active leases below a repository path
 func (s *Services) CancelLeases(ctx context.Context, repoPath string) error {
 	leaseMutex.Lock()
@@ -267,10 +327,28 @@ func (s *Services) CancelLease(ctx context.Context, token string) error {
 
 // CommitLease associated with the token (transaction commit)
 func (s *Services) CommitLease(ctx context.Context, token, oldRootHash, newRootHash string, tag gw.RepositoryTag) (uint64, error) {
+	return s.commitLease(ctx, token, oldRootHash, newRootHash, tag, false)
+}
+
+// GraftLease commits the lease using the experimental dedicated DirectGraft
+// path: the pre-built subtree catalog is grafted into the parent catalog,
+// skipping the DiffRec catalog merge.  This is intentionally kept separate from
+// CommitLease until the endpoint is promoted to a stable API.
+func (s *Services) GraftLease(ctx context.Context, token, oldRootHash, newRootHash string, tag gw.RepositoryTag) (uint64, error) {
+	return s.commitLease(ctx, token, oldRootHash, newRootHash, tag, true)
+}
+
+// commitLease is the shared implementation behind CommitLease and GraftLease.
+func (s *Services) commitLease(ctx context.Context, token, oldRootHash, newRootHash string, tag gw.RepositoryTag, directGraft bool) (uint64, error) {
 	t0 := time.Now()
 
+	action := "commit_lease"
+	if directGraft {
+		action = "graft_lease"
+	}
+
 	outcome := "success"
-	defer logAction(ctx, "commit_lease", &outcome, t0)
+	defer logAction(ctx, action, &outcome, t0)
 
 	// Look up and validate the lease. leaseMutex is only held for this short
 	// SQLite read, not for the (potentially very slow) commit below, so that
@@ -322,7 +400,11 @@ func (s *Services) CommitLease(ctx context.Context, token, oldRootHash, newRootH
 	if err := s.DB.WithLock(ctx, lease.Repository, func() error {
 		var err error
 		leasePath := lease.CombinedLeasePath()
-		finalRev, err = s.Pool.CommitLease(ctx, leasePath, oldRootHash, newRootHash, tag, commitDeadline)
+		if directGraft {
+			finalRev, err = s.Pool.GraftLease(ctx, leasePath, oldRootHash, newRootHash, tag, commitDeadline)
+		} else {
+			finalRev, err = s.Pool.CommitLease(ctx, leasePath, oldRootHash, newRootHash, tag, commitDeadline)
+		}
 		return err
 	}); err != nil {
 		outcome = err.Error()

@@ -139,6 +139,13 @@ class WritableCatalogManager : public SimpleCatalogManager {
                          const uint64_t new_size);
   void GraftNestedCatalog(const string &mountpoint, const shash::Any &new_hash,
                           const uint64_t new_size);
+  // Non-panicking variant used by the experimental DirectGraft gateway
+  // endpoint.  Returns false for expected request validation failures (wrong
+  // catalog root, existing target directory, missing parent, etc.) so malformed
+  // experimental requests do not abort the receiver worker.
+  bool TryGraftNestedCatalog(const string &mountpoint,
+                             const shash::Any &new_hash,
+                             const uint64_t new_size);
   bool IsTransitionPoint(const std::string &mountpoint);
   WritableCatalog *GetHostingCatalog(const std::string &path);
 

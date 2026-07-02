@@ -1,0 +1,68 @@
+name: CI_stale_mount
+
+# Regression test for issue #3867: a gateway release manager with a stale
+# read-only mount must not drop content another release manager added.
+on:
+  push:
+    branches: ['devel', 'cvmfs*']
+  pull_request:
+    paths:
+      - 'cvmfs/publish/**'
+      - 'cvmfs/receiver/**'
+      - 'cvmfs/catalog_diff_tool*'
+      - 'gateway/**'
+      - 'test/container/501-stale-mount-drop/**'
+      - '.github/workflows/ci_stale_mount.yml'
+    branches: ['devel', 'cvmfs*']
+  workflow_dispatch:
+
+jobs:
+  stale-mount-drop:
+    name: "Gateway stale-mount content drop (#3867)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    defaults:
+      run:
+        working-directory: test/container/501-stale-mount-drop
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Build the dev image once with a persistent layer cache. All three compose
+      # services reference cvmfs-stale-mount:latest, so this is the only build.
+      - name: Build dev image (cached)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: test/common/container/Dockerfile-dev
+          tags: cvmfs-stale-mount:latest
+          load: true
+          cache-from: type=gha,scope=stale-mount-dev
+          cache-to: type=gha,mode=max,scope=stale-mount-dev
+
+      - name: Start the stack
+        run: docker compose up -d --no-build
+
+      - name: Run the regression scenario
+        run: ./test.sh
+
+      - name: Collect logs on failure
+        if: failure()
+        run: |
+          echo "=== docker compose ps ==="
+          docker compose ps -a
+          for c in cvmfs-gw1 cvmfs-pub1 cvmfs-pub2; do
+            echo "=== $c: cvmfs_receiver debug log ==="
+            docker exec "$c" tail -n 100 /var/log/cvmfs_receiver/debug.log 2>/dev/null || true
+            echo "=== $c: journal (cvmfs-gateway) ==="
+            docker exec "$c" journalctl -u cvmfs-gateway --no-pager -n 80 2>/dev/null || true
+          done
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v --remove-orphans || true

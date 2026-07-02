@@ -7,7 +7,9 @@ CVMFS_TEST077_MOUNTPOINT_ONE=
 CVMFS_TEST077_MOUNTPOINT_TWO=
 
 cleanup() {
-  sudo umount $CVMFS_TEST077_MOUNTPOINT_ONE $CVMFS_TEST077_MOUNTPOINT_TWO
+  sudo umount $CVMFS_TEST077_MOUNTPOINT_ONE
+  # mountpoint_two is not expected to be mounted normally, but it might in case of a bug
+  sudo umount $CVMFS_TEST077_MOUNTPOINT_TWO || true
 }
 
 cvmfs_run_test() {
@@ -25,7 +27,7 @@ cvmfs_run_test() {
   ls $CVMFS_TEST077_MOUNTPOINT_ONE || return 11
 
   sudo mount -t cvmfs grid.cern.ch "$CVMFS_TEST077_MOUNTPOINT_TWO" && return 20
-  sudo mount -t cvmfs grid.cern.ch "$CVMFS_TEST077_MOUNTPOINT_TWO" 2>&1 \
+  (! sudo mount -t cvmfs grid.cern.ch "$CVMFS_TEST077_MOUNTPOINT_TWO" 2>&1) \
     | grep "$CVMFS_TEST077_MOUNTPOINT_ONE" \
     || return 21
   # TODO(vvolkl) check mounting on same directory without the mount helper

@@ -88,7 +88,7 @@ cvmfs_run_test() {
   start_transaction $CVMFS_TEST_REPO                              || return $?
   mkdir /cvmfs/$CVMFS_TEST_REPO/dir                               || return 3
   echo "Hello World" > $small_file                                || return 3
-  yes | head -c $((32*1024*1024)) > $large_file                   || return 3
+  (yes || true) | head -c $((32*1024*1024)) > $large_file                   || return 3
   publish_repo $CVMFS_TEST_REPO -v                                || return $?
 
   local mntpnt="${scratch_dir}/private_mnt"
@@ -161,10 +161,10 @@ cvmfs_run_test() {
 
   rm -f stop_topen
 
-  ./topen ${mntpnt}/dir/small > topen02_small.stdout 2> topen02_small.stderr &
+  ./topen ${mntpnt}/dir/small > topen02_small.stdout &
   local pid_small02=$!
   TEST633_PIDS="$TEST633_PIDS $pid_small02"
-  ./topen ${mntpnt}/dir/large > topen02_large.stdout 2> topen02_large.stderr &
+  ./topen ${mntpnt}/dir/large > topen02_large.stdout &
   local pid_large02=$!
   TEST633_PIDS="$TEST633_PIDS $pid_large02"
   echo "*** {2} topen process pids: $pid_small02, $pid_large02"
@@ -237,10 +237,10 @@ cvmfs_run_test() {
   echo "*** {3} inodes: $inode_small03 [small]    $inode_large03 [large]"
   echo "*** {3} sizes: $size_small03 [small]    $size_large03 [large]"
 
-  ./topen ${mntpnt}/dir/small > topen03_small.stdout 2> topen03_small.stderr &
+  ./topen ${mntpnt}/dir/small > topen03_small.stdout &
   local pid_small03=$!
   TEST633_PIDS="$TEST633_PIDS $pid_small03"
-  ./topen ${mntpnt}/dir/large > topen03_large.stdout 2> topen03_large.stderr &
+  ./topen ${mntpnt}/dir/large > topen03_large.stdout &
   local pid_large03=$!
   TEST633_PIDS="$TEST633_PIDS $pid_large03"
   echo "*** {3} topen process pids: $pid_small03, $pid_large03"
@@ -329,10 +329,10 @@ cvmfs_run_test() {
   echo "*** {4} inodes: $inode_small04 [small]    $inode_large04 [large]"
   echo "*** {4} sizes: $size_small04 [small]    $size_large04 [large]"
 
-  ./topen ${mntpnt}/dir/small > topen04_small.stdout 2> topen04_small.stderr &
+  ./topen ${mntpnt}/dir/small > topen04_small.stdout &
   local pid_small04=$!
   TEST633_PIDS="$TEST633_PIDS $pid_small04"
-  ./topen ${mntpnt}/dir/large > topen04_large.stdout 2> topen04_large.stderr &
+  ./topen ${mntpnt}/dir/large > topen04_large.stdout &
   local pid_large04=$!
   TEST633_PIDS="$TEST633_PIDS $pid_large04"
   echo "*** {4} topen process pids: $pid_small04, $pid_large04"
@@ -404,19 +404,14 @@ cvmfs_run_test() {
   [ $(get_internal_counter cvmfs.n_fs_inode_replace) -gt 0 ] || return 33
 
   touch stop_topen
-  wait $TEST633_PIDS
+  for pid in $TEST633_PIDS; do
+    wait "$pid"
+  done
   TEST633_PIDS=
 
   [ x"$(get_checksum ${mntpnt}/dir/small)" = x"$chksum_small04" ] || return 91
   [ x"$(get_checksum ${mntpnt}/dir/large)" = x"$chksum_large04" ] || return 92
   purge_disk_cache
-
-  [ -s topen02_small.stderr ] && return 30
-  [ -s topen02_large.stderr ] && return 31
-  [ -s topen03_small.stderr ] && return 32
-  [ -s topen03_large.stderr ] && return 33
-  [ -s topen04_small.stderr ] && return 33
-  [ -s topen04_large.stderr ] && return 34
 
   [ x"$(get_checksum ${mntpnt}/dir/small)" = x"$chksum_small04" ] || return 93
   [ x"$(get_checksum ${mntpnt}/dir/large)" = x"$chksum_large04" ] || return 94

@@ -106,12 +106,6 @@ version_lower_or_equal() {
 }
 
 
-has_binary() {
-  local binary_name=$1
-  command -v $binary_name > /dev/null 2>&1
-}
-
-
 decrement_version() {
   local input_version=$1
   local patch_number
@@ -127,9 +121,10 @@ decrement_version() {
 package_version() {
   local pkg_path=$1
 
-  if has_binary rpm; then
-    rpm -qp --queryformat='%{VERSION}' $pkg_path 2>/dev/null
-  elif has_binary dpkg; then
+  source /etc/os-release
+  if [[ "$ID_LIKE" =~ rhel ]]; then
+    rpm -qp --queryformat='%{VERSION}' $pkg_path
+  elif [[ "$ID_LIKE" =~ debian ]]; then
     dpkg --info $pkg_path 2>/dev/null | grep -e "^ Version:" | sed 's/^ Version: \([0-9]\.[0-9]\.[0-9]*\).*$/\1/'
   else
     return 1
@@ -140,9 +135,10 @@ package_version() {
 get_providing_packages() {
   local virt_pkg_name=$1
 
-  if has_binary rpm; then
+  source /etc/os-release
+  if [[ "$ID_LIKE" =~ rhel ]]; then
     rpm -q --whatprovides $virt_pkg_name
-  elif has_binary dpkg; then
+  elif [[ "$ID_LIKE" =~ debian ]]; then
     dpkg -l | grep $virt_pkg_name | awk '{print $2}'
   else
     return 1
@@ -153,9 +149,10 @@ get_providing_packages() {
 installed_package_version() {
   local pkg_name=$1
 
-  if has_binary rpm; then
+  source /etc/os-release
+  if [[ "$ID_LIKE" =~ rhel ]]; then
     echo $(rpm -qa --queryformat '%{version}' $pkg_name)
-  elif has_binary dpkg; then
+  elif [[ "$ID_LIKE" =~ debian ]]; then
     dpkg --status $pkg_name 2>/dev/null | grep -e "^Version:" | sed 's/^Version: \([0-9]\.[0-9]\.[0-9]*\).*$/\1/'
   else
     return 1
@@ -166,11 +163,10 @@ installed_package_version() {
 is_installed() {
   local pkg_name=$1
 
-  if has_binary dnf; then
+  source /etc/os-release
+  if [[ "$ID_LIKE" =~ rhel ]]; then
     dnf info $pkg_name > /dev/null
-  elif has_binary yum; then
-    yum info $pkg_name > /dev/null
-  elif has_binary dpkg; then
+  elif [[ "$ID_LIKE" =~ debian ]]; then
     dpkg --status $pkg_name > /dev/null
   else
     return 1
@@ -227,15 +223,10 @@ yum_update_fallback() {
 install_packages() {
   local pkg_paths="$@"
 
-  if has_binary dnf; then
+  source /etc/os-release
+  if [[ "$ID_LIKE" =~ rhel ]]; then
     dnf_install_packages "$pkg_paths"
-  elif has_binary yum; then
-    if version_lower_or_equal $(installed_package_version 'yum') '3.2.22'; then
-      yum_update_fallback "$pkg_paths"
-    else
-      yum_install_packages "$pkg_paths"
-    fi
-  elif has_binary dpkg; then
+  elif [[ "$ID_LIKE" =~ debian ]]; then
     sudo dpkg --install $pkg_paths
     sudo apt-get --assume-yes -f install
   else
@@ -247,11 +238,10 @@ install_packages() {
 uninstall_package() {
   local pkg_names="$1"
 
-  if has_binary dnf; then
+  source /etc/os-release
+  if [[ "$ID_LIKE" =~ rhel ]]; then
     sudo dnf -y erase $pkg_names
-  elif has_binary yum; then
-    sudo yum -y erase $pkg_names
-  elif has_binary apt-get; then
+  elif [[ "$ID_LIKE" =~ debian ]]; then
     sudo apt-get --assume-yes purge $pkg_names
   else
     return 1
@@ -264,52 +254,24 @@ uninstall_package() {
 find_new_package() {
   local name="$1"
   local dir="${CVMFS_PACKAGE_DIR:-/tmp}"
-  if has_binary rpm; then
-    ls ${dir}/${name}*.rpm 2>/dev/null | head -1
+  source /etc/os-release
+  if [[ "$ID_LIKE" =~ rhel ]]; then
+    (ls ${dir}/${name}*.rpm 2>/dev/null || true) | head -1
   else
-    ls ${dir}/${name}*.deb 2>/dev/null | head -1
+    [[ "$ID_LIKE" =~ debian ]]
+    (ls ${dir}/${name}*.deb 2>/dev/null || true) | head -1
   fi
 }
 
 
 # Install all CernVM-FS packages found in CVMFS_PACKAGE_DIR.
 install_new_packages() {
+  source /etc/os-release
   local dir="${CVMFS_PACKAGE_DIR:-/tmp}"
-  if has_binary rpm; then
+  if [[ "$ID_LIKE" =~ rhel ]]; then
     install_packages ${dir}/cvmfs*.rpm
   else
+    [[ "$ID_LIKE" =~ debian ]]
     install_packages ${dir}/cvmfs*.deb
   fi
 }
-
-
-#
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-#
-
-
-# check availability of packages
-if [ x"$CVMFS_CLIENT_PACKAGE" = x"" ] || [ ! -f $CVMFS_CLIENT_PACKAGE ]; then
-  echo "CernVM-FS client package '$CVMFS_CLIENT_PACKAGE' not found!"
-fi
-
-if [ x"$CVMFS_SERVER_PACKAGE" = x"" ]; then
-  CVMFS_SERVER_PACKAGE="${CVMFS_CLIENT_PACKAGE/cvmfs/cvmfs-server}"
-fi
-if [ ! -f $CVMFS_SERVER_PACKAGE ]; then
-  echo "CernVM-FS server package '$CVMFS_SERVER_PACKAGE' not found!"
-fi
-
-if [ x"$CVMFS_LIBS_PACKAGE" = x"" ]; then
-  CVMFS_LIBS_PACKAGE="${CVMFS_CLIENT_PACKAGE/cvmfs/cvmfs-libs}"
-fi
-if [ ! -f $CVMFS_LIBS_PACKAGE ]; then
-  echo "CernVM-FS libs package '$CVMFS_LIBS_PACKAGE' not found!"
-fi
-
-if [ x"$CVMFS_FUSE_PACKAGE" = x"" ]; then
-  CVMFS_FUSE_PACKAGE="${CVMFS_CLIENT_PACKAGE/cvmfs/cvmfs-fuse3}"
-fi
-if [ ! -f $CVMFS_FUSE_PACKAGE ]; then
-  echo "CernVM-FS fuse package '$CVMFS_FUSE_PACKAGE' not found!"
-fi

@@ -49,8 +49,8 @@ cvmfs_run_test() {
 
 
   echo "*** verify published ingest artifacts without remounting the publisher view"
-  cvmfs_server list-catalogs -x "$repo" | grep -q "foo/tarball_foo/a" || return 31
-  cvmfs_server list-catalogs -x "$repo" | grep -q "bar/tarball_foo/a" || return 32
+  cvmfs_server list-catalogs -x "$repo" | grep "foo/tarball_foo/a" || return 31
+  cvmfs_server list-catalogs -x "$repo" | grep "bar/tarball_foo/a" || return 32
 
   echo "*** verify file content was actually ingested"
   local content_size

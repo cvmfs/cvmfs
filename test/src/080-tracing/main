@@ -4,6 +4,8 @@ cvmfs_test_suites="quick"
 
 CVMFS_TEST080_TRACELOG=
 
+repo="grid.cern.ch"
+
 cleanup() {
   if [ "x$CVMFS_TEST080_TRACELOG" != "x" ]; then
     sudo rm -f /tmp/cvmfs-$repo.trace.log 2> /dev/null
@@ -12,7 +14,6 @@ cleanup() {
 
 cvmfs_run_test() {
   logfile=$1
-  local repo="grid.cern.ch"
   CVMFS_TEST080_TRACELOG=/tmp/cvmfs-$repo.trace.log
   echo "*** Setup..."
   cleanup
@@ -31,7 +32,12 @@ cvmfs_run_test() {
     return 2
   fi
 
-  sudo truncate -s0 $CVMFS_TEST080_TRACELOG > /dev/null
+  #TODO(vavolkl): use cvmfs tooling ( showconfig ) to set CVMFS_USER
+  CVMFS_USER=$(
+    source /etc/cvmfs/default.conf >/dev/null
+    printf %s "$CVMFS_USER"
+  )
+  sudo -u "$CVMFS_USER" truncate -s0 $CVMFS_TEST080_TRACELOG > /dev/null
 
   echo "*** Executing a few operations to check tracing..."
 

@@ -49,9 +49,6 @@ cvmfs_run_test() {
   echo "*** disable automatic garbage collection"
   disable_auto_garbage_collection $CVMFS_TEST_REPO || return $?
 
-  echo "*** delete older stats.db files:"
-  rm -vf $CVMFS_TEST_662_DB_PATH
-
   echo "*** starting transaction to edit repository"
   start_transaction $CVMFS_TEST_REPO || return $?
   echo "*** putting some stuff in the repository"

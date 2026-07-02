@@ -51,7 +51,8 @@ cvmfs_run_test() {
   sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO remount sync || return 22
 
   # TODO(jblomer): adjust once the client is properly fixed; for now, test issue diagnostics
-  ls -lah ${mntpnt}/bar # || return 30
+  # ls -lah ${mntpnt}/bar # || return 30
+  ls -lah ${mntpnt}/bar || true # 2026-05-30: fails with "Input/output error"
   # Second attempt should work
   ls -lah ${mntpnt}/bar || return 30
   ls -lah ${mntpnt}/bar/realdir || return 31

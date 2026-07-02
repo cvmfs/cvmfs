@@ -8,7 +8,8 @@ CVMFS_TEST_688_REPO_NAMES=
 cleanup() {
   if [ -n "$CVMFS_TEST_688_REPO_NAMES" ]; then
     for repo in $CVMFS_TEST_688_REPO_NAMES; do
-      sudo cvmfs_server rmfs -f $repo
+      # may not exist
+      sudo cvmfs_server rmfs -f $repo || true
     done
   fi
 }
@@ -131,7 +132,8 @@ cvmfs_run_test() {
 
   create_fake_gc_lock ${replica_name}-1
   echo "*** verify that fake gc lock prevents gc"
-  cvmfs_server gc -f ${replica_name}-1 2>&1 | grep aborting || return 60
+  ! cvmfs_server gc -f ${replica_name}-1 &> gc.err
+  grep aborting gc.err || return 60
   remove_fake_gc_lock ${replica_name}-1
 
   return 0

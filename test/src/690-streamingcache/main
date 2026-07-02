@@ -28,14 +28,14 @@ cvmfs_run_test() {
   mkdir -p ${repo_dir}/nested                                    || return 2
   touch ${repo_dir}/nested/.cvmfscatalog                         || return 2
   echo "Hello World" > ${repo_dir}/internal/small                || return 3
-  cat /dev/urandom | head -c 2500 > ${repo_dir}/internal/bar     || return 4
+  dd if=/dev/urandom bs=2500 count=1 of="${repo_dir}"/internal/bar || return 4
   publish_repo $CVMFS_TEST_REPO -v                               || return 5
 
   start_transaction $CVMFS_TEST_REPO                                      || return $?
   echo "CVMFS_COMPRESSION_ALGORITHM=none" | \
     sudo tee -a /etc/cvmfs/repositories.d/${CVMFS_TEST_REPO}/server.conf
   mkdir -p ${repo_dir}/external                                           || return 6
-  cat /dev/urandom | head -c $((1000*1000*25)) > ${repo_dir}/external/foo || return 7
+  dd if=/dev/urandom bs=25000 count=1000 of=${repo_dir}/external/foo || return 7
   local external_md5=$(cat ${repo_dir}/external/foo | cvmfs_publish hash -a md5)
   echo "*** MD5 hash of ${repo_dir}/external/foo is $external_md5"
   if ! running_on_s3; then

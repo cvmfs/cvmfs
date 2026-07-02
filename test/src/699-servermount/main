@@ -241,7 +241,7 @@ cvmfs_run_test() {
   cat /proc/mounts | grep -e " $repo2_rdonly_dir " && return 61
 
   echo "do \`cvmfs_server mount -a\` to bring all repositories back into proper shape"
-  sudo cvmfs_server mount -a || return 62
+  sudo cvmfs_server mount -a || (sudo journalctl -xe; return 62)
 
   echo "Check that the repositories are properly mounted"
   cat /proc/mounts | grep -e " $repo_dir "         || return 63

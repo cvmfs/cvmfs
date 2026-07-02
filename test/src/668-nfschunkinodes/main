@@ -39,17 +39,17 @@ cvmfs_run_test() {
   echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
 
-  local size=$((32*1024*1024))
   echo "*** put a a large file into $CVMFS_TEST_REPO"
   start_transaction $CVMFS_TEST_REPO                              || return $?
   mkdir /cvmfs/$CVMFS_TEST_REPO/dir                               || return 3
-  yes | head -c $size > /cvmfs/$CVMFS_TEST_REPO/dir/large         || return 3
+  dd if=/dev/urandom bs=1M count=32 of=/cvmfs/$CVMFS_TEST_REPO/dir/large || return 3
+  sha1sum /cvmfs/$CVMFS_TEST_REPO/dir/large > CHECKSUM
   publish_repo $CVMFS_TEST_REPO -v                                || return $?
 
   local mntpnt="${scratch_dir}/private_mnt"
   echo "*** mount private mount point"
   private_mount $mntpnt || return 20
-  [ "x$(tail -n 1 ${mntpnt}/dir/large)" = "xy" ] || return 21
+  sha1sum -c CHECKSUM || return 21
 
   local revision_old=$(get_xattr revision ${mntpnt}) || return 25
   echo "*** revision is $revision_old"
@@ -65,7 +65,8 @@ cvmfs_run_test() {
   echo "*** change contents of large file"
   ls -lisa ${mntpnt}/dir/*
   start_transaction $CVMFS_TEST_REPO                         || return $?
-  yes n | head -c $size > /cvmfs/$CVMFS_TEST_REPO/dir/large  || return 30
+  dd if=/dev/urandom bs=1M count=32 of=/cvmfs/$CVMFS_TEST_REPO/dir/large || return 30
+  sha1sum /cvmfs/$CVMFS_TEST_REPO/dir/large > CHECKSUM
   publish_repo $CVMFS_TEST_REPO -v                           || return $?
 
   echo "*** remount private mount point"
@@ -76,7 +77,7 @@ cvmfs_run_test() {
 
   echo "*** verify new content"
   ls -lisa ${mntpnt}/dir/*
-  [ "x$(tail -n 1 ${mntpnt}/dir/large)" = "xn" ] || return 50
+  sha1sum -c CHECKSUM || return 50
 
   echo "*** verify that our open tail processes did acutally run"
   /bin/kill -TERM $TEST668_TAIL_PID || return 61

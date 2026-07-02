@@ -14,7 +14,7 @@ cvmfs_run_test() {
   # OpenHTC CDN when the suite runs with CVMFS_TEST_USE_CDN=yes, otherwise the
   # direct stratum 1.
   local stratum1="http://cvmfs-stratum-one.cern.ch"
-  if [ "x$CVMFS_TEST_USE_CDN" = "xyes" ]; then
+  if [ "x${CVMFS_TEST_USE_CDN:-}" = "xyes" ]; then
     stratum1="http://s1cern-cvmfs.openhtc.io"
   fi
 

@@ -44,7 +44,8 @@ CVMFS_TEST_626_REPLICA_NAME=""
 cleanup() {
   echo "running cleanup()"
   if [ ! -z $CVMFS_TEST_626_REPLICA_NAME ]; then
-    sudo cvmfs_server rmfs -f $CVMFS_TEST_626_REPLICA_NAME
+    # may not actually exist at some points
+    sudo cvmfs_server rmfs -f $CVMFS_TEST_626_REPLICA_NAME || true
   fi
 }
 
