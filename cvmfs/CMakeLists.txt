@@ -386,21 +386,18 @@ if (BUILD_CVMFS)
     )
   endif ()
   if (NOT MACOSX)
-    install (
-        TARGETS      dcoredumper
-        RUNTIME
-        DESTINATION  bin
-    )
-  endif ()
-  if (NOT MACOSX)
     # Systemd service unit for reloads after package upgrades
     install (
-    FILES pkg/cvmfs-reload.service
-    DESTINATION /usr/lib/systemd/system
-    PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
-  )
-
-  endif()
+        FILES pkg/cvmfs-reload.service
+        DESTINATION /usr/lib/systemd/system
+        PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+    )
+    install (
+        TARGETS       dcoredumper
+        RUNTIME
+        DESTINATION   bin
+    )
+  endif ()
 
 endif (BUILD_CVMFS)
 
