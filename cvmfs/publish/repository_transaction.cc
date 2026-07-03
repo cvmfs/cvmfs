@@ -23,7 +23,7 @@ namespace publish {
 
 
 void Publisher::TransactionRetry() {
-  if (managed_node_.IsValid()) {
+  if (managed_node_.get()!=nullptr) {
     const int rvi = managed_node_->Check(false /* is_quiet */);
     if (rvi != 0)
       throw EPublish("cannot establish writable mountpoint");
@@ -93,7 +93,7 @@ void Publisher::TransactionImpl() {
   if (settings_.storage().type() == upload::SpoolerDefinition::Gateway) {
     DownloadRootObjects(settings_.url(), settings_.fqrn(),
                         settings_.transaction().spool_area().tmp_dir());
-    if (managed_node_.IsValid()) {
+    if (managed_node_.get()!=nullptr) {
       const int rvi = managed_node_->Check(true /* is_quiet */);
       if (rvi != 0)
         throw EPublish("cannot establish writable mountpoint");

@@ -1123,8 +1123,8 @@ TEST_F(T_Dns, NormalResolverLocalonly) {
 TEST_F(T_Dns, NormalResolverCombinedSlow) {
   if (!HasIpv6Connectivity())
     GTEST_SKIP() << "no outbound IPv6 connectivity";
-  UniquePtr<NormalResolver> resolver(NormalResolver::Create(false, 2, 2000));
-  ASSERT_TRUE(resolver.IsValid());
+  std::unique_ptr<NormalResolver> resolver(NormalResolver::Create(false, 2, 2000));
+  ASSERT_TRUE(resolver.get()!=nullptr);
 
   vector<string> names;
   names.push_back("a.root-servers.net");
