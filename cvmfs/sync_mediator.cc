@@ -661,13 +661,27 @@ void SyncMediator::RemoveDirectoryRecursively(SharedPtr<SyncItem> entry,
   // remove the mountpoint directory entry.
   if (fast_delete && catalog_manager_->IsTransitionPoint(directory_path)) {
     // Get the nested catalog's counters before removal so we can update
-    // publish statistics with the total number of removed entries
+    // publish statistics with the total number of removed entries.  Because the
+    // filesystem is not walked, these aggregate counters (self + subtree) are
+    // the only source for the removal statistics.  self.directories already
+    // accounts for the nested catalog root, which is the same filesystem
+    // directory as the mountpoint removed from the parent below, so it must not
+    // be counted again (the normal traversal path also counts it exactly once).
     std::string subcatalog_path;
     shash::Any hash;
     PathString ps_path;
     ps_path.Assign(directory_path.data(), directory_path.length());
     const catalog::Counters counters =
         catalog_manager_->LookupCounters(ps_path, &subcatalog_path, &hash);
+    // On failure to load the subtree LookupCounters returns zeroed counters and
+    // a null hash.  Removal proceeds regardless, but the statistics would
+    // silently under-count, so warn.
+    if (hash.IsNull()) {
+      LogCvmfs(kLogPublish, kLogStderr | kLogSyslogWarn,
+               "Warning: could not read counters of nested catalog at '%s'; "
+               "removal statistics may be incomplete",
+               directory_path.c_str());
+    }
     {
       perf::Xadd(counters_->n_files_removed,
           static_cast<int64_t>(counters.self.regular_files
@@ -696,7 +710,6 @@ void SyncMediator::RemoveDirectoryRecursively(SharedPtr<SyncItem> entry,
     if (!params_->dry_run) {
       catalog_manager_->RemoveDirectory(directory_path);
     }
-    perf::Inc(counters_->n_directories_removed);
 
     return;
   }
