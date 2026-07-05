@@ -923,8 +923,17 @@ void WritableCatalogManager::RemoveNestedCatalog(const string &mountpoint,
           nested_catalog->database_path().c_str());
   }
 
-  // Remove the catalog from internal data structures
-  DetachCatalog(nested_catalog);
+  // Remove the catalog from internal data structures.
+  // On merge the children have been re-parented into this catalog's parent by
+  // MergeIntoParent (CopyCatalogsToParent), so only this catalog is detached.
+  // On removal (fast delete) the whole subtree is discarded together with the
+  // catalog, so any attached children must be detached as well - otherwise they
+  // would be left in the manager with a dangling parent pointer.
+  if (merge) {
+    DetachCatalog(nested_catalog);
+  } else {
+    DetachSubtree(nested_catalog);
+  }
   SyncUnlock();
 }
 
