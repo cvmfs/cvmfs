@@ -1,6 +1,0 @@
-CVMFS_HTTP_PROXY=VARNISH PROXY URL
-CVMFS_GATEWAY=CVMFS GATEWAY URL, eg http://cvmfs-gateway:4900/api/v1 
-CVMFS_STRATUM0=BUCKET URL FOR INTERNAL DATA, eg http://minio/bucket/test.repo 
-CVMFS_EXTERNAL_URL=BUCKET URL FOR EXTERNAL DATAhttp://minio/bucket/test.repo.external
-CVMFS_S3_ACCESS_KEY=access key for both buckets
-CVMFS_S3_SECRET_KEY=secret key for both buckets
