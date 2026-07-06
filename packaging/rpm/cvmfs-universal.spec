@@ -123,6 +123,13 @@ BuildRequires: nlohmann_json-devel
 BuildRequires: json-devel
 %endif
 BuildRequires: libarchive-devel
+# protobuf is optional: the build uses the system package when present and
+# otherwise falls back to the vendored (FetchContent) sources. protoc ships in a
+# separate protobuf-compiler package everywhere except SUSE.
+BuildRequires: protobuf-devel
+%if !0%{?suse_version}
+BuildRequires: protobuf-compiler
+%endif
 %if 0%{?rhel} >= 7 || 0%{?fedora} || 0%{?sle12} || 0%{?sle15}
 BuildRequires: systemd
 %endif

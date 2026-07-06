@@ -492,7 +492,11 @@ endif ()
 if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_LIBCVMFS_CACHE OR
     BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG OR BUILD_UBENCHMARKS OR
     BUILD_SHRINKWRAP)
-  find_package(Protobuf REQUIRED)
+  # protobuf (protobuf-lite + protoc) is provided by the externals/protobuf
+  # FetchContent module (or the system, via BUILTIN_EXTERNALS_EXCLUDE) as the
+  # protobuf::libprotobuf-lite / protobuf::protoc targets, exposed through the
+  # PROTOBUF_LITE_LIBRARY / PROTOBUF_PROTOC_EXECUTABLE / PROTOBUF_INCLUDE_DIRS
+  # variables.
   set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${PROTOBUF_INCLUDE_DIRS})
 endif ()
 
