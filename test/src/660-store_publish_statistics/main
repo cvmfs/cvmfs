@@ -4,7 +4,7 @@ cvmfs_test_name="Store publish statistics in a SQLite database"
 cvmfs_test_autofs_on_startup=false
 cvmfs_test_suites="quick"
 
-CVMFS_TEST_660_NR_OF_TESTS=5
+CVMFS_TEST_660_NR_OF_TESTS=6
 CVMFS_TEST_660_DB_PATH=/var/spool/cvmfs/test-660.cern.ch/stats.db
 CVMFS_TEST_660_TAR_FILE=tarfile.tar
 CVMFS_TEST_660_TAR_DIR=newTarDir
@@ -79,6 +79,24 @@ test5() {
   echo "smallfilesmallfile" > foo/smallfile
   inflate_file foo/mediumfile foo/smallfile 100000     # 100kB file
   inflate_file foo/bigfile foo/mediumfile   100000000  # 100MB file
+  popdir
+}
+
+# nested catalogs with descendant nested catalogs; used to test fast-delete
+# removal statistics and catalog counter consistency.
+test6() {
+  local working_dir=$1
+  pushdir $working_dir
+
+  mkdir -p fastdel/child/grandchild/plain
+  touch fastdel/.cvmfscatalog
+  touch fastdel/child/.cvmfscatalog
+  touch fastdel/child/grandchild/.cvmfscatalog
+  echo "root" > fastdel/file_root
+  echo "child" > fastdel/child/file_child
+  echo "grand" > fastdel/child/grandchild/file_grandchild
+  echo "plain" > fastdel/child/grandchild/plain/file_plain
+
   popdir
 }
 
@@ -165,6 +183,23 @@ cvmfs_run_test() {
 
   actual_values[5]=$(sqlite3 $CVMFS_TEST_660_DB_PATH 'select * from publish_statistics' | tail -1)
 
+  # ============================ Test6 =============================
+
+  echo "*** Test 6 - fast-delete nested catalogs with descendants"
+  start_transaction $repo_name || return $?
+
+  test6 $repo_dir || return 6
+
+  publish_repo $repo_name || return $?
+
+  cvmfs_server ingest -f fastdel $repo_name || return $?
+
+  # Catch catalog statistics counter regressions immediately after fast-delete,
+  # in addition to checking the stored publish statistics below.
+  check_repository $repo_name -i || return $?
+
+  actual_values[6]=$(sqlite3 $CVMFS_TEST_660_DB_PATH 'select * from publish_statistics' | tail -1)
+
 
   # =========================================================================================================
 
@@ -203,6 +238,9 @@ cvmfs_run_test() {
 
   # test 5
   expected_values_5=([3]=7 4 0 0 8 1 2 1 0 0 0 0 0 100116035 0 243062)
+
+  # test 6 (revision 8 creates the nested tree; revision 9 fast-deletes it)
+  expected_values_6=([3]=9 0 7 0 0 0 1 0 4 0 0 0 0 0 23 0)
 
 
   # check publish statistics
