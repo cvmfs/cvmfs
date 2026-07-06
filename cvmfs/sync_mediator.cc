@@ -667,6 +667,9 @@ void SyncMediator::RemoveDirectoryRecursively(SharedPtr<SyncItem> entry,
     // accounts for the nested catalog root, which is the same filesystem
     // directory as the mountpoint removed from the parent below, so it must not
     // be counted again (the normal traversal path also counts it exactly once).
+    // Likewise, every descendant nested catalog is represented twice in the
+    // aggregate counters (mountpoint + root), so subtract the nested catalog
+    // count from the aggregate directory count below.
     std::string subcatalog_path;
     shash::Any hash;
     PathString ps_path;
@@ -686,9 +689,12 @@ void SyncMediator::RemoveDirectoryRecursively(SharedPtr<SyncItem> entry,
       perf::Xadd(counters_->n_files_removed,
           static_cast<int64_t>(counters.self.regular_files
                                + counters.subtree.regular_files));
+      const uint64_t n_nested_catalogs = counters.self.nested_catalogs
+                                         + counters.subtree.nested_catalogs;
+      const uint64_t n_directories = counters.self.directories
+                                     + counters.subtree.directories;
       perf::Xadd(counters_->n_directories_removed,
-          static_cast<int64_t>(counters.self.directories
-                               + counters.subtree.directories));
+                 static_cast<int64_t>(n_directories - n_nested_catalogs));
       perf::Xadd(counters_->n_symlinks_removed,
           static_cast<int64_t>(counters.self.symlinks
                                + counters.subtree.symlinks));
