@@ -661,20 +661,45 @@ void SyncMediator::RemoveDirectoryRecursively(SharedPtr<SyncItem> entry,
   // remove the mountpoint directory entry.
   if (fast_delete && catalog_manager_->IsTransitionPoint(directory_path)) {
     // Get the nested catalog's counters before removal so we can update
-    // publish statistics with the total number of removed entries
+    // publish statistics with the total number of removed entries.  Because the
+    // filesystem is not walked, these aggregate counters (self + subtree) are
+    // the only source for the removal statistics.  self.directories already
+    // accounts for the nested catalog root, which is the same filesystem
+    // directory as the mountpoint removed from the parent below, so it must not
+    // be counted again (the normal traversal path also counts it exactly once).
+    // Likewise, every descendant nested catalog is represented twice in the
+    // aggregate counters (mountpoint + root), so subtract the nested catalog
+    // count from the aggregate directory count below.
     std::string subcatalog_path;
     shash::Any hash;
+    // LookupCounters expects an absolute catalog path (leading slash); the sync
+    // item's relative path does not carry one, so prepend it here.  Without the
+    // slash the prefix match falls back to the root catalog and the removal
+    // statistics would account for the whole repository instead of the subtree.
+    const std::string absolute_path = "/" + directory_path;
     PathString ps_path;
-    ps_path.Assign(directory_path.data(), directory_path.length());
+    ps_path.Assign(absolute_path.data(), absolute_path.length());
     const catalog::Counters counters =
         catalog_manager_->LookupCounters(ps_path, &subcatalog_path, &hash);
+    // On failure to load the subtree LookupCounters returns zeroed counters and
+    // a null hash.  Removal proceeds regardless, but the statistics would
+    // silently under-count, so warn.
+    if (hash.IsNull()) {
+      LogCvmfs(kLogPublish, kLogStderr | kLogSyslogWarn,
+               "Warning: could not read counters of nested catalog at '%s'; "
+               "removal statistics may be incomplete",
+               directory_path.c_str());
+    }
     {
       perf::Xadd(counters_->n_files_removed,
           static_cast<int64_t>(counters.self.regular_files
                                + counters.subtree.regular_files));
+      const uint64_t n_nested_catalogs = counters.self.nested_catalogs
+                                         + counters.subtree.nested_catalogs;
+      const uint64_t n_directories = counters.self.directories
+                                     + counters.subtree.directories;
       perf::Xadd(counters_->n_directories_removed,
-          static_cast<int64_t>(counters.self.directories
-                               + counters.subtree.directories));
+                 static_cast<int64_t>(n_directories - n_nested_catalogs));
       perf::Xadd(counters_->n_symlinks_removed,
           static_cast<int64_t>(counters.self.symlinks
                                + counters.subtree.symlinks));
@@ -696,7 +721,6 @@ void SyncMediator::RemoveDirectoryRecursively(SharedPtr<SyncItem> entry,
     if (!params_->dry_run) {
       catalog_manager_->RemoveDirectory(directory_path);
     }
-    perf::Inc(counters_->n_directories_removed);
 
     return;
   }
