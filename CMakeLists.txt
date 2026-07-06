@@ -481,11 +481,10 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_SERVER OR BUILD_SERVER_DEBUG OR
 endif ()
 
 # Client/libcvmfs/preloader only: pacparser, sparsehash
+# pacparser is provided by the externals/pacparser FetchContent module (or the
+# system, via BUILTIN_EXTERNALS_EXCLUDE) as the pacparser::pacparser target.
 if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_PRELOADER OR
     BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG OR BUILD_SHRINKWRAP)
-  find_package (pacparser REQUIRED)
-  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${PACPARSER_INCLUDE_DIR})
-
   find_package(Sparsehash)
   set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${SPARSEHASH_INCLUDE_DIR})
 endif ()

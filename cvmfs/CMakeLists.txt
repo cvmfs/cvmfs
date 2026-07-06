@@ -270,7 +270,7 @@ if (BUILD_CVMFS)
        ${CURL_LIBRARIES}
        ${CARES_LIBRARIES} ${CARES_LDFLAGS}
        ${OPENSSL_LIBRARIES}
-       ${PACPARSER_LIBRARIES}
+       pacparser::pacparser
        ${SQLITE3_LIBRARY}
        ${ZLIB_LIBRARIES}
        ${SPARSEHASH_LIBRARIES}
@@ -423,7 +423,6 @@ if (BUILD_LIBCVMFS)
   target_include_directories (cvmfs_client PRIVATE ${CARES_INCLUDE_DIRS})
   target_include_directories (cvmfs_client PRIVATE ${CURL_INCLUDE_DIRS})
   target_include_directories (cvmfs_client PRIVATE ${LEVELDB_INCLUDE_DIR})
-  target_include_directories (cvmfs_client PRIVATE ${PACPARSER_INCLUDE_DIR})
   target_include_directories (cvmfs_client PRIVATE ${ZLIB_INCLUDE_DIRS})
   target_include_directories (cvmfs_client PRIVATE ${PROTOBUF_INCLUDE_DIRS})
 
@@ -436,7 +435,7 @@ if (BUILD_LIBCVMFS)
                                  ${CURL_LIBRARIES}
                                  ${CARES_LIBRARIES}
                                  ${LEVELDB_LIBRARIES}
-                                 ${PACPARSER_LIBRARIES}
+                                 pacparser::pacparser
                                  ${ZLIB_LIBRARIES}
                                  nlohmann_json::nlohmann_json
                                  ${PROTOBUF_LITE_LIBRARY}

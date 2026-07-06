@@ -605,7 +605,7 @@ list (APPEND CVMFS_UNITTESTS_LINK_LIBRARIES
       ${SQLITE3_LIBRARY}
       ${ZLIB_LIBRARIES}
       ${UUID_LIBRARIES}
-      ${PACPARSER_LIBRARIES}
+      pacparser::pacparser
       nlohmann_json::nlohmann_json
       ${PROTOBUF_LITE_LIBRARY}
       ${CAP_LIBRARIES}
