@@ -672,8 +672,13 @@ void SyncMediator::RemoveDirectoryRecursively(SharedPtr<SyncItem> entry,
     // count from the aggregate directory count below.
     std::string subcatalog_path;
     shash::Any hash;
+    // LookupCounters expects an absolute catalog path (leading slash); the sync
+    // item's relative path does not carry one, so prepend it here.  Without the
+    // slash the prefix match falls back to the root catalog and the removal
+    // statistics would account for the whole repository instead of the subtree.
+    const std::string absolute_path = "/" + directory_path;
     PathString ps_path;
-    ps_path.Assign(directory_path.data(), directory_path.length());
+    ps_path.Assign(absolute_path.data(), absolute_path.length());
     const catalog::Counters counters =
         catalog_manager_->LookupCounters(ps_path, &subcatalog_path, &hash);
     // On failure to load the subtree LookupCounters returns zeroed counters and
