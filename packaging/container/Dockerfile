@@ -65,6 +65,7 @@ RUN --mount=type=bind,source=.,target=/src \
       -DBUILD_LIBCVMFS=no -DBUILD_LIBCVMFS_CACHE=no \
       -DINSTALL_BASH_COMPLETION=no \
       -DEXTERNALS_PREFIX=/root/.cache/cvmfs_externals_install \
+      -DEXTERNALS_DOWNLOAD_LOCATION=/root/.cache/cvmfs_externals_install/download \
       /src; \
     make -j"$(nproc)"; \
     make DESTDIR=/rootfs install; \

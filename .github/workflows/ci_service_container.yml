@@ -4,11 +4,6 @@ on:
   push:
     branches: ['devel', 'cvmfs*']
   pull_request:
-    paths:
-      - 'packaging/container/**'
-      - 'ci/cvmfs/container.sh'
-      - 'ci/common.sh'
-      - '.github/workflows/ci_service_container.yml'
     branches: ['devel', 'cvmfs*']
   workflow_dispatch:
 
