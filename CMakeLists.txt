@@ -268,9 +268,6 @@ if (BUILTIN_EXTERNALS)
     if (BUILD_GEOAPI)
       set(ENV{BUILD_GEOAPI} "true")
     endif ()
-    if (BUILD_QC_TESTS)
-      set(ENV{BUILD_QC_TESTS} "true")
-    endif()
     if (BUILD_GATEWAY)
       set(ENV{BUILD_GATEWAY} "true")
     endif ()
@@ -306,7 +303,6 @@ if (BUILTIN_EXTERNALS)
     set(ENV{IS_64_BIT} "")
     set(ENV{BUILD_UBENCHMARKS} "")
     set(ENV{BUILD_SERVER} "")
-    set(ENV{BUILD_QC_TESTS} "")
     set(ENV{BUILD_GATEWAY} "")
     set(ENV{BUILD_DUCC} "")
     set(ENV{BUILD_SNAPSHOTTER} "")
@@ -581,7 +577,13 @@ endif ()
 if (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
   add_compile_definitions(_CVMFS_UNITTESTS_ENABLED)
   enable_testing ()
-  add_custom_target (check ${CMAKE_CTEST_COMMAND} -VV)
+  # FuzzTest pulls in Abseil, whose absl/log defines a target named `check`
+  # (absl::check). Skip our `make check` convenience target when the quickcheck
+  # tests are built to avoid a target name collision; CI drives the tests via
+  # ctest directly in that configuration.
+  if (NOT BUILD_QC_TESTS)
+    add_custom_target (check ${CMAKE_CTEST_COMMAND} -VV)
+  endif ()
   add_subdirectory (test/unittests)
 endif ()
 
@@ -590,8 +592,8 @@ if (BUILD_UBENCHMARKS)
 endif ()
 
 if (BUILD_QC_TESTS)
-  find_package(RapidCheck REQUIRED)
-  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${RAPIDCHECK_INCLUDE_DIRS})
+  # FuzzTest is fetched via FetchContent inside test/quickcheck/CMakeLists.txt,
+  # so no find_package / bootstrap external is required here.
   add_subdirectory (test/quickcheck)
 endif ()
 

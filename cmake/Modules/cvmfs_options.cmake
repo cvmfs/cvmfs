@@ -21,7 +21,7 @@ option (BUILD_SERVER_DEBUG      "Build writer's end programs with debug symbols 
 option (BUILD_UNITTESTS         "Build the CernVM-FS unit test set"                                OFF)
 option (BUILD_UNITTESTS_DEBUG   "Build the CernVM-FS unit test set with verbose output and -g"     OFF)
 option (BUILD_UBENCHMARKS       "Build the CernVM-FS micro benchmarks"                             OFF)
-option (BUILD_QC_TESTS          "Build the QuickCheck property random tests"                       OFF)
+option (BUILD_QC_TESTS          "Build the FuzzTest property-based random tests"                   OFF)
 option (BUILD_STRESS_TESTS      "Build the stress tests"                                           OFF)
 option (BUILD_DOCUMENTATION     "Build the CernVM-FS documentation using Doxygen"                   OFF)
 option (BUILD_MANPAGES          "Build the CernVM-FS manpages"                                      ${BUILD_MANPAGES_DEFAULT})
