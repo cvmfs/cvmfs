@@ -218,6 +218,13 @@ include (cvmfs_compiler)
 #
 set (EXTERNALS_LIB_LOCATION       "${CMAKE_SOURCE_DIR}/externals")
 
+# Download cache for FetchContent-based externals. Defaults into the source
+# tree so that a checkout with a populated download cache can be packed into a
+# self-contained source tarball. Override (e.g. in read-only container builds
+# where the source is bind-mounted read-only) to point at a writable location.
+set (EXTERNALS_DOWNLOAD_LOCATION  "${EXTERNALS_LIB_LOCATION}/download"
+     CACHE PATH "Download cache directory for vendored externals")
+
 # For convenience in CI workflows, allow to set EXTERNALS_PREFIX via environment
 if (NOT EXTERNALS_PREFIX)
   if (NOT $ENV{CVMFS_EXTERNALS_PREFIX} STREQUAL "")
