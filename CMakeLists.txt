@@ -474,7 +474,9 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_SERVER OR BUILD_SERVER_DEBUG OR
     endif ()
   endif (CURL_INCLUDE_DIRS)
 
-  find_package (SQLite3 REQUIRED)
+  # sqlite3 is provided by the externals/sqlite3 FetchContent module (or the
+  # system, via BUILTIN_EXTERNALS_EXCLUDE) as the SQLite::SQLite3 target; it also
+  # sets SQLITE3_INCLUDE_DIR for the global include list below.
   set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${SQLITE3_INCLUDE_DIR})
 
   # leveldb is provided by the externals/leveldb FetchContent module (or the
