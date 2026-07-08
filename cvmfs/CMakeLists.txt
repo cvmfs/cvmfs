@@ -273,7 +273,7 @@ if (BUILD_CVMFS)
        pacparser::pacparser
        ${SQLITE3_LIBRARY}
        ${ZLIB_LIBRARIES}
-       ${SPARSEHASH_LIBRARIES}
+       sparsehash::sparsehash
        ${LEVELDB_LIBRARIES}
        ${PROTOBUF_LITE_LIBRARY}
        nlohmann_json::nlohmann_json
@@ -438,6 +438,7 @@ if (BUILD_LIBCVMFS)
                                  pacparser::pacparser
                                  ${ZLIB_LIBRARIES}
                                  nlohmann_json::nlohmann_json
+                                 sparsehash::sparsehash
                                  ${PROTOBUF_LITE_LIBRARY}
   )
 
