@@ -1,6 +1,6 @@
 #!/bin/bash
 
-cvmfs_test_name="Using config files from /etc/cvmfs/default.d/"
+cvmfs_test_name="Client configuration files and showconfig output"
 cvmfs_test_suites="quick"
 
 create_config_files() {
@@ -14,6 +14,26 @@ cleanup_config_files() {
   sudo rm -f /etc/cvmfs/default.d/50-test*
 }
 
+# Turn the plain 'showconfig' output into sorted KEY=VALUE lines: keep only
+# parameter lines, dropping the "# from SOURCE" provenance and the shell quoting.
+normalize_plain() {
+  awk -v q="'" '
+    /^[A-Za-z_][A-Za-z0-9_]*=/ {
+      eq = index($0, "=")
+      key = substr($0, 1, eq - 1)
+      value = substr($0, eq + 1)
+      sub(/[ \t]+# from .*$/, "", value)
+      gsub("^" q "|" q "$", "", value)
+      print key "=" value
+    }
+  ' | sort
+}
+
+# Turn a 'showconfig -j' object into the same sorted KEY=VALUE lines.
+normalize_json() {
+  jq -r 'to_entries[] | "\(.key)=\(.value)"' | sort
+}
+
 cvmfs_run_test() {
   logfile=$1
 
@@ -23,6 +43,21 @@ cvmfs_run_test() {
   cvmfs_mount grid.cern.ch || retval=2
   sudo cvmfs_talk -i grid.cern.ch parameters | grep CVMFS_KCACHE_TIMEOUT=3 | grep /etc/cvmfs/default.d/50-testB.conf || retval=3
   cvmfs_config showconfig grid.cern.ch | grep CVMFS_KCACHE_TIMEOUT=3 | grep /etc/cvmfs/default.d/50-testB.conf || retval=4
+
+  # The JSON output (-j) must expose the same resolved configuration as the
+  # plain text output.
+  # the value resolved above must also appear in the JSON object
+  cvmfs_config showconfig -j grid.cern.ch | jq -e '.CVMFS_KCACHE_TIMEOUT == "3"' > /dev/null || retval=40
+  # the JSON object carries the same parameters as the plain output
+  diff <(cvmfs_config showconfig    grid.cern.ch | normalize_plain) \
+       <(cvmfs_config showconfig -j grid.cern.ch | normalize_json) || retval=41
+  # the short output (-s) is identical in plain and JSON form
+  diff <(cvmfs_config showconfig -s   grid.cern.ch | normalize_plain) \
+       <(cvmfs_config showconfig -s -j grid.cern.ch | normalize_json) || retval=42
+  # without a repository name the output is a JSON array, one object per repo
+  diff <(cvmfs_config showconfig    | normalize_plain) \
+       <(cvmfs_config showconfig -j | jq '.[]' | normalize_json) || retval=43
+
   cvmfs_umount grid.cern.ch || retval=5
 
   cvmfs_mount grid.cern.ch "CVMFS_KCACHE_TIMEOUT=4" || retval=6
