@@ -158,7 +158,7 @@ if (BUILD_CVMFS)
   # /usr/bin/dcoredumper (Linux only, x86_64)
   #
   if (NOT MACOSX)
-    add_executable (dcoredumper Dcoredumper.c)
+    add_executable (dcoredumper Dcoredumper.cc)
     set_target_properties (dcoredumper PROPERTIES LINKER_LANGUAGE C)
   endif ()
 
