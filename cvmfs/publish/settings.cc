@@ -121,6 +121,10 @@ void SettingsTransaction::SetPrintChangeset(bool value) {
 
 void SettingsTransaction::SetDryRun(bool value) { dry_run_ = value; }
 
+void SettingsTransaction::SetAllowNonexistentPath(bool value) {
+  allow_nonexistent_path_ = value;
+}
+
 void SettingsTransaction::SetUnionFsType(const std::string &union_fs) {
   if (union_fs == "aufs") {
     union_fs_ = kUnionFsAufs;

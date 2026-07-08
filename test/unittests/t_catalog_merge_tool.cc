@@ -164,6 +164,184 @@ TEST_F(T_CatalogMergeTool, CRUD) {
   EXPECT_FALSE(output_spec.Item("dir/dir"));
 }
 
+TEST_F(T_CatalogMergeTool, NonExistingLeasePath) {
+  // Base repository only contains "/dir". A publisher opens a lease on the
+  // non-existing path "newtop/sub/leaf" and creates the whole ancestor chain.
+  // The scoped merge must materialize the missing ancestors ("newtop",
+  // "newtop/sub") rather than aborting when adding the leaf's contents.
+  DirSpec base;
+  EXPECT_TRUE(base.AddDirectory("dir", "", 4096));
+
+  const std::string repo_name = "test_nonexisting";
+  CatalogTestTool tester(repo_name);
+  EXPECT_TRUE(tester.Init());
+
+  EXPECT_TRUE(tester.Apply("base", base));
+  manifest::Manifest first_manifest = *(tester.manifest());
+
+  // Add the full new subtree, including the ancestor directories that do not
+  // exist in the base repository.
+  DirSpec update = base;
+  EXPECT_TRUE(update.AddDirectory("newtop", "", 4096));
+  EXPECT_TRUE(update.AddDirectory("sub", "newtop", 4096));
+  EXPECT_TRUE(update.AddDirectory("leaf", "newtop/sub", 4096));
+  EXPECT_TRUE(update.AddFile("f.txt", "newtop/sub/leaf", hashes[3], 1024));
+
+  EXPECT_TRUE(tester.Apply("second", update));
+
+  UniquePtr<ServerTool> server_tool(new ServerTool());
+  EXPECT_TRUE(server_tool->InitDownloadManager(true, ""));
+
+  const receiver::Params params = MakeMergeToolParams(repo_name);
+  CatalogTestTool::History history = tester.history();
+  perf::Statistics statistics;
+
+  // Lease path is the deep, previously non-existing directory.
+  receiver::CatalogMergeTool<catalog::WritableCatalogManager,
+                             catalog::SimpleCatalogManager>
+      merge_tool(params.stratum0, history[1].second, history[2].second,
+                 PathString("newtop/sub/leaf"),
+                 GetCurrentWorkingDirectory() + "/merge_tool",
+                 server_tool->download_manager(), &first_manifest, &statistics,
+                 "");
+  EXPECT_TRUE(merge_tool.Init());
+
+  std::string output_manifest_path;
+  shash::Any output_manifest_hash;
+  uint64_t final_rev;
+  EXPECT_TRUE(merge_tool.Run(params, &output_manifest_path,
+                             &output_manifest_hash, &final_rev));
+
+  UniquePtr<manifest::Manifest> output_manifest(
+      manifest::Manifest::LoadFile(output_manifest_path));
+  EXPECT_TRUE(output_manifest.IsValid());
+
+  DirSpec output_spec;
+  EXPECT_TRUE(
+      tester.DirSpecAtRootHash(output_manifest->catalog_hash(), &output_spec));
+
+  // The materialized ancestors and the leaf subtree must all be present.
+  // Note: DirSpec keys root-level entries with a leading slash (from
+  // GetFullPath with an empty parent) but nested entries without one.
+  ASSERT_TRUE(output_spec.Item("/newtop"));
+  EXPECT_TRUE(output_spec.Item("/newtop")->entry_base().IsDirectory());
+  ASSERT_TRUE(output_spec.Item("newtop/sub"));
+  EXPECT_TRUE(output_spec.Item("newtop/sub")->entry_base().IsDirectory());
+  ASSERT_TRUE(output_spec.Item("newtop/sub/leaf"));
+  EXPECT_TRUE(output_spec.Item("newtop/sub/leaf")->entry_base().IsDirectory());
+  ASSERT_TRUE(output_spec.Item("newtop/sub/leaf/f.txt"));
+  EXPECT_EQ(1024u,
+            output_spec.Item("newtop/sub/leaf/f.txt")->entry_base().size());
+
+  // The pre-existing, out-of-lease "/dir" is untouched.
+  EXPECT_TRUE(output_spec.Item("/dir"));
+}
+
+TEST_F(T_CatalogMergeTool, NonExistingLeasePathNoop) {
+  // Publishing an allowed lease without creating its missing path is a normal
+  // no-op. In particular, C_N has no lease leaf or ancestors to materialize.
+  DirSpec base;
+  EXPECT_TRUE(base.AddDirectory("dir", "", 4096));
+
+  const std::string repo_name = "test_nonexisting_noop";
+  CatalogTestTool tester(repo_name);
+  EXPECT_TRUE(tester.Init());
+  EXPECT_TRUE(tester.Apply("base", base));
+  manifest::Manifest first_manifest = *(tester.manifest());
+
+  UniquePtr<ServerTool> server_tool(new ServerTool());
+  EXPECT_TRUE(server_tool->InitDownloadManager(true, ""));
+
+  const receiver::Params params = MakeMergeToolParams(repo_name);
+  CatalogTestTool::History history = tester.history();
+  perf::Statistics statistics;
+  receiver::CatalogMergeTool<catalog::WritableCatalogManager,
+                             catalog::SimpleCatalogManager>
+      merge_tool(params.stratum0, history[1].second, history[1].second,
+                 PathString("newtop/sub/leaf"),
+                 GetCurrentWorkingDirectory() + "/merge_tool",
+                 server_tool->download_manager(), &first_manifest, &statistics,
+                 "");
+  EXPECT_TRUE(merge_tool.Init());
+
+  std::string output_manifest_path;
+  shash::Any output_manifest_hash;
+  uint64_t final_rev;
+  EXPECT_TRUE(merge_tool.Run(params, &output_manifest_path,
+                             &output_manifest_hash, &final_rev));
+
+  UniquePtr<manifest::Manifest> output_manifest(
+      manifest::Manifest::LoadFile(output_manifest_path));
+  ASSERT_TRUE(output_manifest.IsValid());
+  DirSpec output_spec;
+  EXPECT_TRUE(
+      tester.DirSpecAtRootHash(output_manifest->catalog_hash(), &output_spec));
+  EXPECT_TRUE(output_spec.Item("/dir"));
+  EXPECT_FALSE(output_spec.Item("/newtop"));
+}
+
+TEST_F(T_CatalogMergeTool, RootLeasePathWithSlash) {
+  // Regression test for the mountless "--base_dir /" ingest: the lease path
+  // relative to the repository root arrives as a bare "/" (from a lease path
+  // like "test.repo.org//" reduced by RemoveRepoName) rather than the empty
+  // string. CreateMissingAncestorDirs must treat "/" as the root (no ancestors
+  // to create) instead of trying to look up the non-existent "/" entry and
+  // aborting the whole merge.
+  DirSpec base;
+  EXPECT_TRUE(base.AddDirectory("dir", "", 4096));
+
+  const std::string repo_name = "test_root_slash";
+  CatalogTestTool tester(repo_name);
+  EXPECT_TRUE(tester.Init());
+
+  EXPECT_TRUE(tester.Apply("base", base));
+  manifest::Manifest first_manifest = *(tester.manifest());
+
+  // Add content at the repository root, as a full-tree ingest would.
+  DirSpec update = base;
+  EXPECT_TRUE(update.AddDirectory("top", "", 4096));
+  EXPECT_TRUE(update.AddFile("f.txt", "top", hashes[3], 1024));
+
+  EXPECT_TRUE(tester.Apply("second", update));
+
+  UniquePtr<ServerTool> server_tool(new ServerTool());
+  EXPECT_TRUE(server_tool->InitDownloadManager(true, ""));
+
+  const receiver::Params params = MakeMergeToolParams(repo_name);
+  CatalogTestTool::History history = tester.history();
+  perf::Statistics statistics;
+
+  // Lease path is the bare "/" (root), not the empty string.
+  receiver::CatalogMergeTool<catalog::WritableCatalogManager,
+                             catalog::SimpleCatalogManager>
+      merge_tool(params.stratum0, history[1].second, history[2].second,
+                 PathString("/"), GetCurrentWorkingDirectory() + "/merge_tool",
+                 server_tool->download_manager(), &first_manifest, &statistics,
+                 "");
+  EXPECT_TRUE(merge_tool.Init());
+
+  std::string output_manifest_path;
+  shash::Any output_manifest_hash;
+  uint64_t final_rev;
+  ASSERT_TRUE(merge_tool.Run(params, &output_manifest_path,
+                             &output_manifest_hash, &final_rev));
+
+  UniquePtr<manifest::Manifest> output_manifest(
+      manifest::Manifest::LoadFile(output_manifest_path));
+  ASSERT_TRUE(output_manifest.IsValid());
+
+  DirSpec output_spec;
+  EXPECT_TRUE(
+      tester.DirSpecAtRootHash(output_manifest->catalog_hash(), &output_spec));
+
+  // The root-level additions and the pre-existing "/dir" must all be present.
+  ASSERT_TRUE(output_spec.Item("/top"));
+  EXPECT_TRUE(output_spec.Item("/top")->entry_base().IsDirectory());
+  ASSERT_TRUE(output_spec.Item("top/f.txt"));
+  EXPECT_EQ(1024u, output_spec.Item("top/f.txt")->entry_base().size());
+  EXPECT_TRUE(output_spec.Item("/dir"));
+}
+
 TEST_F(T_CatalogMergeTool, Symlink) {
   // we start by creating a simple structure
   // .

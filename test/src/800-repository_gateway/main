@@ -223,6 +223,41 @@ cvmfs_run_test() {
     compare_file_checksum /cvmfs/test.repo.org/new/c/another_file_trailing.txt \
         f1885b1a57c71cacbd923fc5e9aefef3 || return 103
 
+    ## Transaction 13 (Lease on a non-existing path is rejected by default)
+    ## The parent /nonexistent/deep does not exist. Without
+    ## --allow-nonexistent-path the transaction must fail with ENOENT (2) and
+    ## leave the repository in a clean state (the acquired lease is dropped).
+    echo "***  Starting transaction 13 (expect failure on non-existing path)"
+    if ! expect_exit_code 2 \
+            cvmfs_server transaction test.repo.org/nonexistent/deep/path; then
+        echo "Transaction on a non-existing path should fail with ENOENT (2)"
+        return 120
+    fi
+    echo "  Repository must still be sane after the rejected transaction"
+    cvmfs_server check test.repo.org || return 121
+
+    ## Transaction 14 (Non-existing path allowed via --allow-nonexistent-path)
+    ## The receiver materializes the missing ancestor directories
+    ## (/nonexistent and /nonexistent/deep) during the commit's catalog merge.
+    echo "***  Starting transaction 14 (non-existing path allowed)"
+    cvmfs_server transaction --allow-nonexistent-path \
+        test.repo.org/nonexistent/deep/path || return 122
+    mkdir -p /cvmfs/test.repo.org/nonexistent/deep/path || return 123
+    echo "New file" > \
+        /cvmfs/test.repo.org/nonexistent/deep/path/new_file.txt || return 124
+
+    echo "  Publishing changes 14"
+    cvmfs_server publish test.repo.org || return 125
+    cvmfs_server check -i test.repo.org || return 126
+
+    echo "  Verify the contents of the repository"
+    compare_file_checksum \
+        /cvmfs/test.repo.org/nonexistent/deep/path/new_file.txt \
+        f1885b1a57c71cacbd923fc5e9aefef3 || return 127
+    echo "  The intermediate ancestor directories must have been created"
+    [ -d /cvmfs/test.repo.org/nonexistent ]      || return 128
+    [ -d /cvmfs/test.repo.org/nonexistent/deep ] || return 129
+
     check_repo_integrity test.repo.org || return 110
 
     local reflog_url="$(get_repo_url test.repo.org)/.cvmfsreflog"

@@ -61,6 +61,18 @@ TEST_F(T_GatewayKeyParser, InvalidMissingSeparator) {
   ASSERT_FALSE(gateway::ParseKey("plain_textid secret", &key_id, &secret));
 }
 
+TEST_F(T_GatewayKeyParser, SessionTokenApiVersionRecord) {
+  const std::string token = "token";
+  const std::string record = gateway::MakeSessionTokenApiVersionRecord(4,
+                                                                       token);
+  int api_version = 0;
+  EXPECT_TRUE(
+      gateway::ParseSessionTokenApiVersionRecord(record, token, &api_version));
+  EXPECT_EQ(4, api_version);
+  EXPECT_FALSE(gateway::ParseSessionTokenApiVersionRecord(
+      record, "other-token", &api_version));
+}
+
 TEST_F(T_GatewayKeyParser, InvalidTrailingGarbage) {
   std::string key_id;
   std::string secret;

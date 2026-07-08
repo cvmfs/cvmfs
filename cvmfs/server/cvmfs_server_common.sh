@@ -768,8 +768,9 @@ close_transaction() {
   run_suid_helper rw_mount $name
   clear_flag "$tx_flag"
 
-  # Remove session_token file, used for gateway transactions, if it exists
-  rm -f ${CVMFS_SPOOL_DIR}/session_token
+  # Remove gateway session state, if it exists
+  rm -f ${CVMFS_SPOOL_DIR}/session_token \
+        ${CVMFS_SPOOL_DIR}/session_token.api_version
 
   local fallback_msg=""
   [ $use_fd_fallback -eq 0 ] || fallback_msg="(using force)"

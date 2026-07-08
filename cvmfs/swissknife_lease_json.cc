@@ -72,7 +72,8 @@ LeaseReply ParseAcquireReplyWithRevision(const CurlBuffer &buffer,
   return kLeaseReplyFailure;
 }
 LeaseReply ParseAcquireReply(const CurlBuffer &buffer,
-                             std::string *session_token) {
+                             std::string *session_token,
+                             int *max_api_version) {
   if (buffer.data.size() == 0 || session_token == NULL) {
     return kLeaseReplyFailure;
   }
@@ -94,6 +95,11 @@ LeaseReply ParseAcquireReply(const CurlBuffer &buffer,
         LogCvmfs(kLogCvmfs, kLogDebug, "Session token: %s",
                  token->get<std::string>().c_str());
         *session_token = token->get<std::string>();
+        const JSON *api_version = JsonDocument::SearchInObject(
+            reply->root(), "max_api_version", JSON_INT);
+        if (api_version != NULL && max_api_version != NULL) {
+          *max_api_version = api_version->get<int>();
+        }
         return kLeaseReplySuccess;
       }
     } else if (status == "path_busy") {

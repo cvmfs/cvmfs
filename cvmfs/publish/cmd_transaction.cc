@@ -56,6 +56,9 @@ int CmdTransaction::Main(const Options &options) {
   if (options.Has("retry-timeout")) {
     settings->GetTransaction()->SetTimeout(options.GetInt("retry-timeout"));
   }
+  if (options.Has("allow-nonexistent-path")) {
+    settings->GetTransaction()->SetAllowNonexistentPath(true);
+  }
   if (options.Has("template-from")) {
     if (!options.Has("template-to"))
       throw EPublish("invalid parameter combination for templates");
