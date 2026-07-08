@@ -93,7 +93,7 @@ To create libcvmfs.a in /tmp/cvmfs/INSTALLCVMFS, compile and install CernVM-FS w
       -DCMAKE_INSTALL_PREFIX:PATH=/tmp/cvmfs/CVMFS \
       -DUUID_LIBRARY:FILE=/tmp/cvmfs/UUID/lib/libuuid.a \
       -DUUID_INCLUDE_DIR:PATH=/tmp/cvmfs/UUID/include
-    make libpacparser
+    make pacparser
     cd cvmfs && make && make install
 
 For parrot, use the git branch that reflects the latest released version from the [cctools github repository](https://github.com/cooperative-computing-lab/cctools).  Configure and compile cctools as usual with the `./configure --with-cvmfs-path <CVMFS INSTALL PREFIX>`, e.g. `./configure --with-cvmfs-path /tmp/cvmfs/CVMFS`.

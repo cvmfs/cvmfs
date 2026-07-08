@@ -6,7 +6,6 @@ SSL_VERSION=3.5.3
 CRYPTO_VERSION=3.5.3
 CARES_VERSION=1.18.1
 CURL_VERSION=7.86.0
-PACPARSER_VERSION=1.4.3
 ZLIB_VERSION=1.2.8
 SPARSEHASH_VERSION=1.12
 LEVELDB_VERSION=1.18
@@ -202,15 +201,6 @@ build_lib() {
       do_extract "libcrypto" "libressl-${CRYPTO_VERSION}.tar.gz"
       do_build "libcrypto"
       ;;
-    pacparser)
-      do_extract "pacparser"     "pacparser-${PACPARSER_VERSION}.tar.gz"
-      patch_external "pacparser" "fix_cflags.patch"
-      patch_external "pacparser" "fix_c99.patch"
-      patch_external "pacparser" "fix_git_dependency.patch"
-      patch_external "pacparser" "fix_python_setuptools.patch"
-      patch_external "pacparser" "fix_gcc14.patch"
-      do_build "pacparser"
-      ;;
     zlib)
       do_extract "zlib"         "zlib-${ZLIB_VERSION}.tar.gz"
       do_build "zlib"
@@ -290,7 +280,7 @@ if [ x"$BUILTIN_EXTERNALS_LIST" != x"" ] && ! echo ";${BUILTIN_EXTERNALS_LIST};"
     missing_libs=$(echo "$BUILTIN_EXTERNALS_LIST" | tr ';' ' ')
     echo "Bootstrap - Using custom externals list: $missing_libs"
 else
-    missing_libs="libcurl libcrypto pacparser zlib sparsehash leveldb maxminddb protobuf sqlite3 sha3"
+    missing_libs="libcurl libcrypto zlib sparsehash leveldb maxminddb protobuf sqlite3 sha3"
 
     if [ x"$BUILD_UBENCHMARKS" != x"" ]; then
         missing_libs="$missing_libs googlebench"

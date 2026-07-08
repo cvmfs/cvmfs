@@ -21,7 +21,7 @@ message ("Running CMake version ${CMAKE_VERSION}")
 #
 # DON'T DELETE
 ## CVMFS_VERSION 2.14.0
-## CVMFS_PRERELEASE ~pre5
+## CVMFS_PRERELEASE 
 #---------------------
 set (CernVM-FS_VERSION_MAJOR 2)
 set (CernVM-FS_VERSION_MINOR 14)
@@ -217,6 +217,13 @@ include (cvmfs_compiler)
 # define where to find the external dependencies
 #
 set (EXTERNALS_LIB_LOCATION       "${CMAKE_SOURCE_DIR}/externals")
+
+# Download cache for FetchContent-based externals. Defaults into the source
+# tree so that a checkout with a populated download cache can be packed into a
+# self-contained source tarball. Override (e.g. in read-only container builds
+# where the source is bind-mounted read-only) to point at a writable location.
+set (EXTERNALS_DOWNLOAD_LOCATION  "${EXTERNALS_LIB_LOCATION}/download"
+     CACHE PATH "Download cache directory for vendored externals")
 
 # For convenience in CI workflows, allow to set EXTERNALS_PREFIX via environment
 if (NOT EXTERNALS_PREFIX)
@@ -481,11 +488,10 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_SERVER OR BUILD_SERVER_DEBUG OR
 endif ()
 
 # Client/libcvmfs/preloader only: pacparser, sparsehash
+# pacparser is provided by the externals/pacparser FetchContent module (or the
+# system, via BUILTIN_EXTERNALS_EXCLUDE) as the pacparser::pacparser target.
 if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_PRELOADER OR
     BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG OR BUILD_SHRINKWRAP)
-  find_package (pacparser REQUIRED)
-  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${PACPARSER_INCLUDE_DIR})
-
   find_package(Sparsehash)
   set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${SPARSEHASH_INCLUDE_DIR})
 endif ()
