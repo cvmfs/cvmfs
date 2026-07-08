@@ -287,6 +287,8 @@ cvmfs_config_usage() {
   echo "  killall [-r(reset fuse) ] [-s(reset stuck fuse)]"
   echo ""
   echo "  bugreport [timeout_in_sec_per_command (default = 90)]"
+  echo ""
+  echo "  docker-run [--run] [--image I] [--proxy URL] [<repository>...]"
 }
 
 has_selinux() {
@@ -2605,6 +2607,107 @@ _usrlocal_migrate() {
   __usrlocal_migrate_clean_legacy_sudoers
 }
 
+cvmfs_docker_run() {
+  local runtime=""
+  local image=""
+  local name="cvmfs"
+  local mountpoint="/cvmfs"
+  local profile="single"
+  local proxy=""
+  local do_run=0
+
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --run)        do_run=1 ;;
+      --runtime)    runtime="$2"; shift ;;
+      --image)      image="$2"; shift ;;
+      --name)       name="$2"; shift ;;
+      --mountpoint) mountpoint="$2"; shift ;;
+      --profile)    profile="$2"; shift ;;
+      --proxy)      proxy="$2"; shift ;;
+      -h|--help)
+        echo "Usage: $0 docker-run [options] [repository...]"
+        echo
+        echo "Print (or run with --run) the invocation that starts the CernVM-FS"
+        echo "service container. Without a repository the container uses automount"
+        echo "mode; listing repositories pre-mounts them (explicit mode)."
+        echo
+        echo "Options:"
+        echo "  --run                    execute the command instead of printing it"
+        echo "  --image IMAGE            container image (default cvmfs/service:<client version>)"
+        echo "  --name NAME              container name (default cvmfs)"
+        echo "  --mountpoint DIR         host directory shared in as /cvmfs (default /cvmfs)"
+        echo "  --profile PROFILE        CVMFS_CLIENT_PROFILE value (default single)"
+        echo "  --proxy URL              CVMFS_HTTP_PROXY value"
+        echo "  --runtime docker|podman  container CLI (default: autodetect)"
+        return 0
+        ;;
+      -*) echo "docker-run: unknown option: $1" >&2; return 1 ;;
+      *)  break ;;
+    esac
+    shift
+  done
+
+  local repos="$(echo "$*" | tr ' ' ',')"
+
+  if [ -z "$runtime" ]; then
+    if which docker >/dev/null 2>&1; then
+      runtime=docker
+    elif which podman >/dev/null 2>&1; then
+      runtime=podman
+    else
+      echo "docker-run: neither docker nor podman found; use --runtime" >&2
+      return 1
+    fi
+  fi
+
+  if [ -z "$image" ]; then
+    local version="$(cvmfs2 --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)"
+    image="cvmfs/service:${version:-latest}"
+  fi
+
+  # Assemble the invocation line by line so the printed form is copy-pasteable.
+  local nl=$'\n'
+  local cmd="$runtime run -d --name $name \\$nl"
+  cmd="$cmd  -e CVMFS_CLIENT_PROFILE=$profile \\$nl"
+  [ -n "$proxy" ] && cmd="$cmd  -e CVMFS_HTTP_PROXY=$proxy \\$nl"
+  [ -n "$repos" ] && cmd="$cmd  -e CVMFS_REPOSITORIES=$repos \\$nl"
+  cmd="$cmd  --cap-add SYS_ADMIN \\$nl"
+  # SYS_RESOURCE lets cvmfs2 raise RLIMIT_NOFILE for the system_mount option
+  # used by autofs-spawned mounts.
+  cmd="$cmd  --cap-add SYS_RESOURCE \\$nl"
+  cmd="$cmd  --device /dev/fuse \\$nl"
+  cmd="$cmd  --security-opt apparmor=unconfined \\$nl"
+  # SELinux-enforcing hosts deny the container's autofs/fuse mounts (the denial
+  # is dontaudit'd, so it surfaces only as a failed mount) unless it runs
+  # unlabeled.
+  if has_selinux; then
+    cmd="$cmd  --security-opt label=disable \\$nl"
+  fi
+  # A shared bind mount is what lets repositories mounted inside the container
+  # propagate back out to $mountpoint on the host.
+  cmd="$cmd  -v $mountpoint:/cvmfs:rshared \\$nl"
+  cmd="$cmd  $image"
+
+  if [ $do_run -eq 0 ]; then
+    echo "# host preparation (run once, as root): make $mountpoint a shared mount"
+    echo "mount --bind $mountpoint $mountpoint && mount --make-shared $mountpoint"
+    echo
+    echo "# start the service container:"
+    echo "$cmd"
+    return 0
+  fi
+
+  if [ $(id -u) -ne 0 ]; then
+    echo "docker-run --run: root privileges required" >&2
+    return 1
+  fi
+  mkdir -p "$mountpoint"
+  mountpoint -q "$mountpoint" || mount --bind "$mountpoint" "$mountpoint"
+  mount --make-shared "$mountpoint"
+  eval "$cmd"
+}
+
 case "$1" in
   setup)
     if [ `id -u` -ne 0 ]; then
@@ -2708,6 +2811,12 @@ case "$1" in
      fi
      shift 1
      cvmfs_bugreport $@
+     RETVAL=$?
+     ;;
+
+  docker-run)
+     shift 1
+     cvmfs_docker_run $@
      RETVAL=$?
      ;;
 
