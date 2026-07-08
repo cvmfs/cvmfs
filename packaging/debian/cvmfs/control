@@ -21,6 +21,8 @@ Build-Depends:
  python3-setuptools,
  unzip,
  nlohmann-json3-dev,
+ libprotobuf-dev,
+ protobuf-compiler,
  uuid-dev
 Standards-Version: 3.9.6.1
 Homepage: http://cernvm.cern.ch/portal/filesystem

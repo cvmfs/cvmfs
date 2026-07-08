@@ -11,7 +11,6 @@ SPARSEHASH_VERSION=1.12
 LEVELDB_VERSION=1.18
 IPADDRESS_VERSION=1.0.22
 MAXMINDDB_VERSION=1.5.4
-PROTOBUF_VERSION=2.6.1
 RAPIDCHECK_VERSION=0.0
 LIBARCHIVE_VERSION=3.3.2
 GOLANG_VERSION=1.24.2
@@ -226,11 +225,6 @@ build_lib() {
         do_build "maxminddb"
       fi
       ;;
-    protobuf)
-      do_extract "protobuf"     "protobuf-${PROTOBUF_VERSION}.tar.bz2"
-      patch_external "protobuf" "fix-iterator-cxx17.patch"
-      do_build "protobuf"
-      ;;
     googlebench)
         do_copy "googlebench"
         do_build "googlebench"
@@ -280,7 +274,7 @@ if [ x"$BUILTIN_EXTERNALS_LIST" != x"" ] && ! echo ";${BUILTIN_EXTERNALS_LIST};"
     missing_libs=$(echo "$BUILTIN_EXTERNALS_LIST" | tr ';' ' ')
     echo "Bootstrap - Using custom externals list: $missing_libs"
 else
-    missing_libs="libcurl libcrypto zlib sparsehash leveldb maxminddb protobuf sqlite3 sha3"
+    missing_libs="libcurl libcrypto zlib sparsehash leveldb maxminddb sqlite3 sha3"
 
     if [ x"$BUILD_UBENCHMARKS" != x"" ]; then
         missing_libs="$missing_libs googlebench"
