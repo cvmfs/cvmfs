@@ -146,6 +146,9 @@ Requires: fuse
 Requires: curl
 Requires: attr
 Requires: zlib
+%if !0%{?suse_version}
+Requires: protobuf
+%endif
 Requires: gdb
 %if 0%{?suse_version}
 Requires: libarchive13
