@@ -44,6 +44,18 @@ if(Sparsehash_FOUND)
 else()
   message(STATUS "Building sparsehash from vendored sources.")
 
+  # Stage only the google/ header subtree onto the include path. Upstream ships
+  # stray test helpers directly in src/ (testutil.h, hash_test_interface.h)
+  # alongside google/; exposing the whole src/ dir as an include directory puts
+  # those on the global include path where they shadow unrelated project headers
+  # of the same name (notably test/common/testutil.h). Copying just google/ into
+  # a dedicated include dir mirrors the install layout below and keeps the stray
+  # headers off the include path.
+  set(SPARSEHASH_INCLUDE_DIR "${sparsehash_BINARY_DIR}/include"
+      CACHE INTERNAL "sparsehash include directory")
+  file(COPY ${sparsehash_SOURCE_DIR}/src/google
+       DESTINATION ${SPARSEHASH_INCLUDE_DIR})
+
   # Regenerate google/sparsehash/sparseconfig.h (normally produced by
   # ./configure). cvmfs always passes an explicit hash functor, so only the
   # HAVE_* probes below actually influence the compiled headers.
@@ -62,11 +74,8 @@ else()
 
   configure_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/sparseconfig.h.in
-    ${sparsehash_SOURCE_DIR}/src/google/sparsehash/sparseconfig.h
+    ${SPARSEHASH_INCLUDE_DIR}/google/sparsehash/sparseconfig.h
     @ONLY)
-
-  set(SPARSEHASH_INCLUDE_DIR "${sparsehash_SOURCE_DIR}/src"
-      CACHE INTERNAL "sparsehash include directory")
 
   add_library(sparsehash INTERFACE)
   target_include_directories(sparsehash INTERFACE
@@ -76,7 +85,7 @@ else()
 
   # Mirror the old makeHook.sh: install the google/ headers into the externals
   # prefix so `make install_externals` populates a self-contained include tree.
-  install(DIRECTORY ${sparsehash_SOURCE_DIR}/src/google
+  install(DIRECTORY ${SPARSEHASH_INCLUDE_DIR}/google
           DESTINATION ${EXTERNALS_INSTALL_LOCATION}/include
           COMPONENT external_deps EXCLUDE_FROM_ALL)
   set(EXTERNALS_INSTALL_TARGETS ${EXTERNALS_INSTALL_TARGETS} "sparsehash" PARENT_SCOPE)

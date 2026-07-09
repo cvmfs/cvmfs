@@ -10,7 +10,6 @@ ZLIB_VERSION=1.2.8
 LEVELDB_VERSION=1.18
 IPADDRESS_VERSION=1.0.22
 MAXMINDDB_VERSION=1.5.4
-RAPIDCHECK_VERSION=0.0
 LIBARCHIVE_VERSION=3.3.2
 GOLANG_VERSION=1.24.2
 
@@ -233,12 +232,6 @@ build_lib() {
       do_copy "sha3"
       do_build "sha3"
       ;;
-    rapidcheck)
-      if [ x"$BUILD_QC_TESTS" != x"" ]; then
-        do_extract "rapidcheck" "rapidcheck-${RAPIDCHECK_VERSION}.tar.gz"
-        do_build "rapidcheck"
-      fi
-      ;;
     libarchive)
       do_extract "libarchive" "libarchive-${LIBARCHIVE_VERSION}.tar.gz"
       patch_external "libarchive" "fix-new-glibc.patch"
@@ -281,10 +274,6 @@ else
         else
           missing_libs="$missing_libs golang_rev2"
         fi
-    fi
-
-    if [ x"$BUILD_QC_TESTS" != x"" ]; then
-        missing_libs="$missing_libs rapidcheck"
     fi
 
     echo "Bootstrap - Using default externals list: $missing_libs"

@@ -826,6 +826,11 @@ endif ()
 # For `make check`
 #
 add_test (NAME cvmfs_unittests COMMAND cvmfs_unittests --gtest_filter=-*Slow)
-add_dependencies (check cvmfs_unittests)
+# The `check` convenience target is not created when BUILD_QC_TESTS is on (see
+# top-level CMakeLists.txt), because Abseil (pulled in by FuzzTest) claims that
+# target name.
+if (TARGET check)
+  add_dependencies (check cvmfs_unittests)
+endif ()
 
 endif (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
