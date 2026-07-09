@@ -7,7 +7,6 @@ CRYPTO_VERSION=3.5.3
 CARES_VERSION=1.18.1
 CURL_VERSION=7.86.0
 ZLIB_VERSION=1.2.8
-SPARSEHASH_VERSION=1.12
 LEVELDB_VERSION=1.18
 IPADDRESS_VERSION=1.0.22
 MAXMINDDB_VERSION=1.5.4
@@ -204,14 +203,6 @@ build_lib() {
       do_extract "zlib"         "zlib-${ZLIB_VERSION}.tar.gz"
       do_build "zlib"
       ;;
-    sparsehash)
-      do_extract "sparsehash"   "sparsehash-${SPARSEHASH_VERSION}.tar.gz"
-      patch_external "sparsehash"  "fix_sl4_compilation.patch"          \
-                                  "fix_warning_gcc48.patch"
-      replace_in_external "sparsehash"  "config.guess.latest" "config.guess"
-      replace_in_external "sparsehash"  "config.sub.latest" "config.sub"
-      do_build "sparsehash"
-      ;;
     leveldb)
       do_extract "leveldb"      "leveldb-${LEVELDB_VERSION}.tar.gz"
       patch_external "leveldb"     "dont_search_snappy.patch"           \
@@ -274,7 +265,7 @@ if [ x"$BUILTIN_EXTERNALS_LIST" != x"" ] && ! echo ";${BUILTIN_EXTERNALS_LIST};"
     missing_libs=$(echo "$BUILTIN_EXTERNALS_LIST" | tr ';' ' ')
     echo "Bootstrap - Using custom externals list: $missing_libs"
 else
-    missing_libs="libcurl libcrypto zlib sparsehash leveldb maxminddb sqlite3 sha3"
+    missing_libs="libcurl libcrypto zlib leveldb maxminddb sqlite3 sha3"
 
     if [ x"$BUILD_UBENCHMARKS" != x"" ]; then
         missing_libs="$missing_libs googlebench"

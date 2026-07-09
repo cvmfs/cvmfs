@@ -8,6 +8,7 @@ add_subdirectory(libarchive)
 add_subdirectory(json)
 add_subdirectory(pacparser)
 add_subdirectory(protobuf)
+add_subdirectory(sparsehash)
 
 add_custom_target(install_externals
   COMMAND ${CMAKE_COMMAND} --install ${CMAKE_BINARY_DIR}
