@@ -1,19 +1,15 @@
-# CMake module for vendoring sparsehash (google-sparsehash 1.12)
+# CMake module for vendoring sparsehash 
 include(FetchContent)
 
 set(SPARSEHASH_VERSION "1.12")
-# 1.12 predates the move to GitHub and is not on the CVMFS build-externals
-# mirror, so the tarball vendored next to this file is the only source. Point
-# FetchContent at it directly: it still extracts/patches into the build tree,
-# leaving the repo copy pristine (unlike the old in-place bootstrap build).
-set(SPARSEHASH_URL "${CMAKE_CURRENT_SOURCE_DIR}/sparsehash-${SPARSEHASH_VERSION}.tar.gz")
-set(SPARSEHASH_HASH "MD5=077b7d874d924f6f85e88d527ef42a42")
+set(SPARSEHASH_URL "https://github.com/sparsehash/sparsehash/archive/refs/tags/sparsehash-${SPARSEHASH_VERSION}.tar.gz" "https://ecsft.cern.ch/dist/cvmfs/build_externals/sparsehash-${SPARSEHASH_VERSION}.tar.gz")
+set(SPARSEHASH_HASH "MD5=c8343d730fd7d890799f7b668e4ec263")
 
 # -> sparsehash <-
 # NOTE: sparsehash is header-only to *consume*, but upstream ships an
 # autotools-generated google/sparsehash/sparseconfig.h. Rather than run
 # ./configure we regenerate that one header below with a couple of CMake
-# probes. The two patches touch headers we include and are preserved.
+# probes.
 #
 # The result is exposed as the header-only imported target
 #
@@ -74,7 +70,7 @@ else()
     $<INSTALL_INTERFACE:include>)
   add_library(sparsehash::sparsehash ALIAS sparsehash)
 
-  # Mirror the old makeHook.sh: install the google/ headers into the externals
+  # Install the google/ headers into the externals
   # prefix so `make install_externals` populates a self-contained include tree.
   install(DIRECTORY ${sparsehash_SOURCE_DIR}/src/google
           DESTINATION ${EXTERNALS_INSTALL_LOCATION}/include
