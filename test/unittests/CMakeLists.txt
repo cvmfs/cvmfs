@@ -267,7 +267,7 @@ if (BUILD_SERVER)
         ${CURL_LIBRARIES}
         ${CARES_LIBRARIES} ${CARES_LDFLAGS}
         ${OPENSSL_LIBRARIES}
-        ${SQLITE3_LIBRARY}
+        SQLite::SQLite3
         ${ZLIB_LIBRARIES}
         nlohmann_json::nlohmann_json
         ${CAP_LIBRARIES}
@@ -602,7 +602,7 @@ list (APPEND CVMFS_UNITTESTS_LINK_LIBRARIES
       ${CURL_LIBRARIES}
       ${CARES_LIBRARIES} ${CARES_LDFLAGS}
       ${OPENSSL_LIBRARIES}
-      ${SQLITE3_LIBRARY}
+      SQLite::SQLite3
       ${ZLIB_LIBRARIES}
       ${UUID_LIBRARIES}
       pacparser::pacparser

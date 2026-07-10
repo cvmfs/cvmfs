@@ -271,7 +271,7 @@ if (BUILD_CVMFS)
        ${CARES_LIBRARIES} ${CARES_LDFLAGS}
        ${OPENSSL_LIBRARIES}
        pacparser::pacparser
-       ${SQLITE3_LIBRARY}
+       SQLite::SQLite3
        ${ZLIB_LIBRARIES}
        sparsehash::sparsehash
        leveldb::leveldb
@@ -430,7 +430,7 @@ if (BUILD_LIBCVMFS)
                                 cvmfs_util
                                 ${CARES_LDFLAGS}
                                 ${OPENSSL_LIBRARIES}
-                         PRIVATE ${SQLITE3_LIBRARY}
+                         PRIVATE SQLite::SQLite3
                                  ${CURL_LIBRARIES}
                                  ${CARES_LIBRARIES}
                                  leveldb::leveldb
@@ -707,7 +707,7 @@ if (BUILD_SERVER)
   )  # CVMFS_SWISSKNIFE_SOURCES
   set (CVMFS_SWISSKNIFE_LINK_LIBRARIES "")
   list (APPEND CVMFS_SWISSKNIFE_LINK_LIBRARIES
-        ${SQLITE3_LIBRARY}
+        SQLite::SQLite3
         ${CURL_LIBRARIES}
         ${CARES_LIBRARIES} ${CARES_LDFLAGS}
         ${ZLIB_LIBRARIES}
@@ -824,7 +824,7 @@ if (BUILD_SERVER)
         ${CURL_LIBRARIES}
         ${CARES_LIBRARIES} ${CARES_LDFLAGS}
         ${OPENSSL_LIBRARIES}
-        ${SQLITE3_LIBRARY}
+        SQLite::SQLite3
         ${ZLIB_LIBRARIES}
         nlohmann_json::nlohmann_json
         LibArchive::LibArchive
@@ -1111,7 +1111,7 @@ if(BUILD_RECEIVER)
   list (APPEND CVMFS_RECEIVER_LINK_LIBRARIES
         ${CURL_LIBRARIES}
         ${CARES_LIBRARIES} ${CARES_LDFLAGS}
-        ${SQLITE3_LIBRARY}
+        SQLite::SQLite3
         nlohmann_json::nlohmann_json
         ${OPENSSL_LIBRARIES}
         ${ZLIB_LIBRARIES}
@@ -1270,7 +1270,7 @@ if (BUILD_PRELOADER)
   target_link_libraries(cvmfs_preload_bin
                         cvmfs_crypto
                         cvmfs_util
-                        ${SQLITE3_LIBRARY}
+                        SQLite::SQLite3
                         ${CURL_LIBRARIES}
                         ${CARES_LIBRARIES} ${CARES_LDFLAGS}
                         ${ZLIB_LIBRARIES}

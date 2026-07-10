@@ -212,10 +212,22 @@ set (QC_LINK_LIBRARIES
   # on, so KeysMatch() and manifest verification would fail. The rest of the
   # binary still links the system OpenSSL (below) for libcurl/TLS.
   cvmfs_crypto
-  fuzztest::fuzztest fuzztest::init_fuzztest GTest::gtest ${SQLITE3_LIBRARY}
-  ${CURL_LIBRARIES} ${CARES_LIBRARIES} ${CARES_LDFLAGS} ${OPENSSL_LIBRARIES}
-  ${RT_LIBRARY} ${ZLIB_LIBRARIES} ${SHA3_LIBRARIES} ${PROTOBUF_LITE_LIBRARY}
-  nlohmann_json::nlohmann_json ${TBB_LIBRARIES} ${CAP_LIBRARIES}
-  pthread dl)
+  fuzztest::fuzztest
+  fuzztest::init_fuzztest
+  GTest::gtest
+  SQLite::SQLite3
+  ${CURL_LIBRARIES}
+  ${CARES_LIBRARIES}
+  ${CARES_LDFLAGS}
+  ${OPENSSL_LIBRARIES}
+  ${RT_LIBRARY}
+  ${ZLIB_LIBRARIES}
+  ${SHA3_LIBRARIES}
+  ${PROTOBUF_LITE_LIBRARY}
+  nlohmann_json::nlohmann_json
+  ${TBB_LIBRARIES}
+  ${CAP_LIBRARIES}
+  pthread dl
+  )
 
 target_link_libraries (${PROJECT_QC_NAME} ${QC_LINK_LIBRARIES})

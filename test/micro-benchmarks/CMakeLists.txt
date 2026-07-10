@@ -138,7 +138,7 @@ set (UBENCHMARKS_LINK_LIBRARIES ${GOOGLEBENCH_LIBRARIES}
                                 ${PROTOBUF_LITE_LIBRARY}
                                 ${ZLIB_LIBRARIES}
                                 ${RT_LIBRARY}
-                                ${SQLITE3_LIBRARY}
+                                SQLite::SQLite3
                                 ${CAP_LIBRARIES}
                                 GTest::gmock
                                 GTest::gtest

@@ -211,10 +211,6 @@ build_lib() {
         do_copy "googlebench"
         do_build "googlebench"
       ;;
-    sqlite3)
-      do_copy "sqlite3"
-      do_build "sqlite3"
-      ;;
     vjson)
       do_copy "vjson"
       patch_external "vjson"       "missing_include.patch"
@@ -250,7 +246,7 @@ if [ x"$BUILTIN_EXTERNALS_LIST" != x"" ] && ! echo ";${BUILTIN_EXTERNALS_LIST};"
     missing_libs=$(echo "$BUILTIN_EXTERNALS_LIST" | tr ';' ' ')
     echo "Bootstrap - Using custom externals list: $missing_libs"
 else
-    missing_libs="libcurl libcrypto zlib maxminddb sqlite3 sha3"
+    missing_libs="libcurl libcrypto zlib maxminddb sha3"
 
     if [ x"$BUILD_UBENCHMARKS" != x"" ]; then
         missing_libs="$missing_libs googlebench"
