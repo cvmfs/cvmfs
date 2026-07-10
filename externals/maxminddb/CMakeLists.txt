@@ -30,13 +30,18 @@ FetchContent_MakeAvailable(MaxMindDB)
 
 message(STATUS "Vendoring maxminddb python package from ${maxminddb_SOURCE_DIR}")
 
-# Install the pure-Python package into the externals prefix, reproducing the
-# old makeHook.sh layout (${EXTERNALS_INSTALL_LOCATION}/maxminddb/...), which
+# Copy the pure-Python package into the externals prefix, reproducing the old
+# makeHook.sh layout (${EXTERNALS_INSTALL_LOCATION}/maxminddb/...), which
 # cvmfs/CMakeLists.txt in turn ships to /usr/share/cvmfs-server/webapi/maxminddb.
 #
-# The .py files need no EXTERNALS_INSTALL_TARGETS entry: extraction happens at
-# configure time, so they already exist on disk when `make install_externals`
-# runs, and there is no build target to order the install against.
-install(DIRECTORY ${maxminddb_SOURCE_DIR}/maxminddb
-        DESTINATION ${EXTERNALS_INSTALL_LOCATION}
-        COMPONENT external_deps EXCLUDE_FROM_ALL)
+# This is done at configure time with file(COPY) rather than install(), on
+# purpose: like the old makeHook.sh (which ran during bootstrap.sh), the
+# package must physically exist under EXTERNALS_INSTALL_LOCATION by the time the
+# main `make install` runs, because cvmfs/CMakeLists.txt reads it straight from
+# that directory. An install(... COMPONENT external_deps) would only fire from
+# the `install_externals` target, which nothing in the build/package flow
+# invokes, so the directory would never be populated and `make install` would
+# fail with "file INSTALL cannot find .../maxminddb". FetchContent extracts at
+# configure time, so maxminddb_SOURCE_DIR is already available here.
+file(COPY ${maxminddb_SOURCE_DIR}/maxminddb
+     DESTINATION ${EXTERNALS_INSTALL_LOCATION})
