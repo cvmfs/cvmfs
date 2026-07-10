@@ -440,7 +440,9 @@ message("Using libcrypto for libcvmfs_crypto from ${Libcrypto_INCLUDE_DIRS}")
 if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_SERVER OR BUILD_SERVER_DEBUG OR
     BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG OR BUILD_PRELOADER OR
     BUILD_UBENCHMARKS OR BUILD_SHRINKWRAP)
-  find_package (ZLIB REQUIRED)
+  # zlib is provided by the externals/zlib FetchContent module (or the system,
+  # via BUILTIN_EXTERNALS_EXCLUDE) as the ZLIB::ZLIB target; it also sets
+  # ZLIB_LIBRARIES and ZLIB_INCLUDE_DIRS for the global include list below.
   set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${ZLIB_INCLUDE_DIRS})
 
   find_package (SHA3 REQUIRED)

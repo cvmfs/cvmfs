@@ -6,7 +6,6 @@ SSL_VERSION=3.5.3
 CRYPTO_VERSION=3.5.3
 CARES_VERSION=1.18.1
 CURL_VERSION=7.86.0
-ZLIB_VERSION=1.2.8
 IPADDRESS_VERSION=1.0.22
 LIBARCHIVE_VERSION=3.3.2
 GOLANG_VERSION=1.24.2
@@ -196,10 +195,6 @@ build_lib() {
       do_extract "libcrypto" "libressl-${CRYPTO_VERSION}.tar.gz"
       do_build "libcrypto"
       ;;
-    zlib)
-      do_extract "zlib"         "zlib-${ZLIB_VERSION}.tar.gz"
-      do_build "zlib"
-      ;;
     googlebench)
         do_copy "googlebench"
         do_build "googlebench"
@@ -239,7 +234,7 @@ if [ x"$BUILTIN_EXTERNALS_LIST" != x"" ] && ! echo ";${BUILTIN_EXTERNALS_LIST};"
     missing_libs=$(echo "$BUILTIN_EXTERNALS_LIST" | tr ';' ' ')
     echo "Bootstrap - Using custom externals list: $missing_libs"
 else
-    missing_libs="libcurl libcrypto zlib sha3"
+    missing_libs="libcurl libcrypto sha3"
 
     if [ x"$BUILD_UBENCHMARKS" != x"" ]; then
         missing_libs="$missing_libs googlebench"

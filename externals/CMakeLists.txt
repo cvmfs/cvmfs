@@ -11,6 +11,7 @@ add_subdirectory(protobuf)
 add_subdirectory(sparsehash)
 add_subdirectory(leveldb)
 add_subdirectory(sqlite3)
+add_subdirectory(zlib)
 
 # maxminddb is the geo-api's python reader, only needed for the server geoapi
 if ((BUILD_SERVER OR BUILD_SERVER_DEBUG) AND BUILD_GEOAPI)
