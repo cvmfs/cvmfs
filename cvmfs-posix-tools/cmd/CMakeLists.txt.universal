@@ -8,7 +8,8 @@ add_custom_target(
   DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${TOOL_NAME}
 )
 
-file(GLOB_RECURSE TOOL_GO_SOURCES LIST_DIRECTORIES false ./*.go)
+file(GLOB_RECURSE TOOL_GO_SOURCES LIST_DIRECTORIES false ./*.go ../../pkg/*.go ../../go-acl/*.go ../../go-acl/os/*.go ../../go-acl/os/group/*.go)
+
 
 add_custom_command(
   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${TOOL_NAME}
