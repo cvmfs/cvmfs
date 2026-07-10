@@ -477,8 +477,8 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_SERVER OR BUILD_SERVER_DEBUG OR
   find_package (SQLite3 REQUIRED)
   set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${SQLITE3_INCLUDE_DIR})
 
-  find_package(leveldb)
-  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${LEVELDB_INCLUDE_DIR})
+  # leveldb is provided by the externals/leveldb FetchContent module (or the
+  # system, via BUILTIN_EXTERNALS_EXCLUDE) as the leveldb::leveldb target.
 
   find_package (UUID REQUIRED)
 endif ()

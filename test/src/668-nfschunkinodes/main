@@ -2,7 +2,9 @@
 
 cvmfs_test_name="Test inodes of chunked files in NFS mode"
 cvmfs_test_autofs_on_startup=false
-cvmfs_test_suites="quick"
+# Runs both in the generic "quick" matrix (CVMFS_NFS_SOURCE=yes is a pure
+# client-side feature, no kernel NFS server needed) and under the "nfs" profile.
+cvmfs_test_suites="quick nfs"
 
 TEST668_PRIVATE_MOUNT=
 TEST668_TAIL_PID=

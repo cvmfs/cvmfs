@@ -274,7 +274,7 @@ if (BUILD_CVMFS)
        ${SQLITE3_LIBRARY}
        ${ZLIB_LIBRARIES}
        sparsehash::sparsehash
-       ${LEVELDB_LIBRARIES}
+       leveldb::leveldb
        ${PROTOBUF_LITE_LIBRARY}
        nlohmann_json::nlohmann_json
        ${RT_LIBRARY}
@@ -422,7 +422,6 @@ if (BUILD_LIBCVMFS)
   target_include_directories (cvmfs_client PRIVATE ${SQLITE3_INCLUDE_DIR})
   target_include_directories (cvmfs_client PRIVATE ${CARES_INCLUDE_DIRS})
   target_include_directories (cvmfs_client PRIVATE ${CURL_INCLUDE_DIRS})
-  target_include_directories (cvmfs_client PRIVATE ${LEVELDB_INCLUDE_DIR})
   target_include_directories (cvmfs_client PRIVATE ${ZLIB_INCLUDE_DIRS})
   target_include_directories (cvmfs_client PRIVATE ${PROTOBUF_INCLUDE_DIRS})
 
@@ -434,7 +433,7 @@ if (BUILD_LIBCVMFS)
                          PRIVATE ${SQLITE3_LIBRARY}
                                  ${CURL_LIBRARIES}
                                  ${CARES_LIBRARIES}
-                                 ${LEVELDB_LIBRARIES}
+                                 leveldb::leveldb
                                  pacparser::pacparser
                                  ${ZLIB_LIBRARIES}
                                  nlohmann_json::nlohmann_json
