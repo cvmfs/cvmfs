@@ -12,6 +12,11 @@ add_subdirectory(sparsehash)
 add_subdirectory(leveldb)
 add_subdirectory(sqlite3)
 
+# maxminddb is the geo-api's python reader, only needed for the server geoapi
+if ((BUILD_SERVER OR BUILD_SERVER_DEBUG) AND BUILD_GEOAPI)
+  add_subdirectory(maxminddb)
+endif()
+
 add_custom_target(install_externals
   COMMAND ${CMAKE_COMMAND} --install ${CMAKE_BINARY_DIR}
      --component external_deps
