@@ -250,13 +250,7 @@ if [ x"$BUILTIN_EXTERNALS_LIST" != x"" ] && ! echo ";${BUILTIN_EXTERNALS_LIST};"
     missing_libs=$(echo "$BUILTIN_EXTERNALS_LIST" | tr ';' ' ')
     echo "Bootstrap - Using custom externals list: $missing_libs"
 else
-<<<<<<< HEAD
-    missing_libs="libcurl libcrypto zlib leveldb maxminddb sqlite3 sha3"
-||||||| parent of a87fe0cd4 (update leveldb, move to fetchcontent)
-    missing_libs="libcurl libcrypto zlib sparsehash leveldb maxminddb protobuf sqlite3 sha3"
-=======
-    missing_libs="libcurl libcrypto zlib sparsehash maxminddb protobuf sqlite3 sha3"
->>>>>>> a87fe0cd4 (update leveldb, move to fetchcontent)
+    missing_libs="libcurl libcrypto zlib maxminddb sqlite3 sha3"
 
     if [ x"$BUILD_UBENCHMARKS" != x"" ]; then
         missing_libs="$missing_libs googlebench"
