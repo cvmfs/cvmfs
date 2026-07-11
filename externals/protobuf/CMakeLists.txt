@@ -24,6 +24,19 @@ set(PROTOBUF_HASH "MD5=6b4fd9cee2fa63834f29c7d433679855")
 #   OPT_IN (default)                   -> try the system first, else source
 setup_external_build_mode(protobuf)
 
+# Clear our own re-exported cache entries before discovery. They reuse
+# FindProtobuf's legacy all-caps variable names (PROTOBUF_LITE_LIBRARY etc.) and
+# hold *target names* like "protobuf::libprotobuf-lite", not library paths. On a
+# re-configure FindProtobuf's backward-compat shim copies the stale all-caps
+# value into its modern Protobuf_LITE_LIBRARY and then "honors" it instead of
+# searching, fabricating an imported protobuf::libprotobuf-lite target with no
+# IMPORTED_LOCATION -> "IMPORTED_LOCATION not set" at generate time. Unsetting
+# them here makes every configure search from a clean slate; we repopulate them
+# with the correct values at the end of this module.
+unset(PROTOBUF_LITE_LIBRARY      CACHE)
+unset(PROTOBUF_PROTOC_EXECUTABLE CACHE)
+unset(PROTOBUF_INCLUDE_DIRS      CACHE)
+
 if(NOT FETCHCONTENT_TRY_FIND_PACKAGE_MODE STREQUAL "NEVER")
   if(FETCHCONTENT_TRY_FIND_PACKAGE_MODE STREQUAL "ALWAYS")
     find_package(Protobuf REQUIRED)

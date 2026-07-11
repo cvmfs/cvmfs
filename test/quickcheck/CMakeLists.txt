@@ -216,8 +216,8 @@ set (QC_LINK_LIBRARIES
   fuzztest::init_fuzztest
   GTest::gtest
   SQLite::SQLite3
-  ${CURL_LIBRARIES}
-  ${CARES_LIBRARIES}
+  CURL::libcurl
+  c-ares::cares
   ${CARES_LDFLAGS}
   ${OPENSSL_LIBRARIES}
   ${RT_LIBRARY}

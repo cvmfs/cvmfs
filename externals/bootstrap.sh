@@ -2,10 +2,7 @@
 
 set -e
 
-SSL_VERSION=3.5.3
 CRYPTO_VERSION=3.5.3
-CARES_VERSION=1.18.1
-CURL_VERSION=7.86.0
 IPADDRESS_VERSION=1.0.22
 LIBARCHIVE_VERSION=3.3.2
 GOLANG_VERSION=1.24.2
@@ -175,22 +172,6 @@ build_lib() {
   local lib_name=$1
   rm -rf $externals_build_dir/build_${lib_name}
   case ${lib_name} in
-    libcurl)
-      # (only on Mac)
-      if [ x"$(uname)" = x"Darwin" ]; then
-          rm -rf $externals_build_dir/build_ssl
-          do_extract "ssl" "libressl-${SSL_VERSION}.tar.gz"
-          do_build "ssl"
-      fi
-
-      rm -rf $externals_build_dir/build_c-ares
-      do_extract "c-ares" "c-ares-${CARES_VERSION}.tar.gz"
-      do_build "c-ares"
-
-      do_extract "libcurl" "curl-${CURL_VERSION}.tar.bz2"
-      patch_external "libcurl" "reenable_poll_darwin.patch"
-      do_build "libcurl"
-      ;;
     libcrypto)
       do_extract "libcrypto" "libressl-${CRYPTO_VERSION}.tar.gz"
       do_build "libcrypto"
@@ -234,7 +215,7 @@ if [ x"$BUILTIN_EXTERNALS_LIST" != x"" ] && ! echo ";${BUILTIN_EXTERNALS_LIST};"
     missing_libs=$(echo "$BUILTIN_EXTERNALS_LIST" | tr ';' ' ')
     echo "Bootstrap - Using custom externals list: $missing_libs"
 else
-    missing_libs="libcurl libcrypto sha3"
+    missing_libs="libcrypto sha3"
 
     if [ x"$BUILD_UBENCHMARKS" != x"" ]; then
         missing_libs="$missing_libs googlebench"

@@ -17,6 +17,10 @@ add_subdirectory(zlib)
 if ((BUILD_SERVER OR BUILD_SERVER_DEBUG) AND BUILD_GEOAPI)
   add_subdirectory(maxminddb)
 endif()
+# c-ares must be configured before libcurl: libcurl's build consumes the
+# c-ares::cares target for its async DNS resolver.
+add_subdirectory(c-ares)
+add_subdirectory(libcurl)
 
 add_custom_target(install_externals
   COMMAND ${CMAKE_COMMAND} --install ${CMAKE_BINARY_DIR}

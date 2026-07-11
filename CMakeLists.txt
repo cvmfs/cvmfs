@@ -454,27 +454,10 @@ endif ()
 if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_SERVER OR BUILD_SERVER_DEBUG OR
     BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG OR BUILD_PRELOADER OR
     BUILD_SHRINKWRAP)
-  find_package (CARES REQUIRED)
-  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${CARES_INCLUDE_DIRS})
-
-  find_package (CURL REQUIRED)
-  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${CURL_INCLUDE_DIRS})
-
-  if (CURL_INCLUDE_DIRS)
-    find_program(CURL_CONFIG_EXEC NAMES curl-config)
-    if (CURL_CONFIG_EXEC)
-      execute_process(
-        COMMAND ${CURL_CONFIG_EXEC} --features
-        OUTPUT_VARIABLE _libcurl_features
-        ERROR_VARIABLE _libcurl_features_error
-        )
-      if (NOT ${_libcurl_features} MATCHES AsynchDNS)
-        message(FATAL_ERROR "libcurl was not compiled with c-ares")
-      endif ()
-    else (CURL_CONFIG_EXEC)
-      message(SEND_ERROR "Command \"${CURL_CONFIG_EXEC} --features\" failed with output:\n${_libcurl_features_error}")
-    endif ()
-  endif (CURL_INCLUDE_DIRS)
+  # c-ares and libcurl are provided as the c-ares::cares and CURL::libcurl
+  # targets by add_subdirectory(externals) above (FetchContent). libcurl is
+  # always built with c-ares as its async DNS resolver, so the former
+  # curl-config AsynchDNS check is no longer needed.
 
   # sqlite3 is provided by the externals/sqlite3 FetchContent module (or the
   # system, via BUILTIN_EXTERNALS_EXCLUDE) as the SQLite::SQLite3 target; it also
