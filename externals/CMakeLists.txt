@@ -13,6 +13,11 @@ add_subdirectory(leveldb)
 add_subdirectory(sqlite3)
 add_subdirectory(zlib)
 
+# google benchmark is only needed by the micro benchmarks
+if (BUILD_UBENCHMARKS)
+  add_subdirectory(googlebench)
+endif ()
+
 # maxminddb is the geo-api's python reader, only needed for the server geoapi
 if ((BUILD_SERVER OR BUILD_SERVER_DEBUG) AND BUILD_GEOAPI)
   add_subdirectory(maxminddb)
