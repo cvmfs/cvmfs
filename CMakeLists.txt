@@ -443,6 +443,9 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_SERVER OR BUILD_SERVER_DEBUG OR
 
   find_package (SHA3 REQUIRED)
   set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${SHA3_INCLUDE_DIRS})
+
+  # Libnettle_* is set by externals/libnettle (system or vendored build)
+  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${Libnettle_INCLUDE_DIRS})
 endif ()
 
 

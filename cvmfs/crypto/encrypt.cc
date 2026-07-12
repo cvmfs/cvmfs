@@ -220,7 +220,7 @@ string CipherAes256Cbc::DoDecrypt(const string &ciphertext, const Key &key) {
   assert(plaintext.length() > 0);
 
   CBC_DECRYPT(&cbc_ctx, aes256_decrypt, plaintext.length(),
-              reinterpret_cast<uint8_t *>(plaintext.data()),
+              reinterpret_cast<uint8_t *>(&plaintext[0]),
               reinterpret_cast<const uint8_t *>(ciphertext.data()) + kIvSize);
 
   unsigned char padding_value = plaintext[plaintext.length() - 1];
@@ -251,17 +251,17 @@ string CipherAes256Cbc::DoEncrypt(const string &plaintext, const Key &key) {
 
   ciphertext.resize(length_cipher);
 
-  memcpy(ciphertext.data(), md5.digest, AES_BLOCK_SIZE);
+  memcpy(&ciphertext[0], md5.digest, AES_BLOCK_SIZE);
   // Encrypt all full blocks of the plain text
   if (plaintext.length() / AES_BLOCK_SIZE > 0) {
     CBC_ENCRYPT(&cbc_ctx, aes256_encrypt,
                 AES_BLOCK_SIZE * (plaintext.length() / AES_BLOCK_SIZE),
-                reinterpret_cast<uint8_t *>(ciphertext.data()) + AES_BLOCK_SIZE,
+                reinterpret_cast<uint8_t *>(&ciphertext[0]) + AES_BLOCK_SIZE,
                 reinterpret_cast<const uint8_t *>(plaintext.data()));
   }
 
   // PKCS padding block
-  unsigned char *padding_block = reinterpret_cast<uint8_t *>(ciphertext.data())
+  unsigned char *padding_block = reinterpret_cast<uint8_t *>(&ciphertext[0])
                                  + ciphertext.length() - AES_BLOCK_SIZE;
   if (length_tail > 0) {
     memcpy(padding_block, plaintext.data() + plaintext.length() - length_tail,

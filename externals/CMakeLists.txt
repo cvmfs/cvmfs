@@ -13,6 +13,9 @@ add_subdirectory(leveldb)
 add_subdirectory(sqlite3)
 add_subdirectory(zlib)
 
+# symmetric crypto / hashing primitives for libcvmfs_crypto
+add_subdirectory(libnettle)
+
 # google benchmark is only needed by the micro benchmarks
 if (BUILD_UBENCHMARKS)
   add_subdirectory(googlebench)
