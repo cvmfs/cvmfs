@@ -122,6 +122,7 @@ BuildRequires: nettle-devel
 # m4 preprocesses the assembler routines of the vendored nettle build; without
 # it, nettle falls back to the portable C implementations
 BuildRequires: m4
+BuildRequires: libacl-devel
 BuildRequires: openssl-devel
 BuildRequires: patch
 BuildRequires: pkgconfig
@@ -417,6 +418,7 @@ cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} \
   -DBUILD_GATEWAY=$BUILD_GATEWAY \
   -DBUILD_DUCC=$BUILD_DUCC \
   -DBUILD_SNAPSHOTTER=$BUILD_SNAPSHOTTER \
+  -DBUILD_POSIX_TOOLS=yes \
   -DINSTALL_UNITTESTS=$INSTALL_UNITTESTS \
   -DBUILD_LIBFUSE2=$BUILD_LIBFUSE2 \
   -DCMAKE_INSTALL_PREFIX:PATH=/usr .
@@ -761,6 +763,16 @@ systemctl daemon-reload
 %{_bindir}/cvmfs_suid_helper
 %{_bindir}/cvmfs_server
 %{_bindir}/cvmfs_rsync
+%{_bindir}/cvmfs_chgrp
+%{_bindir}/cvmfs_chmod
+%{_bindir}/cvmfs_chown
+%{_bindir}/cvmfs_insert
+%{_bindir}/cvmfs_ln
+%{_bindir}/cvmfs_mkdir
+%{_bindir}/cvmfs_rm
+%{_bindir}/cvmfs_rmdir
+%{_bindir}/cvmfs_setfacl
+%{_bindir}/cvmfs_touch
 %{_libdir}/libcvmfs_server.so
 %{_libdir}/libcvmfs_server.so.%{base_version}
 %{_libdir}/libcvmfs_server_debug.so
