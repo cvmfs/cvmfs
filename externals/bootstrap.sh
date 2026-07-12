@@ -176,10 +176,6 @@ build_lib() {
       do_extract "libcrypto" "libressl-${CRYPTO_VERSION}.tar.gz"
       do_build "libcrypto"
       ;;
-    googlebench)
-        do_copy "googlebench"
-        do_build "googlebench"
-      ;;
     vjson)
       do_copy "vjson"
       patch_external "vjson"       "missing_include.patch"
@@ -216,10 +212,6 @@ if [ x"$BUILTIN_EXTERNALS_LIST" != x"" ] && ! echo ";${BUILTIN_EXTERNALS_LIST};"
     echo "Bootstrap - Using custom externals list: $missing_libs"
 else
     missing_libs="libcrypto sha3"
-
-    if [ x"$BUILD_UBENCHMARKS" != x"" ]; then
-        missing_libs="$missing_libs googlebench"
-    fi
 
     if [ x"$BUILD_GATEWAY" != x ] || [ x"$BUILD_DUCC" != x ] || [ x"$BUILD_SNAPSHOTTER" != x ]; then
         required_go_minor_version="23"

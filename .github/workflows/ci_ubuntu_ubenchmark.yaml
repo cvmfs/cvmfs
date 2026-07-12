@@ -1,0 +1,63 @@
+
+# Github actions workflow to build and run the micro benchmarks
+# (test/micro-benchmarks).
+name: ubenchmark_ubuntu
+
+on:
+  pull_request:
+    branches: [devel, cvmfs*]
+  push:
+    branches: [devel, cvmfs*]
+  workflow_dispatch:
+
+jobs:
+  ubenchmark_ubuntu:
+    runs-on: ubuntu-latest
+    steps:
+      - id: lsb-release
+        run: |
+          source /etc/lsb-release
+          echo "id-release=${DISTRIB_ID}-${DISTRIB_RELEASE}" >> $GITHUB_OUTPUT
+          echo "arch=$(uname -m)" >> $GITHUB_OUTPUT
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Create cache directories
+        run: |
+          mkdir -p /home/runner/.cache
+      - name: Restore CI cache
+        uses: actions/cache/restore@v4
+        id: cvmfs-ci-cache-restore
+        with:
+          path: /home/runner/.cache/
+          key: v3-cvmfs-ubench-cache-${{ steps.lsb-release.outputs.id-release }}-${{ steps.lsb-release.outputs.arch }}
+      - name: Check for builddep package
+        id: cvmfs-builddep-check
+        run: |
+          if [ -f "/home/runner/.cache/cvmfs-build-deps_*_all.deb" ]; then
+            echo "package_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "package_exists=false" >> $GITHUB_OUTPUT
+          fi
+      - name: Generate build-dep metapackage
+        if: steps.cvmfs-builddep-check.outputs.package_exists != 'true'
+        run: |
+          sudo apt-get -y update
+          sudo apt-get install -y devscripts equivs
+          mk-build-deps ./packaging/debian/cvmfs/control
+          mv cvmfs-build-deps_*_all.deb /home/runner/.cache
+      - name: Install build dependencies
+        run: |
+          sudo apt-get install -y /home/runner/.cache/cvmfs-build-deps_*_all.deb
+          sudo apt-get -y install ccache
+      - name: Build micro benchmarks
+        run: |
+          export CVMFS_EXTERNALS_PREFIX=/home/runner/.cache/cvmfs_externals_install
+          export CMAKE_CXX_COMPILER_LAUNCHER=ccache
+          mkdir build; cd build
+          cmake .. -DBUILD_UBENCHMARKS=ON \
+                   -DCMAKE_BUILD_TYPE=Release
+          make -j $(nproc) cvmfs_ubenchmarks
+      - name: Run micro benchmarks
+        run: |
+          ./build/test/micro-benchmarks/cvmfs_ubenchmarks

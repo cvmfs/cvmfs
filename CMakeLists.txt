@@ -259,9 +259,6 @@ if (BUILTIN_EXTERNALS)
     set(ENV{CVMFS_BASE_CXX_FLAGS} ${CVMFS_BASE_CXX_FLAGS})
     set(ENV{IS_64_BIT} ${IS_64_BIT})
 
-    if (BUILD_UBENCHMARKS)
-      set(ENV{BUILD_UBENCHMARKS} "true")
-    endif ()
     if (BUILD_SERVER OR BUILD_SERVER_DEBUG)
       set(ENV{BUILD_SERVER} "true")
     endif ()
@@ -301,7 +298,6 @@ if (BUILTIN_EXTERNALS)
     set(ENV{CVMFS_BASE_C_FLAGS} "")
     set(ENV{CVMFS_BASE_CXX_FLAGS} "")
     set(ENV{IS_64_BIT} "")
-    set(ENV{BUILD_UBENCHMARKS} "")
     set(ENV{BUILD_SERVER} "")
     set(ENV{BUILD_GATEWAY} "")
     set(ENV{BUILD_DUCC} "")
@@ -541,11 +537,11 @@ if (BUILD_SERVER OR BUILD_SERVER_DEBUG)
 endif ()
 
 
-# Only micro benchmarks need google bench
-if (BUILD_UBENCHMARKS)
-  find_package(GOOGLEBENCH REQUIRED)
-  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${GOOGLEBENCH_INCLUDE_DIRS})
-endif ()
+# Only micro benchmarks need google bench. It is provided by the
+# externals/googlebench FetchContent module (or the system, via
+# BUILTIN_EXTERNALS_EXCLUDE) as the benchmark::benchmark target, which the
+# micro-benchmark executable links directly (its include dirs propagate
+# transitively, so nothing needs adding to INCLUDE_DIRECTORIES here).
 
 include_directories (${INCLUDE_DIRECTORIES})
 
@@ -559,6 +555,13 @@ if (INSTALL_MOUNT_SCRIPTS)
 endif ()
 
 #
+# GoogleTest is needed by both the unit tests and the micro benchmarks
+#
+if (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG OR BUILD_UBENCHMARKS)
+  include(SetupGoogleTest)
+endif ()
+
+#
 # compile the unit tests, if necessary
 #
 if (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
@@ -566,8 +569,7 @@ if (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
   enable_testing ()
   # FuzzTest pulls in Abseil, whose absl/log defines a target named `check`
   # (absl::check). Skip our `make check` convenience target when the quickcheck
-  # tests are built to avoid a target name collision; CI drives the tests via
-  # ctest directly in that configuration.
+  # tests are built to avoid a target name collision
   if (NOT BUILD_QC_TESTS)
     add_custom_target (check ${CMAKE_CTEST_COMMAND} -VV)
   endif ()
@@ -579,11 +581,17 @@ if (BUILD_UBENCHMARKS)
 endif ()
 
 if (BUILD_QC_TESTS)
-  # FuzzTest is fetched via FetchContent inside test/quickcheck/CMakeLists.txt,
-  # so no find_package / bootstrap external is required here.
   add_subdirectory (test/quickcheck)
 endif ()
 
+if (BUILD_STRESS_TESTS)
+  include(test/stress/CMakeLists.txt)
+endif ()
+
+#
+# Builds of golang components
+# First check if we have golang available
+#
 if (BUILD_GATEWAY OR BUILD_DUCC OR BUILD_SNAPSHOTTER)
   find_program(GO_COMPILER go)
   if(NOT GO_COMPILER)
@@ -605,9 +613,6 @@ if (BUILD_SNAPSHOTTER)
   add_subdirectory (snapshotter)
 endif ()
 
-if (BUILD_STRESS_TESTS)
-  include(test/stress/CMakeLists.txt)
-endif ()
 
 #
 # Documentation

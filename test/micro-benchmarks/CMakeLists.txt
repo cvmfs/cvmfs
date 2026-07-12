@@ -128,7 +128,7 @@ set_target_properties (${PROJECT_UBENCHMARKS_NAME} PROPERTIES
                        COMPILE_FLAGS "${CVMFS_UBENCHMARKS_CFLAGS}"
                        LINK_FLAGS "${CVMFS_UBENCHMARKS_LD_FLAGS}")
 
-set (UBENCHMARKS_LINK_LIBRARIES ${GOOGLEBENCH_LIBRARIES}
+set (UBENCHMARKS_LINK_LIBRARIES benchmark::benchmark
                                 ${GTEST_LIBRARIES}
                                 CURL::libcurl
                                 c-ares::cares
