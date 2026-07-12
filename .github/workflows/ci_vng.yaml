@@ -136,6 +136,7 @@ jobs:
           CVMFS_TESTCASES=${{ github.event.inputs.inputTestCases || '"src/00* src/01*"' }}
           CVMFS_TEST_SUITES=${{ github.event.inputs.inputSuites || 'quick' }}
           ./run.sh -- \
+                   -c \
                    -s "${CVMFS_TEST_SUITES}" \
                    -x src/095-fuser \
                       src/004-davinci \

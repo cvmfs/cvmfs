@@ -98,7 +98,7 @@ jobs:
           CVMFS_TEST_USE_CDN=yes \
           CVMFS_TEST_USER=$(id -un) \
           CVMFS_TEST_GROUP=$(id -gn) \
-          ./run.sh /tmp/test.log -p nfs || exit 1
+          ./run.sh /tmp/test.log -c -p nfs || exit 1
 
       - name: Show NFS state on failure
         if: failure()

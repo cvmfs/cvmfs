@@ -119,6 +119,7 @@ jobs:
           CVMFS_TEST_USER=$(id -un) \
           CVMFS_TEST_GROUP=$(id -gn) \
           ./run.sh /tmp/test.log    \
+                   -c                         \
                    -s "${CVMFS_TEST_SUITES}"  \
                    -x src/095-fuser   \
                       src/004-davinci                              \
