@@ -7,7 +7,7 @@ cvmfs_test_suites="quick"
 # through a repository gateway
 
 cvmfs_run_test() {
-    set_up_repository_gateway || return 1
+    set_up_repository_gateway test.repo.org || return 1
 
     echo "Checking transaction + publish"
 
