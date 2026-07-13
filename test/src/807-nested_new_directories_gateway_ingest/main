@@ -22,7 +22,7 @@ compare_file_checksum() {
 }
 
 cvmfs_run_test() {
-    set_up_repository_gateway || return 1
+    set_up_repository_gateway test.repo.org || return 1
 
     echo "  Getting lease on subdirectory that does not exists yet should not work"
     # Expect ENOENT
