@@ -2646,6 +2646,8 @@ find_or_build_cvmfs_preload() {
 
 # Sets up the CVMFS repository gateway application
 set_up_repository_gateway() {
+    local repo_name=${1:-test.repo.org}
+    shift
     local mkfs_args=("$@")
 
     echo "Setting up repository gateway"
@@ -2666,38 +2668,38 @@ set_up_repository_gateway() {
     sudo rm -f /var/log/cvmfs_receiver/debug.log
 
     echo "  Writing configuration files"
-    sudo bash -c 'cat <<EOF > /etc/cvmfs/gateway/repo.json
+    sudo dd status=none of=/etc/cvmfs/gateway/repo.json <<EOF
 {
     "repos" : [
         {
-            "domain" : "test.repo.org",
+            "domain" : "$repo_name",
             "keys" : ["key1"]
         }
     ],
     "keys" : [
         {
             "type" : "file",
-            "file_name" : "/etc/cvmfs/keys/test.repo.org.gw",
+            "file_name" : "/etc/cvmfs/keys/$repo_name.gw",
             "repo_subpath" : "/"
         }
     ]
 }
-EOF'
+EOF
 
     echo "  Creating test repo"
-    create_repo test.repo.org `whoami` NO "${mkfs_args[@]}"
+    create_repo "$repo_name" `whoami` NO "${mkfs_args[@]}"
 
     echo "  Writing API key file"
-    sudo bash -c 'cat <<EOF > /etc/cvmfs/keys/test.repo.org.gw
+    sudo dd status=none of=/etc/cvmfs/keys/"$repo_name".gw <<EOF
 plain_text key1 secret1
-EOF'
+EOF
 
     echo "  Modifying test repo configuration"
-    local repo_server_config=/etc/cvmfs/repositories.d/test.repo.org/server.conf
+    local repo_server_config=/etc/cvmfs/repositories.d/"$repo_name"/server.conf
     local original_upstream=$(grep CVMFS_UPSTREAM_STORAGE $repo_server_config | cut -d'=' -f2-)
-    sudo bash -c "echo CVMFS_UPSTREAM_STORAGE=gw,/srv/cvmfs/test.repo.org/txn,http://localhost:4929/api/v1 >> $repo_server_config"
+    sudo bash -c "echo CVMFS_UPSTREAM_STORAGE=gw,/srv/cvmfs/"$repo_name"/txn,http://localhost:4929/api/v1 >> $repo_server_config"
     sudo bash -c "echo TEST_CVMFS_RECEIVER_UPSTREAM_STORAGE=$original_upstream >> $repo_server_config"
-    sudo sed -i -e "s/CVMFS_ROOT_HASH=.*//" /var/spool/cvmfs/test.repo.org/client.local
+    sudo sed -i -e "s/CVMFS_ROOT_HASH=.*//" /var/spool/cvmfs/"$repo_name"/client.local
 
     echo "  Starting repository gateway"
     sudo $gateway_script start

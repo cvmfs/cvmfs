@@ -27,7 +27,7 @@ produce_tarball() {
 
 
 cvmfs_run_test() {
-    set_up_repository_gateway || return 1
+    set_up_repository_gateway test.repo.org || return 1
 
     local scratch_dir=$(pwd)
     local tarfile=$scratch_dir/tarball.tar
