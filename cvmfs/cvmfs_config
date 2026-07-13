@@ -266,7 +266,7 @@ cvmfs_config_usage() {
   fi
   echo "  chksetup"
   echo ""
-  echo "  showconfig [-s(hort output, only non-empty parameters)] [-j|--json] [<repository>]"
+  echo "  showconfig [-s(hort output, only parameters set in the configuration)] [-j|--json] [<repository>]"
   echo ""
   echo "  stat [-v | <repository>]"
   echo ""
@@ -968,8 +968,14 @@ cvmfs_chksetup() {
 # Ensure that a string is properly escaped for JSON output
 json_string() {
   local s=$1
-  s=${s//\\/\\\\} # every \ becomes \\
-  s=${s//\"/\\\"} # every " becomes \"
+  s=${s//\\/\\\\}     # every \ becomes \\
+  s=${s//\"/\\\"}     # every " becomes \"
+  # Control characters are not allowed literally inside a JSON string
+  s=${s//$'\b'/\\b}
+  s=${s//$'\f'/\\f}
+  s=${s//$'\n'/\\n}
+  s=${s//$'\r'/\\r}
+  s=${s//$'\t'/\\t}
   printf '"%s"' "$s"
 }
 
@@ -1046,10 +1052,16 @@ cvmfs_showconfig() {
     printf '  "CVMFS_REPOSITORY_NAME": %s' "$(json_string "$fqrn")"
     local jvar=
     while read jvar; do
-      local value=${!jvar}
-      value=${value//@org@/$org}
-      value=${value//@fqrn@/$fqrn}
-      # short mode: hide only never-set parameters, like the plain output
+      local value=
+      if [ "x$jvar" = "xCVMFS_CACHE_DIR" ]; then
+        # Derived in cvmfs_readconfig (unset beforehand), never from the shell.
+        value=$CVMFS_CACHE_DIR
+      elif [[ " $set_vars " == *" $jvar "* ]]; then
+        value=${!jvar}
+        value=${value//@org@/$org}
+        value=${value//@fqrn@/$fqrn}
+      fi
+      # short mode: hide only never-set parameters
       if [ $short_output -eq 1 ] && [ -z "$value" ] \
          && [[ " $set_vars " != *" $jvar "* ]]; then
         continue
