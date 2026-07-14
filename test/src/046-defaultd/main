@@ -14,6 +14,20 @@ cleanup_config_files() {
   sudo rm -f /etc/cvmfs/default.d/50-test*
 }
 
+# Sort ';'- separated components within each value: some (e.g. CVMFS_PAC_URLS,
+# randomized in cvmfs-config.cern.ch's default.conf because of $RANDOM) aren't guaranteed to
+# keep a stable order across separate showconfig invocations.
+sort_value_lists() {
+  awk '{
+    eq = index($0, "=")
+    n = split(substr($0, eq + 1), v, ";")
+    n = asort(v)
+    val = v[1]
+    for (i = 2; i <= n; i++) val = val ";" v[i]
+    print substr($0, 1, eq) val
+  }'
+}
+
 # Turn the plain 'showconfig' output into sorted KEY=VALUE lines: keep only
 # parameter lines, dropping the "# from SOURCE" provenance and inverting the
 # shell quoting that 'cvmfs2 -o parse' applies (EscapeShell in options.cc).
@@ -41,12 +55,12 @@ normalize_plain() {
       }
       print key "=" value
     }
-  ' | sort
+  ' | sort_value_lists | sort
 }
 
 # Turn a 'showconfig -j' object into the same sorted KEY=VALUE lines.
 normalize_json() {
-  jq -r 'to_entries[] | "\(.key)=\(.value)"' | sort
+  jq -r 'to_entries[] | "\(.key)=\(.value)"' | sort_value_lists | sort
 }
 
 cvmfs_run_test() {
@@ -58,10 +72,6 @@ cvmfs_run_test() {
   cvmfs_mount grid.cern.ch || retval=2
   sudo cvmfs_talk -i grid.cern.ch parameters | grep CVMFS_KCACHE_TIMEOUT=3 | grep /etc/cvmfs/default.d/50-testB.conf || retval=3
   cvmfs_config showconfig grid.cern.ch | grep CVMFS_KCACHE_TIMEOUT=3 | grep /etc/cvmfs/default.d/50-testB.conf || retval=4
-
-  # TODO(vavolkl): Re-enable once test logic is fixed
-  cleanup_config_files
-  return $retval
 
   # The JSON output (-j) must expose the same resolved configuration as the
   # plain text output.
@@ -76,6 +86,19 @@ cvmfs_run_test() {
   # without a repository name the output is a JSON array, one object per repo
   diff <(cvmfs_config showconfig    | normalize_plain) \
        <(cvmfs_config showconfig -j | jq '.[]' | normalize_json) || retval=43
+
+  # Check that the environment variable CVMFS_USE_CDN is not leaked into the JSON and plain output
+  local leaked="shell_leak_sentinel"
+  [ "$(CVMFS_USE_CDN=$leaked cvmfs_config showconfig -j grid.cern.ch \
+         | jq -r '.CVMFS_USE_CDN')" = "$leaked" ] && retval=44
+  CVMFS_USE_CDN=$leaked cvmfs_config showconfig grid.cern.ch \
+    | grep -q "^CVMFS_USE_CDN=$leaked" && retval=45
+
+  # grid.cern.ch is a repository that has 4 server urls, separated by ';' so we check that the JSON output
+  # does not contain any single quotes put by EscapeShell()
+  cvmfs_config showconfig -j grid.cern.ch \
+    | jq -e "(.CVMFS_SERVER_URL // \"\") | test(\"'\") | not" >/dev/null \
+    || retval=46
 
   cvmfs_umount grid.cern.ch || retval=5
 
