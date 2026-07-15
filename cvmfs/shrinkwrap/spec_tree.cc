@@ -50,9 +50,8 @@ bool SpecTree::IsMatching(std::string path) {
   SpecTreeNode *cur_node = root_;
   bool is_wildcard = (cur_node->mode == '*');
   bool is_flat_cp = (cur_node->mode == '^');
-  if (cur_node->mode == '!') {
-    return false;
-  }
+  bool hit_exclusion = (root_->mode == '!');
+  
   if (path.length() > 0 && path.at(path.length() - 1) == '/') {
     path.erase(path.length() - 1);
   }
@@ -63,14 +62,19 @@ bool SpecTree::IsMatching(std::string path) {
        part_it++) {
     cur_node = cur_node->GetNode(*part_it);
     if (cur_node == NULL) {
-      if (is_wildcard || (is_flat_cp && (part_it + 1) == path_parts.end())) {
+      // Wildcard only works if we didn't hit an exclusion
+      if (is_wildcard && !hit_exclusion) {
+        return true;
+      }
+      if (is_flat_cp && (part_it + 1) == path_parts.end()) {
         return true;
       }
       return false;
     }
     is_flat_cp = false;
     if (cur_node->mode == '!') {
-      return false;
+      hit_exclusion = true;
+      // DON'T return here - continue walking to check for overrides
     }
     if (cur_node->mode == '*') {
       is_wildcard = true;
@@ -78,6 +82,10 @@ bool SpecTree::IsMatching(std::string path) {
     if (cur_node->mode == '^') {
       is_flat_cp = true;
     }
+  }
+  // Final node check
+  if (cur_node->mode == '!' || cur_node->mode == '-') {
+    return false;
   }
   return is_wildcard || is_flat_cp || cur_node->mode == '_'
          || cur_node->mode == 0;
@@ -196,11 +204,10 @@ void SpecTree::Parse(FILE *spec_file) {
 int SpecTree::ListDir(const char *dir, char ***buf, size_t *len) {
   std::string path = dir;
   SpecTreeNode *cur_node = root_;
-  bool is_wildcard = (cur_node->mode == '*');
-  bool is_flat_cp = (cur_node->mode == '^');
-  if (cur_node->mode == '!') {
-    return -1;
-  }
+  bool is_wildcard = (root_->mode == '*');
+  bool is_flat_cp = (root_->mode == '^');
+  bool hit_exclusion = (root_->mode == '!');
+  
   if (path.length() > 0 && path.at(path.length() - 1) == '/') {
     path.erase(path.length() - 1);
   }
@@ -211,14 +218,15 @@ int SpecTree::ListDir(const char *dir, char ***buf, size_t *len) {
        part_it++) {
     cur_node = cur_node->GetNode(*part_it);
     if (cur_node == NULL) {
-      if (is_wildcard) {
-        break;
+      if (is_wildcard && !hit_exclusion) {
+        return SPEC_READ_FS;
       }
       return -1;
     }
     is_flat_cp = false;
     if (cur_node->mode == '!') {
-      return -1;
+      hit_exclusion = true;
+      // Don't return -1 - continue walking
     }
     if (cur_node->mode == '*') {
       is_wildcard = true;
@@ -227,8 +235,19 @@ int SpecTree::ListDir(const char *dir, char ***buf, size_t *len) {
       is_flat_cp = true;
     }
   }
-  if (is_wildcard || is_flat_cp) {
+  // Wildcard only applies if no exclusion was hit
+  if ((is_wildcard || is_flat_cp) && !hit_exclusion) {
     return SPEC_READ_FS;
+  }
+  // For excluded dirs, check if they have valid children to list
+  if (cur_node->mode == '!' || cur_node->mode == '-') {
+    int result = cur_node->GetListing(path, buf, len);
+    // GetListing already filters out '!' and '-' entries
+    // If only NULL terminator remains, nothing valid to list
+    if (*len <= 1) {
+      return -1;
+    }
+    return result;
   }
   return cur_node->GetListing(path, buf, len);
 }
