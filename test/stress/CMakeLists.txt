@@ -48,6 +48,7 @@ add_executable(s3mockserver
 
 target_link_libraries (s3mockserver
                        cvmfs_util
+                       CURL::libcurl
                        pthread
                        dl
 )
