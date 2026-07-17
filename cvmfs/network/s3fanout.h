@@ -350,6 +350,9 @@ class S3FanoutManager : SingleCopy {
   std::string dot_cvmfs_cache_control_header;           // Cache-Control: max-age=...
 };  // S3FanoutManager
 
+std::string MkV2CanonicalResource(const std::string &bucket,
+                                  const std::string &object_key,
+                                  bool dns_buckets, bool multi_delete);
 std::string ComposeDeleteMultiXml(const std::vector<std::string> &keys);
 unsigned ParseDeleteMultiResponse(const std::string &response,
                                   std::vector<std::string> *error_keys,
