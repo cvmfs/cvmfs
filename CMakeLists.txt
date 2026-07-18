@@ -515,11 +515,14 @@ if (BUILD_CVMFS)
   endif (MACOSX)
 endif ()
 
-# libcap is needed by cvmfs2, cvmfs_fuse*_stub, mount.cvmfs, and the
-# server-side swissknife — every target that links cvmfs/util/capabilities.cc.
+# libcap is needed by every target that links cvmfs/util/capabilities.cc,
+# i.e. everything that builds libcvmfs-util.
 # macOS has stubbed-out implementations in capabilities.{cc,h} that don't
 # reference libcap symbols, so the lookup is skipped there.
-if (NOT MACOSX AND (BUILD_CVMFS OR BUILD_SERVER OR BUILD_SERVER_DEBUG OR INSTALL_MOUNT_SCRIPTS))
+if (NOT MACOSX AND (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_LIBCVMFS_CACHE OR
+                    BUILD_SERVER OR BUILD_SERVER_DEBUG OR BUILD_RECEIVER OR
+                    BUILD_SHRINKWRAP OR BUILD_PRELOADER OR BUILD_UNITTESTS OR
+                    BUILD_STRESS_TESTS OR INSTALL_MOUNT_SCRIPTS))
   find_package(LibCAP REQUIRED)
 endif ()
 
