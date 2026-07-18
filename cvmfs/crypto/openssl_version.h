@@ -8,8 +8,10 @@
 #include <openssl/opensslv.h>
 
 // Safeguard when compiling libcvmfs_crypto: make sure we pick up the built-in
-// LibreSSL and not the system's OpenSSL
-#ifdef CVMFS_LIBRARY
+// LibreSSL and not the system's OpenSSL. The build system defines
+// CVMFS_CRYPTO_SYSTEM_OPENSSL when the libcrypto external is disabled and
+// the system OpenSSL is the intended crypto provider.
+#if defined(CVMFS_LIBRARY) && !defined(CVMFS_CRYPTO_SYSTEM_OPENSSL)
 #ifndef LIBRESSL_VERSION_NUMBER
 #error "picking up OpenSSL includes instead of LibreSSL"
 #endif

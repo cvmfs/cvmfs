@@ -7,19 +7,26 @@
 #  Libcrypto_LIBRARIES - Link these to use SHA3
 #
 
-find_path(
-    Libcrypto_INCLUDE_DIRS
-    NAMES tls.h
-    PATHS ${EXTERNALS_INSTALL_LOCATION}/crypto/include
-    NO_DEFAULT_PATH
-)
+if(CVMFS_SYSTEM_LIBCRYPTO)
+  # The built-in LibreSSL is disabled: use the system OpenSSL located by the
+  # mandatory find_package(OpenSSL) instead.
+  set(Libcrypto_LIBRARIES OpenSSL::Crypto)
+  set(Libcrypto_INCLUDE_DIRS ${OPENSSL_INCLUDE_DIR})
+else()
+  find_path(
+      Libcrypto_INCLUDE_DIRS
+      NAMES tls.h
+      PATHS ${EXTERNALS_INSTALL_LOCATION}/crypto/include
+      NO_DEFAULT_PATH
+  )
 
-find_library(
-    Libcrypto_LIBRARIES
-    NAMES crypto
-    PATHS ${EXTERNALS_INSTALL_LOCATION}/crypto/lib
-    NO_DEFAULT_PATH
-)
+  find_library(
+      Libcrypto_LIBRARIES
+      NAMES crypto
+      PATHS ${EXTERNALS_INSTALL_LOCATION}/crypto/lib
+      NO_DEFAULT_PATH
+  )
+endif()
 
 include(FindPackageHandleStandardArgs)
 FIND_PACKAGE_HANDLE_STANDARD_ARGS(

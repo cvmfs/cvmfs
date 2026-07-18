@@ -426,6 +426,22 @@ endif ()
 find_package (OpenSSL REQUIRED)
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${OPENSSL_INCLUDE_DIR})
 
+# libcvmfs_crypto links a private static LibreSSL libcrypto by default. When
+# the libcrypto external is disabled (BUILTIN_EXTERNALS=OFF, an explicit
+# BUILTIN_EXTERNALS_LIST without it, or BUILTIN_EXTERNALS_EXCLUDE=libcrypto),
+# fall back to the system OpenSSL for libcvmfs_crypto as well.
+string (TOLOWER "${BUILTIN_EXTERNALS_LIST}" _builtin_list_lower)
+string (TOLOWER "${BUILTIN_EXTERNALS_EXCLUDE}" _builtin_exclude_lower)
+if (NOT BUILTIN_EXTERNALS
+    OR "libcrypto" IN_LIST _builtin_exclude_lower
+    OR (BUILTIN_EXTERNALS_LIST AND NOT "libcrypto" IN_LIST _builtin_list_lower))
+  set (CVMFS_SYSTEM_LIBCRYPTO ON)
+  message (STATUS "libcvmfs_crypto: using the system OpenSSL libcrypto")
+  add_definitions (-DCVMFS_CRYPTO_SYSTEM_OPENSSL)
+else ()
+  set (CVMFS_SYSTEM_LIBCRYPTO OFF)
+endif ()
+
 find_package (Libcrypto REQUIRED)
 # We do not add the Libcrypto include directories to INCLUDE_DIRECTORIES
 # to avoid a clash with the system openssl. We only use it for libcvmfs_crypto
