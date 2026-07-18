@@ -318,11 +318,13 @@ endif(BUILTIN_EXTERNALS)
 # Migrate bootstrap.sh to cmake
 if(BUILTIN_EXTERNALS)
   message(STATUS "Entering external dependencies setup")
+  # Some vendored externals (e.g. libarchive) force their preferred
+  # CMAKE_BUILD_TYPE into the cache; save the configured value and restore
+  # it afterwards.
+  set(_cvmfs_build_type "${CMAKE_BUILD_TYPE}")
   add_subdirectory(externals)
+  set(CMAKE_BUILD_TYPE "${_cvmfs_build_type}" CACHE STRING "Build Type" FORCE)
 endif()
-
-# reset cache variables the externals may have changed
-set(CMAKE_BUILD_TYPE "" CACHE STRING "Build Type" FORCE)
 
 #
 # include some common functionality
