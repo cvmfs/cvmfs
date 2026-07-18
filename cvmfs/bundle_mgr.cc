@@ -142,11 +142,29 @@ void BundleMgr::Fetch() {
   }
 
   while (auto file = bfm_->GetNext()) {
+    const PathString path = NormalizeDependencyPath(file);
     // A TrySendPath() here is used as a profylaxis to a scenario where the pipe
     // is currently blocked.
-    while (not TrySendPath(back_channel_, file)) {
+    while (not TrySendPath(back_channel_, path)) {
     }
   }
+}
+
+/**
+ * Dependency paths in a bundle are absolute from the repository root.
+ * Entries without a leading slash (optionally prefixed with "./") are
+ * resolved relative to the directory holding the bundle file.
+ */
+PathString BundleMgr::NormalizeDependencyPath(const PathString &path) const {
+  if (path.StartsWith(PathString("/", 1)))
+    return path;
+  const PathString relative = path.StartsWith(PathString("./", 2))
+                                  ? path.Suffix(2)
+                                  : path;
+  PathString normalized(parent_path_);
+  normalized.Append("/", 1);
+  normalized.Append(relative.GetChars(), relative.GetLength());
+  return normalized;
 }
 
 void BundleMgr::JoinFetcherPool() {
