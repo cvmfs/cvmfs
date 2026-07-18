@@ -328,7 +328,7 @@ bool SyncMediator::Commit(manifest::Manifest *manifest) {
   }
 
   if (!bundle_specs_.empty()) {
-    LogCvmfs(kLogPublish, kLogStdout, "Processing hardlinks...");
+    LogCvmfs(kLogPublish, kLogStdout, "Processing file bundles...");
     AddBundleSpecs();
   }
 
