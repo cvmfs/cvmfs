@@ -27,7 +27,7 @@
 namespace {
 constexpr size_t kDefaultBundlePoolSize = 8;
 
-// Read the .cvmfsbundle.<basename> file via the cvmfs cache
+// Read the .cvmfsbundle-<basename> file via the cvmfs cache
 BundleFileMgr *LoadBundleFromCvmfs(MountPoint *mp,
                                    const PathString &bundle_file_path) {
   catalog::DirectoryEntry dirent;
@@ -102,7 +102,7 @@ BundleMgr::BundleMgr(MountPoint *mp, const PathString &path)
   parent_path_ = GetParentPath(path_);
   // There is a naming convention regarding the name of the file with the
   // contents of the bundle
-  bundle_file_path_ = PathString(parent_path_.ToString() + "/.cvmfsbundle."
+  bundle_file_path_ = PathString(parent_path_.ToString() + "/.cvmfsbundle-"
                                  + fname_.ToString());
 
   pipe_bm_[0] = pipe_bm_[1] = -1;
