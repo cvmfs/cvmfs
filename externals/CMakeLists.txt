@@ -4,7 +4,12 @@ include(${CMAKE_SOURCE_DIR}/cmake/Modules/ExternalDepMacros.cmake)
 
 set(EXTERNALS_INSTALL_TARGETS "")
 
-add_subdirectory(libarchive)
+# libarchive is only used for tarball ingestion by the publishing tools
+# (cvmfs_swissknife, cvmfs_publish, cvmfs_preload)
+if(BUILD_CVMFS OR BUILD_SERVER OR BUILD_SERVER_DEBUG OR BUILD_RECEIVER OR
+   BUILD_PRELOADER)
+  add_subdirectory(libarchive)
+endif()
 add_subdirectory(json)
 add_subdirectory(pacparser)
 add_subdirectory(protobuf)
