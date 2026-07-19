@@ -4,9 +4,12 @@ cvmfs_test_autofs_on_startup=false
 cvmfs_test_suites="quick"
 
 CVMFS_TEST_618_REPLICA_NAME=
+CVMFS_TEST_618_PRIVATE_MOUNT=
 cleanup() {
   echo "running cleanup()"
   [ -z $CVMFS_TEST_618_REPLICA_NAME ] || destroy_repo $CVMFS_TEST_618_REPLICA_NAME
+  [ -z $CVMFS_TEST_618_PRIVATE_MOUNT ] || \
+    remove_local_mount $CVMFS_TEST_618_PRIVATE_MOUNT
 }
 
 cvmfs_run_test() {
@@ -87,6 +90,20 @@ EOF
   echo "check that the metainfo on Stratum1 has updated"
   cvmfs_swissknife info -r $(get_repo_url $replica_name) -M > downloaded4 || return 70
   diff $json_file downloaded4 || return 71
+
+  # The rdonly mount is pinned to a fixed root hash and never downloads a
+  # manifest, so repo_metainfo is not expected to work there.
+  # Check it on a regular client mount.
+  echo "mount $CVMFS_TEST_REPO as a regular client"
+  local mntpnt="$(pwd)/private_mnt"
+  CVMFS_TEST_618_PRIVATE_MOUNT="$mntpnt"
+  do_local_mount "$mntpnt" \
+                 "$CVMFS_TEST_REPO" \
+                 "$(get_repo_url $CVMFS_TEST_REPO)" || return 80
+
+  echo "check the repo_metainfo magic xattr on the client"
+  attr -qg repo_metainfo "$mntpnt" > downloaded5 || return 81
+  diff $json_file downloaded5 || return 82
 
   return 0
 }
