@@ -223,7 +223,7 @@ string CipherAes256Cbc::DoDecrypt(const string &ciphertext, const Key &key) {
               reinterpret_cast<uint8_t *>(&plaintext[0]),
               reinterpret_cast<const uint8_t *>(ciphertext.data()) + kIvSize);
 
-  unsigned char padding_value = plaintext[plaintext.length() - 1];
+  const unsigned char padding_value = plaintext[plaintext.length() - 1];
   if (padding_value > AES_BLOCK_SIZE || padding_value > plaintext.length())
     return "";
   plaintext.resize(plaintext.length() - padding_value);
