@@ -53,6 +53,27 @@ TEST_F(T_FsPosix, Init) {
 }
 
 
+TEST_F(T_FsPosix, InitParallel) {
+  // The .data directory structure is built by num_threads workers, each
+  // taking care of an independent set of top level directories.
+  interface_->finalize(interface_->context_);
+  interface_->context_ = interface_->initialize("InitParallel-2", "./",
+                                                "./.data-InitParallel", NULL,
+                                                8);
+  EXPECT_TRUE(DirectoryExists("./.data-InitParallel"));
+  EXPECT_TRUE(DirectoryExists("./.data-InitParallel/00/00"));
+  EXPECT_TRUE(DirectoryExists("./.data-InitParallel/7f/80"));
+  EXPECT_TRUE(DirectoryExists("./.data-InitParallel/ff/ff"));
+
+  // Re-initializing an already existing structure must be a no-op
+  interface_->finalize(interface_->context_);
+  interface_->context_ = interface_->initialize("InitParallel-3", "./",
+                                                "./.data-InitParallel", NULL,
+                                                8);
+  EXPECT_TRUE(DirectoryExists("./.data-InitParallel/ff/ff"));
+}
+
+
 TEST_F(T_FsPosix, ListDir) {
   ASSERT_TRUE(MkdirDeep("./ListDir/testdir", 0700));
   const bool ignore_failure = false;
