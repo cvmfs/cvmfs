@@ -901,7 +901,7 @@ bool CommandMigrate::MigrationWorker_20x::CreateNewEmptyCatalog(
     // as well, to remove this inefficiency
     const std::unique_ptr<catalog::CatalogDatabase> new_clg_db(
         catalog::CatalogDatabase::Create(clg_db_path));
-    if (new_clg_db.get()
+    if (new_clg_db.get() == nullptr
         || !new_clg_db->InsertInitialValues(root_path, volatile_content, "")) {
       Error("Failed to create database for new catalog");
       unlink(clg_db_path.c_str());
