@@ -43,7 +43,7 @@ static std::string DirLevelName(unsigned i) {
 }
 
 static void PosixMkdir(const std::string &path, mode_t mode) {
-  int res = mkdir(path.c_str(), mode);
+  const int res = mkdir(path.c_str(), mode);
   assert(res == 0 || errno == EEXIST);
 }
 
@@ -106,7 +106,7 @@ void InitializeDataDirectory(struct fs_traversal_context *ctx) {
       *posix_ctx = reinterpret_cast<struct fs_traversal_posix_context *>(
           ctx->ctx);
   const mode_t mode = 0700;
-  bool res = MkdirDeep(ctx->data, mode);
+  const bool res = MkdirDeep(ctx->data, mode);
   assert(res);
   if (kDirLevels == 0)
     return;
@@ -135,7 +135,7 @@ void InitializeDataDirectory(struct fs_traversal_context *ctx) {
     thread_contexts[i].mode = mode;
     thread_contexts[i].thread_total = thread_total;
     thread_contexts[i].thread_num = i;
-    int retval = pthread_create(&workers[i], NULL, PosixDataDirInitMainWorker,
+    const int retval = pthread_create(&workers[i], NULL, PosixDataDirInitMainWorker,
                                 &thread_contexts[i]);
     assert(retval == 0);
   }
