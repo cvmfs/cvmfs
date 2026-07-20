@@ -18,6 +18,7 @@
 #include "cache.h"
 #include "catalog_mgr_client.h"
 #include "fetch.h"
+#include "file_chunk.h"
 #include "json_document.h"
 #include "mountpoint.h"
 #include "options.h"
@@ -235,6 +236,39 @@ void BundleMgr::FetchPath(const PathString &path) {
   }
   LogCvmfs(kLogCvmfs, kLogDebug, "BUNDLE-FETCH: prefetching %s",
            path.ToString().c_str());
+
+  if (dirent.IsChunkedFile()) {
+    // Files above the chunking threshold are stored as per-chunk objects;
+    // their bulk object only exists if the repository sets
+    // CVMFS_GENERATE_LEGACY_BULK_CHUNKS. Fetch the chunks, exactly like the
+    // read path does.
+    FileChunkList chunks;
+    if (!mount_point_->catalog_mgr()->ListFileChunks(
+            path, dirent.hash_algorithm(), &chunks)
+        || chunks.IsEmpty()) {
+      LogCvmfs(kLogCvmfs, kLogDebug, "BUNDLE-FETCH: no chunks found for %s",
+               path.ToString().c_str());
+      return;
+    }
+    for (unsigned i = 0; i < chunks.size(); ++i) {
+      CacheManager::Label label;
+      label.path = path.ToString();
+      label.size = chunks.AtPtr(i)->size();
+      label.zip_algorithm = dirent.compression_algorithm();
+      label.flags |= CacheManager::kLabelChunked;
+      if (mount_point_->catalog_mgr()->volatile_flag())
+        label.flags |= CacheManager::kLabelVolatile;
+      if (dirent.IsExternalFile()) {
+        label.flags |= CacheManager::kLabelExternal;
+        label.range_offset = chunks.AtPtr(i)->offset();
+      }
+      const int fd = this_fetcher->Fetch(
+          CacheManager::LabeledObject(chunks.AtPtr(i)->content_hash(), label));
+      if (fd >= 0)
+        mount_point_->file_system()->cache_mgr()->Close(fd);
+    }
+    return;
+  }
 
   CacheManager::Label label;
   label.path = path.ToString();
