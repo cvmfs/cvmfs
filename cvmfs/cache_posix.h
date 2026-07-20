@@ -5,6 +5,7 @@
 #ifndef CVMFS_CACHE_POSIX_H_
 #define CVMFS_CACHE_POSIX_H_
 
+#include <pthread.h>
 #include <stdint.h>
 #include <sys/types.h>
 
@@ -68,7 +69,7 @@ class PosixCacheManager : public CacheManager {
       const std::string &cache_path, const bool alien_cache,
       const RenameWorkarounds rename_workaround = kRenameNormal,
       const bool do_refcount = true, const bool cleanup_unused_first = false);
-  virtual ~PosixCacheManager() { }
+  virtual ~PosixCacheManager() { pthread_mutex_destroy(&lock_cache_dirs_); }
   virtual bool AcquireQuotaManager(QuotaManager *quota_mgr);
 
   virtual int Open(const LabeledObject &object);
@@ -108,6 +109,15 @@ class PosixCacheManager : public CacheManager {
 
  private:
   bool InitCacheDirectory(const std::string &cache_path);
+  /**
+   * Physically create the cache directory skeleton (base directory, txn,
+   * quarantaine and the 00..ff content directories) and detect the underlying
+   * file system.  Idempotent and thread-safe (double-checked locking on
+   * cache_dirs_created_).  For alien caches this is deferred until the first
+   * cache write so that a bogus fqrn (e.g. a stray access under /cvmfs) does
+   * not leave empty directories behind.  See issue #4217.
+   */
+  bool EnsureCacheDirectories();
 
   struct Transaction {
     Transaction(const shash::Any &id, const std::string &final_path)
@@ -145,6 +155,8 @@ class PosixCacheManager : public CacheManager {
       , fd_mgr_(new FdRefcountMgr())
       , cleanup_unused_first_(cleanup_unused_first) {
     atomic_init32(&no_inflight_txns_);
+    atomic_init32(&cache_dirs_created_);
+    pthread_mutex_init(&lock_cache_dirs_, NULL);
   }
 
   std::string GetPathInCache(const shash::Any &id);
@@ -185,6 +197,17 @@ class PosixCacheManager : public CacheManager {
    * True if posixcache is on tmpfs (and with this already in RAM)
    */
   bool is_tmpfs_;
+  /**
+   * Set to 1 by EnsureCacheDirectories() once the on-disk cache skeleton exists.
+   * For alien caches the skeleton is created lazily on the first write, so this
+   * starts at 0 and the flag is checked (lock-free) on every StartTxn().  See
+   * issue #4217.
+   */
+  atomic_int32 cache_dirs_created_;
+  /**
+   * Serializes the one-time skeleton creation in EnsureCacheDirectories().
+   */
+  pthread_mutex_t lock_cache_dirs_;
   /**
    * Refcount and return only unique file descriptors
    */
