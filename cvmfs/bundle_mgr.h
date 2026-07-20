@@ -27,6 +27,7 @@ class BundleMgr : SingleCopy {
   friend class T_BundleMgr;
   FRIEND_TEST(T_BundleMgr, ExchangeCT);
   FRIEND_TEST(T_BundleMgr, ExchangePathString);
+  FRIEND_TEST(T_BundleMgr, ReceivePathLongerThanPipeBuf);
   FRIEND_TEST(T_BundleMgr, Fetch);
 
  public:
@@ -94,7 +95,6 @@ class BundleMgr : SingleCopy {
 
   std::string BlockingReceive(int fd) const {
     const size_t size = BlockingReceive<size_t>(fd);
-    assert(size * sizeof(char) < PIPE_BUF);
     std::string result(size, '\t');
     ReadPipe(fd, static_cast<void *>(&result[0]), size * sizeof(char));
     return result;
