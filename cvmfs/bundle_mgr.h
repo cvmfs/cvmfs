@@ -28,6 +28,7 @@ class BundleMgr : SingleCopy {
   FRIEND_TEST(T_BundleMgr, ExchangePathString);
   FRIEND_TEST(T_BundleMgr, ReceivePathLongerThanPipeBuf);
   FRIEND_TEST(T_BundleMgr, Fetch);
+  FRIEND_TEST(T_BundleMgr, FetchChunked);
 
  public:
   BundleMgr(MountPoint *mp, const PathString &path);

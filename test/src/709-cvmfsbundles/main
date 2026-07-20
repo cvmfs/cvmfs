@@ -11,6 +11,9 @@ produce_dependency_files() {
   printf "This is dependency 1\n" > dep1.txt
   printf "This is dependency 2\n" > dep2.txt
   printf "This is a trigger\n" > trigger.txt
+  # Large enough to be split into several chunks with the tiny chunk sizes
+  # configured in server.conf (deterministic content, ~120 kB)
+  seq -f "chunked dependency line %06.0f" 1 4000 > dep3_chunked.txt
 
   # dep1 uses the canonical absolute-from-repository-root form, dep2 the
   # form relative to the directory holding the bundle file
@@ -19,7 +22,7 @@ produce_dependency_files() {
   "name": "CVMFS_BUNDLE",
   "version": "1.0.0",
   "encoding": "UTF-8",
-  "dependencies": ["/dep1.txt", "./dep2.txt"]
+  "dependencies": ["/dep1.txt", "./dep2.txt", "/dep3_chunked.txt"]
 }
 EOF
 
@@ -48,6 +51,14 @@ cvmfs_run_test() {
 
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "enable file chunking with tiny chunk sizes so dep3 gets split"
+  sudo tee -a /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf <<-EOF
+CVMFS_USE_FILE_CHUNKING=true
+CVMFS_MIN_CHUNK_SIZE=8192
+CVMFS_AVG_CHUNK_SIZE=16384
+CVMFS_MAX_CHUNK_SIZE=32768
+EOF
 
   echo "starting transaction to edit repository"
   start_transaction $CVMFS_TEST_REPO || return $?
@@ -88,6 +99,15 @@ cvmfs_run_test() {
       return 54
   fi
 
+  echo "make sure dep3 really got chunked (metadata lookup, no data fetch)"
+  local num_chunks=$(get_xattr chunks $mnt_point/dep3_chunked.txt)
+  echo "dep3_chunked.txt consists of ${num_chunks:-?} chunks"
+  if [ "x$num_chunks" = "x" ] || [ $num_chunks -le 1 ]; then
+      echo "dep3_chunked.txt is not chunked; the test would be vacuous"
+      desaster_cleanup $mnt_point $CVMFS_TEST_REPO
+      return 58
+  fi
+
   # core testing here
   echo "Opening trigger file"
   cat $mnt_point/trigger.txt
@@ -118,6 +138,28 @@ cvmfs_run_test() {
       desaster_cleanup $mnt_point $CVMFS_TEST_REPO
       return 57
   fi
+
+  # The chunk objects of dep3 cannot be located in the cache by the file's
+  # (bulk) hash xattr, so prove they were prefetched by cutting the network
+  # and reading the file: every chunk must be served from the local cache.
+  echo "cut the network and read the chunked dependency offline"
+  local talk_socket=$cache/cvmfs_io.$CVMFS_TEST_REPO
+  sudo cvmfs_talk -p $talk_socket proxy set "http://127.0.0.1:40403" \
+    || { desaster_cleanup $mnt_point $CVMFS_TEST_REPO; return 59; }
+  if ! timeout 60 cat $mnt_point/dep3_chunked.txt > $scratch_dir/dep3_offline.txt; then
+      echo "reading the chunked dependency offline failed: its chunks were not prefetched"
+      desaster_cleanup $mnt_point $CVMFS_TEST_REPO
+      return 60
+  fi
+  if ! cmp $scratch_dir/dep3_offline.txt $reference_dir/dep3_chunked.txt; then
+      echo "chunked dependency read offline does not match the reference copy"
+      desaster_cleanup $mnt_point $CVMFS_TEST_REPO
+      return 61
+  fi
+
+  echo "restore the network"
+  sudo cvmfs_talk -p $talk_socket proxy set DIRECT \
+    || { desaster_cleanup $mnt_point $CVMFS_TEST_REPO; return 62; }
 
   echo "check if the mounted repository contains exactly the same as the reference copy"
   compare_directories $mnt_point $reference_dir || { desaster_cleanup $mnt_point $CVMFS_TEST_REPO; return 11; }
