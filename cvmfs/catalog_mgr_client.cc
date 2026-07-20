@@ -310,8 +310,8 @@ LoadReturn ClientCatalogManager::LoadCatalogByHash(
       // if coming from server: update breadcrumb
       if (ctlg_context->root_ctlg_location() == kCtlgLocationServer) {
         // Keep a copy of the manifest, it backs the repo_metainfo xattr
-        manifest_ = new manifest::Manifest(
-            *ctlg_context->manifest_ensemble()->manifest);
+        manifest_ .reset(  new manifest::Manifest(
+              *ctlg_context->manifest_ensemble()->manifest) );
 
         // Store new manifest and certificate
         CacheManager::Label label;

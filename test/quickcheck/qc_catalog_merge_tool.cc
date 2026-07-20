@@ -191,7 +191,7 @@ void CatalogMergeInOut(const std::vector<EntrySpec> &base_entries,
   DirSpec spec2 = ModifySpec(spec1, changes);
   ASSERT_TRUE(tester.Apply("target", spec2));
 
-  UniquePtr<ServerTool> server_tool(new ServerTool());
+  std::unique_ptr<ServerTool> server_tool(new ServerTool());
   ASSERT_TRUE(server_tool->InitDownloadManager(true, ""));
 
   receiver::Params params = MakeMergeToolParams("test");
