@@ -6,6 +6,7 @@
 #include <gtest/gtest.h>
 
 #include <atomic>
+#include <climits>
 #include <string>
 #include <vector>
 
@@ -206,6 +207,22 @@ TEST_F(T_BundleMgr, ExchangePathString) {
 
   bundle_mgr_->BlockingSend(wfd_, path);
   EXPECT_EQ(path, bundle_mgr_->ReceivePath(rfd_));
+}
+
+// A dependency path published in a repo's .cvmfsbundle spec can be longer
+// than PIPE_BUF (4096 on Linux, 512 on macOS) and the fetcher work queue must
+// carry it intact: in production it flows through BundleMgr::Fetch ->
+// TrySendPath -> worker ReceivePath. This exercises the receive side directly
+// over the fixture's blocking common_pipe_, mirroring ExchangePathString with
+// a payload beyond the PIPE_BUF boundary. The send side over the pool's own
+// O_NONBLOCK work-queue pipe still cannot deliver such payloads (WritePipe
+// asserts on a short or EAGAIN write); that path is not exercised here.
+TEST_F(T_BundleMgr, ReceivePathLongerThanPipeBuf) {
+  // 2 * PIPE_BUF still fits comfortably in the pipe's buffer, so the single
+  // write()/read() in WritePipe/ReadPipe transfers the whole payload.
+  const PathString long_path(std::string(2 * PIPE_BUF, 'a'));
+  bundle_mgr_->BlockingSend(wfd_, long_path);
+  EXPECT_EQ(long_path, bundle_mgr_->ReceivePath(rfd_));
 }
 
 TEST_F(T_BundleMgr, Fetch) {
