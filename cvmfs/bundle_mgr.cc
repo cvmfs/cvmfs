@@ -244,7 +244,10 @@ void BundleMgr::FetchPath(const PathString &path) {
     label.flags |= CacheManager::kLabelVolatile;
   if (dirent.IsExternalFile())
     label.flags |= CacheManager::kLabelExternal;
-  this_fetcher->Fetch(CacheManager::LabeledObject(dirent.checksum(), label));
+  const int fd = this_fetcher->Fetch(
+      CacheManager::LabeledObject(dirent.checksum(), label));
+  if (fd >= 0)
+    mount_point_->file_system()->cache_mgr()->Close(fd);
 }
 
 void *BundleMgr::MainBundleMgrFetcher(void *data) {
