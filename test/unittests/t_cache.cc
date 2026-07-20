@@ -577,7 +577,6 @@ TEST_F(T_CacheManager, Create) {
   string path = tmp_path_ + "/test";
   MkdirDeep(path, 0700);
   EXPECT_EQ(NULL, PosixCacheManager::Create("/dev/null", false));
-  EXPECT_EQ(NULL, PosixCacheManager::Create("/dev/null", true));
 
   PosixCacheManager *mgr = PosixCacheManager::Create(path, false);
   EXPECT_TRUE(mgr != NULL);
@@ -587,20 +586,40 @@ TEST_F(T_CacheManager, Create) {
   EXPECT_EQ(0700U, info.st_mode & 0x03FF);
   delete mgr;
 
-  mode_t mask_save = umask(000);
-  string path2 = path + "2";
-  MkdirDeep(path2, 0700);
-  mgr = PosixCacheManager::Create(path2, true);
-  EXPECT_TRUE(mgr != NULL);
-  EXPECT_TRUE(DirectoryExists(path2 + "/ff"));
-  EXPECT_EQ(0, platform_stat((path2 + "/ff").c_str(), &info));
-  EXPECT_EQ(0770U, info.st_mode & 0x03FF);
-  delete mgr;
-  umask(mask_save);
-
   CopyPath2Path(tmp_path_ + "/" + hash_null_.MakePath(),
                 path + "/cvmfscatalog.cache");
   EXPECT_EQ(NULL, PosixCacheManager::Create(path, false));
+}
+
+
+TEST_F(T_CacheManager, LazyAlienCacheCreation) {
+  // For an alien cache, Create() must not materialize any directory, so that a
+  // bogus fqrn (e.g. a stray access to /cvmfs/<typo>) does not leave a
+  // superfluous top-level directory behind (#4217).
+  const mode_t mask_save = umask(000);
+  const string alien = tmp_path_ + "/alien";
+  PosixCacheManager *mgr = PosixCacheManager::Create(alien, true);
+  ASSERT_TRUE(mgr != NULL);
+  EXPECT_FALSE(DirectoryExists(alien));
+
+  // The first transaction materializes the full skeleton with alien (0770)
+  // permissions.
+  void *txn = alloca(mgr->SizeOfTxn());
+  EXPECT_GE(mgr->StartTxn(hash_null_, 0, txn), 0);
+  EXPECT_TRUE(DirectoryExists(alien + "/ff"));
+  platform_stat64 info;
+  EXPECT_EQ(0, platform_stat((alien + "/ff").c_str(), &info));
+  EXPECT_EQ(0770U, info.st_mode & 0x03FF);
+  EXPECT_EQ(0, mgr->CommitTxn(txn));
+  delete mgr;
+  umask(mask_save);
+
+  // A regular (non-alien) cache is still created eagerly by Create().
+  const string local = tmp_path_ + "/local";
+  mgr = PosixCacheManager::Create(local, false);
+  ASSERT_TRUE(mgr != NULL);
+  EXPECT_TRUE(DirectoryExists(local + "/ff"));
+  delete mgr;
 }
 
 
