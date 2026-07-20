@@ -8,6 +8,7 @@
 #include <fcntl.h>
 #include <inttypes.h>
 #include <stdint.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include <algorithm>
@@ -505,8 +506,8 @@ bool FileSystem::LockWorkspace() {
     return true;
 
   if (fd_workspace_lock_ == -1) {
-    boot_error_ = "could not acquire workspace lock (" + StringifyInt(errno)
-                  + ")";
+    boot_error_ = "could not acquire workspace lock " + path_workspace_lock_
+                  + " (" + strerror(errno) + ")";
     boot_status_ = loader::kFailCacheDir;
     return false;
   }
@@ -520,8 +521,8 @@ bool FileSystem::LockWorkspace() {
 
   fd_workspace_lock_ = LockFile(path_workspace_lock_);
   if (fd_workspace_lock_ < 0) {
-    boot_error_ = "could not acquire workspace lock (" + StringifyInt(errno)
-                  + ")";
+    boot_error_ = "could not acquire workspace lock " + path_workspace_lock_
+                  + " (" + strerror(errno) + ")";
     boot_status_ = loader::kFailCacheDir;
     return false;
   }
@@ -1037,6 +1038,22 @@ void FileSystem::SetupSqlite() {
 }
 
 
+/**
+ * Describes why MkdirDeep() failed for path.  Must be called immediately after
+ * the failure, before errno is clobbered.  MkdirDeep() reports EEXIST both for
+ * a path that is already a directory (not a failure) and for a path that is
+ * taken by a non-directory, so spell out the latter instead of printing the
+ * confusing "File exists".
+ */
+static string DescribeMkdirFailure(const string &path) {
+  const int saved_errno = errno;
+  platform_stat64 info;
+  if ((platform_stat(path.c_str(), &info) == 0) && !S_ISDIR(info.st_mode))
+    return path + " exists but is not a directory";
+  return path + " (" + strerror(saved_errno) + ")";
+}
+
+
 bool FileSystem::SetupWorkspace() {
   string optarg;
   // This is very similar to "determine cache dir".  It's for backward
@@ -1069,7 +1086,8 @@ bool FileSystem::SetupWorkspace() {
   // permission now to 0770 to avoid a race when fixing it later
   const int mode = 0770;
   if (!MkdirDeep(workspace_, mode, false)) {
-    boot_error_ = "cannot create workspace directory " + workspace_;
+    boot_error_ = "cannot create workspace directory "
+                  + DescribeMkdirFailure(workspace_);
     boot_status_ = loader::kFailCacheDir;
     return false;
   }
