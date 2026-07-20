@@ -466,6 +466,11 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
   bool ListingPath(const PathString &path,
                    catalog::DirectoryEntryList *listing,
                    const bool expand_symlink) const;
+  bool ListPathChunks(const PathString &path,
+                      const shash::Algorithms interpret_hashes_as,
+                      FileChunkList *chunks) const {
+    return false;
+  }
 
   bool GetVOMSAuthz(std::string *authz) { return false; }
 

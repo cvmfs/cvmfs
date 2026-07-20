@@ -4,20 +4,27 @@
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include <pthread.h>
 
+#include <algorithm>
 #include <atomic>
 #include <climits>
+#include <cstring>
 #include <string>
 #include <vector>
 
 #include "bundle_mgr.h"
 #include "catalog_mgr_client.h"
+#include "crypto/hash.h"
 #include "fetch.h"
 #include "file_bundle.h"
+#include "file_chunk.h"
 #include "json_document.h"
 #include "mountpoint.h"
 #include "options.h"
 #include "shortstring.h"
+#include "testutil.h"
+#include "util/mutex.h"
 #include "util/posix.h"
 
 class MockCatalogManager : public catalog::ClientCatalogManager {
@@ -32,6 +39,12 @@ class MockCatalogManager : public catalog::ClientCatalogManager {
                const catalog::LookupOptions options,
                catalog::DirectoryEntry *dirent),
               (override));
+  MOCK_METHOD(bool,
+              ListFileChunks,
+              (const PathString &path,
+               const shash::Algorithms interpret_hashes_as,
+               FileChunkList *chunks),
+              (override));
 };
 
 class MockFetcher : public cvmfs::Fetcher {
@@ -45,6 +58,10 @@ class MockFetcher : public cvmfs::Fetcher {
   int Fetch(const CacheManager::LabeledObject &object,
             const std::string &alt_url = "") override {
     ++counter_;
+    {
+      const MutexLockGuard guard(&fetched_mutex_);
+      fetched_hashes_.push_back(object.id);
+    }
     // Return an invalid file descriptor on purpose. The mock does not place
     // anything in the cache, so handing back a small fabricated fd (e.g. 1)
     // would make the production code perform a real Pread()/Close() on an
@@ -52,11 +69,23 @@ class MockFetcher : public cvmfs::Fetcher {
     return -1;
   }
   virtual ~MockFetcher() { delete statistics_; }
-  void Reset() { counter_ = 0; }
+  static void Reset() {
+    counter_ = 0;
+    const MutexLockGuard guard(&fetched_mutex_);
+    fetched_hashes_.clear();
+  }
+  static std::vector<shash::Any> FetchedHashes() {
+    const MutexLockGuard guard(&fetched_mutex_);
+    return fetched_hashes_;
+  }
 
   // Shared across all fetcher instances and incremented from several worker
   // threads concurrently, hence atomic.
   inline static std::atomic<size_t> counter_{0};
+  // Every hash requested through Fetch(), in arrival order. Written by the
+  // worker threads concurrently, hence the mutex.
+  inline static pthread_mutex_t fetched_mutex_ = PTHREAD_MUTEX_INITIALIZER;
+  inline static std::vector<shash::Any> fetched_hashes_;
   perf::Statistics *statistics_;
 };
 
@@ -115,7 +144,7 @@ class T_BundleMgr : public ::testing::Test {
     bundle_mgr_->SpawnFetcherPool();
     // Count only the dependency fetches triggered by Fetch(), not the single
     // probe the constructor performed while trying to load the bundle file.
-    MockFetcher::counter_ = 0;
+    MockFetcher::Reset();
     EXPECT_TRUE(bundle_mgr_);
     EXPECT_EQ(bundle_mgr_->bfm_, bfm_);
     MakePipe(common_pipe_);
@@ -232,5 +261,58 @@ TEST_F(T_BundleMgr, Fetch) {
   // is deterministic.
   bundle_mgr_->JoinFetcherPool();
   EXPECT_EQ(MockFetcher::counter_.load(), dependencies_.size());
+}
+
+namespace {
+shash::Any Sha1WithByte(const unsigned char byte) {
+  shash::Any result(shash::kSha1);
+  memset(result.digest, byte, shash::kDigestSizes[shash::kSha1]);
+  return result;
+}
+}  // namespace
+
+TEST_F(T_BundleMgr, FetchChunked) {
+  const shash::Any bulk_hash = Sha1WithByte(0xaa);
+  std::vector<shash::Any> chunk_hashes;
+  for (unsigned char i = 1; i <= 3; ++i) {
+    chunk_hashes.push_back(Sha1WithByte(i));
+  }
+
+  // Dependencies above the chunking threshold have no bulk object in the
+  // repository (unless CVMFS_GENERATE_LEGACY_BULK_CHUNKS is set); only the
+  // per-chunk objects exist.
+  const catalog::DirectoryEntry chunked_dirent =
+      catalog::DirectoryEntryTestFactory::ChunkedFile(bulk_hash);
+  ON_CALL(*mock_catalog_mgr_, LookupPath(testing::_, testing::_, testing::_))
+      .WillByDefault([chunked_dirent](const PathString &,
+                                      const catalog::LookupOptions,
+                                      catalog::DirectoryEntry *out) -> bool {
+        *out = chunked_dirent;
+        return true;
+      });
+  ON_CALL(*mock_catalog_mgr_,
+          ListFileChunks(testing::_, testing::_, testing::_))
+      .WillByDefault([chunk_hashes](const PathString &,
+                                    const shash::Algorithms,
+                                    FileChunkList *chunks) -> bool {
+        off_t offset = 0;
+        for (const shash::Any &hash : chunk_hashes) {
+          chunks->PushBack(FileChunk(hash, offset, 4096));
+          offset += 4096;
+        }
+        return true;
+      });
+
+  bundle_mgr_->Fetch();
+  bundle_mgr_->JoinFetcherPool();
+
+  const std::vector<shash::Any> fetched = MockFetcher::FetchedHashes();
+  EXPECT_EQ(0, std::count(fetched.begin(), fetched.end(), bulk_hash))
+      << "prefetcher requested the (nonexistent) bulk object";
+  const ptrdiff_t n_deps = static_cast<ptrdiff_t>(dependencies_.size());
+  for (const shash::Any &hash : chunk_hashes) {
+    EXPECT_EQ(n_deps, std::count(fetched.begin(), fetched.end(), hash));
+  }
+  EXPECT_EQ(dependencies_.size() * chunk_hashes.size(), fetched.size());
 }
 
