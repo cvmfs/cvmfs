@@ -38,6 +38,13 @@ cache_object_path() {
   echo "$cache/$(echo $hash | cut -c 1-2)/$(echo $hash | cut -c 3-)"
 }
 
+# Number of finalized content objects in the local cache (the two-hex-digit
+# CAS directories; excludes txn/ scratch files and quota bookkeeping)
+cache_object_count() {
+  local cache=$1
+  find "$cache" -mindepth 2 -maxdepth 2 -type f -path "*/??/*" 2>/dev/null | wc -l
+}
+
 cvmfs_run_test() {
   logfile=$1
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
@@ -109,11 +116,30 @@ EOF
   fi
 
   # core testing here
+  local objects_before=$(cache_object_count $cache)
+
   echo "Opening trigger file"
   cat $mnt_point/trigger.txt
 
   echo "Cache location"
   echo $cache
+
+  # Prefetching is asynchronous: opening the trigger only hands the path to
+  # the background prefetcher. Wait for the expected objects to arrive:
+  # trigger + bundle spec + dep1 + dep2 + one object per chunk of dep3.
+  local objects_expected=$((objects_before + 4 + num_chunks))
+  echo "waiting for the cache to grow from $objects_before to $objects_expected objects"
+  local waited=0
+  while [ $(cache_object_count $cache) -lt $objects_expected ]; do
+    if [ $waited -ge 120 ]; then
+      echo "timeout: $(cache_object_count $cache) of $objects_expected objects after ${waited}s"
+      desaster_cleanup $mnt_point $CVMFS_TEST_REPO
+      return 63
+    fi
+    sleep 1
+    waited=$((waited + 1))
+  done
+  echo "prefetch finished after ${waited}s"
 
   if [ -f "$trigger_in_cache" ]; then
       echo "Trigger FOUND inside the cache in the expected location"
