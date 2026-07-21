@@ -27,7 +27,7 @@
 namespace {
 constexpr size_t kDefaultBundlePoolSize = 8;
 
-// Read the .cvmfsbundle.<basename> file via the cvmfs cache
+// Read the .cvmfsbundle-<basename> file via the cvmfs cache
 BundleFileMgr *LoadBundleFromCvmfs(MountPoint *mp,
                                    const PathString &bundle_file_path) {
   catalog::DirectoryEntry dirent;
@@ -102,7 +102,7 @@ BundleMgr::BundleMgr(MountPoint *mp, const PathString &path)
   parent_path_ = GetParentPath(path_);
   // There is a naming convention regarding the name of the file with the
   // contents of the bundle
-  bundle_file_path_ = PathString(parent_path_.ToString() + "/.cvmfsbundle."
+  bundle_file_path_ = PathString(parent_path_.ToString() + "/.cvmfsbundle-"
                                  + fname_.ToString());
 
   pipe_bm_[0] = pipe_bm_[1] = -1;
@@ -142,11 +142,29 @@ void BundleMgr::Fetch() {
   }
 
   while (auto file = bfm_->GetNext()) {
+    const PathString path = NormalizeDependencyPath(file);
     // A TrySendPath() here is used as a profylaxis to a scenario where the pipe
     // is currently blocked.
-    while (not TrySendPath(back_channel_, file)) {
+    while (not TrySendPath(back_channel_, path)) {
     }
   }
+}
+
+/**
+ * Dependency paths in a bundle are absolute from the repository root.
+ * Entries without a leading slash (optionally prefixed with "./") are
+ * resolved relative to the directory holding the bundle file.
+ */
+PathString BundleMgr::NormalizeDependencyPath(const PathString &path) const {
+  if (path.StartsWith(PathString("/", 1)))
+    return path;
+  const PathString relative = path.StartsWith(PathString("./", 2))
+                                  ? path.Suffix(2)
+                                  : path;
+  PathString normalized(parent_path_);
+  normalized.Append("/", 1);
+  normalized.Append(relative.GetChars(), relative.GetLength());
+  return normalized;
 }
 
 void BundleMgr::JoinFetcherPool() {

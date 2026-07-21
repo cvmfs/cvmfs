@@ -12,16 +12,27 @@ produce_dependency_files() {
   printf "This is dependency 2\n" > dep2.txt
   printf "This is a trigger\n" > trigger.txt
 
-  cat > .cvmfsbundle.trigger.txt <<-EOF
+  # dep1 uses the canonical absolute-from-repository-root form, dep2 the
+  # form relative to the directory holding the bundle file
+  cat > .cvmfsbundle-trigger.txt <<-EOF
 {
   "name": "CVMFS_BUNDLE",
   "version": "1.0.0",
   "encoding": "UTF-8",
-  "dependencies": ["./dep1.txt", "./dep2.txt"]
+  "dependencies": ["/dep1.txt", "./dep2.txt"]
 }
 EOF
 
   popd >/dev/null || return 1
+}
+
+# Path of a file's content object in the local cache, derived from its
+# hash extended attribute (a metadata lookup that does not fetch content)
+cache_object_path() {
+  local cache=$1
+  local file=$2
+  local hash=$(get_xattr hash "$file")
+  echo "$cache/$(echo $hash | cut -c 1-2)/$(echo $hash | cut -c 3-)"
 }
 
 cvmfs_run_test() {
@@ -53,26 +64,29 @@ cvmfs_run_test() {
   echo "compare the results of cvmfs to our reference copy"
   compare_directories $repo_dir $reference_dir || return $?
 
-  echo "putting some stuff in the new repository"
-  produce_dependency_files $repo_dir || return 3
-
   echo "check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
 
-  echo "mount the repository on a local mountpoint"
-  do_local_mount $mnt_point $CVMFS_TEST_REPO $(get_repo_url $CVMFS_TEST_REPO) || { desaster_cleanup $mnt_point $CVMFS_TEST_REPO; return 10; }
+  echo "check that publishing marked the trigger file"
+  local attr_value=$(get_xattr bundle_trigger $repo_dir/trigger.txt)
+  [ "x$attr_value" = "x1" ] || return 20
+  attr_value=$(get_xattr bundle_trigger $repo_dir/dep1.txt)
+  [ "x$attr_value" = "x0" ] || return 21
 
-  echo "check if the Stratum1 repository contains exactly the same as the reference copy"
-  compare_directories $mnt_point $reference_dir || { desaster_cleanup $mnt_point $CVMFS_TEST_REPO; return 11; }
+  echo "mount the repository on a local mountpoint with bundle prefetching enabled"
+  do_local_mount $mnt_point $CVMFS_TEST_REPO $(get_repo_url $CVMFS_TEST_REPO) \
+    "" "CVMFS_PREFETCH_FILEBUNDLES=yes" || { desaster_cleanup $mnt_point $CVMFS_TEST_REPO; return 10; }
 
-  dep1_hash=$(attr -g hash "$mnt_point/dep1.txt" | cut -d: -f2 | xargs)
-  trigger_hash=$(attr -g hash "$mnt_point/trigger.txt" | cut -d: -f2 | xargs)
+  local trigger_in_cache=$(cache_object_path $cache "$mnt_point/trigger.txt")
+  local dep1_in_cache=$(cache_object_path $cache "$mnt_point/dep1.txt")
+  local dep2_in_cache=$(cache_object_path $cache "$mnt_point/dep2.txt")
 
-  dep1_location=$cache/"$(echo $dep1_hash | cut -c 1-2)"
-  trigger_location=$cache/"$(echo $trigger_hash | cut -c 1-2)"
-
-  trigger_in_cas=$(echo $trigger_hash | cut -c 3- )
-  dep1_in_cas=$(echo $dep1_hash | cut -c 3- )
+  echo "make sure the dependencies are not in the cache before the trigger is opened"
+  if [ -f "$dep1_in_cache" ] || [ -f "$dep2_in_cache" ]; then
+      echo "Dependencies found inside the cache before opening the trigger"
+      desaster_cleanup $mnt_point $CVMFS_TEST_REPO
+      return 54
+  fi
 
   # core testing here
   echo "Opening trigger file"
@@ -81,25 +95,35 @@ cvmfs_run_test() {
   echo "Cache location"
   echo $cache
 
-  echo "Trigger expected location"
-  echo $trigger_location/$trigger_in_cas
-
-  if [ -f "$trigger_location/$trigger_in_cas" ]; then
+  if [ -f "$trigger_in_cache" ]; then
       echo "Trigger FOUND inside the cache in the expected location"
   else
       echo "Trigger NOT FOUND inside the cache in the expected location"
+      desaster_cleanup $mnt_point $CVMFS_TEST_REPO
       return 55
   fi
 
-  if [ -f "$dep1_location/$dep1_in_cas" ]; then
+  if [ -f "$dep1_in_cache" ]; then
       echo "Dep1 FOUND inside the cache in the expected location"
   else
       echo "Dep1 NOT FOUND inside the cache in the expected location"
+      desaster_cleanup $mnt_point $CVMFS_TEST_REPO
       return 56
   fi
 
-  echo "unmount the Stratum1 repository"
-  sudo umount $mnt_point || { desaster_cleanup $mnt_point; return 12; }
+  if [ -f "$dep2_in_cache" ]; then
+      echo "Dep2 FOUND inside the cache in the expected location"
+  else
+      echo "Dep2 NOT FOUND inside the cache in the expected location"
+      desaster_cleanup $mnt_point $CVMFS_TEST_REPO
+      return 57
+  fi
+
+  echo "check if the mounted repository contains exactly the same as the reference copy"
+  compare_directories $mnt_point $reference_dir || { desaster_cleanup $mnt_point $CVMFS_TEST_REPO; return 11; }
+
+  echo "unmount the repository"
+  sudo umount $mnt_point || { desaster_cleanup $mnt_point $CVMFS_TEST_REPO; return 12; }
 
   echo "clean up"
   sudo cvmfs_server rmfs -f $CVMFS_TEST_REPO

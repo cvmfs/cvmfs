@@ -45,6 +45,7 @@ class BundleMgr : SingleCopy {
   void JoinFetcherPool();
   PathString ReceivePath(int fd) const;
   bool TrySendPath(int fd, const PathString &path) const;
+  PathString NormalizeDependencyPath(const PathString &path) const;
 
   void FetchPath(const PathString &path);
 
