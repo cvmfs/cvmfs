@@ -8,7 +8,6 @@
 #include <limits.h>
 #include <pthread.h>
 
-#include <cassert>
 #include <cstddef>
 #include <memory>
 #include <type_traits>
