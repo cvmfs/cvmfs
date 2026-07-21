@@ -59,6 +59,65 @@ TEST_F(T_SpecTree, BasicMatchTest) {
 }
 
 
+TEST(T_SpecTreeStandalone, GitignoreStyleReinclude) {
+  const std::string spec_file = "./cvmfs-spec-tree-gitignore-test.spec.txt";
+  const std::string content = "/base*\n"
+                              "!/base/accel/amd/*\n"
+                              "/base/accel/amd/gfx90a\n"
+                              "!/base/accel/amd/gfx90a/excluded\n";
+  ASSERT_TRUE(SafeWriteToFile(content, spec_file, 0600));
+
+  SpecTree *specs = SpecTree::Create(spec_file);
+
+  EXPECT_TRUE(specs->IsMatching("/base/accel/amd"));
+  EXPECT_FALSE(specs->IsMatching("/base/accel/amd/gfx900"));
+  EXPECT_FALSE(specs->IsMatching("/base/accel/amd/gfx900/file"));
+  EXPECT_TRUE(specs->IsMatching("/base/accel/amd/gfx90a"));
+  EXPECT_TRUE(specs->IsMatching("/base/accel/amd/gfx90a/file"));
+  EXPECT_FALSE(specs->IsMatching("/base/accel/amd/gfx90a/excluded"));
+  EXPECT_FALSE(specs->IsMatching("/base/accel/amd/gfx90a/excluded/file"));
+
+  size_t listLen = 0;
+  char **dirList = NULL;
+  EXPECT_EQ(0, specs->ListDir("/base/accel/amd", &dirList, &listLen));
+  EXPECT_EQ(1U, listLen);
+  ExpectListHas("gfx90a", dirList);
+  FreeList(dirList, listLen);
+  dirList = NULL;
+  listLen = 0;
+
+  EXPECT_EQ(SPEC_READ_FS,
+            specs->ListDir("/base/accel/amd/gfx90a", &dirList, &listLen));
+  EXPECT_EQ(-1, specs->ListDir("/base/accel/amd/gfx900", &dirList, &listLen));
+
+  delete specs;
+  unlink(spec_file.c_str());
+}
+
+
+TEST(T_SpecTreeStandalone, ExcludeChildrenHonorsOrder) {
+  const std::string spec_file = "./cvmfs-spec-tree-order-test.spec.txt";
+  const std::string content = "/base*\n"
+                              "/base/accel/amd/gfx90a\n"
+                              "!/base/accel/amd/*\n";
+  ASSERT_TRUE(SafeWriteToFile(content, spec_file, 0600));
+
+  SpecTree *specs = SpecTree::Create(spec_file);
+
+  EXPECT_TRUE(specs->IsMatching("/base/accel/amd"));
+  EXPECT_FALSE(specs->IsMatching("/base/accel/amd/gfx90a"));
+  EXPECT_FALSE(specs->IsMatching("/base/accel/amd/gfx90a/file"));
+
+  size_t listLen = 0;
+  char **dirList = NULL;
+  EXPECT_EQ(-1, specs->ListDir("/base/accel/amd", &dirList, &listLen));
+  EXPECT_EQ(NULL, dirList);
+
+  delete specs;
+  unlink(spec_file.c_str());
+}
+
+
 TEST_F(T_SpecTree, CheckListings) {
   size_t listLen = 0;
   char **dirList = NULL;
