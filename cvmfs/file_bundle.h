@@ -19,7 +19,7 @@
 /*
 
 The .cvmfsbundle file serves both as a file list and as a trigger for loading a
-bundle. The convention is to call it .cvmfsbundle.<filename>, where <filename>
+bundle. The convention is to call it .cvmfsbundle-<filename>, where <filename>
 should trigger the bundle.
 
 ? The content could be structured in json.
