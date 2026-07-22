@@ -7,7 +7,7 @@ include(TestBigEndian)
 
 set(NETTLE_VERSION "3.10.2")
 # gnu.org downloads are quite unreliable. Try our servers first
-set(NETTLE_URL_MIRROR "https://ecsft.cern.ch/dist/cvmfs/build_externals/nettle-${NETTLE_VERSION}.tar.gz")
+set(NETTLE_URL "https://ecsft.cern.ch/dist/cvmfs/build_externals/nettle-${NETTLE_VERSION}.tar.gz")
 set(NETTLE_URL_MIRROR "https://ftp.gnu.org/gnu/nettle/nettle-${NETTLE_VERSION}.tar.gz")
 set(NETTLE_HASH "MD5=b28bcbf6f045ff007940a9401673600d")
 
