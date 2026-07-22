@@ -213,7 +213,7 @@ if [ x"$BUILTIN_EXTERNALS_LIST" != x"" ] && ! echo ";${BUILTIN_EXTERNALS_LIST};"
 else
     missing_libs="libcrypto sha3"
 
-    if [ x"$BUILD_GATEWAY" != x ] || [ x"$BUILD_DUCC" != x ] || [ x"$BUILD_SNAPSHOTTER" != x ]; then
+    if [ x"$BUILD_GATEWAY" != x ] || [ x"$BUILD_DUCC" != x ] || [ x"$BUILD_SNAPSHOTTER" != x ] || [ x"$BUILD_CONFIG_VALIDATOR" != x ]; then
         required_go_minor_version="23"
         if [ -n "$(command -v go)" ]; then
           go_minor_version=`go version | { read _ _ v _; echo ${v#go}; } | cut -d '.' -f2`

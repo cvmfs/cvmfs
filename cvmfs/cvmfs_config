@@ -268,6 +268,8 @@ cvmfs_config_usage() {
   echo ""
   echo "  showconfig [-s(hort output, only parameters set in the configuration)] [-j|--json] [<repository>]"
   echo ""
+  echo "  validate [<repository>]"
+  echo ""
   echo "  stat [-v | <repository>]"
   echo ""
   echo "  status [-v(erbose, force detail output)] [<repository list>]"
@@ -1037,13 +1039,13 @@ cvmfs_showconfig() {
     return $retval
   fi
 
-  local setting=
+  local name=
   local all_vars=
   local set_vars=          # names present in the config file
-  while read setting; do
-    [ "x${setting:0:6}" != "xCVMFS_" ] && continue
-    set_vars="$set_vars ${setting%%=*}"
-  done <<< "$CVMFS_PARMS"
+  for name in $(echo "$CVMFS_PARMS" | grep -o '^[A-Za-z0-9_]*=' | tr -d '=' \
+                  | grep '^CVMFS_\|^X509_\|^CERNVM_' | sort -u); do
+    set_vars="$set_vars $name"
+  done
   all_vars="$(echo $set_vars $var_list | tr ' ' '\n' | sort -u)"
 
   if [ $json_output -eq 1 ]; then
@@ -1094,6 +1096,66 @@ cvmfs_showconfig() {
       [ $short_output -eq 0 ] && echo "${var}="
     fi
   done <<< "$all_vars"
+}
+
+
+cvmfs_validate() {
+  local org=$1
+
+  # Find the validation binary (cvmfs_validator). Packaged installs (Debian,
+  # RPM/RedHat-family) put it under libexec/cvmfs; ArchLinux's CMake config
+  # instead uses lib/cvmfs.
+  local validator_bin="/usr/libexec/cvmfs/cvmfs_validator"
+  [ -x "$validator_bin" ] || validator_bin="/usr/lib/cvmfs/cvmfs_validator"
+  [ -x "$validator_bin" ] || validator_bin=
+  if [ -z "$validator_bin" ]; then
+    echo "Error: no validation engine available"
+    echo "Build CernVM-FS with -DBUILD_CONFIG_VALIDATOR=ON"
+    return 1
+  fi
+
+  cvmfs_readconfig || die "Failed to read CernVM-FS configuration"
+
+  # Without a repository argument, validate all configured repositories
+  if [ -z "$org" ]; then
+    local entry retval=0
+    for entry in $(list_repos); do
+      cvmfs_validate $entry || retval=1
+    done
+    return $retval
+  fi
+
+  local fqrn; fqrn=$(cvmfs_mkfqrn $org)
+  org=$(cvmfs_getorg $fqrn)
+  cvmfs_readconfig $fqrn || die "Failed to read CernVM-FS configuration of $fqrn"
+
+  # Dump the merged configuration as a JSON object onto the schema. Parameters
+  # with empty values count as unset to comply to the schema and are dropped.
+  local name value sep=""
+  local json="{"
+  for name in $(echo "$CVMFS_PARMS" | grep -o '^[A-Za-z0-9_]*=' | tr -d '=' \
+                  | grep '^CVMFS_\|^X509_\|^CERNVM_' | sort -u); do
+    # First unset the variable to avoid picking up a value from the environment
+    unset "$name"
+    eval "$(echo "$CVMFS_PARMS" | grep "^${name}=")"
+    value="${!name}"
+    [ -z "$value" ] && continue
+    value="${value//@org@/$org}"
+    value="${value//@fqrn@/$fqrn}"
+    json="$json$sep
+  $(json_string "$name"): $(json_string "$value")"
+    sep=","
+  done
+  json="$json
+}"
+
+  echo "$json" | "$validator_bin" -d '#ClientConfig'
+  if [ $? -ne 0 ]; then
+    echo "Configuration of $fqrn is invalid"
+    return 1
+  fi
+  echo "Configuration of $fqrn is valid"
+  return 0
 }
 
 
@@ -2689,6 +2751,12 @@ case "$1" in
   showconfig)
     shift 1
     cvmfs_showconfig $@
+    RETVAL=$?
+    ;;
+
+  validate)
+    shift 1
+    cvmfs_validate $@
     RETVAL=$?
     ;;
 

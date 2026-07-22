@@ -44,6 +44,7 @@ Makefile:
 		-DBUILD_LIBCVMFS=yes -DBUILD_LIBCVMFS_CACHE=yes \
 		-DBUILD_GATEWAY=$(BUILD_GO) \
 		-DBUILD_SNAPSHOTTER=$(BUILD_GO) \
+		-DBUILD_CONFIG_VALIDATOR=$(BUILD_GO) \
 		-DBUILD_LIBFUSE2=$(BUILD_LIBFUSE2) \
 		-DCMAKE_INSTALL_PREFIX:PATH=/usr \
 		.
@@ -72,6 +73,9 @@ debian/%.install: debian/%.install.in
     sed  -i 's;^usr/lib/libcvmfs_fuse.so;;g' $< ; \
     sed  -i 's;^usr/lib/libcvmfs_fuse_debug.so.@CVMFS_VERSION@;;g' $< ;  \
     sed  -i 's;^usr/lib/libcvmfs_fuse_debug.so;;g' $< ;  \
+  fi
+	if [ $(BUILD_GO) = "no"  ]; then \
+    sed  -i 's;^usr/libexec/cvmfs/cvmfs_validator;;g' $< ; \
   fi
 	sed "s/@CVMFS_VERSION@/$(shell dpkg-parsechangelog | sed -n -e 's/^Version: \([0-9]\.[0-9][0-9]\.[0-9][0-9]*\).*/\1/p')/g" $< | grep . > $@
 

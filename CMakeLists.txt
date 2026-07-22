@@ -274,6 +274,9 @@ if (BUILTIN_EXTERNALS)
     if (BUILD_SNAPSHOTTER)
       set(ENV{BUILD_SNAPSHOTTER} "true")
     endif()
+    if (BUILD_CONFIG_VALIDATOR)
+      set(ENV{BUILD_CONFIG_VALIDATOR} "true")
+    endif()
     if (BUILTIN_EXTERNALS_LIST)
       set(ENV{BUILTIN_EXTERNALS_LIST} "${BUILTIN_EXTERNALS_LIST}")
     endif()
@@ -302,6 +305,7 @@ if (BUILTIN_EXTERNALS)
     set(ENV{BUILD_GATEWAY} "")
     set(ENV{BUILD_DUCC} "")
     set(ENV{BUILD_SNAPSHOTTER} "")
+    set(ENV{BUILD_CONFIG_VALIDATOR} "")
     set(ENV{BUILTIN_EXTERNALS_LIST} "")
     set(ENV{BUILTIN_EXTERNALS_EXCLUDE} "")
   endif (EXISTS "${CMAKE_SOURCE_DIR}/externals/bootstrap.sh")
@@ -600,7 +604,7 @@ endif ()
 # Builds of golang components
 # First check if we have golang available
 #
-if (BUILD_GATEWAY OR BUILD_DUCC OR BUILD_SNAPSHOTTER)
+if (BUILD_GATEWAY OR BUILD_DUCC OR BUILD_SNAPSHOTTER OR BUILD_CONFIG_VALIDATOR)
   find_program(GO_COMPILER go)
   if(NOT GO_COMPILER)
     message(FATAL_ERROR "go compiler not found")
@@ -619,6 +623,10 @@ endif ()
 
 if (BUILD_SNAPSHOTTER)
   add_subdirectory (snapshotter)
+endif ()
+
+if (BUILD_CONFIG_VALIDATOR)
+  add_subdirectory (cvmfs/config)
 endif ()
 
 

@@ -1,0 +1,423 @@
+#!/bin/bash
+
+cvmfs_test_name="CUE configuration schema validates example and shipped configs"
+cvmfs_test_suites="quick"
+
+CVMFS_TEST114_TMPDIR=
+
+cleanup() {
+  [ -n "$CVMFS_TEST114_TMPDIR" ] && rm -rf "$CVMFS_TEST114_TMPDIR"
+}
+
+# Sources config files in a clean shell, emits CVMFS_*/X509_*/CERNVM_* as
+# JSON. Empty values are dropped (unset).
+dump_config_json() {
+  env -i PATH="$PATH" /bin/bash -c '
+    set -a
+    for f in "$@"; do . "$f" || exit 1; done
+    set +a
+    printf "{"
+    sep=""
+    for name in "${!CVMFS_@}" "${!X509_@}" "${!CERNVM_@}"; do
+      value="${!name}"
+      [ -z "$value" ] && continue
+      value="${value//\\/\\\\}"
+      value="${value//\"/\\\"}"
+      printf "%s\n  \"%s\": \"%s\"" "$sep" "$name" "$value"
+      sep=","
+    done
+    printf "\n}\n"
+  ' dump_config_json "$@"
+}
+
+# Checks a JSON config against expect/marker via the preinstalled
+# cvmfs_validator (schema embedded, no cue CLI). Rejections must match
+# marker, not just fail for any reason.
+check_config() {
+  local defn="$1" json="$2" expect="$3" marker="$4"
+  local errors
+  errors="$("$validator_bin" -d "$defn" < "$json" 2>&1)"
+  if [ $? -eq 0 ]; then
+    [ "$expect" = "accept" ] && return 0
+    echo "ERROR: expected rejection by '$marker' but the config was accepted"
+    return 1
+  fi
+  if [ "$expect" = "accept" ]; then
+    echo "ERROR: expected acceptance but the config was rejected:"
+    echo "$errors"
+    return 1
+  fi
+  if [ "$marker" != "-" ] && ! echo "$errors" | grep -qF "$marker"; then
+    echo "ERROR: rejected, but not by the expected check '$marker':"
+    echo "$errors"
+    return 1
+  fi
+  return 0
+}
+
+# One named-type case (verdict, #Definition, value)
+check_type() {
+  local verdict="$1" defn="$2" value="$3"
+  printf '"%s"\n' "$value" > "$type_json"
+  num_types=$((num_types + 1))
+  if ! check_config "$defn" "$type_json" "$verdict" -; then
+    echo "ERROR: in type case: $verdict $defn $value"
+    num_types_failed=$((num_types_failed + 1))
+  fi
+}
+
+# One rule case (verdict, marker, client/server, KEY=VALUE...)
+check_rule() {
+  local verdict="$1" marker="$2" kind="$3"
+  shift 3
+  local defn kv
+  case "$kind" in
+    client) defn="#ClientConfig" ;;
+    server) defn="#ServerConfig" ;;
+    *) echo "malformed test case: $verdict $marker $kind $*"; exit 5 ;;
+  esac
+
+  : > "$case_conf"
+  for kv in "$@"; do
+    printf "%s='%s'\n" "${kv%%=*}" "${kv#*=}" >> "$case_conf"
+  done
+  dump_config_json "$CVMFS_TEST114_TMPDIR/$kind-base.conf" "$case_conf" \
+    > "$case_json" || exit 6
+
+  num_cases=$((num_cases + 1))
+  if ! check_config "$defn" "$case_json" "$verdict" "$marker"; then
+    echo "ERROR: in test case: $verdict $marker $kind $*"
+    num_failed=$((num_failed + 1))
+  fi
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local script_location=$2
+  local mount_dir="$script_location/../../../mount"
+  local schema="$script_location/../../../cvmfs/config/cvmfs.cue"
+  local examples="$script_location/examples"
+
+  [ -f "$schema" ]   || { echo "schema not found: $schema"; return 1; }
+  [ -d "$examples" ] || { echo "examples not found: $examples"; return 2; }
+
+  CVMFS_TEST114_TMPDIR="$(mktemp -d)"
+  trap cleanup EXIT HUP INT TERM
+
+  echo "*** looking for a preinstalled cvmfs_validator"
+  local validator_bin=""
+  for validator_bin in \
+    "${INSTALL_BASE:-/usr}/libexec/cvmfs/cvmfs_validator" \
+    /usr/libexec/cvmfs/cvmfs_validator \
+    /usr/local/libexec/cvmfs/cvmfs_validator
+  do
+    [ -x "$validator_bin" ] && break
+    validator_bin=""
+  done
+
+  if [ -z "$validator_bin" ]; then
+    echo "Warning: no preinstalled cvmfs_validator found, skipping test"
+    CVMFS_GENERAL_WARNING_FLAG=1
+    return 0
+  fi
+  echo "*** using $validator_bin"
+
+  # -------------------------------------------------------------------------
+  echo "*** example configs checks"
+  local f base defn retval=0
+  for f in "$examples"/client-*.json "$examples"/server-*.json; do
+    [ -f "$f" ] || continue
+    base="$(basename "$f")"
+    case "$base" in
+      client-*) defn="#ClientConfig" ;;
+      server-*) defn="#ServerConfig" ;;
+    esac
+    case "$base" in
+      *-invalid*)
+        echo "***   $base must be rejected ($defn)"
+        check_config "$defn" "$f" reject - || retval=3
+        ;;
+      *)
+        echo "***   $base must validate ($defn)"
+        check_config "$defn" "$f" accept - || retval=3
+        ;;
+    esac
+  done
+  [ $retval -eq 0 ] || return $retval
+
+  # -------------------------------------------------------------------------
+  # Every named (multi-use) type gets an accept + reject case here.
+  # Single-use patterns are inlined on their field and covered below,
+  # as part of the rule checks.
+  echo "*** type definition checks"
+
+  local type_json="$CVMFS_TEST114_TMPDIR/type.json"
+  local num_types=0 num_types_failed=0
+
+  check_type accept '#Bool' yEs
+  check_type accept '#Bool' ON
+  check_type accept '#Bool' 1
+  check_type accept '#Bool' TRUE
+  check_type accept '#Bool' no
+  check_type accept '#Bool' Off
+  check_type accept '#Bool' 0
+  check_type accept '#Bool' false
+  check_type reject '#Bool' maybe
+  check_type reject '#Bool' 2
+  check_type reject '#Bool' yesp
+  check_type accept '#FQRN' atlas.cern.ch
+  check_type accept '#FQRN' sw.hsf.org
+  check_type reject '#FQRN' atlas
+  check_type reject '#FQRN' Atlas.cern.ch
+  check_type accept '#FQRNList' atlas.cern.ch,cms.cern.ch,cvmfs-config.cern.ch
+  check_type reject '#FQRNList' 'atlas.cern.ch;cms.cern.ch'
+  check_type reject '#FQRNList' atlas.cern.ch,
+  check_type accept '#AbsPath' /var/lib/cvmfs
+  check_type reject '#AbsPath' var/lib/cvmfs
+  check_type accept '#AbsPathList' /etc/cvmfs/keys/cern.ch:/etc/cvmfs/keys/egi.eu
+  check_type reject '#AbsPathList' /etc/cvmfs/keys:relative/path
+  check_type accept '#UInt' 0
+  check_type accept '#UInt' 42
+  check_type reject '#UInt' -1
+  check_type reject '#UInt' 4.2
+  check_type accept '#PosInt' 1
+  check_type accept '#PosInt' 007
+  check_type reject '#PosInt' 0
+  check_type reject '#PosInt' 000
+  check_type accept '#Int' -1
+  check_type accept '#Int' 30
+  check_type reject '#Int' +1
+  check_type accept '#UIntList' 0,1,15
+  check_type reject '#UIntList' 1,,2
+  check_type accept '#QuotaLimit' -1
+  check_type accept '#QuotaLimit' 20000
+  check_type reject '#QuotaLimit' -2
+  check_type accept '#IPv4' 137.138.17.5
+  check_type accept '#IPv4' 255.255.255.255
+  check_type reject '#IPv4' 256.1.1.1
+  check_type reject '#IPv4' 1.2.3
+  check_type accept '#IPv6' 2001:1458::53
+  check_type accept '#IPv6' ::1
+  check_type reject '#IPv6' 1:2:3:4:5:6:7:8:9
+  check_type accept '#IP' 137.138.17.5
+  check_type accept '#IP' 2001:1458::53
+  check_type reject '#IP' dns.cern.ch
+  check_type accept '#Hostname' cvmfs-stratum-one.cern.ch
+  check_type accept '#Hostname' localhost
+  check_type reject '#Hostname' -bad.cern.ch
+  check_type accept '#Host' monit.cern.ch
+  check_type accept '#Host' 2001:1458::53
+  check_type reject '#Host' 'bad host'
+  check_type accept '#Port' 1
+  check_type accept '#Port' 8000
+  check_type accept '#Port' 65535
+  check_type reject '#Port' 0
+  check_type reject '#Port' 65536
+  check_type accept '#URL' http://cvmfs-stratum-one.cern.ch/cvmfs/atlas.cern.ch
+  check_type accept '#URL' HTTPS://example.org/cvmfs
+  check_type reject '#URL' ftp://example.org/cvmfs
+  check_type reject '#URL' 'http://a b'
+  check_type accept '#URLChain' 'http://s1.cern.ch/cvmfs/@fqrn@;http://s2.gridpp.rl.ac.uk/cvmfs/@fqrn@'
+  check_type accept '#URLChain' 'http://a.cern.ch/x|http://b.cern.ch/x;http://c.cern.ch/x'
+  check_type reject '#URLChain' 'http://a.cern.ch/x;;http://b.cern.ch/x'
+  check_type reject '#URLChain' DIRECT
+  check_type accept '#ProxyChain' DIRECT
+  check_type accept '#ProxyChain' auto
+  check_type accept '#ProxyChain' 'http://ca-proxy.cern.ch:3128|http://ca-proxy2.cern.ch:3128;DIRECT'
+  check_type reject '#ProxyChain' 'http://ca proxy.cern.ch:3128'
+  check_type accept '#TimeSpan' '3 days ago'
+  check_type accept '#TimeSpan' '1 week ago'
+  check_type reject '#TimeSpan' yesterday
+  check_type reject '#TimeSpan' '3 days'
+  check_type accept '#UserName' cvmfs
+  check_type accept '#UserName' _cvmfs-user
+  check_type reject '#UserName' 1cvmfs
+  check_type reject '#UserName' 'cv mfs'
+
+  echo "***   $((num_types - num_types_failed))/$num_types type checks passed"
+  [ $num_types_failed -eq 0 ] || return 4
+
+  # -------------------------------------------------------------------------
+  echo "*** table-driven rule checks"
+
+  cat > "$CVMFS_TEST114_TMPDIR/client-base.conf" << EOF
+CVMFS_USER=cvmfs
+CVMFS_NFILES=65536
+CVMFS_MOUNT_DIR=/cvmfs
+CVMFS_RELOAD_SOCKETS=/var/run/cvmfs
+CVMFS_CHECK_PERMISSIONS=yes
+CVMFS_TIMEOUT=5
+CVMFS_TIMEOUT_DIRECT=10
+CVMFS_SERVER_URL=http://cvmfs-stratum-one.cern.ch/cvmfs/atlas.cern.ch
+CVMFS_HTTP_PROXY=DIRECT
+CVMFS_STRICT_MOUNT=no
+CVMFS_SHARED_CACHE=yes
+CVMFS_QUOTA_LIMIT=4000
+CVMFS_CACHE_BASE=/var/lib/cvmfs
+EOF
+  cat > "$CVMFS_TEST114_TMPDIR/server-base.conf" << EOF
+CVMFS_CREATOR_VERSION=143
+CVMFS_REPOSITORY_NAME=sw.cvmfs.io
+CVMFS_REPOSITORY_TYPE=stratum0
+CVMFS_USER=cvmfs
+CVMFS_STRATUM0=http://localhost/cvmfs/sw.cvmfs.io
+CVMFS_SPOOL_DIR=/var/spool/cvmfs/sw.cvmfs.io
+CVMFS_UNION_DIR=/cvmfs/sw.cvmfs.io
+CVMFS_UNION_FS_TYPE=overlayfs
+CVMFS_UPSTREAM_STORAGE=local,/srv/cvmfs/sw.cvmfs.io/data/txn,/srv/cvmfs/sw.cvmfs.io
+EOF
+
+  local case_conf="$CVMFS_TEST114_TMPDIR/case.conf"
+  local case_json="$CVMFS_TEST114_TMPDIR/case.json"
+  local num_cases=0 num_failed=0
+
+  check_rule reject _rule_cache_dir_conflicts_with_cache_base client CVMFS_CACHE_DIR=/scratch/cvmfs
+  check_rule reject _rule_alien_cache_conflicts_with_shared_cache client CVMFS_ALIEN_CACHE=/gpfs/alien CVMFS_SHARED_CACHE=yes CVMFS_QUOTA_LIMIT=-1
+  check_rule reject _rule_alien_cache_requires_unmanaged_quota client CVMFS_ALIEN_CACHE=/gpfs/alien CVMFS_SHARED_CACHE=no CVMFS_QUOTA_LIMIT=4000
+  check_rule accept - client CVMFS_ALIEN_CACHE=/gpfs/alien CVMFS_SHARED_CACHE=no CVMFS_QUOTA_LIMIT=-1
+  check_rule reject - client CVMFS_STRICT_MOUNT=
+  check_rule reject CVMFS_QUOTA_LIMIT client CVMFS_QUOTA_LIMIT=
+  check_rule reject CVMFS_SHARED_CACHE client CVMFS_SHARED_CACHE=
+  check_rule reject CVMFS_CACHE_BASE client CVMFS_CACHE_BASE=
+  check_rule reject CVMFS_NFILES client CVMFS_NFILES=
+  check_rule reject CVMFS_TIMEOUT client CVMFS_TIMEOUT=
+  check_rule reject - client CVMFS_USER=
+  check_rule reject _rule_cleanup_nonopenlru_requires_refcount client CVMFS_CACHE_CLEANUP_NONOPENLRU=yes
+  check_rule accept - client CVMFS_CACHE_CLEANUP_NONOPENLRU=yes CVMFS_CACHE_REFCOUNT=yes
+  check_rule reject _rule_nfs_shared_requires_nfs_source client CVMFS_NFS_SHARED=/var/nfsmaps
+  check_rule accept - client CVMFS_NFS_SHARED=/var/nfsmaps CVMFS_NFS_SOURCE=yes
+  check_rule reject _rule_nfs_interleaved_inodes_require_nfs_source client CVMFS_NFS_INTERLEAVED_INODES=0%2
+  check_rule accept - client CVMFS_NFS_INTERLEAVED_INODES=0%2 CVMFS_NFS_SOURCE=yes
+  check_rule reject _rule_tracing_headers_require_http_tracing client CVMFS_HTTP_TRACING_HEADERS=key:value
+  check_rule accept - client CVMFS_HTTP_TRACING=on 'CVMFS_HTTP_TRACING_HEADERS=key:value|key2:value2'
+  check_rule reject _rule_telemetry_requires_influx_endpoint client CVMFS_TELEMETRY_SEND=ON
+  check_rule accept - client CVMFS_TELEMETRY_SEND=ON CVMFS_INFLUX_HOST=monit.cern.ch CVMFS_INFLUX_PORT=8092 CVMFS_INFLUX_METRIC_NAME=cvmfs
+  check_rule reject _rule_telemetry_rate_requires_telemetry_send client CVMFS_TELEMETRY_RATE=60
+  check_rule accept - client CVMFS_TELEMETRY_RATE=60 CVMFS_TELEMETRY_SEND=ON CVMFS_INFLUX_HOST=monit.cern.ch CVMFS_INFLUX_PORT=8092 CVMFS_INFLUX_METRIC_NAME=cvmfs
+  check_rule reject _rule_at_most_one_revision_pin client CVMFS_ROOT_HASH=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa CVMFS_REPOSITORY_TAG=v1
+  check_rule reject _rule_at_most_one_revision_pin client CVMFS_REPOSITORY_TAG=v1 CVMFS_REPOSITORY_DATE=2026-01-01T00:00:00Z
+  check_rule reject _rule_alt_root_path_requires_fixed_catalog client CVMFS_ALT_ROOT_PATH=yes
+  check_rule accept - client CVMFS_ALT_ROOT_PATH=yes CVMFS_ROOT_HASH=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+  check_rule reject _rule_fixed_catalog_conflicts_with_auto_update client CVMFS_ROOT_HASH=cccccccccccccccccccccccccccccccccccccccc CVMFS_AUTO_UPDATE=yes
+  check_rule reject _rule_strict_mount_requires_repositories client CVMFS_STRICT_MOUNT=yes
+  check_rule accept - client CVMFS_STRICT_MOUNT=yes CVMFS_REPOSITORIES=atlas.cern.ch
+  check_rule reject _rule_backoff_init_le_backoff_max client CVMFS_BACKOFF_INIT=20 CVMFS_BACKOFF_MAX=10
+  check_rule reject _rule_dns_min_ttl_le_dns_max_ttl client CVMFS_DNS_MIN_TTL=600 CVMFS_DNS_MAX_TTL=60
+  check_rule reject _rule_dns_min_ttl_le_dns_max_ttl client CVMFS_DNS_MIN_TTL=100000
+  check_rule accept - client CVMFS_DNS_MIN_TTL=300
+  check_rule reject _rule_tracebuffer_requires_tracefile client CVMFS_TRACEBUFFER=65536
+  check_rule accept - client CVMFS_TRACEFILE=/tmp/cvmfs-trace.log CVMFS_TRACEBUFFER=65536
+  check_rule reject CVMFS_HTTP_PROXI client CVMFS_HTTP_PROXI=DIRECT
+  check_rule accept - client CVMFS_CACHE_PRIMARY=hpc CVMFS_CACHE_hpc_TYPE=tiered CVMFS_CACHE_hpc_UPPER=mem CVMFS_CACHE_hpc_LOWER=disk CVMFS_CACHE_mem_TYPE=ram CVMFS_CACHE_mem_SIZE=50% CVMFS_CACHE_disk_TYPE=posix CVMFS_CACHE_disk_BASE=/var/lib/cvmfs
+  check_rule reject CVMFS_CACHE_mem_MALLOC client CVMFS_CACHE_mem_TYPE=ram CVMFS_CACHE_mem_MALLOC=jemalloc
+  check_rule reject CVMFS_CACHE_hpc_TYPE client CVMFS_CACHE_hpc_TYPE=posix-cache
+  check_rule reject _rule_auto_gc_requires_garbage_collection server CVMFS_AUTO_GC=true
+  check_rule accept - server CVMFS_AUTO_GC=true CVMFS_GARBAGE_COLLECTION=true
+  check_rule accept - server CVMFS_REPOSITORY_TYPE=stratum1 CVMFS_STRATUM1=http://s1.cern.ch/cvmfs/sw.cvmfs.io CVMFS_AUTO_GC=true
+  check_rule reject _rule_min_chunk_size_le_avg_chunk_size server CVMFS_MIN_CHUNK_SIZE=9000000 CVMFS_AVG_CHUNK_SIZE=8388608
+  check_rule reject _rule_avg_chunk_size_le_max_chunk_size server CVMFS_AVG_CHUNK_SIZE=8388608 CVMFS_MAX_CHUNK_SIZE=4194304
+  check_rule accept - server CVMFS_MIN_CHUNK_SIZE=4194304 CVMFS_AVG_CHUNK_SIZE=8388608 CVMFS_MAX_CHUNK_SIZE=16777216
+  check_rule reject _rule_min_chunk_size_le_avg_chunk_size server CVMFS_MIN_CHUNK_SIZE=99999999
+  check_rule reject _rule_autocatalogs_min_weight_le_max_weight server CVMFS_AUTOCATALOGS_MIN_WEIGHT=200000 CVMFS_AUTOCATALOGS_MAX_WEIGHT=100000
+  check_rule accept - server CVMFS_AUTOCATALOGS_MIN_WEIGHT=1000 CVMFS_AUTOCATALOGS_MAX_WEIGHT=200000
+  check_rule reject _rule_stratum1_requires_stratum1_url server CVMFS_REPOSITORY_TYPE=stratum1
+  check_rule reject _rule_replica_active_requires_stratum1 server CVMFS_REPLICA_ACTIVE=no
+  check_rule accept - server CVMFS_REPLICA_ACTIVE=no CVMFS_REPOSITORY_TYPE=stratum1 CVMFS_STRATUM1=http://s1.cern.ch/cvmfs/sw.cvmfs.io
+  check_rule reject _rule_partial_replication_requires_spec server CVMFS_REPOSITORY_TYPE=stratum1 CVMFS_STRATUM1=http://s1.cern.ch/cvmfs/sw.cvmfs.io CVMFS_PARTIAL_REPLICATION=true
+  check_rule accept - server CVMFS_REPOSITORY_TYPE=stratum1 CVMFS_STRATUM1=http://s1.cern.ch/cvmfs/sw.cvmfs.io CVMFS_PARTIAL_REPLICATION=true CVMFS_PARTIAL_REPLICATION_SPEC=/etc/cvmfs/repo.spec
+  check_rule reject CVMFS_S3_FLAVOR server CVMFS_S3_FLAVOR=aws
+  check_rule reject CVMFS_HASH_ALGORITHM server CVMFS_HASH_ALGORITHM=sha256
+  check_rule accept - client CVMFS_BASE_ENV=1
+  check_rule reject CVMFS_BASE_ENV client CVMFS_BASE_ENV=2
+  check_rule accept - client CVMFS_CLIENT_PROFILE=single
+  check_rule reject CVMFS_CLIENT_PROFILE client CVMFS_CLIENT_PROFILE=multi
+  check_rule accept - client CVMFS_PARTIAL_REPLICA_MODE=failover
+  check_rule reject CVMFS_PARTIAL_REPLICA_MODE client CVMFS_PARTIAL_REPLICA_MODE=retry
+  check_rule accept - client CVMFS_PROXY_SHARDING_POLICY=EXTERNAL
+  check_rule reject CVMFS_PROXY_SHARDING_POLICY client CVMFS_PROXY_SHARDING_POLICY=INTERNAL
+  check_rule accept - client CVMFS_XATTR_PROTECTED_XATTRS=user.foo,user.bar
+  check_rule reject CVMFS_XATTR_PROTECTED_XATTRS client 'CVMFS_XATTR_PROTECTED_XATTRS=bad attr'
+  check_rule accept - server CVMFS_GEO_DB_FILE=none
+  check_rule reject CVMFS_GEO_DB_FILE server CVMFS_GEO_DB_FILE=relative/path.mmdb
+  check_rule accept - server CVMFS_S3_X_AMZ_ACL=public-read
+  check_rule reject CVMFS_S3_X_AMZ_ACL server CVMFS_S3_X_AMZ_ACL=bad-acl
+  check_rule accept - server CVMFS_SERVER_DEBUG=2
+  check_rule reject CVMFS_SERVER_DEBUG server CVMFS_SERVER_DEBUG=4
+  check_rule accept - server CVMFS_SERVER_PROXY=DIRECT
+  check_rule reject CVMFS_SERVER_PROXY server 'CVMFS_SERVER_PROXY=bad proxy'
+  check_rule accept - server CVMFS_SNAPSHOT_GROUP=group1
+  check_rule reject CVMFS_SNAPSHOT_GROUP server 'CVMFS_SNAPSHOT_GROUP=bad group'
+  check_rule accept - server CVMFS_SYNCFS_LEVEL=cautious
+  check_rule reject CVMFS_SYNCFS_LEVEL server CVMFS_SYNCFS_LEVEL=aggressive
+  check_rule accept - server CVMFS_UPDATEGEO_SOURCE=maxmind
+  check_rule reject CVMFS_UPDATEGEO_SOURCE server CVMFS_UPDATEGEO_SOURCE=google
+
+  # Patterns inlined on a single field (no longer named types): boundary
+  # checks on the field itself.
+  check_rule accept - client CVMFS_CACHE_test1_SIZE=4000
+  check_rule accept - client CVMFS_CACHE_test1_SIZE=50%
+  check_rule reject - client CVMFS_CACHE_test1_SIZE=50%%
+  check_rule accept - client CVMFS_OOM_SCORE_ADJ=-1000
+  check_rule accept - client CVMFS_OOM_SCORE_ADJ=0
+  check_rule accept - client CVMFS_OOM_SCORE_ADJ=1000
+  check_rule reject - client CVMFS_OOM_SCORE_ADJ=1001
+  check_rule reject - client CVMFS_OOM_SCORE_ADJ=-1001
+  check_rule accept - client CVMFS_TELEMETRY_RATE=5 CVMFS_TELEMETRY_SEND=ON CVMFS_INFLUX_HOST=monit.cern.ch CVMFS_INFLUX_PORT=8092 CVMFS_INFLUX_METRIC_NAME=cvmfs
+  check_rule reject - client CVMFS_TELEMETRY_RATE=4 CVMFS_TELEMETRY_SEND=ON CVMFS_INFLUX_HOST=monit.cern.ch CVMFS_INFLUX_PORT=8092 CVMFS_INFLUX_METRIC_NAME=cvmfs
+  check_rule accept - client CVMFS_SYSLOG_FACILITY=0
+  check_rule accept - client CVMFS_SYSLOG_FACILITY=7
+  check_rule reject - client CVMFS_SYSLOG_FACILITY=8
+  check_rule accept - client CVMFS_PAC_URLS=auto
+  check_rule accept - client 'CVMFS_PAC_URLS=http://wpad.cern.ch/wpad.dat;auto'
+  check_rule reject - client CVMFS_PAC_URLS=file:///etc/wpad.dat
+  check_rule accept - client CVMFS_REPOSITORY_DATE=2007-03-01T13:00:00Z
+  check_rule reject - client CVMFS_REPOSITORY_DATE=2007-03-01
+  check_rule accept - client CVMFS_ROOT_HASH=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  check_rule reject - client CVMFS_ROOT_HASH=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  check_rule reject - client CVMFS_ROOT_HASH=gggggggggggggggggggggggggggggggggggggggg
+  check_rule accept - client CVMFS_HTTP_TRACING=on CVMFS_HTTP_TRACING_HEADERS=key:value
+  check_rule reject - client CVMFS_HTTP_TRACING=on CVMFS_HTTP_TRACING_HEADERS=keyvalue
+  check_rule reject - client CVMFS_NFS_SOURCE=yes CVMFS_NFS_INTERLEAVED_INODES=0-2
+  check_rule accept - client CVMFS_MAGIC_XATTRS_VISIBILITY=rootonly
+  check_rule accept - client CVMFS_MAGIC_XATTRS_VISIBILITY=ALWAYS
+  check_rule reject - client CVMFS_MAGIC_XATTRS_VISIBILITY=sometimes
+  check_rule accept - server CVMFS_UPSTREAM_STORAGE=local,/srv/cvmfs/sw.cvmfs.io/data/txn,/srv/cvmfs/sw.cvmfs.io
+  check_rule accept - server CVMFS_UPSTREAM_STORAGE=S3,/var/spool/cvmfs/sw.cvmfs.io/tmp,cvmfs/sw.cvmfs.io@/etc/cvmfs/s3.conf
+  check_rule accept - server CVMFS_UPSTREAM_STORAGE=gw,/var/spool/cvmfs/sw.cvmfs.io/tmp,http://cvmfs-gw.cvmfs.io:4929/api/v1
+  check_rule reject - server CVMFS_UPSTREAM_STORAGE=local,/only-one-part
+
+  echo "***   $((num_cases - num_failed))/$num_cases rule checks passed"
+  [ $num_failed -eq 0 ] || return 7
+
+  # -------------------------------------------------------------------------
+  # Shipped config fragments, merged as installed, must validate.
+  echo "*** corpus checks: shipped configuration files"
+
+  cat > "$CVMFS_TEST114_TMPDIR/domain-overlay.conf" << EOF
+CVMFS_SERVER_URL='http://cvmfs-stratum-one.cern.ch/cvmfs/@fqrn@'
+CVMFS_HTTP_PROXY=DIRECT
+EOF
+
+  local scenario name rel files corpus_json="$CVMFS_TEST114_TMPDIR/corpus.json"
+  for scenario in \
+    "linux=default.conf default.d/50-cern.conf" \
+    "debian=default.conf default.d/50-cern-debian.conf" \
+    "arch=default.conf default.d/10-arch.conf default.d/50-cern.conf" \
+    "macos=default.conf default.d/10-osx.conf default.d/50-cern.conf" \
+    "container=default.conf default.d/42-container.conf default.d/50-cern.conf" \
+    "graphdriver=default.conf default.d/42-graphdriver.conf default.d/50-cern.conf"
+  do
+    name="${scenario%%=*}"
+    files=""
+    for rel in ${scenario#*=}; do
+      files="$files $mount_dir/$rel"
+    done
+    echo "***   scenario $name must validate"
+    dump_config_json $files "$CVMFS_TEST114_TMPDIR/domain-overlay.conf" \
+      > "$corpus_json" || return 8
+    check_config "#ClientConfig" "$corpus_json" accept - \
+      || return 9
+  done
+
+  return 0
+}

@@ -16,7 +16,7 @@ fi
 CVMFS_SOURCE_TREE="$1"
 DOWNLOAD_CACHE_DIR="$2"
 
-for godir in ducc gateway snapshotter; do
+for godir in ducc gateway snapshotter cvmfs/config; do
   if [ -f "${CVMFS_SOURCE_TREE}/${godir}/go.mod" ]; then
     (cd "${CVMFS_SOURCE_TREE}/${godir}" && go mod vendor)
   fi

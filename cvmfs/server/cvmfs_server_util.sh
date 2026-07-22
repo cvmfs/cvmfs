@@ -1238,7 +1238,7 @@ cvmfs_server_update_geodb() {
 is_subcommand() {
   local subcommand="$1"
   local supported_commands="mkfs connect-gw add-replica import publish rollback rmfs alterfs   \
-    resign list info tag list-tags lstags check transaction enter abort snapshot    \
+    resign list info tag list-tags lstags check validate transaction enter abort snapshot \
     skeleton migrate list-catalogs diff checkout update-geodb gc catalog-chown      \
     eliminate-hardlinks eliminate-bulk-hashes fix-stats update-info update-repoinfo \
     mount fix-permissions masterkeycard ingest ingestsql overlay merge-stats print-stats \
@@ -1405,6 +1405,9 @@ Supported Commands:
                     <fully qualified name> ]
                   <fully qualified name>
                   Checks if the repository is sane
+  validate        [-a check all local repos]
+                  <fully qualified name>
+                  Checks the repository's server.conf against the config schema
   transaction     [-t (timeout in seconds for waiting if the repository is busy, 0=infinite)]
                   [-T /template-from=/template-to]
                   <fully qualified name>
