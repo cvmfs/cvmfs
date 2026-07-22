@@ -119,6 +119,9 @@ BuildRequires: libnettle-devel
 %else
 BuildRequires: nettle-devel
 %endif
+# m4 preprocesses the assembler routines of the vendored nettle build; without
+# it, nettle falls back to the portable C implementations
+BuildRequires: m4
 BuildRequires: openssl-devel
 BuildRequires: patch
 BuildRequires: pkgconfig
