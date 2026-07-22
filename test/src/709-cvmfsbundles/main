@@ -29,12 +29,18 @@ EOF
   popd >/dev/null || return 1
 }
 
-# Path of a file's content object in the local cache, derived from its
-# hash extended attribute (a metadata lookup that does not fetch content)
+desaster_cleanup() {
+  local mountpoint=$1
+  local repo_name=$2
+
+  sudo umount $mountpoint > /dev/null 2>&1
+  sudo cvmfs_server rmfs -f $repo_name > /dev/null 2>&1
+}
+
+# Path of a content object in a cache directory, given its content hash
 cache_object_path() {
   local cache=$1
-  local file=$2
-  local hash=$(get_xattr hash "$file")
+  local hash=$2
   echo "$cache/$(echo $hash | cut -c 1-2)/$(echo $hash | cut -c 3-)"
 }
 
@@ -47,6 +53,7 @@ cache_object_count() {
 
 cvmfs_run_test() {
   logfile=$1
+  local workdir="$2"
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
 
   local scratch_dir=$(mktemp -d)
@@ -95,9 +102,13 @@ EOF
   do_local_mount $mnt_point $CVMFS_TEST_REPO $(get_repo_url $CVMFS_TEST_REPO) \
     "" "CVMFS_PREFETCH_FILEBUNDLES=yes" || { desaster_cleanup $mnt_point $CVMFS_TEST_REPO; return 10; }
 
-  local trigger_in_cache=$(cache_object_path $cache "$mnt_point/trigger.txt")
-  local dep1_in_cache=$(cache_object_path $cache "$mnt_point/dep1.txt")
-  local dep2_in_cache=$(cache_object_path $cache "$mnt_point/dep2.txt")
+  # The hash xattr is a metadata lookup that does not fetch content
+  local trigger_hash=$(get_xattr hash "$mnt_point/trigger.txt")
+  local dep1_hash=$(get_xattr hash "$mnt_point/dep1.txt")
+  local dep2_hash=$(get_xattr hash "$mnt_point/dep2.txt")
+  local trigger_in_cache=$(cache_object_path $cache $trigger_hash)
+  local dep1_in_cache=$(cache_object_path $cache $dep1_hash)
+  local dep2_in_cache=$(cache_object_path $cache $dep2_hash)
 
   echo "make sure the dependencies are not in the cache before the trigger is opened"
   if [ -f "$dep1_in_cache" ] || [ -f "$dep2_in_cache" ]; then
@@ -192,6 +203,29 @@ EOF
 
   echo "unmount the repository"
   sudo umount $mnt_point || { desaster_cleanup $mnt_point $CVMFS_TEST_REPO; return 12; }
+
+  echo "opening the trigger through libcvmfs must prefetch the same bundle"
+  local bin_name="709-test"
+  local libcvmfs_cache=$scratch_dir/libcvmfs-cache
+
+  echo "compiling libcvmfs test binary"
+  g++ -o $bin_name "$workdir/main.cc" -lcvmfs_client -pthread -ldl -lssl -lcrypto -luuid -lcap -lrt \
+    || { desaster_cleanup $mnt_point $CVMFS_TEST_REPO; return 64; }
+
+  echo "opening the trigger through libcvmfs and waiting for the prefetch"
+  ./$bin_name "$(get_repo_url $CVMFS_TEST_REPO)" "$CVMFS_TEST_REPO" "$libcvmfs_cache" \
+    $((4 + num_chunks)) 120 \
+    || { desaster_cleanup $mnt_point $CVMFS_TEST_REPO; return 65; }
+
+  echo "verify the prefetched objects in the libcvmfs cache by hash"
+  local hash
+  for hash in $trigger_hash $dep1_hash $dep2_hash; do
+    if [ ! -f "$(cache_object_path $libcvmfs_cache $hash)" ]; then
+      echo "object $hash missing from the libcvmfs cache"
+      desaster_cleanup $mnt_point $CVMFS_TEST_REPO
+      return 66
+    fi
+  done
 
   echo "clean up"
   sudo cvmfs_server rmfs -f $CVMFS_TEST_REPO
