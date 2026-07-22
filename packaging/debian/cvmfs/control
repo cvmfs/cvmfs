@@ -16,6 +16,7 @@ Build-Depends:
  nettle-dev,
  libattr1-dev,
  libz-dev,
+ m4,
  patch,
  pkg-config,
  python3-dev,
