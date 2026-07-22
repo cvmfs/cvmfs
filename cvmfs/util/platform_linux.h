@@ -23,6 +23,7 @@
 #include <sys/file.h>
 #include <sys/mount.h>
 #include <sys/prctl.h>
+#include <sys/random.h>
 #include <sys/select.h>
 #include <sys/stat.h>
 #include <sys/utsname.h>
@@ -394,6 +395,12 @@ inline uint16_t platform_htole16(uint16_t host_16bits) {
 
 inline uint16_t platform_le16toh(uint16_t little_endian_16bits) {
   return le16toh(little_endian_16bits);
+}
+
+inline void platform_getrandom(void *buf, size_t length) {
+  const ssize_t retval = getrandom(buf, length, 0);
+  assert(retval >= 0);
+  assert(static_cast<size_t>(retval) == length);
 }
 
 #ifdef CVMFS_NAMESPACE_GUARD

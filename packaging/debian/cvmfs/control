@@ -13,6 +13,7 @@ Build-Depends:
  libarchive-dev,
  libcap-dev,
  libssl-dev,
+ nettle-dev,
  libattr1-dev,
  libz-dev,
  patch,

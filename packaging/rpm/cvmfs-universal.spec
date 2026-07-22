@@ -111,6 +111,14 @@ BuildRequires: fuse-devel
 %endif
 BuildRequires: fuse3-devel >= 3.3.0
 BuildRequires: libattr-devel
+# nettle is optional in the same sense as protobuf below: the build uses a
+# system nettle >= 3.10 when present and otherwise falls back to the vendored
+# (FetchContent) sources.
+%if 0%{?suse_version}
+BuildRequires: libnettle-devel
+%else
+BuildRequires: nettle-devel
+%endif
 BuildRequires: openssl-devel
 BuildRequires: patch
 BuildRequires: pkgconfig

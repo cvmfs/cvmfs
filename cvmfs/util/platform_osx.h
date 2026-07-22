@@ -329,6 +329,10 @@ inline uint16_t platform_le16toh(uint16_t little_endian_16bits) {
   return OSSwapLittleToHostInt16(little_endian_16bits);
 }
 
+inline void platform_getrandom(void *buf, size_t length) {
+  arc4random_buf(buf, length);
+}
+
 #ifdef CVMFS_NAMESPACE_GUARD
 }  // namespace CVMFS_NAMESPACE_GUARD
 #endif
