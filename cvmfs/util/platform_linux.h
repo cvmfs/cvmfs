@@ -398,9 +398,19 @@ inline uint16_t platform_le16toh(uint16_t little_endian_16bits) {
 }
 
 inline void platform_getrandom(void *buf, size_t length) {
-  const ssize_t retval = getrandom(buf, length, 0);
-  assert(retval >= 0);
-  assert(static_cast<size_t>(retval) == length);
+  // getrandom() can be interrupted by a signal while blocking on an
+  // uninitialized entropy pool and returns short for requests > 256 bytes
+  size_t nbytes = 0;
+  while (nbytes < length) {
+    const ssize_t retval =
+        getrandom(static_cast<unsigned char *>(buf) + nbytes, length - nbytes,
+                  0);
+    if (retval < 0) {
+      assert(errno == EINTR);
+      continue;
+    }
+    nbytes += retval;
+  }
 }
 
 #ifdef CVMFS_NAMESPACE_GUARD
