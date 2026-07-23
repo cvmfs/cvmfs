@@ -440,6 +440,11 @@ if (BUILD_LIBCVMFS)
   set_property (TARGET cvmfs_client APPEND PROPERTY INCLUDE_DIRECTORIES "${CMAKE_BINARY_DIR}")
   set_property (TARGET cvmfs_client APPEND PROPERTY INCLUDE_DIRECTORIES "${CMAKE_CURRENT_BINARY_DIR}")
   target_include_directories (cvmfs_client PRIVATE ${GTEST_INCLUDE_DIRS})
+  # authz_curl.cc includes <openssl/*.h>; the target links ${OPENSSL_LIBRARIES}
+  # but resetting INCLUDE_DIRECTORIES above dropped the matching include path.
+  # Only noticeable where OpenSSL lives outside the default search paths, e.g.
+  # Homebrew on macOS.
+  target_include_directories (cvmfs_client PRIVATE ${OPENSSL_INCLUDE_DIR})
   target_include_directories (cvmfs_client PRIVATE ${SQLITE3_INCLUDE_DIR})
   target_include_directories (cvmfs_client PRIVATE ${ZLIB_INCLUDE_DIRS})
   target_include_directories (cvmfs_client PRIVATE ${PROTOBUF_INCLUDE_DIRS})
