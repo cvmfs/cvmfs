@@ -198,7 +198,8 @@ struct LoaderExports {
   // As of CernVM-FS 2.7, this has been rebranded from
   // struct fuse_chan **fuse_channel  to
   // void **fuse_channel_or_session
-  // in order to work with both libfuse2 and libfuse3
+  // in order to work with both libfuse2 and libfuse3.  Since the removal of
+  // libfuse2 support it always points to a struct fuse_session *.
   void **fuse_channel_or_session;
 
   bool fuse_passthrough;

@@ -116,7 +116,8 @@ class FuseInvalidator : SingleCopy {
   glue::InodeTracker *inode_tracker_;
   glue::DentryTracker *dentry_tracker_;
   /**
-   * libfuse2 uses struct fuse_chan, libfuse3 uses struct fuse_session
+   * Points to the loader's struct fuse_session *.  Kept as void ** because the
+   * loader interface predates the libfuse2 removal.
    */
   void **fuse_channel_or_session_;
   bool spawned_;

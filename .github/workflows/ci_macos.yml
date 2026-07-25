@@ -33,6 +33,20 @@ jobs:
           mkdir -p /Library/Application\ Support/fuse-t/cfg/
           sudo zsh -c 'echo "namedattr=true" >> /Library/Application\ Support/fuse-t/cfg/fuse-t.ini'
 
+      - name: Build libfuse3 for Fuse-t
+        run: |
+          # The fuse-t installer only ships the libfuse2-compatible library.
+          # cvmfs requires libfuse3, which fuse-t provides through its own
+          # libfuse3 fork.  Installs into /usr/local, i.e. where FindFUSE3
+          # looks for fuse3/fuse.h and libfuse3.
+          brew install meson ninja pkg-config
+          git clone --depth 1 --branch fuse-t \
+            https://github.com/macos-fuse-t/libfuse3.git /tmp/libfuse3
+          cd /tmp/libfuse3
+          meson setup build --prefix=/usr/local
+          ninja -C build
+          sudo ninja -C build install
+
       - name: Build CVMFS
         run: |
           cd ${GITHUB_WORKSPACE}

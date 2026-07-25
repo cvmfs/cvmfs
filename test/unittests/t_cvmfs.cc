@@ -5,7 +5,6 @@
 
 #define CVMFS_DUPLEX_FUSE_H_
 #define __TEST_CVMFS_MOCKFUSE
-#define CVMFS_USE_LIBFUSE 3
 #define FUSE_USE_VERSION  31
 #include <fuse3/fuse.h>
 #include <fuse3/fuse_lowlevel.h>

@@ -5,14 +5,13 @@
 
 ### Client
 The easiest way of live debugging is to mount the client in debug (`-d`) and foreground (`-f`) using `cvmfs2`.
-Mounting with `cvmfs2` allows also to set a few parameters, e.g. `libfuse=` to select `Fuse2` or 
-`Fuse3`.
+Mounting with `cvmfs2` allows also to set a few parameters, see `cvmfs2 -h`.
 
-Example mounting with `Fuse3` on mount point `/mnt/test`
+Example mounting on mount point `/mnt/test`
 ```bash
   export CVMFS_REPO=symlink.test.repo
   sudo /usr/bin/cvmfs2  -d -f \
-                        -o rw,system_mount,fsname=cvmfs2,allow_other,grab_mountpoint,uid=`id -u cvmfs`,gid=`id -g cvmfs`,libfuse=3 \
+                        -o rw,system_mount,fsname=cvmfs2,allow_other,grab_mountpoint,uid=`id -u cvmfs`,gid=`id -g cvmfs` \
                         $CVMFS_REPO \
                         /mnt/test
 ```

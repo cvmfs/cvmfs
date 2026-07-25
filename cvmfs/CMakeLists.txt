@@ -36,7 +36,7 @@ endif ()  # Protobuf generated sources
 
 if (BUILD_CVMFS OR BUILD_LIBCVMFS)
   #
-  # /usr/lib/libcvmfs_fuse[3] and /usr/lib/libcvmfs_client
+  # /usr/lib/libcvmfs_fuse3 and /usr/lib/libcvmfs_client
   #
   set (CVMFS_COMMON_CLIENT_SOURCES
        authz/authz.cc
@@ -186,7 +186,7 @@ if (BUILD_CVMFS)
   target_link_libraries(cvmfs2 pthread dl ${CAP_LIBRARIES})
 
   #
-  # /usr/lib/libcvmfs_fuse_stub[3]
+  # /usr/lib/libcvmfs_fuse3_stub
   # Note: we must _not_ depend on cvmfs-util. The utility functions are compiled
   # in the loader namespace so that their symbols don't conflict with
   # libcvmfs-fuse.
@@ -207,36 +207,23 @@ if (BUILD_CVMFS)
   set (CVMFS_STUB_CFLAGS "-DCVMFS_FUSE_MODULE -DCVMFS_NAMESPACE_GUARD=loader -D_FILE_OFFSET_BITS=64 -fexceptions")
   set (CVMFS_STUB_LDFLAGS "-ldl -lm")
   set (CVMFS_STUB_LINK_LIBRARIES pthread dl)
-  if (BUILD_LIBFUSE2)
-    add_library (cvmfs_fuse_stub SHARED ${CVMFS_STUB_SOURCES})
-    set_target_properties (cvmfs_fuse_stub PROPERTIES
-      VERSION ${CernVM-FS_VERSION_STRING}
-      COMPILE_FLAGS "${CVMFS_STUB_CFLAGS} -DCVMFS_USE_LIBFUSE=2"
-      LINK_FLAGS "${CVMFS_STUB_LDFLAGS}"
-    )
-    target_link_libraries (cvmfs_fuse_stub
-                           ${FUSE_LIBRARIES} ${CVMFS_STUB_LINK_LIBRARIES}
-    )
-  endif()
-  if (FUSE3_FOUND)
-    add_library (cvmfs_fuse3_stub SHARED ${CVMFS_STUB_SOURCES})
-    set (CVMFS_STUB3_CFLAGS "${CVMFS_STUB_CFLAGS}")
-    if (CVMFS_ENABLE_FUSE3_LOOP_CONFIG)
-      set (CVMFS_STUB3_CFLAGS "${CVMFS_STUB3_CFLAGS} -DCVMFS_ENABLE_FUSE3_LOOP_CONFIG")
-    endif ()
-    set_target_properties (cvmfs_fuse3_stub PROPERTIES
-      VERSION ${CernVM-FS_VERSION_STRING}
-      COMPILE_FLAGS "${CVMFS_STUB3_CFLAGS} -DCVMFS_USE_LIBFUSE=3"
-      LINK_FLAGS "${CVMFS_STUB_LDFLAGS}"
-    )
-    target_link_libraries (cvmfs_fuse3_stub
-                           ${FUSE3_LIBRARIES} ${CVMFS_STUB_LINK_LIBRARIES}
-    )
+  add_library (cvmfs_fuse3_stub SHARED ${CVMFS_STUB_SOURCES})
+  set (CVMFS_STUB3_CFLAGS "${CVMFS_STUB_CFLAGS}")
+  if (CVMFS_ENABLE_FUSE3_LOOP_CONFIG)
+    set (CVMFS_STUB3_CFLAGS "${CVMFS_STUB3_CFLAGS} -DCVMFS_ENABLE_FUSE3_LOOP_CONFIG")
   endif ()
+  set_target_properties (cvmfs_fuse3_stub PROPERTIES
+    VERSION ${CernVM-FS_VERSION_STRING}
+    COMPILE_FLAGS "${CVMFS_STUB3_CFLAGS}"
+    LINK_FLAGS "${CVMFS_STUB_LDFLAGS}"
+  )
+  target_link_libraries (cvmfs_fuse3_stub
+                         ${FUSE3_LIBRARIES} ${CVMFS_STUB_LINK_LIBRARIES}
+  )
 
 
   #
-  # /usr/lib/libcvmfs_fuse[3]_debug
+  # /usr/lib/libcvmfs_fuse3_debug
   #
   set (CVMFS_FUSE_SOURCES
        ${CVMFS_COMMON_CLIENT_SOURCES}
@@ -282,59 +269,30 @@ if (BUILD_CVMFS)
        pthread
        dl
   )
-  if (BUILD_LIBFUSE2)
-    add_library (cvmfs_fuse SHARED ${CVMFS_FUSE_SOURCES})
-    add_library (cvmfs_fuse_debug SHARED ${CVMFS_FUSE_SOURCES})
-    add_dependencies (cvmfs_fuse cache.pb.generated)
-    add_dependencies (cvmfs_fuse_debug cache.pb.generated)
-    set_target_properties (cvmfs_fuse PROPERTIES
-      VERSION ${CernVM-FS_VERSION_STRING}
-      COMPILE_FLAGS "-DCVMFS_USE_LIBFUSE=2 ${CVMFS_FUSE_CFLAGS}"
-      LINK_FLAGS "${CVMFS_FUSE_LDFLAGS}"
-    )
-    set_target_properties (cvmfs_fuse_debug PROPERTIES
-      VERSION ${CernVM-FS_VERSION_STRING}
-      COMPILE_FLAGS "-DCVMFS_USE_LIBFUSE=2 ${CVMFS_FUSE_CFLAGS} -O0 -Wno-cpp -DDEBUGMSG"
-      LINK_FLAGS "${CVMFS_FUSE_LDFLAGS}"
-    )
-    target_link_libraries (cvmfs_fuse
-                           cvmfs_crypto
-                           cvmfs_util
-                           ${FUSE_LIBRARIES} ${CVMFS_FUSE_LINK_LIBRARIES}
-    )
-    target_link_libraries (cvmfs_fuse_debug
-                           cvmfs_crypto_debug
-                           cvmfs_util_debug
-                           ${FUSE_LIBRARIES} ${CVMFS_FUSE_LINK_LIBRARIES}
-    )
-  endif()
-
-  if (FUSE3_FOUND) # for MacOS
-    add_library (cvmfs_fuse3 SHARED ${CVMFS_FUSE_SOURCES})
-    add_library (cvmfs_fuse3_debug SHARED ${CVMFS_FUSE_SOURCES})
-    add_dependencies (cvmfs_fuse3 cache.pb.generated)
-    add_dependencies (cvmfs_fuse3_debug cache.pb.generated)
-    set_target_properties (cvmfs_fuse3 PROPERTIES
-      VERSION ${CernVM-FS_VERSION_STRING}
-      COMPILE_FLAGS "-DCVMFS_USE_LIBFUSE=3 ${CVMFS_FUSE_CFLAGS}"
-      LINK_FLAGS "${CVMFS_FUSE_LDFLAGS}"
-    )
-    set_target_properties (cvmfs_fuse3_debug PROPERTIES
-      VERSION ${CernVM-FS_VERSION_STRING}
-      COMPILE_FLAGS "-DCVMFS_USE_LIBFUSE=3 ${CVMFS_FUSE_CFLAGS} -O0 -Wno-cpp -DDEBUGMSG"
-      LINK_FLAGS "${CVMFS_FUSE_LDFLAGS}"
-    )
-    target_link_libraries (cvmfs_fuse3
-                           cvmfs_crypto
-                           cvmfs_util
-                           ${FUSE3_LIBRARIES} ${CVMFS_FUSE_LINK_LIBRARIES}
-    )
-    target_link_libraries (cvmfs_fuse3_debug
-                           cvmfs_crypto_debug
-                           cvmfs_util_debug
-                           ${FUSE3_LIBRARIES} ${CVMFS_FUSE_LINK_LIBRARIES}
-    )
-  endif()
+  add_library (cvmfs_fuse3 SHARED ${CVMFS_FUSE_SOURCES})
+  add_library (cvmfs_fuse3_debug SHARED ${CVMFS_FUSE_SOURCES})
+  add_dependencies (cvmfs_fuse3 cache.pb.generated)
+  add_dependencies (cvmfs_fuse3_debug cache.pb.generated)
+  set_target_properties (cvmfs_fuse3 PROPERTIES
+    VERSION ${CernVM-FS_VERSION_STRING}
+    COMPILE_FLAGS "${CVMFS_FUSE_CFLAGS}"
+    LINK_FLAGS "${CVMFS_FUSE_LDFLAGS}"
+  )
+  set_target_properties (cvmfs_fuse3_debug PROPERTIES
+    VERSION ${CernVM-FS_VERSION_STRING}
+    COMPILE_FLAGS "${CVMFS_FUSE_CFLAGS} -O0 -Wno-cpp -DDEBUGMSG"
+    LINK_FLAGS "${CVMFS_FUSE_LDFLAGS}"
+  )
+  target_link_libraries (cvmfs_fuse3
+                         cvmfs_crypto
+                         cvmfs_util
+                         ${FUSE3_LIBRARIES} ${CVMFS_FUSE_LINK_LIBRARIES}
+  )
+  target_link_libraries (cvmfs_fuse3_debug
+                         cvmfs_crypto_debug
+                         cvmfs_util_debug
+                         ${FUSE3_LIBRARIES} ${CVMFS_FUSE_LINK_LIBRARIES}
+  )
 
 
   #
@@ -350,20 +308,11 @@ if (BUILD_CVMFS)
     RUNTIME
     DESTINATION  ${CVMFS_LIBEXEC_DIR}/authz
   )
-  if (BUILD_LIBFUSE2)
-    install (
-      TARGETS      cvmfs_fuse_stub cvmfs_fuse cvmfs_fuse_debug
-      LIBRARY
-      DESTINATION  ${CMAKE_INSTALL_LIBDIR}
-    )
-  endif()
-  if (FUSE3_FOUND) # for MacOS
-    install (
-      TARGETS      cvmfs_fuse3_stub cvmfs_fuse3 cvmfs_fuse3_debug
-      LIBRARY
-      DESTINATION  ${CMAKE_INSTALL_LIBDIR}
-    )
-  endif()
+  install (
+    TARGETS      cvmfs_fuse3_stub cvmfs_fuse3 cvmfs_fuse3_debug
+    LIBRARY
+    DESTINATION  ${CMAKE_INSTALL_LIBDIR}
+  )
   install (
     FILES        cvmfs_config
     DESTINATION  bin
