@@ -26,7 +26,12 @@ FetchContent_Declare(
   # MakeAvailable only downloads and extracts -- we define the target ourselves.
   SOURCE_SUBDIR does-not-exist
   EXCLUDE_FROM_ALL
-  FIND_PACKAGE_ARGS
+  # Deliberately no FIND_PACKAGE_ARGS: a system zlib must not be picked up
+  # implicitly. Content hashes are computed over the deflate output, so a
+  # different implementation (e.g. zlib-ng in compat mode, the system libz on
+  # recent Fedora/RHEL) yields different object names for identical files.
+  # Setting BUILTIN_EXTERNALS_EXCLUDE=zlib still switches to the system zlib,
+  # because that selects FETCHCONTENT_TRY_FIND_PACKAGE_MODE=ALWAYS.
 )
 
 FetchContent_MakeAvailable(ZLIB)
