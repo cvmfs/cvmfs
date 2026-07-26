@@ -39,6 +39,7 @@ unset(FETCHCONTENT_TRY_FIND_PACKAGE_MODE)
 
 if(ZLIB_FOUND)
   message(STATUS "Found system zlib: ${ZLIB_LIBRARIES}")
+  check_zlib_deflate_fingerprint("${ZLIB_LIBRARIES}" "${ZLIB_INCLUDE_DIRS}")
   # The standard FindZLIB module already exposes the ZLIB::ZLIB imported target
   # and sets ZLIB_LIBRARIES / ZLIB_INCLUDE_DIRS. Promote them to the cache so the
   # rest of the tree sees them (this runs from the externals/ subdirectory).
