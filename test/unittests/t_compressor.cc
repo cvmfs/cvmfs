@@ -2,9 +2,14 @@
  * This file is part of the CernVM File System.
  */
 
+#include <algorithm>
+#include <cstdio>
+#include <vector>
+
 #include "compression/compression.h"
 #include "gtest/gtest.h"
 #include "util/pointer.h"
+#include "util/prng.h"
 #include "util/smalloc.h"
 
 // TODO(jblomer): typed tests
@@ -152,6 +157,68 @@ TEST_F(T_Compressor, EchoCompressionLong) {
 
   EXPECT_EQ(compress_pos, long_size);
   EXPECT_EQ(0, memcmp(compress_buf.weak_ref(), long_string, long_size));
+}
+
+
+/**
+ * Content hashes are computed over the compressed stream, so the deflate output
+ * is part of cvmfs' on-disk format: a zlib that compresses differently (but
+ * still correctly) renames every object. The build checks the zlib it selects
+ * at configure time, this pins the one we actually end up linked against.
+ *
+ * Fingerprint and reference buffer are kept in sync with
+ * externals/zlib/check_deflate_fingerprint.c. Every upstream zlib from 1.2.8 to
+ * 1.3.1 produces this value; zlib-ng in compat mode does not.
+ */
+TEST(T_DeflateFingerprint, MatchesVendoredZlib) {
+  const size_t kTotal = 64 * 1024;
+  const size_t kInBlock = 4096 * 4;   // TaskRead::kBlockSize
+  const size_t kOutBlock = 4096 * 2;  // TaskCompress::kCompressedBlockSize
+
+  std::vector<unsigned char> data(kTotal);
+  Prng prng;
+  prng.InitSeed(1337);
+  for (size_t i = 0; i < kTotal; ++i)
+    data[i] = prng.Next(256);
+
+  UniquePtr<Compressor> compressor(Compressor::Construct(kZlibDefault));
+  std::vector<unsigned char> outbuf(kOutBlock);
+  uLong crc = crc32(0L, Z_NULL, 0);
+  size_t pos = 0;
+  size_t total_out = 0;
+  bool done = false;
+
+  // mirrors TaskCompress::Process()
+  while (!done) {
+    const size_t in_size = std::min(kTotal - pos, kInBlock);
+    const bool flush = (pos + in_size >= kTotal);
+    unsigned char *in_ptr = &data[pos];
+    size_t remaining_in = in_size;
+    bool inner_done = false;
+    pos += in_size;
+
+    do {
+      unsigned char *out_ptr = &outbuf[0];
+      size_t produced = kOutBlock;
+      inner_done = compressor->Deflate(flush, &in_ptr, &remaining_in, &out_ptr,
+                                       &produced);
+      crc = crc32(crc, &outbuf[0], static_cast<uInt>(produced));
+      total_out += produced;
+    } while ((remaining_in > 0) || (flush && !inner_done));
+
+    if (flush)
+      done = true;
+  }
+
+  char fingerprint[64];
+  snprintf(fingerprint, sizeof(fingerprint), "%08lx:%lu",
+           static_cast<unsigned long>(crc),
+           static_cast<unsigned long>(total_out));
+  EXPECT_STREQ("e415c33f:65562", fingerprint)
+      << "this zlib does not compress the way cvmfs expects, most likely "
+      << "zlib-ng in zlib-compat mode (" << zlibVersion() << "). Objects "
+      << "written by this build get different content hashes, which breaks "
+      << "deduplication against published repositories.";
 }
 
 }  // end namespace zlib
