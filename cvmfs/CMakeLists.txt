@@ -485,6 +485,9 @@ if (BUILD_LIBCVMFS_CACHE)
   set_property (TARGET cvmfs_cache APPEND PROPERTY INCLUDE_DIRECTORIES "${CMAKE_BINARY_DIR}")
   set_property (TARGET cvmfs_cache APPEND PROPERTY INCLUDE_DIRECTORIES "${CMAKE_CURRENT_BINARY_DIR}")
   target_include_directories (cvmfs_cache PRIVATE ${GTEST_INCLUDE_DIRS})
+  # cache.h -> compression.h -> duplex_zlib.h needs zlib.h, which is not in a
+  # default include path when zlib is built from the vendored sources
+  target_include_directories (cvmfs_cache PRIVATE ${ZLIB_INCLUDE_DIRS})
   target_include_directories (cvmfs_cache PRIVATE ${PROTOBUF_INCLUDE_DIRS})
 
   target_link_libraries(cvmfs_cache

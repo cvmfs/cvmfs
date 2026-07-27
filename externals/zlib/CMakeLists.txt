@@ -26,7 +26,12 @@ FetchContent_Declare(
   # MakeAvailable only downloads and extracts -- we define the target ourselves.
   SOURCE_SUBDIR does-not-exist
   EXCLUDE_FROM_ALL
-  FIND_PACKAGE_ARGS
+  # Deliberately no FIND_PACKAGE_ARGS: a system zlib must not be picked up
+  # implicitly. Content hashes are computed over the deflate output, so a
+  # different implementation (e.g. zlib-ng in compat mode, the system libz on
+  # recent Fedora/RHEL) yields different object names for identical files.
+  # Setting BUILTIN_EXTERNALS_EXCLUDE=zlib still switches to the system zlib,
+  # because that selects FETCHCONTENT_TRY_FIND_PACKAGE_MODE=ALWAYS.
 )
 
 FetchContent_MakeAvailable(ZLIB)
@@ -34,6 +39,7 @@ unset(FETCHCONTENT_TRY_FIND_PACKAGE_MODE)
 
 if(ZLIB_FOUND)
   message(STATUS "Found system zlib: ${ZLIB_LIBRARIES}")
+  check_zlib_deflate_fingerprint("${ZLIB_LIBRARIES}" "${ZLIB_INCLUDE_DIRS}")
   # The standard FindZLIB module already exposes the ZLIB::ZLIB imported target
   # and sets ZLIB_LIBRARIES / ZLIB_INCLUDE_DIRS. Promote them to the cache so the
   # rest of the tree sees them (this runs from the externals/ subdirectory).
@@ -63,7 +69,16 @@ else()
     HAVE_HIDDEN
     NO_vsnprintf
   )
-  target_compile_options(zlib PRIVATE -O3)
+  # -fno-lto: the zlib symbols are hidden (-fvisibility=hidden -DHAVE_HIDDEN),
+  # so with LTO the plugin sees only IR references to e.g. deflateInit_ and
+  # internalizes it. That breaks as soon as the linker has to pull a member out
+  # of libzlib.a *after* the LTO pass: on Fedora, libcrypto.so.3 leaves
+  # compress()/uncompress() undefined (it gets them from libz.so.1 at runtime),
+  # which drags compress.c.o and uncompr.c.o in at the end of the link, and
+  # those then no longer find deflateInit_/deflateEnd. Keeping zlib out of LTO
+  # is also what we want for the vendored copy anyway -- it exists to pin the
+  # deflate output.
+  target_compile_options(zlib PRIVATE -O3 -fno-lto)
   set_target_properties(zlib PROPERTIES
     POSITION_INDEPENDENT_CODE ON
   )
