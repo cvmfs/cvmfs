@@ -23,8 +23,14 @@ cvmfs_run_test() {
   # Sanity check
   [ "x$cache_dir" != "x$PWD" ] || return 1
 
+  if ! command -v g++ > /dev/null 2>&1; then
+    echo "Warning: g++ is not available, skipping libcvmfs test"
+    CVMFS_GENERAL_WARNING_FLAG=1
+    return 0
+  fi
+
   echo "compiling libcvmfs test binary..."
-  g++ -o "$bin_name" -DDEBUGMSG "$workdir/main.cc" -lcvmfs_client -pthread -ldl -lssl -lcrypto -luuid -lcap -lrt || return 1
+  compile_libcvmfs_binary "$bin_name" "$workdir/main.cc" -DDEBUGMSG || return 1
 
   echo "register cleanup trap"
   trap cleanup EXIT HUP INT TERM || return $?
