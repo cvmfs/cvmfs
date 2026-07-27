@@ -217,7 +217,7 @@ void CatalogMergeInOut(const std::vector<EntrySpec> &base_entries,
   std::unique_ptr<manifest::Manifest> output_manifest(
       manifest::Manifest::LoadFile(output_manifest_path));
 
-  ASSERT_TRUE(output_manifest.IsValid());
+  ASSERT_TRUE(output_manifest.get()!=nullptr);
 
   DirSpec output_spec;
   ASSERT_TRUE(
