@@ -33,8 +33,9 @@ desaster_cleanup() {
   local mountpoint=$1
   local repo_name=$2
 
-  sudo umount $mountpoint > /dev/null 2>&1
-  sudo cvmfs_server rmfs -f $repo_name > /dev/null 2>&1
+  # Cleanup must not hide the original failure under the test runner's `set -e`.
+  sudo umount "$mountpoint" > /dev/null 2>&1 || true
+  sudo cvmfs_server rmfs -f "$repo_name" > /dev/null 2>&1 || true
 }
 
 # Path of a content object in a cache directory, given its content hash
@@ -208,24 +209,29 @@ EOF
   local bin_name="709-test"
   local libcvmfs_cache=$scratch_dir/libcvmfs-cache
 
-  echo "compiling libcvmfs test binary"
-  g++ -o $bin_name "$workdir/main.cc" -lcvmfs_client -pthread -ldl -lssl -lcrypto -luuid -lcap -lrt \
-    || { desaster_cleanup $mnt_point $CVMFS_TEST_REPO; return 64; }
+  if ! command -v g++ > /dev/null 2>&1; then
+    echo "Warning: g++ is not available, skipping libcvmfs coverage"
+    CVMFS_GENERAL_WARNING_FLAG=1
+  else
+    echo "compiling libcvmfs test binary"
+    g++ -o $bin_name "$workdir/main.cc" -lcvmfs_client -pthread -ldl -lssl -lcrypto -luuid -lcap -lrt \
+      || { desaster_cleanup $mnt_point $CVMFS_TEST_REPO; return 64; }
 
-  echo "opening the trigger through libcvmfs and waiting for the prefetch"
-  ./$bin_name "$(get_repo_url $CVMFS_TEST_REPO)" "$CVMFS_TEST_REPO" "$libcvmfs_cache" \
-    $((4 + num_chunks)) 120 \
-    || { desaster_cleanup $mnt_point $CVMFS_TEST_REPO; return 65; }
+    echo "opening the trigger through libcvmfs and waiting for the prefetch"
+    ./$bin_name "$(get_repo_url $CVMFS_TEST_REPO)" "$CVMFS_TEST_REPO" "$libcvmfs_cache" \
+      $((4 + num_chunks)) 120 \
+      || { desaster_cleanup $mnt_point $CVMFS_TEST_REPO; return 65; }
 
-  echo "verify the prefetched objects in the libcvmfs cache by hash"
-  local hash
-  for hash in $trigger_hash $dep1_hash $dep2_hash; do
-    if [ ! -f "$(cache_object_path $libcvmfs_cache $hash)" ]; then
-      echo "object $hash missing from the libcvmfs cache"
-      desaster_cleanup $mnt_point $CVMFS_TEST_REPO
-      return 66
-    fi
-  done
+    echo "verify the prefetched objects in the libcvmfs cache by hash"
+    local hash
+    for hash in $trigger_hash $dep1_hash $dep2_hash; do
+      if [ ! -f "$(cache_object_path $libcvmfs_cache $hash)" ]; then
+        echo "object $hash missing from the libcvmfs cache"
+        desaster_cleanup $mnt_point $CVMFS_TEST_REPO
+        return 66
+      fi
+    done
+  fi
 
   echo "clean up"
   sudo cvmfs_server rmfs -f $CVMFS_TEST_REPO

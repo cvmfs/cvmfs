@@ -551,11 +551,12 @@ int LibContext::Open(const char *c_path) {
     return -ENOENT;
   }
 
-  if (dirent.IsBundleTrigger() && (mount_point_->bundle_mgr() != nullptr)) {
+  BundleMgr *bundle_mgr = mount_point_->bundle_mgr();
+  if (bundle_mgr != nullptr && dirent.IsBundleTrigger()) {
     // Hand the trigger over to the long-lived prefetcher; spec loading and
     // dependency downloads happen on its background threads, so the open()
     // does not wait for them.
-    mount_point_->bundle_mgr()->ScheduleTrigger(path);
+    bundle_mgr->ScheduleTrigger(path);
   }
 
   if (dirent.IsChunkedFile()) {
