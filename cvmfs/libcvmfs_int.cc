@@ -46,6 +46,7 @@
 #include <string>
 #include <vector>
 
+#include "bundle_mgr.h"
 #include "cache_posix.h"
 #include "catalog.h"
 #include "catalog_mgr_client.h"
@@ -151,6 +152,11 @@ LibContext *LibContext::Create(const string &fqrn,
 
   ctx->mount_point_ = MountPoint::Create(
       fqrn, LibGlobals::GetInstance()->file_system(), options_mgr);
+  // The library never daemonizes, so the prefetcher threads can start
+  // right away (the fuse client defers this until after the fork)
+  if (ctx->mount_point_->bundle_mgr() != nullptr) {
+    ctx->mount_point_->bundle_mgr()->Spawn();
+  }
   return ctx;
 }
 
@@ -543,6 +549,14 @@ int LibContext::Open(const char *c_path) {
 
   if (!found) {
     return -ENOENT;
+  }
+
+  BundleMgr *bundle_mgr = mount_point_->bundle_mgr();
+  if (bundle_mgr != nullptr && dirent.IsBundleTrigger()) {
+    // Hand the trigger over to the long-lived prefetcher; spec loading and
+    // dependency downloads happen on its background threads, so the open()
+    // does not wait for them.
+    bundle_mgr->ScheduleTrigger(path);
   }
 
   if (dirent.IsChunkedFile()) {
