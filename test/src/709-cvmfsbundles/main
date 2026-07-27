@@ -214,7 +214,7 @@ EOF
     CVMFS_GENERAL_WARNING_FLAG=1
   else
     echo "compiling libcvmfs test binary"
-    g++ -o $bin_name "$workdir/main.cc" -lcvmfs_client -pthread -ldl -lssl -lcrypto -luuid -lcap -lrt \
+    compile_libcvmfs_binary "$bin_name" "$workdir/main.cc" \
       || { desaster_cleanup $mnt_point $CVMFS_TEST_REPO; return 64; }
 
     echo "opening the trigger through libcvmfs and waiting for the prefetch"

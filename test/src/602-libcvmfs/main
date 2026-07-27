@@ -30,7 +30,7 @@ cvmfs_run_test() {
   fi
 
   echo "compiling libcvmfs test binary..."
-  g++ -o "$bin_name" -DDEBUGMSG "$workdir/main.cc" -lcvmfs_client -pthread -ldl -lssl -lcrypto -luuid -lcap -lrt || return 1
+  compile_libcvmfs_binary "$bin_name" "$workdir/main.cc" -DDEBUGMSG || return 1
 
   echo "register cleanup trap"
   trap cleanup EXIT HUP INT TERM || return $?
