@@ -11,6 +11,7 @@
 #include <cassert>
 #include <cerrno>
 #include <cstdlib>
+#include <cstring>
 #include <memory>
 #include <string>
 #include <vector>
@@ -94,28 +95,12 @@ BundleFileMgr *LoadBundleFromCvmfs(MountPoint *mp,
 }
 }  // namespace
 
-BundleMgr::BundleMgr(MountPoint *mp, const PathString &path)
+BundleMgr::BundleMgr(MountPoint *mp)
     : mount_point_(mp)
-    , path_(path)
     , fetcher_threads_()
     , pool_size_(kDefaultBundlePoolSize) {
-  fname_ = GetFileName(path_);
-  parent_path_ = GetParentPath(path_);
-  // There is a naming convention regarding the name of the file with the
-  // contents of the bundle
-  bundle_file_path_ = PathString(parent_path_.ToString() + "/.cvmfsbundle-"
-                                 + fname_.ToString());
-
-  pipe_bm_[0] = pipe_bm_[1] = -1;
+  atomic_init32(&terminating_);
   pthread_mutex_init(&worker_read_mutex_, nullptr);
-
-  bfm_ = LoadBundleFromCvmfs(mount_point_, bundle_file_path_);
-  if (bfm_ == nullptr) {
-    LogCvmfs(kLogCvmfs, kLogDebug, "BundleMgr: failed to load bundle file %s",
-             bundle_file_path_.ToString().c_str());
-    is_valid_ = false;
-    return;
-  }
 
   // Pool size override via CVMFS_BUNDLE_POOL_SIZE
   if (mount_point_ != nullptr && mount_point_->file_system() != nullptr
@@ -131,24 +116,43 @@ BundleMgr::BundleMgr(MountPoint *mp, const PathString &path)
     }
   }
 
-  SpawnFetcherPool();
+  // The queues are created here so that ScheduleTrigger() can already
+  // enqueue before Spawn(); pipe file descriptors, unlike threads, survive
+  // the fuse client's daemonization fork.
+  MakePipe(pipe_bm_);
+  MakePipe(pipe_triggers_);
+
+  // Non-blocking writes so TrySendPath/ScheduleTrigger can drop when a
+  // queue is full. Per pipe(7), writes <= PIPE_BUF are atomic on
+  // non-blocking pipes: they either fully succeed or fail with EAGAIN.
+  int flags = fcntl(pipe_bm_[1], F_GETFL);
+  fcntl(pipe_bm_[1], F_SETFL, flags | O_NONBLOCK);
+  flags = fcntl(pipe_triggers_[1], F_GETFL);
+  fcntl(pipe_triggers_[1], F_SETFL, flags | O_NONBLOCK);
 }
 
-void BundleMgr::Fetch() {
+void BundleMgr::Spawn() {
+  SpawnFetcherPool();
+  if (is_valid_)
+    SpawnDispatcher();
+}
+
+bool BundleMgr::ScheduleTrigger(const PathString &path) {
   if (not is_valid_) {
     LogCvmfs(kLogBundleMgr,
              kLogDebug,
-             "BundleMgr is not in a valid state. Can't fetch!");
-    return;
+             "BundleMgr is not in a valid state. Can't schedule trigger!");
+    return false;
   }
-
-  while (auto file = bfm_->GetNext()) {
-    const PathString path = NormalizeDependencyPath(file);
-    // A TrySendPath() here is used as a profylaxis to a scenario where the pipe
-    // is currently blocked.
-    while (not TrySendPath(back_channel_, path)) {
-    }
+  // A single non-blocking attempt: prefetching is best-effort, so if the
+  // trigger queue is full the request is dropped instead of stalling the
+  // caller (an open() holding the remount fence).
+  if (not TrySendPath(pipe_triggers_[1], path)) {
+    LogCvmfs(kLogBundleMgr, kLogDebug, "trigger queue full, dropping %s",
+             path.ToString().c_str());
+    return false;
   }
+  return true;
 }
 
 /**
@@ -156,13 +160,14 @@ void BundleMgr::Fetch() {
  * Entries without a leading slash (optionally prefixed with "./") are
  * resolved relative to the directory holding the bundle file.
  */
-PathString BundleMgr::NormalizeDependencyPath(const PathString &path) const {
+PathString BundleMgr::NormalizeDependencyPath(const PathString &path,
+                                              const PathString &parent_path) {
   if (path.StartsWith(PathString("/", 1)))
     return path;
   const PathString relative = path.StartsWith(PathString("./", 2))
                                   ? path.Suffix(2)
                                   : path;
-  PathString normalized(parent_path_);
+  PathString normalized(parent_path);
   normalized.Append("/", 1);
   normalized.Append(relative.GetChars(), relative.GetLength());
   return normalized;
@@ -197,15 +202,6 @@ void BundleMgr::JoinFetcherPool() {
 }
 
 void BundleMgr::SpawnFetcherPool() {
-  MakePipe(pipe_bm_);
-  back_channel_ = pipe_bm_[1];
-
-  // Non-blocking writes on the work-queue pipe so TrySendPath can poll.
-  // Per pipe(7), writes <= PIPE_BUF are atomic on non-blocking pipes:
-  // they either fully succeed or fail with EAGAIN.
-  const int flags = fcntl(back_channel_, F_GETFL);
-  fcntl(back_channel_, F_SETFL, flags | O_NONBLOCK);
-
   for (size_t i = 0; i < pool_size_; ++i) {
     std::unique_ptr<pthread_t> thread(new pthread_t());
     const int res = pthread_create(thread.get(), nullptr, MainBundleMgrFetcher,
@@ -218,6 +214,73 @@ void BundleMgr::SpawnFetcherPool() {
       return;
     }
     fetcher_threads_.emplace_back(std::move(thread));
+  }
+}
+
+void BundleMgr::SpawnDispatcher() {
+  dispatcher_thread_.reset(new pthread_t());
+  const int res = pthread_create(dispatcher_thread_.get(), nullptr,
+                                 MainBundleMgrDispatcher, this);
+  if (res != 0) {
+    LogCvmfs(kLogBundleMgr, kLogDebug, "Dispatcher thread creation failed!");
+    dispatcher_thread_.reset();
+    is_valid_ = false;
+  }
+}
+
+void BundleMgr::JoinDispatcher() {
+  if (pipe_triggers_[1] < 0)
+    return;
+  // The dispatcher only exists once Spawn() has run; without it there is
+  // just the pipe to close.
+  if (dispatcher_thread_) {
+    Command cmd = Command::kTerminate;
+    while (true) {
+      const ssize_t n = ::write(pipe_triggers_[1], &cmd, sizeof(Command));
+      if (n == sizeof(Command))
+        break;
+      if (errno != EAGAIN && errno != EWOULDBLOCK)
+        break;
+    }
+    pthread_join(*dispatcher_thread_, nullptr);
+    dispatcher_thread_.reset();
+  }
+  ClosePipe(pipe_triggers_);
+  pipe_triggers_[0] = pipe_triggers_[1] = -1;
+}
+
+/**
+ * Loads the bundle spec that belongs to the given trigger file and enqueues
+ * its dependencies for the fetcher pool. Runs on the dispatcher thread.
+ */
+void BundleMgr::ProcessTrigger(const PathString &trigger_path) {
+  const NameString fname = GetFileName(trigger_path);
+  const PathString parent_path = GetParentPath(trigger_path);
+  // There is a naming convention regarding the name of the file with the
+  // contents of the bundle
+  const PathString bundle_file_path(parent_path.ToString() + "/.cvmfsbundle-"
+                                    + fname.ToString());
+
+  const std::unique_ptr<BundleFileMgr> bfm(
+      LoadBundleFromCvmfs(mount_point_, bundle_file_path));
+  if (bfm == nullptr) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "Couldn't fetch bundle associated to %s",
+             trigger_path.ToString().c_str());
+    return;
+  }
+  EnqueueDependencies(bfm.get(), parent_path);
+}
+
+void BundleMgr::EnqueueDependencies(BundleFileMgr *bfm,
+                                    const PathString &parent_path) {
+  while (auto file = bfm->GetNext()) {
+    const PathString path = NormalizeDependencyPath(file, parent_path);
+    // A single non-blocking attempt: if the dependency queue is full the
+    // entry is dropped (prefetching is best-effort) instead of spinning.
+    if (not TrySendPath(pipe_bm_[1], path)) {
+      LogCvmfs(kLogBundleMgr, kLogDebug, "dependency queue full, dropping %s",
+               path.ToString().c_str());
+    }
   }
 }
 
@@ -284,6 +347,31 @@ void BundleMgr::FetchPath(const PathString &path) {
     mount_point_->file_system()->cache_mgr()->Close(fd);
 }
 
+void *BundleMgr::MainBundleMgrDispatcher(void *data) {
+#ifndef __APPLE__
+  pthread_setname_np(pthread_self(), "bm_dispatch");
+#endif
+  BundleMgr *mgr = static_cast<BundleMgr *>(data);
+  const int rfd = mgr->pipe_triggers_[0];
+
+  // Single reader on this pipe, so no receive mutex is needed here
+  while (true) {
+    Command cmd = Command::kTerminate;
+    const ssize_t n = read(rfd, &cmd, sizeof(Command));
+    if (n != static_cast<ssize_t>(sizeof(Command)))
+      break;
+    if (cmd != Command::kFetch)
+      break;
+    const PathString path = mgr->ReceivePath(rfd);
+    // While terminating, drain the queue without processing so that
+    // unmounting does not wait for spec downloads
+    if (atomic_read32(&mgr->terminating_) == 0)
+      mgr->ProcessTrigger(path);
+  }
+
+  pthread_exit(nullptr);
+}
+
 void *BundleMgr::MainBundleMgrFetcher(void *data) {
 #ifndef __APPLE__
   pthread_setname_np(pthread_self(), "bm_fetcher");
@@ -320,7 +408,10 @@ void *BundleMgr::MainBundleMgrFetcher(void *data) {
           terminate = true;
           break;
         }
-        mgr->FetchPath(path);
+        // While terminating, drain the queue without fetching so that
+        // unmounting does not wait for pending downloads
+        if (atomic_read32(&mgr->terminating_) == 0)
+          mgr->FetchPath(path);
       } break;
       case Command::kTerminate:
       default:
@@ -342,17 +433,32 @@ PathString BundleMgr::ReceivePath(int fd) const {
 }
 
 bool BundleMgr::TrySendPath(int fd, const PathString &path) const {
-  Command cmd = Command::kFetch;
-  if ((write(fd, &cmd, sizeof(Command))) != sizeof(Command)) {
-    if (not(errno == EAGAIN || errno == EWOULDBLOCK)) {
-      LogCvmfs(kLogBundleMgr,
-               kLogDebug,
-               "write() on back channel failed unexpectedly");
-    }
+  // The whole message (command + length + payload) is sent as a single
+  // write: per pipe(7), writes <= PIPE_BUF to a non-blocking pipe are
+  // atomic, they either fully succeed or fail with EAGAIN. Sending the
+  // parts separately could hit a full queue in the middle of a message
+  // and corrupt the stream for all readers.
+  const Command cmd = Command::kFetch;
+  const size_t length = path.GetLength();
+  const size_t msg_size = sizeof(cmd) + sizeof(length) + length;
+  if (msg_size > PIPE_BUF) {
+    LogCvmfs(kLogBundleMgr, kLogDebug,
+             "path too long for the work queue, dropping %s",
+             path.ToString().c_str());
     return false;
-  } else {
-    BlockingSend(fd, path);
   }
-  return true;
-}
+  char msg[PIPE_BUF];
+  memcpy(msg, &cmd, sizeof(cmd));
+  memcpy(msg + sizeof(cmd), &length, sizeof(length));
+  memcpy(msg + sizeof(cmd) + sizeof(length), path.GetChars(), length);
 
+  const ssize_t n = write(fd, msg, msg_size);
+  if (n == static_cast<ssize_t>(msg_size))
+    return true;
+  if ((n < 0) && not(errno == EAGAIN || errno == EWOULDBLOCK)) {
+    LogCvmfs(kLogBundleMgr, kLogDebug,
+             "write() on the work queue failed unexpectedly (errno=%d)",
+             errno);
+  }
+  return false;
+}
