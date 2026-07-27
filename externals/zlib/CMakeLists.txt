@@ -69,7 +69,16 @@ else()
     HAVE_HIDDEN
     NO_vsnprintf
   )
-  target_compile_options(zlib PRIVATE -O3)
+  # -fno-lto: the zlib symbols are hidden (-fvisibility=hidden -DHAVE_HIDDEN),
+  # so with LTO the plugin sees only IR references to e.g. deflateInit_ and
+  # internalizes it. That breaks as soon as the linker has to pull a member out
+  # of libzlib.a *after* the LTO pass: on Fedora, libcrypto.so.3 leaves
+  # compress()/uncompress() undefined (it gets them from libz.so.1 at runtime),
+  # which drags compress.c.o and uncompr.c.o in at the end of the link, and
+  # those then no longer find deflateInit_/deflateEnd. Keeping zlib out of LTO
+  # is also what we want for the vendored copy anyway -- it exists to pin the
+  # deflate output.
+  target_compile_options(zlib PRIVATE -O3 -fno-lto)
   set_target_properties(zlib PROPERTIES
     POSITION_INDEPENDENT_CODE ON
   )
