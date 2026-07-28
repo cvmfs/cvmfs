@@ -8,7 +8,7 @@
 
 #include "compression/compression.h"
 #include "gtest/gtest.h"
-#include "util/pointer.h"
+#include <memory>
 #include "util/prng.h"
 #include "util/smalloc.h"
 
@@ -181,7 +181,7 @@ TEST(T_DeflateFingerprint, MatchesVendoredZlib) {
   for (size_t i = 0; i < kTotal; ++i)
     data[i] = prng.Next(256);
 
-  UniquePtr<Compressor> compressor(Compressor::Construct(kZlibDefault));
+  std::unique_ptr<Compressor> compressor(Compressor::Construct(kZlibDefault));
   std::vector<unsigned char> outbuf(kOutBlock);
   uLong crc = crc32(0L, Z_NULL, 0);
   size_t pos = 0;

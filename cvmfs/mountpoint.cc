@@ -1295,7 +1295,7 @@ MountPoint *MountPoint::Create(const string &fqrn,
   mountpoint->ReEvaluateAuthz();
   mountpoint->CreateTables();
   if (!mountpoint->SetupBehavior())
-    return mountpoint.Release();
+    return mountpoint.release();
   mountpoint->CreateBundleMgr();
 
   mountpoint->boot_status_ = loader::kFailOk;
