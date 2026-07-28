@@ -162,8 +162,9 @@ Requires: zlib
 %if !0%{?suse_version}
 Requires: protobuf
 %endif
-# gdb adds details to watchdog crash reports.
+# gdb and matching debug symbols add details to watchdog crash reports.
 Recommends: gdb
+Recommends: %{name}-debuginfo%{?_isa} = %{version}-%{release}
 %if 0%{?suse_version}
 Requires: libarchive13
 %else

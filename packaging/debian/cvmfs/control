@@ -48,8 +48,9 @@ Depends:
  ${shlibs:Depends}
 Recommends:
  autofs (>= 5.1.2),
-# gdb adds details to watchdog crash reports.
- gdb
+# gdb and matching debug symbols add details to watchdog crash reports.
+ gdb,
+ cvmfs-dbg (= ${binary:Version})
 Homepage: http://cernvm.cern.ch
 Description: CernVM File System
  HTTP File System for Distributing Software to CernVM.
