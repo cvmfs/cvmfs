@@ -16,7 +16,7 @@
 namespace {
 
 bool CheckParams(const swissknife::CommandLease::Parameters &p) {
-  if (p.action != "acquire" && p.action != "drop") {
+  if (p.action != "acquire" && p.action != "refresh" && p.action != "drop") {
     return false;
   }
 
@@ -43,7 +43,7 @@ CommandLease::~CommandLease() { }
 ParameterList CommandLease::GetParams() const {
   ParameterList r;
   r.push_back(Parameter::Mandatory('u', "repo service url"));
-  r.push_back(Parameter::Mandatory('a', "action (acquire or drop)"));
+  r.push_back(Parameter::Mandatory('a', "action (acquire, refresh or drop)"));
   r.push_back(Parameter::Mandatory('k', "key file"));
   r.push_back(Parameter::Mandatory('p', "lease path"));
   return r;
@@ -104,6 +104,35 @@ int CommandLease::Main(const ArgumentList &args) {
       }
     } else {
       ret = kLeaseCurlReqError;
+    }
+  } else if (params.action == "refresh") {
+    // Try to read session token from repository scratch directory
+    std::string session_token;
+    const std::string token_file_name = "/var/spool/cvmfs/" + lease_fqdn
+                                        + "/session_token";
+    FILE *token_file = std::fopen(token_file_name.c_str(), "r");
+    if (token_file) {
+      GetLineFile(token_file, &session_token);
+      std::fclose(token_file);
+      LogCvmfs(kLogCvmfs, kLogDebug, "Read session token from file: %s",
+               session_token.c_str());
+
+      CurlBuffer buffer;
+      if (MakeEndRequest("PATCH", key_id, secret, session_token,
+                         params.repo_service_url, "", &buffer)) {
+        if (kLeaseReplySuccess == ParseDropReply(buffer)) {
+          return kLeaseSuccess;
+        } else {
+          LogCvmfs(kLogCvmfs, kLogStderr, "Could not refresh active lease");
+          ret = kLeaseFailure;
+        }
+      } else {
+        LogCvmfs(kLogCvmfs, kLogStderr, "Error making PATCH request");
+        ret = kLeaseCurlReqError;
+      }
+    } else {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Error reading session token from file");
+      ret = kLeaseFileOpenError;
     }
   } else if (params.action == "drop") {
     // Try to read session token from repository scratch directory
