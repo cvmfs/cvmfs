@@ -14,6 +14,17 @@ BUILD_LIBFUSE2 := 'no'
 
 CVMFS_BUILD_UNITTESTS ?= no
 
+# Packages whose debug info is moved into cvmfs-dbg (excluding Go packages).
+STRIP_PACKAGES := debian/cvmfs debian/cvmfs-libs debian/cvmfs-fuse3 \
+	debian/cvmfs-server debian/cvmfs-shrinkwrap
+
+# Keep .symtab so watchdog backtraces include function names.
+ifeq (,$(filter nostrip,$(DEB_BUILD_OPTIONS)))
+STRIP_DEBUGINFO := debian/strip-debuginfo.sh debian/cvmfs-dbg $(STRIP_PACKAGES)
+else
+STRIP_DEBUGINFO := echo "DEB_BUILD_OPTIONS=nostrip: keeping debug info in place"
+endif
+
 # Detect Go once; gateway and snapshotter packages are only built when available.
 BUILD_GO := $(shell if go version >/dev/null 2>&1; then echo "yes"; else echo "no"; fi)
 ifeq ($(BUILD_GO),no)
@@ -114,13 +125,14 @@ binary-arch: build install
 #        dh_undocumented
 	dh_installchangelogs ChangeLog
 	dh_link
-#	dh_strip
+	mkdir -p debian/cvmfs-dbg
+	$(STRIP_DEBUGINFO)
 	dh_compress
 	dh_fixperms --exclude cvmfs_suid_helper
-	dh_makeshlibs
+	dh_makeshlibs -Ncvmfs-dbg
 	dh_installdeb
 #        dh_perl
-	dh_shlibdeps
+	dh_shlibdeps -Ncvmfs-dbg
 	dh_gencontrol $(GO_SKIP)
 	dh_md5sums $(GO_SKIP)
 	dh_builddeb $(GO_SKIP)

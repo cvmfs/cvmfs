@@ -40,7 +40,6 @@ Depends:
  lsof,
  attr,
  zlib1g,
- gdb,
  uuid-dev,
  uuid,
  adduser,
@@ -48,7 +47,9 @@ Depends:
  ${misc:Depends},
  ${shlibs:Depends}
 Recommends:
- autofs (>= 5.1.2)
+ autofs (>= 5.1.2),
+# gdb adds details to watchdog crash reports.
+ gdb
 Homepage: http://cernvm.cern.ch
 Description: CernVM File System
  HTTP File System for Distributing Software to CernVM.
@@ -117,6 +118,21 @@ Depends:
 Homepage: http://cernvm.cern.ch
 Description: CernVM File System fuse3 libraries
  Shared libraries implementing the CernVM-FS fuse module based on libfuse3
+
+Package: cvmfs-dbg
+Architecture: amd64 armhf arm64
+Section: debug
+Priority: optional
+Depends:
+ ${misc:Depends}
+Homepage: http://cernvm.cern.ch
+Description: CernVM File System debug symbols
+ Detached debug symbols for the CernVM-FS binaries and libraries, indexed by
+ build ID under /usr/lib/debug/.build-id.
+ .
+ This package is only needed to turn a crash backtrace into file names and line
+ numbers. The shipped binaries keep their symbol table, so function names are
+ already available without it.
 
 #GATEWAY-BEGIN
 Package: cvmfs-gateway
