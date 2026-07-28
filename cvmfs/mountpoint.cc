@@ -1409,7 +1409,7 @@ bool MountPoint::CreateDownloadManagers() {
     download_mgr_->SetFailoverIndefinitely();
   }
 
-  if (options_mgr_->GetValue("CVMFS_METALINK_URL", &optarg)) {
+  if (options_mgr_->GetValue("CVMFS_METALINK_URL", &optarg) && (optarg != "")) {
     download_mgr_->SetMetalinkChain(optarg);
     // host chain will be set later when the metalink server is contacted
     download_mgr_->SetHostChain("");
@@ -2274,7 +2274,8 @@ bool MountPoint::SetupExternalDownloadMgr(bool dogeosort) {
   }
   external_download_mgr_->SetTimeout(timeout, timeout_direct);
 
-  if (options_mgr_->GetValue("CVMFS_EXTERNAL_METALINK", &optarg)) {
+  if (options_mgr_->GetValue("CVMFS_EXTERNAL_METALINK", &optarg) &&
+      (optarg != "")) {
     external_download_mgr_->SetMetalinkChain(optarg);
     // host chain will be set later when the metalink server is contacted
     external_download_mgr_->SetHostChain("");
