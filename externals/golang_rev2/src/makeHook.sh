@@ -1,4 +1,6 @@
-#!/bin/sh
+#!/bin/bash
+set -x
+set -euo pipefail
 
 export GOROOT_FINAL=$EXTERNALS_INSTALL_LOCATION/go
 

@@ -1,4 +1,6 @@
-#!/bin/sh
+#!/bin/bash
+set -x
+set -euo pipefail
 
 cdir=$(pwd)
 ssl_install_dir=${cdir}/ssl_install

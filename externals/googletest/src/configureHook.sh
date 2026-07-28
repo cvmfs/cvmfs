@@ -1,4 +1,6 @@
-#!/bin/sh
+#!/bin/bash
+set -x
+set -euo pipefail
 
 mkdir build
 cd build
