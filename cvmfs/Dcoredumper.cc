@@ -443,7 +443,7 @@ size_t write_note(FILE *out, uint32_t type,
  * performs heuristic RBP recovery, then writes a GDB-compatible core file.
  */
 int build_core(int pid, const char *output_path) {
-  printf("=== dcoredumper ===\n");
+  printf("---- dcoredumper ----\n");
   printf("Target PID:   %d\n", pid);
   printf("Output:       %s\n", output_path);
   printf("Architecture: x86_64\n");
@@ -765,7 +765,7 @@ int build_core(int pid, const char *output_path) {
   free(threads);
   free(auxv_data);
 
-  printf("\n=== Summary ===\n");
+  printf("\n----- Summary ----\n");
   printf("Threads:  %d\n", num_threads);
   printf("Regions:  %d total, %d dumped\n", num_regions, loadable);
   printf("Memory:   %zu bytes read, %zu bytes zeroed\n",
@@ -822,6 +822,15 @@ int main(int argc, char *argv[]) {
   const int pid = atoi(argv[argi]);
   if (pid <= 0) {
     fprintf(stderr, "Invalid PID: %s\n", argv[argi]);
+    return 1;
+  }
+
+  // Verify the process actually exists before printing anything
+  char proc_path[64];
+  snprintf(proc_path, sizeof(proc_path), "/proc/%d", pid);
+  if (access(proc_path, F_OK) != 0) {
+    fprintf(stderr, "Error: No process with PID %d found.\n", pid);
+    fprintf(stderr, "       Check the PID with: ps aux | grep <process_name>\n");
     return 1;
   }
 
