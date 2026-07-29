@@ -120,6 +120,10 @@ cvmfs_server_ingest() {
   local fast_delete=false
   local tolerate_missing_hardlinks=false
   local gc_db=""
+  # direct-to-S3 data upload: "" means "take the default from the repository
+  # config", 1/0 mean explicitly requested/refused on the command line
+  local direct_s3=""
+  local direct_s3_config=""
 
   local force_native=0
   local force_external=0
@@ -178,6 +182,15 @@ cvmfs_server_ingest() {
         ;;
       -m | --tolerate-missing-hardlinks )
         tolerate_missing_hardlinks=true
+        ;;
+      --direct-s3 )
+        direct_s3=1
+        ;;
+      --no-direct-s3 )
+        direct_s3=0
+        ;;
+      --s3-config )
+        direct_s3_config=$2
         ;;
     esac
     shift
@@ -533,14 +546,41 @@ cvmfs_server_ingest() {
     ingest_command="$ingest_command -H $gw_key_file -P ${spool_dir}/session_token"
   fi
 
-  # Direct-to-S3 upload: if the publisher has S3 credentials and we are in
-  # mountless gateway mode, pass the S3 config so data chunks bypass the
-  # gateway.  The S3 config file is expected at the conventional path
-  # /etc/cvmfs/<repo>.s3.conf (same format as the native S3 backend).
-  local s3_direct_config="/etc/cvmfs/${name}.s3.conf"
-  if [ $mountless_gateway_ingest -eq 1 ] && [ -f "$s3_direct_config" ]; then
-    ingest_command="$ingest_command -3 $s3_direct_config"
-    echo "Info: using direct-to-S3 upload for data objects ($s3_direct_config)"
+  # Direct-to-S3 upload: data chunks bypass the gateway and are written to the
+  # object store with the publisher's own S3 credentials; catalogs still go
+  # through the gateway.  Off unless requested, because it needs the publisher
+  # to hold write credentials for the backend storage.
+  #
+  # Enabled by --direct-s3 or by CVMFS_INGEST_DIRECT_S3=true in the repository
+  # server.conf; --no-direct-s3 wins over both.  The S3 config file (same
+  # format as the native S3 backend) is taken from --s3-config,
+  # CVMFS_INGEST_DIRECT_S3_CONFIG, or the conventional
+  # /etc/cvmfs/<repo>.s3.conf, in that order.
+  if [ x"$direct_s3" = "x" ]; then
+    if [ x"$CVMFS_INGEST_DIRECT_S3" = "xtrue" ]; then
+      direct_s3=1
+    else
+      direct_s3=0
+    fi
+  fi
+  if [ $direct_s3 -eq 1 ]; then
+    if [ x"$direct_s3_config" = "x" ]; then
+      direct_s3_config="${CVMFS_INGEST_DIRECT_S3_CONFIG:-/etc/cvmfs/${name}.s3.conf}"
+    fi
+    # Only the gateway upstream is a real requirement: the S3 uploader is a
+    # variant of the gateway uploader and needs a session to push catalogs
+    # through.  A mounted publisher works just as well -- mountless ingest is
+    # merely where this was first used.
+    if [ x"$upstream_type" != xgw ]; then
+      _abort
+      die "Direct-to-S3 upload requires a gateway upstream (CVMFS_UPSTREAM_STORAGE=gw,...)"
+    fi
+    if [ ! -f "$direct_s3_config" ]; then
+      _abort
+      die "Direct-to-S3 upload requested but S3 config '$direct_s3_config' does not exist"
+    fi
+    ingest_command="$ingest_command -3 $direct_s3_config"
+    echo "Info: using direct-to-S3 upload for data objects ($direct_s3_config)"
   fi
 
 

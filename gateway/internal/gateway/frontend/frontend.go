@@ -70,10 +70,6 @@ func NewFrontend(services be.ActionController, port int, timeout time.Duration, 
 	// Payloads (new and improved)
 	router.POST(APIRoot+"/payloads/:token", mw(MakePayloadsHandler(services)))
 
-	// Catalogs-only endpoint (for direct-to-S3 upload mode where only
-	// catalogs need to flow through the gateway)
-	router.POST(APIRoot+"/catalogs/:token", mw(MakeCatalogsHandler(services)))
-
 	// Notification system endpoints
 	router.POST(APIRoot+"/notifications/publish", tag(MakeNotificationsHandler(services)))
 	router.GET(APIRoot+"/notifications/subscribe", tag(MakeNotificationsHandler(services)))

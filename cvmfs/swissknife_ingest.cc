@@ -171,9 +171,14 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
     s3_config_path = *args.find('3')->second;
   }
 
-  const bool use_s3_direct = !s3_config_path.empty()
-                             && spooler_definition.driver_type
-                                    == upload::SpoolerDefinition::Gateway;
+  const bool use_s3_direct = !s3_config_path.empty();
+  if (use_s3_direct
+      && spooler_definition.driver_type != upload::SpoolerDefinition::Gateway) {
+    // Do not silently fall back to the plain uploader: the caller asked for
+    // direct-to-S3 and would otherwise not notice that it did not happen.
+    PrintError("Direct-to-S3 upload (-3) requires a gateway spooler");
+    return 3;
+  }
 
   if (use_s3_direct) {
     // Direct-to-S3 mode: data chunks go to S3, catalogs through gateway

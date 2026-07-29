@@ -118,11 +118,6 @@ func WithAuthz(ac be.ActionController, next httprouter.Handle) httprouter.Handle
 		} else if strings.HasPrefix(req.URL.Path, APIRoot+"/repos") && req.Method == "GET" {
 			// For GET requests on repo endpoints (e.g. keys), use the URL path to compute HMAC
 			HMACInput = []byte(req.URL.Path)
-		} else if strings.HasPrefix(req.URL.Path, APIRoot+"/catalogs") {
-			token := ps.ByName("token")
-			if token != "" {
-				HMACInput = []byte(token)
-			}
 		} else if strings.HasPrefix(req.URL.Path, APIRoot+"/payloads") {
 			token := ps.ByName("token")
 			if token != "" {

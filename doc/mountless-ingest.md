@@ -97,6 +97,8 @@ makes it easy to script ingest commands using the same paths.
 | `-g` | `--group` | Owner group of ingested files |
 | `-k` | `--keep-ownership` | Preserve the tarball's original uid/gid |
 | `-f` | `--fast-delete` | Use fast deletion for nested catalogs |
+|      | `--direct-s3` / `--no-direct-s3` | Enable/disable direct-to-S3 data upload for this invocation (see below) |
+|      | `--s3-config` | S3 config file to use for direct-to-S3 data upload |
 
 **Gateway mode restrictions:**
 - Only one `-d` / `--delete` path per invocation (gateway leases are path-scoped).
@@ -134,14 +136,28 @@ CVMFS_S3_FLAVOR=awsv4
 CVMFS_S3_REGION=<REGION>
 ```
 
-When this file exists and the publisher is in mountless gateway mode, the
-ingest command automatically detects it and uploads data chunks directly to
-S3.  No additional flags are needed — the user runs the same
-`cvmfs_server ingest` command:
+Direct-to-S3 upload is off by default: it only works if the publisher holds
+S3 write credentials for the backend, which is not the case for a normal
+gateway publisher.  Enable it per invocation with `--direct-s3`:
 
 ```bash
-cvmfs_server ingest -t /path/to/content.tar -b /cvmfs/<REPO_NAME>/
+cvmfs_server ingest --direct-s3 -t /path/to/content.tar -b /cvmfs/<REPO_NAME>/
 ```
+
+or turn it on for the repository by putting
+
+```ini
+CVMFS_INGEST_DIRECT_S3=true
+```
+
+into the repository's `server.conf`, in which case a single invocation can
+opt out again with `--no-direct-s3`.  The S3 config file defaults to
+`/etc/cvmfs/<REPO_NAME>.s3.conf` and can be overridden with `--s3-config
+<path>` or `CVMFS_INGEST_DIRECT_S3_CONFIG` in `server.conf`.
+
+Direct-to-S3 requires mountless gateway ingest; requesting it otherwise, or
+with a missing S3 config file, aborts the transaction with an error rather
+than silently falling back to the gateway.
 
 You will see the log line:
 
@@ -155,9 +171,13 @@ The `GatewayS3Uploader` extends the standard `GatewayUploader`:
 
 - **Data chunks** (content-addressed blobs) are written directly to S3 via
   the `S3FanoutManager`, bypassing the gateway entirely.
-- **Catalog objects** (SQLite metadata databases) are posted to the gateway's
-  `POST /api/v1/catalogs/:token` endpoint, which ensures transactional
-  consistency of the repository's Merkle tree.
+- **Catalog objects** (SQLite metadata databases) keep the normal gateway path
+  (`POST /api/v1/payloads`, committed with `POST /api/v1/leases/:token`), which
+  ensures transactional consistency of the repository's Merkle tree.
+
+Only the gateway upstream is required, not mountless ingest: the S3 uploader is
+a variant of the gateway uploader and still needs a lease/session to push
+catalogs through.  It works with a mounted publisher too.
 
 ---
 

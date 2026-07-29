@@ -19,6 +19,7 @@
 
 #include "network/s3fanout.h"
 #include "upload_gateway.h"
+#include "util/atomic.h"
 
 namespace upload {
 
@@ -49,7 +50,8 @@ class GatewayS3Uploader : public GatewayUploader {
   std::string s3_config_path_;
   std::string repo_alias_;
   std::unique_ptr<s3fanout::S3FanoutManager> s3fanout_mgr_;
-  mutable unsigned int s3_errors_;
+  /// Written by the collect-results thread, read by the publisher thread
+  mutable atomic_int32 s3_errors_;
 
   pthread_t thread_collect_results_;
   bool collector_running_;

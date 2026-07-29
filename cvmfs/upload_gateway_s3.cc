@@ -15,7 +15,6 @@
 #include "options.h"
 #include "util/file_backed_buffer.h"
 #include "util/logging.h"
-#include "util/posix.h"
 #include "util/string.h"
 
 namespace upload {
@@ -28,8 +27,9 @@ GatewayS3Uploader::GatewayS3Uploader(
     , s3_config_path_(s3_config_path)
     , repo_alias_(repo_alias)
     , s3fanout_mgr_()
-    , s3_errors_(0)
-    , collector_running_(false) { }
+    , collector_running_(false) {
+  atomic_init32(&s3_errors_);
+}
 
 GatewayS3Uploader::~GatewayS3Uploader() {
   if (collector_running_) {
@@ -39,9 +39,11 @@ GatewayS3Uploader::~GatewayS3Uploader() {
 }
 
 bool GatewayS3Uploader::InitS3Manager() {
-  // Parse S3 config file using the same format as the native S3 backend
+  // Parse S3 config file using the same format as the native S3 backend.  The
+  // template manager takes the fqrn, which is what @fqrn@/@org@ in the config
+  // file expand to -- the native backend passes the repository alias here too.
   BashOptionsManager options_manager = BashOptionsManager(
-      new DefaultOptionsTemplateManager("data"));
+      new DefaultOptionsTemplateManager(repo_alias_));
   options_manager.ParsePath(s3_config_path_, false);
   std::string parameter;
 
@@ -157,11 +159,17 @@ bool GatewayS3Uploader::Initialize() {
 }
 
 void GatewayS3Uploader::WaitForUpload() const {
+  // GatewayUploader::WaitForUpload() overrides the AbstractUploader version and
+  // only drains the gateway session, which knows nothing about the objects we
+  // handed to the S3 fanout manager.  Those are tracked by jobs_in_flight_,
+  // decremented in Respond() from the collector thread, so wait for that too --
+  // otherwise the manifest is committed while data chunks are still in flight.
+  AbstractUploader::WaitForUpload();
   GatewayUploader::WaitForUpload();
 }
 
 unsigned int GatewayS3Uploader::GetNumberOfErrors() const {
-  return GatewayUploader::GetNumberOfErrors() + s3_errors_;
+  return GatewayUploader::GetNumberOfErrors() + atomic_read32(&s3_errors_);
 }
 
 void GatewayS3Uploader::FinalizeStreamedUpload(UploadStreamHandle *handle,
@@ -194,6 +202,13 @@ void GatewayS3Uploader::FinalizeStreamedUpload(UploadStreamHandle *handle,
   FileBackedBuffer *buf = FileBackedBuffer::Create(500 * 1024);
   buf->Append(gw_handle->bucket->content, gw_handle->bucket->size);
   buf->Commit();
+
+  // The content now lives in buf; hand the bucket back to the session.  It is
+  // never committed to an ObjectPack, so without this it would stay in the
+  // session's active handles for the rest of the publish, keeping the whole
+  // ingested payload in memory and being copied into every following pack.
+  session_context_->DiscardBucket(gw_handle->bucket);
+  gw_handle->bucket = NULL;
 
   const size_t bytes_uploaded = buf->GetSize();
 
@@ -231,7 +246,7 @@ void *GatewayS3Uploader::MainCollectResults(void *data) {
                info->object_key.c_str(), info->error_code,
                s3fanout::Code2Ascii(info->error_code));
       reply_code = 99;
-      uploader->s3_errors_++;
+      atomic_inc32(&uploader->s3_errors_);
     }
 
     if (info->request == s3fanout::JobInfo::kReqHeadPut
