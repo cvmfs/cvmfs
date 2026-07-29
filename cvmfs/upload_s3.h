@@ -133,10 +133,10 @@ class S3Uploader : public AbstractUploader {
   unsigned num_retries_;
   unsigned timeout_sec_;
   std::string access_key_;
-  std::string secret_key_;
-  bool azure_msi_;
-  std::string azure_mi_client_id_;
-  s3fanout::AuthzMethods authz_method_;
+   std::string secret_key_;
+   s3fanout::AuthzMethods authz_method_;
+   bool azure_msi_;
+   std::string azure_mi_client_id_;
   bool peek_before_put_;
   bool use_https_;
   bool batch_delete_enabled_;
