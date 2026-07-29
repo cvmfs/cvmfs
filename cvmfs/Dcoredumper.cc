@@ -98,9 +98,11 @@ int parse_maps(int pid, mem_region_t **regions_out) {
     unsigned long inode;
     char name[256] = "";
 
-    // /proc/pid/maps format:
-    // addr-addr perms offset major:minor inode [name]
-    // major:minor are HEX (use %x not %d)
+    /** 
+     * /proc/pid/maps format:
+     * addr-addr perms offset major:minor inode [name]
+     * major:minor are HEX (use %x not %d)
+     */
     sscanf(line, "%lx-%lx %4s %lx %x:%x %lu %255[^\n]",
          &start, &end, perms, &offset,
          &major, &minor, &inode, name);
@@ -151,7 +153,7 @@ int read_thread_registers(int pid, int tid, unsigned long *regs) {
   // Format: syscall_nr a0 a1 a2 a3 a4 a5 RSP RIP
   unsigned long nr, a0, a1, a2, a3, a4, a5, rsp, rip;
 
-  int n = sscanf(line,
+  const int n = sscanf(line,
     "%lu 0x%lx 0x%lx 0x%lx 0x%lx 0x%lx 0x%lx 0x%lx 0x%lx",
     &nr, &a0, &a1, &a2, &a3, &a4, &a5, &rsp, &rip);
 
@@ -221,11 +223,11 @@ int enumerate_threads(int pid, thread_info_t **threads_out) {
       threads = tmp;
     }
 
-    int tid = atoi(entry->d_name);
+    const int tid = atoi(entry->d_name);
     memset(&threads[count], 0, sizeof(thread_info_t));
     threads[count].tid = tid;
 
-    int ret = read_thread_registers(pid, tid,
+    const int ret = read_thread_registers(pid, tid,
                     threads[count].regs);
     if (ret == 0) {
       count++;
@@ -246,7 +248,7 @@ int enumerate_threads(int pid, thread_info_t **threads_out) {
   // GDB treats the first NT_PRSTATUS as the "current" thread
   for (int i = 1; i < count; i++) {
     if (threads[i].tid == pid) {
-      thread_info_t tmp = threads[0];
+      const thread_info_t tmp = threads[0];
       threads[0] = threads[i];
       threads[i] = tmp;
       break;
@@ -263,7 +265,7 @@ int read_auxv(int pid, char **data_out, size_t *sz_out) {
   char path[64];
   snprintf(path, sizeof(path), "/proc/%d/auxv", pid);
 
-  int fd = open(path, O_RDONLY);
+  const int fd = open(path, O_RDONLY);
   if (fd < 0) return -1;
 
   size_t cap = 4096;
@@ -298,7 +300,6 @@ int read_auxv(int pid, char **data_out, size_t *sz_out) {
  * and *(candidate) chains to another stack address.  The candidate with the
  * longest valid chain is selected as the recovered RBP.
  */
-
 static int is_executable_addr(unsigned long addr,
                 const mem_region_t *regions,
                 int num_regions) {
@@ -330,11 +331,11 @@ static int walk_fp_chain(unsigned long rbp_candidate,
 
   while (depth < max_depth) {
     unsigned long frame[2];
-    ssize_t n = pread(mem_fd, frame, 16, (off_t)fp);
+    const ssize_t n = pread(mem_fd, frame, 16, (off_t)fp);
     if (n < 16) break;
 
-    unsigned long saved_rbp = frame[0];
-    unsigned long ret_addr  = frame[1];
+    const unsigned long saved_rbp = frame[0];
+    const unsigned long ret_addr  = frame[1];
 
     if (!is_executable_addr(ret_addr, regions, num_regions))
       break;
@@ -377,7 +378,7 @@ static unsigned long recover_rbp(int mem_fd,
   unsigned char *stack_buf = (unsigned char *)malloc(scan_size);
   if (!stack_buf) return 0;
 
-  ssize_t nr = pread(mem_fd, stack_buf, scan_size, (off_t)rsp);
+  const ssize_t nr = pread(mem_fd, stack_buf, scan_size, (off_t)rsp);
   if (nr < 16) { free(stack_buf); return 0; }
 
   unsigned long best_rbp = 0;
@@ -390,7 +391,7 @@ static unsigned long recover_rbp(int mem_fd,
     if (!is_stack_addr(val, rsp, stack_hi))
       continue;
 
-    int depth = walk_fp_chain(val, mem_fd, stack_lo, stack_hi,
+    const int depth = walk_fp_chain(val, mem_fd, stack_lo, stack_hi,
                   regions, num_regions, 64);
 
     if (depth > best_depth) {
@@ -427,7 +428,7 @@ size_t write_note(FILE *out, uint32_t type,
   fwrite(desc,        desc_sz,      1, out);
 
   // Pad descriptor to 4-byte boundary
-  size_t pad = NOTE_ALIGN(desc_sz) - desc_sz;
+  const size_t pad = NOTE_ALIGN(desc_sz) - desc_sz;
   if (pad > 0) {
     char zeros[4] = {0};
     fwrite(zeros, pad, 1, out);
@@ -450,14 +451,14 @@ int build_core(int pid, const char *output_path) {
   printf("\n");
 
   mem_region_t *regions = NULL;
-  int num_regions = parse_maps(pid, &regions);
+  const int num_regions = parse_maps(pid, &regions);
   if (num_regions < 0) return -1;
   printf("Memory regions: %d\n", num_regions);
 
   // Open /proc/pid/mem for RBP heuristic and memory dump
   char mem_path[64];
   snprintf(mem_path, sizeof(mem_path), "/proc/%d/mem", pid);
-  int mem_fd = open(mem_path, O_RDONLY);
+  const int mem_fd = open(mem_path, O_RDONLY);
   if (mem_fd < 0) {
     perror("Cannot open /proc/pid/mem (run as root)");
     free(regions);
@@ -465,7 +466,7 @@ int build_core(int pid, const char *output_path) {
   }
 
   thread_info_t *threads = NULL;
-  int num_threads = enumerate_threads(pid, &threads);
+  const int num_threads = enumerate_threads(pid, &threads);
   if (num_threads <= 0) {
     fprintf(stderr, "No threads found — is PID %d alive?\n", pid);
     free(regions); close(mem_fd);
@@ -480,9 +481,9 @@ int build_core(int pid, const char *output_path) {
          threads[i].regs[X86_64_REG_RSP]);
 
     // Attempt RBP recovery if RBP is missing
-    unsigned long rsp = threads[i].regs[X86_64_REG_RSP];
+    const unsigned long rsp = threads[i].regs[X86_64_REG_RSP];
     if (rsp != 0 && threads[i].regs[X86_64_REG_RBP] == 0) {
-      unsigned long rbp = recover_rbp(mem_fd, rsp,
+      const unsigned long rbp = recover_rbp(mem_fd, rsp,
                       regions, num_regions);
       if (rbp != 0) {
         threads[i].regs[X86_64_REG_RBP] = rbp;
@@ -509,12 +510,12 @@ int build_core(int pid, const char *output_path) {
   // Calculate note section sizes
 
   // NT_PRSTATUS: one per thread
-  size_t per_prstatus  = sizeof(Elf64_Nhdr) + 8
+  const size_t per_prstatus  = sizeof(Elf64_Nhdr) + 8
              + NOTE_ALIGN(X86_64_PRSTATUS_SIZE);
-  size_t total_prstatus = per_prstatus * num_threads;
+  const size_t total_prstatus = per_prstatus * num_threads;
 
   // NT_PRPSINFO
-  size_t prpsinfo_sz = sizeof(Elf64_Nhdr) + 8
+  const size_t prpsinfo_sz = sizeof(Elf64_Nhdr) + 8
              + NOTE_ALIGN(X86_64_PRPSINFO_SIZE);
 
   // NT_FILE: all file-backed regions (GDB needs this for .text reload)
@@ -527,10 +528,10 @@ int build_core(int pid, const char *output_path) {
     }
   }
   // NT_FILE descriptor: count + page_size + entries + filenames
-  size_t file_desc_sz = 16
+  const size_t file_desc_sz = 16
             + (file_count * 24)
             + strings_len;
-  size_t file_note_sz = sizeof(Elf64_Nhdr) + 8
+  const size_t file_note_sz = sizeof(Elf64_Nhdr) + 8
             + NOTE_ALIGN(file_desc_sz);
 
   // NT_AUXV
@@ -540,7 +541,7 @@ int build_core(int pid, const char *output_path) {
            + NOTE_ALIGN(auxv_sz);
   }
 
-  size_t all_notes_sz = total_prstatus + prpsinfo_sz
+  const size_t all_notes_sz = total_prstatus + prpsinfo_sz
             + file_note_sz   + auxv_note_sz;
 
   FILE *core = fopen(output_path, "wb");
@@ -569,9 +570,9 @@ int build_core(int pid, const char *output_path) {
   fwrite(&ehdr, sizeof(ehdr), 1, core);
 
   // Calculate segment offsets
-  size_t phdr_total  = ehdr.e_phnum * sizeof(Elf64_Phdr);
-  size_t note_offset = sizeof(Elf64_Ehdr) + phdr_total;
-  size_t data_offset = note_offset + all_notes_sz;
+  const size_t phdr_total  = ehdr.e_phnum * sizeof(Elf64_Phdr);
+  const size_t note_offset = sizeof(Elf64_Ehdr) + phdr_total;
+  const size_t data_offset = note_offset + all_notes_sz;
 
   // PT_NOTE program header
   Elf64_Phdr note_phdr;
@@ -586,7 +587,7 @@ int build_core(int pid, const char *output_path) {
   for (int i = 0; i < num_regions; i++) {
     if (!should_dump_region(&regions[i])) continue;
 
-    size_t seg_size = regions[i].end - regions[i].start;
+    const size_t seg_size = regions[i].end - regions[i].start;
 
     Elf64_Phdr phdr;
     memset(&phdr, 0, sizeof(phdr));
@@ -638,9 +639,9 @@ int build_core(int pid, const char *output_path) {
     char cmd_path[64];
     snprintf(cmd_path, sizeof(cmd_path),
          "/proc/%d/cmdline", pid);
-    int cmd_fd = open(cmd_path, O_RDONLY);
+    const int cmd_fd = open(cmd_path, O_RDONLY);
     if (cmd_fd >= 0) {
-      ssize_t n = read(cmd_fd, cmdline, sizeof(cmdline) - 1);
+      const ssize_t n = read(cmd_fd, cmdline, sizeof(cmdline) - 1);
       close(cmd_fd);
       // cmdline uses null bytes as separators; convert to spaces
       if (n > 0) {
@@ -708,7 +709,7 @@ int build_core(int pid, const char *output_path) {
   for (int i = 0; i < num_regions; i++) {
     if (!should_dump_region(&regions[i])) continue;
 
-    size_t seg_size = regions[i].end - regions[i].start;
+    const size_t seg_size = regions[i].end - regions[i].start;
     printf("  0x%lx-0x%lx %-40s ... ",
          regions[i].start, regions[i].end,
          regions[i].name[0] ? regions[i].name : "(anon)");
@@ -721,9 +722,9 @@ int build_core(int pid, const char *output_path) {
     size_t        region_zero  = 0;
 
     while (rem > 0) {
-      size_t chunk = rem > PAGE_SIZE ? PAGE_SIZE : rem;
+      const size_t chunk = rem > PAGE_SIZE ? PAGE_SIZE : rem;
 
-      ssize_t n = pread(mem_fd, buf, chunk, (off_t)addr);
+      const ssize_t n = pread(mem_fd, buf, chunk, (off_t)addr);
 
       if (n <= 0) {
         // Guard page or unmapped — zero-fill this chunk
@@ -734,7 +735,7 @@ int build_core(int pid, const char *output_path) {
         fwrite(buf, n, 1, core);
         if ((size_t)n < chunk) {
           // Short read — pad remainder with zeros
-          size_t shortfall = chunk - n;
+          const size_t shortfall = chunk - n;
           memset(buf, 0, shortfall);
           fwrite(buf, shortfall, 1, core);
           region_zero += shortfall;
@@ -818,7 +819,7 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  int pid = atoi(argv[argi]);
+  const int pid = atoi(argv[argi]);
   if (pid <= 0) {
     fprintf(stderr, "Invalid PID: %s\n", argv[argi]);
     return 1;
