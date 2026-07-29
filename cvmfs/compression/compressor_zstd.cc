@@ -94,56 +94,6 @@ StreamStates ZstdCompressor::StreamingStep(InputAbstract* input,
   return kStreamContinue;
 }
 
-#if 0
-StreamStates ZstdCompressor::CompressStreamHard(InputAbstract *input,
-                                     cvmfs::MemSink *output, const bool flush) {
-  if (!is_healthy_) {
-    return kStreamError;
-  }
-
-  ZSTD_EndDirective mode = ZSTD_e_continue;
-
-  size_t remaining;
-  do {
-    if (input->GetIdxInsideChunk() < input->chunk_size()
-        && input->chunk_size() != 0) {
-      // still stuff to process in the current chunk
-    } else if (!input->NextChunk() && !compress_stream_outbuf_full_) {
-      return kStreamIOError;
-    }
-    compress_stream_outbuf_full_ = false;
-
-    ZSTD_inBuffer inBuffer = {input->chunk(), input->chunk_size(),
-                              input->GetIdxInsideChunk()};
-
-    if (!input->has_chunk_left()) {
-      mode = (flush) ? ZSTD_e_end : ZSTD_e_continue;
-    }
-
-    ZSTD_outBuffer outBuffer = {output->data(), output->size(), output->pos()};
-
-    remaining = ZSTD_compressStream2(stream_, &outBuffer, &inBuffer, mode);
-
-    if (ZSTD_isError(remaining)) {
-      ZSTD_freeCCtx(stream_);
-      is_healthy_ = false;
-      return kStreamDataError;
-    }
-
-    assert(output->SetPos(outBuffer.pos));
-    input->SetIdxInsideChunk(inBuffer.pos);
-
-    if (outBuffer.pos == outBuffer.size) {
-      compress_stream_outbuf_full_ = true;
-      return kStreamOutBufFull;
-    }
-  } while (input->has_chunk_left()
-          || (input->GetIdxInsideChunk() < input->chunk_size()
-              && input->chunk_size() != 0));
-  return kStreamEnd;
-}
-#endif
-
 
 ZstdCompressor::~ZstdCompressor() {
   auto ret = ZSTD_freeCCtx(stream_);

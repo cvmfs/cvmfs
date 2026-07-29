@@ -55,58 +55,6 @@ StreamStates EchoCompressor::StreamingStep(InputAbstract* input,
   }
 }
 
-#if 0
-StreamStates EchoCompressor::CompressStreamHard(InputAbstract *input,
-                                cvmfs::MemSink *output, const bool /*flush*/) {
-  if (!is_healthy_) {
-    return kStreamError;
-  }
-
-  do {
-    // TODO TODO replace with input->HasInputLeftInChunk()
-    if (input->GetIdxInsideChunk() < input->chunk_size()
-        && input->chunk_size() != 0) {
-      // still stuff to process in the current chunk
-    } else if (!input->NextChunk() && !output_full_) {
-      return kStreamIOError;
-    }
-
-    const size_t have = input->chunk_size();
-    const int64_t written = output->Write(input->chunk(), have);
-    if (written > 0) {
-      input->SetIdxInsideChunk(input->GetIdxInsideChunk() + written);
-    }
-    if (written != static_cast<int64_t>(have)) {
-      output_full_ = true;
-      return kStreamOutBufFull;
-    }
-
-  // TODO TODO replace with input->HasInputLeftInChunk()
-  } while (input->has_chunk_left()
-          || (input->GetIdxInsideChunk() < input->chunk_size()
-              && input->chunk_size() != 0));
-  output_full_ = false;
-  return kStreamEnd;
-}
-#endif
-
-// bool EchoCompressor::CompressStream(
-//   const bool /*flush*/,
-//   unsigned char **inbuf, size_t *inbufsize,
-//   unsigned char **outbuf, size_t *outbufsize)
-// {
-//   const size_t bytes_to_copy = std::min(*outbufsize, *inbufsize);
-//   memcpy(*outbuf, *inbuf, bytes_to_copy);
-//   const bool done = (bytes_to_copy == *inbufsize);
-
-//   // Update the return variables
-//   *inbuf += bytes_to_copy;
-//   *outbufsize = bytes_to_copy;
-//   *inbufsize -= bytes_to_copy;
-
-//   return done;
-// }
-
 StreamStates EchoCompressor::Compress(InputAbstract *input,
                                       cvmfs::Sink *output) {
   if (!is_healthy_) {

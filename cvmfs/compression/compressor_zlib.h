@@ -28,10 +28,6 @@ class ZlibCompressor : public Compressor {
                                 shash::Any *compressed_hash);
   virtual StreamStates StreamingStep(InputAbstract* input,
                                      cvmfs::MemSink* output, const bool flush);
-#if 0
-  virtual StreamStates CompressStreamHard(InputAbstract *input,
-                                      cvmfs::MemSink *output, const bool flush);
-#endif
   virtual bool Reset();
   virtual size_t CompressUpperBound(const size_t bytes);
   Compressor* Clone();
