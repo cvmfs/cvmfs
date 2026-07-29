@@ -1424,6 +1424,17 @@ void DownloadManager::ProcessLink(JobInfo *info) {
   if (host_list.size() > 0) {
     SetHostChain(host_list);
     opt_metalink_timestamp_link_ = time(NULL);
+    // Set the index to the first linked host because the protocol includes
+    // redirecting to the first host
+    info->SetCurrentHostChainIndex(0);
+    // Don't process the same links again if there are retries
+    info->SetLink("");
+    LogCvmfs(kLogDownload, kLogDebug | kLogSyslog,
+                 "(manager '%s' - id %" PRId64 ") "
+                 "received %d hosts from metalink server, starting with %s",
+                 name_.c_str(), info->id(),
+                 host_list.size(),
+                 host_list[0].c_str());
   }
 }
 
@@ -1445,17 +1456,22 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
   bool was_metalink;
   std::string typ;
   if (info->current_metalink_chain_index() >= 0) {
-    was_metalink = true;
-    typ = "metalink";
     if (info->link() != "") {
       // process Link header whether or not the redirected URL got an error
       ProcessLink(info);
+      // The metalink lookup succeeded, so if there was an error it was
+      // with the redirect
+      was_metalink = false;
+      typ = "host";
+    } else {
+      // no Link headers were received, so the metalink lookup failed
+      was_metalink = true;
+      typ = "metalink";
     }
   } else {
     was_metalink = false;
     typ = "host";
   }
-
 
   // Verification and error classification
   switch (curl_error) {
@@ -1662,10 +1678,12 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
   if (try_again) {
     LogCvmfs(kLogDownload, kLogDebug,
              "(manager '%s' - id %" PRId64 ") "
-             "Trying again on same curl handle, same url: %d, "
-             "error code %d no-cache %d",
-             name_.c_str(), info->id(), same_url_retry, info->error_code(),
-             info->nocache());
+             "Trying again on same curl handle, %s"
+             "error code %d%s",
+             name_.c_str(), info->id(),
+             same_url_retry ? "same url, " : "",
+             info->error_code(),
+             info->nocache() ? ", no cache" : "");
     // Reset internal state and destination. In parallel-decompress mode the
     // sink and zstream are owned by the caller thread (it pops and decompresses
     // the queued chunks). Resetting them here would race the caller and, worse,
@@ -1984,9 +2002,6 @@ Failures DownloadManager::Fetch(JobInfo *info) {
     info->GetHashContextPtr()->size = shash::GetContextSize(algorithm);
     info->GetHashContextPtr()->buffer = alloca(info->hash_context().size);
   }
-
-  // In case JobInfo object is being reused
-  info->SetLink("");
 
   // Prepare cvmfs-info: header, allocate string on the stack
   info->SetInfoHeader(NULL);
@@ -2455,10 +2470,10 @@ void DownloadManager::SwitchHostInfo(const std::string &typ,
   }
 
   string reason = "manually triggered";
-  string info_id = "(manager " + name_;
+  string info_id = "(manager '" + name_ + "'";
   if (jobinfo) {
     reason = download::Code2Ascii(jobinfo->error_code());
-    info_id = " - id " + StringifyInt(jobinfo->id());
+    info_id += " - id " + StringifyInt(jobinfo->id());
   }
   info_id += ")";
 
