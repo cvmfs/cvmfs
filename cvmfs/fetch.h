@@ -108,14 +108,26 @@ class Fetcher : SingleCopy {
           download::DownloadManager *download_mgr,
           BackoffThrottle *backoff_throttle,
           perf::StatisticsTemplate statistics);
-  ~Fetcher();
+  virtual ~Fetcher();
 
-  int Fetch(const CacheManager::LabeledObject &object,
-            const std::string &alt_url = "");
+  virtual int Fetch(const CacheManager::LabeledObject &object,
+                    const std::string &alt_url = "");
 
   void ReplaceCacheManager(CacheManager *new_cache_mgr) {
     cache_mgr_ = new_cache_mgr;
   }
+
+  /**
+   * Set the full-replica download manager used for partial replica failover.
+   * When the primary download fails with an HTTP error (404 from a partial
+   * Stratum-1), the download is retried using this manager whose host chain
+   * points to a full Stratum-1.  Ownership is NOT transferred.
+   */
+  void SetFullReplicaDownloadManager(
+      download::DownloadManager *full_replica_mgr) {
+    full_replica_download_mgr_ = full_replica_mgr;
+  }
+
   CacheManager *cache_mgr() { return cache_mgr_; }
   download::DownloadManager *download_mgr() { return download_mgr_; }
 
@@ -184,6 +196,11 @@ class Fetcher : SingleCopy {
 
   CacheManager *cache_mgr_;
   download::DownloadManager *download_mgr_;
+  /**
+   * Optional full-replica download manager for partial replica failover mode.
+   * Not owned by this Fetcher.
+   */
+  download::DownloadManager *full_replica_download_mgr_;
   BackoffThrottle *backoff_throttle_;
   perf::Counter *n_downloads;
   perf::Counter *n_invocations;
@@ -192,3 +209,4 @@ class Fetcher : SingleCopy {
 }  // namespace cvmfs
 
 #endif  // CVMFS_FETCH_H_
+

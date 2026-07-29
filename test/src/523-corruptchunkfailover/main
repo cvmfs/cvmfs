@@ -3,8 +3,8 @@ cvmfs_test_name="Data Corruption in Data Chunk"
 cvmfs_test_autofs_on_startup=false
 cvmfs_test_suites="quick"
 
-# Note: this test is currently supposed to fail because cvmfs does not fail-over
-# on S1 data corruption
+# Note: corrupting the data chunks on Stratum0 must make cvmfs transparently
+# fail-over to the intact Stratum1 replica, so every file stays readable.
 
 desaster_cleanup() {
   local mnt_point=$1
@@ -55,8 +55,12 @@ EOF
   cvmfs2 -d -o config=private.conf $CVMFS_TEST_REPO $mnt_point >> cvmfs2_output.log 2>&1 || { desaster_cleanup $mnt_point $replica_name; return 6; }
 
   echo "try to access files in the repository"
+  # Reading a file whose Stratum0 chunk is corrupt must transparently fail over
+  # to the (intact) Stratum1 replica, so a single read of each file has to
+  # succeed.  (A retry here would mask the parallel-decompress fail-over bug
+  # that this test guards against.)
   for f in $(find $mnt_point -maxdepth 1 -type f); do
-    cat $f || { desaster_cleanup $mnt_point $replica_name; return 7; }
+    cat $f > /dev/null || { desaster_cleanup $mnt_point $replica_name; cat cvmfs2_output.log; return 7; }
   done
 
   echo "clean up"

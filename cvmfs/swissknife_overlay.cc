@@ -6,8 +6,6 @@
  * and publishes the result as a repository subdirectory.
  */
 
-#define __STDC_FORMAT_MACROS
-
 #include "swissknife_overlay.h"
 
 #include <fcntl.h>
@@ -62,6 +60,11 @@ ParameterList CommandOverlay::GetParams() const {
   r.push_back(Parameter::Mandatory('b', "base hash of current root catalog"));
   r.push_back(Parameter::Mandatory('K', "public key path"));
   r.push_back(Parameter::Mandatory('N', "repository name"));
+  // Gateway publishing (same convention as ingest): when the upstream is a
+  // repository gateway these carry the lease so the merge can be committed
+  // without a local FUSE mount (mountless publishing).
+  r.push_back(Parameter::Optional('P', "session token file (gateway)"));
+  r.push_back(Parameter::Optional('H', "gateway key file"));
 
   // Overlay-specific parameters
   r.push_back(Parameter::Mandatory('l', "comma-separated layer paths "
@@ -1134,6 +1137,13 @@ int CommandOverlay::Main(const ArgumentList &args) {
       (args.count('c') > 0) ? *args.find('c')->second : "";
   const bool skip_singularity = (args.count('S') > 0);
 
+  // Gateway lease: empty for a directly-writable (S3/local) upstream, set when
+  // committing through a repository gateway (mountless publishing).
+  const string session_token_file =
+      (args.count('P') > 0) ? *args.find('P')->second : "";
+  const string key_file =
+      (args.count('H') > 0) ? *args.find('H')->second : "";
+
   // Parse comma-separated layer paths
   const vector<string> layers = SplitString(layers_str, ',');
   if (layers.empty()) {
@@ -1155,7 +1165,7 @@ int CommandOverlay::Main(const ArgumentList &args) {
       false /* generate_legacy_bulk_chunks */,
       false /* use_file_chunking */,
       0, 0, 0 /* chunk sizes: unused */,
-      "" /* session_token_file */, "" /* key_file */);
+      session_token_file, key_file);
 
   upload::SpoolerDefinition spooler_definition_catalogs(spooler_definition);
   spooler_definition_catalogs.compression_alg = zip::CompressionAlgFromEnv();

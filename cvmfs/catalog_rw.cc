@@ -2,8 +2,6 @@
  * This file is part of the CernVM File System.
  */
 
-#define __STDC_FORMAT_MACROS
-
 #include "catalog_rw.h"
 
 #include <inttypes.h>
@@ -702,12 +700,25 @@ void WritableCatalog::CopyToParent() {
                                           "AS other;");
   retval = sql_attach.Execute();
   assert(retval);
-  retval = SqlCatalog(database(), "INSERT INTO other.catalog "
-                                  "SELECT * FROM main.catalog;")
+  // The two databases can have a different physical column order: fresh
+  // databases are created with mtimens between mtime and flags, while
+  // databases migrated from schema revision < 7 have mtimens appended at the
+  // end (ALTER TABLE can only append).  A positional "SELECT *" copy would
+  // silently shuffle the values into the wrong columns, so the columns have
+  // to be named explicitly.
+  const string catalog_columns =
+      "md5path_1, md5path_2, parent_1, parent_2, hardlinks, hash, size, "
+      "mode, mtime, mtimens, flags, name, symlink, uid, gid, xattr";
+  retval = SqlCatalog(database(),
+                      "INSERT INTO other.catalog (" + catalog_columns
+                          + ") SELECT " + catalog_columns
+                          + " FROM main.catalog;")
                .Execute();
   assert(retval);
-  retval = SqlCatalog(database(), "INSERT INTO other.chunks "
-                                  "SELECT * FROM main.chunks;")
+  const string chunks_columns = "md5path_1, md5path_2, offset, size, hash";
+  retval = SqlCatalog(database(),
+                      "INSERT INTO other.chunks (" + chunks_columns
+                          + ") SELECT " + chunks_columns + " FROM main.chunks;")
                .Execute();
   assert(retval);
   retval = SqlCatalog(database(), "DETACH other;").Execute();

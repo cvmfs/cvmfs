@@ -21,6 +21,7 @@
 #include "file_chunk.h"
 #include "util/platform.h"
 #include "util/shared_ptr.h"
+#include "util/string.h"
 
 class IngestionSource;
 
@@ -92,8 +93,12 @@ class SyncItem {
     return WasType(kItemCharacterDevice) || WasType(kItemBlockDevice)
            || WasType(kItemFifo) || WasType(kItemSocket);
   }
-  inline bool IsBundleSpec() const { return filename_ == ".cvmfsbundles"; }
-  inline bool WasBundleSpec() const { return filename_ == ".cvmfsbundles"; }
+  inline bool IsBundleSpec() const {
+    return HasPrefix(filename_, ".cvmfsbundle-", false /* ignore_case */);
+  }
+  inline bool WasBundleSpec() const {
+    return HasPrefix(filename_, ".cvmfsbundle-", false /* ignore_case */);
+  }
 
   inline unsigned int GetRdevMajor() const {
     assert(IsSpecialFile());

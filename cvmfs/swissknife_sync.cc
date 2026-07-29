@@ -18,8 +18,6 @@
 
 // NOLINTNEXTLINE
 #define _FILE_OFFSET_BITS 64
-// NOLINTNEXTLINE
-#define __STDC_FORMAT_MACROS
 
 #include "swissknife_sync.h"
 
@@ -750,6 +748,11 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
 
   if (args.find('J') != args.end()) {
     params.repo_tag.SetDescription(*args.find('J')->second);
+  }
+
+  if (args.find('C') != args.end()) {
+    params.repo_tag.SetAutoTagThreshold(
+        static_cast<time_t>(String2Int64(*args.find('C')->second)));
   }
 
   if (args.find('G') != args.end()) {

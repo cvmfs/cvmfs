@@ -105,14 +105,54 @@ Writing your own integration tests is done the following way:
 - Your test can be executed like all the other tests. No compilation of the `cvmfs` source code needed.
 
 
-> **_Tips_** &nbsp;
-> - `return` values must be handed up to the parent function `my_sub_func || return $?`
-> - For readability it might be nice to split the test routines in multiple files
->     - Use the line `source ./src/701-xattr-catalog_counters/<filename>` to include another file in the file `main`. It should be positioned after the `cvmfs_test_suites` parameter
-> - For `cvmfs_talk` when interacting with locally mounted repository (= *server test*) you have to use the socket of the repository and not the repository name
->   ```bash
->   sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO internal affairs
->   ```        
+#### Tips
+
+- `return` values must be handed up to the parent function `my_sub_func || return $?`
+- For readability it might be nice to split the test routines in multiple files
+    - Use the line `source ./src/701-xattr-catalog_counters/<filename>` to include another file in the file `main`. It should be positioned after the `cvmfs_test_suites` parameter
+- For `cvmfs_talk` when interacting with locally mounted repository (= *server test*) you have to use the socket of the repository and not the repository name
+  ```bash
+  sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO internal affairs
+  ```
+- Use trace mode `set -x` to debug shell code.
+- Do not suppress stdout and especially stderr unnecessarily. The failure may be not readily reproducible. It is a delay and cost to have to edit the suppression and re-run the CI workflow just to see the reason of the failure.
+- Integration tests are executed with Bash. Use Bash builtin constructs for brevity and performance:
+    - arrays for accumulation of tokens, including passing command line parameters, without re-tokenization problems with empty tokens and escaping;
+    - `[[ ... ]]` test clauses (no need for `[ "x$var" = x ]`);
+    - `$(( ... ))` arithmetic clauses;
+    - avoid `sed` and `awk` and lean into [Parameter Expansion](https://www.gnu.org/software/bash/manual/html_node/Shell-Parameter-Expansion.html) like `${var#removed_prefix}`, `${var%removed_suffix}`, `${var/pattern/replacement}`;
+- Use [Bash strict mode](http://redsymbol.net/articles/unofficial-bash-strict-mode/) to the maximum extent, to ensure test code doesn't silently ignore failed operations.
+    - `set -euo pipefail` is the essence of Bash strict mode.
+    - Each line of code is an assertion that the command exits successfully. Use it:
+      ```bash
+      [[ -d "$repo_dir"/this_should_exist ]] || return 8
+      ```
+    - You don't have to give each line of code a unique return code. The following works fine. Enable trace mode (`set -x`) and it will print each command prefixed with `+ ` into stderr.
+      ```bash
+      [[ -d "$repo_dir"/this_should_exist ]]
+      ```
+    - Change of `IFS` described in the original article is not necessary - for correct tokenization quote the array: `for name in "${names[@]}"; do echo "$name"; done`
+    - [Strict mode is not inherited in subshells, be careful to reenable it there if needed](https://fosstodon.org/@autkin/116612829870054231).
+    - Strict mode bits like `set -e` cannot be enabled from a function, must be initiated in outer context.
+    - When failure of a particular line of code doesn't matter, append `|| true`, this is an idiomatic way to express that.
+    - When expecting the command to fail with a specific exitcode, use `expect_exit_code <expected> <command> [args...]`
+    - To get hold of exit code for expressions, you can disable parts of strict mode in subshells for readability:
+      ```bash
+      RC=$(
+          set +e
+          cvmfs_server transaction $CVMFS_TEST_REPO >/dev/null
+          echo $?
+      )
+      # Expect EEXIST
+      [[ "$RC" == 17 ]] || return 30
+      ```
+    - `set -o pipefail` means all exit codes of pipeline processes matter, not just of the last part.
+        - These commands will trigger failure unless pipefail is disabled:
+            - `... | head -n$N` or `... | head -c$N` - the source gets "broken pipe" when writing because head terminates early;
+            - `... | grep -q` - grep quits as soon as it finds the first match, because it doesn't have to print all matches.
+        - `set -o pipefail` friendly expressions:
+            - `dd` instructed to copy exact amount doesn't fail like `cat ... | head -c$N`
+            - `find ... -print -quit` outputs the first match, doesn't fail like `fild ... | head -n1`
 
 ## Unit Tests
 

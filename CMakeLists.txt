@@ -20,11 +20,11 @@ message ("Running CMake version ${CMAKE_VERSION}")
 # The version numbers
 #
 # DON'T DELETE
-## CVMFS_VERSION 2.14.0
-## CVMFS_PRERELEASE ~pre3
+## CVMFS_VERSION 2.15.0
+## CVMFS_PRERELEASE ~pre1
 #---------------------
 set (CernVM-FS_VERSION_MAJOR 2)
-set (CernVM-FS_VERSION_MINOR 14)
+set (CernVM-FS_VERSION_MINOR 15)
 set (CernVM-FS_VERSION_PATCH 0)
 set (CernVM-FS_VERSION_STRING "${CernVM-FS_VERSION_MAJOR}.${CernVM-FS_VERSION_MINOR}.${CernVM-FS_VERSION_PATCH}")
 if (CMAKE_VERSION VERSION_LESS "3.12.0")
@@ -150,7 +150,7 @@ endif ()
 #       (https://wiki.debian.org/Multiarch)
 #
 if (MACOSX)
-  set (CMAKE_INSTALL_LIBDIR "lib")
+  set (CMAKE_INSTALL_LIBDIR "lib" CACHE STRING "library installation directory")
   set (CMAKE_MOUNT_INSTALL_BINDIR "${CMAKE_INSTALL_PREFIX}/sbin")
   set (CVMFS_LIBEXEC_DIR "libexec/cvmfs")
   set (CMAKE_MACOSX_RPATH true)
@@ -164,14 +164,14 @@ else (MACOSX) # --> Linux
       set (CMAKE_MOUNT_INSTALL_BINDIR "/sbin")
       set (CVMFS_LIBEXEC_DIR "libexec/cvmfs")
     endif (ARCHLINUX)
-    set (CMAKE_INSTALL_LIBDIR "lib")
+    set (CMAKE_INSTALL_LIBDIR "lib" CACHE STRING "library installation directory")
   else (DEBIAN OR ARCHLINUX) # --> RedHat, Fedora, CentOS, SuSE
     set (CMAKE_MOUNT_INSTALL_BINDIR "/sbin")
     set (CVMFS_LIBEXEC_DIR "libexec/cvmfs")
     if (IS_64_BIT)
-      set (CMAKE_INSTALL_LIBDIR "lib64")
+      set (CMAKE_INSTALL_LIBDIR "lib64" CACHE STRING "library installation directory")
     else (IS_64_BIT) # --> 32 Bit
-      set (CMAKE_INSTALL_LIBDIR "lib")
+      set (CMAKE_INSTALL_LIBDIR "lib" CACHE STRING "library installation directory")
     endif (IS_64_BIT)
   endif (DEBIAN OR ARCHLINUX)
 endif (MACOSX)
@@ -218,6 +218,13 @@ include (cvmfs_compiler)
 #
 set (EXTERNALS_LIB_LOCATION       "${CMAKE_SOURCE_DIR}/externals")
 
+# Download cache for FetchContent-based externals. Defaults into the source
+# tree so that a checkout with a populated download cache can be packed into a
+# self-contained source tarball. Override (e.g. in read-only container builds
+# where the source is bind-mounted read-only) to point at a writable location.
+set (EXTERNALS_DOWNLOAD_LOCATION  "${EXTERNALS_LIB_LOCATION}/download"
+     CACHE PATH "Download cache directory for vendored externals")
+
 # For convenience in CI workflows, allow to set EXTERNALS_PREFIX via environment
 if (NOT EXTERNALS_PREFIX)
   if (NOT $ENV{CVMFS_EXTERNALS_PREFIX} STREQUAL "")
@@ -252,18 +259,12 @@ if (BUILTIN_EXTERNALS)
     set(ENV{CVMFS_BASE_CXX_FLAGS} ${CVMFS_BASE_CXX_FLAGS})
     set(ENV{IS_64_BIT} ${IS_64_BIT})
 
-    if (BUILD_UBENCHMARKS)
-      set(ENV{BUILD_UBENCHMARKS} "true")
-    endif ()
     if (BUILD_SERVER OR BUILD_SERVER_DEBUG)
       set(ENV{BUILD_SERVER} "true")
     endif ()
     if (BUILD_GEOAPI)
       set(ENV{BUILD_GEOAPI} "true")
     endif ()
-    if (BUILD_QC_TESTS)
-      set(ENV{BUILD_QC_TESTS} "true")
-    endif()
     if (BUILD_GATEWAY)
       set(ENV{BUILD_GATEWAY} "true")
     endif ()
@@ -297,9 +298,7 @@ if (BUILTIN_EXTERNALS)
     set(ENV{CVMFS_BASE_C_FLAGS} "")
     set(ENV{CVMFS_BASE_CXX_FLAGS} "")
     set(ENV{IS_64_BIT} "")
-    set(ENV{BUILD_UBENCHMARKS} "")
     set(ENV{BUILD_SERVER} "")
-    set(ENV{BUILD_QC_TESTS} "")
     set(ENV{BUILD_GATEWAY} "")
     set(ENV{BUILD_DUCC} "")
     set(ENV{BUILD_SNAPSHOTTER} "")
@@ -319,11 +318,13 @@ endif(BUILTIN_EXTERNALS)
 # Migrate bootstrap.sh to cmake
 if(BUILTIN_EXTERNALS)
   message(STATUS "Entering external dependencies setup")
+  # Some vendored externals (e.g. libarchive) force their preferred
+  # CMAKE_BUILD_TYPE into the cache; save the configured value and restore
+  # it afterwards.
+  set(_cvmfs_build_type "${CMAKE_BUILD_TYPE}")
   add_subdirectory(externals)
+  set(CMAKE_BUILD_TYPE "${_cvmfs_build_type}" CACHE STRING "Build Type" FORCE)
 endif()
-
-# reset cache variables the externals may have changed
-set(CMAKE_BUILD_TYPE "" CACHE STRING "Build Type" FORCE)
 
 #
 # include some common functionality
@@ -438,11 +439,16 @@ message("Using libcrypto for libcvmfs_crypto from ${Libcrypto_INCLUDE_DIRS}")
 if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_SERVER OR BUILD_SERVER_DEBUG OR
     BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG OR BUILD_PRELOADER OR
     BUILD_UBENCHMARKS OR BUILD_SHRINKWRAP)
-  find_package (ZLIB REQUIRED)
+  # zlib is provided by the externals/zlib FetchContent module (or the system,
+  # via BUILTIN_EXTERNALS_EXCLUDE) as the ZLIB::ZLIB target; it also sets
+  # ZLIB_LIBRARIES and ZLIB_INCLUDE_DIRS for the global include list below.
   set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${ZLIB_INCLUDE_DIRS})
 
   find_package (SHA3 REQUIRED)
   set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${SHA3_INCLUDE_DIRS})
+
+  # Libnettle_* is set by externals/libnettle (system or vendored build)
+  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${Libnettle_INCLUDE_DIRS})
 
   find_package (ZSTD REQUIRED)
   set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${ZSTD_INCLUDE_DIRS})
@@ -453,51 +459,45 @@ endif ()
 if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_SERVER OR BUILD_SERVER_DEBUG OR
     BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG OR BUILD_PRELOADER OR
     BUILD_SHRINKWRAP)
-  find_package (CARES REQUIRED)
-  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${CARES_INCLUDE_DIRS})
+  # c-ares and libcurl are provided as the c-ares::cares and CURL::libcurl
+  # targets by add_subdirectory(externals) above (FetchContent). libcurl is
+  # always built with c-ares as its async DNS resolver, so the former
+  # curl-config AsynchDNS check is no longer needed.
 
-  find_package (CURL REQUIRED)
-  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${CURL_INCLUDE_DIRS})
-
-  if (CURL_INCLUDE_DIRS)
-    find_program(CURL_CONFIG_EXEC NAMES curl-config)
-    if (CURL_CONFIG_EXEC)
-      execute_process(
-        COMMAND ${CURL_CONFIG_EXEC} --features
-        OUTPUT_VARIABLE _libcurl_features
-        ERROR_VARIABLE _libcurl_features_error
-        )
-      if (NOT ${_libcurl_features} MATCHES AsynchDNS)
-        message(FATAL_ERROR "libcurl was not compiled with c-ares")
-      endif ()
-    else (CURL_CONFIG_EXEC)
-      message(SEND_ERROR "Command \"${CURL_CONFIG_EXEC} --features\" failed with output:\n${_libcurl_features_error}")
-    endif ()
-  endif (CURL_INCLUDE_DIRS)
-
-  find_package (SQLite3 REQUIRED)
+  # sqlite3 is provided by the externals/sqlite3 FetchContent module (or the
+  # system, via BUILTIN_EXTERNALS_EXCLUDE) as the SQLite::SQLite3 target; it also
+  # sets SQLITE3_INCLUDE_DIR for the global include list below.
   set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${SQLITE3_INCLUDE_DIR})
 
-  find_package(leveldb)
-  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${LEVELDB_INCLUDE_DIR})
+  # leveldb is provided by the externals/leveldb FetchContent module (or the
+  # system, via BUILTIN_EXTERNALS_EXCLUDE) as the leveldb::leveldb target.
 
   find_package (UUID REQUIRED)
 endif ()
 
 # Client/libcvmfs/preloader only: pacparser, sparsehash
+# pacparser is provided by the externals/pacparser FetchContent module (or the
+# system, via BUILTIN_EXTERNALS_EXCLUDE) as the pacparser::pacparser target.
+# sparsehash is provided the same way (externals/sparsehash), as the header-only
+# sparsehash::sparsehash target. It is header-only, so we also expose its
+# include directory globally here; SPARSEHASH_INCLUDE_DIR is set either by that
+# module or, for BUILTIN_EXTERNALS=OFF builds, by the system find_package below.
 if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_PRELOADER OR
     BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG OR BUILD_SHRINKWRAP)
-  find_package (pacparser REQUIRED)
-  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${PACPARSER_INCLUDE_DIR})
-
-  find_package(Sparsehash)
+  if (NOT SPARSEHASH_INCLUDE_DIR)
+    find_package(Sparsehash REQUIRED)
+  endif ()
   set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${SPARSEHASH_INCLUDE_DIR})
 endif ()
 
 if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_LIBCVMFS_CACHE OR
     BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG OR BUILD_UBENCHMARKS OR
     BUILD_SHRINKWRAP)
-  find_package(Protobuf REQUIRED)
+  # protobuf (protobuf-lite + protoc) is provided by the externals/protobuf
+  # FetchContent module (or the system, via BUILTIN_EXTERNALS_EXCLUDE) as the
+  # protobuf::libprotobuf-lite / protobuf::protoc targets, exposed through the
+  # PROTOBUF_LITE_LIBRARY / PROTOBUF_PROTOC_EXECUTABLE / PROTOBUF_INCLUDE_DIRS
+  # variables.
   set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${PROTOBUF_INCLUDE_DIRS})
 endif ()
 
@@ -524,10 +524,20 @@ if (BUILD_CVMFS)
   endif (MACOSX)
 endif ()
 
-# Server only: unzip, libcap
-if (BUILD_SERVER OR BUILD_SERVER_DEBUG)
-  find_package(PythonLibs REQUIRED)
+# libcap is needed by every target that links cvmfs/util/capabilities.cc,
+# i.e. everything that builds libcvmfs-util.
+# macOS has stubbed-out implementations in capabilities.{cc,h} that don't
+# reference libcap symbols, so the lookup is skipped there.
+if (NOT MACOSX AND (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_LIBCVMFS_CACHE OR
+                    BUILD_SERVER OR BUILD_SERVER_DEBUG OR BUILD_RECEIVER OR
+                    BUILD_SHRINKWRAP OR BUILD_PRELOADER OR BUILD_UNITTESTS OR
+                    BUILD_STRESS_TESTS OR INSTALL_MOUNT_SCRIPTS))
   find_package(LibCAP REQUIRED)
+endif ()
+
+# Server only: python, unzip, libacl
+if (BUILD_SERVER OR BUILD_SERVER_DEBUG)
+  find_package(Python COMPONENTS Interpreter REQUIRED)
   if (BUILD_COMPARE_TO_LIBACL)
     add_definitions(-DCOMPARE_TO_LIBACL)
     find_package(LibACL REQUIRED)
@@ -539,11 +549,11 @@ if (BUILD_SERVER OR BUILD_SERVER_DEBUG)
 endif ()
 
 
-# Only micro benchmarks need google bench
-if (BUILD_UBENCHMARKS)
-  find_package(GOOGLEBENCH REQUIRED)
-  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${GOOGLEBENCH_INCLUDE_DIRS})
-endif ()
+# Only micro benchmarks need google bench. It is provided by the
+# externals/googlebench FetchContent module (or the system, via
+# BUILTIN_EXTERNALS_EXCLUDE) as the benchmark::benchmark target, which the
+# micro-benchmark executable links directly (its include dirs propagate
+# transitively, so nothing needs adding to INCLUDE_DIRECTORIES here).
 
 include_directories (${INCLUDE_DIRECTORIES})
 
@@ -557,12 +567,24 @@ if (INSTALL_MOUNT_SCRIPTS)
 endif ()
 
 #
+# GoogleTest is needed by both the unit tests and the micro benchmarks
+#
+if (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG OR BUILD_UBENCHMARKS)
+  include(SetupGoogleTest)
+endif ()
+
+#
 # compile the unit tests, if necessary
 #
 if (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
   add_compile_definitions(_CVMFS_UNITTESTS_ENABLED)
   enable_testing ()
-  add_custom_target (check ${CMAKE_CTEST_COMMAND} -VV)
+  # FuzzTest pulls in Abseil, whose absl/log defines a target named `check`
+  # (absl::check). Skip our `make check` convenience target when the quickcheck
+  # tests are built to avoid a target name collision
+  if (NOT BUILD_QC_TESTS)
+    add_custom_target (check ${CMAKE_CTEST_COMMAND} -VV)
+  endif ()
   add_subdirectory (test/unittests)
 endif ()
 
@@ -571,11 +593,17 @@ if (BUILD_UBENCHMARKS)
 endif ()
 
 if (BUILD_QC_TESTS)
-  find_package(RapidCheck REQUIRED)
-  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${RAPIDCHECK_INCLUDE_DIRS})
   add_subdirectory (test/quickcheck)
 endif ()
 
+if (BUILD_STRESS_TESTS)
+  include(test/stress/CMakeLists.txt)
+endif ()
+
+#
+# Builds of golang components
+# First check if we have golang available
+#
 if (BUILD_GATEWAY OR BUILD_DUCC OR BUILD_SNAPSHOTTER)
   find_program(GO_COMPILER go)
   if(NOT GO_COMPILER)
@@ -597,9 +625,6 @@ if (BUILD_SNAPSHOTTER)
   add_subdirectory (snapshotter)
 endif ()
 
-if (BUILD_STRESS_TESTS)
-  include(test/stress/CMakeLists.txt)
-endif ()
 
 #
 # Documentation

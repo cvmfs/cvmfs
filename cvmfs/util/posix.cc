@@ -4,11 +4,6 @@
  * Some common functions.
  */
 
-#ifndef __STDC_FORMAT_MACROS
-// NOLINTNEXTLINE
-#define __STDC_FORMAT_MACROS
-#endif
-
 #include <cctype>
 #include <stdlib.h>
 #include <cstdlib>
@@ -308,6 +303,7 @@ void CreateFile(const std::string &path,
  * Symlinks /tmp/cvmfs.XYZ/l --> ParentPath(path) to make it shorter
  */
 static std::string MakeShortSocketLink(const std::string &path) {
+  //NOLINTNEXTLINE(misc-const-correctness)
   struct sockaddr_un sock_addr;
   const unsigned max_length = sizeof(sock_addr.sun_path);
 

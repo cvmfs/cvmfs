@@ -8,7 +8,7 @@ cvmfs_run_test() {
 
   echo "*** create reload script"
   local tainted_env="$(mktemp ./setenv.XXXXXX)"
-  echo "export LD_LIBRARY_PATH=/cvmfs/grid.cern.ch:$LD_LIBRARY_PATH" > $tainted_env
+  echo "export LD_LIBRARY_PATH=/cvmfs/grid.cern.ch:${LD_LIBRARY_PATH:-}" > $tainted_env
   echo "env" >> $tainted_env
   echo "cvmfs_config reload" >> $tainted_env
   chmod +x $tainted_env

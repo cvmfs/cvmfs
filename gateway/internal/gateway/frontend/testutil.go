@@ -73,6 +73,14 @@ func (b *mockBackend) GetLease(ctx context.Context, tokenStr string) (*be.LeaseD
 	}, nil
 }
 
+func (b *mockBackend) RefreshLease(ctx context.Context, tokenStr string, requestedExtension time.Duration) (*be.LeaseDTO, error) {
+	return &be.LeaseDTO{
+		KeyID:     "keyid1",
+		LeasePath: "test2.repo.org/some/path/one",
+		Expires:   time.Now().Add(60 * time.Second).String(),
+	}, nil
+}
+
 func (b *mockBackend) CancelLeases(ctx context.Context, repoPath string) error {
 	return nil
 }
@@ -82,6 +90,10 @@ func (b *mockBackend) CancelLease(ctx context.Context, tokenStr string) error {
 }
 
 func (b *mockBackend) CommitLease(ctx context.Context, tokenStr, oldRootHash, newRootHash string, tag gw.RepositoryTag) (uint64, error) {
+	return 1, nil
+}
+
+func (b *mockBackend) GraftLease(ctx context.Context, tokenStr, oldRootHash, newRootHash string, tag gw.RepositoryTag) (uint64, error) {
 	return 1, nil
 }
 

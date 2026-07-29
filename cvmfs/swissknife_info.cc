@@ -5,8 +5,6 @@
  * to the user.
  */
 
-#define __STDC_FORMAT_MACROS
-
 #include "swissknife_info.h"
 
 #include <string>

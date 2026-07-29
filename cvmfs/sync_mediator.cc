@@ -2,8 +2,6 @@
  * This file is part of the CernVM File System.
  */
 
-#define __STDC_FORMAT_MACROS
-
 #include "sync_mediator.h"
 
 #include <fcntl.h>
@@ -91,39 +89,19 @@ void SyncMediator::Add(SharedPtr<SyncItem> entry) {
     return;
   }
 
-  // .cvmfsbundles file type
   if (entry->IsBundleSpec()) {
-    PrintWarning(".cvmfsbundles file encountered. "
+    PrintWarning(".cvmfsbundle file encountered. "
                  "Bundles is currently an experimental feature.");
 
-    if (!entry->IsRegularFile()) {
-      PANIC(kLogStderr, "Error: .cvmfsbundles file must be a regular file");
+    if (!entry->IsRegularFile() && !entry->IsSymlink()) {
+      PANIC(kLogStderr,
+            "Error: bundle specification must be a regular file or a symlink");
     }
     if (entry->HasHardlinks()) {
-      PANIC(kLogStderr, "Error: .cvmfsbundles file must not be a hard link");
+      PANIC(kLogStderr, "Error: bundle specification must not be a hard link");
     }
 
-    const std::string parent_path = GetParentPath(entry->GetUnionPath());
-    if (parent_path != union_engine_->union_path()) {
-      PANIC(kLogStderr,
-            "Error: .cvmfsbundles file must be in the root"
-            " directory of the repository. Found in %s",
-            parent_path.c_str());
-    }
-
-    std::string json_string;
-
-    const int fd = open(entry->GetUnionPath().c_str(), O_RDONLY);
-    if (fd < 0) {
-      PANIC(kLogStderr, "Could not open file: %s",
-            entry->GetUnionPath().c_str());
-    }
-    if (!SafeReadToString(fd, &json_string)) {
-      PANIC(kLogStderr, "Could not read contents of file: %s",
-            entry->GetUnionPath().c_str());
-    }
-    const UniquePtr<JsonDocument> json(JsonDocument::Create(json_string));
-
+    InsertBundleSpec(entry);
     AddFile(entry);
     return;
   }
@@ -237,7 +215,8 @@ void SyncMediator::Remove(SharedPtr<SyncItem> entry, bool fast_delete) {
   }
 
   if (entry->WasBundleSpec()) {
-    // for now remove using RemoveFile()
+    if (!params_->dry_run)
+      catalog_manager_->UpdateBundleTrigger(GetBundleTriggerPath(entry), false);
     RemoveFile(entry);
     return;
   }
@@ -262,8 +241,9 @@ void SyncMediator::Replace(SharedPtr<SyncItem> entry) {
   Add(entry);
 }
 
-void SyncMediator::Clone(const std::string from, const std::string to) {
-  catalog_manager_->Clone(from, to);
+bool SyncMediator::Clone(const std::string from, const std::string to,
+                         bool fail_if_source_missing) {
+  return catalog_manager_->Clone(from, to, fail_if_source_missing);
 }
 
 void SyncMediator::EnterDirectory(SharedPtr<SyncItem> entry) {
@@ -347,8 +327,20 @@ bool SyncMediator::Commit(manifest::Manifest *manifest) {
     }
   }
 
+  if (!bundle_specs_.empty()) {
+    LogCvmfs(kLogPublish, kLogStdout, "Processing file bundles...");
+    AddBundleSpecs();
+  }
+
   if (union_engine_)
     union_engine_->PostUpload();
+
+  // PostUpload may have spooled additional files (the tarball engine
+  // materializes empty files for hardlinks whose target is missing from the
+  // archive).  Wait for those uploads so their catalog entries are added by
+  // the file callback before the listeners are unregistered below.
+  if (!params_->dry_run)
+    params_->spooler->WaitForUpload();
 
   params_->spooler->UnregisterListeners();
 
@@ -386,6 +378,42 @@ bool SyncMediator::Commit(manifest::Manifest *manifest) {
                                   params_->manual_revision, manifest);
 }
 
+std::string SyncMediator::GetBundleTriggerPath(
+  SharedPtr<SyncItem> bundle_spec_entry) const
+{
+  static const size_t nStrip = strlen(".cvmfsbundle-");
+  const std::string main_file_name = bundle_spec_entry->filename().substr(nStrip);
+  if (main_file_name.empty()) {
+    PANIC(kLogStderr, "invalid empty bundle specification: %s",
+          bundle_spec_entry->GetUnionPath().c_str());
+  }
+  // relative_parent_path() is empty for the repo root and otherwise lacks a
+  // leading slash (e.g. "root/lib/ROOT/__pycache__"). The catalog lookup in
+  // WritableCatalogManager::FindCatalog needs an absolute path, so prepend
+  // "/" — but skip it when relative_parent_path() is empty, in which case
+  // the existing literal "/" already produces a valid "/<basename>".
+  const std::string &parent = bundle_spec_entry->relative_parent_path();
+  return (parent.empty() ? "" : "/" + parent) + "/" + main_file_name;
+}
+
+void SyncMediator::InsertBundleSpec(SharedPtr<SyncItem> entry) {
+  assert(entry->IsBundleSpec());
+
+  // When we leave the directory, we'll check all the bundle specs and set
+  // the corresponding flags on the main file.
+  bundle_specs_.push_back(GetBundleTriggerPath(entry));
+}
+
+void SyncMediator::AddBundleSpecs() {
+  if (params_->dry_run)
+    return;
+
+  for (BundleSpecs::const_iterator itr = bundle_specs_.begin();
+       itr != bundle_specs_.end(); ++itr)
+  {
+    catalog_manager_->UpdateBundleTrigger(*itr, true);
+  }
+}
 
 void SyncMediator::InsertHardlink(SharedPtr<SyncItem> entry) {
   assert(handle_hardlinks_);
@@ -633,20 +661,45 @@ void SyncMediator::RemoveDirectoryRecursively(SharedPtr<SyncItem> entry,
   // remove the mountpoint directory entry.
   if (fast_delete && catalog_manager_->IsTransitionPoint(directory_path)) {
     // Get the nested catalog's counters before removal so we can update
-    // publish statistics with the total number of removed entries
+    // publish statistics with the total number of removed entries.  Because the
+    // filesystem is not walked, these aggregate counters (self + subtree) are
+    // the only source for the removal statistics.  self.directories already
+    // accounts for the nested catalog root, which is the same filesystem
+    // directory as the mountpoint removed from the parent below, so it must not
+    // be counted again (the normal traversal path also counts it exactly once).
+    // Likewise, every descendant nested catalog is represented twice in the
+    // aggregate counters (mountpoint + root), so subtract the nested catalog
+    // count from the aggregate directory count below.
     std::string subcatalog_path;
     shash::Any hash;
+    // LookupCounters expects an absolute catalog path (leading slash); the sync
+    // item's relative path does not carry one, so prepend it here.  Without the
+    // slash the prefix match falls back to the root catalog and the removal
+    // statistics would account for the whole repository instead of the subtree.
+    const std::string absolute_path = "/" + directory_path;
     PathString ps_path;
-    ps_path.Assign(directory_path.data(), directory_path.length());
+    ps_path.Assign(absolute_path.data(), absolute_path.length());
     const catalog::Counters counters =
         catalog_manager_->LookupCounters(ps_path, &subcatalog_path, &hash);
+    // On failure to load the subtree LookupCounters returns zeroed counters and
+    // a null hash.  Removal proceeds regardless, but the statistics would
+    // silently under-count, so warn.
+    if (hash.IsNull()) {
+      LogCvmfs(kLogPublish, kLogStderr | kLogSyslogWarn,
+               "Warning: could not read counters of nested catalog at '%s'; "
+               "removal statistics may be incomplete",
+               directory_path.c_str());
+    }
     {
       perf::Xadd(counters_->n_files_removed,
           static_cast<int64_t>(counters.self.regular_files
                                + counters.subtree.regular_files));
+      const uint64_t n_nested_catalogs = counters.self.nested_catalogs
+                                         + counters.subtree.nested_catalogs;
+      const uint64_t n_directories = counters.self.directories
+                                     + counters.subtree.directories;
       perf::Xadd(counters_->n_directories_removed,
-          static_cast<int64_t>(counters.self.directories
-                               + counters.subtree.directories));
+                 static_cast<int64_t>(n_directories - n_nested_catalogs));
       perf::Xadd(counters_->n_symlinks_removed,
           static_cast<int64_t>(counters.self.symlinks
                                + counters.subtree.symlinks));
@@ -668,7 +721,6 @@ void SyncMediator::RemoveDirectoryRecursively(SharedPtr<SyncItem> entry,
     if (!params_->dry_run) {
       catalog_manager_->RemoveDirectory(directory_path);
     }
-    perf::Inc(counters_->n_directories_removed);
 
     return;
   }
@@ -1059,8 +1111,8 @@ void SyncMediator::AddUnmaterializedDirectory(SharedPtr<SyncItem> entry) {
 void SyncMediator::AddDirectory(SharedPtr<SyncItem> entry) {
   if (entry->IsBundleSpec()) {
     PANIC(kLogStderr,
-          "Illegal directory name: .cvmfsbundles (%s). "
-          ".cvmfsbundles is reserved for bundles specification files",
+          "Illegal directory name: %s. "
+          "The .cvmfsbundle- prefix is reserved for bundles specifications",
           entry->GetUnionPath().c_str());
   }
 

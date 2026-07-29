@@ -312,6 +312,11 @@ class DirectIoMagicXattr : public RegularMagicXattr {
   virtual void FinalizeValue();
 };
 
+class BundleTriggerMagicXattr : public RegularMagicXattr {
+  virtual bool PrepareValueFenced();
+  virtual void FinalizeValue();
+};
+
 class ExternalFileMagicXattr : public RegularMagicXattr {
   virtual bool PrepareValueFenced();
   virtual void FinalizeValue();
@@ -427,7 +432,7 @@ class RepoCountersMagicXattr : public BaseMagicXattr {
 };
 
 class RepoMetainfoMagicXattr : public BaseMagicXattr {
-  static uint64_t kMaxMetainfoLength;
+  static const uint64_t kMaxMetainfoLength;
 
   shash::Any metainfo_hash_;
   std::string error_reason_;

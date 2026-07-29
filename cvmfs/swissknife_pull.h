@@ -40,6 +40,8 @@ class CommandPull : public Command {
     r.push_back(Parameter::Optional('t', "timeout (s)"));
     r.push_back(Parameter::Optional('a', "number of retries"));
     r.push_back(Parameter::Optional('d', "directory for path specification"));
+    r.push_back(Parameter::Optional('E',
+        "inclusion spec for partial replication"));
     r.push_back(Parameter::Optional('Z', "pull revisions younger than <Z>"));
     r.push_back(Parameter::Optional('@', "proxy url"));
     r.push_back(Parameter::Switch('p', "pull catalog history, too"));
@@ -56,7 +58,8 @@ class CommandPull : public Command {
 
  protected:
   bool PullRecursion(catalog::Catalog *catalog, const std::string &path);
-  bool Pull(const shash::Any &catalog_hash, const std::string &path, shash::Any &previous_catalog);
+  bool Pull(const shash::Any &catalog_hash, const std::string &path,
+            shash::Any &previous_catalog, bool is_historic_catalog = false);
 };
 
 }  // namespace swissknife

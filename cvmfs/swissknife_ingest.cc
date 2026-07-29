@@ -7,10 +7,14 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#include <string>
+#include <vector>
+
 #include "catalog_virtual.h"
 #include "manifest.h"
 #include "statistics.h"
 #include "statistics_database.h"
+#include "swissknife_ingest_gc.h"
 #include "sync_mediator.h"
 #include "sync_union.h"
 #include "sync_union_tarball.h"
@@ -53,6 +57,41 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
     params.to_delete = *args.find('D')->second;
   }
 
+  std::string gc_db_path;
+  std::vector<int64_t> gc_batch_ids;
+  if (args.find('Q') != args.end()) {
+    gc_db_path = *args.find('Q')->second;
+    // Batch size comes from the -X flag (populated by the shell from
+    // CVMFS_GC_DB_BATCH_SIZE in the repository server.conf).  0 / missing /
+    // negative means "no limit": read all pending rows.  Default is 1000.
+    int gc_db_batch_size = 1000;
+    if (args.find('X') != args.end()) {
+      gc_db_batch_size = static_cast<int>(String2Int64(*args.find('X')->second));
+      if (gc_db_batch_size < 0) gc_db_batch_size = 0;
+    }
+    std::vector<std::string> gc_paths;
+    if (!ReadGCDatabase(gc_db_path, &gc_paths, &gc_batch_ids,
+                        gc_db_batch_size)) {
+      PrintError("Swissknife Ingest: failed to read GC database");
+      return 1;
+    }
+    LogCvmfs(kLogCvmfs, kLogStdout,
+             "Swissknife Ingest: Read %lu paths from GC database %s "
+             "(batch size %d)",
+             gc_paths.size(), gc_db_path.c_str(), gc_db_batch_size);
+    // Append GC paths to the existing to_delete string using /// delimiter
+    for (size_t i = 0; i < gc_paths.size(); ++i) {
+      if (!params.to_delete.empty()) {
+        params.to_delete += "///";
+      }
+      params.to_delete += gc_paths[i];
+    }
+    // GC database implies fast delete
+    if (!gc_paths.empty()) {
+      params.fast_delete = true;
+    }
+  }
+
   if (args.find('O') != args.end()) {
     params.generate_legacy_bulk_chunks = true;
   }
@@ -61,6 +100,9 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
   }
   if (args.find('f') != args.end()) {
     params.fast_delete = true;
+  }
+  if (args.find('m') != args.end()) {
+    params.tolerate_missing_hardlinks = true;
   }
   shash::Algorithms hash_algorithm = shash::kSha1;
   if (args.find('e') != args.end()) {
@@ -178,7 +220,7 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
   publish::SyncUnion *sync = new publish::SyncUnionTarball(
       &mediator, params.dir_rdonly, params.tar_file, params.base_directory,
       params.uid, params.gid, params.to_delete, create_catalog,
-      params.fast_delete, "///");
+      params.fast_delete, "///", params.tolerate_missing_hardlinks);
 
   if (!sync->Initialize()) {
     LogCvmfs(kLogCvmfs, kLogStderr,
@@ -266,6 +308,24 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
   if (!manifest->Export(params.manifest_path)) {
     PrintError("Swissknife Ingest: Failed to create new repository");
     return 6;
+  }
+
+  // Mark GC paths as deleted in the database after successful publication.
+  // Only the rows that were just read (gc_batch_ids) are marked, so rows
+  // added after the read by a concurrent scanner are preserved for the next
+  // invocation.
+  if (!gc_db_path.empty()) {
+    if (MarkGCPathsDeleted(gc_db_path, gc_batch_ids)) {
+      LogCvmfs(kLogCvmfs, kLogStdout,
+               "Swissknife Ingest: Marked %lu GC paths as deleted in %s",
+               gc_batch_ids.size(), gc_db_path.c_str());
+    } else {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "Swissknife Ingest: WARNING - Failed to mark GC paths as "
+               "deleted in %s. Paths were removed from the repository but "
+               "the database was not updated.",
+               gc_db_path.c_str());
+    }
   }
 
   return 0;

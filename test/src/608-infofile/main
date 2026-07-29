@@ -6,7 +6,8 @@ cvmfs_test_suites="quick"
 CVMFS_TEST_608_REPLICA_NAME=
 cleanup() {
   echo "running cleanup..."
-  [ -z $CVMFS_TEST_608_REPLICA_NAME ] ||  sudo cvmfs_server rmfs -f $CVMFS_TEST_608_REPLICA_NAME
+  # may not actually exist at some points
+  [ -z $CVMFS_TEST_608_REPLICA_NAME ] ||  sudo cvmfs_server rmfs -f $CVMFS_TEST_608_REPLICA_NAME || true
 }
 
 d() {

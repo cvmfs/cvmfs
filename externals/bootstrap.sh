@@ -2,18 +2,8 @@
 
 set -e
 
-SSL_VERSION=3.5.3
 CRYPTO_VERSION=3.5.3
-CARES_VERSION=1.18.1
-CURL_VERSION=7.86.0
-PACPARSER_VERSION=1.4.3
-ZLIB_VERSION=1.2.8
-SPARSEHASH_VERSION=1.12
-LEVELDB_VERSION=1.18
 IPADDRESS_VERSION=1.0.22
-MAXMINDDB_VERSION=1.5.4
-PROTOBUF_VERSION=2.6.1
-RAPIDCHECK_VERSION=0.0
 LIBARCHIVE_VERSION=3.3.2
 GOLANG_VERSION=1.24.2
 ZSTD_VERSION=1.5.6
@@ -183,72 +173,9 @@ build_lib() {
   local lib_name=$1
   rm -rf $externals_build_dir/build_${lib_name}
   case ${lib_name} in
-    libcurl)
-      # (only on Mac)
-      if [ x"$(uname)" = x"Darwin" ]; then
-          rm -rf $externals_build_dir/build_ssl
-          do_extract "ssl" "libressl-${SSL_VERSION}.tar.gz"
-          do_build "ssl"
-      fi
-
-      rm -rf $externals_build_dir/build_c-ares
-      do_extract "c-ares" "c-ares-${CARES_VERSION}.tar.gz"
-      do_build "c-ares"
-
-      do_extract "libcurl" "curl-${CURL_VERSION}.tar.bz2"
-      patch_external "libcurl" "reenable_poll_darwin.patch"
-      do_build "libcurl"
-      ;;
     libcrypto)
       do_extract "libcrypto" "libressl-${CRYPTO_VERSION}.tar.gz"
       do_build "libcrypto"
-      ;;
-    pacparser)
-      do_extract "pacparser"     "pacparser-${PACPARSER_VERSION}.tar.gz"
-      patch_external "pacparser" "fix_cflags.patch"
-      patch_external "pacparser" "fix_c99.patch"
-      patch_external "pacparser" "fix_git_dependency.patch"
-      patch_external "pacparser" "fix_python_setuptools.patch"
-      patch_external "pacparser" "fix_gcc14.patch"
-      do_build "pacparser"
-      ;;
-    zlib)
-      do_extract "zlib"         "zlib-${ZLIB_VERSION}.tar.gz"
-      do_build "zlib"
-      ;;
-    sparsehash)
-      do_extract "sparsehash"   "sparsehash-${SPARSEHASH_VERSION}.tar.gz"
-      patch_external "sparsehash"  "fix_sl4_compilation.patch"          \
-                                  "fix_warning_gcc48.patch"
-      replace_in_external "sparsehash"  "config.guess.latest" "config.guess"
-      replace_in_external "sparsehash"  "config.sub.latest" "config.sub"
-      do_build "sparsehash"
-      ;;
-    leveldb)
-      do_extract "leveldb"      "leveldb-${LEVELDB_VERSION}.tar.gz"
-      patch_external "leveldb"     "dont_search_snappy.patch"           \
-                                  "dont_search_tcmalloc.patch"         \
-                                  "arm64_memory_barrier.patch"
-      do_build "leveldb"
-      ;;
-    maxminddb)
-      if [ x"$BUILD_SERVER" != x ] && [ x"$BUILD_GEOAPI" != x ]; then
-        do_extract "maxminddb" "MaxMind-DB-Reader-python-${MAXMINDDB_VERSION}.tar.gz"
-        do_build "maxminddb"
-      fi
-      ;;
-    protobuf)
-      do_extract "protobuf"     "protobuf-${PROTOBUF_VERSION}.tar.bz2"
-      patch_external "protobuf" "fix-iterator-cxx17.patch"
-      do_build "protobuf"
-      ;;
-    googlebench)
-        do_copy "googlebench"
-        do_build "googlebench"
-      ;;
-    sqlite3)
-      do_copy "sqlite3"
-      do_build "sqlite3"
       ;;
     vjson)
       do_copy "vjson"
@@ -258,12 +185,6 @@ build_lib() {
     sha3)
       do_copy "sha3"
       do_build "sha3"
-      ;;
-    rapidcheck)
-      if [ x"$BUILD_QC_TESTS" != x"" ]; then
-        do_extract "rapidcheck" "rapidcheck-${RAPIDCHECK_VERSION}.tar.gz"
-        do_build "rapidcheck"
-      fi
       ;;
     libarchive)
       do_extract "libarchive" "libarchive-${LIBARCHIVE_VERSION}.tar.gz"
@@ -295,11 +216,7 @@ if [ x"$BUILTIN_EXTERNALS_LIST" != x"" ] && ! echo ";${BUILTIN_EXTERNALS_LIST};"
     missing_libs=$(echo "$BUILTIN_EXTERNALS_LIST" | tr ';' ' ')
     echo "Bootstrap - Using custom externals list: $missing_libs"
 else
-    missing_libs="libcurl libcrypto pacparser zlib sparsehash leveldb maxminddb protobuf sqlite3 sha3 zstd"
-
-    if [ x"$BUILD_UBENCHMARKS" != x"" ]; then
-        missing_libs="$missing_libs googlebench"
-    fi
+    missing_libs="libcrypto sha3 zstd"
 
     if [ x"$BUILD_GATEWAY" != x ] || [ x"$BUILD_DUCC" != x ] || [ x"$BUILD_SNAPSHOTTER" != x ]; then
         required_go_minor_version="23"
@@ -311,10 +228,6 @@ else
         else
           missing_libs="$missing_libs golang_rev2"
         fi
-    fi
-
-    if [ x"$BUILD_QC_TESTS" != x"" ]; then
-        missing_libs="$missing_libs rapidcheck"
     fi
 
     echo "Bootstrap - Using default externals list: $missing_libs"

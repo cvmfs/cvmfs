@@ -7,8 +7,6 @@
 
 // NOLINTNEXTLINE
 #define _FILE_OFFSET_BITS 64
-// NOLINTNEXTLINE
-#define __STDC_FORMAT_MACROS
 
 
 #include "swissknife_pull.h"
@@ -39,6 +37,7 @@
 #include "network/sink_mem.h"
 #include "network/sink_path.h"
 #include "object_fetcher.h"
+#include "path_filters/inclusion_spec.h"
 #include "path_filters/relaxed_path_filter.h"
 #include "reflog.h"
 #include "upload.h"
@@ -113,6 +112,7 @@ int pipe_chunks[2];
 pthread_mutex_t lock_pipe = PTHREAD_MUTEX_INITIALIZER;
 unsigned retries = 3;
 catalog::RelaxedPathFilter *pathfilter = NULL;
+catalog::InclusionSpec *inclusion_spec = NULL;
 atomic_int64 overall_chunks;
 atomic_int64 overall_new;
 atomic_int64 chunk_queue;
@@ -341,6 +341,19 @@ bool CommandPull::PullRecursion(catalog::Catalog *catalog,
              iEnd = nested_catalogs.end();
          i != iEnd;
          ++i) {
+      // Partial replication: prune entire subtrees that contain no included
+      // path.  IsExcluded() is true exactly when the subtree rooted at this
+      // mountpoint is disjoint from the inclusion set, so neither this nested
+      // catalog nor any of its descendants need to be replicated.  Ancestor
+      // catalogs on the way to an included subtree are *not* excluded and are
+      // therefore still pulled and recursed into.
+      if (inclusion_spec
+          && inclusion_spec->IsExcluded(i->mountpoint.ToString())) {
+        LogCvmfs(kLogCvmfs, kLogStdout,
+                 "Pruning excluded subtree (catalog + objects) at %s",
+                 i->mountpoint.c_str());
+        continue;
+      }
       LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from catalog at %s",
                i->mountpoint.c_str());
       shash::Any previous_catalog_hash;  // expected to be null for subcatalog
@@ -356,7 +369,8 @@ bool CommandPull::PullRecursion(catalog::Catalog *catalog,
 
 bool CommandPull::Pull(const shash::Any &catalog_hash,
                        const std::string &path,
-                       shash::Any &previous_catalog) {
+                       shash::Any &previous_catalog,
+                       bool is_historic_catalog) {
   int retval;
   download::Failures dl_retval;
   assert(shash::kSuffixCatalog == catalog_hash.suffix);
@@ -427,10 +441,12 @@ bool CommandPull::Pull(const shash::Any &catalog_hash,
   dl_retval = download_manager()->Fetch(&download_catalog);
   fclose(fcatalog_vanilla);
   if (dl_retval != download::kFailOk) {
-    if (path == "" && is_garbage_collectable) {
+    const bool genuinely_missing = (dl_retval == download::kFailHostHttp)
+                                   && (download_catalog.http_code() == 404);
+    if (is_historic_catalog && is_garbage_collectable && genuinely_missing) {
       LogCvmfs(kLogCvmfs, kLogStdout,
-               "skipping missing root catalog %s - "
-               "probably sweeped by garbage collection",
+               "skipping missing catalog %s - "
+               "probably swept by garbage collection",
                catalog_hash.ToString().c_str());
       goto pull_skip;
     } else {
@@ -477,29 +493,34 @@ bool CommandPull::Pull(const shash::Any &catalog_hash,
   }
   apply_timestamp_threshold = true;
 
-  // Traverse the chunks
-  LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
-           "  Processing chunks [%" PRIu64 " registered chunks]: ",
-           catalog->GetNumChunks());
-  retval = catalog->AllChunksBegin();
-  if (!retval) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to gather chunks");
-    goto pull_cleanup;
+  // Traverse the chunks.  In partial replication mode, excluded subtrees are
+  // pruned before reaching this point (see PullRecursion), so any catalog we
+  // pull here has its objects replicated.  Ancestor catalogs on the way to an
+  // included subtree are replicated in full, which keeps navigation intact.
+  {
+    LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
+             "  Processing chunks [%" PRIu64 " registered chunks]: ",
+             catalog->GetNumChunks());
+    retval = catalog->AllChunksBegin();
+    if (!retval) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to gather chunks");
+      goto pull_cleanup;
+    }
+    while (catalog->AllChunksNext(&chunk_hash, &compression_alg)) {
+      ChunkJob next_chunk(chunk_hash, compression_alg);
+      WritePipe(pipe_chunks[1], &next_chunk, sizeof(next_chunk));
+      atomic_inc64(&chunk_queue);
+    }
+    catalog->AllChunksEnd();
+    while (atomic_read64(&chunk_queue) != 0) {
+      SafeSleepMs(100);
+    }
+    LogCvmfs(kLogCvmfs, kLogStdout,
+             " fetched %" PRId64 " new chunks out of "
+             "%" PRId64 " unique chunks",
+             atomic_read64(&overall_new) - gauge_new,
+             atomic_read64(&overall_chunks) - gauge_chunks);
   }
-  while (catalog->AllChunksNext(&chunk_hash, &compression_alg)) {
-    ChunkJob next_chunk(chunk_hash, compression_alg);
-    WritePipe(pipe_chunks[1], &next_chunk, sizeof(next_chunk));
-    atomic_inc64(&chunk_queue);
-  }
-  catalog->AllChunksEnd();
-  while (atomic_read64(&chunk_queue) != 0) {
-    SafeSleepMs(100);
-  }
-  LogCvmfs(kLogCvmfs, kLogStdout,
-           " fetched %" PRId64 " new chunks out of "
-           "%" PRId64 " unique chunks",
-           atomic_read64(&overall_new) - gauge_new,
-           atomic_read64(&overall_chunks) - gauge_chunks);
 
   retval = PullRecursion(catalog, path);
   previous_catalog = catalog->GetPreviousRevision();
@@ -571,6 +592,24 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   if (args.find('d') != args.end()) {
     pathfilter = catalog::RelaxedPathFilter::Create(*args.find('d')->second);
     assert(pathfilter->IsValid());
+  }
+  if (args.find('E') != args.end()) {
+    if (pathfilter != NULL) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "Options -d and -E are mutually exclusive");
+      return 1;
+    }
+    inclusion_spec =
+        catalog::InclusionSpec::Create(*args.find('E')->second);
+    if (inclusion_spec == NULL || !inclusion_spec->IsValid()) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "Failed to parse inclusion spec from '%s'",
+               args.find('E')->second->c_str());
+      return 1;
+    }
+    LogCvmfs(kLogCvmfs, kLogStdout,
+             "CernVM-FS: partial replication with inclusion spec (version %d)",
+             inclusion_spec->version());
   }
   if (args.find('p') != args.end())
     pull_history = true;
@@ -830,14 +869,21 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
 
   LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from trunk catalog at /");
   current_catalog_hash = ensemble.manifest->catalog_hash();
-  do {
-    retval = Pull(current_catalog_hash, "", previous_catalog_hash);
-    if (pull_history && !previous_catalog_hash.IsNull()) {
-      LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from historic catalog %s",
-               previous_catalog_hash.ToString().c_str());
-    }
-    current_catalog_hash = previous_catalog_hash;
-  } while (pull_history && !previous_catalog_hash.IsNull());
+  retval = 1;
+  {
+    bool is_historic = false;
+    do {
+      retval = static_cast<int>(
+          Pull(current_catalog_hash, "", previous_catalog_hash, is_historic)
+          && (retval != 0));
+      if (pull_history && !previous_catalog_hash.IsNull()) {
+        LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from historic catalog %s",
+                 previous_catalog_hash.ToString().c_str());
+      }
+      current_catalog_hash = previous_catalog_hash;
+      is_historic = true;
+    } while (pull_history && !previous_catalog_hash.IsNull());
+  }
 
   if (!historic_tags.empty()) {
     LogCvmfs(kLogCvmfs, kLogStdout, "Checking tagged snapshots...");
@@ -852,10 +898,12 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
              i->name.c_str());
     apply_timestamp_threshold = false;
 
-    bool retval2;
+    bool retval2 = true;
     current_catalog_hash = i->root_hash;
     do {
-      retval2 = Pull(current_catalog_hash, "", previous_catalog_hash);
+      retval2 = Pull(current_catalog_hash, "", previous_catalog_hash,
+                     true /* is_historic_catalog */)
+                && retval2;
       if (pull_history && !previous_catalog_hash.IsNull()) {
         LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from historic catalog %s",
                  previous_catalog_hash.ToString().c_str());
@@ -879,6 +927,15 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
 
   if (!retval)
     goto fini;
+
+  WaitForStorage();
+  if (!Peek(ensemble.manifest->catalog_hash())) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "root catalog %s is missing from the destination - refusing to "
+             "publish an incomplete revision",
+             ensemble.manifest->catalog_hash().ToString().c_str());
+    goto fini;
+  }
 
   // Upload manifest ensemble
   {
@@ -963,6 +1020,17 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
                   ".cvmfswhitelist", copy.weak_ref(), decomp_copy.weak_ref());
       StoreBuffer(ensemble.raw_manifest_buf, ensemble.raw_manifest_size,
                   ".cvmfspublished", copy.weak_ref(), decomp_copy.weak_ref());
+
+      // Upload the partial replication spec to the backend
+      if (inclusion_spec != NULL) {
+        const std::string &spec_content = inclusion_spec->content();
+        StoreBuffer(
+            reinterpret_cast<const unsigned char *>(spec_content.data()),
+            spec_content.size(), ".cvmfs_partial_replication", copy.weak_ref(),
+            decomp_copy.weak_ref());
+        LogCvmfs(kLogCvmfs, kLogStdout,
+                 "Uploaded partial replication spec to backend");
+      }
     }
     LogCvmfs(kLogCvmfs, kLogStdout, "Serving revision %" PRIu64,
              ensemble.manifest->revision());
@@ -980,6 +1048,8 @@ fini:
   free(workers);
   delete spooler;
   delete pathfilter;
+  delete inclusion_spec;
+  inclusion_spec = NULL;
   return result;
 }
 

@@ -68,6 +68,7 @@ MagicXattrManager::MagicXattrManager(
   Register("user.chunks", new ChunksMagicXattr());
   Register("user.compression", new CompressionMagicXattr());
   Register("user.direct_io", new DirectIoMagicXattr());
+  Register("user.bundle_trigger", new BundleTriggerMagicXattr());
   Register("user.external_file", new ExternalFileMagicXattr());
 
   Register("user.rawlink", new RawlinkMagicXattr());
@@ -370,6 +371,14 @@ void DirectIoMagicXattr::FinalizeValue() {
   result_pages_.push_back(dirent_->IsDirectIo() ? "1" : "0");
 }
 
+bool BundleTriggerMagicXattr::PrepareValueFenced() {
+  return dirent_->IsRegular();
+}
+
+void BundleTriggerMagicXattr::FinalizeValue() {
+  result_pages_.push_back(dirent_->IsBundleTrigger() ? "1" : "0");
+}
+
 bool ExternalFileMagicXattr::PrepareValueFenced() {
   return dirent_->IsRegular();
 }
@@ -655,7 +664,7 @@ void RepoCountersMagicXattr::FinalizeValue() {
   result_pages_.push_back(counters_.GetCsvMap());
 }
 
-uint64_t RepoMetainfoMagicXattr::kMaxMetainfoLength = 65536;
+const uint64_t RepoMetainfoMagicXattr::kMaxMetainfoLength = 65536;
 
 bool RepoMetainfoMagicXattr::PrepareValueFenced() {
   if (!xattr_mgr_->mount_point()->catalog_mgr()->manifest()) {

@@ -1,0 +1,114 @@
+#!/bin/bash
+cvmfs_test_name="Garbage Collection on Partial Replication Stratum1"
+cvmfs_test_autofs_on_startup=false
+
+# Creates a test repo structure with nested catalogs under /dir1 and /dir2.
+# /dir1/sub1 will be INCLUDED in replication; /dir1/sub2 will be EXCLUDED.
+produce_files_v1_in() {
+  local working_dir=$1
+  pushdir $working_dir
+
+  mkdir -p dir1/sub1
+  touch dir1/sub1/.cvmfscatalog
+  echo "sub1 content v1" > dir1/sub1/file_a.txt
+
+  mkdir -p dir1/sub2
+  touch dir1/sub2/.cvmfscatalog
+  echo "sub2 content v1" > dir1/sub2/file_b.txt
+
+  mkdir -p dir2
+  echo "root dir2 content" > dir2/file_c.txt
+
+  popdir
+}
+
+# Second revision: updates files in both included and excluded dirs.
+produce_files_v2_in() {
+  local working_dir=$1
+  pushdir $working_dir
+
+  echo "sub1 content v2" > dir1/sub1/file_a.txt
+  echo "sub1 new file"   > dir1/sub1/file_new.txt
+  echo "sub2 content v2" > dir1/sub2/file_b.txt
+
+  popdir
+}
+
+desaster_cleanup() {
+  local replica_name=$1
+  sudo cvmfs_server rmfs -f $replica_name > /dev/null 2>&1
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local scratch_dir=$(pwd)
+  local replica_name="$(get_stratum1_name $CVMFS_TEST_REPO)"
+
+  echo "*** Create repository $CVMFS_TEST_REPO (with GC enabled)"
+  # 'NO' = no debug log; -z = enable garbage collection in the manifest
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -z || return $?
+
+  echo "*** Publish first revision"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  produce_files_v1_in $repo_dir        || return 3
+  publish_repo $CVMFS_TEST_REPO        || return $?
+
+  echo "*** Publish second revision"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  produce_files_v2_in $repo_dir        || return 4
+  publish_repo $CVMFS_TEST_REPO        || return $?
+
+  echo "*** Create partial Stratum-1"
+  load_repo_config $CVMFS_TEST_REPO
+  create_stratum1 $replica_name                          \
+                  $CVMFS_TEST_USER                       \
+                  $CVMFS_STRATUM0                        \
+                  /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub \
+    || { desaster_cleanup $replica_name; return 7; }
+
+  echo "*** Configure partial replication (include /dir1/sub1 and /dir2, leaving /dir1/sub2 excluded)"
+  local spec_file="${scratch_dir}/partial_gc_test.spec"
+  cat > $spec_file << EOF
+version 1
+/dir1/sub1
+/dir2
+EOF
+
+  load_repo_config $replica_name
+  local replica_conf="/etc/cvmfs/repositories.d/${replica_name}/server.conf"
+  sudo sh -c "echo 'CVMFS_PARTIAL_REPLICATION=true'           >> $replica_conf"
+  sudo sh -c "echo 'CVMFS_PARTIAL_REPLICATION_SPEC=$spec_file' >> $replica_conf"
+  load_repo_config $CVMFS_TEST_REPO
+
+  echo "*** Snapshot both revisions to partial Stratum-1"
+  sudo cvmfs_server snapshot $replica_name || { desaster_cleanup $replica_name; return 9; }
+
+  echo "*** Check partial replica"
+  sudo cvmfs_server check -c $replica_name || { desaster_cleanup $replica_name; return 10; }
+
+  echo "*** Run GC on partial replica (keep only latest revision)"
+  sudo cvmfs_server gc -r 0 -f $replica_name \
+    || { desaster_cleanup $replica_name; return 11; }
+
+  echo "*** Check partial replica after GC"
+  sudo cvmfs_server check -c $replica_name || { desaster_cleanup $replica_name; return 12; }
+
+  echo "*** Verify .cvmfs_partial_replication still present after GC"
+  peek_backend_raw $replica_name ".cvmfs_partial_replication" \
+    || { desaster_cleanup $replica_name; return 13; }
+  echo "  .cvmfs_partial_replication found after GC"
+
+  echo "*** Publish third revision (stress test: GC again after new snapshot)"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  echo "sub1 content v3" > ${repo_dir}/dir1/sub1/file_a.txt
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  sudo cvmfs_server snapshot $replica_name || { desaster_cleanup $replica_name; return 14; }
+  sudo cvmfs_server gc -r 0 -f $replica_name || { desaster_cleanup $replica_name; return 15; }
+  sudo cvmfs_server check -c $replica_name || { desaster_cleanup $replica_name; return 16; }
+
+  echo "*** Clean up"
+  sudo cvmfs_server rmfs -f $replica_name
+  return 0
+}

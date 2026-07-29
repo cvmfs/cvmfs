@@ -44,6 +44,7 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS)
        authz/authz_fetch.cc
        authz/authz_session.cc
        backoff.cc
+       bundle_mgr.cc
        cache.cc
        cache.pb.cc cache.pb.h
        cache_extern.cc
@@ -98,11 +99,17 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS)
        network/sink_mem.cc
        network/sink_path.cc
        options.cc
+       path_filters/dirtab.cc
+       path_filters/inclusion_spec.cc
+       path_filters/relaxed_path_filter.cc
+       pathspec/pathspec.cc
+       pathspec/pathspec_pattern.cc
        quota.cc
        quota_posix.cc
        resolv_conf_event_handler.cc
        ring_buffer.cc
        sanitizer.cc
+       shortstring.cc
        sql.cc
        sqlitemem.cc
        sqlitevfs.cc
@@ -275,7 +282,6 @@ if (BUILD_CVMFS)
        notify/subscriber_supervisor.cc
        notify/subscriber_sse.cc
        quota_listener.cc
-       shortstring.cc
        supervisor.cc
        talk.cc
        url.cc
@@ -291,15 +297,15 @@ if (BUILD_CVMFS)
   set (CVMFS_FUSE_LDFLAGS "-ldl -lm")
   set (CVMFS_FUSE_LINK_LIBRARIES "")
   list(APPEND CVMFS_FUSE_LINK_LIBRARIES
-       ${CURL_LIBRARIES}
-       ${CARES_LIBRARIES} ${CARES_LDFLAGS}
+       CURL::libcurl
+       c-ares::cares
        ${OPENSSL_LIBRARIES}
-       ${PACPARSER_LIBRARIES}
-       ${SQLITE3_LIBRARY}
+       pacparser::pacparser
+       SQLite::SQLite3
        ${ZLIB_LIBRARIES}
        ${ZSTD_LIBRARIES}
-       ${SPARSEHASH_LIBRARIES}
-       ${LEVELDB_LIBRARIES}
+       sparsehash::sparsehash
+       leveldb::leveldb
        ${PROTOBUF_LITE_LIBRARY}
        nlohmann_json::nlohmann_json
        ${RT_LIBRARY}
@@ -319,7 +325,7 @@ if (BUILD_CVMFS)
     )
     set_target_properties (cvmfs_fuse_debug PROPERTIES
       VERSION ${CernVM-FS_VERSION_STRING}
-      COMPILE_FLAGS "-DCVMFS_USE_LIBFUSE=2 ${CVMFS_FUSE_CFLAGS} -O0 -DDEBUGMSG"
+      COMPILE_FLAGS "-DCVMFS_USE_LIBFUSE=2 ${CVMFS_FUSE_CFLAGS} -O0 -Wno-cpp -DDEBUGMSG"
       LINK_FLAGS "${CVMFS_FUSE_LDFLAGS}"
     )
     target_link_libraries (cvmfs_fuse
@@ -346,7 +352,7 @@ if (BUILD_CVMFS)
     )
     set_target_properties (cvmfs_fuse3_debug PROPERTIES
       VERSION ${CernVM-FS_VERSION_STRING}
-      COMPILE_FLAGS "-DCVMFS_USE_LIBFUSE=3 ${CVMFS_FUSE_CFLAGS} -O0 -DDEBUGMSG"
+      COMPILE_FLAGS "-DCVMFS_USE_LIBFUSE=3 ${CVMFS_FUSE_CFLAGS} -O0 -Wno-cpp -DDEBUGMSG"
       LINK_FLAGS "${CVMFS_FUSE_LDFLAGS}"
     )
     target_link_libraries (cvmfs_fuse3
@@ -445,27 +451,23 @@ if (BUILD_LIBCVMFS)
   set_property (TARGET cvmfs_client APPEND PROPERTY INCLUDE_DIRECTORIES "${CMAKE_CURRENT_BINARY_DIR}")
   target_include_directories (cvmfs_client PRIVATE ${GTEST_INCLUDE_DIRS})
   target_include_directories (cvmfs_client PRIVATE ${SQLITE3_INCLUDE_DIR})
-  target_include_directories (cvmfs_client PRIVATE ${CARES_INCLUDE_DIRS})
-  target_include_directories (cvmfs_client PRIVATE ${CURL_INCLUDE_DIRS})
-  target_include_directories (cvmfs_client PRIVATE ${LEVELDB_INCLUDE_DIR})
-  target_include_directories (cvmfs_client PRIVATE ${PACPARSER_INCLUDE_DIR})
   target_include_directories (cvmfs_client PRIVATE ${ZLIB_INCLUDE_DIRS})
   target_include_directories (cvmfs_client PRIVATE ${PROTOBUF_INCLUDE_DIRS})
 
   target_link_libraries (cvmfs_client
                          PUBLIC cvmfs_crypto
                                 cvmfs_util
-                                ${CARES_LDFLAGS}
                                 ${OPENSSL_LIBRARIES}
-                         PRIVATE ${SQLITE3_LIBRARY}
-                                 ${CURL_LIBRARIES}
-                                 ${CARES_LIBRARIES}
-                                 ${LEVELDB_LIBRARIES}
-                                 ${PACPARSER_LIBRARIES}
+                         PRIVATE SQLite::SQLite3
+                                 CURL::libcurl
+                                 c-ares::cares
+                                 leveldb::leveldb
+                                 pacparser::pacparser
                                  ${ZLIB_LIBRARIES}
                                  nlohmann_json::nlohmann_json
                                  ${ZSTD_LIBRARIES}
                                  ${VJSON_LIBRARIES}
+                                 sparsehash::sparsehash
                                  ${PROTOBUF_LITE_LIBRARY}
   )
 
@@ -516,6 +518,9 @@ if (BUILD_LIBCVMFS_CACHE)
   set_property (TARGET cvmfs_cache APPEND PROPERTY INCLUDE_DIRECTORIES "${CMAKE_BINARY_DIR}")
   set_property (TARGET cvmfs_cache APPEND PROPERTY INCLUDE_DIRECTORIES "${CMAKE_CURRENT_BINARY_DIR}")
   target_include_directories (cvmfs_cache PRIVATE ${GTEST_INCLUDE_DIRS})
+  # cache.h -> compression.h -> duplex_zlib.h needs zlib.h, which is not in a
+  # default include path when zlib is built from the vendored sources
+  target_include_directories (cvmfs_cache PRIVATE ${ZLIB_INCLUDE_DIRS})
   target_include_directories (cvmfs_cache PRIVATE ${PROTOBUF_INCLUDE_DIRS})
 
   target_link_libraries(cvmfs_cache
@@ -703,6 +708,7 @@ if (BUILD_SERVER)
        pack.cc
        path_filters/dirtab.cc
        path_filters/relaxed_path_filter.cc
+       path_filters/inclusion_spec.cc
        pathspec/pathspec.cc
        pathspec/pathspec_pattern.cc
        reflog.cc
@@ -766,9 +772,9 @@ if (BUILD_SERVER)
   )  # CVMFS_SWISSKNIFE_SOURCES
   set (CVMFS_SWISSKNIFE_LINK_LIBRARIES "")
   list (APPEND CVMFS_SWISSKNIFE_LINK_LIBRARIES
-        ${SQLITE3_LIBRARY}
-        ${CURL_LIBRARIES}
-        ${CARES_LIBRARIES} ${CARES_LDFLAGS}
+        SQLite::SQLite3
+        CURL::libcurl
+        c-ares::cares
         ${ZLIB_LIBRARIES}
         ${ZSTD_LIBRARIES}
         ${OPENSSL_LIBRARIES}
@@ -787,7 +793,7 @@ if (BUILD_SERVER)
   if (BUILD_SERVER_DEBUG)
     add_executable (cvmfs_swissknife_debug ${CVMFS_SWISSKNIFE_SOURCES})
     set_target_properties (cvmfs_swissknife_debug PROPERTIES
-      COMPILE_FLAGS "-O0 -DDEBUGMSG"
+      COMPILE_FLAGS "-O0 -Wno-cpp -DDEBUGMSG"
     )
     target_link_libraries (cvmfs_swissknife_debug
                            cvmfs_crypto_debug
@@ -895,10 +901,10 @@ if (BUILD_SERVER)
   set (LIBCVMFS_SERVER_CFLAGS "-D_FILE_OFFSET_BITS=64 -DCVMFS_RAISE_EXCEPTIONS -fexceptions")
   set (LIBCVMFS_SERVER_LINK_LIBRARIES "")
   list (APPEND LIBCVMFS_SERVER_LINK_LIBRARIES
-        ${CURL_LIBRARIES}
-        ${CARES_LIBRARIES} ${CARES_LDFLAGS}
+        CURL::libcurl
+        c-ares::cares
         ${OPENSSL_LIBRARIES}
-        ${SQLITE3_LIBRARY}
+        SQLite::SQLite3
         ${ZLIB_LIBRARIES}
         nlohmann_json::nlohmann_json
         LibArchive::LibArchive
@@ -920,7 +926,7 @@ if (BUILD_SERVER)
     add_library (cvmfs_server_debug SHARED ${LIBCVMFS_SERVER_SOURCES})
     set_target_properties (cvmfs_server_debug PROPERTIES
       VERSION ${CernVM-FS_VERSION_STRING}
-      COMPILE_FLAGS "${LIBCVMFS_SERVER_CFLAGS} -O0 -DDEBUGMSG")
+      COMPILE_FLAGS "${LIBCVMFS_SERVER_CFLAGS} -O0 -Wno-cpp -DDEBUGMSG")
     target_link_libraries (cvmfs_server_debug
                            cvmfs_crypto_debug
                            cvmfs_util_debug
@@ -968,6 +974,7 @@ if (BUILD_SERVER)
        publish/cmd_info.cc
        publish/cmd_lsof.cc
        publish/cmd_mkfs.cc
+       publish/cmd_tag.cc
        publish/cmd_transaction.cc
        publish/cmd_util.cc
        publish/cmd_zpipe.cc
@@ -994,7 +1001,7 @@ if (BUILD_SERVER)
   if (BUILD_SERVER_DEBUG)
     add_executable (cvmfs_publish_debug ${CVMFS_PUBLISH_SOURCES})
     set_target_properties (cvmfs_publish_debug PROPERTIES
-      COMPILE_FLAGS "${CVMFS_PUBLISH_CFLAGS} -O0 -DDEBUGMSG"
+      COMPILE_FLAGS "${CVMFS_PUBLISH_CFLAGS} -O0 -Wno-cpp -DDEBUGMSG"
     )
     target_link_libraries (cvmfs_publish_debug
                            cvmfs_crypto_debug
@@ -1211,9 +1218,9 @@ if(BUILD_RECEIVER)
   set (CVMFS_RECEIVER_CFLAGS "-D_FILE_OFFSET_BITS=64 -DCVMFS_RAISE_EXCEPTIONS -fexceptions")
   set (CVMFS_RECEIVER_LINK_LIBRARIES "")
   list (APPEND CVMFS_RECEIVER_LINK_LIBRARIES
-        ${CURL_LIBRARIES}
-        ${CARES_LIBRARIES} ${CARES_LDFLAGS}
-        ${SQLITE3_LIBRARY}
+        CURL::libcurl
+        c-ares::cares
+        SQLite::SQLite3
         nlohmann_json::nlohmann_json
         ${OPENSSL_LIBRARIES}
         ${ZLIB_LIBRARIES}
@@ -1236,7 +1243,7 @@ if(BUILD_RECEIVER)
   if (BUILD_RECEIVER_DEBUG)
     add_executable(cvmfs_receiver_debug ${CVMFS_RECEIVER_SOURCES})
     set_target_properties (cvmfs_receiver_debug PROPERTIES
-      COMPILE_FLAGS "${CVMFS_RECEIVER_CFLAGS} -O0 -DDEBUGMSG")
+      COMPILE_FLAGS "${CVMFS_RECEIVER_CFLAGS} -O0 -Wno-cpp -DDEBUGMSG")
     target_link_libraries(cvmfs_receiver_debug
                           cvmfs_crypto_debug
                           cvmfs_util_debug
@@ -1358,6 +1365,7 @@ if (BUILD_PRELOADER)
                   pack.cc
                   path_filters/dirtab.cc
                   path_filters/relaxed_path_filter.cc
+                  path_filters/inclusion_spec.cc
                   pathspec/pathspec.cc
                   pathspec/pathspec_pattern.cc
                   preload.cc
@@ -1386,9 +1394,9 @@ if (BUILD_PRELOADER)
   target_link_libraries(cvmfs_preload_bin
                         cvmfs_crypto
                         cvmfs_util
-                        ${SQLITE3_LIBRARY}
-                        ${CURL_LIBRARIES}
-                        ${CARES_LIBRARIES} ${CARES_LDFLAGS}
+                        SQLite::SQLite3
+                        CURL::libcurl
+                        c-ares::cares
                         ${ZLIB_LIBRARIES}
                         ${ZSTD_LIBRARIES}
                         ${OPENSSL_LIBRARIES}

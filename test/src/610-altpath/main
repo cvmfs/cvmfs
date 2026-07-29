@@ -8,7 +8,8 @@ CVMFS_TEST_610_REPLICA_NAME=
 CVMFS_TEST_610_MOUNTPOINT=
 cleanup() {
   [ -z $CVMFS_TEST_610_MOUNTPOINT ] || sudo umount $CVMFS_TEST_610_MOUNTPOINT > /dev/null 2>&1
-  [ -z $CVMFS_TEST_610_REPLICA_NAME ] || sudo cvmfs_server rmfs -f $CVMFS_TEST_610_REPLICA_NAME
+  # may not actually exist at some points
+  [ -z $CVMFS_TEST_610_REPLICA_NAME ] || sudo cvmfs_server rmfs -f $CVMFS_TEST_610_REPLICA_NAME || true
 }
 
 produce_files_in() {

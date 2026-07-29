@@ -16,21 +16,17 @@ cvmfs_run_test() {
 
   cvmfs_umount atlas.cern.ch,lhcb.cern.ch,cms.cern.ch || return 10
 
-  echo "Destroying data integrity in $cms_cachedir"
+  echo "Destroying data integrity in cachedir"
   cms_cachedir=$(get_cvmfs_cachedir cms.cern.ch)
-  [ "x$cms_cachedir" = "x" ] && return 11
-  for f in $(sudo find $cms_cachedir -mindepth 2 -type f); do
-    sudo sh -c "cat /dev/null > $f"
+  [[ "$cms_cachedir" == "" ]] && return 11
+  for f in $(sudo find "$cms_cachedir" -mindepth 2 -type f); do
+    sudo truncate -s0 "$f"
   done
   # This is checking shared cache so there's no repo or domain context.
   # But by the test design, we have cern.ch repos only, which we know use zlib right now.
   export CVMFS_COMPRESSION_ALGORITHM=zlib CVMFS_DECOMPRESSION_ALGORITHM=zlib
-  sudo -E cvmfs_config fsck -j8 -p
-  RET=$?
+  expect_exit_code 1 sudo -E cvmfs_config fsck -j8 -p || return 12
   unset CVMFS_COMPRESSION_ALGORITHM CVMFS_DECOMPRESSION_ALGORITHM
-  if [ $RET -ne 1 ]; then
-    return 12
-  fi
   sudo mkdir -p $cms_cachedir/aa
   sudo touch $cms_cachedir/aa/aaaaaaaa # made-up, too short hash
   sudo cvmfs_config fsck -q && return 13

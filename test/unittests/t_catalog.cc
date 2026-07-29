@@ -6,6 +6,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <set>
+
 #include "catalog.h"
 #include "catalog_rw.h"
 #include "compression/compressor.h"
@@ -14,6 +16,7 @@
 #include "crypto/hash.h"
 #include "network/sink_mem.h"
 #include "network/sink_path.h"
+#include "duplex_sqlite3.h"
 #include "shortstring.h"
 #include "testutil.h"
 #include "util/posix.h"
@@ -127,6 +130,37 @@ class T_Catalog : public ::testing::Test {
     delete catalog;
     delete nested;
     RemoveTree(sandbox);
+  }
+
+  /**
+   * Rebuilds the catalog table with the physical column order of a database
+   * that was migrated from schema revision < 7, where mtimens was appended
+   * at the end by ALTER TABLE instead of being created between mtime and
+   * flags.
+   */
+  void RebuildWithTrailingMtimens(const string &db_file) {
+    sqlite3 *db;
+    ASSERT_EQ(SQLITE_OK, sqlite3_open(db_file.c_str(), &db));
+    const char *sql =
+        "BEGIN; "
+        "CREATE TABLE catalog_legacy "
+        "(md5path_1 INTEGER, md5path_2 INTEGER, parent_1 INTEGER, "
+        "parent_2 INTEGER, hardlinks INTEGER, hash BLOB, size INTEGER, "
+        "mode INTEGER, mtime INTEGER, flags INTEGER, name TEXT, symlink TEXT, "
+        "uid INTEGER, gid INTEGER, xattr BLOB, mtimens INTEGER, "
+        "CONSTRAINT pk_catalog PRIMARY KEY (md5path_1, md5path_2)); "
+        "INSERT INTO catalog_legacy (md5path_1, md5path_2, parent_1, parent_2, "
+        "hardlinks, hash, size, mode, mtime, mtimens, flags, name, symlink, "
+        "uid, gid, xattr) "
+        "SELECT md5path_1, md5path_2, parent_1, parent_2, hardlinks, hash, "
+        "size, mode, mtime, mtimens, flags, name, symlink, uid, gid, xattr "
+        "FROM catalog; "
+        "DROP TABLE catalog; "
+        "ALTER TABLE catalog_legacy RENAME TO catalog; "
+        "CREATE INDEX idx_catalog_parent ON catalog (parent_1, parent_2); "
+        "COMMIT;";
+    ASSERT_EQ(SQLITE_OK, sqlite3_exec(db, sql, NULL, NULL, NULL));
+    ASSERT_EQ(SQLITE_OK, sqlite3_close(db));
   }
 
   Catalog *catalog;
@@ -582,6 +616,85 @@ TEST_F(T_Catalog, AttachSchema10) {
   shash::Any hash_compare = shash::MkFromHexPtr(
       shash::HexPtr("0000000000000000000000000000000000000042"));
   EXPECT_EQ(h, hash_compare);
+}
+
+TEST_F(T_Catalog, MergeIntoParentLegacyColumnOrder) {
+  // Merge a freshly created nested catalog into a parent whose catalog table
+  // has the physical column order of a repository migrated from schema
+  // revision < 7 (mtimens as last column).  The copy must map the columns by
+  // name; a positional copy shuffles every column after mtime.
+  const string root_db = CreateCatalogDB("");
+  RebuildWithTrailingMtimens(root_db);
+
+  WritableCatalog *root = WritableCatalog::AttachFreely(
+      "", root_db, shash::Any(shash::kSha1), NULL, false);
+  ASSERT_TRUE(root != NULL);
+  const XattrList no_xattrs;
+  root->AddEntry(
+      DirectoryEntryTestFactory::Directory("dir", 4096, shash::Any(), true),
+      no_xattrs, "/dir", "");
+
+  const string child_db = CreateCatalogDB("/dir");
+  WritableCatalog *child = WritableCatalog::AttachFreely(
+      "/dir", child_db, shash::Any(shash::kSha1), root, true);
+  ASSERT_TRUE(child != NULL);
+  AddEntry(child, "dir", "", S_IFDIR, "");
+  AddEntry(child, "file1", "/dir", S_IFREG,
+           "38be7d1b981f2fb6a4a0a052453f887373dc1fe8", "", true);
+  child->AddFileChunk("/dir/file1", FileChunk());
+  AddEntry(child, "subdir", "/dir", S_IFDIR, "");
+  AddEntry(child, "link1", "/dir", S_IFLNK, "", "/dir/file1");
+  child->Commit();
+
+  shash::Any child_hash = shash::Any(shash::kSha1);
+  ASSERT_TRUE(shash::HashFile(child_db, &child_hash));
+  root->InsertNestedCatalog("/dir", NULL, child_hash, GetFileSize(child_db));
+
+  child->MergeIntoParent();
+  root->Commit();
+  delete child;
+  delete root;
+
+  catalog = catalog::Catalog::AttachFreely("", root_db, shash::Any(), NULL,
+                                           false);
+  ASSERT_TRUE(catalog != NULL);
+
+  DirectoryEntry entry;
+  ASSERT_TRUE(catalog->LookupPath(PathString("/dir"), &entry));
+  EXPECT_TRUE(entry.IsDirectory());
+  EXPECT_FALSE(entry.IsNestedCatalogMountpoint());
+
+  DirectoryEntryList listing;
+  ASSERT_TRUE(catalog->ListingPath(PathString("/dir"), &listing));
+  ASSERT_EQ(3u, listing.size());
+  set<string> listing_names;
+  for (unsigned i = 0; i < listing.size(); ++i)
+    listing_names.insert(listing.at(i).name().ToString());
+  EXPECT_EQ(1u, listing_names.count("file1"));
+  EXPECT_EQ(1u, listing_names.count("link1"));
+  EXPECT_EQ(1u, listing_names.count("subdir"));
+
+  ASSERT_TRUE(catalog->LookupPath(PathString("/dir/file1"), &entry));
+  EXPECT_EQ("file1", entry.name().ToString());
+  EXPECT_TRUE(entry.IsRegular());
+  EXPECT_TRUE(entry.IsChunkedFile());
+  EXPECT_EQ(shash::MkFromHexPtr(
+                shash::HexPtr("38be7d1b981f2fb6a4a0a052453f887373dc1fe8")),
+            entry.checksum());
+
+  ASSERT_TRUE(catalog->LookupPath(PathString("/dir/subdir"), &entry));
+  EXPECT_EQ("subdir", entry.name().ToString());
+  EXPECT_TRUE(entry.IsDirectory());
+
+  ASSERT_TRUE(catalog->LookupPath(PathString("/dir/link1"), &entry));
+  EXPECT_EQ("link1", entry.name().ToString());
+  EXPECT_TRUE(entry.IsLink());
+  EXPECT_EQ("/dir/file1", entry.symlink().ToString());
+
+  FileChunkList chunk_list;
+  EXPECT_TRUE(catalog->ListPathChunks(PathString("/dir/file1"), shash::kSha1,
+                                      &chunk_list));
+  EXPECT_EQ(1u, chunk_list.size());
 }
 
 }  // namespace catalog

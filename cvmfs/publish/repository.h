@@ -305,6 +305,15 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   void EditTags(const std::vector<history::History::Tag> &add_tags,
                 const std::vector<std::string> &rm_tags);
   /**
+   * Edit tags on a gateway repository. The publisher cannot write the tag
+   * database directly, so a lease is acquired and the add/remove is forwarded
+   * to the receiver, which applies it in the commit's history transaction.
+   * The catalog is unchanged, so the commit carries the current root hash as
+   * both old and new hash. Called by EditTags() for gateway storage.
+   */
+  void EditTagsGateway(const std::vector<history::History::Tag> &add_tags,
+                       const std::vector<std::string> &rm_tags);
+  /**
    * Create empty $url/.cvmfs_master_replica
    */
   void MarkReplicatible(bool value);
@@ -358,7 +367,7 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   void CheckTagName(const std::string &name);
 
   void TransactionRetry();
-  void TransactionImpl(bool waiting_on_lease = false);
+  void TransactionImpl();
 
   SettingsPublisher settings_;
   UniquePtr<perf::StatisticsTemplate> statistics_publish_;

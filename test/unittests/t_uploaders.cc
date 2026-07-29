@@ -680,13 +680,12 @@ static void *BatchedRemoveWorker(void *arg) {
 //
 // With batched deletes enabled, the base-class RemoveAsync() increments
 // jobs_in_flight_ for every key while the batch only flushes every
-// kMaxBatchDeleteSize (1000) keys.  jobs_in_flight_ is capped at
-// number_of_concurrent_uploads (default 512) and saturates long before the
-// batch is full, blocking the next RemoveAsync() forever.
-//
-// Enqueuing > 512 but < kMaxBatchDeleteSize keys triggers the deadlock.  The
-// loop runs in a worker thread so the main thread can bail out after a
-// generous timeout if the bug is present.
+// batch_delete_size_ keys.  jobs_in_flight_ is capped at
+// number_of_concurrent_uploads (default 512); historically, a large batch
+// size (1000) let jobs_in_flight_ saturate long before the batch was full,
+// blocking the next RemoveAsync() forever.  The fix decrements
+// jobs_in_flight_ per queued key so only dispatched batches count.  This
+// test enqueues enough keys through the batched path to catch regressions.
 TYPED_TEST(T_Uploaders, BatchedRemoveNoDeadlockSlow) {
   if (!TestFixture::IsS3()) {
     SUCCEED();

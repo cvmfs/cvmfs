@@ -29,8 +29,14 @@ case "$1" in
 	else
 		version_major=$(env -i sh -c '. /etc/os-release; echo $VERSION_ID' | cut -d. -f1)
 		fallback_release=
-    if [ "$ID" = "Ubuntu" ]; then
-      if [ $version_major -ge 22 ]; then
+    if [ "$ID" = "ubuntu" ]; then
+      if [ $version_major -ge 26 ]; then
+        echo "Warning: this distribution is not supported. Using Ubuntu 26.04 packages as fallback."
+        fallback_release=resolute
+      elif [ $version_major -ge 24 ]; then
+        echo "Warning: this distribution is not supported. Using Ubuntu 24.04 packages as fallback."
+        fallback_release=noble
+      elif [ $version_major -ge 22 ]; then
         echo "Warning: this distribution is not supported. Using Ubuntu 22.04 packages as fallback."
         fallback_release=jammy
       elif [ $version_major -ge 20 ]; then

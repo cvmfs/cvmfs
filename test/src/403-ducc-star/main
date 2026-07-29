@@ -61,7 +61,7 @@ EOL
 
     # crete the repository where to store the content
     echo -n "*** Creating CVMFS repo..."
-    create_empty_repo $CVMFS_TEST403_REPOSITORY $USER || return $?
+    create_empty_repo $CVMFS_TEST403_REPOSITORY $CVMFS_TEST_USER || return $?
     echo "done"
 
     # start by running the docker registry on localhost

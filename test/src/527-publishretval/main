@@ -17,11 +17,7 @@ cvmfs_run_test() {
   sudo rm -f /etc/cvmfs/keys/$CVMFS_TEST_REPO.pub
 
   echo "creating CVMFS snapshot"
-  publish_repo $CVMFS_TEST_REPO
-  local retval=$?
-
-  echo "Return value is $retval"
-  if [ $retval -eq 0 ]; then
+  if publish_repo $CVMFS_TEST_REPO; then
     echo "error retval expected but retval was ok"
     return 5
   fi

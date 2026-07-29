@@ -37,6 +37,7 @@ struct Params {
   size_t max_weight;
   size_t min_weight;
   bool upload_stats_db;
+  std::string auto_tag_timespan;
 };
 
 bool GetParamsFromFile(const std::string &repo_name, Params *params);

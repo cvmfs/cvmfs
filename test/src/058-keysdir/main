@@ -11,10 +11,7 @@ cvmfs_run_test() {
   cvmfs_remove_breadcrumb grid.cern.ch
   cvmfs_umount grid.cern.ch
 
-  cvmfs_mount grid.cern.ch "CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/egi.eu/egi.eu.pub"
-  if [ $? -eq 0 ]; then
-    return 10
-  fi
+  cvmfs_mount grid.cern.ch "CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/egi.eu/egi.eu.pub" && return 10
 
   autofs_switch off
   autofs_switch on

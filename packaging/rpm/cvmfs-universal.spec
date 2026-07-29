@@ -74,9 +74,9 @@
 
 Summary: CernVM File System
 Name: cvmfs
-Version: 2.14.0~pre3
+Version: 2.15.0~pre1
 %global base_version %(echo %{version} | cut -d'~' -f1)
-Release: 2%{?dist}
+Release: 1%{?dist}
 URL: https://cernvm.cern.ch/fs/
 Source0: https://ecsft.cern.ch/dist/cvmfs/%{name}-%{version}/%{name}-%{version}.tar.gz
 %if 0%{?selinux_cvmfs}
@@ -111,6 +111,17 @@ BuildRequires: fuse-devel
 %endif
 BuildRequires: fuse3-devel >= 3.3.0
 BuildRequires: libattr-devel
+# nettle is optional in the same sense as protobuf below: the build uses a
+# system nettle >= 3.10 when present and otherwise falls back to the vendored
+# (FetchContent) sources.
+%if 0%{?suse_version}
+BuildRequires: libnettle-devel
+%else
+BuildRequires: nettle-devel
+%endif
+# m4 preprocesses the assembler routines of the vendored nettle build; without
+# it, nettle falls back to the portable C implementations
+BuildRequires: m4
 BuildRequires: openssl-devel
 BuildRequires: patch
 BuildRequires: pkgconfig
@@ -123,6 +134,13 @@ BuildRequires: nlohmann_json-devel
 BuildRequires: json-devel
 %endif
 BuildRequires: libarchive-devel
+# protobuf is optional: the build uses the system package when present and
+# otherwise falls back to the vendored (FetchContent) sources. protoc ships in a
+# separate protobuf-compiler package everywhere except SUSE.
+BuildRequires: protobuf-devel
+%if !0%{?suse_version}
+BuildRequires: protobuf-compiler
+%endif
 %if 0%{?rhel} >= 7 || 0%{?fedora} || 0%{?sle12} || 0%{?sle15}
 BuildRequires: systemd
 %endif
@@ -139,6 +157,9 @@ Requires: fuse
 Requires: curl
 Requires: attr
 Requires: zlib
+%if !0%{?suse_version}
+Requires: protobuf
+%endif
 Requires: gdb
 %if 0%{?suse_version}
 Requires: libarchive13

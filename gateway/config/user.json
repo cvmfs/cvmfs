@@ -1,5 +1,6 @@
 {
     "max_lease_time" : 7200,
+    "lease_refresh_time" : 0,
     "port" : 4929,
     "num_receivers": 1,
     "receiver_path": "/usr/bin/cvmfs_receiver",

@@ -24,7 +24,7 @@ CVMFS_CONFIG_PACKAGE="cvmfs-config-default_2.2-1_all.deb"
 # retrieve the upstream version string from CVMFS
 cvmfs_version="$(get_cvmfs_version_from_cmake $CVMFS_SOURCE_LOCATION)"
 cvmfs_prerelease="$(get_cvmfs_prerelease_from_cmake $CVMFS_SOURCE_LOCATION)"
-echo "detected upstream version: ${cvmfs_version}${cvmfs_preelease}"
+echo "detected upstream version: ${cvmfs_version}${cvmfs_prerelease}"
 
 # generate the release tag for either a nightly build or a release
 if [ $CVMFS_NIGHTLY_BUILD_NUMBER -gt 0 ]; then
@@ -72,14 +72,10 @@ cd $copied_source
 
 . /etc/os-release
 VERSION_NUMBER=$(echo ${VERSION_ID} | tr -d '.')
-BUILD_LIBFUSE2=yes
-if [ "$ID" = "ubuntu" ] && [ ${VERSION_NUMBER} -ge 2504 ]; then
-  BUILD_LIBFUSE2=no
-fi
-if [ "$ID" = "debian" ] && [ ${VERSION_NUMBER} -ge 13 ]; then
-  BUILD_LIBFUSE2=no
-fi
-if [ "${BUILD_LIBUFSE2}" = "yes" ]; then
+# libfuse2 packaging is disabled: libfuse-dev is not available in the build
+# environment and libfuse3 is used on all supported platforms.
+BUILD_LIBFUSE2=no
+if [ "${BUILD_LIBFUSE2}" = "yes" ]; then
   sed -i -e "s/^#BUILD_LIBFUSE2//g" debian/control
   sed -i -e "s/^#BUILD_LIBFUSE2/BUILD_LIBFUSE2/g" debian/rules
 fi
@@ -148,17 +144,22 @@ cd ${CVMFS_RESULT_LOCATION}
 # generating package map section for specific platform
 if [ ! -z $CVMFS_CI_PLATFORM_LABEL ]; then
   echo "generating package map section for ${CVMFS_CI_PLATFORM_LABEL}..."
-  generate_package_map "$CVMFS_CI_PLATFORM_LABEL"                           \
-                       "$(basename $(find . -name 'cvmfs_*.deb'))"          \
-                       "$(basename $(find . -name 'cvmfs-server*.deb'))"    \
-                       "$(basename $(find . -name 'cvmfs-dev*.deb'))"       \
-                       "$(basename $(find . -name 'cvmfs-unittests*.deb'))" \
-                       "$CVMFS_CONFIG_PACKAGE"                              \
-                       "$(basename $(find . -name 'cvmfs-shrinkwrap*.deb'))"\
-                       ""                                                   \
-                       "$(basename $(find . -name 'cvmfs-fuse3*.deb'))"     \
-                       "$(basename $(find . -name 'cvmfs-gateway*.deb'))"   \
-                       "$(basename $(find . -name 'cvmfs-libs*.deb'))"
+  # Return the first .deb matching $1, or empty if none — avoids
+  # `basename: missing operand` when an optional package wasn't built.
+  _find_deb() {
+    find . -maxdepth 2 -name "$1" -printf '%f\n' 2>/dev/null | head -n1
+  }
+  generate_package_map "$CVMFS_CI_PLATFORM_LABEL"      \
+                       "$(_find_deb 'cvmfs_*.deb')"          \
+                       "$(_find_deb 'cvmfs-server*.deb')"    \
+                       "$(_find_deb 'cvmfs-dev*.deb')"       \
+                       "$(_find_deb 'cvmfs-unittests*.deb')" \
+                       "$CVMFS_CONFIG_PACKAGE"               \
+                       "$(_find_deb 'cvmfs-shrinkwrap*.deb')"\
+                       ""                                    \
+                       "$(_find_deb 'cvmfs-fuse3*.deb')"     \
+                       "$(_find_deb 'cvmfs-gateway*.deb')"   \
+                       "$(_find_deb 'cvmfs-libs*.deb')"
 fi
 
 # clean up the source tree

@@ -156,6 +156,11 @@ void Repository::DownloadRootObjects(const std::string &url,
   delete manifest_;
   manifest_ = new manifest::Manifest(*ensemble.manifest);
 
+  // The read-only catalog manager is cached and bound to the previous root
+  // hash; drop it so it is rebuilt against the refreshed manifest on next use.
+  delete simple_catalog_mgr_;
+  simple_catalog_mgr_ = NULL;
+
   std::string reflog_path;
   FILE *reflog_fd = CreateTempFile(tmp_dir + "/reflog", kPrivateFileMode, "w",
                                    &reflog_path);

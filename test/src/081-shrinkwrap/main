@@ -17,6 +17,13 @@ cleanup() {
 cvmfs_run_test() {
     logfile=$1
     local test_location=$2
+
+    if ! command -v cvmfs_shrinkwrap > /dev/null 2>&1; then
+        echo "Warning: cvmfs_shrinkwrap is not available, skipping test"
+        CVMFS_GENERAL_WARNING_FLAG=1
+        return 0
+    fi
+
     workdir=/tmp/cvmfs-test-081-shrinkwrap-workdir
     CVMFS_TEST081_SHRINKWRAP_DEST="$PWD/shrinkwrap-base"
 
@@ -91,8 +98,7 @@ cvmfs_run_test() {
     sudo stat $CVMFS_TEST081_SHRINKWRAP_DEST/.data || return 11
     ls $CVMFS_TEST081_SHRINKWRAP_DEST/.provenance || return 12
 
-    ls $CVMFS_TEST081_SHRINKWRAP_DEST/$repo/lcg/lastUpdate
-    [ $? -ne 0 ] || return 20
+    ls $CVMFS_TEST081_SHRINKWRAP_DEST/$repo/lcg/lastUpdate && return 20
 
     echo "*** Update destination..."
     echo | sudo tee -a $workdir/cvmfs-$repo.spec.txt
@@ -103,6 +109,5 @@ cvmfs_run_test() {
       --dest-base $CVMFS_TEST081_SHRINKWRAP_DEST
     [ $? -eq 0 ] || return 30
     ls $CVMFS_TEST081_SHRINKWRAP_DEST/$repo/lcg/lastUpdate || return 31
-    rm $workdir
     return 0
 }

@@ -8,10 +8,11 @@ set -euo pipefail
 # Options:
 #   -l, --list       List build and runtime dependencies instead of installing
 #   -i, --install    Install build dependencies (default)
+#   --test-deps      Install dependencies needed by integration tests
 #   -h, --help       Show this help
 # Examples:
 #   ci/build_install_builddeps.sh --list
-#   ci/build_install_builddeps.sh --install /path/to/cvmfs
+#   ci/build_install_builddeps.sh --test-deps
 
 ########################
 # Utilities
@@ -94,8 +95,9 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     -l|--list) MODE="list"; shift;;
     -i|--install) MODE="install"; shift;;
+    --test-deps) MODE="test-deps"; shift;;
     -h|--help)
-      sed -n '1,20p' "$0" | sed 's/^# \{0,1\}//'; exit 0;;
+      sed -n '5,15p' "$0" | sed 's/^# \{0,1\}//'; exit 0;;
     --) shift; break;;
     -*) die "Unknown option: $1";;
     *) REPO_ARG="$1"; shift;;
@@ -116,7 +118,7 @@ SUDO=""
 if check_available sudo; then
   SUDO="sudo"
 else
-  if [[ "${MODE}" = "install" ]] && [[ ${EUID:-$(id -u)} -ne 0 ]]; then
+  if [[ "${MODE}" != "list" ]] && [[ ${EUID:-$(id -u)} -ne 0 ]]; then
     die "sudo not found and not running as root; cannot install packages"
   fi
 fi
@@ -255,6 +257,20 @@ install_deps_suse() {
   $SUDO zypper -n install $pkgs
 }
 
+install_test_deps() {
+  log "Installing integration test dependencies"
+  case "$OS_FAMILY" in
+    deb)
+      export DEBIAN_FRONTEND=noninteractive
+      $SUDO apt-get -y update
+      $SUDO apt-get -y install g++
+      ;;
+    rhel) $SUDO dnf -y install gcc-c++;;
+    suse) $SUDO zypper -n install gcc-c++;;
+    *) die "Unsupported OS family for test dependencies: $OS_FAMILY";;
+  esac
+}
+
 ########################
 # Main
 ########################
@@ -283,6 +299,10 @@ case "$MODE" in
     log "Build dependencies installed successfully"
     bootstrap_cmake_if_needed
     bootstrap_golang_if_needed
+    ;;
+  test-deps)
+    install_test_deps
+    log "Integration test dependencies installed successfully"
     ;;
   *) die "Unknown mode: $MODE";;
 esac

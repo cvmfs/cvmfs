@@ -122,7 +122,7 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
   Failures FetchHistory(HistoryTN **history,
                         const shash::Any &history_hash = shash::Any()) {
     // retrieve the current HEAD history hash (if nothing else given)
-    shash::Any effective_history_hash = (!history_hash.IsNull())
+    shash::Any const effective_history_hash = (!history_hash.IsNull())
                                             ? history_hash
                                             : GetHistoryHash();
     if (effective_history_hash.IsNull()) {
@@ -196,7 +196,7 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
     const bool nocache = true;
     auto decomp = zip::Decompressor::Construct(zip::DecompressionAlg::kNoCompression);
     // decomp freeing responsibility is transferred to Fetch()
-    Failures failure = Fetch(kReflogFilename, decomp, nocache, &tmp_path);
+    Failures const failure = Fetch(kReflogFilename, decomp, nocache, &tmp_path);
     if (failure != kFailOk) {
       return failure;
     }
@@ -220,7 +220,7 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
 
   Failures FetchManifest(UniquePtr<manifest::Manifest> *manifest) {
     manifest::Manifest *raw_manifest_ptr = NULL;
-    Failures failure = FetchManifest(&raw_manifest_ptr);
+    Failures const failure = FetchManifest(&raw_manifest_ptr);
     if (failure == kFailOk)
       *manifest = raw_manifest_ptr;
     return failure;
@@ -229,7 +229,7 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
   Failures FetchHistory(UniquePtr<HistoryTN> *history,
                         const shash::Any &history_hash = shash::Any()) {
     HistoryTN *raw_history_ptr = NULL;
-    Failures failure = FetchHistory(&raw_history_ptr, history_hash);
+    Failures const failure = FetchHistory(&raw_history_ptr, history_hash);
     if (failure == kFailOk)
       *history = raw_history_ptr;
     return failure;
@@ -557,7 +557,7 @@ class HttpObjectFetcher : public AbstractObjectFetcher<
 
     // Download manifest file
     struct manifest::ManifestEnsemble manifest_ensemble;
-    manifest::Failures retval = manifest::Fetch(repo_url_,
+    manifest::Failures const retval = manifest::Fetch(repo_url_,
                                                 repo_name_,
                                                 0,
                                                 NULL,
@@ -672,7 +672,7 @@ class HttpObjectFetcher : public AbstractObjectFetcher<
     download::JobInfo download_job(&url, decomp, probe_hosts, expected_hash,
                                    &filesink);
     download_job.SetForceNocache(nocache);
-    download::Failures retval = download_manager_->Fetch(&download_job);
+    download::Failures const retval = download_manager_->Fetch(&download_job);
     const bool success = (retval == download::kFailOk);
     fclose(f);
 

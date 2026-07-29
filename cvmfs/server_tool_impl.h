@@ -7,13 +7,15 @@
 
 #include <string>
 
+#include "server_tool.h"
+
 template<class ObjectFetcherT>
 manifest::Reflog *ServerTool::FetchReflog(ObjectFetcherT *object_fetcher,
                                           const std::string &repo_name,
                                           const shash::Any &reflog_hash) {
   // try to fetch the Reflog from the backend storage first
   manifest::Reflog *reflog = NULL;
-  typename ObjectFetcherT::Failures f = object_fetcher->FetchReflog(reflog_hash,
+  typename ObjectFetcherT::Failures const f = object_fetcher->FetchReflog(reflog_hash,
                                                                     &reflog);
 
   switch (f) {

@@ -39,6 +39,12 @@ func PublishToCVMFSWithLogger(logger *log.Entry, CVMFSRepo string, path string, 
 	}()
 	opLogger.Trace("Start ingesting")
 
+	if MountlessPublishing() {
+		// The deferred cleanup above removes target on success (err == nil).
+		err = publishToCVMFSMountless(logger, CVMFSRepo, path, target)
+		return err
+	}
+
 	repoName, _ := GetRepoAndSubdir(CVMFSRepo)
 	path = PrefixRepoSubdirOnce(CVMFSRepo, path)
 	path = filepath.Join("/", "cvmfs", repoName, path)
@@ -105,6 +111,8 @@ func CreateSymlinkIntoCVMFS(CVMFSRepo, newLinkName, toLinkPath string) (err erro
 
 func CreateSymlinkIntoCVMFSWithLogger(logger *log.Entry, CVMFSRepo, newLinkName, toLinkPath string) (err error) {
 	logger = l.Ensure(logger)
+	// repository-relative link path (kept for the mountless ingest path)
+	repoRelLink := newLinkName
 	// add the necessary prefix
 	newLinkName = filepath.Join("/", "cvmfs", CVMFSRepo, newLinkName)
 	toLinkPath = filepath.Join("/", "cvmfs", CVMFSRepo, toLinkPath)
@@ -116,11 +124,7 @@ func CreateSymlinkIntoCVMFSWithLogger(logger *log.Entry, CVMFSRepo, newLinkName,
 			"target to link": toLinkPath})
 	}
 
-	// check if the file we want to link actually exists
-	if _, err := os.Stat(toLinkPath); os.IsNotExist(err) {
-		return err
-	}
-
+	// Compute the relative link target (pure path arithmetic, no I/O).
 	relativePath, err := filepath.Rel(newLinkName, toLinkPath)
 	if err != nil {
 		llog(l.LogE(err)).Error("Error in find the relative path")
@@ -130,6 +134,16 @@ func CreateSymlinkIntoCVMFSWithLogger(logger *log.Entry, CVMFSRepo, newLinkName,
 	// The part we remove represents the same directory where is the target.
 	linkChunks := strings.Split(relativePath, string(os.PathSeparator))
 	link := filepath.Join(linkChunks[1:]...)
+
+	if MountlessPublishing() {
+		// No mount to stat the target against; create the link via ingest.
+		return createSymlinkMountless(logger, CVMFSRepo, repoRelLink, link)
+	}
+
+	// check if the file we want to link actually exists
+	if _, err := os.Stat(toLinkPath); os.IsNotExist(err) {
+		return err
+	}
 
 	err = WithinTransactionWithLogger(logger, CVMFSRepo, func() error {
 		linkDir := filepath.Dir(newLinkName)
@@ -195,6 +209,11 @@ func CreateVariantSymlinkIntoCVMFSWithLogger(logger *log.Entry, CVMFSRepo, newLi
 			"link name": fullLinkName,
 			"target":    rawTarget,
 		})
+	}
+
+	if MountlessPublishing() {
+		// rawTarget is stored verbatim (it may contain $(...) expansions).
+		return createSymlinkMountless(logger, CVMFSRepo, newLinkName, rawTarget)
 	}
 
 	err = WithinTransactionWithLogger(logger, CVMFSRepo, func() error {

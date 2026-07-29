@@ -3,6 +3,19 @@ cvmfs_test_name="Automatic cleanup when a lease has expired"
 cvmfs_test_autofs_on_startup=false
 cvmfs_test_suites="quick"
 
+CVMFS_TEST_814_USER_JSON=/etc/cvmfs/gateway/user.json
+CVMFS_TEST_814_BACKUP=
+
+# Restore the global gateway config we mutated. Registered as a trap so a failure
+# anywhere between the backup and the inline restore below does not leave
+# max_lease_time=1 installed system-wide, which would break every later run.
+cleanup() {
+    if [ -n "$CVMFS_TEST_814_BACKUP" ] && [ -f "$CVMFS_TEST_814_BACKUP" ]; then
+        echo "*** cleanup: restoring gateway lease config"
+        sudo mv "$CVMFS_TEST_814_BACKUP" "$CVMFS_TEST_814_USER_JSON"
+        restart_repository_gateway
+    fi
+}
 
 cvmfs_run_test() {
     set_up_repository_gateway || return 1
@@ -12,9 +25,11 @@ cvmfs_run_test() {
     cvmfs_server publish test.repo.org     || return 11
 
     echo "*** Reducing lease lifetime"
-    cp /etc/cvmfs/gateway/user.json user.json.orig
-    jq '.max_lease_time = 1' /etc/cvmfs/gateway/user.json > user.json.new
-    sudo mv user.json.new /etc/cvmfs/gateway/user.json
+    CVMFS_TEST_814_BACKUP="$(pwd)/user.json.orig"
+    trap cleanup EXIT HUP INT TERM || return 12
+    cp "$CVMFS_TEST_814_USER_JSON" "$CVMFS_TEST_814_BACKUP" || return 13
+    jq '.max_lease_time = 1' "$CVMFS_TEST_814_USER_JSON" > user.json.new || return 14
+    sudo mv user.json.new "$CVMFS_TEST_814_USER_JSON"
     restart_repository_gateway
 
     echo "*** Transaction should fail but recover through abort -f"
@@ -24,12 +39,11 @@ cvmfs_run_test() {
     cvmfs_server abort -f test.repo.org    || return 22
 
     echo "*** Restore lease lifetime"
-    sudo mv user.json.orig /etc/cvmfs/gateway/user.json
-    restart_repository_gateway
+    cleanup
+    trap - EXIT HUP INT TERM
 
     cvmfs_server transaction test.repo.org/ || return 30
     cvmfs_server publish test.repo.org || return 31
 
     return 0
 }
-

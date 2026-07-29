@@ -233,7 +233,7 @@ cvmfs_run_test() {
     else
         local repo_storage=$(get_local_repo_storage test.repo.org)
     fi
-    find ${repo_storage}/data -type f -name *C 2>/dev/null | rev | cut -d"/" -f 1-2 | rev | tr -d "/C" | sort | uniq > actual_catalogs.txt
+    (set +e; find ${repo_storage}/data -type f -name *C; true) | rev | cut -d"/" -f 1-2 | rev | tr -d "/C" | sort | uniq > actual_catalogs.txt
     diff reflog_catalogs.txt actual_catalogs.txt || return 111
 
     return 0

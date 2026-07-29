@@ -93,10 +93,20 @@ cvmfs_run_test() {
   local secure_mnt_pid=$(get_xattr pid $mntpnt)
   echo "secure mount point has pid $secure_mnt_pid"
   local authz_helper_pid=$(pgrep -P $secure_mnt_pid cvmfs_allow)
+  # a bunch of info about /proc/PID dir, supposed to stay unchanged within process lifetime
+  # but be different if PID gets recycled.
+  local authz_helper_pid_stat=$(stat --terse /proc/"$authz_helper_pid")
   echo "authz helper has pid $authz_helper_pid; killing it."
-  sudo kill -SEGV $authz_helper_pid
+  sudo ps -fu -p "$authz_helper_pid"
+  sudo kill -KILL $authz_helper_pid
+  sudo ps -fu -p "$authz_helper_pid" || true
+  # authz_helper_pid is observed a zombie not reaped by cvmfs2 for a long time. 2026-05-30
+  while [[ -d /proc/"$authz_helper_pid" ]] && [[ "$(stat --terse /proc/"$authz_helper_pid")" == "$authz_helper_pid_stat" ]] && [[ "$(ps -o stat= -p "$authz_helper_pid")" != Z ]]; do
+    sleep 0.1
+  done
+  sudo ps -fu -p "$authz_helper_pid" || true
   echo "authz helper has died, access should fail"
-  sudo -u nobody setsid /bin/sh -c "cat ${mntpnt}/hello_world" && return 74
+  sudo -u nobody setsid -w /bin/sh -c "cat ${mntpnt}/hello_world" && return 74
   echo "Waiting for rate-limit timeout to pass"
   sleep 11
   #
@@ -109,7 +119,7 @@ cvmfs_run_test() {
         --debug || return 75
   echo "Waiting for reload to finish"
   sleep 2
-  sudo -u nobody setsid /bin/sh -c "cat ${mntpnt}/hello_world" || return 76
+  sudo -u nobody setsid -w /bin/sh -c "cat ${mntpnt}/hello_world" || return 76
   local authz_helper_pid_new=$(pgrep -P $secure_mnt_pid cvmfs_allow)
   echo "new authz helper pid $authz_helper_pid_new"
   [ "x$authz_helper_pid_new" = "x" ] && return 77

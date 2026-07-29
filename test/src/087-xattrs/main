@@ -25,6 +25,12 @@ CVMFS_XATTR_PROTECTED_XATTRS=user.fqrn" || return 3
   cvmfs_umount grid.cern.ch || return 2
   echo "  ...Success"
 
+  if [ $(id -u) -eq 0 ]; then
+    echo "  Warning: running as root, cannot verify non-root denial of protected xattrs, skipping"
+    CVMFS_GENERAL_WARNING_FLAG=1
+    return 0
+  fi
+
   echo "  Only root access"
   cvmfs_mount grid.cern.ch "CVMFS_MAGIC_XATTRS_VISIBILITY=always
 CVMFS_XATTR_PROTECTED_XATTRS=user.fqrn" || return 3
@@ -53,7 +59,10 @@ cvmfs_run_test() {
 
   echo "Test listing magic extended attributes"
 
-  local attributes_err=$(list_xattrs /cvmfs/grid.cern.ch 2>&1 1>/dev/null)
+  local attributes_err=$(
+    set +x # disable trace mode if it was enabled
+    list_xattrs /cvmfs/grid.cern.ch 2>&1 1>/dev/null
+  )
   local attributes=$(list_xattrs /cvmfs/grid.cern.ch)
   if [ "x$attributes" = "x" ] || [ "x$attributes_err" != "x" ]; then
     return 2
@@ -61,7 +70,10 @@ cvmfs_run_test() {
 
   echo "Test 'repo_counters' magic extended attribute"
 
-  local repo_counters_err=$(get_xattr repo_counters /cvmfs/grid.cern.ch 2>&1 1>/dev/null)
+  local repo_counters_err=$(
+    set +x
+    get_xattr repo_counters /cvmfs/grid.cern.ch 2>&1 1>/dev/null
+  )
   local repo_counters=$(get_xattr repo_counters /cvmfs/grid.cern.ch)
   if [ "x$repo_counters" = "x" ] || [ "x$repo_counters_err" != "x" ]; then
     return 3
@@ -70,7 +82,10 @@ cvmfs_run_test() {
   echo "Test 'catalog_counters' magic extended attribute"
 
   # test nested catalog counters (test can break if grid.cern.ch repo changes)
-  local catalog_counters_nested_err=$(get_xattr catalog_counters /cvmfs/grid.cern.ch/etc 2>&1 1>/dev/null)
+  local catalog_counters_nested_err=$(
+    set +x
+    get_xattr catalog_counters /cvmfs/grid.cern.ch/etc 2>&1 1>/dev/null
+  )
   local catalog_counters_nested=$(get_xattr catalog_counters /cvmfs/grid.cern.ch/etc)
   if [ "x$catalog_counters_nested" = "x" ] || [ "x$catalog_counters_nested_err" != "x" ]; then
     return 4
@@ -109,7 +124,10 @@ cvmfs_run_test() {
 
   echo "Test 'cleanup_unused_first' magic extended attribute"
 
-  local cleanup_unused_first_err=$(get_xattr cleanup_unused_first /cvmfs/grid.cern.ch 2>&1 1>/dev/null)
+  local cleanup_unused_first_err=$(
+    set +x
+    get_xattr cleanup_unused_first /cvmfs/grid.cern.ch 2>&1 1>/dev/null
+  )
   local cleanup_unused_first=$(get_xattr cleanup_unused_first /cvmfs/grid.cern.ch)
   if [ "x$cleanup_unused_first" = "x" ] || [ "x$cleanup_unused_first_err" != "x" ]; then
     return 13
@@ -117,7 +135,10 @@ cvmfs_run_test() {
 
   echo "Test 'list_open_hashes' magic extended attribute"
 
-  local list_open_hashes_err=$(get_xattr list_open_hashes /cvmfs/grid.cern.ch 2>&1 1>/dev/null)
+  local list_open_hashes_err=$(
+    set +x
+    get_xattr list_open_hashes /cvmfs/grid.cern.ch 2>&1 1>/dev/null
+  )
   local list_open_hashes=$(get_xattr list_open_hashes /cvmfs/grid.cern.ch)
   if [ "$cleanup_unused_first" = "yes" ]; then
     if [ "x$list_open_hashes" = "x" ] || [ "x$list_open_hashes_err" != "x" ]; then
@@ -177,11 +198,6 @@ Pages available: 1"
   [ "x$info_machine" != "$info_machine_correct" ] || return 41
 
   echo "*** Check invalid input for num pages"
-  negative_num=$(get_xattr proxy_list@-2 /cvmfs/grid.cern.ch/README 2>&1)
-  large_num=$(get_xattr proxy_list~1000 /cvmfs/grid.cern.ch/README 2>&1)  
-  letters_num=$(get_xattr proxy_list~xxx /cvmfs/grid.cern.ch/README 2>&1) 
-  nothing=$(get_xattr proxy_list@ /cvmfs/grid.cern.ch/README 2>&1) 
-
   local error
   if running_on_osx; then
     error="No message available on STREAM"
@@ -189,18 +205,14 @@ Pages available: 1"
     error="attr_get: No data available"
   fi
 
-  if echo $negative_num | grep -v "$error"; then
-    return 50
-  fi
-  if echo $large_num | grep -v "$error"; then
-    return 51
-  fi
-  if echo $letters_num | grep -v "$error"; then
-    return 52
-  fi
-  if echo $nothing | grep -v "$error"; then
-    return 53
-  fi
+  # negative
+  get_xattr proxy_list@-2 /cvmfs/grid.cern.ch/README 2>&1 | grep -v "$error" && return 50
+  # large_num
+  get_xattr proxy_list~1000 /cvmfs/grid.cern.ch/README 2>&1 | grep -v "$error" && return 51
+  # letters
+  get_xattr proxy_list~xxx /cvmfs/grid.cern.ch/README 2>&1 | grep -v "$error" && return 52
+  # nothing
+  get_xattr proxy_list@ /cvmfs/grid.cern.ch/README 2>&1 | grep -v "$error" && return 53
 
   cvmfs_umount grid.cern.ch || return 2
 

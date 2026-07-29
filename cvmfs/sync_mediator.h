@@ -115,7 +115,10 @@ class AbstractSyncMediator {
   virtual void Touch(SharedPtr<SyncItem> entry) = 0;
   virtual void Remove(SharedPtr<SyncItem> entry, bool fast_delete = false) = 0;
   virtual void Replace(SharedPtr<SyncItem> entry) = 0;
-  virtual void Clone(const std::string from, const std::string to) = 0;
+  // Returns false if the source was missing and fail_if_source_missing was
+  // false (the clone was skipped); true otherwise.
+  virtual bool Clone(const std::string from, const std::string to,
+                     bool fail_if_source_missing) = 0;
 
   virtual void AddUnmaterializedDirectory(SharedPtr<SyncItem> entry) = 0;
 
@@ -133,6 +136,12 @@ class AbstractSyncMediator {
  * Mapping of inode number to the related HardlinkGroup.
  */
 typedef std::map<uint64_t, HardlinkGroup> HardlinkGroupMap;
+
+/**
+ * List of bundle specification files found in a certain directory
+ * (non-recursive).
+ */
+typedef std::vector<std::string> BundleSpecs;
 
 /**
  * The SyncMediator refines the input received from a concrete UnionSync object.
@@ -158,7 +167,8 @@ class SyncMediator : public virtual AbstractSyncMediator {
   void Touch(SharedPtr<SyncItem> entry);
   void Remove(SharedPtr<SyncItem> entry, bool fast_delete = false);
   void Replace(SharedPtr<SyncItem> entry);
-  void Clone(const std::string from, const std::string to);
+  bool Clone(const std::string from, const std::string to,
+             bool fail_if_source_missing);
 
   void AddUnmaterializedDirectory(SharedPtr<SyncItem> entry);
 
@@ -245,6 +255,10 @@ class SyncMediator : public virtual AbstractSyncMediator {
   void PublishFilesCallback(const upload::SpoolerResult &result);
   void PublishHardlinksCallback(const upload::SpoolerResult &result);
 
+  std::string GetBundleTriggerPath(SharedPtr<SyncItem> bundle_spec_entry) const;
+  void InsertBundleSpec(SharedPtr<SyncItem> entry);
+  void AddBundleSpecs();
+
   // Hardlink handling
   void CompleteHardlinks(SharedPtr<SyncItem> entry);
   HardlinkGroupMap &GetHardlinkMap() { return hardlink_stack_.top(); }
@@ -288,6 +302,15 @@ class SyncMediator : public virtual AbstractSyncMediator {
    * popped and the HardlinkGroupMap is processed.
    */
   HardlinkGroupMapStack hardlink_stack_;
+
+  /**
+   * Files that trigger preloading a file bundle have a .cvmfsbundle-<filename>
+   * bundle specification file. We don't know in which order we encounter the
+   * main file and the bundle specification file. So we pick up all the bundle
+   * specifications first and compare them to the present files at the end of
+   * the transaction.
+   */
+  BundleSpecs bundle_specs_;
 
   /**
    * New and modified files are sent to an external spooler for hashing and

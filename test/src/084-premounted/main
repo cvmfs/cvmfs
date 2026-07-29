@@ -21,6 +21,12 @@ cvmfs_run_test() {
   local sourcedir="$2"
   workdir="$PWD"
 
+  if [ $(id -u) -eq 0 ]; then
+    echo "Warning: this test must run as a normal user, skipping test"
+    CVMFS_GENERAL_WARNING_FLAG=1
+    return 0
+  fi
+
   echo "*** creating fuse-premount"
   cc -o $workdir/fuse_premount "$sourcedir/fuse_premount.c" || return 1
   CVMFS_TEST084_FUSEPREMOUNT=$workdir/fuse_premount

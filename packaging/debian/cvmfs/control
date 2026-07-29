@@ -13,14 +13,18 @@ Build-Depends:
  libarchive-dev,
  libcap-dev,
  libssl-dev,
+ nettle-dev,
  libattr1-dev,
  libz-dev,
+ m4,
  patch,
  pkg-config,
  python3-dev,
  python3-setuptools,
  unzip,
  nlohmann-json3-dev,
+ libprotobuf-dev,
+ protobuf-compiler,
  uuid-dev
 Standards-Version: 3.9.6.1
 Homepage: http://cernvm.cern.ch/portal/filesystem

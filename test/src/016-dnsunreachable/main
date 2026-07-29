@@ -29,7 +29,8 @@ cvmfs_run_test() {
   echo "trying to mount again with unreachable DNS"
   local milliseconds
   cvmfs_disable_config_repository
-  milliseconds=$(stop_watch do_faulty_mount)
+  # should fail
+  milliseconds=$(stop_watch do_faulty_mount) && return 4
   cvmfs_enable_config_repository
   echo "timeout was $milliseconds seconds"
 
