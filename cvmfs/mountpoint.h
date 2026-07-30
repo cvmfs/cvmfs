@@ -568,6 +568,8 @@ class MountPoint : SingleCopy, public BootFactory {
   glue::InodeTracker *inode_tracker() { return inode_tracker_; }
   lru::InodeCache *inode_cache() { return inode_cache_; }
   double kcache_timeout_sec() { return kcache_timeout_sec_; }
+  bool fuse_dir_cache() { return fuse_dir_cache_; }
+  bool fuse_keep_dir_cache() { return fuse_keep_dir_cache_; }
   lru::Md5PathCache *md5path_cache() { return md5path_cache_; }
   std::string membership_req() { return membership_req_; }
   glue::DentryTracker *dentry_tracker() { return dentry_tracker_; }
@@ -738,6 +740,8 @@ class MountPoint : SingleCopy, public BootFactory {
   unsigned max_ttl_sec_;
   pthread_mutex_t lock_max_ttl_;
   double kcache_timeout_sec_;
+  bool fuse_dir_cache_;
+  bool fuse_keep_dir_cache_;
   bool fixed_catalog_;
   bool enforce_acls_;
   bool cache_symlinks_;
