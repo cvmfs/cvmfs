@@ -2003,6 +2003,10 @@ Failures DownloadManager::Fetch(JobInfo *info) {
     info->GetHashContextPtr()->buffer = alloca(info->hash_context().size);
   }
 
+  // Clear out any saved Links in case this will be a metalink request and
+  // previous non-metalink requests sent Link headers
+  info->SetLink("");
+
   // Prepare cvmfs-info: header, allocate string on the stack
   info->SetInfoHeader(NULL);
   if (enable_info_header_) {
