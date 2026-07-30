@@ -69,6 +69,8 @@ if (BUILD_LIBCVMFS_CACHE)
                          cvmfs_crypto
                          cvmfs_util
                          GTest::gtest
+                         CURL::libcurl
+                         c-ares::cares
                          ${ZLIB_LIBRARIES}
                          ${ZSTD_LIBRARIES}
                          ${RT_LIBRARY}

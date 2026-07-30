@@ -1665,7 +1665,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     if (info->expected_hash()) {
       shash::Init(info->hash_context());
     }
-    if (info->compressed() && !defer_reset) {
+    if (!defer_reset) {
       info->ResetDecompression();
     }
     if (defer_reset) {
@@ -1755,8 +1755,6 @@ verify_and_finalize_stop:
     if (info->sink() != NULL && info->sink()->Flush() != 0) {
       info->SetErrorCode(kFailLocalIO);
     }
-    if (info->compressed())
-      zlib::DecompressFini(info->GetZstreamPtr());
   }
 
   if (info->headers()) {
@@ -2027,10 +2025,7 @@ Failures DownloadManager::Fetch(JobInfo *info) {
         // superseded by a retry / host fail-over (VerifyAndFinalize enqueued
         // this marker). Discard their — possibly corrupt — decompressed output
         // and start fresh so the next attempt's bytes are processed cleanly.
-        if (info->compressed()) {
-          zlib::DecompressFini(info->GetZstreamPtr());
-          zlib::DecompressInit(info->GetZstreamPtr());
-        }
+        info->ResetDecompression();
         if (info->sink() != NULL && info->sink()->Reset() != 0) {
           decompress_err = kFailLocalIO;
         } else {
@@ -2041,31 +2036,9 @@ Failures DownloadManager::Fetch(JobInfo *info) {
       }
 
       if (decompress_err == kFailOk && ele->size > 0) {
-        if (info->compressed()) {
-          const zlib::StreamStates retval = zlib::DecompressZStream2Sink(
-              ele->data, static_cast<int64_t>(ele->size),
-              info->GetZstreamPtr(), info->sink());
-          if (retval == zlib::kStreamDataError) {
-            LogCvmfs(kLogDownload, kLogSyslogErr,
-                     "(id %" PRId64 ") failed to decompress %s",
-                     info->id(), info->url()->c_str());
-            decompress_err = kFailBadData;
-          } else if (retval == zlib::kStreamIOError) {
-            LogCvmfs(kLogDownload, kLogSyslogErr,
-                     "(id %" PRId64 ") decompressing %s, local IO error",
-                     info->id(), info->url()->c_str());
-            decompress_err = kFailLocalIO;
-          }
-        } else {
-          const int64_t written = info->sink()->Write(ele->data, ele->size);
-          if (written < 0 ||
-              static_cast<uint64_t>(written) != ele->size) {
-            LogCvmfs(kLogDownload, kLogDebug,
-                     "(id %" PRId64 ") sink write failed for %s (%ld of %zu)",
-                     info->id(), info->url()->c_str(),
-                     static_cast<long>(written), ele->size);
-            decompress_err = kFailLocalIO;
-          }
+        zip::InputMem in_mem(reinterpret_cast<unsigned char*>(ele->data), ele->size);
+        if (!info->DecompressToSink(&in_mem)) {
+          decompress_err = kFailLocalIO;
         }
       }
       delete ele;
@@ -2079,9 +2052,6 @@ Failures DownloadManager::Fetch(JobInfo *info) {
       if (info->sink() != NULL && info->sink()->Flush() != 0) {
         decompress_err = kFailLocalIO;
       }
-    }
-    if (info->compressed()) {
-      zlib::DecompressFini(info->GetZstreamPtr());
     }
     if (result == kFailOk && decompress_err != kFailOk) {
       result = decompress_err;

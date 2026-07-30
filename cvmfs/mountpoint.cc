@@ -1620,7 +1620,7 @@ void MountPoint::SetupPartialReplica() {
   // Probe for the partial replication spec file
   const string spec_url = primary_url + "/.cvmfs_partial_replication";
   cvmfs::MemSink spec_memsink;
-  download::JobInfo probe_job(&spec_url, false, false, NULL, &spec_memsink);
+  download::JobInfo probe_job(&spec_url, zip::DecompressionAlg::kNoCompression, false, NULL, &spec_memsink);
   const download::Failures probe_result = download_mgr_->Fetch(&probe_job);
 
   if (probe_result != download::kFailOk) {

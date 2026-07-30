@@ -12,6 +12,7 @@
 #include <cstdlib>  // for rand()
 
 #include "c_file_sandbox.h"
+#include "compression/compression.h"
 #include "compression/compressor.h"
 #include "compression/compressor_zlib.h"
 #include "compression/decompressor.h"
@@ -1087,7 +1088,7 @@ TEST(T_DeflateFingerprint, MatchesVendoredZlib) {
   for (size_t i = 0; i < kTotal; ++i)
     data[i] = prng.Next(256);
 
-  UniquePtr<Compressor> compressor(Compressor::Construct(kZlibDefault));
+  UniquePtr<zlib::Compressor> compressor(zlib::Compressor::Construct(zlib::kZlibDefault));
   std::vector<unsigned char> outbuf(kOutBlock);
   uLong crc = crc32(0L, Z_NULL, 0);
   size_t pos = 0;

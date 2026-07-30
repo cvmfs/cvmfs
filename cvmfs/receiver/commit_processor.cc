@@ -345,7 +345,7 @@ CommitProcessor::Result CommitProcessor::Process(
       // the catalog database, not of the compressed CAS object.  Compare
       // CommandCheck::FetchCatalog, which validates this column against the
       // size of the decompressed catalog.
-      download::JobInfo dl_job(&catalog_url, true, false, &expected,
+      download::JobInfo dl_job(&catalog_url, zip::DecompressionAlg::kGuessDecompression, false, &expected,
                                &catalog_sink);
       const download::Failures dl_ret =
           server_tool->download_manager()->Fetch(&dl_job);

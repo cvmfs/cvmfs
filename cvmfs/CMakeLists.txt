@@ -583,6 +583,8 @@ if (BUILD_LIBCVMFS_CACHE)
                          cvmfs_util_debug
                          ${ZLIB_LIBRARIES}
                          ${ZSTD_LIBRARIES}
+                         CURL::libcurl
+                         c-ares::cares
                          pthread
   )
 
