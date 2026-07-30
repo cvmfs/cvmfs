@@ -1061,7 +1061,10 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
   // This affects only reads on the same open directory handle (e.g. multiple
   // reads with rewinddir() between them).  A new opendir on the same directory
   // will trigger readdir calls independently of this setting.
-  fi->cache_readdir = 1;
+  fi->cache_readdir = mount_point_->fuse_dir_cache();
+
+  // Whether to let the cached data survive fd closing.
+  fi->keep_cache = mount_point_->fuse_keep_dir_cache();
 #endif
   fuse_reply_open(req, fi);
 }

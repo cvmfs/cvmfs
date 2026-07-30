@@ -2020,6 +2020,8 @@ MountPoint::MountPoint(const string &fqrn,
     , resolv_conf_watcher_(NULL)
     , max_ttl_sec_(kDefaultMaxTtlSec)
     , kcache_timeout_sec_(static_cast<double>(kDefaultKCacheTtlSec))
+    , fuse_dir_cache_(true)
+    , fuse_keep_dir_cache_(false)
     , fixed_catalog_(false)
     , enforce_acls_(false)
     , cache_symlinks_(false)
@@ -2118,6 +2120,26 @@ bool MountPoint::SetupBehavior() {
   }
   LogCvmfs(kLogCvmfs, kLogDebug, "kernel caches expire after %d seconds",
            static_cast<int>(kcache_timeout_sec_));
+
+  if (options_mgr_->GetValue("CVMFS_FUSE_DIR_CACHE", &optarg)) {
+    if (options_mgr_->IsOn(optarg) || options_mgr_->IsOff(optarg)) {
+      fuse_dir_cache_ = options_mgr_->IsOn(optarg);
+    } else {
+      LogCvmfs(kLogCvmfs, kLogSyslogWarn | kLogDebug,
+               "CVMFS_FUSE_DIR_CACHE value '%s' not boolean",
+               optarg.c_str());
+    }
+  }
+
+  if (options_mgr_->GetValue("CVMFS_FUSE_KEEP_DIR_CACHE", &optarg)) {
+    if (options_mgr_->IsOn(optarg) || options_mgr_->IsOff(optarg)) {
+      fuse_keep_dir_cache_ = options_mgr_->IsOn(optarg);
+    } else {
+      LogCvmfs(kLogCvmfs, kLogSyslogWarn | kLogDebug,
+               "CVMFS_FUSE_KEEP_DIR_CACHE value '%s' not boolean",
+               optarg.c_str());
+    }
+  }
 
   uint64_t statfs_time_cache_valid = 0;
   if (options_mgr_->GetValue("CVMFS_STATFS_CACHE_TIMEOUT", &optarg)) {
