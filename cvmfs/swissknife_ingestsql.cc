@@ -244,7 +244,8 @@ static uint64_t make_commit_on_gateway(const std::string &old_root_hash,
                               + "\",\n\"priority\": " + priorityStr + "}";
 
   return MakeEndRequest("POST", g_gateway_key_id, g_gateway_secret,
-                        g_session_token, g_gateway_url, payload, &buffer, true /*expect_final_revision*/);
+                        g_session_token, g_gateway_url, payload, &buffer,
+                        true /*expect_final_revision*/);
 }
 
 static void refresh_lease() {
@@ -255,7 +256,8 @@ static void refresh_lease() {
   }
 
   if (MakeEndRequest("PATCH", g_gateway_key_id, g_gateway_secret,
-                     g_session_token, g_gateway_url, "", &buffer, false /*expect_final_revision*/)) {
+                     g_session_token, g_gateway_url, "", &buffer,
+                     false /*expect_final_revision*/)) {
     const int ret = ParseDropReply(buffer);
     if (kLeaseReplySuccess == ret) {
       LogCvmfs(kLogCvmfs, kLogVerboseMsg, "Lease refreshed");
@@ -277,7 +279,8 @@ static void refresh_lease() {
 static void cancel_lease() {
   CurlBuffer buffer;
   if (MakeEndRequest("DELETE", g_gateway_key_id, g_gateway_secret,
-                     g_session_token, g_gateway_url, "", &buffer, false /*expect_final_revision*/)) {
+                     g_session_token, g_gateway_url, "", &buffer,
+                     false /*expect_final_revision*/)) {
     const int ret = ParseDropReply(buffer);
     if (kLeaseReplySuccess == ret) {
       LogCvmfs(kLogCvmfs, kLogStdout, "Lease cancelled");
@@ -767,7 +770,7 @@ int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
   std::unique_ptr<upload::Spooler> const spooler_catalogs(
       upload::Spooler::Construct(spooler_definition_catalogs, nullptr));
 
-  if (spooler_catalogs.get()==nullptr) {
+  if (spooler_catalogs.get() == nullptr) {
     LogCvmfs(kLogCvmfs, kLogStderr, "spooler_catalogs invalid");
     cancel_lease();
     return 1;
@@ -785,9 +788,9 @@ int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
 
   std::unique_ptr<manifest::Manifest> manifest;
 
-  manifest .reset(  FetchRemoteManifest(stratum0, repo_name, shash::Any()) );
+  manifest.reset(FetchRemoteManifest(stratum0, repo_name, shash::Any()));
 
-  if (manifest.get()==nullptr) {
+  if (manifest.get() == nullptr) {
     LogCvmfs(kLogCvmfs, kLogStderr, "manifest invalid");
     cancel_lease();
     return 1;
@@ -839,8 +842,8 @@ int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
   bool const is_balanced = false;
 
   catalog::WritableCatalogManager catalog_manager(
-      base_hash, stratum0, dir_temp, spooler_catalogs.get(),
-      download_manager(), false, SyncParameters::kDefaultNestedKcatalogLimit,
+      base_hash, stratum0, dir_temp, spooler_catalogs.get(), download_manager(),
+      false, SyncParameters::kDefaultNestedKcatalogLimit,
       SyncParameters::kDefaultRootKcatalogLimit,
       SyncParameters::kDefaultFileMbyteLimit, statistics(), is_balanced,
       SyncParameters::kDefaultMaxWeight, SyncParameters::kDefaultMinWeight,

@@ -8,6 +8,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -24,7 +25,6 @@
 #include "testutil.h"
 #include "upload.h"
 #include "upload_spooler_definition.h"
-#include <memory>
 #include "util/posix.h"
 #include "util/uuid.h"
 
@@ -463,7 +463,8 @@ TEST_F(T_MountPoint, MountLatest) {
   options_mgr_.UnsetValue("CVMFS_ROOT_HASH");
 
   {
-    std::unique_ptr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.get()));
+    std::unique_ptr<MountPoint> mp(
+        MountPoint::Create("keys.cern.ch", fs.get()));
     EXPECT_EQ(loader::kFailOk, mp->boot_status());
     EXPECT_EQ(root_hash, mp->catalog_mgr()->GetRootHash().ToString());
     EXPECT_TRUE(fs->cache_mgr()->LoadBreadcrumb("keys.cern.ch").IsValid());
@@ -471,7 +472,8 @@ TEST_F(T_MountPoint, MountLatest) {
 
   // Again to check proper cleanup
   {
-    std::unique_ptr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.get()));
+    std::unique_ptr<MountPoint> mp(
+        MountPoint::Create("keys.cern.ch", fs.get()));
     EXPECT_EQ(loader::kFailOk, mp->boot_status());
   }
 }
@@ -482,10 +484,12 @@ TEST_F(T_MountPoint, MountMulti) {
   std::unique_ptr<FileSystem> fs(FileSystem::Create(fs_info_));
   ASSERT_EQ(loader::kFailOk, fs->boot_status());
 
-  std::unique_ptr<MountPoint> mp01(MountPoint::Create("keys.cern.ch", fs.get()));
+  std::unique_ptr<MountPoint> mp01(
+      MountPoint::Create("keys.cern.ch", fs.get()));
   EXPECT_EQ(loader::kFailOk, mp01->boot_status());
 
-  std::unique_ptr<MountPoint> mp02(MountPoint::Create("keys.cern.ch", fs.get()));
+  std::unique_ptr<MountPoint> mp02(
+      MountPoint::Create("keys.cern.ch", fs.get()));
   EXPECT_EQ(loader::kFailOk, mp02->boot_status());
 }
 
@@ -538,7 +542,8 @@ TEST_F(T_MountPoint, Blacklist) {
   {
     std::unique_ptr<FileSystem> fs(FileSystem::Create(fs_info_));
     ASSERT_EQ(loader::kFailOk, fs->boot_status());
-    std::unique_ptr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.get()));
+    std::unique_ptr<MountPoint> mp(
+        MountPoint::Create("keys.cern.ch", fs.get()));
     EXPECT_EQ(loader::kFailOk, mp->boot_status());
     EXPECT_TRUE(mp->ReloadBlacklists());
   }
@@ -550,7 +555,8 @@ TEST_F(T_MountPoint, Blacklist) {
   {
     std::unique_ptr<FileSystem> fs(FileSystem::Create(fs_info_));
     ASSERT_EQ(loader::kFailOk, fs->boot_status());
-    std::unique_ptr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.get()));
+    std::unique_ptr<MountPoint> mp(
+        MountPoint::Create("keys.cern.ch", fs.get()));
     EXPECT_EQ(loader::kFailRevisionBlacklisted, mp->boot_status());
   }
 
@@ -561,7 +567,8 @@ TEST_F(T_MountPoint, Blacklist) {
   {
     std::unique_ptr<FileSystem> fs(FileSystem::Create(fs_info_));
     ASSERT_EQ(loader::kFailOk, fs->boot_status());
-    std::unique_ptr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.get()));
+    std::unique_ptr<MountPoint> mp(
+        MountPoint::Create("keys.cern.ch", fs.get()));
     EXPECT_EQ(loader::kFailCatalog, mp->boot_status());
   }
 
@@ -570,7 +577,8 @@ TEST_F(T_MountPoint, Blacklist) {
   {
     std::unique_ptr<FileSystem> fs(FileSystem::Create(fs_info_));
     ASSERT_EQ(loader::kFailOk, fs->boot_status());
-    std::unique_ptr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.get()));
+    std::unique_ptr<MountPoint> mp(
+        MountPoint::Create("keys.cern.ch", fs.get()));
     EXPECT_EQ(loader::kFailOk, mp->boot_status());
     EXPECT_TRUE(mp->ReloadBlacklists());
   }
@@ -581,7 +589,8 @@ TEST_F(T_MountPoint, Blacklist) {
   {
     std::unique_ptr<FileSystem> fs(FileSystem::Create(fs_info_));
     ASSERT_EQ(loader::kFailOk, fs->boot_status());
-    std::unique_ptr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.get()));
+    std::unique_ptr<MountPoint> mp(
+        MountPoint::Create("keys.cern.ch", fs.get()));
     EXPECT_EQ(loader::kFailCatalog, mp->boot_status());
   }
 }
@@ -595,7 +604,8 @@ TEST_F(T_MountPoint, History) {
 
   options_mgr_.SetValue("CVMFS_REPOSITORY_DATE", "1984-03-04T00:00:00Z");
   {
-    std::unique_ptr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.get()));
+    std::unique_ptr<MountPoint> mp(
+        MountPoint::Create("keys.cern.ch", fs.get()));
     EXPECT_EQ(loader::kFailHistory, mp->boot_status());
   }
 
@@ -605,19 +615,22 @@ TEST_F(T_MountPoint, History) {
     options_mgr_.SetValue("CVMFS_REPOSITORY_DATE", "2038-01-01T00:00:00Z");
   }
   {
-    std::unique_ptr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.get()));
+    std::unique_ptr<MountPoint> mp(
+        MountPoint::Create("keys.cern.ch", fs.get()));
     EXPECT_EQ(loader::kFailOk, mp->boot_status());
   }
 
   options_mgr_.SetValue("CVMFS_REPOSITORY_TAG", "no-such-tag");
   {
-    std::unique_ptr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.get()));
+    std::unique_ptr<MountPoint> mp(
+        MountPoint::Create("keys.cern.ch", fs.get()));
     EXPECT_EQ(loader::kFailHistory, mp->boot_status());
   }
 
   options_mgr_.SetValue("CVMFS_REPOSITORY_TAG", "snapshot");
   {
-    std::unique_ptr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.get()));
+    std::unique_ptr<MountPoint> mp(
+        MountPoint::Create("keys.cern.ch", fs.get()));
     EXPECT_EQ(loader::kFailOk, mp->boot_status());
   }
 }
@@ -636,7 +649,8 @@ TEST_F(T_MountPoint, MaxServers) {
 
   options_mgr_.SetValue("CVMFS_MAX_SERVERS", "10");
   {
-    std::unique_ptr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.get()));
+    std::unique_ptr<MountPoint> mp(
+        MountPoint::Create("keys.cern.ch", fs.get()));
     ASSERT_EQ(loader::kFailOk, mp->boot_status());
     mp->download_mgr()->GetHostInfo(&host_chain, NULL, NULL);
     EXPECT_EQ(2U, host_chain.size());
@@ -646,7 +660,8 @@ TEST_F(T_MountPoint, MaxServers) {
 
   options_mgr_.SetValue("CVMFS_EXTERNAL_MAX_SERVERS", "10");
   {
-    std::unique_ptr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.get()));
+    std::unique_ptr<MountPoint> mp(
+        MountPoint::Create("keys.cern.ch", fs.get()));
     ASSERT_EQ(loader::kFailOk, mp->boot_status());
     mp->external_download_mgr()->GetHostInfo(&host_chain, NULL, NULL);
     // Host chain has been set to one empty string in SetupExternalDownloadMgr
@@ -657,7 +672,8 @@ TEST_F(T_MountPoint, MaxServers) {
   options_mgr_.SetValue("CVMFS_MAX_SERVERS", "1");
   options_mgr_.SetValue("CVMFS_EXTERNAL_MAX_SERVERS", "1");
   {
-    std::unique_ptr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.get()));
+    std::unique_ptr<MountPoint> mp(
+        MountPoint::Create("keys.cern.ch", fs.get()));
     ASSERT_EQ(loader::kFailOk, mp->boot_status());
     mp->download_mgr()->GetHostInfo(&host_chain, NULL, NULL);
     EXPECT_EQ(1U, host_chain.size());
@@ -668,7 +684,8 @@ TEST_F(T_MountPoint, MaxServers) {
   options_mgr_.SetValue("CVMFS_MAX_SERVERS", "0");
   options_mgr_.SetValue("CVMFS_EXTERNAL_MAX_SERVERS", "0");
   {
-    std::unique_ptr<MountPoint> mp(MountPoint::Create("keys.cern.ch", fs.get()));
+    std::unique_ptr<MountPoint> mp(
+        MountPoint::Create("keys.cern.ch", fs.get()));
     ASSERT_EQ(loader::kFailOk, mp->boot_status());
     mp->download_mgr()->GetHostInfo(&host_chain, NULL, NULL);
     EXPECT_EQ(2U, host_chain.size());

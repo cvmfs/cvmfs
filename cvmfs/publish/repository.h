@@ -5,6 +5,7 @@
 #ifndef CVMFS_PUBLISH_REPOSITORY_H_
 #define CVMFS_PUBLISH_REPOSITORY_H_
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -13,7 +14,6 @@
 #include "publish/settings.h"
 #include "repository_util.h"
 #include "upload_spooler_result.h"
-#include <memory>
 #include "util/single_copy.h"
 
 namespace catalog {

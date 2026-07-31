@@ -6,13 +6,13 @@
 #include <unistd.h>
 
 #include <cassert>
+#include <memory>
 #include <string>
 
 #include "aux/tar_files.h"
 #include "mock/m_sync_mediator.h"
 #include "sync_item.h"
 #include "sync_union_tarball.h"
-#include <memory>
 #include "util/posix.h"
 #include "util/string.h"
 
@@ -20,7 +20,7 @@ namespace {
 
 class T_SyncUnionTarball : public ::testing::Test {
  protected:
-  void SetUp() { m_sync_mediator_ .reset(  new publish::MockSyncMediator() ); }
+  void SetUp() { m_sync_mediator_.reset(new publish::MockSyncMediator()); }
 
   std::string CreateTarFile(const std::string &tar_filename,
                             const std::string &base64_data) {
@@ -44,9 +44,8 @@ class T_SyncUnionTarball : public ::testing::Test {
 
 TEST_F(T_SyncUnionTarball, Simple) {
   std::string tar_filename = CreateTarFile("tar.tar", simple_tar);
-  publish::SyncUnionTarball sync_union(m_sync_mediator_.get(), "",
-                                       tar_filename, "tmpsync", -1u, -1u, "",
-                                       false);
+  publish::SyncUnionTarball sync_union(m_sync_mediator_.get(), "", tar_filename,
+                                       "tmpsync", -1u, -1u, "", false);
 
   EXPECT_TRUE(sync_union.Initialize());
   EXPECT_EQ(1, m_sync_mediator_->n_register);
@@ -58,9 +57,8 @@ TEST_F(T_SyncUnionTarball, Simple) {
 
 TEST_F(T_SyncUnionTarball, FourEmptyFiles) {
   std::string tar_filename = CreateTarFile("tar.tar", four_empty_files);
-  publish::SyncUnionTarball sync_union(m_sync_mediator_.get(), "",
-                                       tar_filename, "tmpsync", -1u, -1u, "",
-                                       false);
+  publish::SyncUnionTarball sync_union(m_sync_mediator_.get(), "", tar_filename,
+                                       "tmpsync", -1u, -1u, "", false);
 
   EXPECT_TRUE(sync_union.Initialize());
   EXPECT_EQ(1, m_sync_mediator_->n_register);
@@ -72,9 +70,8 @@ TEST_F(T_SyncUnionTarball, FourEmptyFiles) {
 
 TEST_F(T_SyncUnionTarball, Complex) {
   std::string tar_filename = CreateTarFile("tar.tar", complex_tar);
-  publish::SyncUnionTarball sync_union(m_sync_mediator_.get(), "",
-                                       tar_filename, "tmpsync", -1u, -1u, "",
-                                       false);
+  publish::SyncUnionTarball sync_union(m_sync_mediator_.get(), "", tar_filename,
+                                       "tmpsync", -1u, -1u, "", false);
 
   EXPECT_TRUE(sync_union.Initialize());
   EXPECT_EQ(1, m_sync_mediator_->n_register);
@@ -88,11 +85,9 @@ TEST_F(T_SyncUnionTarball, Complex) {
 TEST_F(T_SyncUnionTarball, FastDeletePassedToRemove) {
   // Create a SyncUnionTarball with fast_delete=true and a to_delete path
   // but no actual tarball (empty string means delete-only mode)
-  publish::SyncUnionTarball sync_union(m_sync_mediator_.get(), "",
-                                       "", "", -1u, -1u,
-                                       "some/nested/dir",
-                                       false /* create_catalog_on_root */,
-                                       true  /* fast_delete */);
+  publish::SyncUnionTarball sync_union(
+      m_sync_mediator_.get(), "", "", "", -1u, -1u, "some/nested/dir",
+      false /* create_catalog_on_root */, true /* fast_delete */);
 
   EXPECT_TRUE(sync_union.Initialize());
 
@@ -105,9 +100,8 @@ TEST_F(T_SyncUnionTarball, FastDeletePassedToRemove) {
 TEST_F(T_SyncUnionTarball, NoFastDeleteByDefault) {
   // Create a SyncUnionTarball with default fast_delete (false) and a
   // to_delete path
-  publish::SyncUnionTarball sync_union(m_sync_mediator_.get(), "",
-                                       "", "", -1u, -1u,
-                                       "some/dir",
+  publish::SyncUnionTarball sync_union(m_sync_mediator_.get(), "", "", "", -1u,
+                                       -1u, "some/dir",
                                        false /* create_catalog_on_root */);
 
   EXPECT_TRUE(sync_union.Initialize());
@@ -121,11 +115,9 @@ TEST_F(T_SyncUnionTarball, NoFastDeleteByDefault) {
 TEST_F(T_SyncUnionTarball, FastDeleteMultiplePaths) {
   // Test that fast_delete is passed for each path when deleting multiple
   // paths (using the path delimiter ":")
-  publish::SyncUnionTarball sync_union(m_sync_mediator_.get(), "",
-                                       "", "", -1u, -1u,
-                                       "dir/a:dir/b",
-                                       false /* create_catalog_on_root */,
-                                       true  /* fast_delete */);
+  publish::SyncUnionTarball sync_union(
+      m_sync_mediator_.get(), "", "", "", -1u, -1u, "dir/a:dir/b",
+      false /* create_catalog_on_root */, true /* fast_delete */);
 
   EXPECT_TRUE(sync_union.Initialize());
 

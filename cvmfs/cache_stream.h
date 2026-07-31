@@ -7,6 +7,7 @@
 
 #include <pthread.h>
 
+#include <memory>
 #include <string>
 
 #include "cache.h"
@@ -14,7 +15,6 @@
 #include "fd_table.h"
 #include "ring_buffer.h"
 #include "smallhash.h"
-#include <memory>
 
 namespace download {
 class DownloadManager;

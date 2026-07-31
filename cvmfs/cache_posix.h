@@ -198,10 +198,10 @@ class PosixCacheManager : public CacheManager {
    */
   bool is_tmpfs_;
   /**
-   * Set to 1 by EnsureCacheDirectories() once the on-disk cache skeleton exists.
-   * For alien caches the skeleton is created lazily on the first write, so this
-   * starts at 0 and the flag is checked (lock-free) on every StartTxn().  See
-   * issue #4217.
+   * Set to 1 by EnsureCacheDirectories() once the on-disk cache skeleton
+   * exists. For alien caches the skeleton is created lazily on the first write,
+   * so this starts at 0 and the flag is checked (lock-free) on every
+   * StartTxn().  See issue #4217.
    */
   atomic_int32 cache_dirs_created_;
   /**
@@ -218,4 +218,3 @@ class PosixCacheManager : public CacheManager {
 };  // class PosixCacheManager
 
 #endif  // CVMFS_CACHE_POSIX_H_
-

@@ -139,18 +139,18 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
       return 1;
     }
 
-    manifest .reset(  manifest::Manifest::LoadMem(manifest_memsink.data(),
-          manifest_memsink.pos()) );
+    manifest.reset(manifest::Manifest::LoadMem(manifest_memsink.data(),
+                                               manifest_memsink.pos()));
   } else {
     if (chdir(repository.c_str()) != 0) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to switch to directory %s",
                repository.c_str());
       return 1;
     }
-    manifest .reset(  manifest::Manifest::LoadFile(".cvmfspublished") );
+    manifest.reset(manifest::Manifest::LoadFile(".cvmfspublished"));
   }
 
-  if (manifest.get()==nullptr) {
+  if (manifest.get() == nullptr) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to load repository manifest");
     return 1;
   }

@@ -105,19 +105,19 @@ int CommandReconstructReflog::Main(const ArgumentList &args) {
   const std::unique_ptr<upload::AbstractUploader> uploader(
       upload::AbstractUploader::Construct(spooler_definition));
 
-  if (uploader.get()==nullptr) {
+  if (uploader.get() == nullptr) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to initialize spooler for '%s'",
              spooler.c_str());
     return 1;
   }
 
-  std::unique_ptr<manifest::Reflog> reflog(CreateEmptyReflog(tmp_dir, repo_name));
+  std::unique_ptr<manifest::Reflog> reflog(
+      CreateEmptyReflog(tmp_dir, repo_name));
   reflog->TakeDatabaseFileOwnership();
 
   reflog->BeginTransaction();
   AddStaticManifestObjects(reflog.get(), manifest.get());
-  RootChainWalker walker(manifest.get(), &object_fetcher,
-                         reflog.get());
+  RootChainWalker walker(manifest.get(), &object_fetcher, reflog.get());
   walker.FindObjectsAndPopulateReflog();
   reflog->CommitTransaction();
 
@@ -183,7 +183,10 @@ void RootChainWalker::WalkRootCatalogs(const shash::Any &root_catalog_hash) {
   std::unique_ptr<CatalogTN> current_catalog;
 
   while (!current_hash.IsNull() && !reflog_->ContainsCatalog(current_hash)
-         && (current_catalog = std::unique_ptr<CatalogTN>( FetchCatalog(current_hash)) ).get()!=nullptr) {
+         && (current_catalog = std::unique_ptr<CatalogTN>(
+                 FetchCatalog(current_hash)))
+                    .get()
+                != nullptr) {
     LogCvmfs(kLogCvmfs, kLogStdout, "Catalog: %s Revision: %" PRIu64,
              current_hash.ToString().c_str(), current_catalog->GetRevision());
 
@@ -200,7 +203,10 @@ void RootChainWalker::WalkHistories(const shash::Any &history_hash) {
   std::unique_ptr<HistoryTN> current_history;
 
   while (!current_hash.IsNull() && !reflog_->ContainsHistory(current_hash)
-         && (current_history = std::unique_ptr<HistoryTN>( FetchHistory(current_hash) )).get()!=nullptr) {
+         && (current_history = std::unique_ptr<HistoryTN>(
+                 FetchHistory(current_hash)))
+                    .get()
+                != nullptr) {
     LogCvmfs(kLogCvmfs, kLogStdout, "History: %s",
              current_hash.ToString().c_str());
 

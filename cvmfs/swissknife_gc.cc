@@ -11,10 +11,10 @@
 #include <string>
 
 #include "garbage_collection/garbage_collector.h"
-#include "path_filters/inclusion_spec.h"
 #include "garbage_collection/gc_aux.h"
 #include "garbage_collection/hash_filter.h"
 #include "manifest.h"
+#include "path_filters/inclusion_spec.h"
 #include "reflog.h"
 #include "statistics_database.h"
 #include "upload_facility.h"
@@ -47,8 +47,8 @@ ParameterList CommandGc::GetParams() const {
   r.push_back(Parameter::Switch('d', "dry run"));
   r.push_back(Parameter::Switch('l', "list objects to be removed"));
   r.push_back(Parameter::Switch('I', "upload updated statistics DB file"));
-  r.push_back(Parameter::Optional('E',
-      "inclusion spec for partial replication"));
+  r.push_back(
+      Parameter::Optional('E', "inclusion spec for partial replication"));
   return r;
 }
 
@@ -96,8 +96,8 @@ int CommandGc::Main(const ArgumentList &args) {
   // silently skipped along with their entire subtree; and the sweep phase is a
   // no-op for objects that were never downloaded.
   if (args.count('E') > 0) {
-    catalog::InclusionSpec *inclusion_spec =
-        catalog::InclusionSpec::Create(*args.find('E')->second);
+    catalog::InclusionSpec *inclusion_spec = catalog::InclusionSpec::Create(
+        *args.find('E')->second);
     if (inclusion_spec != NULL && inclusion_spec->IsValid()) {
       LogCvmfs(kLogCvmfs, kLogStdout,
                "Partial replication mode: GC will skip pruned (excluded) "
@@ -154,14 +154,14 @@ int CommandGc::Main(const ArgumentList &args) {
   }
 
   std::unique_ptr<manifest::Reflog> reflog;
-  reflog .reset(  FetchReflog(&object_fetcher, repo_name, reflog_hash) );
-  assert(reflog.get()!=nullptr);
+  reflog.reset(FetchReflog(&object_fetcher, repo_name, reflog_hash));
+  assert(reflog.get() != nullptr);
 
   const upload::SpoolerDefinition spooler_definition(spooler, shash::kAny);
   const std::unique_ptr<upload::AbstractUploader> uploader(
       upload::AbstractUploader::Construct(spooler_definition));
 
-  if (uploader.get()==nullptr) {
+  if (uploader.get() == nullptr) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to initialize spooler for '%s'",
              spooler.c_str());
     return 1;

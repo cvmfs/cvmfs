@@ -180,4 +180,3 @@ class SqliteHistory : public History {
 }  // namespace history
 
 #endif  // CVMFS_HISTORY_SQLITE_H_
-

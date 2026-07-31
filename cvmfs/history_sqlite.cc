@@ -482,4 +482,3 @@ void SqliteHistory::DropDatabaseFileOwnership() {
 }
 
 }  // namespace history
-

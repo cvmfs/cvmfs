@@ -286,4 +286,3 @@ class JobInfo {
 }  // namespace download
 
 #endif  // CVMFS_NETWORK_JOBINFO_H_
-

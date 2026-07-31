@@ -574,4 +574,3 @@ bool Reactor::HandleRequest(Request req, const std::string &data) {
 }
 
 }  // namespace receiver
-

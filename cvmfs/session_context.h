@@ -7,13 +7,13 @@
 
 #include <pthread.h>
 
+#include <memory>
 #include <string>
 #include <vector>
 
 #include "pack.h"
 #include "repository_tag.h"
 #include "util/future.h"
-#include <memory>
 #include "util/tube.h"
 
 namespace upload {

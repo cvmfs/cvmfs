@@ -6,6 +6,8 @@
 
 #include <inttypes.h>
 
+#include <memory>
+
 #include "crypto/signature.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
@@ -16,7 +18,6 @@
 #include "subscriber_supervisor.h"
 #include "supervisor.h"
 #include "util/logging.h"
-#include <memory>
 #include "util/posix.h"
 #include "util/string.h"
 
@@ -84,8 +85,8 @@ class SwissknifeSubscriber : public notify::SubscriberSSE {
     manifest::ManifestEnsemble ensemble;
     const manifest::Failures res = manifest::Verify(
         reinterpret_cast<unsigned char *>(&(msg.manifest_[0])),
-        msg.manifest_.size(), "", repo, 0, NULL, sig_mgr_.get(),
-        dl_mgr_.get(), &ensemble);
+        msg.manifest_.size(), "", repo, 0, NULL, sig_mgr_.get(), dl_mgr_.get(),
+        &ensemble);
 
     if (res != manifest::kFailOk) {
       LogCvmfs(kLogCvmfs, kLogError,
@@ -94,9 +95,10 @@ class SwissknifeSubscriber : public notify::SubscriberSSE {
       return notify::Subscriber::kError;
     }
 
-    const std::unique_ptr<manifest::Manifest> manifest(manifest::Manifest::LoadMem(
-        reinterpret_cast<const unsigned char *>(msg.manifest_.data()),
-        msg.manifest_.size()));
+    const std::unique_ptr<manifest::Manifest> manifest(
+        manifest::Manifest::LoadMem(
+            reinterpret_cast<const unsigned char *>(msg.manifest_.data()),
+            msg.manifest_.size()));
 
     if (manifest.get() == nullptr) {
       LogCvmfs(kLogCvmfs, kLogError,

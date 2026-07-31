@@ -12,6 +12,7 @@
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
+#include <memory>
 #include <string>
 
 #include "cache_plugin/channel.h"
@@ -19,7 +20,6 @@
 #include "crypto/hash.h"
 #include "manifest.h"
 #include "monitor.h"
-#include <memory>
 
 using namespace std;  // NOLINT
 

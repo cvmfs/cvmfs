@@ -8,6 +8,7 @@
 #include <unistd.h>
 
 #include <cstdlib>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -16,7 +17,6 @@
 #include "publish/except.h"
 #include "publish/repository.h"
 #include "sanitizer.h"
-#include <memory>
 #include "util/posix.h"
 #include "util/string.h"
 

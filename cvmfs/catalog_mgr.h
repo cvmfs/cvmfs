@@ -536,4 +536,3 @@ class InodeNfsGenerationAnnotation : public InodeAnnotation {
 #include "catalog_mgr_impl.h"
 
 #endif  // CVMFS_CATALOG_MGR_H_
-

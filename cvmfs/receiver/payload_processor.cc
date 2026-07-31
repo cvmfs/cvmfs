@@ -219,15 +219,16 @@ PayloadProcessor::Result PayloadProcessor::Initialize() {
   uploader_.reset();
 
   // configure the uploader environment
-  uploader_ = std::unique_ptr<upload::AbstractUploader>(upload::AbstractUploader::Construct(definition));
-  if (uploader_.get()==nullptr) {
+  uploader_ = std::unique_ptr<upload::AbstractUploader>(
+      upload::AbstractUploader::Construct(definition));
+  if (uploader_.get() == nullptr) {
     LogCvmfs(kLogSpooler, kLogWarning,
              "Failed to initialize backend upload "
              "facility in PayloadProcessor.");
     return kUploaderError;
   }
 
-  if (statistics_.get()!=nullptr) {
+  if (statistics_.get() != nullptr) {
     uploader_->InitCounters(statistics_.get());
   }
 
@@ -258,4 +259,3 @@ PayloadProcessor::Result PayloadProcessor::Finalize() {
 }
 
 }  // namespace receiver
-

@@ -7,6 +7,7 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <memory>
 
 #include "c_mock_uploader.h"
 #include "compression/compression.h"
@@ -24,7 +25,6 @@
 #include "testutil.h"
 #include "upload_facility.h"
 #include "util/atomic.h"
-#include <memory>
 #include "util/posix.h"
 #include "util/smalloc.h"
 
@@ -825,7 +825,8 @@ TEST_F(T_Ingestion, PipelineNull) {
 
 
 TEST_F(T_Ingestion, Scrubbing) {
-  std::unique_ptr<ScrubbingPipeline> pipeline_scrubbing(new ScrubbingPipeline());
+  std::unique_ptr<ScrubbingPipeline> pipeline_scrubbing(
+      new ScrubbingPipeline());
   FnFileHashed fn_hashed;
   pipeline_scrubbing->RegisterListener(&FnFileHashed::OnFileProcessed,
                                        &fn_hashed);

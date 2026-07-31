@@ -4,9 +4,10 @@
 
 #include <unistd.h>
 
+#include <memory>
+
 #include "gtest/gtest.h"
 #include "util/file_guard.h"
-#include <memory>
 #include "util/posix.h"
 #include "util/string.h"
 #include "util/uuid.h"
@@ -18,8 +19,8 @@ namespace cvmfs {
 TEST(T_Uuid, Unique) {
   std::unique_ptr<Uuid> uuid(Uuid::Create(""));
   std::unique_ptr<Uuid> uuid2(Uuid::Create(""));
-  ASSERT_TRUE(uuid.get()!=nullptr);
-  ASSERT_TRUE(uuid2.get()!=nullptr);
+  ASSERT_TRUE(uuid.get() != nullptr);
+  ASSERT_TRUE(uuid2.get() != nullptr);
   EXPECT_NE(uuid->uuid(), uuid2->uuid());
 }
 
@@ -32,7 +33,7 @@ TEST(T_Uuid, Create) {
   unlink(path.c_str());
 
   std::unique_ptr<Uuid> uuid(Uuid::Create(path));
-  ASSERT_TRUE(uuid.get()!=nullptr);
+  ASSERT_TRUE(uuid.get() != nullptr);
   ASSERT_EQ(16U, uuid->size());
   char data[16];
   memset(data, 0, sizeof(data));
@@ -63,20 +64,20 @@ TEST(T_Uuid, FromCache) {
   UnlinkGuard unlink_guard(path);
 
   std::unique_ptr<Uuid> uuid(Uuid::Create(path));
-  ASSERT_FALSE(uuid.get()!=nullptr);
+  ASSERT_FALSE(uuid.get() != nullptr);
 
   EXPECT_EQ(0, truncate(path.c_str(), 0));
   std::unique_ptr<Uuid> uuid_empty(Uuid::Create(path));
-  ASSERT_FALSE(uuid_empty.get()!=nullptr);
+  ASSERT_FALSE(uuid_empty.get() != nullptr);
 
   std::unique_ptr<Uuid> uuid_valid(Uuid::Create(""));
-  EXPECT_TRUE(uuid_valid.get()!=nullptr);
+  EXPECT_TRUE(uuid_valid.get() != nullptr);
   f = fopen(path.c_str(), "w");
   EXPECT_TRUE(f != NULL);
   fprintf(f, "%s", uuid_valid->uuid().c_str());
   fclose(f);
   std::unique_ptr<Uuid> uuid_cached(Uuid::Create(path));
-  EXPECT_TRUE(uuid_cached.get()!=nullptr);
+  EXPECT_TRUE(uuid_cached.get() != nullptr);
   EXPECT_EQ(uuid_cached->uuid(), uuid_valid->uuid());
   EXPECT_EQ(
       0, memcmp(uuid_cached->data(), uuid_valid->data(), uuid_valid->size()));
@@ -84,7 +85,7 @@ TEST(T_Uuid, FromCache) {
 
 TEST(T_Uuid, FailWrite) {
   std::unique_ptr<Uuid> uuid(Uuid::Create("/no/such/path"));
-  EXPECT_FALSE(uuid.get()!=nullptr);
+  EXPECT_FALSE(uuid.get() != nullptr);
 }
 
 TEST(T_Uuid, FailRead) {
@@ -94,7 +95,7 @@ TEST(T_Uuid, FailRead) {
   fclose(f);
   UnlinkGuard unlink_guard(path);
   std::unique_ptr<Uuid> uuid(Uuid::Create(path));
-  EXPECT_FALSE(uuid.get()!=nullptr);
+  EXPECT_FALSE(uuid.get() != nullptr);
 }
 
 }  // namespace cvmfs

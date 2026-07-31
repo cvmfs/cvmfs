@@ -238,8 +238,8 @@ void WritableCatalogManager::RemoveFile(const std::string &path) {
   DirectoryEntry entry;
   if (FindCatalog(file_path, &catalog, &entry)) {
     if (entry.IsBundleTrigger()) {
-      catalog->RemoveEntry(
-        GetParentPath(file_path) + "/.cvmfsbundle-" + GetFileName(file_path));
+      catalog->RemoveEntry(GetParentPath(file_path) + "/.cvmfsbundle-"
+                           + GetFileName(file_path));
     }
     catalog->RemoveEntry(file_path);
   }
@@ -592,8 +592,7 @@ void WritableCatalogManager::AddChunkedFile(const DirectoryEntryBase &entry,
  * be hard to get rid of dangling bundle trigger markers).
  */
 void WritableCatalogManager::UpdateBundleTrigger(const std::string &file_path,
-                                                 bool new_value)
-{
+                                                 bool new_value) {
   SyncLock();
 
   WritableCatalog *catalog = NULL;
@@ -999,7 +998,7 @@ void WritableCatalogManager::SwapNestedCatalog(const string &mountpoint,
     }
     const std::unique_ptr<Catalog> old_free_catalog(
         LoadFreeCatalog(nested_root_ps, old_hash));
-    if (old_free_catalog.get()==nullptr) {
+    if (old_free_catalog.get() == nullptr) {
       SyncUnlock();
       PANIC(kLogStderr,
             "failed to swap nested catalog '%s': failed to load old catalog",
@@ -1094,7 +1093,7 @@ bool WritableCatalogManager::TryGraftNestedCatalog(const string &mountpoint,
   // Load freely attached new catalog
   const std::unique_ptr<Catalog> new_catalog(
       LoadFreeCatalog(nested_root_ps, new_hash));
-  if (new_catalog.get()==nullptr) {
+  if (new_catalog.get() == nullptr) {
     LogCvmfs(kLogCatalog, kLogStderr,
              "failed to graft nested catalog '%s': failed to load new catalog",
              nested_root_path.c_str());
@@ -1156,8 +1155,8 @@ bool WritableCatalogManager::TryGraftNestedCatalog(const string &mountpoint,
   }
   if (!parent_entry.IsDirectory()) {
     SyncUnlock();
-    LogCvmfs(kLogCatalog, kLogStderr,
-             "parent path '%s' is not a directory", parent_path.c_str());
+    LogCvmfs(kLogCatalog, kLogStderr, "parent path '%s' is not a directory",
+             parent_path.c_str());
     return false;
   }
   if (parent_catalog->LookupPath(nested_root_ps, NULL)) {

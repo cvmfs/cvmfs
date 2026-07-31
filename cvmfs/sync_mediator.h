@@ -27,6 +27,7 @@
 #include <pthread.h>
 
 #include <map>
+#include <memory>
 #include <stack>
 #include <string>
 #include <vector>
@@ -38,7 +39,6 @@
 #include "statistics.h"
 #include "swissknife_sync.h"
 #include "sync_item.h"
-#include <memory>
 #include "util/shared_ptr.h"
 #include "xattr.h"
 

@@ -12,9 +12,9 @@
 
 #include <cassert>
 #include <cstring>
+#include <memory>
 
 #include "util/platform.h"
-#include <memory>
 #include "util/smalloc.h"
 #include "util/string.h"
 
@@ -74,7 +74,7 @@ XattrList *XattrList::CreateFromFile(const std::string &path) {
     if (sz_value >= 0)
       result->Set(keys[i], string(buffer, sz_value));
     if (buffer != value_smallbuf)
-        free(buffer);
+      free(buffer);
   }
   return result;
 }
@@ -102,8 +102,8 @@ XattrList *XattrList::Deserialize(const unsigned char *inbuf,
   for (unsigned i = 0; i < header.num_xattrs; ++i) {
     std::string key;
     std::string value;
-    const uint32_t nbytes =
-      entry_serializer.Deserialize(bufpos, remain, &key, &value);
+    const uint32_t nbytes = entry_serializer.Deserialize(bufpos, remain, &key,
+                                                         &value);
     if (nbytes == 0)
       return NULL;
     const bool retval = result->Set(key, value);
@@ -225,8 +225,9 @@ void XattrList::Serialize(unsigned char **outbuf,
   *size = sizeof(header);
 
   for (map<string, string>::const_iterator it_att = xattrs_.begin(),
-       it_att_end = xattrs_.end(); it_att != it_att_end; ++it_att)
-  {
+                                           it_att_end = xattrs_.end();
+       it_att != it_att_end;
+       ++it_att) {
     *size += it_att->first.length();
     *size += it_att->second.length();
     if (it_att->second.length() > 255)
@@ -278,14 +279,13 @@ void XattrList::Serialize(unsigned char **outbuf,
 //------------------------------------------------------------------------------
 
 XattrList::XattrEntrySerializer::XattrEntrySerializer(uint8_t version)
-  : version_(version)
-{
+    : version_(version) {
   assert(version_ == kVersionSmall || version_ == kVersionBig);
 }
 
-uint32_t XattrList::XattrEntrySerializer::Serialize(
-  const std::string &key, const std::string &value, unsigned char *to)
-{
+uint32_t XattrList::XattrEntrySerializer::Serialize(const std::string &key,
+                                                    const std::string &value,
+                                                    unsigned char *to) {
   assert(key.size() < 256);
   assert(value.size() < ((version_ == kVersionSmall) ? 256 : 64 * 1024));
 
@@ -312,10 +312,10 @@ uint32_t XattrList::XattrEntrySerializer::Serialize(
   return GetHeaderSize() + key.size() + value.size();
 }
 
-uint32_t XattrList::XattrEntrySerializer::Deserialize(
-  const unsigned char *from, uint32_t bufsize,
-  std::string *key, std::string *value)
-{
+uint32_t XattrList::XattrEntrySerializer::Deserialize(const unsigned char *from,
+                                                      uint32_t bufsize,
+                                                      std::string *key,
+                                                      std::string *value) {
   if (bufsize < GetHeaderSize())
     return 0;
   bufsize -= GetHeaderSize();

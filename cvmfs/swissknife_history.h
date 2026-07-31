@@ -218,4 +218,3 @@ class CommandEmptyRecycleBin : public CommandTag {
 }  // namespace swissknife
 
 #endif  // CVMFS_SWISSKNIFE_HISTORY_H_
-

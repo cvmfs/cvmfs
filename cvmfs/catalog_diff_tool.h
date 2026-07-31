@@ -5,13 +5,13 @@
 #ifndef CVMFS_CATALOG_DIFF_TOOL_H_
 #define CVMFS_CATALOG_DIFF_TOOL_H_
 
+#include <memory>
 #include <string>
 
 #include "directory_entry.h"
 #include "file_chunk.h"
 #include "shortstring.h"
 #include "statistics.h"
-#include <memory>
 #include "util/raii_temp_dir.h"
 #include "xattr.h"
 

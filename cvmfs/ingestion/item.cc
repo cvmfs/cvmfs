@@ -86,9 +86,9 @@ void ChunkItem::MakeBulkChunk() {
 
 
 zlib::Compressor *ChunkItem::GetCompressor() {
-  if (compressor_.get()==nullptr) {
-    compressor_ = std::unique_ptr<zlib::Compressor>( zlib::Compressor::Construct(
-          file_item_->compression_algorithm()) );
+  if (compressor_.get() == nullptr) {
+    compressor_ = std::unique_ptr<zlib::Compressor>(
+        zlib::Compressor::Construct(file_item_->compression_algorithm()));
   }
   return compressor_.get();
 }

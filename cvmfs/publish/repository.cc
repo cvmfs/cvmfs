@@ -907,4 +907,3 @@ Replica::Replica(const SettingsReplica &settings)
 Replica::~Replica() { }
 
 }  // namespace publish
-

@@ -7,11 +7,11 @@
 
 #include <cerrno>
 #include <cstdio>
+#include <memory>
 #include <string>
 
 #include "sink.h"
 #include "sink_file.h"
-#include <memory>
 
 namespace cvmfs {
 
@@ -30,7 +30,8 @@ class PathSink : public Sink {
  public:
   explicit PathSink(const std::string &destination_path);
 
-  virtual ~PathSink() { }  // std::unique_ptr<FileSink> sink_ takes care of everything
+  virtual ~PathSink() {
+  }  // std::unique_ptr<FileSink> sink_ takes care of everything
 
   /**
    * Appends data to the sink

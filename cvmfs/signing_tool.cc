@@ -4,6 +4,7 @@
 
 #include "signing_tool.h"
 
+#include <memory>
 #include <string>
 
 #include "manifest.h"
@@ -12,7 +13,6 @@
 #include "server_tool.h"
 #include "upload.h"
 #include "util/exception.h"
-#include <memory>
 
 namespace {
 
@@ -64,8 +64,9 @@ SigningTool::Result SigningTool::Run(
                                server_tool_->signature_manager());
 
   // Load Manifest
-  manifest = std::unique_ptr<manifest::Manifest>( manifest::Manifest::LoadFile(manifest_path) );
-  if (manifest.get()==nullptr) {
+  manifest = std::unique_ptr<manifest::Manifest>(
+      manifest::Manifest::LoadFile(manifest_path));
+  if (manifest.get() == nullptr) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Failed to parse manifest");
     return kError;
   }
@@ -79,15 +80,16 @@ SigningTool::Result SigningTool::Run(
   // Connect to the spooler
   const upload::SpoolerDefinition sd(spooler_definition,
                                      manifest->GetHashAlgorithm());
-  spooler =std::unique_ptr<upload::Spooler> ( upload::Spooler::Construct(sd) );
-  if (spooler.get()==nullptr) {
+  spooler = std::unique_ptr<upload::Spooler>(upload::Spooler::Construct(sd));
+  if (spooler.get() == nullptr) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Failed to setup upload spooler");
     return kInitError;
   }
 
   std::unique_ptr<manifest::Reflog> reflog;
   if (!reflog_hash.IsNull()) {
-    reflog.reset(server_tool_->FetchReflog(&object_fetcher, repo_name, reflog_hash));
+    reflog.reset(
+        server_tool_->FetchReflog(&object_fetcher, repo_name, reflog_hash));
     if (reflog.get() == nullptr) {
       LogCvmfs(kLogCvmfs, kLogStderr, "reflog missing");
       return kReflogMissing;
@@ -133,7 +135,7 @@ SigningTool::Result SigningTool::Run(
   }
 
   // Update Reflog database
-  if (reflog.get()!=nullptr) {
+  if (reflog.get() != nullptr) {
     reflog->BeginTransaction();
 
     if (!reflog->AddCatalog(manifest->catalog_hash())) {

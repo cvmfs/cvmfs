@@ -21,12 +21,12 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdlib>
+#include <memory>
 
 #include "statistics.h"
 #include "util/concurrency.h"
 #include "util/exception.h"
 #include "util/logging.h"
-#include <memory>
 #include "util/posix.h"
 #include "util/prng.h"
 #include "util/smalloc.h"

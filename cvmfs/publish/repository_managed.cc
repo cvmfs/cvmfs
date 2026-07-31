@@ -4,13 +4,13 @@
 
 
 #include <cstdio>
+#include <memory>
 
 #include "crypto/hash.h"
 #include "manifest.h"
 #include "publish/except.h"
 #include "publish/repository.h"
 #include "publish/repository_util.h"
-#include <memory>
 #include "util/posix.h"
 #include "util/string.h"
 
@@ -73,10 +73,10 @@ void Publisher::ManagedNode::ClearScratch() {
     // Disk full: cannot create a wastebin directory. Clean scratch/current
     // in place synchronously instead (deletion does not require free space).
     RunSuidHelper("clear_scratch", publisher_->settings_.fqrn());
-    // scratch_dir still exists and is now empty; chown without allocating space.
-    // AlterMountpoint(kAlterScratchWipe) is intentionally skipped: it runs
-    // clear_scratch_async to clean the wastebin, but no wastebin was created
-    // in this path so there is nothing to clean asynchronously.
+    // scratch_dir still exists and is now empty; chown without allocating
+    // space. AlterMountpoint(kAlterScratchWipe) is intentionally skipped: it
+    // runs clear_scratch_async to clean the wastebin, but no wastebin was
+    // created in this path so there is nothing to clean asynchronously.
     publisher_->CreateDirectoryAsOwner(scratch_dir, kDefaultDirMode);
   }
 
@@ -113,7 +113,7 @@ int Publisher::ManagedNode::Check(bool is_quiet) {
   shash::Any expected_hash;
   if (publisher_->manifest() != NULL)
     expected_hash = publisher_->manifest()->catalog_hash();
-  if (marker.get()!=nullptr)
+  if (marker.get() != nullptr)
     expected_hash = marker->hash();
 
   if (!IsMountPoint(rdonly_mnt)) {
@@ -128,7 +128,7 @@ int Publisher::ManagedNode::Check(bool is_quiet) {
         const shash::Any root_hash = shash::MkFromHexPtr(
             shash::HexPtr(root_hash_str), shash::kSuffixCatalog);
         if (expected_hash != root_hash) {
-          if (marker.get()!=nullptr) {
+          if (marker.get() != nullptr) {
             result |= kFailRdOnlyWrongRevision;
           } else {
             result |= kFailRdOnlyOutdated;

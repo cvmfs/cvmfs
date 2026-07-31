@@ -20,6 +20,7 @@
 
 #include <cassert>
 #include <cstddef>
+#include <memory>
 
 #include "leveldb/cache.h"
 #include "leveldb/db.h"
@@ -28,7 +29,6 @@
 #include "util/concurrency.h"
 #include "util/exception.h"
 #include "util/logging.h"
-#include <memory>
 #include "util/posix.h"
 #include "util/smalloc.h"
 

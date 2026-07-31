@@ -18,6 +18,7 @@
 #endif
 #include <cstring>
 #include <map>
+#include <memory>
 #include <new>
 #include <set>
 #include <string>
@@ -28,7 +29,6 @@
 #include "util/concurrency.h"
 #include "util/exception.h"
 #include "util/logging.h"
-#include <memory>
 #include "util/posix.h"
 #ifdef __APPLE__
 #include "util/smalloc.h"
@@ -210,7 +210,7 @@ ExternalCacheManager *ExternalCacheManager::Create(int fd_connection,
                                                    const string &ident) {
   std::unique_ptr<ExternalCacheManager> cache_mgr(
       new ExternalCacheManager(fd_connection, max_open_fds));
-  assert(cache_mgr.get()!=nullptr);
+  assert(cache_mgr.get() != nullptr);
 
   cvmfs::MsgHandshake msg_handshake;
   msg_handshake.set_protocol_version(kPbProtocolVersion);
@@ -906,7 +906,7 @@ ExternalQuotaManager *ExternalQuotaManager::Create(
     ExternalCacheManager *cache_mgr) {
   std::unique_ptr<ExternalQuotaManager> quota_mgr(
       new ExternalQuotaManager(cache_mgr));
-  assert(quota_mgr.get()!=nullptr);
+  assert(quota_mgr.get() != nullptr);
 
   return quota_mgr.release();
 }

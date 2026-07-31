@@ -12,6 +12,7 @@
 
 #include <cstdio>
 #include <map>
+#include <memory>
 #include <set>
 #include <string>
 #include <vector>
@@ -29,7 +30,6 @@
 #include "statistics.h"
 #include "util/atomic.h"
 #include "util/pipe.h"
-#include <memory>
 #include "util/prng.h"
 #include "util/shared_ptr.h"
 

@@ -6,13 +6,14 @@
 
 #include <unistd.h>
 
+#include <memory>
+
 #include "crypto/hash.h"
 #include "gateway_util.h"
 #include "json_document.h"
 #include "json_document_write.h"
 #include "ssl.h"
 #include "util/logging.h"
-#include <memory>
 #include "util/posix.h"
 #include "util/string.h"
 

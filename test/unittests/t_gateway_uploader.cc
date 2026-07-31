@@ -5,12 +5,12 @@
 #include <gtest/gtest.h>
 
 #include <cstdlib>
+#include <memory>
 
 #include "repository_tag.h"
 #include "upload.h"
 #include "upload_gateway.h"
 #include "upload_spooler_definition.h"
-#include <memory>
 #include "util/posix.h"
 
 class GatewayUploaderMocked : public upload::GatewayUploader {
@@ -100,8 +100,8 @@ TEST_F(T_GatewayUploader, ConstructThroughSpooler) {
       "gw,/local/temp/dir,http://my.repo.address:4929/api/v1", shash::kSha1,
       zlib::kZlibDefault, false, 0, 0, 0,
       "/var/spool/cvmfs/test.cern.ch/session_token_some_path");
-  std::unique_ptr<upload::Spooler> spooler(upload::Spooler::Construct(definition));
-  EXPECT_TRUE(spooler.IsValid());
+  std::unique_ptr<upload::Spooler>
+spooler(upload::Spooler::Construct(definition)); EXPECT_TRUE(spooler.IsValid());
   EXPECT_EQ(spooler->backend_name(), "HTTP");
 }
 */

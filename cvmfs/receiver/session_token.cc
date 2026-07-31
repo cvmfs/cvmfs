@@ -182,4 +182,3 @@ TokenCheckResult CheckToken(const std::string &token, const std::string &secret,
 }
 
 }  // namespace receiver
-

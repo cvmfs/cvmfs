@@ -237,4 +237,3 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString &path) {
 }
 
 #endif  // CVMFS_CATALOG_DIFF_TOOL_IMPL_H_
-

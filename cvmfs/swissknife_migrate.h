@@ -6,6 +6,7 @@
 #define CVMFS_SWISSKNIFE_MIGRATE_H_
 
 #include <map>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -22,7 +23,6 @@
 #include "util/concurrency.h"
 #include "util/future.h"
 #include "util/logging.h"
-#include <memory>
 
 namespace catalog {
 class WritableCatalog;

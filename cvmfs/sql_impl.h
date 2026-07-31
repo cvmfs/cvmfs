@@ -517,4 +517,3 @@ inline double Sql::Retrieve(const int index) {
 }  // namespace sqlite
 
 #endif  // CVMFS_SQL_IMPL_H_
-

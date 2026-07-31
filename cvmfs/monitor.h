@@ -11,11 +11,11 @@
 #include <unistd.h>
 
 #include <map>
+#include <memory>
 #include <string>
 
 #include "util/pipe.h"
 #include "util/platform.h"
-#include <memory>
 #include "util/single_copy.h"
 
 
@@ -24,15 +24,16 @@
  * that needs to be preserved through reloads.
  */
 class WatchdogState {
- friend class Watchdog;
+  friend class Watchdog;
+
  public:
-  WatchdogState() :
-    version(0),
-    watchdog_write_fd(-1),
-    listener_read_fd(-1),
-    spawned(false),
-    pid(0)
-  { }
+  WatchdogState()
+      : version(0)
+      , watchdog_write_fd(-1)
+      , listener_read_fd(-1)
+      , spawned(false)
+      , pid(0) { }
+
  private:
   unsigned version;
   int watchdog_write_fd;

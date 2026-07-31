@@ -111,4 +111,3 @@ class Reflog {
 }  // namespace manifest
 
 #endif  // CVMFS_REFLOG_H_
-

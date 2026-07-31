@@ -622,12 +622,12 @@ TEST_F(T_Util, ReadHalfPipeTimeout) {
 
 TEST_F(T_Util, ClosePipe) {
   int fd[2];
-  std::unique_ptr<void,decltype(&free)> buffer_output(scalloc(20, sizeof(char)),free);
+  std::unique_ptr<void, decltype(&free)> buffer_output(
+      scalloc(20, sizeof(char)), free);
   MakePipe(fd);
   ClosePipe(fd);
   ASSERT_DEATH(WritePipe(fd[1], to_write.c_str(), to_write.length()), ".*");
-  ASSERT_DEATH(ReadPipe(fd[0], buffer_output.get(), to_write.length()),
-               ".*");
+  ASSERT_DEATH(ReadPipe(fd[0], buffer_output.get(), to_write.length()), ".*");
 }
 
 
@@ -1756,8 +1756,8 @@ TEST_F(T_Util, ExecuteBinary) {
   argv.push_back(message);
   pid_t gdb_pid = 0;
 
-  result = ExecuteBinary(
-      &fd_stdin, &fd_stdout, &fd_stderr, "/bin/echo", argv, false, &gdb_pid);
+  result = ExecuteBinary(&fd_stdin, &fd_stdout, &fd_stderr, "/bin/echo", argv,
+                         false, &gdb_pid);
   EXPECT_TRUE(result);
   ssize_t bytes_read = read(fd_stdout, buffer, message.length());
   EXPECT_EQ(static_cast<size_t>(bytes_read), message.length());

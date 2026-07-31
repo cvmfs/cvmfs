@@ -7,6 +7,7 @@
 
 #include <unistd.h>
 
+#include <memory>
 #include <string>
 
 #include "crypto/signature.h"
@@ -16,7 +17,6 @@
 #include "publish/settings.h"
 #include "sanitizer.h"
 #include "upload_spooler_definition.h"
-#include <memory>
 #include "util/posix.h"
 
 namespace publish {

@@ -38,7 +38,8 @@ int CmdTransaction::Main(const Options &options) {
   SettingsBuilder builder;
   std::unique_ptr<SettingsPublisher> settings;
   try {
-    settings .reset(  builder.CreateSettingsPublisher(fqrn, true /* needs_managed */) );
+    settings.reset(
+        builder.CreateSettingsPublisher(fqrn, true /* needs_managed */));
   } catch (const EPublish &e) {
     if (e.failure() == EPublish::kFailRepositoryNotFound) {
       LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "CernVM-FS error: %s",
@@ -85,7 +86,7 @@ int CmdTransaction::Main(const Options &options) {
 
   std::unique_ptr<Publisher> publisher;
   try {
-    publisher .reset(  new Publisher(*settings) );
+    publisher.reset(new Publisher(*settings));
     if (publisher->whitelist()->IsExpired()) {
       throw EPublish("Repository whitelist for $name is expired",
                      EPublish::kFailWhitelistExpired);

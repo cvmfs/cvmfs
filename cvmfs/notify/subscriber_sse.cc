@@ -4,11 +4,11 @@
 
 #include "subscriber_sse.h"
 
+#include <memory>
 #include <vector>
 
 #include "url.h"
 #include "util/logging.h"
-#include <memory>
 #include "util/string.h"
 
 namespace {

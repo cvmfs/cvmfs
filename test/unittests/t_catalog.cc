@@ -72,8 +72,8 @@ class T_Catalog : public ::testing::Test {
     uint64_t size = GetFileSize(catalog_db_nested);
 
     // commit the father (root)
-    writable_root_catalog->InsertNestedCatalog(
-        nested_path, NULL, child_hash, size);
+    writable_root_catalog->InsertNestedCatalog(nested_path, NULL, child_hash,
+                                               size);
     writable_root_catalog->Commit();
     delete writable_root_catalog;
   }
@@ -86,7 +86,7 @@ class T_Catalog : public ::testing::Test {
     {
       std::unique_ptr<catalog::CatalogDatabase> new_clg_db(
           catalog::CatalogDatabase::Create(db_file));
-      EXPECT_TRUE(new_clg_db.get()!=nullptr);
+      EXPECT_TRUE(new_clg_db.get() != nullptr);
       bool retval = new_clg_db->InsertInitialValues(root_path, volatile_content,
                                                     "");
       EXPECT_TRUE(retval);
@@ -224,8 +224,8 @@ TEST_F(T_Catalog, PlantPath) {
 
 
 TEST_F(T_Catalog, Attach) {
-  catalog = catalog::Catalog::AttachFreely(
-      "", catalog_db_root, shash::Any(), NULL, false);
+  catalog = catalog::Catalog::AttachFreely("", catalog_db_root, shash::Any(),
+                                           NULL, false);
   EXPECT_NE(static_cast<Catalog *>(NULL), catalog);
   EXPECT_TRUE(catalog->IsInitialized());
   EXPECT_TRUE(catalog->IsRoot());
@@ -254,8 +254,8 @@ TEST_F(T_Catalog, Attach) {
   shash::Any hash;
   uint64_t size;
   EXPECT_TRUE(catalog->FindNested(PathString(nested_path), &hash, &size));
-  nested = catalog::Catalog::AttachFreely(
-      nested_path, catalog_db_nested, shash::Any(), catalog, true);
+  nested = catalog::Catalog::AttachFreely(nested_path, catalog_db_nested,
+                                          shash::Any(), catalog, true);
   EXPECT_TRUE(nested->IsInitialized());
   EXPECT_FALSE(nested->IsRoot());
   EXPECT_FALSE(nested->IsWritable());
@@ -292,8 +292,8 @@ TEST_F(T_Catalog, Lookup) {
   EXPECT_DEATH(catalog->LookupXattrsPath(fake_path, &xattr_list), ".*");
 
   delete catalog;
-  catalog = catalog::Catalog::AttachFreely(
-      "", catalog_db_root, shash::Any(), NULL, false);
+  catalog = catalog::Catalog::AttachFreely("", catalog_db_root, shash::Any(),
+                                           NULL, false);
   EXPECT_FALSE(catalog->LookupPath(fake_path, &dirent));
   EXPECT_TRUE(catalog->LookupPath(path, &dirent));
   EXPECT_TRUE(dirent.IsDirectory());
@@ -329,8 +329,8 @@ TEST_F(T_Catalog, Listing) {
   PathString fake_path("/fakepath/fakefile");
   PathString path("/dir/dir");
   PathString root_path("");
-  catalog = catalog::Catalog::AttachFreely(
-      "", catalog_db_root, shash::Any(), NULL, false);
+  catalog = catalog::Catalog::AttachFreely("", catalog_db_root, shash::Any(),
+                                           NULL, false);
 
   EXPECT_TRUE(catalog->ListingPathStat(fake_path, &stat_entry_list));
   EXPECT_TRUE(stat_entry_list.IsEmpty());
@@ -355,8 +355,8 @@ TEST_F(T_Catalog, Listing) {
   EXPECT_EQ(PathString("/dir/folder"), nc_list.at(0).mountpoint);
 
   FileChunkList file_chunk_list;
-  EXPECT_TRUE(catalog->ListPathChunks(
-      PathString("/foo"), shash::kSha1, &file_chunk_list));
+  EXPECT_TRUE(catalog->ListPathChunks(PathString("/foo"), shash::kSha1,
+                                      &file_chunk_list));
   DirectoryEntry chunk_dir_entry;
   ASSERT_EQ(1u, file_chunk_list.size());
   ASSERT_TRUE(catalog->LookupPath(PathString("/foo"), &chunk_dir_entry));
@@ -382,8 +382,8 @@ TEST_F(T_Catalog, Listing) {
 }
 
 TEST_F(T_Catalog, Chunks) {
-  catalog = catalog::Catalog::AttachFreely(
-      "", catalog_db_root, shash::Any(), NULL, false);
+  catalog = catalog::Catalog::AttachFreely("", catalog_db_root, shash::Any(),
+                                           NULL, false);
   shash::Any hash;
   zlib::Algorithms compression_alg;
   EXPECT_TRUE(catalog->AllChunksBegin());
@@ -401,8 +401,8 @@ TEST_F(T_Catalog, Chunks) {
 }
 
 TEST_F(T_Catalog, Statistics) {
-  catalog = catalog::Catalog::AttachFreely(
-      "", catalog_db_root, shash::Any(), NULL, false);
+  catalog = catalog::Catalog::AttachFreely("", catalog_db_root, shash::Any(),
+                                           NULL, false);
   EXPECT_NE("", catalog->PrintMemStatistics());
 }
 

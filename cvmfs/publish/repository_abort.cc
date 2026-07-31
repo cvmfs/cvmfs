@@ -87,4 +87,3 @@ void Publisher::Abort() {
 }
 
 }  // namespace publish
-

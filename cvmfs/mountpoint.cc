@@ -692,7 +692,7 @@ CacheManager *FileSystem::SetupPosixCacheMgr(const string &instance) {
       settings.avoid_rename ? PosixCacheManager::kRenameLink
                             : PosixCacheManager::kRenameNormal,
       settings.do_refcount, settings.cleanup_unused_first));
-  if (cache_mgr.get()==nullptr) {
+  if (cache_mgr.get() == nullptr) {
     boot_error_ = "Failed to setup posix cache '" + instance + "' in "
                   + settings.cache_path + ": " + strerror(errno);
     boot_status_ = loader::kFailCacheDir;
@@ -770,7 +770,7 @@ CacheManager *FileSystem::SetupTieredCacheMgr(const string &instance) {
     return NULL;
   }
   std::unique_ptr<CacheManager> upper(SetupCacheMgr(optarg));
-  if (upper.get()==nullptr)
+  if (upper.get() == nullptr)
     return NULL;
 
   if (!options_mgr_->GetValue(MkCacheParm("CVMFS_CACHE_LOWER", instance),
@@ -780,7 +780,7 @@ CacheManager *FileSystem::SetupTieredCacheMgr(const string &instance) {
     return NULL;
   }
   std::unique_ptr<CacheManager> lower(SetupCacheMgr(optarg));
-  if (lower.get()==nullptr)
+  if (lower.get() == nullptr)
     return NULL;
 
   CacheManager *tiered = TieredCacheManager::Create(upper.release(),
@@ -1606,7 +1606,8 @@ void MountPoint::SetupPartialReplica() {
     if (!mode_norm.empty() && !options_mgr_->IsOff(mode_norm)) {
       LogCvmfs(kLogCvmfs, kLogSyslogWarn | kLogDebug,
                "ignoring invalid CVMFS_PARTIAL_REPLICA_MODE='%s' "
-               "(expected 'fail' or 'failover')", mode.c_str());
+               "(expected 'fail' or 'failover')",
+               mode.c_str());
     }
     return;
   }
@@ -1634,8 +1635,8 @@ void MountPoint::SetupPartialReplica() {
   }
 
   // Parse the spec
-  const string spec_content(
-      reinterpret_cast<char *>(spec_memsink.data()), spec_memsink.pos());
+  const string spec_content(reinterpret_cast<char *>(spec_memsink.data()),
+                            spec_memsink.pos());
   partial_inclusion_spec_ = new catalog::InclusionSpec();
   if (!partial_inclusion_spec_->Parse(spec_content)) {
     LogCvmfs(kLogCvmfs, kLogSyslogErr | kLogDebug,
@@ -1668,8 +1669,8 @@ void MountPoint::SetupPartialReplica() {
     return;
   }
 
-  LogCvmfs(kLogCvmfs, kLogDebug,
-           "partial replica mode: failover to %s", optarg.c_str());
+  LogCvmfs(kLogCvmfs, kLogDebug, "partial replica mode: failover to %s",
+           optarg.c_str());
 
   // Clone the primary download manager so proxy, DNS, timeout, certificate and
   // sharding settings carry over unchanged; only the host chain is repointed at
@@ -1856,7 +1857,7 @@ bool MountPoint::DetermineRootHash(shash::Any *root_hash) {
   const UnlinkGuard history_file(history_path);
   const std::unique_ptr<history::History> tag_db(
       history::SqliteHistory::Open(history_path));
-  if (tag_db.get()==nullptr) {
+  if (tag_db.get() == nullptr) {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
              "failed to open history database (%s)", history_path.c_str());
     boot_error_ = "failed to open history database";
@@ -2440,4 +2441,3 @@ bool MountPoint::SetupOwnerMaps() {
 
   return true;
 }
-

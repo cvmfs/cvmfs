@@ -4,9 +4,10 @@
 
 #include "swissknife_lease_json.h"
 
+#include <memory>
+
 #include "json_document.h"
 #include "util/logging.h"
-#include <memory>
 
 // TODO(@vvolkl): refactor
 LeaseReply ParseAcquireReplyWithRevision(const CurlBuffer &buffer,
@@ -125,7 +126,8 @@ LeaseReply ParseDropReply(const CurlBuffer &buffer) {
     return kLeaseReplyFailure;
   }
 
-  const std::unique_ptr<const JsonDocument> reply(JsonDocument::Create(buffer.data));
+  const std::unique_ptr<const JsonDocument> reply(
+      JsonDocument::Create(buffer.data));
   if (reply.get() == nullptr || !reply->IsValid()) {
     return kLeaseReplyFailure;
   }

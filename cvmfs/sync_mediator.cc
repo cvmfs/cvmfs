@@ -47,7 +47,8 @@ SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalog_manager,
 
   params->spooler->RegisterListener(&SyncMediator::PublishFilesCallback, this);
 
-  counters_ =std::unique_ptr< perf::FsCounters>( new perf::FsCounters(statistics));
+  counters_ = std::unique_ptr<perf::FsCounters>(
+      new perf::FsCounters(statistics));
 }
 
 SyncMediator::~SyncMediator() { pthread_mutex_destroy(&lock_file_queue_); }
@@ -379,10 +380,10 @@ bool SyncMediator::Commit(manifest::Manifest *manifest) {
 }
 
 std::string SyncMediator::GetBundleTriggerPath(
-  SharedPtr<SyncItem> bundle_spec_entry) const
-{
+    SharedPtr<SyncItem> bundle_spec_entry) const {
   static const size_t nStrip = strlen(".cvmfsbundle-");
-  const std::string main_file_name = bundle_spec_entry->filename().substr(nStrip);
+  const std::string main_file_name = bundle_spec_entry->filename().substr(
+      nStrip);
   if (main_file_name.empty()) {
     PANIC(kLogStderr, "invalid empty bundle specification: %s",
           bundle_spec_entry->GetUnionPath().c_str());
@@ -409,8 +410,8 @@ void SyncMediator::AddBundleSpecs() {
     return;
 
   for (BundleSpecs::const_iterator itr = bundle_specs_.begin();
-       itr != bundle_specs_.end(); ++itr)
-  {
+       itr != bundle_specs_.end();
+       ++itr) {
     catalog_manager_->UpdateBundleTrigger(*itr, true);
   }
 }
@@ -679,8 +680,8 @@ void SyncMediator::RemoveDirectoryRecursively(SharedPtr<SyncItem> entry,
     const std::string absolute_path = "/" + directory_path;
     PathString ps_path;
     ps_path.Assign(absolute_path.data(), absolute_path.length());
-    const catalog::Counters counters =
-        catalog_manager_->LookupCounters(ps_path, &subcatalog_path, &hash);
+    const catalog::Counters counters = catalog_manager_->LookupCounters(
+        ps_path, &subcatalog_path, &hash);
     // On failure to load the subtree LookupCounters returns zeroed counters and
     // a null hash.  Removal proceeds regardless, but the statistics would
     // silently under-count, so warn.
@@ -692,8 +693,8 @@ void SyncMediator::RemoveDirectoryRecursively(SharedPtr<SyncItem> entry,
     }
     {
       perf::Xadd(counters_->n_files_removed,
-          static_cast<int64_t>(counters.self.regular_files
-                               + counters.subtree.regular_files));
+                 static_cast<int64_t>(counters.self.regular_files
+                                      + counters.subtree.regular_files));
       const uint64_t n_nested_catalogs = counters.self.nested_catalogs
                                          + counters.subtree.nested_catalogs;
       const uint64_t n_directories = counters.self.directories
@@ -701,11 +702,11 @@ void SyncMediator::RemoveDirectoryRecursively(SharedPtr<SyncItem> entry,
       perf::Xadd(counters_->n_directories_removed,
                  static_cast<int64_t>(n_directories - n_nested_catalogs));
       perf::Xadd(counters_->n_symlinks_removed,
-          static_cast<int64_t>(counters.self.symlinks
-                               + counters.subtree.symlinks));
+                 static_cast<int64_t>(counters.self.symlinks
+                                      + counters.subtree.symlinks));
       perf::Xadd(counters_->sz_removed_bytes,
-          static_cast<int64_t>(counters.self.file_size
-                               + counters.subtree.file_size));
+                 static_cast<int64_t>(counters.self.file_size
+                                      + counters.subtree.file_size));
     }
 
     // Remove nested catalog (merge=false: just remove the reference and
@@ -730,7 +731,8 @@ void SyncMediator::RemoveDirectoryRecursively(SharedPtr<SyncItem> entry,
   // Propagate fast_delete so that any nested catalog transition points
   // encountered during the traversal are still fast-deleted.
   const bool prev_fast_delete = recursive_fast_delete_;
-  if (fast_delete) recursive_fast_delete_ = true;
+  if (fast_delete)
+    recursive_fast_delete_ = true;
 
   const bool recurse = false;
   FileSystemTraversal<SyncMediator> traversal(

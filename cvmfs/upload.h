@@ -110,6 +110,7 @@
 #define CVMFS_UPLOAD_H_
 
 #include <cstdio>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -122,7 +123,6 @@
 #include "upload_spooler_definition.h"
 #include "upload_spooler_result.h"
 #include "util/concurrency.h"
-#include <memory>
 #include "util/shared_ptr.h"
 
 namespace upload {

@@ -6,12 +6,13 @@
 #include <gtest/gtest.h>
 #include <unistd.h>
 
+#include <memory>
+
 #include "authz/authz.h"
 #include "authz/authz_fetch.h"
 #include "authz/authz_session.h"
 #include "statistics.h"
 #include "util/platform.h"
-#include <memory>
 
 
 class TestAuthzFetcher : public AuthzFetcher {
@@ -23,9 +24,7 @@ class TestAuthzFetcher : public AuthzFetcher {
     *authz_token = next_token;
     return next_status;
   }
-  virtual AuthzStatus CheckHelper(
-    const std::string &membership)
-  {
+  virtual AuthzStatus CheckHelper(const std::string &membership) {
     return kAuthzOk;
   }
 
@@ -174,7 +173,7 @@ TEST_F(T_AuthzSession, GetTokenCopy) {
   authz_fetcher_.next_token = fetched_token;
 
   std::unique_ptr<AuthzToken> tokenX(authz_session_mgr_->GetTokenCopy(1, "A"));
-  ASSERT_TRUE(tokenX.get()!=nullptr);
+  ASSERT_TRUE(tokenX.get() != nullptr);
   EXPECT_EQ(kTokenX509, tokenX->type);
   EXPECT_EQ(1U, tokenX->size);
   EXPECT_EQ('X', reinterpret_cast<char *>(tokenX->data)[0]);
@@ -182,7 +181,7 @@ TEST_F(T_AuthzSession, GetTokenCopy) {
 
   reinterpret_cast<char *>(fetched_token.data)[0] = 'Y';
   std::unique_ptr<AuthzToken> tokenY(authz_session_mgr_->GetTokenCopy(1, "A"));
-  ASSERT_TRUE(tokenY.get()!=nullptr);
+  ASSERT_TRUE(tokenY.get() != nullptr);
   EXPECT_EQ(kTokenX509, tokenY->type);
   EXPECT_EQ(1U, tokenY->size);
   EXPECT_EQ('Y', reinterpret_cast<char *>(tokenY->data)[0]);

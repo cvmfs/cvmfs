@@ -136,4 +136,3 @@ class CatalogMergeTool : public CatalogDiffTool<RoCatalogMgr> {
 #include "catalog_merge_tool_impl.h"
 
 #endif  // CVMFS_RECEIVER_CATALOG_MERGE_TOOL_H_
-

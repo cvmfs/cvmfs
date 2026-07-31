@@ -135,8 +135,8 @@ int CommandMigrate::Main(const ArgumentList &args) {
   // Create an upstream spooler
   temporary_directory_ = tmp_dir;
   const upload::SpoolerDefinition spooler_definition(spooler, shash::kSha1);
-  spooler_ .reset(  upload::Spooler::Construct(spooler_definition) );
-  if (spooler_.get()==nullptr) {
+  spooler_.reset(upload::Spooler::Construct(spooler_definition));
+  if (spooler_.get() == nullptr) {
     Error("Failed to create upstream Spooler.");
     return 5;
   }
@@ -421,7 +421,7 @@ bool CommandMigrate::DoMigrationAndCommit(
     manifest.set_revision(new_catalog->GetRevision());
 
     // Commit the new (migrated) repository revision...
-    if (history_upstream_.get()!=nullptr) {
+    if (history_upstream_.get() != nullptr) {
       shash::Any history_hash(manifest_upstream_->history());
       LogCvmfs(kLogCatalog, kLogStdout | kLogNoLinebreak,
                "Updating repository tag database... ");

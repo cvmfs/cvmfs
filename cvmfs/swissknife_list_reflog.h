@@ -5,6 +5,7 @@
 #ifndef CVMFS_SWISSKNIFE_LIST_REFLOG_H_
 #define CVMFS_SWISSKNIFE_LIST_REFLOG_H_
 
+#include <memory>
 #include <set>
 #include <string>
 #include <vector>
@@ -13,7 +14,6 @@
 #include "crypto/hash.h"
 #include "smallhash.h"
 #include "swissknife.h"
-#include <memory>
 
 namespace swissknife {
 

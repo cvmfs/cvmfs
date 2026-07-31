@@ -48,8 +48,8 @@ bool Spooler::Initialize(perf::StatisticsTemplate *statistics) {
   }
 
   // configure the file processor context
-  ingestion_pipeline_.reset(new IngestionPipeline(uploader_.get(),
-                                              spooler_definition_));
+  ingestion_pipeline_.reset(
+      new IngestionPipeline(uploader_.get(), spooler_definition_));
   ingestion_pipeline_->RegisterListener(&Spooler::ProcessingCallback, this);
   ingestion_pipeline_->Spawn();
 

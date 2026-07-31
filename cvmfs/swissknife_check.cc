@@ -11,6 +11,7 @@
 
 #include <cassert>
 #include <map>
+#include <memory>
 #include <set>
 #include <string>
 #include <vector>
@@ -27,7 +28,6 @@
 #include "shortstring.h"
 #include "util/exception.h"
 #include "util/logging.h"
-#include <memory>
 #include "util/posix.h"
 
 using namespace std;  // NOLINT
@@ -44,8 +44,10 @@ static inline uint32_t hasher_any(const shash::Any &key) {
 namespace swissknife {
 
 CommandCheck::CommandCheck()
-    : check_chunks_(false), no_duplicates_map_(false), is_remote_(false),
-      inclusion_spec_(NULL) {
+    : check_chunks_(false)
+    , no_duplicates_map_(false)
+    , is_remote_(false)
+    , inclusion_spec_(NULL) {
   const shash::Any hash_null;
   duplicates_map_.Init(16, hash_null, hasher_any);
 }
@@ -231,8 +233,9 @@ bool CommandCheck::InspectReflog(const shash::Any &reflog_hash,
     return false;
   }
 
-  const std::unique_ptr<manifest::Reflog> reflog(manifest::Reflog::Open(reflog_path));
-  assert(reflog.get()!=nullptr);
+  const std::unique_ptr<manifest::Reflog> reflog(
+      manifest::Reflog::Open(reflog_path));
+  assert(reflog.get() != nullptr);
   reflog->TakeDatabaseFileOwnership();
 
   if (!reflog->ContainsCatalog(manifest->catalog_hash())) {
@@ -362,10 +365,11 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
   for (unsigned i = 0; i < entries.size(); ++i) {
     // for performance reasons, keep track of files already checked
     // and only run requests once per hash
-    const bool entry_needs_check = !entries[i].checksum().IsNull() &&
-                                   !entries[i].IsExternalFile() &&
-                                   !(catalog::g_ignore_legacy_bulk_hashes &&
-                                     entries[i].IsChunkedFile()) &&
+    const bool entry_needs_check = !entries[i].checksum().IsNull()
+                                   && !entries[i].IsExternalFile()
+                                   && !(catalog::g_ignore_legacy_bulk_hashes
+                                        && entries[i].IsChunkedFile())
+                                   &&
                                    // fallback cli option can force the entry to
                                    // be checked
                                    (no_duplicates_map_
@@ -1014,8 +1018,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
     repo_name = *args.find('N')->second;
 
   if (args.find('E') != args.end()) {
-    inclusion_spec_ =
-        catalog::InclusionSpec::Create(*args.find('E')->second);
+    inclusion_spec_ = catalog::InclusionSpec::Create(*args.find('E')->second);
     if (inclusion_spec_ == NULL || !inclusion_spec_->IsValid()) {
       LogCvmfs(kLogCvmfs, kLogStderr,
                "Failed to parse inclusion spec from '%s'",
@@ -1060,17 +1063,17 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
   bool successful = true;
 
   if (is_remote_) {
-    manifest .reset(  FetchRemoteManifest(repo_base_path_, repo_name) );
+    manifest.reset(FetchRemoteManifest(repo_base_path_, repo_name));
   } else {
     if (chdir(repo_base_path_.c_str()) != 0) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to switch to directory %s",
                repo_base_path_.c_str());
       return 1;
     }
-    manifest .reset(  OpenLocalManifest(".cvmfspublished") );
+    manifest.reset(OpenLocalManifest(".cvmfspublished"));
   }
 
-  if (manifest.get()==nullptr) {
+  if (manifest.get() == nullptr) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to load repository manifest");
     return 1;
   }
@@ -1138,8 +1141,8 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
                manifest->history().ToString().c_str());
       return 1;
     }
-    tag_db .reset(  history::SqliteHistory::Open(tmp_file) );
-    if (tag_db.get()==nullptr) {
+    tag_db.reset(history::SqliteHistory::Open(tmp_file));
+    if (tag_db.get() == nullptr) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to open history database %s",
                manifest->history().ToString().c_str());
       return 1;
@@ -1166,7 +1169,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
   shash::Any root_hash = manifest->catalog_hash();
   uint64_t root_size = manifest->catalog_size();
   if (tag_name != "") {
-    if (tag_db.get()==nullptr) {
+    if (tag_db.get() == nullptr) {
       LogCvmfs(kLogCvmfs, kLogStderr, "no history");
       return 1;
     }

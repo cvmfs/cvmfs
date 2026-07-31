@@ -6,11 +6,11 @@
 #define CVMFS_SQL_H_
 
 #include <cassert>
+#include <memory>
 #include <string>
 
 #include "duplex_sqlite3.h"
 #include "util/file_guard.h"
-#include <memory>
 
 namespace sqlite {
 

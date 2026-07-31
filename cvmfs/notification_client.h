@@ -5,12 +5,12 @@
 #ifndef CVMFS_NOTIFICATION_CLIENT_H_
 #define CVMFS_NOTIFICATION_CLIENT_H_
 
+#include <memory>
 #include <string>
 
 #include "fuse_remount.h"
 #include "network/download.h"
 #include "notify/subscriber.h"
-#include <memory>
 #include "util/single_copy.h"
 
 namespace signature {

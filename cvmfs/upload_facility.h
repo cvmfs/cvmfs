@@ -8,6 +8,7 @@
 #include <fcntl.h>
 #include <stdint.h>
 
+#include <memory>
 #include <string>
 
 #include "ingestion/ingestion_source.h"
@@ -17,7 +18,6 @@
 #include "upload_spooler_definition.h"
 #include "util/atomic.h"
 #include "util/concurrency.h"
-#include <memory>
 #include "util/posix.h"
 #include "util/tube.h"
 

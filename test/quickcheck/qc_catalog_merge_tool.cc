@@ -4,13 +4,12 @@
 
 #include <gtest/gtest.h>
 
-#include "fuzztest/fuzztest.h"
-
 #include <cstdint>
 #include <string>
 #include <vector>
 
 #include "catalog_test_tools.h"
+#include "fuzztest/fuzztest.h"
 #include "receiver/catalog_merge_tool.h"
 #include "receiver/params.h"
 #include "testutil.h"
@@ -217,7 +216,7 @@ void CatalogMergeInOut(const std::vector<EntrySpec> &base_entries,
   std::unique_ptr<manifest::Manifest> output_manifest(
       manifest::Manifest::LoadFile(output_manifest_path));
 
-  ASSERT_TRUE(output_manifest.get()!=nullptr);
+  ASSERT_TRUE(output_manifest.get() != nullptr);
 
   DirSpec output_spec;
   ASSERT_TRUE(

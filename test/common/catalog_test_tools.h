@@ -203,4 +203,3 @@ void CreateMiniRepository(SimpleOptionsParser *options_mgr_,
                           string *repo_path_);
 
 #endif  //  TEST_COMMON_CATALOG_TEST_TOOLS_H_
-

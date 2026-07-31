@@ -7,6 +7,7 @@
 #include <unistd.h>
 
 #include <cassert>
+#include <memory>
 #include <string>
 
 #include "crypto/hash.h"
@@ -17,7 +18,6 @@
 #include "publish/repository.h"
 #include "ssl.h"
 #include "util/logging.h"
-#include <memory>
 #include "util/posix.h"
 #include "util/string.h"
 
@@ -154,7 +154,7 @@ static LeaseReply ParseAcquireReply(const CurlBuffer &buffer,
   }
 
   const std::unique_ptr<JsonDocument> reply(JsonDocument::Create(buffer.data));
-  if (reply.get()==nullptr || !reply->IsValid()) {
+  if (reply.get() == nullptr || !reply->IsValid()) {
     return kLeaseReplyFailure;
   }
 
@@ -200,8 +200,9 @@ static LeaseReply ParseDropReply(const CurlBuffer &buffer, int llvl) {
     return kLeaseReplyFailure;
   }
 
-  const std::unique_ptr<const JsonDocument> reply(JsonDocument::Create(buffer.data));
-  if (reply.get()==nullptr || !reply->IsValid()) {
+  const std::unique_ptr<const JsonDocument> reply(
+      JsonDocument::Create(buffer.data));
+  if (reply.get() == nullptr || !reply->IsValid()) {
     return kLeaseReplyFailure;
   }
 

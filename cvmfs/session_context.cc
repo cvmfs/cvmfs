@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <limits>
+#include <memory>
 
 #include "curl/curl.h"
 #include "gateway_util.h"
@@ -13,7 +14,6 @@
 #include "json_document_write.h"
 #include "swissknife_lease_curl.h"
 #include "util/exception.h"
-#include <memory>
 #include "util/string.h"
 
 namespace {
@@ -260,7 +260,8 @@ SessionContext::SessionContext()
 
 bool SessionContext::InitializeDerived(uint64_t max_queue_size) {
   // Start worker thread
-  upload_jobs_ =std::unique_ptr< Tube<UploadJob>>( new Tube<UploadJob>(max_queue_size));
+  upload_jobs_ = std::unique_ptr<Tube<UploadJob> >(
+      new Tube<UploadJob>(max_queue_size));
 
   const int retval = pthread_create(&worker_, NULL, UploadLoop,
                                     reinterpret_cast<void *>(this));

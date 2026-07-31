@@ -328,4 +328,3 @@ void AuthzAttachment::ReleaseCurlHandle(CURL *curl_handle, void *info_data) {
     curl_easy_setopt(curl_handle, CURLOPT_SSL_CTX_DATA, 0);
   }
 }
-

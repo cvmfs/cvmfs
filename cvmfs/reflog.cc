@@ -334,4 +334,3 @@ std::string Reflog::database_file() const {
 }
 
 }  // namespace manifest
-

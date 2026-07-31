@@ -646,4 +646,3 @@ struct object_fetcher_traits<HttpObjectFetcher<CatalogT, HistoryT, ReflogT> > {
 };
 
 #endif  // CVMFS_OBJECT_FETCHER_H_
-

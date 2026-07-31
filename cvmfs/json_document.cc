@@ -4,8 +4,9 @@
 
 #include "json_document.h"
 
-#include "util/logging.h"
 #include <memory>
+
+#include "util/logging.h"
 
 using namespace std;  // NOLINT
 

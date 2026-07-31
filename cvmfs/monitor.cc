@@ -86,7 +86,7 @@ string Watchdog::GenerateStackTrace(pid_t pid) {
   string result = "";
 
   // Get capability to ptrace the dead main cvmfs2 process.
-  // This is often necessary because the main process can have its own 
+  // This is often necessary because the main process can have its own
   // elevated capability which would otherwise block ptrace.
   if (!ObtainSysPtraceCapability()) {
     result += "failed to gain ptrace capability... still give it a try\n";
@@ -392,8 +392,10 @@ Watchdog::SigactionMap Watchdog::SetSignalHandlers(
  */
 void Watchdog::Fork(bool needs_read_environ) {
   Pipe<kPipeWatchdogPid> pipe_pid;
-  pipe_watchdog_ = std::unique_ptr<Pipe<kPipeWatchdog> >(new Pipe<kPipeWatchdog>());
-  pipe_listener_ = std::unique_ptr<Pipe<kPipeWatchdogSupervisor> >(new Pipe<kPipeWatchdogSupervisor>());
+  pipe_watchdog_ = std::unique_ptr<Pipe<kPipeWatchdog> >(
+      new Pipe<kPipeWatchdog>());
+  pipe_listener_ = std::unique_ptr<Pipe<kPipeWatchdogSupervisor> >(
+      new Pipe<kPipeWatchdogSupervisor>());
 
   pid_t pid;
   int statloc;
@@ -419,7 +421,8 @@ void Watchdog::Fork(bool needs_read_environ) {
               // ptrace (needed for collecting a stack trace) is not
               // allowed on a process with more capabilities.
               if (needs_read_environ) {
-                const std::vector<cap_value_t> reservecaps = {CAP_SYS_ADMIN, CAP_SYS_PTRACE};
+                const std::vector<cap_value_t> reservecaps = {CAP_SYS_ADMIN,
+                                                              CAP_SYS_PTRACE};
                 const std::vector<cap_value_t> inheritcaps = {CAP_SYS_PTRACE};
                 assert(ClearPermittedCapabilities(reservecaps, inheritcaps));
               } else {
@@ -516,7 +519,8 @@ bool Watchdog::WaitForSupervisee() {
     case ControlFlow::kQuit:
       return false;
     case ControlFlow::kQuitWithExit:
-      if (on_exit_) on_exit_(false);
+      if (on_exit_)
+        on_exit_(false);
       return false;
     case ControlFlow::kSupervise:
       break;
@@ -576,7 +580,8 @@ void Watchdog::Spawn(const std::string &crash_dump_path) {
   }
   old_signal_handlers_ = SetSignalHandlers(signal_handlers);
 
-  pipe_terminate_ =std::unique_ptr< Pipe<kPipeThreadTerminator>>( new Pipe<kPipeThreadTerminator>());
+  pipe_terminate_ = std::unique_ptr<Pipe<kPipeThreadTerminator> >(
+      new Pipe<kPipeThreadTerminator>());
   const int retval = pthread_create(&thread_listener_, NULL,
                                     MainWatchdogListener, this);
   assert(retval == 0);
@@ -697,8 +702,10 @@ void Watchdog::RestoreState(WatchdogState *saved_state) {
   if (!saved_state->spawned) {
     return;
   }
-  pipe_watchdog_ =std::unique_ptr< Pipe<kPipeWatchdog>>( new Pipe<kPipeWatchdog>(-1, saved_state->watchdog_write_fd));
-  pipe_listener_ =std::unique_ptr< Pipe<kPipeWatchdogSupervisor>>( new Pipe<kPipeWatchdogSupervisor>(saved_state->listener_read_fd, -1));
+  pipe_watchdog_ = std::unique_ptr<Pipe<kPipeWatchdog> >(
+      new Pipe<kPipeWatchdog>(-1, saved_state->watchdog_write_fd));
+  pipe_listener_ = std::unique_ptr<Pipe<kPipeWatchdogSupervisor> >(
+      new Pipe<kPipeWatchdogSupervisor>(saved_state->listener_read_fd, -1));
   spawned_ = true;
 }
 
@@ -708,8 +715,7 @@ Watchdog::Watchdog(FnOnExit on_exit)
     , maintenance_mode_(false)
     , exe_path_(string(platform_getexepath()))
     , watchdog_pid_(0)
-    , on_exit_(on_exit)
-{
+    , on_exit_(on_exit) {
   const int retval = platform_spinlock_init(&lock_handler_, 0);
   assert(retval == 0);
   memset(&sighandler_stack_, 0, sizeof(sighandler_stack_));

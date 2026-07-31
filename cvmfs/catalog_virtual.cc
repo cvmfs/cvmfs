@@ -337,4 +337,3 @@ VirtualCatalog::VirtualCatalog(manifest::Manifest *m,
     : catalog_mgr_(c), assistant_(d, m, p->stratum0, p->dir_temp) { }
 
 }  // namespace catalog
-

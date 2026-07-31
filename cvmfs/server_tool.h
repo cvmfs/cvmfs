@@ -5,6 +5,7 @@
 #ifndef CVMFS_SERVER_TOOL_H_
 #define CVMFS_SERVER_TOOL_H_
 
+#include <memory>
 #include <string>
 
 #include "crypto/signature.h"
@@ -12,7 +13,6 @@
 #include "network/download.h"
 #include "reflog.h"
 #include "statistics.h"
-#include <memory>
 
 class ServerTool {
  public:

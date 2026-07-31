@@ -3,6 +3,7 @@
  */
 
 
+#include <memory>
 #include <string>
 
 #include "backoff.h"
@@ -16,14 +17,13 @@
 #include "publish/settings.h"
 #include "util/exception.h"
 #include "util/logging.h"
-#include <memory>
 #include "util/posix.h"
 
 namespace publish {
 
 
 void Publisher::TransactionRetry() {
-  if (managed_node_.get()!=nullptr) {
+  if (managed_node_.get() != nullptr) {
     const int rvi = managed_node_->Check(false /* is_quiet */);
     if (rvi != 0)
       throw EPublish("cannot establish writable mountpoint");
@@ -61,7 +61,7 @@ void Publisher::TransactionRetry() {
     }  // try-catch
   }  // while (true)
 
-  if (managed_node_.get()!=nullptr)
+  if (managed_node_.get() != nullptr)
     managed_node_->Open();
 }
 
@@ -80,20 +80,20 @@ void Publisher::TransactionImpl() {
 
   // Now that the lease is held (the lease subtree is frozen) refresh to the
   // current HEAD before any HEAD-dependent step. The manifest fetched when this
-  // process started can be stale: another release manager may have advanced HEAD
-  // in the meantime. Refreshing here makes both the lease-path validation below
-  // and the catalog diff at publish time see post-lease HEAD. Without it, a
-  // parent path another publisher just created looks absent (spurious
+  // process started can be stale: another release manager may have advanced
+  // HEAD in the meantime. Refreshing here makes both the lease-path validation
+  // below and the catalog diff at publish time see post-lease HEAD. Without it,
+  // a parent path another publisher just created looks absent (spurious
   // kFailLeaseNoEntry), and concurrently-added content looks deleted and gets
-  // dropped (#3867). Done on every gateway transaction, not only when waiting on
-  // a busy lease -- staleness is independent of contention. DownloadRootObjects
-  // also invalidates the cached read-only catalog manager; Check() remounts the
-  // read-only layer only if outdated; managed_node_ is absent for mount-less
-  // publishing.
+  // dropped (#3867). Done on every gateway transaction, not only when waiting
+  // on a busy lease -- staleness is independent of contention.
+  // DownloadRootObjects also invalidates the cached read-only catalog manager;
+  // Check() remounts the read-only layer only if outdated; managed_node_ is
+  // absent for mount-less publishing.
   if (settings_.storage().type() == upload::SpoolerDefinition::Gateway) {
     DownloadRootObjects(settings_.url(), settings_.fqrn(),
                         settings_.transaction().spool_area().tmp_dir());
-    if (managed_node_.get()!=nullptr) {
+    if (managed_node_.get() != nullptr) {
       const int rvi = managed_node_->Check(true /* is_quiet */);
       if (rvi != 0)
         throw EPublish("cannot establish writable mountpoint");
@@ -129,7 +129,7 @@ void Publisher::TransactionImpl() {
   // if the disk fills up before abort is called.
   is_publishing_.Touch();
   ConstructSpoolers();
-  if (marker.get()!=nullptr)
+  if (marker.get() != nullptr)
     settings_.GetTransaction()->SetBaseHash(marker->hash());
   else
     settings_.GetTransaction()->SetBaseHash(manifest_->catalog_hash());

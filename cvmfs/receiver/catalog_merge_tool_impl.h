@@ -348,4 +348,3 @@ bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::CreateNewManifest(
 }  // namespace receiver
 
 #endif  // CVMFS_RECEIVER_CATALOG_MERGE_TOOL_IMPL_H_
-

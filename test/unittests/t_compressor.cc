@@ -4,11 +4,11 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <memory>
 #include <vector>
 
 #include "compression/compression.h"
 #include "gtest/gtest.h"
-#include <memory>
 #include "util/prng.h"
 #include "util/smalloc.h"
 
@@ -53,7 +53,7 @@ class T_Compressor : public ::testing::Test {
 
 
 TEST_F(T_Compressor, Compression) {
-  compressor .reset(  zlib::Compressor::Construct(zlib::kZlibDefault) );
+  compressor.reset(zlib::Compressor::Construct(zlib::kZlibDefault));
 
   // Compress the output
   unsigned char *input = reinterpret_cast<unsigned char *>(ptr_test_string);
@@ -78,7 +78,7 @@ TEST_F(T_Compressor, Compression) {
 
 
 TEST_F(T_Compressor, CompressionLong) {
-  compressor .reset(  zlib::Compressor::Construct(zlib::kZlibDefault) );
+  compressor.reset(zlib::Compressor::Construct(zlib::kZlibDefault));
   unsigned char
       *compress_buf = new unsigned char[compressor->DeflateBound(long_size)];
   unsigned compress_pos = 0;
@@ -116,7 +116,7 @@ TEST_F(T_Compressor, CompressionLong) {
 
 
 TEST_F(T_Compressor, EchoCompression) {
-  compressor .reset(  zlib::Compressor::Construct(zlib::kNoCompression) );
+  compressor.reset(zlib::Compressor::Construct(zlib::kNoCompression));
 
   unsigned char *input = reinterpret_cast<unsigned char *>(ptr_test_string);
   bool deflate_finished = compressor->Deflate(true, &input, &size_input, &buf,
@@ -133,7 +133,7 @@ TEST_F(T_Compressor, EchoCompression) {
 
 
 TEST_F(T_Compressor, EchoCompressionLong) {
-  compressor .reset(  zlib::Compressor::Construct(zlib::kNoCompression) );
+  compressor.reset(zlib::Compressor::Construct(zlib::kNoCompression));
   std::unique_ptr<unsigned char> compress_buf(reinterpret_cast<unsigned char *>(
       smalloc(compressor->DeflateBound(long_size))));
   unsigned compress_pos = 0;

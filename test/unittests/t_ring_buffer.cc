@@ -5,16 +5,16 @@
 #include <gtest/gtest.h>
 
 #include <cstring>
+#include <memory>
 
 #include "ring_buffer.h"
-#include <memory>
 #include "util/prng.h"
 
 class T_RingBuffer : public ::testing::Test {
  protected:
   static const size_t kSize;
 
-  virtual void SetUp() { ring .reset(  new RingBuffer(kSize) ); }
+  virtual void SetUp() { ring.reset(new RingBuffer(kSize)); }
 
   virtual void TearDown() { ring.reset(); }
 

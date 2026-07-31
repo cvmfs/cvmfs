@@ -8,11 +8,12 @@
 #include <poll.h>
 #include <unistd.h>
 
+#include <memory>
+
 #include "glue_buffer.h"
 #include "telemetry_aggregator_influx.h"
 #include "util/exception.h"
 #include "util/logging.h"
-#include <memory>
 #include "util/posix.h"
 namespace perf {
 
@@ -27,8 +28,9 @@ TelemetryAggregator *TelemetryAggregator::Create(Statistics *statistics,
 
   switch (type) {
     case kTelemetryInflux:
-      telemetryInflux =std::unique_ptr< TelemetryAggregatorInflux>( new TelemetryAggregatorInflux(
-          statistics, send_rate, options_mgr, mount_point, fqrn));
+      telemetryInflux = std::unique_ptr<TelemetryAggregatorInflux>(
+          new TelemetryAggregatorInflux(statistics, send_rate, options_mgr,
+                                        mount_point, fqrn));
       telemetry = reinterpret_cast<std::unique_ptr<TelemetryAggregator> *>(
           &telemetryInflux);
       break;

@@ -17,6 +17,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <map>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -36,7 +37,6 @@
 #include "testutil.h"
 #include "upload.h"
 #include "upload_spooler_definition.h"
-#include <memory>
 #include "util/posix.h"
 #include "util/uuid.h"
 
@@ -223,10 +223,8 @@ TEST_F(T_CatalogManagerClient, LoadByHash) {
   EXPECT_TRUE(options_mgr_.GetValue("CVMFS_ROOT_HASH", &root_hash_str));
   options_mgr_.UnsetValue("CVMFS_ROOT_HASH");
 
-  const std::unique_ptr<MountPoint> mp(
-      MountPoint::Create(options_mgr_.GetValueOrDie("TEST_REPO_NAME"),
-                         fs.get(),
-                         &options_mgr_));
+  const std::unique_ptr<MountPoint> mp(MountPoint::Create(
+      options_mgr_.GetValueOrDie("TEST_REPO_NAME"), fs.get(), &options_mgr_));
   EXPECT_EQ(loader::kFailOk, mp->boot_status());
   EXPECT_EQ(root_hash_str, mp->catalog_mgr()->GetRootHash().ToString());
 
@@ -266,10 +264,8 @@ TEST_F(T_CatalogManagerClient, LoadByHashNetworkFailure) {
   EXPECT_TRUE(options_mgr_.GetValue("CVMFS_ROOT_HASH", &root_hash_str));
   options_mgr_.UnsetValue("CVMFS_ROOT_HASH");
 
-  const std::unique_ptr<MountPoint> mp(
-      MountPoint::Create(options_mgr_.GetValueOrDie("TEST_REPO_NAME"),
-                         fs.get(),
-                         &options_mgr_));
+  const std::unique_ptr<MountPoint> mp(MountPoint::Create(
+      options_mgr_.GetValueOrDie("TEST_REPO_NAME"), fs.get(), &options_mgr_));
   EXPECT_EQ(loader::kFailOk, mp->boot_status());
   EXPECT_EQ(root_hash_str, mp->catalog_mgr()->GetRootHash().ToString());
 
@@ -325,10 +321,8 @@ TEST_F(T_CatalogManagerClient, LoadRootCatalog) {
   EXPECT_TRUE(options_mgr_.GetValue("CVMFS_ROOT_HASH", &root_hash_str));
   options_mgr_.UnsetValue("CVMFS_ROOT_HASH");
 
-  const std::unique_ptr<MountPoint> mp(
-      MountPoint::Create(options_mgr_.GetValueOrDie("TEST_REPO_NAME"),
-                         fs.get(),
-                         &options_mgr_));
+  const std::unique_ptr<MountPoint> mp(MountPoint::Create(
+      options_mgr_.GetValueOrDie("TEST_REPO_NAME"), fs.get(), &options_mgr_));
   EXPECT_EQ(loader::kFailOk, mp->boot_status());
   EXPECT_EQ(root_hash_str, mp->catalog_mgr()->GetRootHash().ToString());
 

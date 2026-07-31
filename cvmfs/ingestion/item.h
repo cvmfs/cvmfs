@@ -258,4 +258,3 @@ class BlockItem : SingleCopy {
 };
 
 #endif  // CVMFS_INGESTION_ITEM_H_
-

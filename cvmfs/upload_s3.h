@@ -7,6 +7,7 @@
 
 #include <pthread.h>
 
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
@@ -15,7 +16,6 @@
 #include "upload_facility.h"
 #include "util/atomic.h"
 #include "util/file_backed_buffer.h"
-#include <memory>
 #include "util/single_copy.h"
 
 namespace upload {

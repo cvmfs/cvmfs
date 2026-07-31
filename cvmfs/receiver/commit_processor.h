@@ -6,11 +6,11 @@
 #define CVMFS_RECEIVER_COMMIT_PROCESSOR_H_
 
 #include <ctime>
+#include <memory>
 #include <string>
 
 #include "repository_tag.h"
 #include "server_tool.h"
-#include <memory>
 
 namespace receiver {
 

@@ -6,16 +6,17 @@
 
 #include "util/uuid.h"
 
-#include <cassert>
-#include <cinttypes>
-#include <cstdio>
-#include <cstring>
-#include <string>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <uuid/uuid.h>
 
+#include <cassert>
+#include <cinttypes>
+#include <cstdio>
+#include <cstring>
 #include <memory>
+#include <string>
+
 #include "util/posix.h"
 #include "util/string.h"
 

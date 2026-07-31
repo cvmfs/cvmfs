@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -20,7 +21,6 @@
 #include "sync_union_tarball.h"
 #include "util/capabilities.h"
 #include "util/logging.h"
-#include <memory>
 #include "util/posix.h"
 
 /*
@@ -66,8 +66,10 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
     // negative means "no limit": read all pending rows.  Default is 1000.
     int gc_db_batch_size = 1000;
     if (args.find('X') != args.end()) {
-      gc_db_batch_size = static_cast<int>(String2Int64(*args.find('X')->second));
-      if (gc_db_batch_size < 0) gc_db_batch_size = 0;
+      gc_db_batch_size = static_cast<int>(
+          String2Int64(*args.find('X')->second));
+      if (gc_db_batch_size < 0)
+        gc_db_batch_size = 0;
     }
     std::vector<std::string> gc_paths;
     if (!ReadGCDatabase(gc_db_path, &gc_paths, &gc_batch_ids,
@@ -166,9 +168,10 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
                                               &publish_statistics);
   if (NULL == params.spooler)
     return 3;
-  const std::unique_ptr<upload::Spooler> spooler_catalogs(upload::Spooler::Construct(
-      spooler_definition_catalogs, &publish_statistics));
-  if (spooler_catalogs.get()==nullptr)
+  const std::unique_ptr<upload::Spooler> spooler_catalogs(
+      upload::Spooler::Construct(spooler_definition_catalogs,
+                                 &publish_statistics));
+  if (spooler_catalogs.get() == nullptr)
     return 3;
 
   const bool follow_redirects = (args.count('L') > 0);
@@ -190,17 +193,17 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
   std::unique_ptr<manifest::Manifest> manifest;
   if (params.branched_catalog) {
     // Throw-away manifest
-    manifest .reset(  new manifest::Manifest(shash::Any(), 0, "") );
+    manifest.reset(new manifest::Manifest(shash::Any(), 0, ""));
   } else {
     if (with_gateway) {
-      manifest .reset(  FetchRemoteManifest(params.stratum0, params.repo_name,
-            shash::Any()) );
+      manifest.reset(
+          FetchRemoteManifest(params.stratum0, params.repo_name, shash::Any()));
     } else {
-      manifest .reset(  FetchRemoteManifest(params.stratum0, params.repo_name,
-            params.base_hash) );
+      manifest.reset(FetchRemoteManifest(params.stratum0, params.repo_name,
+                                         params.base_hash));
     }
   }
-  if (manifest.get()==nullptr) {
+  if (manifest.get() == nullptr) {
     return 3;
   }
 

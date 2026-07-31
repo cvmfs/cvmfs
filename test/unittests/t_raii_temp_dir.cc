@@ -4,8 +4,9 @@
 
 #include <gtest/gtest.h>
 
-#include "util/platform.h"
 #include <memory>
+
+#include "util/platform.h"
 #include "util/posix.h"
 #include "util/raii_temp_dir.h"
 
@@ -20,7 +21,7 @@ class T_RaiiTempDir : public ::testing::Test { };
 TEST_F(T_RaiiTempDir, Basic) {
   std::unique_ptr<RaiiTempDir> temp_dir(
       RaiiTempDir::Create(GetCurrentWorkingDirectory() + "/test_dir"));
-  ASSERT_TRUE(temp_dir.get()!=nullptr);
+  ASSERT_TRUE(temp_dir.get() != nullptr);
 
   const std::string temp_path = temp_dir->dir();
 
@@ -32,7 +33,7 @@ TEST_F(T_RaiiTempDir, Basic) {
 TEST_F(T_RaiiTempDir, DeletedExternally) {
   std::unique_ptr<RaiiTempDir> temp_dir(
       RaiiTempDir::Create(GetCurrentWorkingDirectory() + "/test_dir"));
-  ASSERT_TRUE(temp_dir.get()!=nullptr);
+  ASSERT_TRUE(temp_dir.get() != nullptr);
 
   const std::string temp_path = temp_dir->dir();
 

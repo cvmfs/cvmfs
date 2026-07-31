@@ -22,7 +22,7 @@ TEST(T_Encrypt, Entropy) {
   // Enough entropy for 100,000 256 bit keys?
   for (unsigned i = 0; i < 100000; ++i) {
     std::unique_ptr<Key> k(Key::CreateRandomly(32));
-    ASSERT_TRUE(k.get()!=nullptr);
+    ASSERT_TRUE(k.get() != nullptr);
   }
 }
 
@@ -30,7 +30,7 @@ TEST(T_Encrypt, Entropy) {
 TEST(T_Encrypt, KeyFiles) {
   CipherNone cipher;
   std::unique_ptr<Key> k(Key::CreateRandomly(cipher.key_size()));
-  ASSERT_TRUE(k.get()!=nullptr);
+  ASSERT_TRUE(k.get() != nullptr);
 
   string tmp_path;
   FILE *f = CreateTempFile("./key", 0600, "w+", &tmp_path);
@@ -40,33 +40,34 @@ TEST(T_Encrypt, KeyFiles) {
   EXPECT_TRUE(k->SaveToFile(tmp_path));
 
   std::unique_ptr<Key> k_restore1(Key::CreateFromFile(tmp_path));
-  ASSERT_TRUE(k_restore1.get()!=nullptr);
+  ASSERT_TRUE(k_restore1.get() != nullptr);
   EXPECT_EQ(k->size(), k_restore1->size());
   EXPECT_EQ(0, memcmp(k->data(), k_restore1->data(),
                       std::min(k->size(), k_restore1->size())));
 
   EXPECT_EQ(0, truncate(tmp_path.c_str(), 0));
   std::unique_ptr<Key> k_restore2(Key::CreateFromFile(tmp_path));
-  EXPECT_FALSE(k_restore2.get()!=nullptr);
+  EXPECT_FALSE(k_restore2.get() != nullptr);
 
   unlink(tmp_path.c_str());
   std::unique_ptr<Key> k_restore3(Key::CreateFromFile(tmp_path));
-  EXPECT_FALSE(k_restore3.get()!=nullptr);
+  EXPECT_FALSE(k_restore3.get() != nullptr);
 }
 
 
 TEST(T_Encrypt, KeyStrings) {
   std::unique_ptr<Key> k_invalid_small(Key::CreateFromString(""));
-  EXPECT_FALSE(k_invalid_small.get()!=nullptr);
+  EXPECT_FALSE(k_invalid_small.get() != nullptr);
   std::unique_ptr<Key> k_invalid_big(
       Key::CreateFromString(string(Key::kMaxSize + 1, 'X')));
-  EXPECT_FALSE(k_invalid_big.get()!=nullptr);
-  std::unique_ptr<Key> k_max_size(Key::CreateFromString(string(Key::kMaxSize, 'X')));
-  EXPECT_TRUE(k_max_size.get()!=nullptr);
+  EXPECT_FALSE(k_invalid_big.get() != nullptr);
+  std::unique_ptr<Key> k_max_size(
+      Key::CreateFromString(string(Key::kMaxSize, 'X')));
+  EXPECT_TRUE(k_max_size.get() != nullptr);
 
   string secret = "This is a secret";
   std::unique_ptr<Key> k(Key::CreateFromString(secret));
-  ASSERT_TRUE(k.get()!=nullptr);
+  ASSERT_TRUE(k.get() != nullptr);
   EXPECT_EQ(k->ToBase64(), Base64(secret));
 }
 
@@ -86,9 +87,9 @@ TEST(T_Encrypt, MemoryKeyDatabase) {
 TEST(T_Encrypt, DecryptWrongEnvelope) {
   CipherNone cipher;
   std::unique_ptr<Key> k(Key::CreateRandomly(cipher.key_size()));
-  ASSERT_TRUE(k.get()!=nullptr);
+  ASSERT_TRUE(k.get() != nullptr);
   std::unique_ptr<Key> k_bad(Key::CreateRandomly(1));
-  ASSERT_TRUE(k_bad.get()!=nullptr);
+  ASSERT_TRUE(k_bad.get() != nullptr);
 
   string ciphertext;
   string plaintext;
@@ -114,7 +115,7 @@ TEST(T_Encrypt, DecryptWrongEnvelope) {
 TEST(T_Encrypt, None) {
   CipherNone cipher;
   std::unique_ptr<Key> k(Key::CreateRandomly(cipher.key_size()));
-  ASSERT_TRUE(k.get()!=nullptr);
+  ASSERT_TRUE(k.get() != nullptr);
 
   string empty;
   string dummy = "Hello, World!";
@@ -139,7 +140,7 @@ TEST(T_Encrypt, None) {
 TEST(T_Encrypt, Aes_256_Cbc) {
   CipherAes256Cbc cipher;
   std::unique_ptr<Key> k(Key::CreateRandomly(cipher.key_size()));
-  ASSERT_TRUE(k.get()!=nullptr);
+  ASSERT_TRUE(k.get() != nullptr);
 
   string empty;
   string dummy = "Hello, World!";
@@ -214,8 +215,9 @@ TEST(T_Encrypt, Aes_256_Cbc) {
 
 TEST(T_Encrypt, Aes_256_Cbc_Iv) {
   CipherAes256Cbc cipher;
-  std::unique_ptr<cipher::Key> key(cipher::Key::CreateRandomly(cipher.key_size()));
-  ASSERT_TRUE(key.get()!=nullptr);
+  std::unique_ptr<cipher::Key> key(
+      cipher::Key::CreateRandomly(cipher.key_size()));
+  ASSERT_TRUE(key.get() != nullptr);
   // Many Iv requests in a short time should still return unique IVs
   shash::Md5 md5;
   for (unsigned i = 0; i < 100000; ++i) {
