@@ -709,9 +709,20 @@ int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
                 key_file.c_str());
 
   //  string spooler_definition_string = string("gw,,") + g_gateway_url;
-  // create a spooler that will upload to S3
-  string const spooler_definition_string = string("S3,") + dir_temp + ","
-                                           + repo_name + "@" + s3_file;
+  // Prefer the repository's configured upstream (local / S3 / gw) so ingestsql
+  // works against any storage backend, not only S3. Falls back to the legacy S3
+  // construction when CVMFS_UPSTREAM_STORAGE is not provided in the config.
+  string spooler_definition_string;
+  {
+    std::unordered_map<std::string, std::string>::const_iterator up =
+        config_map.find("CVMFS_UPSTREAM_STORAGE");
+    if (up != config_map.end() && !up->second.empty()) {
+      spooler_definition_string = up->second;
+    } else {
+      spooler_definition_string = string("S3,") + dir_temp + ","
+                                  + repo_name + "@" + s3_file;
+    }
+  }
 
   // load gateway lease
   if (!gateway::ReadKeys(key_file, &g_gateway_key_id, &g_gateway_secret)) {
