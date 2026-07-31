@@ -73,7 +73,7 @@ const unsigned kMaxDigestSize = 20;
 /**
  * The maximum of GetContextSize()
  */
-const unsigned kMaxContextSize = 256;
+const unsigned kMaxContextSize = 384;
 
 /**
  * Hex representations of hashes with the same length need a suffix

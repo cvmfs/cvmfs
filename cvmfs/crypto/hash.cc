@@ -50,10 +50,7 @@ void Ripemd160Digest(ripemd160_ctx *ctx, uint8_t *digest) {
   nettle_ripemd160_digest(ctx, digest);
 }
 
-void Shake128Digest(sha3_128_ctx *ctx, uint8_t *digest) {
-  nettle_sha3_128_shake(ctx, digest);
-}
-#else // nettle 3.x takes digest size as 2nd arg
+#else  // nettle 3.x takes digest size as 2nd arg
 void Md5Digest(md5_ctx *ctx, uint8_t *digest) {
   nettle_md5_digest(ctx, MD5_DIGEST_SIZE, digest);
 }
@@ -70,10 +67,14 @@ void Ripemd160Digest(ripemd160_ctx *ctx, uint8_t *digest) {
   nettle_ripemd160_digest(ctx, RIPEMD160_DIGEST_SIZE, digest);
 }
 
-void Shake128Digest(sha3_128_ctx *ctx, uint8_t *digest) {
-  nettle_sha3_128_shake(ctx, SHA3_128_DIGEST_SIZE, digest);
-}
 #endif
+
+void Shake128Digest(sha3_128_ctx *ctx, uint8_t *digest) {
+  nettle_sha3_128_shake(ctx, kDigestSizes[kShake128], digest);
+}
+
+static_assert(sizeof(sha3_128_ctx) <= kMaxContextSize,
+              "SHAKE128 context exceeds allocated buffers");
 
 }  // namespace
 
@@ -245,7 +246,8 @@ void Update(const unsigned char *buffer, const unsigned buffer_length,
                        buffer_length, buffer);
       break;
     case kShake128:
-      sha3_128_update(reinterpret_cast<sha3_128_ctx *>(context.buffer), buffer_length, buffer);
+      sha3_128_update(reinterpret_cast<sha3_128_ctx *>(context.buffer),
+                      buffer_length, buffer);
       break;
     default:
       PANIC(NULL);  // Undefined hash
@@ -258,13 +260,16 @@ void Final(ContextPtr context, Any *any_digest) {
       Md5Digest(reinterpret_cast<md5_ctx *>(context.buffer), any_digest->digest);
       break;
     case kSha1:
-      Sha1Digest(reinterpret_cast<sha1_ctx *>(context.buffer), any_digest->digest);
+      Sha1Digest(reinterpret_cast<sha1_ctx *>(context.buffer),
+                 any_digest->digest);
       break;
     case kRmd160:
-      Ripemd160Digest(reinterpret_cast<ripemd160_ctx *>(context.buffer), any_digest->digest);
+      Ripemd160Digest(reinterpret_cast<ripemd160_ctx *>(context.buffer),
+                      any_digest->digest);
       break;
     case kShake128:
-      Shake128Digest(reinterpret_cast<sha3_128_ctx *>(context.buffer), any_digest->digest);
+      Shake128Digest(reinterpret_cast<sha3_128_ctx *>(context.buffer),
+                     any_digest->digest);
       break;
     default:
       PANIC(NULL);  // Undefined hash
