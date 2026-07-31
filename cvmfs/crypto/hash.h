@@ -72,6 +72,8 @@ const unsigned kMaxDigestSize = 20;
 
 /**
  * The maximum of GetContextSize()
+ * Nettle v3.x has a larger context size for sha3.
+ * When using v4 exclusively, this could be reset to 256 bytes.
  */
 const unsigned kMaxContextSize = 384;
 
