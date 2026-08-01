@@ -155,11 +155,10 @@ if (BUILD_CVMFS)
   )
 
   #
-  # /usr/bin/dcoredumper (Linux only, x86_64)
+  # /usr/bin/cvmfs_dcoredumper (Linux only, x86_64)
   #
   if (NOT MACOSX)
-    add_executable (dcoredumper Dcoredumper.cc)
-    set_target_properties (dcoredumper PROPERTIES LINKER_LANGUAGE C)
+    add_executable (cvmfs_dcoredumper Dcoredumper.cc)
   endif ()
 
   #
@@ -393,7 +392,7 @@ if (BUILD_CVMFS)
         PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
     )
     install (
-        TARGETS       dcoredumper
+        TARGETS       cvmfs_dcoredumper
         RUNTIME
         DESTINATION   bin
     )

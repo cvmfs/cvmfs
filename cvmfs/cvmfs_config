@@ -1794,14 +1794,21 @@ cvmfs_bugreport() {
 
 
 cvmfs_dcoredump() {
-  local dumper_bin="${INSTALL_BASE}/bin/dcoredumper"
-  if [ ! -x "$dumper_bin" ]; then
-    echo "Error: dcoredumper binary not found at $dumper_bin"
+  if [ $# -lt 1 ]; then
+    echo "Usage: cvmfs_config dcoredump <pid> [output.core]"
     return 1
   fi
 
-  if [ $# -lt 1 ]; then
-    echo "Usage: cvmfs_config dcoredump <pid> [output.core]"
+  local arch=$(uname -m)
+  if [ "$arch" != "x86_64" ] && [ "$arch" != "amd64" ]; then
+    echo "Error: cvmfs_dcoredumper is currently only supported on x86_64 architectures."
+    echo "Detected architecture: $arch"
+    return 1
+  fi
+
+  local dumper_bin="${INSTALL_BASE}/bin/cvmfs_dcoredumper"
+  if [ ! -x "$dumper_bin" ]; then
+    echo "Error: cvmfs_dcoredumper binary not found at $dumper_bin"
     return 1
   fi
 
