@@ -69,7 +69,9 @@
 
 Summary: CernVM File System
 Name: cvmfs
-Version: 2.15.0~pre1
+# Package scripts replace this placeholder before creating an RPM or SRPM.
+# Keeping it valid lets tools such as `dnf builddep` parse this source spec.
+Version: 0
 %global base_version %(echo %{version} | cut -d'~' -f1)
 Release: 1%{?dist}
 URL: https://cernvm.cern.ch/fs/

@@ -46,10 +46,10 @@ mkdir -p $pkg_install_dir
 mkdir -p $pkg_build_dir
 mkdir -p $pkg_resource_dir
 
-# retrieve the upstream version string from CVMFS
-cvmfs_version="$(get_cvmfs_version_from_cmake $CVMFS_SOURCE_LOCATION)"
-cvmfs_prerelease="$(get_cvmfs_prerelease_from_cmake $CVMFS_SOURCE_LOCATION)"
-cvmfs_version=${cvmfs_version}${cvmfs_prerelease}
+# Preserve the legacy nightly-number interface.
+set_cvmfs_version_sequence_from_nightly "$CVMFS_NIGHTLY_BUILD_NUMBER"
+
+cvmfs_version="$(get_cvmfs_version "$CVMFS_SOURCE_LOCATION")"
 echo "detected upstream version: $cvmfs_version"
 
 echo "building CernVM-FS $cvmfs_version in '$CVMFS_RESULT_LOCATION' from '$CVMFS_SOURCE_LOCATION'"
@@ -66,15 +66,8 @@ cmake -DCMAKE_INSTALL_PREFIX:PATH=$CVMFS_INSTALL_PREFIX          \
       $CVMFS_SOURCE_LOCATION
 make -j $(get_number_of_cpu_cores)
 
-# generate the release tag for either a nightly build or a release
 cvmfs_build_tag="cvmfs-${cvmfs_version}"
-if [ $CVMFS_NIGHTLY_BUILD_NUMBER -gt 0 ]; then
-  git_hash="$(get_cvmfs_git_revision $CVMFS_SOURCE_LOCATION)"
-  cvmfs_build_tag="${cvmfs_build_tag}-0.${CVMFS_NIGHTLY_BUILD_NUMBER}-git-${git_hash}"
-  echo "creating nightly build '$cvmfs_build_tag'"
-else
-  echo "creating release: $cvmfs_build_tag"
-fi
+echo "creating package: $cvmfs_build_tag"
 
 echo "Installing cvmfs to $pkg_install_dir ..."
 make install DESTDIR=$pkg_install_dir || die "failed to install"

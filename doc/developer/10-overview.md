@@ -8,6 +8,7 @@ While most of it is explained in detail in the [documentation](https://cvmfs.rea
 ## Content
 - [Codestyle and Git Contribution](20-codestyle-and-git-contribution.md)
 - [Building from Source](30-building-from-source.md)
+- [Versioning](32-versioning.md)
 - Setup
   - [Setup CVMFS Server](40-setup-cvmfs-server.md)
   - [Setup CVMFS Gateway](41-setup-cvmfs-gateway.md)

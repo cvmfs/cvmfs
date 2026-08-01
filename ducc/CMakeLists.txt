@@ -8,7 +8,7 @@ file(GLOB_RECURSE CVMFS_CONTAINER_TOOLS_GO_SOURCES LIST_DIRECTORIES false ./*.go
 
 add_custom_command(
   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/cvmfs_ducc
-  COMMAND ${GO_COMPILER} build -o ${CMAKE_CURRENT_BINARY_DIR}/cvmfs_ducc -ldflags='-X github.com/cvmfs/ducc/cmd.Version=${CernVM-FS_VERSION_STRING}'
+  COMMAND ${GO_COMPILER} build -o ${CMAKE_CURRENT_BINARY_DIR}/cvmfs_ducc -ldflags='-X github.com/cvmfs/ducc/cmd.Version=${CernVM-FS_BUILD_VERSION}'
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   DEPENDS ${CVMFS_CONTAINER_TOOLS_GO_SOURCES}
   COMMENT "Build ducc using the Go Compiler"

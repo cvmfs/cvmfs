@@ -29,6 +29,8 @@ BASE_IMAGE="${BASE_IMAGE:-almalinux:9}"
 [ -n "$CVMFS_RESULT_LOCATION" ] || exit 1
 [ -n "$CVMFS_TAG" ]             || exit 1
 
+CVMFS_BUILD_VERSION=$("$CVMFS_SOURCE_LOCATION/cmake/get_version.sh" \
+  "$CVMFS_SOURCE_LOCATION")
 mkdir -p "$CVMFS_RESULT_LOCATION"
 
 IMAGE_NAME="cvmfs/service:$CVMFS_TAG"
@@ -36,6 +38,7 @@ ARCHIVE_NAME="cvmfs-service-${CVMFS_TAG}.$(uname -m)"
 
 DOCKER_BUILDKIT=1 docker build \
   --build-arg "VERSION=$CVMFS_TAG" \
+  --build-arg "CVMFS_VERSION_OVERRIDE=$CVMFS_BUILD_VERSION" \
   --build-arg "PLATFORM=$BASE_IMAGE" \
   --build-arg "BASE_IMAGE=$BASE_IMAGE" \
   --file "$CVMFS_SOURCE_LOCATION/packaging/container/Dockerfile" \

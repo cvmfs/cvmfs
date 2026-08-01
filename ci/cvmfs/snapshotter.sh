@@ -19,26 +19,15 @@ CVMFS_SOURCE_LOCATION="$1"
 CVMFS_RESULT_LOCATION="$2"
 CVMFS_NIGHTLY_BUILD_NUMBER="${3-0}"
 
-# retrieve the upstream version string from CVMFS
-cvmfs_prerelease="$(get_cvmfs_prerelease_from_cmake $CVMFS_SOURCE_LOCATION)"
-cvmfs_version=${cvmfs_version}${cvmfs_prerelease}
+# Preserve the legacy nightly-number interface.
+set_cvmfs_version_sequence_from_nightly "$CVMFS_NIGHTLY_BUILD_NUMBER"
 
+cvmfs_version="$(get_cvmfs_version "$CVMFS_SOURCE_LOCATION")"
+cvmfs_tag_version=$(echo "$cvmfs_version" | tr '~+' '--')
 echo "detected upstream version: $cvmfs_version"
 
-git_hash="$(get_cvmfs_git_revision $CVMFS_SOURCE_LOCATION)"
-
-# generate the release tag for either a nightly build or a release
-CVMFS_TAG=
-if [ $CVMFS_NIGHTLY_BUILD_NUMBER -gt 0 ]; then
-  build_tag="git-${git_hash}"
-  nightly_tag="0.${CVMFS_NIGHTLY_BUILD_NUMBER}.${git_hash}git"
-
-  echo "creating nightly build '$nightly_tag'"
-  CVMFS_TAG="${cvmfs_version}-$nightly_tag"
-else
-  echo "creating release: $cvmfs_version"
-  CVMFS_TAG="${cvmfs_version}-1"
-fi
+CVMFS_TAG="${cvmfs_tag_version}-1"
+echo "creating container: $CVMFS_TAG"
 
 if [ -d ${CVMFS_RESULT_LOCATION}/build ]; then
   if [ ! -z "$(ls -A ${CVMFS_RESULT_LOCATION}/build)" ]; then
