@@ -677,6 +677,7 @@ systemctl daemon-reload
 %{_libdir}/libcvmfs_fuse_debug.so.%{base_version}
 %endif
 %{_bindir}/cvmfs_talk
+%{_bindir}/cvmfs_dcoredumper
 %{_bindir}/cvmfs_fsck
 %{_bindir}/cvmfs_config
 /usr/libexec/cvmfs/auto.cvmfs

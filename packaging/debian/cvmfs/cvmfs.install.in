@@ -11,6 +11,7 @@ usr/lib/libcvmfs_fuse.so
 usr/lib/libcvmfs_fuse_debug.so.@CVMFS_VERSION@
 usr/lib/libcvmfs_fuse_debug.so
 usr/bin/cvmfs_talk
+usr/bin/cvmfs_dcoredumper
 usr/bin/cvmfs_config
 usr/libexec/cvmfs/auto.cvmfs
 usr/libexec/cvmfs/authz/cvmfs_allow_helper
