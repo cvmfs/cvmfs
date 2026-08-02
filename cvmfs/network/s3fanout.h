@@ -103,7 +103,9 @@ struct JobInfo : SingleCopy {
     kReqPutHtml,       // HTML file - display instead of downloading
     kReqPutBucket,     // bucket creation
     kReqDelete,
-    kReqDeleteMulti,   // S3 multi-object delete (POST /?delete)
+    kReqDeleteMulti,       // S3 multi-object delete (POST /?delete)
+    kReqPutAzureBlock,     // Azure staged block upload (PUT ?comp=block)
+    kReqPutAzureBlockList,  // Azure staged commit (PUT ?comp=blocklist)
   };
 
   const std::string object_key;
@@ -131,6 +133,14 @@ struct JobInfo : SingleCopy {
     throttle_timestamp = 0;
     errorbuffer = reinterpret_cast<char *>(
         smalloc(sizeof(char) * CURL_ERROR_SIZE));
+    azure_staged_upload = false;
+    azure_staged_original_req = kReqPutCas;
+    azure_block_size = 0;
+    azure_block_count = 0;
+    azure_block_idx = 0;
+    azure_payload_origin_offset = 0;
+    azure_payload_size = 0;
+    azure_payload_pos = 0;
   }
   ~JobInfo() { free(errorbuffer); }
 
@@ -153,6 +163,20 @@ struct JobInfo : SingleCopy {
   // Remember when the 429 reply came in to only throttle if still necessary
   uint64_t throttle_timestamp;
   char *errorbuffer;
+
+  // Azure staged block-blob upload state (used only when azure_staged_upload)
+  bool azure_staged_upload;
+  RequestType azure_staged_original_req;
+  uint64_t azure_block_size;
+  uint64_t azure_block_count;
+  uint64_t azure_block_idx;
+  uint64_t azure_payload_origin_offset;
+  uint64_t azure_payload_size;
+  uint64_t azure_payload_pos;
+  std::string azure_current_block_id_b64;  // UNESCAPED: signer + block-list XML
+  std::string azure_current_block_id_url;  // URL-escaped: request URL only
+  std::string azure_block_list_xml;
+  std::string azure_blob_content_type;
 };  // JobInfo
 
 struct S3FanOutDnsEntry {
@@ -270,6 +294,15 @@ class S3FanoutManager : SingleCopy {
   bool MkAzureAuthz(const JobInfo &info,
                     std::vector<std::string> *headers) const;
   bool RefreshAzureToken() const;
+
+  bool ShouldUseAzureStagedUpload(const JobInfo &info) const;
+  uint64_t AzureSinglePutLimit() const;
+  uint64_t AzureBlockSize() const;
+  void BeginAzureStagedUpload(JobInfo *info) const;
+  void PrepareAzureBlockRequest(JobInfo *info) const;
+  void BuildAzureBlockListXml(JobInfo *info) const;
+  std::string MkAzureBlockIdB64(uint64_t index) const;
+  std::string UrlEscapeBlockId(const std::string &b64) const;
   std::string MkUrl(const std::string &objkey) const {
     if (config_.dns_buckets) {
       return config_.protocol + "://" + complete_hostname_ + "/" + objkey;
