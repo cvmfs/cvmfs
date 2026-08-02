@@ -225,7 +225,7 @@ if [ -z "$testsuite" ]; then
     testsuite="$PROFILE_TESTSUITE"
     default_testsuite_used=1
   elif [ "$suite_option_provided" -eq 0 ]; then
-    testsuite="src/0* src/1* src/5* src/6*"
+    testsuite="src/0* src/1* src/5* src/6* src/9*"
     default_testsuite_used=1
   else
     testsuite=$(find src -mindepth 1 -maxdepth 1 -type d | sort)
