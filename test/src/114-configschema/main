@@ -95,11 +95,14 @@ cvmfs_run_test() {
   logfile=$1
   local script_location=$2
   local mount_dir="$script_location/../../../mount"
-  local schema="$script_location/../../../cvmfs/config/cvmfs.cue"
+  local schema_dir="$script_location/../../../cvmfs/config"
+  local client_schema="$schema_dir/cvmfs_client.cue"
+  local server_schema="$schema_dir/cvmfs_server.cue"
   local examples="$script_location/examples"
 
-  [ -f "$schema" ]   || { echo "schema not found: $schema"; return 1; }
-  [ -d "$examples" ] || { echo "examples not found: $examples"; return 2; }
+  [ -f "$client_schema" ] || { echo "schema not found: $client_schema"; return 1; }
+  [ -f "$server_schema" ] || { echo "schema not found: $server_schema"; return 1; }
+  [ -d "$examples" ]      || { echo "examples not found: $examples"; return 2; }
 
   CVMFS_TEST114_TMPDIR="$(mktemp -d)"
   trap cleanup EXIT HUP INT TERM
