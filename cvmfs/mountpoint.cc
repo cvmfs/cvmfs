@@ -31,6 +31,7 @@
 #include "authz/authz_fetch.h"
 #include "authz/authz_session.h"
 #include "backoff.h"
+#include "bundle_mgr.h"
 #include "cache.h"
 #include "cache_extern.h"
 #include "cache_posix.h"
@@ -1294,6 +1295,7 @@ MountPoint *MountPoint::Create(const string &fqrn,
   mountpoint->CreateTables();
   if (!mountpoint->SetupBehavior())
     return mountpoint.Release();
+  mountpoint->CreateBundleMgr();
 
   mountpoint->boot_status_ = loader::kFailOk;
   return mountpoint.Release();
@@ -1318,6 +1320,15 @@ void MountPoint::CreateAuthz() {
 
   authz_attachment_ = new AuthzAttachment(authz_session_mgr_);
   assert(authz_attachment_ != NULL);
+}
+
+
+void MountPoint::CreateBundleMgr() {
+  std::string optarg;
+  if (options_mgr_->GetValue("CVMFS_PREFETCH_FILEBUNDLES", &optarg)
+      && options_mgr_->IsOn(optarg)) {
+    bundle_mgr_ = new BundleMgr(this);
+  }
 }
 
 
@@ -1398,7 +1409,7 @@ bool MountPoint::CreateDownloadManagers() {
     download_mgr_->SetFailoverIndefinitely();
   }
 
-  if (options_mgr_->GetValue("CVMFS_METALINK_URL", &optarg)) {
+  if (options_mgr_->GetValue("CVMFS_METALINK_URL", &optarg) && (optarg != "")) {
     download_mgr_->SetMetalinkChain(optarg);
     // host chain will be set later when the metalink server is contacted
     download_mgr_->SetHostChain("");
@@ -1974,6 +1985,7 @@ MountPoint::MountPoint(const string &fqrn,
     , partial_replica_fail_mode_(false)
     , inode_annotation_(NULL)
     , catalog_mgr_(NULL)
+    , bundle_mgr_(NULL)
     , chunk_tables_(NULL)
     , simple_chunk_tables_(NULL)
     , inode_cache_(NULL)
@@ -2002,6 +2014,11 @@ MountPoint::MountPoint(const string &fqrn,
 
 MountPoint::~MountPoint() {
   pthread_mutex_destroy(&lock_max_ttl_);
+
+  // The bundle prefetcher owns background threads that use the catalog
+  // manager, the fetchers and the cache manager; join them before any of
+  // those are destroyed.
+  delete bundle_mgr_;
 
   delete page_cache_tracker_;
   delete dentry_tracker_;
@@ -2257,7 +2274,8 @@ bool MountPoint::SetupExternalDownloadMgr(bool dogeosort) {
   }
   external_download_mgr_->SetTimeout(timeout, timeout_direct);
 
-  if (options_mgr_->GetValue("CVMFS_EXTERNAL_METALINK", &optarg)) {
+  if (options_mgr_->GetValue("CVMFS_EXTERNAL_METALINK", &optarg) &&
+      (optarg != "")) {
     external_download_mgr_->SetMetalinkChain(optarg);
     // host chain will be set later when the metalink server is contacted
     external_download_mgr_->SetHostChain("");

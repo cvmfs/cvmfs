@@ -29,6 +29,7 @@ class AuthzAttachment;
 class AuthzFetcher;
 class AuthzSessionManager;
 class BackoffThrottle;
+class BundleMgr;
 class CacheManager;
 namespace catalog {
 class ClientCatalogManager;
@@ -515,6 +516,10 @@ class MountPoint : SingleCopy, public BootFactory {
 
   AuthzSessionManager *authz_session_mgr() { return authz_session_mgr_; }
   BackoffThrottle *backoff_throttle() { return backoff_throttle_; }
+  /**
+   * The file bundle prefetcher; NULL unless CVMFS_PREFETCH_FILEBUNDLES is on.
+   */
+  BundleMgr *bundle_mgr() { return bundle_mgr_; }
   catalog::ClientCatalogManager *catalog_mgr() { return catalog_mgr_; }
   ChunkTables *chunk_tables() { return chunk_tables_; }
   download::DownloadManager *download_mgr() { return download_mgr_; }
@@ -634,6 +639,7 @@ class MountPoint : SingleCopy, public BootFactory {
 
   void CreateStatistics();
   void CreateAuthz();
+  void CreateBundleMgr();
   bool CreateSignatureManager();
   bool CheckBlacklists();
   bool CreateDownloadManagers();
@@ -689,6 +695,12 @@ class MountPoint : SingleCopy, public BootFactory {
   bool partial_replica_fail_mode_;
   catalog::InodeAnnotation *inode_annotation_;
   catalog::ClientCatalogManager *catalog_mgr_;
+  /**
+   * File bundle prefetcher, NULL unless CVMFS_PREFETCH_FILEBUNDLES is on.
+   * Owns background threads that use catalog_mgr_ and the fetchers, so it
+   * must be destroyed before them.
+   */
+  BundleMgr *bundle_mgr_;
   ChunkTables *chunk_tables_;
   SimpleChunkTables *simple_chunk_tables_;
   lru::InodeCache *inode_cache_;

@@ -605,7 +605,11 @@ endif ()
 # First check if we have golang available
 #
 if (BUILD_GATEWAY OR BUILD_DUCC OR BUILD_SNAPSHOTTER OR BUILD_CONFIG_VALIDATOR)
-  find_program(GO_COMPILER go)
+  if (NOT CVMFS_GO_DIR AND NOT "$ENV{CVMFS_GO_DIR}" STREQUAL "")
+    set (CVMFS_GO_DIR "$ENV{CVMFS_GO_DIR}")
+  endif ()
+  find_program(GO_COMPILER go
+               HINTS ${CVMFS_GO_DIR} "${EXTERNALS_INSTALL_LOCATION}/go/bin")
   if(NOT GO_COMPILER)
     message(FATAL_ERROR "go compiler not found")
   else()

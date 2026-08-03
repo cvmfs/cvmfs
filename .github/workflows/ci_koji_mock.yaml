@@ -61,6 +61,25 @@ jobs:
                 --config-opts=rpmbuild_networking=False
             '
 
+      # mock keeps the compiler/rpmbuild output in build.log inside the result
+      # directory, so without this the job log shows nothing but "Command
+      # failed" and the actual error has to be dug out of the artifact.
+      - name: Show mock logs on failure
+        if: ${{ failure() }}
+        run: |
+          for log in mock-result/build.log mock-result/root.log; do
+            [ -f "$log" ] || continue
+            echo "::group::$log (last 300 lines)"
+            tail -n 300 "$log" >&2 || true
+            echo "::endgroup::"
+          done
+
+          first_error=$(grep -m1 -E "CMake Error|^error:|Bad exit status" \
+                        mock-result/build.log 2>/dev/null || true)
+          if [ -n "$first_error" ]; then
+            echo "::error::mock build failed: $first_error"
+          fi
+
       - name: Upload mock results
         if: ${{ always() }}
         uses: actions/upload-artifact@v4

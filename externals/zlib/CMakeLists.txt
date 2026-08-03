@@ -2,8 +2,11 @@
 include(FetchContent)
 
 set(ZLIB_VERSION "1.2.8")
-set(ZLIB_URL "https://zlib.net/fossils/zlib-${ZLIB_VERSION}.tar.gz")
-set(ZLIB_URL_MIRROR "https://ecsft.cern.ch/dist/cvmfs/build_externals/zlib-${ZLIB_VERSION}.tar.gz")
+# zlib.net occasionally answers with an HTTP 200 anti-bot interstitial page
+# instead of the tarball, so go to our own mirror first and keep zlib.net as
+# the fallback.
+set(ZLIB_URL "https://ecsft.cern.ch/dist/cvmfs/build_externals/zlib-${ZLIB_VERSION}.tar.gz")
+set(ZLIB_URL_MIRROR "https://zlib.net/fossils/zlib-${ZLIB_VERSION}.tar.gz")
 set(ZLIB_HASH "MD5=44d667c142d7cda120332623eab69f40")
 
 # -> zlib <-

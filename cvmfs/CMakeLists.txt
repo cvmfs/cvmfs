@@ -44,6 +44,7 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS)
        authz/authz_fetch.cc
        authz/authz_session.cc
        backoff.cc
+       bundle_mgr.cc
        cache.cc
        cache.pb.cc cache.pb.h
        cache_extern.cc
@@ -94,6 +95,7 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS)
        resolv_conf_event_handler.cc
        ring_buffer.cc
        sanitizer.cc
+       shortstring.cc
        sql.cc
        sqlitemem.cc
        sqlitevfs.cc
@@ -239,7 +241,6 @@ if (BUILD_CVMFS)
   set (CVMFS_FUSE_SOURCES
        ${CVMFS_COMMON_CLIENT_SOURCES}
        auto_umount.cc
-       bundle_mgr.cc
        compat.cc
        cvmfs.cc
        fuse_evict.cc
@@ -251,7 +252,6 @@ if (BUILD_CVMFS)
        notify/subscriber_supervisor.cc
        notify/subscriber_sse.cc
        quota_listener.cc
-       shortstring.cc
        supervisor.cc
        talk.cc
        url.cc

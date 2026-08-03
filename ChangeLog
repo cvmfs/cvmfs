@@ -1,9 +1,9 @@
 
 2.14.1:
-  * [client] Close file descriptors of prefetched bundle dependencies
-  * [client] Prefetch the chunk objects of chunked bundle dependencies
-  * [client] Do not abort on bundle dependency paths reaching PIPE_BUF
-  * [client] Fix file bundle trigger inconsistency (#4351)
+  * [client] Fix metalink request retry and failover handling (#4380)
+  * [client] Prefetch file bundles asynchronously and support libcvmfs (#4359)
+  * [server] Avoid a catalog corruption on a certain migration path (#4362)
+  * [client] Fix file bundle trigger inconsistency and other issues (#4351)
   * [client] Fix repo_metainfo magic xattr always reporting "manifest not available" (#4344)
   * [client] aliencache: fix cache dir error logic (#4350)
   * [server] Fix S3 V2 signature for multi-object delete with DNS buckets (#4336)

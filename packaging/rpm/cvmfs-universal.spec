@@ -130,11 +130,6 @@ BuildRequires: pkgconfig
 BuildRequires: %{cvmfs_python_devel}
 BuildRequires: unzip
 BuildRequires: zlib-devel
-%if 0%{?suse_version}
-BuildRequires: nlohmann_json-devel
-%else
-BuildRequires: json-devel
-%endif
 BuildRequires: libarchive-devel
 # protobuf is optional: the build uses the system package when present and
 # otherwise falls back to the vendored (FetchContent) sources. protoc ships in a
@@ -263,11 +258,6 @@ BuildRequires: %{cvmfs_python_devel}
 BuildRequires: libcap-devel
 BuildRequires: help2man
 BuildRequires: unzip
-%if 0%{?suse_version}
-BuildRequires: nlohmann_json-devel
-%else
-BuildRequires: json-devel
-%endif
 BuildRequires: libarchive-devel
 BuildRequires: %{cvmfs_python_setuptools}
 %if 0%{?suse_version}

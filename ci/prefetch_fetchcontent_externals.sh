@@ -16,6 +16,47 @@ fi
 CVMFS_SOURCE_TREE="$1"
 DOWNLOAD_CACHE_DIR="$2"
 
+# Print the <algorithm> digest of a file as lowercase hex.
+file_digest() {
+  digest_algorithm="$1"
+  digest_file="$2"
+
+  if command -v "${digest_algorithm}sum" > /dev/null 2>&1; then
+    "${digest_algorithm}sum" "${digest_file}" | cut -d' ' -f1
+  elif [ "${digest_algorithm}" = "md5" ] && command -v md5 > /dev/null 2>&1; then
+    md5 -q "${digest_file}"
+  elif [ "${digest_algorithm}" != "md5" ] && command -v shasum > /dev/null 2>&1; then
+    shasum -a "${digest_algorithm#sha}" "${digest_file}" | cut -d' ' -f1
+  elif command -v openssl > /dev/null 2>&1; then
+    openssl dgst "-${digest_algorithm}" "${digest_file}" | sed 's/^.*= *//'
+  else
+    return 1
+  fi
+}
+
+# Check a file against a "<ALGORITHM>=<hex digest>" string, i.e. the value of the
+# URL_HASH of the corresponding FetchContent_Declare().
+verify_digest() {
+  verify_file="$1"
+  expected_algorithm=$(echo "$2" | cut -d= -f1 | tr 'A-Z' 'a-z')
+  expected_digest=$(echo "$2" | cut -d= -f2- | tr 'A-Z' 'a-z')
+
+  case "${expected_algorithm}" in
+    md5|sha1|sha224|sha256|sha384|sha512) ;;
+    *)
+      echo "unsupported URL_HASH algorithm '$2' for ${verify_file}" >&2
+      exit 1
+      ;;
+  esac
+
+  actual_digest=$(file_digest "${expected_algorithm}" "${verify_file}") || {
+    echo "cannot compute the ${expected_algorithm} digest of ${verify_file}" >&2
+    exit 1
+  }
+
+  [ "${actual_digest}" = "${expected_digest}" ]
+}
+
 for godir in ducc gateway snapshotter cvmfs/config; do
   if [ -f "${CVMFS_SOURCE_TREE}/${godir}/go.mod" ]; then
     (cd "${CVMFS_SOURCE_TREE}/${godir}" && go mod vendor)
@@ -26,6 +67,9 @@ mkdir -p "${DOWNLOAD_CACHE_DIR}"
 
 manifest_file=$(mktemp)
 cmake_file_list=$(mktemp)
+sorted_manifest=$(mktemp)
+trap 'rm -f "${manifest_file}" "${cmake_file_list}" "${sorted_manifest}"' EXIT
+
 find "${CVMFS_SOURCE_TREE}/externals" -mindepth 2 -maxdepth 2 -name CMakeLists.txt -type f | sort > "${cmake_file_list}"
 
 while IFS= read -r file; do
@@ -85,7 +129,12 @@ while IFS= read -r file; do
           if (n <= 1 || primary[1] !~ /^https?:\/\//) {
             continue
           }
-          printf "%s", basename(primary[1])
+          hash_var = var
+          sub(/_URL$/, "_HASH", hash_var)
+          # "-" and not an empty field: read splits on runs of tabs, so an empty
+          # field would shift the URLs into the digest column.
+          hash = (hash_var in vars) ? vars[hash_var] : "-"
+          printf "%s\t%s", basename(primary[1]), hash
           for (i = 1; i < n; ++i) {
             printf "\t%s", primary[i]
           }
@@ -104,22 +153,32 @@ while IFS= read -r file; do
 done < "${cmake_file_list}"
 
 if [ -f "${CVMFS_SOURCE_TREE}/cmake/Modules/SetupGoogleTest.cmake" ]; then
-  echo "googletest-1.17.0.tar.gz	https://github.com/google/googletest/releases/download/v1.17.0/googletest-1.17.0.tar.gz	https://ecsft.cern.ch/dist/cvmfs/build_externals/googletest-1.17.0.tar.gz" >> "${manifest_file}"
+  echo "googletest-1.17.0.tar.gz	MD5=b6f100bc2a5853a48046aa168ececf84	https://github.com/google/googletest/releases/download/v1.17.0/googletest-1.17.0.tar.gz	https://ecsft.cern.ch/dist/cvmfs/build_externals/googletest-1.17.0.tar.gz" >> "${manifest_file}"
 fi
 
-sorted_manifest=$(mktemp)
 sort -u "${manifest_file}" > "${sorted_manifest}"
 
-while IFS=$(printf '\t') read -r filename url1 url2 url3 url4; do
+while IFS=$(printf '\t') read -r filename hash url1 url2 url3 url4; do
   [ -n "$filename" ] || continue
+
+  # Without a digest we cannot tell an archive from an error page, and the
+  # offline build would happily use whatever ends up in the cache.
+  if [ -z "$hash" ] || [ "$hash" = "-" ]; then
+    echo "no URL_HASH declared for $filename, refusing to prefetch it unverified" >&2
+    exit 1
+  fi
+
   destination="${DOWNLOAD_CACHE_DIR}/${filename}"
-  [ -f "$destination" ] && continue
+  if [ -f "$destination" ]; then
+    verify_digest "$destination" "$hash" && continue
+    echo "cached $filename does not match $hash, downloading it again" >&2
+    rm -f "$destination"
+  fi
 
   for url in "$url1" "$url2" "$url3" "$url4"; do
     [ -n "$url" ] || continue
     echo "$url" | grep -q '\${' && {
-      echo "failed to resolve FetchContent URL for $filename: $url"
-      rm -f "${manifest_file}" "${cmake_file_list}" "${sorted_manifest}"
+      echo "failed to resolve FetchContent URL for $filename: $url" >&2
       exit 1
     }
     echo "Prefetching $filename from $url"
@@ -128,16 +187,16 @@ while IFS=$(printf '\t') read -r filename url1 url2 url3 url4; do
       -o "$destination" \
       "$url" < /dev/null
     then
-      break
+      verify_digest "$destination" "$hash" && break
+      # Servers do answer with an HTTP 200 error page or anti-bot interstitial
+      # every now and then; that is a failed download, not a valid archive.
+      echo "$url did not return $hash for $filename, trying the next URL" >&2
     fi
     rm -f "$destination"
   done
 
   [ -f "$destination" ] || {
-    echo "failed to download $filename from all configured URLs"
-    rm -f "${manifest_file}" "${cmake_file_list}" "${sorted_manifest}"
+    echo "failed to download $filename from all configured URLs" >&2
     exit 1
   }
 done < "${sorted_manifest}"
-
-rm -f "${manifest_file}" "${cmake_file_list}" "${sorted_manifest}"

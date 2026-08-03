@@ -329,20 +329,22 @@ CommitProcessor::Result CommitProcessor::Process(
       return kMergeFailure;
     }
 
-    // Download new_root_hash to a temp file to obtain its compressed size.
-    // TryGraftNestedCatalog will download it again internally via
-    // LoadFreeCatalog; with a local cache that second fetch is a cheap cache
-    // hit.
+    // Download new_root_hash to a temp file to obtain the size of the catalog
+    // database.  TryGraftNestedCatalog downloads the catalog once more
+    // internally via LoadFreeCatalog; the probe writes outside the local cache
+    // directory, so that second fetch does not hit the cache.
     const std::string catalog_url =
         params.stratum0 + "/data/" + new_root_hash.MakePath();
     const std::string catalog_tmp = graft_temp + "/catalog_size";
     {
       cvmfs::PathSink catalog_sink(catalog_tmp);
       const shash::Any expected = new_root_hash;
-      // Fetch the compressed object verbatim: the nested catalog reference
-      // stores the compressed CAS object size, while DownloadManager's normal
-      // catalog path (compressed=true) writes the decompressed SQLite file.
-      download::JobInfo dl_job(&catalog_url, false, false, &expected,
+      // Decompress while downloading (the content hash is still verified
+      // against the compressed stream): nested_catalogs.size holds the size of
+      // the catalog database, not of the compressed CAS object.  Compare
+      // CommandCheck::FetchCatalog, which validates this column against the
+      // size of the decompressed catalog.
+      download::JobInfo dl_job(&catalog_url, true, false, &expected,
                                &catalog_sink);
       const download::Failures dl_ret =
           server_tool->download_manager()->Fetch(&dl_job);
@@ -357,9 +359,11 @@ CommitProcessor::Result CommitProcessor::Process(
     }  // PathSink destructor closes the file here
     const int64_t catalog_size = GetFileSize(catalog_tmp);
     unlink(catalog_tmp.c_str());
-    if (catalog_size < 0) {
+    // A zero size would be recorded as "unknown" by swissknife check and
+    // silently disable its size validation, so reject it here.
+    if (catalog_size <= 0) {
       LogCvmfs(kLogReceiver, kLogSyslogErr,
-               "CommitProcessor - error: cannot stat downloaded catalog %s",
+               "CommitProcessor - error: empty or unstatable catalog %s",
                catalog_url.c_str());
       return kError;
     }
