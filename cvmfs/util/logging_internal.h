@@ -70,6 +70,31 @@ enum LogLevels {
 };
 
 /**
+ * The log facilities, flags, and levels occupy disjoint bit ranges of the
+ * same integer log mask and are meant to be combined with bitwise OR.
+ * C++20 deprecates bitwise operations between different enumeration types,
+ * so spell out the intended integer combination once, centrally.
+ */
+inline int operator|(LogFacilities facility, LogFlags flag) {
+  return static_cast<int>(facility) | static_cast<int>(flag);
+}
+inline int operator|(LogFlags flag, LogFacilities facility) {
+  return static_cast<int>(flag) | static_cast<int>(facility);
+}
+inline int operator|(LogFacilities facility, LogLevels level) {
+  return static_cast<int>(facility) | static_cast<int>(level);
+}
+inline int operator|(LogLevels level, LogFacilities facility) {
+  return static_cast<int>(level) | static_cast<int>(facility);
+}
+inline int operator|(LogFlags flag, LogLevels level) {
+  return static_cast<int>(flag) | static_cast<int>(level);
+}
+inline int operator|(LogLevels level, LogFlags flag) {
+  return static_cast<int>(level) | static_cast<int>(flag);
+}
+
+/**
  * Changes in this enum must be done in logging.cc as well!
  * (see const char *module_names[] = {....})
  */
