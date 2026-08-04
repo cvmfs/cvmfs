@@ -39,6 +39,24 @@
 #define X86_64_PRPSINFO_FNAME 40
 #define X86_64_PRPSINFO_ARGS  56
 
+/**
+ * Dump level controls which memory regions are written to the core.
+ * NT_FILE always covers all file-backed regions regardless of level
+ * so GDB can reload .text from disk.
+ */
+typedef enum {
+  DUMP_STANDARD,  /**< skip read-only file-backed regions (default) */
+  DUMP_FULL       /**< dump everything readable */
+} dump_level_t;
+
+static dump_level_t g_level = DUMP_STANDARD;
+
+/**
+ * Path of the main executable, detected from the first file-backed
+ * region in /proc/pid/maps.  Used by should_dump_region() to always
+ * keep the executable's regions in standard mode.
+ */
+static char g_exe_path[256] = "";
 
 typedef struct {
   unsigned long start;
@@ -58,13 +76,44 @@ typedef struct {
 /**
  * Decides whether a memory region should be included in the core dump.
  * Skips kernel-mapped regions that cause EIO on pread().
+ *
+ * In DUMP_STANDARD mode, read-only file-backed regions of shared
+ * libraries are skipped because GDB can reload them from disk via
+ * NT_FILE.  The dynamic linker and main executable are always kept
+ * because GDB needs _DYNAMIC -> DT_DEBUG -> r_debug -> link_map
+ * from the linker's memory to discover shared libraries.
  */
 static int should_dump_region(const mem_region_t *r) {
   if (!r->readable) return 0;
   if (strstr(r->name, "[vvar]"))        return 0;
   if (strstr(r->name, "[vvar_vclock]")) return 0;
   if (strstr(r->name, "[vsyscall]"))    return 0;
-  return 1;
+
+  switch (g_level) {
+  case DUMP_STANDARD:
+    // Always keep the dynamic linker (ld-linux).
+    if (strstr(r->name, "/ld-linux") ||
+        strstr(r->name, "/ld-musl")  ||
+        strstr(r->name, "/ld.so"))
+      return 1;
+
+    // Always keep the main executable's regions.
+    if (g_exe_path[0] && strcmp(r->name, g_exe_path) == 0)
+      return 1;
+
+    // Skip large read-only file-backed regions (.text, .rodata)
+    // of OTHER shared libraries — GDB reloads from disk via NT_FILE
+    if (r->name[0] == '/' && !r->writable)
+      return 0;
+
+    // Keep everything else (writable file-backed, anonymous,
+    // stack, heap, vdso)
+    return 1;
+
+  case DUMP_FULL:
+  default:
+    return 1;
+  }
 }
 
 /**
@@ -118,6 +167,13 @@ int parse_maps(int pid, mem_region_t **regions_out) {
     while (*p == ' ') p++;
     strncpy(regions[count].name, p, 255);
     regions[count].name[255] = '\0';
+
+    // First file-backed region in maps is the main executable.
+    // Save its path so should_dump_region() can always keep it.
+    if (g_exe_path[0] == '\0' && p[0] == '/') {
+      strncpy(g_exe_path, p, sizeof(g_exe_path) - 1);
+      g_exe_path[sizeof(g_exe_path) - 1] = '\0';
+    }
 
     count++;
   }
@@ -447,7 +503,8 @@ int build_core(int pid, const char *output_path) {
   printf("Target PID:   %d\n", pid);
   printf("Output:       %s\n", output_path);
   printf("Architecture: x86_64\n");
-  printf("Dump level:   full\n");
+  printf("Dump level:   %s\n",
+         g_level == DUMP_STANDARD ? "standard" : "full");
   printf("\n");
 
   mem_region_t *regions = NULL;
@@ -784,8 +841,12 @@ int build_core(int pid, const char *output_path) {
 int main(int argc, char *argv[]) {
   int argi = 1;
   while (argi < argc && argv[argi][0] == '-') {
-    if (!strcmp(argv[argi], "--help") ||
-           !strcmp(argv[argi], "-h")) {
+    if (!strcmp(argv[argi], "--standard")) {
+      g_level = DUMP_STANDARD;
+    } else if (!strcmp(argv[argi], "--full")) {
+      g_level = DUMP_FULL;
+    } else if (!strcmp(argv[argi], "--help") ||
+              !strcmp(argv[argi], "-h")) {
       printf(
 "Usage: dcoredumper [OPTIONS] <pid> <output.core>\n"
 "\n"
@@ -793,13 +854,15 @@ int main(int argc, char *argv[]) {
 "without ptrace. Reads /proc/<pid>/ interfaces directly.\n"
 "\n"
 "Options:\n"
-
+"  --standard   skip read-only file-backed regions (default)\n"
+"  --full       dump all readable regions\n"
 "  --help       this message\n"
 "\n"
 "Requires root on kernel 6.x (for /proc/pid/syscall access).\n"
 "\n"
 "Example:\n"
 "  sudo dcoredumper 1234 /tmp/hung.core\n"
+"  sudo dcoredumper --full 1234 /tmp/hung.core\n"
 "  gdb /usr/bin/cvmfs2 /tmp/hung.core\n"
 "  (gdb) thread apply all bt\n"
       );
