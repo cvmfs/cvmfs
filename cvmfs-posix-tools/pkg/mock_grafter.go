@@ -50,10 +50,22 @@ func Mock_graft(db DB, repo string, debug bool, baseDir string) (GraftMetrics, e
 		configPrefix = baseDir + "/pkg/etc/cvmfs-gateway-client/" + repo + "/"
 		args_add = []string{}
 	}
-	args := append([]string{"ingestsql", "-N", repo,
-		"-D", db.GetPath(), "-w", "http://127.0.0.1:9000/mybucket/" + repo, "-k", configPrefix + "pubkey",
-		"-s", configPrefix + "gatewaykey", "-3", configPrefix + "s3.conf", "-g", "http://127.0.0.1:4929/api/v1",
-		"-t", cvmfsRsyncTempDir, "-a", "-d"}, args_add...)
+	args := append([]string{
+		"ingestsql",
+		"-c",
+		"-v",
+		"-N", repo,
+		"-D", db.GetPath(),
+		"-t", cvmfsRsyncTempDir,
+		"-a",
+		"-d",
+		"-w", os.Getenv("CVMFS_TEST_HTTP_BASE") + "/" + repo,
+		"-k", configPrefix + "pubkey",
+		"-s", configPrefix + "gatewaykey",
+		"-3", os.Getenv("CVMFS_TEST_S3_CONFIG"),
+		"-g", "http://127.0.0.1:4929/api/v1",
+	},
+	args_add...)
 
 	cmd := exec.Command("cvmfs_swissknife", args...)
 
