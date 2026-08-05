@@ -14,7 +14,7 @@ const (
 	S3503SlowDown              = "503SlowDown"
 	SlurmJobCpusPerNode        = "SLURM_JOB_CPUS_PER_NODE"
 	UploadRetries              = 3
-	AutoRegion                 = "auto"
+	AutoRegion                 = "garage"
 	S3NoSuchKey                = "NoSuchKey"
 	NotDirectoryError          = "readdirent: not a directory"
 )
