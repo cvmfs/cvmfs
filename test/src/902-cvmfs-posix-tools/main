@@ -3,10 +3,6 @@ cvmfs_test_name="cvmfs-posix-tools"
 cvmfs_test_autofs_on_startup=false
 cvmfs_test_suites="cvmfs-posix-tools quick"
 
-cleanup() {
-  true
-}
-
 cvmfs_run_test() {
   [[ -v TEST_ROOT ]] # expected /home/sftnight/cvmfs/test
   this_script_dir=$TEST_ROOT/src/902-cvmfs-posix-tools
