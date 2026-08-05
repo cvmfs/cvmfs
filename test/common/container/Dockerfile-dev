@@ -41,8 +41,8 @@ USER root
 RUN chmod 0400 /etc/shadow
 
 
-# cloudtest dependencies
-RUN dnf install -y \
+# cloudtest dependencies (s3cmd is only available from EPEL)
+RUN dnf install -y epel-release && dnf install -y \
     attr \
     autofs \
     bc \
@@ -59,6 +59,7 @@ RUN dnf install -y \
     python \
     python3-mod_wsgi \
     python3-pip \
+    s3cmd \
     sqlite \
     sudo \
     usbutils \

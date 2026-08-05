@@ -1,0 +1,26 @@
+#!/bin/bash
+cvmfs_test_name="swissknife ingestsql"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="ingestsql quick"
+
+cvmfs_run_test() {
+  if ! running_on_s3; then
+    echo "Warning: CVMFS_TEST_S3_CONFIG is not set, skipping test"
+    CVMFS_GENERAL_WARNING_FLAG=1
+    return 0
+  fi
+  if ! command -v s3cmd >/dev/null 2>&1; then
+    echo "Warning: s3cmd not found, skipping test"
+    CVMFS_GENERAL_WARNING_FLAG=1
+    return 0
+  fi
+
+  [[ -v TEST_ROOT ]] # expected /home/sftnight/cvmfs/test
+  this_script_dir=$TEST_ROOT/src/901-ingestsql
+  # We want strict mode here, to catch any failure.
+  # But turning on errexit (set -e) inside a function has no effect.
+  # So we exec our script to keep its error handling mode independent from test/run.sh.
+  exe="$this_script_dir"/run_test
+  echo Launching "$exe"
+  exec "$exe" "$@"
+}

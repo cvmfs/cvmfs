@@ -1,0 +1,23 @@
+#!/bin/bash
+set -euo pipefail
+
+TIMESTAMP=$(date +%F_%T.%N)
+
+# rr doesn't support FUSE syscalls as of Fedora 42, hence strace
+nohup strace -o /var/log/cvmfs2."$TIMESTAMP".strace.log -f --string-limit=256 --relative-timestamps=us --syscall-times=us \
+	cvmfs2 -f -d "$@" \
+	&> /var/log/cvmfs2."$TIMESTAMP".log \
+	&
+
+TIMEOUT=30
+COUNTER=0
+while ! attr -g revision /tmp/ingestsql_test_mount; do
+	COUNTER=$(( COUNTER + 1))
+	if [[ "$COUNTER" == "$TIMEOUT" ]]; then
+		echo "Timed out in $COUNTER seconds" | tee /var/log/cvmfs2."$TIMESTAMP".outcome.log
+		exit 1
+	fi
+	sleep 1
+done
+echo "Mounted in $COUNTER seconds" | tee /var/log/cvmfs2."$TIMESTAMP".outcome.log
+exit 0
