@@ -2738,6 +2738,28 @@ restart_repository_gateway() {
     fi
 }
 
+gateway_rr() {
+  if [[ $# != 1 ]]; then
+    echo "Usage: $0 <enable|disable>"
+    return 1
+  fi
+
+  local exec_line_enable='ExecStart=/usr/bin/rr /usr/bin/cvmfs_gateway'
+  local exec_line_disable='ExecStart=/usr/bin/cvmfs_gateway'
+  local exec_line
+  if [[ "$1" == enable ]]; then
+    exec_line=$exec_line_enable
+  elif [[ "$1" == disable ]]; then
+    exec_line=$exec_line_disable
+  else
+    echo Undefined operation
+    return 1
+  fi
+  sudo sed -i /usr/lib/systemd/system/cvmfs-gateway@.service -e '/^ExecStart/s:.*:'"$exec_line":
+  sudo systemctl daemon-reload
+  sudo systemctl restart cvmfs-gateway@root
+}
+
 grep_receiver_debuglog() {
   local needle="$1"
 
