@@ -49,6 +49,7 @@
 #include "quota.h"
 #include "util/atomic.h"
 #include "util/logging.h"
+#include "util/mutex.h"
 #include "util/platform.h"
 #include "util/posix.h"
 #include "util/smalloc.h"
@@ -215,16 +216,63 @@ int PosixCacheManager::CommitTxn(void *txn) {
 }
 
 bool PosixCacheManager::InitCacheDirectory(const string &cache_path) {
-  const FileSystemInfo fs_info = GetFileSystemInfo(cache_path);
-
-  if (fs_info.type == kFsTypeTmpfs) {
-    is_tmpfs_ = true;
+  // For an alien cache the directory skeleton is created lazily on the first
+  // write (see EnsureCacheDirectories), so that merely trying to mount a bogus
+  // fqrn -- e.g. a stray access to /cvmfs/<typo> -- does not leave empty
+  // directories behind in a per-fqrn alien cache (see #4217).  A regular cache
+  // coincides with the workspace and backs the quota manager, which scans the
+  // 00..ff directories at start-up, so it is created eagerly.
+  if (!alien_cache_) {
+    if (!EnsureCacheDirectories())
+      return false;
   }
 
+  // TODO(jblomer): we might not need to look anymore for cvmfs 2.0 relicts
+  if (FileExists(cache_path + "/cvmfscatalog.cache")) {
+    LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
+             "Not mounting on cvmfs 2.0.X cache");
+    return false;
+  }
+  return true;
+}
+
+
+/**
+ * Idempotently create the on-disk cache skeleton and detect the underlying
+ * file system.  For alien caches this is deferred until the first cache write
+ * so that the skeleton is only materialized once the repository has actually
+ * been validated and content is about to be stored (see #4217).
+ */
+bool PosixCacheManager::EnsureCacheDirectories() {
+  if (atomic_read32(&cache_dirs_created_))
+    return true;
+
+  const MutexLockGuard guard(lock_cache_dirs_);
+  if (atomic_read32(&cache_dirs_created_))
+    return true;
+
+  const mode_t mode = alien_cache_ ? 0770 : 0700;
+
+  // Create the base directory first so that the file system type can be
+  // detected reliably: statfs() on a not-yet-existing path returns nothing.
+  if (!MkdirDeep(cache_path_, mode, false)) {
+    LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
+             "Failed to create cache directory %s", cache_path_.c_str());
+    return false;
+  }
+
+  const FileSystemInfo fs_info = GetFileSystemInfo(cache_path_);
+  if (fs_info.type == kFsTypeTmpfs)
+    is_tmpfs_ = true;
+
+  if (!MakeCacheDirectories(cache_path_, mode))
+    return false;
+
   if (alien_cache_) {
-    if (!MakeCacheDirectories(cache_path, 0770)) {
-      return false;
-    }
+    // Sentinel file for future use (see FileSystem::SetupPosixCacheMgr).  For
+    // an alien cache the skeleton -- and hence this file -- is created here
+    // lazily rather than at mount time; a read-only alien cache may reject it.
+    CreateFile(cache_path_ + "/.cvmfscache", 0600, true /* ignore_failure */);
     LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
              "Cache directory structure created.");
     switch (fs_info.type) {
@@ -240,17 +288,9 @@ bool PosixCacheManager::InitCacheDirectory(const string &cache_path) {
       default:
         break;
     }
-  } else {
-    if (!MakeCacheDirectories(cache_path, 0700))
-      return false;
   }
 
-  // TODO(jblomer): we might not need to look anymore for cvmfs 2.0 relicts
-  if (FileExists(cache_path + "/cvmfscatalog.cache")) {
-    LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
-             "Not mounting on cvmfs 2.0.X cache");
-    return false;
-  }
+  atomic_write32(&cache_dirs_created_, 1);
   return true;
 }
 
@@ -513,6 +553,12 @@ int PosixCacheManager::Reset(void *txn) {
 int PosixCacheManager::StartTxn(const shash::Any &id,
                                 uint64_t size,
                                 void *txn) {
+  // Materialize the cache skeleton on first use.  For alien caches this is
+  // deferred from mount time to here, so that a bogus fqrn never creates any
+  // directories (see #4217); for regular caches this is a lock-free no-op.
+  if (!EnsureCacheDirectories())
+    return -EIO;
+
   atomic_inc32(&no_inflight_txns_);
   if (cache_mode_ == kCacheReadOnly) {
     atomic_dec32(&no_inflight_txns_);

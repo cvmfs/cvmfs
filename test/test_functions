@@ -2738,6 +2738,30 @@ lockfile() {
   ./lockfile $1
 }
 
+# Compile a program against the installed libcvmfs client library.
+#   compile_libcvmfs_binary <output> <source> [extra compiler flags...]
+#
+# libcvmfs_client is a shared library that records its own dependencies, so
+# consumers must not repeat them on the link line.  Spelling out -lssl,
+# -lcrypto, -luuid, ... (a leftover from the days when libcvmfs was a static
+# library) requires the corresponding -devel packages, which are not part of
+# the test node setup and made the link fail with "cannot find -lssl".
+compile_libcvmfs_binary() {
+  local output="$1"
+  local source="$2"
+  shift 2
+
+  local cflags=""
+  local libs="-lcvmfs_client"
+  if pkg-config --exists libcvmfs 2>/dev/null; then
+    cflags="$(pkg-config --cflags libcvmfs)"
+    libs="$(pkg-config --libs libcvmfs)"
+  fi
+
+  echo "g++ -o $output $cflags $@ $source $libs -pthread"
+  g++ -o "$output" $cflags "$@" "$source" $libs -pthread
+}
+
 # Run a command and assert it exits with an expected status.
 #   expect_exit_code <expected> <command> [args...]
 expect_exit_code() {

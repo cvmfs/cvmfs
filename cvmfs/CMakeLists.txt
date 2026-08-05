@@ -44,6 +44,7 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS)
        authz/authz_fetch.cc
        authz/authz_session.cc
        backoff.cc
+       bundle_mgr.cc
        cache.cc
        cache.pb.cc cache.pb.h
        cache_extern.cc
@@ -94,6 +95,7 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS)
        resolv_conf_event_handler.cc
        ring_buffer.cc
        sanitizer.cc
+       shortstring.cc
        sql.cc
        sqlitemem.cc
        sqlitevfs.cc
@@ -246,7 +248,6 @@ if (BUILD_CVMFS)
   set (CVMFS_FUSE_SOURCES
        ${CVMFS_COMMON_CLIENT_SOURCES}
        auto_umount.cc
-       bundle_mgr.cc
        compat.cc
        cvmfs.cc
        fuse_evict.cc
@@ -258,7 +259,6 @@ if (BUILD_CVMFS)
        notify/subscriber_supervisor.cc
        notify/subscriber_sse.cc
        quota_listener.cc
-       shortstring.cc
        supervisor.cc
        talk.cc
        url.cc
@@ -274,14 +274,14 @@ if (BUILD_CVMFS)
   set (CVMFS_FUSE_LDFLAGS "-ldl -lm")
   set (CVMFS_FUSE_LINK_LIBRARIES "")
   list(APPEND CVMFS_FUSE_LINK_LIBRARIES
-       ${CURL_LIBRARIES}
-       ${CARES_LIBRARIES} ${CARES_LDFLAGS}
+       CURL::libcurl
+       c-ares::cares
        ${OPENSSL_LIBRARIES}
        pacparser::pacparser
-       ${SQLITE3_LIBRARY}
+       SQLite::SQLite3
        ${ZLIB_LIBRARIES}
-       ${SPARSEHASH_LIBRARIES}
-       ${LEVELDB_LIBRARIES}
+       sparsehash::sparsehash
+       leveldb::leveldb
        ${PROTOBUF_LITE_LIBRARY}
        nlohmann_json::nlohmann_json
        ${RT_LIBRARY}
@@ -431,24 +431,21 @@ if (BUILD_LIBCVMFS)
   set_property (TARGET cvmfs_client APPEND PROPERTY INCLUDE_DIRECTORIES "${CMAKE_CURRENT_BINARY_DIR}")
   target_include_directories (cvmfs_client PRIVATE ${GTEST_INCLUDE_DIRS})
   target_include_directories (cvmfs_client PRIVATE ${SQLITE3_INCLUDE_DIR})
-  target_include_directories (cvmfs_client PRIVATE ${CARES_INCLUDE_DIRS})
-  target_include_directories (cvmfs_client PRIVATE ${CURL_INCLUDE_DIRS})
-  target_include_directories (cvmfs_client PRIVATE ${LEVELDB_INCLUDE_DIR})
   target_include_directories (cvmfs_client PRIVATE ${ZLIB_INCLUDE_DIRS})
   target_include_directories (cvmfs_client PRIVATE ${PROTOBUF_INCLUDE_DIRS})
 
   target_link_libraries (cvmfs_client
                          PUBLIC cvmfs_crypto
                                 cvmfs_util
-                                ${CARES_LDFLAGS}
                                 ${OPENSSL_LIBRARIES}
-                         PRIVATE ${SQLITE3_LIBRARY}
-                                 ${CURL_LIBRARIES}
-                                 ${CARES_LIBRARIES}
-                                 ${LEVELDB_LIBRARIES}
+                         PRIVATE SQLite::SQLite3
+                                 CURL::libcurl
+                                 c-ares::cares
+                                 leveldb::leveldb
                                  pacparser::pacparser
                                  ${ZLIB_LIBRARIES}
                                  nlohmann_json::nlohmann_json
+                                 sparsehash::sparsehash
                                  ${PROTOBUF_LITE_LIBRARY}
   )
 
@@ -499,6 +496,9 @@ if (BUILD_LIBCVMFS_CACHE)
   set_property (TARGET cvmfs_cache APPEND PROPERTY INCLUDE_DIRECTORIES "${CMAKE_BINARY_DIR}")
   set_property (TARGET cvmfs_cache APPEND PROPERTY INCLUDE_DIRECTORIES "${CMAKE_CURRENT_BINARY_DIR}")
   target_include_directories (cvmfs_cache PRIVATE ${GTEST_INCLUDE_DIRS})
+  # cache.h -> compression.h -> duplex_zlib.h needs zlib.h, which is not in a
+  # default include path when zlib is built from the vendored sources
+  target_include_directories (cvmfs_cache PRIVATE ${ZLIB_INCLUDE_DIRS})
   target_include_directories (cvmfs_cache PRIVATE ${PROTOBUF_INCLUDE_DIRS})
 
   target_link_libraries(cvmfs_cache
@@ -718,9 +718,9 @@ if (BUILD_SERVER)
   )  # CVMFS_SWISSKNIFE_SOURCES
   set (CVMFS_SWISSKNIFE_LINK_LIBRARIES "")
   list (APPEND CVMFS_SWISSKNIFE_LINK_LIBRARIES
-        ${SQLITE3_LIBRARY}
-        ${CURL_LIBRARIES}
-        ${CARES_LIBRARIES} ${CARES_LDFLAGS}
+        SQLite::SQLite3
+        CURL::libcurl
+        c-ares::cares
         ${ZLIB_LIBRARIES}
         ${OPENSSL_LIBRARIES}
         ${RT_LIBRARY}
@@ -832,10 +832,10 @@ if (BUILD_SERVER)
   set (LIBCVMFS_SERVER_CFLAGS "-D_FILE_OFFSET_BITS=64 -DCVMFS_RAISE_EXCEPTIONS -fexceptions")
   set (LIBCVMFS_SERVER_LINK_LIBRARIES "")
   list (APPEND LIBCVMFS_SERVER_LINK_LIBRARIES
-        ${CURL_LIBRARIES}
-        ${CARES_LIBRARIES} ${CARES_LDFLAGS}
+        CURL::libcurl
+        c-ares::cares
         ${OPENSSL_LIBRARIES}
-        ${SQLITE3_LIBRARY}
+        SQLite::SQLite3
         ${ZLIB_LIBRARIES}
         nlohmann_json::nlohmann_json
         LibArchive::LibArchive
@@ -1120,9 +1120,9 @@ if(BUILD_RECEIVER)
   set (CVMFS_RECEIVER_CFLAGS "-D_FILE_OFFSET_BITS=64 -DCVMFS_RAISE_EXCEPTIONS -fexceptions")
   set (CVMFS_RECEIVER_LINK_LIBRARIES "")
   list (APPEND CVMFS_RECEIVER_LINK_LIBRARIES
-        ${CURL_LIBRARIES}
-        ${CARES_LIBRARIES} ${CARES_LDFLAGS}
-        ${SQLITE3_LIBRARY}
+        CURL::libcurl
+        c-ares::cares
+        SQLite::SQLite3
         nlohmann_json::nlohmann_json
         ${OPENSSL_LIBRARIES}
         ${ZLIB_LIBRARIES}
@@ -1281,9 +1281,9 @@ if (BUILD_PRELOADER)
   target_link_libraries(cvmfs_preload_bin
                         cvmfs_crypto
                         cvmfs_util
-                        ${SQLITE3_LIBRARY}
-                        ${CURL_LIBRARIES}
-                        ${CARES_LIBRARIES} ${CARES_LDFLAGS}
+                        SQLite::SQLite3
+                        CURL::libcurl
+                        c-ares::cares
                         ${ZLIB_LIBRARIES}
                         ${OPENSSL_LIBRARIES}
                         ${RT_LIBRARY}

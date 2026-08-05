@@ -278,9 +278,9 @@ class AbstractCatalogManager : public SingleCopy {
   }
   bool ListingStat(const PathString &path, StatEntryList *listing);
 
-  bool ListFileChunks(const PathString &path,
-                      const shash::Algorithms interpret_hashes_as,
-                      FileChunkList *chunks);
+  virtual bool ListFileChunks(const PathString &path,
+                              const shash::Algorithms interpret_hashes_as,
+                              FileChunkList *chunks);
   void SetOwnerMaps(const OwnerMap &uid_map, const OwnerMap &gid_map);
   void SetCatalogWatermark(unsigned limit);
 

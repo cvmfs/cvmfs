@@ -4,47 +4,7 @@
 
 if (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
 
-# GoogleTest
-set(GOOGLETEST_MIN_VERSION "1.10.0")
-if(USE_EXTERNAL_GOOGLETEST)
-  if (USE_EXTERNAL_GOOGLETEST STREQUAL AUTO)
-    find_package(GTest ${GOOGLETEST_MIN_VERSION})
-  else()
-    find_package(GTest ${GOOGLETEST_MIN_VERSION} REQUIRED)
-  endif()
-endif()
-
-if(NOT GTest_FOUND)
-  message(STATUS "Fetching local copy of Googletest library v1.17.0 for unit-tests...")
-  Include(FetchContent)
-  set(INSTALL_GTEST OFF)
-
-  # Check if local file exists first
-  set(GOOGLETEST_LOCAL_PATH "${PROJECT_SOURCE_DIR}/externals/googletest-1.17.0.tar.gz")
-
-  if(EXISTS "${GOOGLETEST_LOCAL_PATH}")
-      message(STATUS "Using local GoogleTest archive: ${GOOGLETEST_LOCAL_PATH}")
-      FetchContent_Declare(
-          GoogleTest
-          #DOWNLOAD_EXTRACT_TIMESTAMP TRUE
-          DOWNLOAD_DIR ${PROJECT_SOURCE_DIR}/externals
-          URL "file://${GOOGLETEST_LOCAL_PATH}"
-          URL_HASH MD5=b6f100bc2a5853a48046aa168ececf84
-      )
-  else()
-      message(STATUS "Local GoogleTest archive not found, downloading from remote")
-      FetchContent_Declare(
-          GoogleTest
-          #DOWNLOAD_EXTRACT_TIMESTAMP TRUE
-          DOWNLOAD_DIR ${PROJECT_SOURCE_DIR}/externals
-          URL https://github.com/google/googletest/releases/download/v1.17.0/googletest-1.17.0.tar.gz
-              https://ecsft.cern.ch/dist/cvmfs/build_externals/googletest-1.17.0.tar.gz
-          URL_HASH MD5=b6f100bc2a5853a48046aa168ececf84
-      )
-  endif()
-
-FetchContent_MakeAvailable(GoogleTest)
-endif()
+include(SetupGoogleTest)
 get_target_property(GTEST_INCLUDE_DIRS GTest::gtest INCLUDE_DIRECTORIES)
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${GTEST_INCLUDE_DIRS})
 
@@ -264,10 +224,10 @@ if (BUILD_SERVER)
   list (APPEND CVMFS_UNITTEST_SERVER_LINK_LIBRARIES
         GTest::gtest
         ${OPENSSL_LIBRARIES}
-        ${CURL_LIBRARIES}
-        ${CARES_LIBRARIES} ${CARES_LDFLAGS}
+        CURL::libcurl
+        c-ares::cares
         ${OPENSSL_LIBRARIES}
-        ${SQLITE3_LIBRARY}
+        SQLite::SQLite3
         ${ZLIB_LIBRARIES}
         nlohmann_json::nlohmann_json
         ${CAP_LIBRARIES}
@@ -599,10 +559,10 @@ list (APPEND CVMFS_UNITTESTS_LINK_LIBRARIES
       GTest::gtest
       GTest::gmock
       ${OPENSSL_LIBRARIES}
-      ${CURL_LIBRARIES}
-      ${CARES_LIBRARIES} ${CARES_LDFLAGS}
+      CURL::libcurl
+      c-ares::cares
       ${OPENSSL_LIBRARIES}
-      ${SQLITE3_LIBRARY}
+      SQLite::SQLite3
       ${ZLIB_LIBRARIES}
       ${UUID_LIBRARIES}
       pacparser::pacparser
@@ -826,6 +786,11 @@ endif ()
 # For `make check`
 #
 add_test (NAME cvmfs_unittests COMMAND cvmfs_unittests --gtest_filter=-*Slow)
-add_dependencies (check cvmfs_unittests)
+# The `check` convenience target is not created when BUILD_QC_TESTS is on (see
+# top-level CMakeLists.txt), because Abseil (pulled in by FuzzTest) claims that
+# target name.
+if (TARGET check)
+  add_dependencies (check cvmfs_unittests)
+endif ()
 
 endif (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)

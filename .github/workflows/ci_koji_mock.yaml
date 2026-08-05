@@ -1,0 +1,92 @@
+name: cvmfs_koji_mock
+
+on:
+  push:
+    branches: ['devel', 'cvmfs*']
+  pull_request:
+    branches: ['devel', 'cvmfs*']
+  workflow_dispatch:
+
+jobs:
+  mock-build:
+    name: "mock rebuild from source tarball (fedora-44)"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build in mock inside Fedora 44 container
+        run: |
+          docker run --rm --privileged \
+            -v "$PWD":/src \
+            -w /src \
+            fedora:44 \
+            bash -euxo pipefail -c '
+              dnf -y upgrade
+              dnf -y install \
+                git \
+                go \
+                mock \
+                rpm-build \
+                rpmdevtools
+
+              version=$(awk "/^Version:/ { print \$2; exit }" packaging/rpm/cvmfs-universal.spec)
+
+              rm -rf dist rpmbuild mock-result
+              mkdir -p dist rpmbuild/SOURCES rpmbuild/SRPMS mock-result
+
+              ./ci/build_cvmfs_sourcetarball.sh /src /src/dist
+
+              tarball="dist/cvmfs_source_tarball/cvmfs-${version}.tar.gz"
+              test -f "$tarball"
+
+              cp "$tarball" rpmbuild/SOURCES/
+              cp packaging/rpm/cvmfs.te packaging/rpm/cvmfs.fc rpmbuild/SOURCES/
+
+              rpmbuild -bs packaging/rpm/cvmfs-universal.spec \
+                --define "_topdir /src/rpmbuild" \
+                --define "_sourcedir /src/rpmbuild/SOURCES" \
+                --define "_srcrpmdir /src/rpmbuild/SRPMS"
+
+              srpm=$(find rpmbuild/SRPMS -name "*.src.rpm" -print -quit)
+              test -n "$srpm"
+
+              mock -r fedora-44-x86_64 \
+                --isolation=simple \
+                --rebuild "$srpm" \
+                --resultdir /src/mock-result \
+                --config-opts=rpmbuild_networking=False
+            '
+
+      # mock keeps the compiler/rpmbuild output in build.log inside the result
+      # directory, so without this the job log shows nothing but "Command
+      # failed" and the actual error has to be dug out of the artifact.
+      - name: Show mock logs on failure
+        if: ${{ failure() }}
+        run: |
+          for log in mock-result/build.log mock-result/root.log; do
+            [ -f "$log" ] || continue
+            echo "::group::$log (last 300 lines)"
+            tail -n 300 "$log" >&2 || true
+            echo "::endgroup::"
+          done
+
+          first_error=$(grep -m1 -E "CMake Error|^error:|Bad exit status" \
+                        mock-result/build.log 2>/dev/null || true)
+          if [ -n "$first_error" ]; then
+            echo "::error::mock build failed: $first_error"
+          fi
+
+      - name: Upload mock results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: mock-fedora-44-results
+          if-no-files-found: warn
+          path: |
+            mock-result/**
+            rpmbuild/SRPMS/*.src.rpm
+            dist/**/*.tar.gz

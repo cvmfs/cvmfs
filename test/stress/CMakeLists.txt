@@ -24,8 +24,8 @@ add_executable(s3benchmark
 target_link_libraries (s3benchmark
                        cvmfs_crypto
                        cvmfs_util
-                       ${CURL_LIBRARIES}
-                       ${CARES_LIBRARIES} ${CARES_LDFLAGS}
+                       CURL::libcurl
+                       c-ares::cares
                        ${ZLIB_LIBRARIES}
                        ${OPENSSL_LIBRARIES}
                        LibArchive::LibArchive
@@ -48,6 +48,7 @@ add_executable(s3mockserver
 
 target_link_libraries (s3mockserver
                        cvmfs_util
+                       CURL::libcurl
                        pthread
                        dl
 )

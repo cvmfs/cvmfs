@@ -63,8 +63,14 @@ endif (CMAKE_COMPILER_IS_GNUCC)
 message (STATUS "using compiler opt flag ${CVMFS_OPT_FLAGS}")
 set (CVMFS_BASE_C_FLAGS "${CVMFS_OPT_FLAGS} -g -fno-strict-aliasing -fasynchronous-unwind-tables -fno-omit-frame-pointer -fwrapv -fvisibility=hidden -Wall ${CVMFS_FIX_FLAGS}")
 if (APPLE)
-  set(MACOSX_DEPLOYMENT_TARGET "10.14")
-  set(CVMFS_BASE_C_FLAGS "${CVMFS_BASE_C_FLAGS} -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -mmacosx-version-min=10.14")
+  # Fall back to the Command Line Tools SDK and a default deployment target
+  # unless the build environment already selects them (through the SDKROOT
+  # and MACOSX_DEPLOYMENT_TARGET environment variables, which clang honors),
+  # so that non-default toolchains can use their own SDK.
+  if ("$ENV{SDKROOT}" STREQUAL "" AND "$ENV{MACOSX_DEPLOYMENT_TARGET}" STREQUAL "")
+    set(MACOSX_DEPLOYMENT_TARGET "10.14")
+    set(CVMFS_BASE_C_FLAGS "${CVMFS_BASE_C_FLAGS} -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -mmacosx-version-min=10.14")
+  endif()
 endif(APPLE)
 set (CVMFS_BASE_CXX_FLAGS "${CVMFS_BASE_C_FLAGS} -fno-exceptions")
 if (NOT USING_CLANG)

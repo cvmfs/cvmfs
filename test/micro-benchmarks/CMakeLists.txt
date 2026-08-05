@@ -128,17 +128,18 @@ set_target_properties (${PROJECT_UBENCHMARKS_NAME} PROPERTIES
                        COMPILE_FLAGS "${CVMFS_UBENCHMARKS_CFLAGS}"
                        LINK_FLAGS "${CVMFS_UBENCHMARKS_LD_FLAGS}")
 
-set (UBENCHMARKS_LINK_LIBRARIES ${GOOGLEBENCH_LIBRARIES}
+set (UBENCHMARKS_LINK_LIBRARIES benchmark::benchmark
                                 ${GTEST_LIBRARIES}
-                                ${CURL_LIBRARIES}
-                                ${CARES_LIBRARIES} ${CARES_LDFLAGS}
+                                CURL::libcurl
+                                c-ares::cares
                                 ${OPENSSL_LIBRARIES}
                                 ${Libcrypto_LIBRARIES}
+                                ${Libnettle_LIBRARIES}
                                 ${SHA3_LIBRARIES}
                                 ${PROTOBUF_LITE_LIBRARY}
                                 ${ZLIB_LIBRARIES}
                                 ${RT_LIBRARY}
-                                ${SQLITE3_LIBRARY}
+                                SQLite::SQLite3
                                 ${CAP_LIBRARIES}
                                 GTest::gmock
                                 GTest::gtest

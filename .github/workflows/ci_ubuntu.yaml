@@ -66,6 +66,9 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get install -y /home/runner/.cache/cvmfs-build-deps_*_all.deb
+      - name: Install integration test dependencies
+        run: |
+          ./ci/build_install_builddeps.sh --test-deps
       - name: Hash Externals
         id: get-externals-hash
         run: |

@@ -1,0 +1,124 @@
+name: cloudtests_nfs
+
+# Exercises the leveldb-backed persistent inode maps (cvmfs/nfs_maps_leveldb.cc)
+# used in NFS-export mode. Besides the dedicated NFS test cases, the job stands
+# up the in-kernel NFS server and actually re-exports a repository over NFS, so
+# the full "cvmfs as an NFS source" path is covered end to end.
+
+on:
+  pull_request:
+    branches: [devel, cvmfs*]
+  push:
+    branches: [devel, cvmfs*]
+  workflow_dispatch: {}
+
+jobs:
+  cloudtest_nfs:
+    name: "CVMFS NFS re-export (leveldb inode maps)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+
+      - id: lsb-release
+        run: |
+          source /etc/lsb-release
+          echo "id-release=${DISTRIB_ID}-${DISTRIB_RELEASE}" >> $GITHUB_OUTPUT
+          echo "arch=$(uname -m)" >> $GITHUB_OUTPUT
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Create cache directories
+        run: mkdir -p /home/runner/.cache
+
+      - name: Restore CI cache
+        uses: actions/cache/restore@v4
+        id: cvmfs-ci-cache-restore
+        with:
+          path: /home/runner/.cache/
+          key: v3-cvmfs-ci-cache-${{ steps.lsb-release.outputs.id-release }}-${{ steps.lsb-release.outputs.arch }}
+
+      - name: Setup Squid proxy
+        id: squid-proxy
+        uses: ./.github/actions/setup-squid-proxy
+
+      - name: Generate build-dep metapackage
+        run: |
+          sudo apt-get -y update
+          sudo apt-get install -y devscripts equivs
+          mk-build-deps ./packaging/debian/cvmfs/control
+          mv cvmfs-build-deps_*_all.deb /home/runner/.cache
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get install -y /home/runner/.cache/cvmfs-build-deps_*_all.deb
+
+      - name: Build packages
+        run: |
+          sudo apt-get -y install devscripts ccache apache2 libapache2-mod-wsgi-py3
+          export CVMFS_EXTERNALS_PREFIX=/home/runner/.cache/cvmfs_externals_install
+          export CMAKE_CXX_COMPILER_LAUNCHER=ccache
+          mkdir /tmp/build-nfs
+          mkdir /tmp/build-nfs-config
+          ./ci/build_package.sh $PWD /tmp/build-nfs-config cvmfs-config
+          ./ci/build_package.sh $PWD /tmp/build-nfs cvmfs
+
+      - name: Install packages
+        run: |
+          sudo apt-get -y remove "cvmfs*" || true
+          sudo apt-get -y install /tmp/build-nfs*/*.deb
+          sudo cvmfs_config setup
+          sudo systemctl start apache2
+          sudo systemctl status apache2
+
+      # ---------------------------------------------------------------------
+      # NFS server provisioning: the test re-exports the FUSE mount through
+      # knfsd and mounts it back over loopback NFS (v3, hence rpcbind).
+      # ---------------------------------------------------------------------
+      - name: Install and start the NFS server
+        run: |
+          sudo apt-get -y install nfs-kernel-server nfs-common rpcbind
+          sudo modprobe nfsd || true
+          sudo mkdir -p /var/lib/nfs/rpc_pipefs
+          sudo systemctl enable --now rpcbind
+          sudo systemctl restart nfs-server
+          sudo systemctl status nfs-server --no-pager || true
+          # FUSE mounts must be shareable with other users for nfsd to traverse.
+          grep -q '^user_allow_other' /etc/fuse.conf || \
+            echo 'user_allow_other' | sudo tee -a /etc/fuse.conf
+          echo "rpcinfo:"; rpcinfo -p localhost || true
+
+      - name: Run NFS test cases
+        run: |
+          cd test
+          # The 'nfs' profile selects the NFS test cases (668-nfschunkinodes,
+          # 669-nfsexport); each mounts its repo with CVMFS_NFS_SOURCE=yes.
+          CVMFS_TEST_PROXY=${{ steps.squid-proxy.outputs.proxy-url }} \
+          CVMFS_TEST_USE_CDN=yes \
+          CVMFS_TEST_USER=$(id -un) \
+          CVMFS_TEST_GROUP=$(id -gn) \
+          ./run.sh /tmp/test.log -p nfs || exit 1
+
+      - name: Show NFS state on failure
+        if: failure()
+        run: |
+          echo "=== exportfs ==="; sudo exportfs -v || true
+          echo "=== mounts ==="; mount | grep -E 'cvmfs|nfs' || true
+          echo "=== nfs-server ==="; sudo systemctl status nfs-server --no-pager || true
+          echo "=== dmesg tail ==="; sudo dmesg | tail -50 || true
+
+      - name: Upload logs as artifact
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: CVMFS NFS test logs
+          path: |
+              /tmp/test.log
+
+      - name: Save CI cache
+        if: github.ref == 'refs/heads/devel' && github.event_name != 'pull_request'
+        uses: actions/cache/save@v4
+        with:
+          path: /home/runner/.cache/
+          key: v3-cvmfs-ci-cache-${{ steps.lsb-release.outputs.id-release }}-${{ steps.lsb-release.outputs.arch }}

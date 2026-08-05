@@ -11,21 +11,50 @@ produce_dependency_files() {
   printf "This is dependency 1\n" > dep1.txt
   printf "This is dependency 2\n" > dep2.txt
   printf "This is a trigger\n" > trigger.txt
+  # Large enough to be split into several chunks with the tiny chunk sizes
+  # configured in server.conf (deterministic content, ~120 kB)
+  seq -f "chunked dependency line %06.0f" 1 4000 > dep3_chunked.txt
 
-  cat > .cvmfsbundle.trigger.txt <<-EOF
+  # dep1 uses the canonical absolute-from-repository-root form, dep2 the
+  # form relative to the directory holding the bundle file
+  cat > .cvmfsbundle-trigger.txt <<-EOF
 {
   "name": "CVMFS_BUNDLE",
   "version": "1.0.0",
   "encoding": "UTF-8",
-  "dependencies": ["./dep1.txt", "./dep2.txt"]
+  "dependencies": ["/dep1.txt", "./dep2.txt", "/dep3_chunked.txt"]
 }
 EOF
 
   popd >/dev/null || return 1
 }
 
+desaster_cleanup() {
+  local mountpoint=$1
+  local repo_name=$2
+
+  # Cleanup must not hide the original failure under the test runner's `set -e`.
+  sudo umount "$mountpoint" > /dev/null 2>&1 || true
+  sudo cvmfs_server rmfs -f "$repo_name" > /dev/null 2>&1 || true
+}
+
+# Path of a content object in a cache directory, given its content hash
+cache_object_path() {
+  local cache=$1
+  local hash=$2
+  echo "$cache/$(echo $hash | cut -c 1-2)/$(echo $hash | cut -c 3-)"
+}
+
+# Number of finalized content objects in the local cache (the two-hex-digit
+# CAS directories; excludes txn/ scratch files and quota bookkeeping)
+cache_object_count() {
+  local cache=$1
+  find "$cache" -mindepth 2 -maxdepth 2 -type f -path "*/??/*" 2>/dev/null | wc -l
+}
+
 cvmfs_run_test() {
   logfile=$1
+  local workdir="$2"
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
 
   local scratch_dir=$(mktemp -d)
@@ -37,6 +66,14 @@ cvmfs_run_test() {
 
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "enable file chunking with tiny chunk sizes so dep3 gets split"
+  sudo tee -a /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf <<-EOF
+CVMFS_USE_FILE_CHUNKING=true
+CVMFS_MIN_CHUNK_SIZE=8192
+CVMFS_AVG_CHUNK_SIZE=16384
+CVMFS_MAX_CHUNK_SIZE=32768
+EOF
 
   echo "starting transaction to edit repository"
   start_transaction $CVMFS_TEST_REPO || return $?
@@ -53,53 +90,148 @@ cvmfs_run_test() {
   echo "compare the results of cvmfs to our reference copy"
   compare_directories $repo_dir $reference_dir || return $?
 
-  echo "putting some stuff in the new repository"
-  produce_dependency_files $repo_dir || return 3
-
   echo "check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
 
-  echo "mount the repository on a local mountpoint"
-  do_local_mount $mnt_point $CVMFS_TEST_REPO $(get_repo_url $CVMFS_TEST_REPO) || { desaster_cleanup $mnt_point $CVMFS_TEST_REPO; return 10; }
+  echo "check that publishing marked the trigger file"
+  local attr_value=$(get_xattr bundle_trigger $repo_dir/trigger.txt)
+  [ "x$attr_value" = "x1" ] || return 20
+  attr_value=$(get_xattr bundle_trigger $repo_dir/dep1.txt)
+  [ "x$attr_value" = "x0" ] || return 21
 
-  echo "check if the Stratum1 repository contains exactly the same as the reference copy"
-  compare_directories $mnt_point $reference_dir || { desaster_cleanup $mnt_point $CVMFS_TEST_REPO; return 11; }
+  echo "mount the repository on a local mountpoint with bundle prefetching enabled"
+  do_local_mount $mnt_point $CVMFS_TEST_REPO $(get_repo_url $CVMFS_TEST_REPO) \
+    "" "CVMFS_PREFETCH_FILEBUNDLES=yes" || { desaster_cleanup $mnt_point $CVMFS_TEST_REPO; return 10; }
 
-  dep1_hash=$(attr -g hash "$mnt_point/dep1.txt" | cut -d: -f2 | xargs)
-  trigger_hash=$(attr -g hash "$mnt_point/trigger.txt" | cut -d: -f2 | xargs)
+  # The hash xattr is a metadata lookup that does not fetch content
+  local trigger_hash=$(get_xattr hash "$mnt_point/trigger.txt")
+  local dep1_hash=$(get_xattr hash "$mnt_point/dep1.txt")
+  local dep2_hash=$(get_xattr hash "$mnt_point/dep2.txt")
+  local trigger_in_cache=$(cache_object_path $cache $trigger_hash)
+  local dep1_in_cache=$(cache_object_path $cache $dep1_hash)
+  local dep2_in_cache=$(cache_object_path $cache $dep2_hash)
 
-  dep1_location=$cache/"$(echo $dep1_hash | cut -c 1-2)"
-  trigger_location=$cache/"$(echo $trigger_hash | cut -c 1-2)"
+  echo "make sure the dependencies are not in the cache before the trigger is opened"
+  if [ -f "$dep1_in_cache" ] || [ -f "$dep2_in_cache" ]; then
+      echo "Dependencies found inside the cache before opening the trigger"
+      desaster_cleanup $mnt_point $CVMFS_TEST_REPO
+      return 54
+  fi
 
-  trigger_in_cas=$(echo $trigger_hash | cut -c 3- )
-  dep1_in_cas=$(echo $dep1_hash | cut -c 3- )
+  echo "make sure dep3 really got chunked (metadata lookup, no data fetch)"
+  local num_chunks=$(get_xattr chunks $mnt_point/dep3_chunked.txt)
+  echo "dep3_chunked.txt consists of ${num_chunks:-?} chunks"
+  if [ "x$num_chunks" = "x" ] || [ $num_chunks -le 1 ]; then
+      echo "dep3_chunked.txt is not chunked; the test would be vacuous"
+      desaster_cleanup $mnt_point $CVMFS_TEST_REPO
+      return 58
+  fi
 
   # core testing here
+  local objects_before=$(cache_object_count $cache)
+
   echo "Opening trigger file"
   cat $mnt_point/trigger.txt
 
   echo "Cache location"
   echo $cache
 
-  echo "Trigger expected location"
-  echo $trigger_location/$trigger_in_cas
+  # Prefetching is asynchronous: opening the trigger only hands the path to
+  # the background prefetcher. Wait for the expected objects to arrive:
+  # trigger + bundle spec + dep1 + dep2 + one object per chunk of dep3.
+  local objects_expected=$((objects_before + 4 + num_chunks))
+  echo "waiting for the cache to grow from $objects_before to $objects_expected objects"
+  local waited=0
+  while [ $(cache_object_count $cache) -lt $objects_expected ]; do
+    if [ $waited -ge 120 ]; then
+      echo "timeout: $(cache_object_count $cache) of $objects_expected objects after ${waited}s"
+      desaster_cleanup $mnt_point $CVMFS_TEST_REPO
+      return 63
+    fi
+    sleep 1
+    waited=$((waited + 1))
+  done
+  echo "prefetch finished after ${waited}s"
 
-  if [ -f "$trigger_location/$trigger_in_cas" ]; then
+  if [ -f "$trigger_in_cache" ]; then
       echo "Trigger FOUND inside the cache in the expected location"
   else
       echo "Trigger NOT FOUND inside the cache in the expected location"
+      desaster_cleanup $mnt_point $CVMFS_TEST_REPO
       return 55
   fi
 
-  if [ -f "$dep1_location/$dep1_in_cas" ]; then
+  if [ -f "$dep1_in_cache" ]; then
       echo "Dep1 FOUND inside the cache in the expected location"
   else
       echo "Dep1 NOT FOUND inside the cache in the expected location"
+      desaster_cleanup $mnt_point $CVMFS_TEST_REPO
       return 56
   fi
 
-  echo "unmount the Stratum1 repository"
-  sudo umount $mnt_point || { desaster_cleanup $mnt_point; return 12; }
+  if [ -f "$dep2_in_cache" ]; then
+      echo "Dep2 FOUND inside the cache in the expected location"
+  else
+      echo "Dep2 NOT FOUND inside the cache in the expected location"
+      desaster_cleanup $mnt_point $CVMFS_TEST_REPO
+      return 57
+  fi
+
+  # The chunk objects of dep3 cannot be located in the cache by the file's
+  # (bulk) hash xattr, so prove they were prefetched by cutting the network
+  # and reading the file: every chunk must be served from the local cache.
+  echo "cut the network and read the chunked dependency offline"
+  local talk_socket=$cache/cvmfs_io.$CVMFS_TEST_REPO
+  sudo cvmfs_talk -p $talk_socket proxy set "http://127.0.0.1:40403" \
+    || { desaster_cleanup $mnt_point $CVMFS_TEST_REPO; return 59; }
+  if ! timeout 60 cat $mnt_point/dep3_chunked.txt > $scratch_dir/dep3_offline.txt; then
+      echo "reading the chunked dependency offline failed: its chunks were not prefetched"
+      desaster_cleanup $mnt_point $CVMFS_TEST_REPO
+      return 60
+  fi
+  if ! cmp $scratch_dir/dep3_offline.txt $reference_dir/dep3_chunked.txt; then
+      echo "chunked dependency read offline does not match the reference copy"
+      desaster_cleanup $mnt_point $CVMFS_TEST_REPO
+      return 61
+  fi
+
+  echo "restore the network"
+  sudo cvmfs_talk -p $talk_socket proxy set DIRECT \
+    || { desaster_cleanup $mnt_point $CVMFS_TEST_REPO; return 62; }
+
+  echo "check if the mounted repository contains exactly the same as the reference copy"
+  compare_directories $mnt_point $reference_dir || { desaster_cleanup $mnt_point $CVMFS_TEST_REPO; return 11; }
+
+  echo "unmount the repository"
+  sudo umount $mnt_point || { desaster_cleanup $mnt_point $CVMFS_TEST_REPO; return 12; }
+
+  echo "opening the trigger through libcvmfs must prefetch the same bundle"
+  local bin_name="709-test"
+  local libcvmfs_cache=$scratch_dir/libcvmfs-cache
+
+  if ! command -v g++ > /dev/null 2>&1; then
+    echo "Warning: g++ is not available, skipping libcvmfs coverage"
+    CVMFS_GENERAL_WARNING_FLAG=1
+  else
+    echo "compiling libcvmfs test binary"
+    compile_libcvmfs_binary "$bin_name" "$workdir/main.cc" \
+      || { desaster_cleanup $mnt_point $CVMFS_TEST_REPO; return 64; }
+
+    echo "opening the trigger through libcvmfs and waiting for the prefetch"
+    ./$bin_name "$(get_repo_url $CVMFS_TEST_REPO)" "$CVMFS_TEST_REPO" "$libcvmfs_cache" \
+      $((4 + num_chunks)) 120 \
+      || { desaster_cleanup $mnt_point $CVMFS_TEST_REPO; return 65; }
+
+    echo "verify the prefetched objects in the libcvmfs cache by hash"
+    local hash
+    for hash in $trigger_hash $dep1_hash $dep2_hash; do
+      if [ ! -f "$(cache_object_path $libcvmfs_cache $hash)" ]; then
+        echo "object $hash missing from the libcvmfs cache"
+        desaster_cleanup $mnt_point $CVMFS_TEST_REPO
+        return 66
+      fi
+    done
+  fi
 
   echo "clean up"
   sudo cvmfs_server rmfs -f $CVMFS_TEST_REPO

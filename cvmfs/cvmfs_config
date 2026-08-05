@@ -266,7 +266,7 @@ cvmfs_config_usage() {
   fi
   echo "  chksetup"
   echo ""
-  echo "  showconfig [-s(hort output, only non-empty parameters)] [<repository>]"
+  echo "  showconfig [-s(hort output, only parameters set in the configuration)] [-j|--json] [<repository>]"
   echo ""
   echo "  stat [-v | <repository>]"
   echo ""
@@ -967,29 +967,67 @@ cvmfs_chksetup() {
 }
 
 
+# Ensure that a string is properly escaped for JSON output
+json_string() {
+  local s=$1
+  s=${s//\\/\\\\}     # every \ becomes \\
+  s=${s//\"/\\\"}     # every " becomes \"
+  # Control characters are not allowed literally inside a JSON string
+  s=${s//$'\b'/\\b}
+  s=${s//$'\f'/\\f}
+  s=${s//$'\n'/\\n}
+  s=${s//$'\r'/\\r}
+  s=${s//$'\t'/\\t}
+  printf '"%s"' "$s"
+}
+
 cvmfs_showconfig() {
   local fqrn
   local org
   local retval
   local short_output=0
+  local json_output=0
   local short_opt=
-  org=$1
-  if [ "x$org" = "x-s" ]; then
-    short_output=1
-    short_opt="-s "
-    shift 1
-    org=$1
-  fi
+  # Loop over all arguments: -s for short output, -j for JSON output, and the org name
+  # order of flags (-s and -j) does not matter
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      -s)
+        short_output=1
+        short_opt="-s "
+        shift 1
+      ;;
+      -j|--json)
+        json_output=1
+        shift 1
+      ;;
+      *)
+        org=$1
+        shift 1
+      ;;
+    esac
+  done
 
   cvmfs_readconfig || die "Failed to read CernVM-FS configuration"
   if [ -z "$org" ]; then
     list="$(list_repos)"
-    for entry in $list
-    do
-      echo
-      echo "Running $0 $short_opt$entry:"
-      cvmfs_showconfig $short_opt$entry
-    done
+    if [ $json_output -eq 1 ]; then
+      # Emit all repositories as a JSON array of config objects - no repository argument was given
+      local first=1 entry
+      echo "["
+      for entry in $list; do
+        [ $first -eq 0 ] && echo "," # comma between JSON objects
+        cvmfs_showconfig -j $short_opt$entry # emit JSON object for this repository
+        first=0
+      done
+      echo "]"
+    else
+      for entry in $list; do
+        echo
+        echo "Running $0 $short_opt$entry:"
+        cvmfs_showconfig $short_opt$entry
+      done
+    fi
     return 0
   fi
 
@@ -1003,12 +1041,38 @@ cvmfs_showconfig() {
 
   local setting=
   local all_vars=
+  local set_vars=          # names present in the config file
   while read setting; do
     [ "x${setting:0:6}" != "xCVMFS_" ] && continue
-    var=$(echo "$setting" | cut -d= -f1)
-    all_vars="$all_vars $var"
+    set_vars="$set_vars ${setting%%=*}"
   done <<< "$CVMFS_PARMS"
-  all_vars="$(echo $all_vars $var_list | tr ' ' '\n' | sort -u)"
+  all_vars="$(echo $set_vars $var_list | tr ' ' '\n' | sort -u)"
+
+  if [ $json_output -eq 1 ]; then
+    # Emit this repository's configuration as a single JSON object + the repository name
+    echo "{"
+    printf '  "CVMFS_REPOSITORY_NAME": %s' "$(json_string "$fqrn")"
+    local jvar=
+    while read jvar; do
+      local value=
+      if [ "x$jvar" = "xCVMFS_CACHE_DIR" ]; then
+        # Derived in cvmfs_readconfig (unset beforehand), never from the shell.
+        value=$CVMFS_CACHE_DIR
+      elif [[ " $set_vars " == *" $jvar "* ]]; then
+        value=${!jvar}
+        value=${value//@org@/$org}
+        value=${value//@fqrn@/$fqrn}
+      fi
+      # short mode: hide only never-set parameters
+      if [ $short_output -eq 1 ] && [ -z "$value" ] \
+         && [[ " $set_vars " != *" $jvar "* ]]; then
+        continue
+      fi
+      printf ',\n  "%s": %s' "$jvar" "$(json_string "$value")"
+    done <<< "$all_vars"
+    printf '\n}\n'
+    return 0
+  fi
 
   echo "CVMFS_REPOSITORY_NAME=$fqrn"
   local var=

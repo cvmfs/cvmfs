@@ -144,6 +144,8 @@ TEST(T_Encrypt, Aes_256_Cbc) {
   string empty;
   string dummy = "Hello, World!";
   string dummy2 = k->ToBase64();
+  string dummy3 = "0123456789ABCDEF";  // AES block size
+  string dummy4(1000, 'x');
   string ciphertext;
   string ciphertext_two;
   string plaintext;
@@ -171,6 +173,18 @@ TEST(T_Encrypt, Aes_256_Cbc) {
   EXPECT_TRUE(retval);
   EXPECT_EQ(dummy2, plaintext);
 
+  retval = cipher.Encrypt(dummy3, *k, &ciphertext);
+  EXPECT_TRUE(retval);
+  retval = Cipher::Decrypt(ciphertext, *k, &plaintext);
+  EXPECT_TRUE(retval);
+  EXPECT_EQ(dummy3, plaintext);
+
+  retval = cipher.Encrypt(dummy4, *k, &ciphertext);
+  EXPECT_TRUE(retval);
+  retval = Cipher::Decrypt(ciphertext, *k, &plaintext);
+  EXPECT_TRUE(retval);
+  EXPECT_EQ(dummy4, plaintext);
+
   retval = Cipher::Decrypt(ciphertext.substr(0, 1), *k, &plaintext);
   EXPECT_EQ("", plaintext);
   retval = Cipher::Decrypt(ciphertext.substr(0, 1 + cipher.block_size()), *k,
@@ -178,6 +192,22 @@ TEST(T_Encrypt, Aes_256_Cbc) {
   EXPECT_EQ("", plaintext);
   retval = Cipher::Decrypt(ciphertext.substr(0, ciphertext.length() - 1), *k,
                            &plaintext);
+  EXPECT_EQ("", plaintext);
+
+  // Invalid padding must not go unnoticed.  For the block-aligned dummy3, the
+  // last block decrypts to pure padding (16 x 0x10).  In CBC, xor-ing a byte
+  // of the second-to-last cipher block flips the same bits in the
+  // corresponding padding byte.
+  retval = cipher.Encrypt(dummy3, *k, &ciphertext);
+  EXPECT_TRUE(retval);
+  const unsigned last_block = ciphertext.length() - cipher.block_size();
+  string tampered = ciphertext;
+  tampered[last_block - 1] ^= 0x10;  // padding value becomes 0x00
+  retval = Cipher::Decrypt(tampered, *k, &plaintext);
+  EXPECT_EQ("", plaintext);
+  tampered = ciphertext;
+  tampered[last_block - cipher.block_size()] ^= 0x01;  // inner padding byte
+  retval = Cipher::Decrypt(tampered, *k, &plaintext);
   EXPECT_EQ("", plaintext);
 }
 

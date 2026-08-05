@@ -126,6 +126,11 @@ FROM ${BASE_IMAGE} AS libsource
 # referenced by the binaries, so a slightly over-broad list is harmless.
 # --allowerasing replaces libcurl-minimal (preinstalled in newer almalinux:9
 # base images) with the full libcurl that cvmfs links against.
+# protobuf provides libprotobuf.so.<abi>: the client links it dynamically
+# (generated cache.proto code compiled into libcvmfs_fuse3.so) since the build
+# picks up the system protobuf-devel. It must be present here so the ldd-walk
+# copies it into the scratch image; both stages share the same base image, so
+# the soname matches what the builder linked against.
 RUN dnf -y --allowerasing install \
       fuse3-libs \
       glibc \
@@ -134,6 +139,7 @@ RUN dnf -y --allowerasing install \
       libstdc++ \
       libuuid \
       openssl-libs \
+      protobuf \
       zlib \
  && dnf clean all
 

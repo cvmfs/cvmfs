@@ -1,0 +1,44 @@
+name: unittest_ubuntu_nocache
+# Clean-build unit test job without ccache or cached externals
+#
+# Only runs when the build machinery (CMake / externals) changes, since a
+# full from-scratch externals build is a bit slow.
+on:
+  pull_request:
+    branches: [devel, cvmfs*]
+    paths:
+      - 'cmake/**'
+      - 'packaging/**'
+      - 'externals/**'
+      - '**/CMakeLists.txt'
+      - '**/*.cmake'
+      - '.github/workflows/ci_ubuntu_unittest_nocache.yaml'
+  workflow_dispatch:
+
+jobs:
+  unittest_ubuntu_nocache:
+    runs-on: ubuntu-latest
+    steps:
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Install build dependencies
+        run: |
+          sudo apt-get -y update
+          sudo apt-get -y install devscripts equivs apache2 libapache2-mod-wsgi-py3 gdb
+          mk-build-deps ./packaging/debian/cvmfs/control
+          sudo apt-get install -y ./cvmfs-build-deps_*_all.deb
+      - name: Build CVMFS (no ccache, externals built fresh from source)
+        run: |
+          mkdir build; cd build
+          cmake .. -DBUILD_ALL=ON -DBUILD_UNITTESTS=ON -DBUILTIN_EXTERNALS=ON
+          make -j $(nproc)
+          cd ..
+      - name: Run Unittests - Mockfuse
+        run: |
+          # ./build/test/unittests/cvmfs_unittests_mockfuse
+          echo "TODO: mockfuse unittests skipped"
+      - name: Run Unittests - Regular
+        run: |
+          ./build/test/unittests/cvmfs_unittests --gtest_filter="-T_Namespace.*"

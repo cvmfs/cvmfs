@@ -43,6 +43,27 @@ static string XmlEscape(const string &input) {
 
 
 /**
+ * The CanonicalizedResource of an S3 V2 signature.  It must mirror MkUrl():
+ * the server rebuilds the resource from the request path, so any difference,
+ * down to a trailing slash, yields SignatureDoesNotMatch.
+ *
+ * With DNS buckets the bucket lives in the hostname and the path is
+ * "/" + object_key, so an empty key gives "/<bucket>/".  In path style the
+ * path already carries the bucket and an empty key gives "/<bucket>".
+ */
+string MkV2CanonicalResource(const string &bucket, const string &object_key,
+                             bool dns_buckets, bool multi_delete) {
+  string resource = "/" + bucket;
+  if (dns_buckets || !object_key.empty())
+    resource += "/" + object_key;
+  // V2 requires subresources to be signed; multi-delete posts to "?delete"
+  if (multi_delete)
+    resource += "?delete";
+  return resource;
+}
+
+
+/**
  * Builds an S3 DeleteObjects XML request body for multi-object delete.
  * Uses Quiet mode so the response only contains errors, not successes.
  */
@@ -604,25 +625,14 @@ bool S3FanoutManager::MkV2Authz(const JobInfo &info,
   const string timestamp = RfcTimestamp();
   string to_sign = request + "\n" + payload_hash + "\n" + content_type + "\n"
                    + timestamp + "\n";
-  if (config_.x_amz_acl != "") {
-    if (info.object_key.empty()) {
-      to_sign += "x-amz-acl:" + config_.x_amz_acl + "\n" +  // default ACL
-                 "/" + config_.bucket;
-    } else {
-      to_sign += "x-amz-acl:" + config_.x_amz_acl + "\n" +  // default ACL
-                 "/" + config_.bucket + "/" + info.object_key;
-    }
-  }
-  // S3 V2 requires subresources to be included in the string to sign.
-  // For kReqDeleteMulti, object_key is intentionally empty: the canonical
-  // resource becomes "/<bucket>?delete", matching the POST URL.
-  if (info.request == JobInfo::kReqDeleteMulti) {
-    if (config_.x_amz_acl == "")
-      to_sign += "/" + config_.bucket;
-    to_sign += "?delete";
-  }
-  LogCvmfs(kLogS3Fanout, kLogDebug, "%s string to sign for: %s",
-           request.c_str(), info.object_key.c_str());
+  if (config_.x_amz_acl != "")
+    to_sign += "x-amz-acl:" + config_.x_amz_acl
+               + "\n";  // CanonicalizedAmzHeaders
+  to_sign += MkV2CanonicalResource(config_.bucket, info.object_key,
+                                   config_.dns_buckets,
+                                   info.request == JobInfo::kReqDeleteMulti);
+  LogCvmfs(kLogS3Fanout, kLogDebug, "%s string to sign: %s", request.c_str(),
+           to_sign.c_str());
 
   shash::Any hmac;
   hmac.algorithm = shash::kSha1;
