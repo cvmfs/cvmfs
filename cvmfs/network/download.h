@@ -63,6 +63,42 @@ struct Counters {
   }
 };  // Counters
 
+struct ProxyCacheCounters {
+  /**
+   * For which header to look (if any) to track hits & misses of proxy cache,
+   * per CVMFS_PROXY_CACHE_STATUS_HEADER setting.
+   */
+  static std::string status_hdr;
+
+  perf::Counter *n_hit;
+  perf::Counter *sz_hit;
+  perf::Counter *n_miss;
+  perf::Counter *sz_miss;
+  perf::Counter *n_unc;
+  perf::Counter *sz_unc;
+
+  explicit ProxyCacheCounters(perf::StatisticsTemplate statistics) {
+    n_hit = statistics.RegisterTemplated(
+        "n_proxy_cache_hit",
+        "Number of downloads for which proxy indicated cache hit");
+    n_miss = statistics.RegisterTemplated(
+        "n_proxy_cache_miss",
+        "Number of downloads for which proxy indicated cache miss");
+    n_unc = statistics.RegisterTemplated(
+        "n_proxy_cache_unc", "Number of downloads for which proxy's indication "
+                             "of cache state was absent or not recognized");
+    sz_hit = statistics.RegisterTemplated(
+        "sz_proxy_cache_hit",
+        "Total bytes downloaded where proxy indicated cache hit");
+    sz_miss = statistics.RegisterTemplated(
+        "sz_proxy_cache_miss",
+        "Total bytes downloaded where proxy indicated cache miss");
+    sz_unc = statistics.RegisterTemplated(
+        "sz_proxy_cache_unc", "Total bytes downloaded where proxy's indication "
+                              "of cache state was absent or not recognized");
+  }
+};  // ProxyCacheCounters
+
 /**
  * Manages blocks of arrays of curl_slist storing header strings.  In contrast
  * to curl's slists, these ones don't take ownership of the header strings.
@@ -258,6 +294,10 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   }
 
   dns::IpPreference opt_ip_preference() const { return opt_ip_preference_; }
+
+  ProxyCacheCounters *proxy_cache_counters() const {
+    return proxy_cache_counters_;
+  }
 
  private:
   static int CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
@@ -468,6 +508,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
    * thread than writing.
    */
   Counters *counters_;
+  ProxyCacheCounters *proxy_cache_counters_;
 
   /**
    * Carries the path settings for SSL certificates
