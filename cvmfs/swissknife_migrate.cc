@@ -13,8 +13,11 @@
 #include "catalog_rw.h"
 #include "catalog_sql.h"
 #include "catalog_virtual.h"
-#include "compression/compression.h"
+#include "compression/compressor.h"
+#include "compression/decompressor_guess.h"
+#include "compression/input_path.h"
 #include "crypto/hash.h"
+#include "network/sink_path.h"
 #include "swissknife_history.h"
 #include "util/concurrency.h"
 #include "util/logging.h"
@@ -33,6 +36,7 @@ CommandMigrate::CommandMigrate()
     , gid_(0)
     , root_catalog_(NULL) {
   atomic_init32(&catalogs_processed_);
+  copy_ = zip::Compressor::Construct(zip::kNoCompression);
 }
 
 
@@ -134,7 +138,7 @@ int CommandMigrate::Main(const ArgumentList &args) {
 
   // Create an upstream spooler
   temporary_directory_ = tmp_dir;
-  const upload::SpoolerDefinition spooler_definition(spooler, shash::kSha1);
+  const upload::SpoolerDefinition spooler_definition(spooler, shash::kSha1, zip::CompressionAlgFromEnv());
   spooler_ = upload::Spooler::Construct(spooler_definition);
   if (!spooler_.IsValid()) {
     Error("Failed to create upstream Spooler.");
@@ -318,9 +322,12 @@ bool CommandMigrate::UpdateUndoTags(PendingCatalog *root_catalog,
                                     shash::Any *history_hash) {
   const string filename_old = history_upstream_->filename();
   const string filename_new = filename_old + ".new";
-  bool retval = CopyPath2Path(filename_old, filename_new);
-  if (!retval)
+  bool retval;
+  zip::InputPath in_path(filename_old);
+  cvmfs::PathSink out_path(filename_new);
+  if (copy_->Compress(&in_path, &out_path) != zip::kStreamEnd) {
     return false;
+  }
   UniquePtr<history::SqliteHistory> history(
       history::SqliteHistory::OpenWritable(filename_new));
   history->TakeDatabaseFileOwnership();

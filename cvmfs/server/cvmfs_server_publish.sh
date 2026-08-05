@@ -110,10 +110,13 @@ cvmfs_server_publish() {
     scratch_dir="${spool_dir}/scratch/current"
     stratum0=$CVMFS_STRATUM0
     hash_algorithm="${CVMFS_HASH_ALGORITHM-sha1}"
-    compression_alg="${CVMFS_COMPRESSION_ALGORITHM-default}"
+    compression_alg="${CVMFS_COMPRESSION_ALGORITHM:-default}"
     if [ x"$force_compression_algorithm" != "x" ]; then
       compression_alg="$force_compression_algorithm"
+      export CVMFS_COMPRESSION_ALGORITHM=$force_compression_algorithm
     fi
+    export CVMFS_COMPRESSION_ALGORITHM
+
     if [ x"$CVMFS_EXTERNAL_DATA" = "xtrue" -o $force_external -eq 1 ]; then
       if [ $force_native -eq 0 ]; then
         external_option="-Y"
@@ -208,7 +211,7 @@ cvmfs_server_publish() {
         -w $stratum0                                   \
         -o $manifest                                   \
         -e $hash_algorithm                             \
-        -Z $compression_alg                            \
+        -Z ${compression_alg:-default}                 \
         -N $name                                       \
         -K $CVMFS_PUBLIC_KEY                           \
         $(get_follow_http_redirects_flag)              \
@@ -358,7 +361,7 @@ cvmfs_server_publish() {
 
     # ---> do it! (from here on we are changing things)
     publish_before_hook $name
-    $user_shell "$dirtab_command" || die "Failed to apply .cvmfsdirtab"
+    $user_shell "CVMFS_COMPRESSION_ALGORITHM=$CVMFS_COMPRESSION_ALGORITHM $dirtab_command" || die "Failed to apply .cvmfsdirtab"
 
     # check if we have open file descriptors on /cvmfs/<name>
     local use_fd_fallback=0
@@ -366,7 +369,7 @@ cvmfs_server_publish() {
 
     # synchronize the repository
     publish_starting $name
-    $user_shell "$sync_command" || { publish_failed $name; die "Synchronization failed\n\nExecuted Command:\n$sync_command";   }
+    $user_shell "CVMFS_COMPRESSION_ALGORITHM=$CVMFS_COMPRESSION_ALGORITHM $sync_command" || { publish_failed $name; die "Synchronization failed\n\nExecuted Command:\n$sync_command";   }
     cvmfs_sys_file_is_regular $manifest            || { publish_failed $name; die "Manifest creation failed\n\nExecuted Command:\n$sync_command"; }
     local branch_hash=
     local trunk_hash=$(grep "^C" $manifest | tr -d C)
@@ -409,7 +412,7 @@ cvmfs_server_publish() {
           $(get_swissknife_proxy)                             \
           $(get_follow_http_redirects_flag)                   \
           -d \\\"$REPLY\\\""
-        echo $user_shell \"${tag_cleanup_command}\" >> $tag_remove_cmd_file
+        echo $user_shell \"CVMFS_COMPRESSION_ALGORITHM=$CVMFS_COMPRESSION_ALGORITHM ${tag_cleanup_command}\" >> $tag_remove_cmd_file
       done
       rm -f $tag_list_file
     fi
@@ -427,14 +430,14 @@ cvmfs_server_publish() {
 
     # add a tag for the new revision
     echo "Tagging $name"
-    $user_shell "$tag_command" || { publish_failed $name; die "Tagging failed\n\nExecuted Command:\n$tag_command";  }
+    $user_shell "CVMFS_COMPRESSION_ALGORITHM=$CVMFS_COMPRESSION_ALGORITHM $tag_command" || { publish_failed $name; die "Tagging failed\n\nExecuted Command:\n$tag_command";  }
 
     if [ "x$sync_command_virtual_dir" != "x" ]; then
       # write intermediate catalog hash and history to reflog
       sign_manifest $name $manifest "" true
-      $user_shell "$sync_command_virtual_dir" || { publish_failed $name; die "Editing .cvmfs failed\n\nExecuted Command:\n$sync_command_virtual_dir";  }
+      $user_shell "CVMFS_COMPRESSION_ALGORITHM=$CVMFS_COMPRESSION_ALGORITHM $sync_command_virtual_dir" || { publish_failed $name; die "Editing .cvmfs failed\n\nExecuted Command:\n$sync_command_virtual_dir";  }
       local trunk_hash=$(grep "^C" $manifest | tr -d C)
-      $user_shell "$tag_command_undo_tags" || { publish_failed $name; die "Creating undo tags\n\nExecuted Command:\n$tag_command_undo_tags";  }
+      $user_shell "CVMFS_COMPRESSION_ALGORITHM=$CVMFS_COMPRESSION_ALGORITHM $tag_command_undo_tags" || { publish_failed $name; die "Creating undo tags\n\nExecuted Command:\n$tag_command_undo_tags";  }
     fi
 
     # finalizing transaction

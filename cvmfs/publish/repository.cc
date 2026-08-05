@@ -11,6 +11,7 @@
 
 #include "catalog_mgr_ro.h"
 #include "catalog_mgr_rw.h"
+#include "compression/decompressor_guess.h"
 #include "crypto/hash.h"
 #include "crypto/signature.h"
 #include "gateway_util.h"
@@ -169,8 +170,10 @@ void Repository::DownloadRootObjects(const std::string &url,
   // TODO(jblomer): verify reflog hash
   // shash::Any reflog_hash(manifest_->GetHashAlgorithm());
   cvmfs::FileSink filesink(reflog_fd);
-  download::JobInfo download_reflog(&reflog_url, false /* compressed */,
-                                    false /* probe hosts */, NULL, &filesink);
+  download::JobInfo download_reflog(
+      &reflog_url,
+      new zip::GuessDecompressor(zip::ExpectedContentFormat::kSQLite3),
+      false /* probe hosts */, NULL, &filesink);
   download::Failures rv_dl = download_mgr_->Fetch(&download_reflog);
   fclose(reflog_fd);
   if (rv_dl == download::kFailOk) {
@@ -197,9 +200,10 @@ void Repository::DownloadRootObjects(const std::string &url,
                                  + manifest_->history().MakePath();
     const shash::Any tags_hash(manifest_->history());
     cvmfs::FileSink filesink(tags_fd);
-    download::JobInfo download_tags(&tags_url, true /* compressed */,
-                                    true /* probe hosts */, &tags_hash,
-                                    &filesink);
+    download::JobInfo download_tags(
+        &tags_url,
+        new zip::GuessDecompressor(zip::ExpectedContentFormat::kSQLite3),
+        true /* probe hosts */, &tags_hash, &filesink);
     rv_dl = download_mgr_->Fetch(&download_tags);
     fclose(tags_fd);
     if (rv_dl != download::kFailOk)
@@ -221,10 +225,11 @@ void Repository::DownloadRootObjects(const std::string &url,
     const shash::Any info_hash(manifest_->meta_info());
     const std::string info_url = url + "/data/" + info_hash.MakePath();
     cvmfs::MemSink metainfo_memsink;
-    download::JobInfo download_info(&info_url, true /* compressed */,
-                                    true /* probe_hosts */, &info_hash,
-                                    &metainfo_memsink);
-    const download::Failures rv_info = download_mgr_->Fetch(&download_info);
+    download::JobInfo download_info(
+        &info_url,
+        new zip::GuessDecompressor(zip::ExpectedContentFormat::kJSON),
+        true /* probe_hosts */, &info_hash, &metainfo_memsink);
+    download::Failures rv_info = download_mgr_->Fetch(&download_info);
     if (rv_info != download::kFailOk) {
       throw EPublish(std::string("cannot load meta info [")
                      + download::Code2Ascii(rv_info) + "]");
@@ -279,7 +284,8 @@ void Publisher::ConstructSpoolers() {
   if (spooler_files_ == NULL)
     throw EPublish("could not initialize file spooler");
 
-  const upload::SpoolerDefinition sd_catalogs(sd.Dup2DefaultCompression());
+  upload::SpoolerDefinition sd_catalogs(sd);
+  sd_catalogs.compression_alg = zip::CompressionAlgFromEnv();
   spooler_catalogs_ = upload::Spooler::Construct(
       sd_catalogs, statistics_publish_.weak_ref());
   if (spooler_catalogs_ == NULL) {

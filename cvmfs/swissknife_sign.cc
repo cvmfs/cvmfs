@@ -16,7 +16,7 @@
 #include <cstdlib>
 #include <string>
 
-#include "compression/compression.h"
+#include "compression/compressor.h"
 #include "crypto/hash.h"
 #include "object_fetcher.h"
 #include "signing_tool.h"

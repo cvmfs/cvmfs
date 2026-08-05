@@ -17,7 +17,7 @@ const char *SpoolerDefinition::kDriverNames[] = {"S3", "local", "gw", "mock",
 SpoolerDefinition::SpoolerDefinition(
     const std::string &definition_string,
     const shash::Algorithms hash_algorithm,
-    const zlib::Algorithms compression_algorithm,
+    const zip::Algorithms compression_algorithm,
     const bool generate_legacy_bulk_chunks,
     const bool use_file_chunking,
     const size_t min_file_chunk_size,
@@ -73,12 +73,6 @@ SpoolerDefinition::SpoolerDefinition(
   temporary_path = upstream[1];
   spooler_configuration = upstream[2];
   valid_ = true;
-}
-
-SpoolerDefinition SpoolerDefinition::Dup2DefaultCompression() const {
-  SpoolerDefinition result(*this);
-  result.compression_alg = zlib::kZlibDefault;
-  return result;
 }
 
 }  // namespace upload

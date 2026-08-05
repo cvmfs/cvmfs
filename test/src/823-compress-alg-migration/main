@@ -1,0 +1,152 @@
+#!/bin/bash
+cvmfs_test_name="Creating and using repository should work with every compression algorithm"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites=""
+set -x
+
+ALG_SET=(unset default zlib zstd none)
+
+default_alg_actual=$(cvmfs_swissknife -h | grep -o 'compression algorithm [(]default: [^)]*[)]' | sed -e 's/compression algorithm (default: //' -e 's/)//' | uniq)
+
+do_alg() {
+  alg_spec=$1
+
+  repo_name=$alg_spec.compression.repo
+  MKFS_COMPRESSION_OPTS=()
+  if [[ "$alg_spec" != unset ]]; then
+    alg=$alg_spec
+    #export CVMFS_COMPRESSION_ALGORITHM=$alg_spec # mkfs should propagate it into configs and we shouldn't need to export env var
+    MKFS_COMPRESSION_OPTS+=(-Z $alg)
+  else
+    alg=''
+    # CVMFS_COMPRESSION_ALGORITHM env var left unset (undeclared)
+  fi
+  [[ -v CVMFS_TEST_USER ]]
+  #sudo cvmfs_server mkfs -o "$CVMFS_TEST_USER" "${MKFS_COMPRESSION_OPTS[@]}" $repo_name || return 1 # apache etc
+  create_empty_repo $repo_name "$CVMFS_TEST_USER" NO "${MKFS_COMPRESSION_OPTS[@]}" || return 1
+  echo CVMFS_DEBUGLOG=/tmp/$repo_name.debug.log | sudo tee -a /etc/cvmfs/repositories.d/"$repo_name"/client.conf
+  sudo sed -i /etc/fstab -e "s/fsname=$repo_name,/&debug,/"
+  echo CVMFS_SHARED_CACHE=no                    | sudo tee -a /etc/cvmfs/repositories.d/"$repo_name"/client.conf
+
+  echo "check catalog and data integrity"
+  check_repository $repo_name -i  || return 2
+
+  # It's easier to incrementally change settings and accrue uncompressed local cache.
+  # This drops the cache, for the ultimate test of data accessibility:
+  #sudo cvmfs_config umount "$repo_name"
+  sudo umount /cvmfs/"$repo_name"
+  sudo umount /var/spool/cvmfs/"$repo_name"/rdonly
+  sudo rm -rf /var/spool/cvmfs/"$repo_name"/cache/"$repo_name"
+  #sudo cvmfs_server mount "$repo_name" || return 2
+  sudo mount /var/spool/cvmfs/"$repo_name"/rdonly || return 2
+  sudo mount /cvmfs/"$repo_name"
+
+  start_transaction $repo_name || return 3
+  mkdir /cvmfs/$repo_name/subdir
+  echo -n hello | tee /cvmfs/$repo_name/subdir/hello.txt || return 4
+  publish_repo $repo_name || return 5
+  find /cvmfs/$repo_name
+  ls -lR /cvmfs/$repo_name
+  [[ "$(cat /cvmfs/$repo_name/subdir/hello.txt)" == "hello" ]] || return 6
+
+  # It's easier to incrementally change settings and accrue uncompressed local cache.
+  # This drops the cache, for the ultimate test of data accessibility:
+  sudo umount /cvmfs/"$repo_name"
+  sudo umount /var/spool/cvmfs/"$repo_name"/rdonly
+  sudo rm -rf /var/spool/cvmfs/"$repo_name"/cache/"$repo_name"
+  sudo mount /var/spool/cvmfs/"$repo_name"/rdonly || return 7
+  sudo mount /cvmfs/"$repo_name"
+
+  [[ "$(cat /cvmfs/$repo_name/subdir/hello.txt)" == "hello" ]] || return 7
+
+  # There is not such thing as "decompression algorithm setting" in client.conf, it actually can and does work with no such setting.
+  # Metadata bits (manifest, certificate, metadata, catalogs) are of established formats and their compression format can be reliably recognized from first bytes of content.
+  # This works by invoking zip::GuessDecompressor in the codebase, and this doesn't require a setting in client.conf.
+  # The directory entires have their compression format stored in the catalogs.
+
+  find /cvmfs/$repo_name
+  ls -lR /cvmfs/$repo_name
+  [[ "$(cat /cvmfs/$repo_name/subdir/hello.txt)" == "hello" ]] || return 16
+  local xattr_value=$(attr -q -g compression /var/spool/cvmfs/$repo_name/rdonly/subdir/hello.txt)
+  case "$alg_spec" in
+    zlib|zstd|none)
+      if [[ "$xattr_value" != "$alg_spec" ]]; then return 17; fi
+      ;;
+    unset|default)
+      if [[ "$xattr_value" != "$default_alg_actual" ]]; then return 17; fi
+      ;;
+    *)
+      echo "Unknown alg_spec"
+      return 17
+      ;;
+  esac
+
+  # alg mixing:
+  # set CVMFS_COMPRESSION_ALGORITHM in server.conf to sth else
+  # add and change files as part of publish process
+  # access all files
+  for alg_new_spec in ${ALG_SET[@]}; do
+
+    sudo umount /cvmfs/"$repo_name"
+    sudo umount /var/spool/cvmfs/"$repo_name"/rdonly
+
+    sudo sed -i /etc/cvmfs/repositories.d/"$repo_name"/server.conf -e "/CVMFS_COMPRESSION_ALGORITHM=/d"
+    if [[ "$alg_new_spec" == unset ]]; then
+      new_alg=''
+      # CVMFS_COMPRESSION_ALGORITHM env var left unset (undeclared)
+    else
+      new_alg=$alg_new_spec
+      echo CVMFS_COMPRESSION_ALGORITHM=$new_alg | sudo tee -a /etc/cvmfs/repositories.d/"$repo_name"/server.conf
+    fi
+
+    sudo mount /var/spool/cvmfs/"$repo_name"/rdonly || return 99
+    sudo mount /cvmfs/"$repo_name"
+
+    [[ "$(cat /cvmfs/$repo_name/subdir/hello.txt)" == "hello" ]] || return 100
+    check_repository $repo_name -i  || return 101
+
+    start_transaction $repo_name || return 102
+    mkdir /cvmfs/$repo_name/subdir_newalg."$alg_new_spec"
+    echo -n "hello from $alg_new_spec" | tee /cvmfs/$repo_name/subdir_newalg."$alg_new_spec"/hello."$alg_new_spec".txt || return 103
+    publish_repo $repo_name || return 104
+    xattr_value=$(attr -q -g compression /var/spool/cvmfs/$repo_name/rdonly/subdir_newalg."$alg_new_spec"/hello."$alg_new_spec".txt)
+    case "$alg_new_spec" in
+      zlib|zstd|none)
+        if [[ "$xattr_value" != "$alg_new_spec" ]]; then return 104; fi
+        ;;
+      unset|default)
+        if [[ "$xattr_value" != "$default_alg_actual" ]]; then return 104; fi
+        ;;
+      *)
+        echo "Unknown alg_new_spec"
+        return 104
+        ;;
+    esac
+
+    # It's not an ultimate check of correctness if we just incrementally change settings and accrue uncompressed local cache.
+    # This drops the cache, for the ultimate test of data accessibility:
+    sudo umount /cvmfs/"$repo_name"
+    sudo umount /var/spool/cvmfs/"$repo_name"/rdonly
+    sudo rm -rf /var/spool/cvmfs/"$repo_name"/cache/"$repo_name"
+    sudo mount /var/spool/cvmfs/"$repo_name"/rdonly || return 99
+    sudo mount /cvmfs/"$repo_name"
+
+    [[ "$(cat /cvmfs/$repo_name/subdir_newalg."$alg_new_spec"/hello."$alg_new_spec".txt)" == "hello from $alg_new_spec" ]] || return 105
+    head /cvmfs/$repo_name/subdir*/hello*.txt || return 106
+  done
+}
+
+cvmfs_run_test() {
+  logfile=$1
+
+  case "$default_alg_actual" in
+    zlib|zstd|none) ;;
+    *) echo "Unrecognized default alg reported in swissknife help: $default_alg_actual"; return 1; ;;
+  esac
+
+  for alg in ${ALG_SET[@]}; do
+    do_alg "$alg" || return $?
+
+  done
+  return 0
+}

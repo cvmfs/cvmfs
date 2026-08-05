@@ -9,10 +9,14 @@
 #include <string>
 
 #include "catalog.h"
+#include "compression/compressor.h"
+#include "compression/decompressor.h"
+#include "compression/decompressor_guess.h"
 #include "crypto/hash.h"
 #include "path_filters/inclusion_spec.h"
 #include "smallhash.h"
 #include "swissknife.h"
+#include "util/pointer.h"
 
 namespace download {
 class DownloadManager;
@@ -75,8 +79,9 @@ class CommandCheck : public Command {
                               shash::Any *root_hash,
                               uint64_t *root_size);
 
-  std::string DecompressPiece(const shash::Any catalog_hash);
-  std::string DownloadPiece(const shash::Any catalog_hash);
+  std::string DecompressPiece(const shash::Any catalog_hash,
+                              zip::ExpectedContentFormat expected_fmt);
+
   std::string FetchPath(const std::string &path);
   bool InspectReflog(const shash::Any &reflog_hash,
                      manifest::Manifest *manifest);
@@ -85,7 +90,7 @@ class CommandCheck : public Command {
             const PathString &path,
             catalog::DeltaCounters *computed_counters,
             std::set<PathString> *bind_mountpoints);
-  bool Exists(const std::string &file);
+  bool Exists(const std::string &file, zip::Algorithm decomp_alg = zip::Algorithm::kNoCompression);
   bool CompareCounters(const catalog::Counters &a, const catalog::Counters &b);
   bool CompareEntries(const catalog::DirectoryEntry &a,
                       const catalog::DirectoryEntry &b,
@@ -100,6 +105,7 @@ class CommandCheck : public Command {
   bool is_remote_;
   catalog::InclusionSpec *inclusion_spec_;
   SmallHashDynamic<shash::Any, char> duplicates_map_;
+  UniquePtr<zip::Compressor> copy_;
 };
 
 }  // namespace swissknife

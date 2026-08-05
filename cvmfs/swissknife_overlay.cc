@@ -24,6 +24,9 @@
 #include "catalog_rw.h"
 #include "catalog_sql.h"
 #include "compression/compression.h"
+#include "compression/compressor.h"
+#include "compression/decompressor_guess.h"
+#include "compression/util.h"
 #include "crypto/hash.h"
 #include "directory_entry.h"
 #include "ingestion/ingestion_source.h"
@@ -69,8 +72,9 @@ ParameterList CommandOverlay::GetParams() const {
   r.push_back(Parameter::Mandatory('d', "destination subdirectory path in "
                "repository for the merged overlay"));
   r.push_back(Parameter::Optional('e', "hash algorithm (default: sha1)"));
-  r.push_back(Parameter::Optional('Z', "compression algorithm "
-               "(default: zlib)"));
+  r.push_back(Parameter::Optional('Z', "compression algorithm (default: "
+                                           + zip::AlgorithmName(zip::kDefault)
+                                           + ")"));
   r.push_back(Parameter::Optional('@', "proxy URL"));
   r.push_back(Parameter::Switch('L', "follow HTTP redirects"));
   r.push_back(Parameter::Optional('c', "OCI image config JSON file path "
@@ -984,7 +988,9 @@ catalog::Catalog *CommandOverlay::LoadCatalogForPath(
     catalog_path = temp_dir + "/" + root_hash.ToString();
 
     cvmfs::PathSink pathsink(catalog_path);
-    download::JobInfo download_job(&url, true, false, &root_hash, &pathsink);
+    download::JobInfo download_job(
+        &url, new zip::GuessDecompressor(zip::ExpectedContentFormat::kSQLite3),
+        false, &root_hash, &pathsink);
     const download::Failures retval = download_manager()->Fetch(&download_job);
     if (retval != download::kFailOk) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to download catalog %s (%d)",
@@ -1121,9 +1127,9 @@ int CommandOverlay::Main(const ArgumentList &args) {
       return 1;
     }
   }
-  zlib::Algorithms compression_alg = zlib::kZlibDefault;
+  zip::Algorithms compression_alg = zip::kDefault;
   if (args.find('Z') != args.end()) {
-    compression_alg = zlib::ParseCompressionAlgorithm(
+    compression_alg = zip::ParseCompressionAlgorithm(
         *args.find('Z')->second);
   }
 
@@ -1161,8 +1167,8 @@ int CommandOverlay::Main(const ArgumentList &args) {
       0, 0, 0 /* chunk sizes: unused */,
       session_token_file, key_file);
 
-  const upload::SpoolerDefinition spooler_definition_catalogs(
-      spooler_definition.Dup2DefaultCompression());
+  upload::SpoolerDefinition spooler_definition_catalogs(spooler_definition);
+  spooler_definition_catalogs.compression_alg = zip::CompressionAlgFromEnv();
 
   const UniquePtr<upload::Spooler> spooler_files(
       upload::Spooler::Construct(spooler_definition, &publish_statistics));

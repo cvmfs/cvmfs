@@ -22,14 +22,20 @@
 #include <vector>
 
 #include "catalog.h"
-#include "compression/compression.h"
+#include "compression/compressor.h"
+#include "compression/decompressor.h"
+#include "compression/decompressor_guess.h"
+#include "compression/input_file.h"
+#include "compression/input_mem.h"
+#include "compression/input_path.h"
 #include "crypto/hash.h"
 #include "history_sqlite.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
 #include "network/download.h"
-#include "network/sink_path.h"
+#include "network/sink_file.h"
 #include "network/sink_mem.h"
+#include "network/sink_path.h"
 #include "object_fetcher.h"
 #include "path_filters/inclusion_spec.h"
 #include "path_filters/relaxed_path_filter.h"
@@ -38,6 +44,7 @@
 #include "util/atomic.h"
 #include "util/exception.h"
 #include "util/logging.h"
+#include "util/pointer.h"
 #include "util/posix.h"
 #include "util/shared_ptr.h"
 #include "util/smalloc.h"
@@ -60,9 +67,9 @@ class ChunkJob {
   ChunkJob()
       : suffix(shash::kSuffixNone)
       , hash_algorithm(shash::kAny)
-      , compression_alg(zlib::kZlibDefault) { }
+      , compression_alg(zip::kInvalid) { }
 
-  ChunkJob(const shash::Any &hash, zlib::Algorithms compression_alg)
+  ChunkJob(const shash::Any &hash, zip::Algorithms compression_alg)
       : suffix(hash.suffix)
       , hash_algorithm(hash.algorithm)
       , compression_alg(compression_alg) {
@@ -78,7 +85,7 @@ class ChunkJob {
 
   const shash::Suffix suffix;
   const shash::Algorithms hash_algorithm;
-  const zlib::Algorithms compression_alg;
+  const zip::Algorithms compression_alg;
   unsigned char digest[shash::kMaxDigestSize];
 };
 
@@ -113,7 +120,12 @@ bool preload_cache = false;
 string *preload_cachedir = NULL;
 bool inspect_existing_catalogs = false;
 manifest::Reflog *reflog = NULL;
-
+zip::Algorithm comp_alg;
+zip::DecompressionAlg decomp_alg;
+UniquePtr<zip::Compressor> comp;
+UniquePtr<zip::Compressor> copy;
+UniquePtr<zip::Decompressor> decomp;
+UniquePtr<zip::Decompressor> decomp_copy;
 }  // anonymous namespace
 
 
@@ -178,9 +190,9 @@ static void ReportDownloadError(const download::JobInfo &download_job) {
 
 static void Store(const string &local_path,
                   const string &remote_path,
-                  const bool compressed_src) {
+                  zip::Decompressor *decomp) {
   if (preload_cache) {
-    if (!compressed_src) {
+    if (decomp_alg == zip::kNoCompression) {
       const int retval = rename(local_path.c_str(), remote_path.c_str());
       if (retval != 0) {
         PANIC(kLogStderr, "Failed to move '%s' to '%s'", local_path.c_str(),
@@ -194,13 +206,14 @@ static void Store(const string &local_path,
         PANIC(kLogStderr, "Failed to create temporary file '%s'",
               remote_path.c_str());
       }
-      int retval = zlib::DecompressPath2File(local_path, fdest);
-      if (!retval) {
+      zip::InputPath in_p(local_path);
+      cvmfs::FileSink out_f(fdest, true);
+      const auto decomp_ret = decomp->DecompressStream(&in_p, &out_f);
+      if (decomp_ret != zip::kStreamEnd) {
         PANIC(kLogStderr, "Failed to preload %s to %s", local_path.c_str(),
               remote_path.c_str());
       }
-      fclose(fdest);
-      retval = rename(tmp_dest.c_str(), remote_path.c_str());
+      const int retval = rename(tmp_dest.c_str(), remote_path.c_str());
       assert(retval == 0);
       unlink(local_path.c_str());
     }
@@ -210,32 +223,52 @@ static void Store(const string &local_path,
 }
 
 static void Store(const string &local_path,
-                  const shash::Any &remote_hash,
-                  const bool compressed_src = true) {
-  Store(local_path, MakePath(remote_hash), compressed_src);
+                  const string &remote_path,
+                  zip::DecompressionAlg decomp_alg) {
+  zip::Decompressor *decomp = zip::Decompressor::Construct(decomp_alg);
+  Store(local_path, remote_path, decomp);
+  delete decomp;
 }
 
+static void Store(
+  const string &local_path,
+  const shash::Any &remote_hash,
+  zip::Decompressor* decomp
+  )
+{
+  Store(local_path, MakePath(remote_hash), decomp);
+}
+
+static void Store(
+  const string &local_path,
+  const shash::Any &remote_hash,
+  zip::DecompressionAlg decomp_alg
+  )
+{
+  Store(local_path, MakePath(remote_hash), decomp_alg);
+}
 
 static void StoreBuffer(const unsigned char *buffer, const unsigned size,
-                        const std::string &dest_path, const bool compress) {
+                        const std::string &dest_path,
+                        zip::Compressor *compress, zip::Decompressor* decomp) {
   string tmp_file;
   FILE *ftmp = CreateTempFile(*temp_dir + "/cvmfs", 0600, "w", &tmp_file);
   assert(ftmp);
-  int retval;
-  if (compress) {
-    shash::Any dummy(shash::kSha1);  // hardcoded hash no problem, unused
-    retval = zlib::CompressMem2File(buffer, size, ftmp, &dummy);
-  } else {
-    retval = CopyMem2File(buffer, size, ftmp);
-  }
-  assert(retval);
-  fclose(ftmp);
-  Store(tmp_file, dest_path, true);
+
+  zip::InputMem in_mem(buffer, size);
+  cvmfs::FileSink out_f(ftmp, true);
+
+  const zip::StreamStates retval = compress->Compress(&in_mem, &out_f);
+  assert(retval == zip::kStreamEnd);
+
+  // FIXME bizarre? compress & decompress round-trip instead of just storing fetched data?
+  Store(tmp_file, dest_path,  decomp);
 }
 
 static void StoreBuffer(const unsigned char *buffer, const unsigned size,
-                        const shash::Any &dest_hash, const bool compress) {
-  StoreBuffer(buffer, size, MakePath(dest_hash), compress);
+                        const shash::Any &dest_hash,
+                        zip::Compressor *compress,  zip::Decompressor* decomp) {
+  StoreBuffer(buffer, size, MakePath(dest_hash), compress, decomp);
 }
 
 
@@ -263,7 +296,7 @@ static void *MainWorker(void *data) {
       break;
 
     const shash::Any chunk_hash = next_chunk.hash();
-    const zlib::Algorithms compression_alg = next_chunk.compression_alg;
+    const zip::Algorithms decomp_alg = next_chunk.compression_alg;
     LogCvmfs(kLogCvmfs, kLogVerboseMsg, "processing chunk %s",
              chunk_hash.ToString().c_str());
 
@@ -272,8 +305,9 @@ static void *MainWorker(void *data) {
       FILE *fchunk = CreateTempFile(*temp_dir + "/cvmfs", 0600, "w", &tmp_file);
       const string url_chunk = *stratum0_url + "/data/" + chunk_hash.MakePath();
       cvmfs::FileSink filesink(fchunk);
-      download::JobInfo download_chunk(&url_chunk, false, false, &chunk_hash,
-                                       &filesink);
+      download::JobInfo download_chunk(&url_chunk,
+                                       zip::DecompressionAlg::kNoCompression,
+                                       false, &chunk_hash, &filesink);
 
       const download::Failures download_result = download_manager->Fetch(
           &download_chunk);
@@ -282,8 +316,7 @@ static void *MainWorker(void *data) {
         PANIC(kLogStderr, "Download error");
       }
       fclose(fchunk);
-      Store(tmp_file, chunk_hash,
-            (compression_alg == zlib::kZlibDefault) ? true : false);
+      Store(tmp_file, chunk_hash, decomp_alg);
       atomic_inc64(&overall_new);
     }
     if (atomic_xadd64(&overall_chunks, 1) % 1000 == 0)
@@ -342,6 +375,7 @@ bool CommandPull::Pull(const shash::Any &catalog_hash,
   download::Failures dl_retval;
   assert(shash::kSuffixCatalog == catalog_hash.suffix);
   previous_catalog.SetNull();
+  zip::GuessDecompressor decomp_catalog(zip::ExpectedContentFormat::kSQLite3);
 
   // Check if the catalog already exists
   if (Peek(catalog_hash)) {
@@ -381,7 +415,7 @@ bool CommandPull::Pull(const shash::Any &catalog_hash,
 
   // Download and uncompress catalog
   shash::Any chunk_hash;
-  zlib::Algorithms compression_alg;
+  zip::Algorithms compression_alg;
   catalog::Catalog *catalog = NULL;
   string file_catalog;
   string file_catalog_vanilla;
@@ -401,8 +435,9 @@ bool CommandPull::Pull(const shash::Any &catalog_hash,
   }
   const string url_catalog = *stratum0_url + "/data/" + catalog_hash.MakePath();
   cvmfs::FileSink filesink(fcatalog_vanilla);
-  download::JobInfo download_catalog(&url_catalog, false, false, &catalog_hash,
-                                     &filesink);
+  download::JobInfo download_catalog(&url_catalog,
+                                     zip::DecompressionAlg::kNoCompression,
+                                     false, &catalog_hash, &filesink);
   dl_retval = download_manager()->Fetch(&download_catalog);
   fclose(fcatalog_vanilla);
   if (dl_retval != download::kFailOk) {
@@ -419,12 +454,19 @@ bool CommandPull::Pull(const shash::Any &catalog_hash,
       goto pull_cleanup;
     }
   }
-  retval = zlib::DecompressPath2Path(file_catalog_vanilla, file_catalog);
-  if (!retval) {
+
+  {  // anonymous namespace to prevent crosses initialization due to gotos
+  zip::InputPath in_path(file_catalog_vanilla);
+  cvmfs::PathSink out_path(file_catalog);
+  zip::Decompressor* decomp = new zip::GuessDecompressor(zip::ExpectedContentFormat::kSQLite3);
+  const auto decomp_ret = decomp->DecompressStream(&in_path, &out_path);
+  delete decomp;
+  if (decomp_ret != zip::kStreamEnd) {
     LogCvmfs(kLogCvmfs, kLogStderr, "decompression failure (file %s, hash %s)",
              file_catalog_vanilla.c_str(), catalog_hash.ToString().c_str());
     goto pull_cleanup;
   }
+  }   // end anonymous namespace
   if (path.empty() && reflog != NULL) {
     if (!reflog->AddCatalog(catalog_hash)) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to add catalog to Reflog.");
@@ -489,7 +531,7 @@ bool CommandPull::Pull(const shash::Any &catalog_hash,
   WaitForStorage();
   if (!retval)
     return false;
-  Store(file_catalog_vanilla, catalog_hash);
+  Store(file_catalog_vanilla, catalog_hash, &decomp_catalog);
   return true;
 
 pull_cleanup:
@@ -610,6 +652,13 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   atomic_init64(&overall_new);
   atomic_init64(&chunk_queue);
 
+  comp_alg = zip::CompressionAlgFromEnv();
+  decomp_alg = comp_alg;
+  comp = zip::Compressor::Construct(comp_alg);
+  decomp = zip::Decompressor::Construct(decomp_alg);
+  copy = zip::Compressor::Construct(zip::kNoCompression);
+  decomp_copy = zip::Decompressor::Construct(zip::kNoCompression);
+
   const bool follow_redirects = false;
   const unsigned max_pool_handles = num_parallel + 1;
   const string proxy = (args.find('@') != args.end()) ? *args.find('@')->second
@@ -686,8 +735,8 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     meta_info_hash = ensemble.manifest->meta_info();
     const string url = *stratum0_url + "/data/" + meta_info_hash.MakePath();
     cvmfs::MemSink metainfo_memsink;
-    download::JobInfo download_metainfo(&url, true, false, &meta_info_hash,
-                                        &metainfo_memsink);
+    download::JobInfo download_metainfo(&url, new zip::GuessDecompressor(zip::ExpectedContentFormat::kJSON), false,
+                                        &meta_info_hash, &metainfo_memsink);
     dl_retval = download_manager()->Fetch(&download_metainfo);
     if (dl_retval != download::kFailOk) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to fetch meta info (%d - %s)",
@@ -759,16 +808,23 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     const string history_path = *temp_dir + "/" + history_hash.ToString();
 
     cvmfs::PathSink pathsink(history_path);
-    download::JobInfo download_history(&history_url, false, false,
-                                       &history_hash, &pathsink);
+    download::JobInfo download_history(&history_url,
+                                       zip::DecompressionAlg::kNoCompression,
+                                       false, &history_hash, &pathsink);
     dl_retval = download_manager()->Fetch(&download_history);
     if (dl_retval != download::kFailOk) {
       ReportDownloadError(download_history);
       goto fini;
     }
     const std::string history_db_path = history_path + ".uncompressed";
-    retval = zlib::DecompressPath2Path(history_path, history_db_path);
-    assert(retval);
+    zip::InputPath in_path(history_path);
+    cvmfs::PathSink out_path(history_db_path);
+    zip::Decompressor *decomp_hist = new zip::GuessDecompressor(zip::ExpectedContentFormat::kSQLite3);
+    const zip::StreamStates ret
+                           = decomp_hist->DecompressStream(&in_path, &out_path);
+    delete decomp_hist;
+
+    assert(ret == zip::kStreamEnd);
     history::History *tag_db = history::SqliteHistory::Open(history_db_path);
     if (NULL == tag_db) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to open history database (%s)",
@@ -790,7 +846,8 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     // TODO(jblomer): We should repliacte the previous history dbs, too,
     // in order to avoid races on fail-over between non-synchronized stratum 1s
     LogCvmfs(kLogCvmfs, kLogStdout, "Uploading history database");
-    Store(history_path, history_hash);
+    zip::Decompressor* decomp = new zip::GuessDecompressor(zip::ExpectedContentFormat::kSQLite3);
+    Store(history_path, history_hash, decomp);
     WaitForStorage();
     unlink(history_path.c_str());
     if (reflog != NULL && !reflog->AddHistory(history_hash)) {
@@ -887,7 +944,8 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
 
     if (!Peek(ensemble.manifest->certificate())) {
       StoreBuffer(ensemble.cert_buf, ensemble.cert_size,
-                  ensemble.manifest->certificate(), true);
+                  ensemble.manifest->certificate(), comp.weak_ref(),
+                  decomp.weak_ref());
     }
     if (reflog != NULL
         && !reflog->AddCertificate(ensemble.manifest->certificate())) {
@@ -897,7 +955,8 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     if (!meta_info_hash.IsNull()) {
       const unsigned char *info = reinterpret_cast<const unsigned char *>(
           meta_info.data());
-      StoreBuffer(info, meta_info.size(), meta_info_hash, true);
+      StoreBuffer(info, meta_info.size(), meta_info_hash, comp.weak_ref(),
+                  decomp.weak_ref());
       if (reflog != NULL && !reflog->AddMetainfo(meta_info_hash)) {
         LogCvmfs(kLogCvmfs, kLogStderr, "Failed to add metainfo to Reflog.");
         goto fini;
@@ -954,20 +1013,21 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
       // sync
       if (ensemble.whitelist_pkcs7_buf) {
         StoreBuffer(ensemble.whitelist_pkcs7_buf, ensemble.whitelist_pkcs7_size,
-                    ".cvmfswhitelist.pkcs7", false);
+                    ".cvmfswhitelist.pkcs7", copy.weak_ref(),
+                    decomp_copy.weak_ref());
       }
       StoreBuffer(ensemble.whitelist_buf, ensemble.whitelist_size,
-                  ".cvmfswhitelist", false);
+                  ".cvmfswhitelist", copy.weak_ref(), decomp_copy.weak_ref());
       StoreBuffer(ensemble.raw_manifest_buf, ensemble.raw_manifest_size,
-                  ".cvmfspublished", false);
+                  ".cvmfspublished", copy.weak_ref(), decomp_copy.weak_ref());
 
       // Upload the partial replication spec to the backend
       if (inclusion_spec != NULL) {
         const std::string &spec_content = inclusion_spec->content();
         StoreBuffer(
             reinterpret_cast<const unsigned char *>(spec_content.data()),
-            spec_content.size(),
-            ".cvmfs_partial_replication", false);
+            spec_content.size(), ".cvmfs_partial_replication", copy.weak_ref(),
+            decomp_copy.weak_ref());
         LogCvmfs(kLogCvmfs, kLogStdout,
                  "Uploaded partial replication spec to backend");
       }

@@ -14,7 +14,11 @@
 
 #include "catalog_balancer.h"
 #include "catalog_rw.h"
+#include "compression/compressor.h"
+#include "compression/input_path.h"
 #include "manifest.h"
+#include "network/sink_null.h"
+#include "network/sink_path.h"
 #include "statistics.h"
 #include "upload.h"
 #include "util/exception.h"
@@ -144,9 +148,14 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   }
   const string file_path_compressed = file_path + ".compressed";
   shash::Any hash_catalog(hash_algorithm, shash::kSuffixCatalog);
-  const bool retval = zlib::CompressPath2Path(file_path, file_path_compressed,
-                                              &hash_catalog);
-  if (!retval) {
+
+  const UniquePtr<zip::Compressor>
+                      compress(zip::Compressor::Construct(zip::CompressionAlgFromEnv()));
+  zip::InputPath in_path(file_path);
+  cvmfs::PathSink out_path(file_path_compressed);
+  const zip::StreamStates retval = compress->Compress(&in_path, &out_path,
+                                                                 &hash_catalog);
+  if (retval != zip::kStreamEnd) {
     LogCvmfs(kLogCatalog, kLogStderr, "compression of catalog '%s' failed",
              file_path.c_str());
     unlink(file_path.c_str());
@@ -1441,8 +1450,10 @@ bool WritableCatalogManager::CopyCatalogToLocalCache(
           "Creating file for temporary catalog failed: %s",
           tmp_catalog_path.c_str());
   }
-  CopyPath2File(result.local_path.c_str(), fcatalog);
-  (void)fclose(fcatalog);
+
+  zip::InputPath in_path(result.local_path.c_str());
+  cvmfs::FileSink out_file(fcatalog, true);
+  copy_->DecompressStream(&in_path, &out_file);
 
   if (rename(tmp_catalog_path.c_str(), cache_catalog_path.c_str()) != 0) {
     PANIC(kLogDebug | kLogStderr, "Failed to copy catalog from %s to cache %s",
@@ -1646,13 +1657,19 @@ WritableCatalogManager::SnapshotCatalogsSerialized(const bool stop_for_tweaks) {
   CatalogInfo root_catalog_info;
   WritableCatalogList::const_iterator i = catalogs_to_snapshot.begin();
   const WritableCatalogList::const_iterator iend = catalogs_to_snapshot.end();
+
+  const UniquePtr<zip::Compressor>
+                        compress(zip::Compressor::Construct(zip::CompressionAlgFromEnv()));
   for (; i != iend; ++i) {
     FinalizeCatalog(*i, stop_for_tweaks);
 
     // Compress and upload catalog
     shash::Any hash_catalog(spooler_->GetHashAlgorithm(),
                             shash::kSuffixCatalog);
-    if (!zlib::CompressPath2Null((*i)->database_path(), &hash_catalog)) {
+    zip::InputPath input((*i)->database_path());
+    cvmfs::NullSink out_null;
+    if (compress->Compress(&input, &out_null, &hash_catalog)
+        != zip::kStreamEnd) {
       PANIC(kLogStderr, "could not compress catalog %s",
             (*i)->mountpoint().ToString().c_str());
     }

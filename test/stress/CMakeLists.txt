@@ -2,7 +2,21 @@ set (CVMFS_SOURCE_DIR "${CMAKE_SOURCE_DIR}/cvmfs")
 
 add_executable(s3benchmark
                test/stress/s3benchmark.cc
-               ${CVMFS_SOURCE_DIR}/compression/compression.cc
+               ${CVMFS_SOURCE_DIR}/compression/compressor.cc
+               ${CVMFS_SOURCE_DIR}/compression/compressor_echo.cc
+               ${CVMFS_SOURCE_DIR}/compression/compressor_zlib.cc
+               ${CVMFS_SOURCE_DIR}/compression/compressor_zstd.cc
+               ${CVMFS_SOURCE_DIR}/compression/decompressor.cc
+               ${CVMFS_SOURCE_DIR}/compression/decompressor_echo.cc
+               ${CVMFS_SOURCE_DIR}/compression/decompressor_guess.cc
+               ${CVMFS_SOURCE_DIR}/compression/decompressor_zlib.cc
+               ${CVMFS_SOURCE_DIR}/compression/decompressor_zstd.cc
+               ${CVMFS_SOURCE_DIR}/compression/input_cache.cc
+               ${CVMFS_SOURCE_DIR}/compression/input_fd.cc
+               ${CVMFS_SOURCE_DIR}/compression/input_file.cc
+               ${CVMFS_SOURCE_DIR}/compression/input_mem.cc
+               ${CVMFS_SOURCE_DIR}/compression/input_path.cc
+               ${CVMFS_SOURCE_DIR}/compression/util.cc
                ${CVMFS_SOURCE_DIR}/gateway_util.cc
                ${CVMFS_SOURCE_DIR}/json_document.cc
                ${CVMFS_SOURCE_DIR}/network/dns.cc
@@ -27,6 +41,7 @@ target_link_libraries (s3benchmark
                        CURL::libcurl
                        c-ares::cares
                        ${ZLIB_LIBRARIES}
+                       ${ZSTD_LIBRARIES}
                        ${OPENSSL_LIBRARIES}
                        LibArchive::LibArchive
                        nlohmann_json::nlohmann_json

@@ -9,6 +9,7 @@
 
 #include <string>
 
+#include "compression/decompressor_guess.h"
 #include "crypto/hash.h"
 #include "manifest.h"
 #include "network/download.h"
@@ -129,10 +130,10 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
   if (IsRemote(repository)) {
     const string url = repository + "/.cvmfspublished";
     cvmfs::MemSink manifest_memsink;
-    download::JobInfo download_manifest(&url, false, false, NULL,
-                                        &manifest_memsink);
-    const download::Failures retval = download_manager()->Fetch(
-        &download_manifest);
+    download::JobInfo download_manifest(&url,
+                                        zip::DecompressionAlg::kNoCompression,
+                                        false, NULL, &manifest_memsink);
+    download::Failures retval = download_manager()->Fetch(&download_manifest);
     if (retval != download::kFailOk) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to download manifest (%d - %s)",
                retval, download::Code2Ascii(retval));
@@ -253,10 +254,10 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
     }
     const string url = repository + "/data/" + meta_info.MakePath();
     cvmfs::MemSink metainfo_memsink;
-    download::JobInfo download_metainfo(&url, true, false, &meta_info,
-                                        &metainfo_memsink);
-    const download::Failures retval = download_manager()->Fetch(
-        &download_metainfo);
+    download::JobInfo download_metainfo(
+        &url, new zip::GuessDecompressor(zip::ExpectedContentFormat::kJSON),
+        false, &meta_info, &metainfo_memsink);
+    download::Failures retval = download_manager()->Fetch(&download_metainfo);
     if (retval != download::kFailOk) {
       if (human_readable)
         LogCvmfs(kLogCvmfs, kLogStderr,

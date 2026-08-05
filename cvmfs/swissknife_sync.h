@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-#include "compression/compression.h"
+#include "compression/compressor.h"
 #include "repository_tag.h"
 #include "swissknife.h"
 #include "upload.h"
@@ -45,7 +45,7 @@ struct SyncParameters {
       , virtual_dir_actions(0)
       , ignore_special_files(false)
       , branched_catalog(false)
-      , compression_alg(zlib::kZlibDefault)
+      , compression_alg(zip::kDefault)
       , enforce_limits(false)
       , nested_kcatalog_limit(0)
       , root_kcatalog_limit(0)
@@ -100,7 +100,7 @@ struct SyncParameters {
   int virtual_dir_actions;  // bit field
   bool ignore_special_files;
   bool branched_catalog;
-  zlib::Algorithms compression_alg;
+  zip::Algorithms compression_alg;
   bool enforce_limits;
   unsigned nested_kcatalog_limit;
   unsigned root_kcatalog_limit;
@@ -293,9 +293,9 @@ class CommandSync : public Command {
     r.push_back(Parameter::Optional(
         'J', "tag description (only used when upstream is GW)"));
     r.push_back(Parameter::Optional('X', "maximum weight of the autocatalogs"));
-    r.push_back(Parameter::Optional('Z',
-                                    "compression algorithm "
-                                    "(default: zlib)"));
+    r.push_back(Parameter::Optional('Z', "compression algorithm (default: " +
+                                             zip::AlgorithmName(zip::kDefault) +
+                                             ")"));
     r.push_back(Parameter::Optional('S',
                                     "virtual directory options "
                                     "[snapshots, remove]"));

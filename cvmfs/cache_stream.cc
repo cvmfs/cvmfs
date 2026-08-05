@@ -172,10 +172,11 @@ int64_t StreamingCacheManager::Stream(const FdInfo &info,
   } else {
     url = "/data/" + info.object_id.MakePath();
   }
-  const bool is_zipped = info.label.zip_algorithm == zlib::kZlibDefault;
-
-  download::JobInfo download_job(&url, is_zipped, true /* probe_hosts */,
-                                 &info.object_id, &sink);
+  download::JobInfo download_job(&url, info.label.zip_algorithm,
+                                 true /* probe_hosts */, &info.object_id,
+                                 &sink);
+  /* Label flags are used by GuessDecompressor for sanity checking */
+  download_job.SetDecompressor(info.label);
   download_job.SetPathInfo(&info.label.path);
   download_job.SetRangeOffset(info.label.range_offset);
   download_job.SetRangeSize(static_cast<int64_t>(info.label.size));

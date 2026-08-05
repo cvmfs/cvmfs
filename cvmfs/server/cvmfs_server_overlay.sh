@@ -200,7 +200,7 @@ cvmfs_server_overlay() {
 
   local stratum0=$CVMFS_STRATUM0
   local hash_algorithm="${CVMFS_HASH_ALGORITHM-sha1}"
-  local compression_alg="${CVMFS_COMPRESSION_ALGORITHM-default}"
+  local compression_alg="${CVMFS_COMPRESSION_ALGORITHM:-default}"
 
   local user_shell="$(get_user_shell $name)"
   local base_hash=

@@ -69,7 +69,13 @@ cvmfs_run_test() {
 
   echo "validating the cvmfs cache"
   load_repo_config $CVMFS_TEST_REPO
+  # fsck does not operate in a repo or domain context.
+  # It must be told which compression to expect,
+  # because it takes decompressed files stored on disk,
+  # re-compresses them and compares to the original hash it's stored under.
+  export CVMFS_COMPRESSION_ALGORITHM=none CVMFS_DECOMPRESSION_ALGORITHM=none
   sudo cvmfs_fsck ${CVMFS_CACHE_BASE}/${CVMFS_TEST_REPO} || return 30
+  unset CVMFS_COMPRESSION_ALGORITHM CVMFS_DECOMPRESSION_ALGORITHM
 
   echo "check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i  || return $?

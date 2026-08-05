@@ -94,7 +94,8 @@ class PolymorphicConstructionUnittestAdapter {
 static const char *g_sandbox_path = "/tmp/cvmfs_mockuploader";
 static const char *g_sandbox_tmp_dir = "/tmp/cvmfs_mockuploader/tmp";
 static inline upload::SpoolerDefinition MockSpoolerDefinition(
-    bool generate_legacy_bulk_chunks = true) {
+    bool generate_legacy_bulk_chunks = true,
+    zip::Algorithm compression_alg = zip::Algorithm::kDefault) {
   const size_t min_chunk_size = 512000;
   const size_t avg_chunk_size = 2 * min_chunk_size;
   const size_t max_chunk_size = 4 * min_chunk_size;
@@ -102,7 +103,7 @@ static inline upload::SpoolerDefinition MockSpoolerDefinition(
   return upload::SpoolerDefinition("mock," + std::string(g_sandbox_path) + ","
                                        + std::string(g_sandbox_tmp_dir),
                                    shash::kSha1,
-                                   zlib::kZlibDefault,
+                                   compression_alg,
                                    generate_legacy_bulk_chunks,
                                    true,
                                    min_chunk_size,
@@ -847,9 +848,18 @@ class MockObjectFetcher : public AbstractObjectFetcher<MockObjectFetcher> {
 
   using BaseTN::FetchManifest;  // un-hiding convenience overload
   Failures FetchManifest(manifest::Manifest **manifest);
-  Failures Fetch(const shash::Any &object_hash, std::string *file_path);
+  Failures Fetch(const shash::Any &object_hash,
+                 std::string *file_path,
+                 zip::DecompressionAlg decomp_alg);
   Failures Fetch(const std::string &relative_path,
-                 const bool decompress,
+                 zip::DecompressionAlg decomp_alg,
+                 const bool nocache,
+                 std::string *file_path);
+  Failures Fetch(const shash::Any &object_hash,
+                 std::string *file_path,
+                 zip::Decompressor *decomp);
+  Failures Fetch(const std::string &relative_path,
+                 zip::Decompressor *decomp,
                  const bool nocache,
                  std::string *file_path);
 

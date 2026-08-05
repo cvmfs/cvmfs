@@ -523,12 +523,12 @@ shash::Algorithms SqlDirent::RetrieveHashAlgorithm(const unsigned flags) const {
 }
 
 
-zlib::Algorithms SqlDirent::RetrieveCompressionAlgorithm(
+zip::Algorithm SqlDirent::RetrieveCompressionAlgorithm(
     const unsigned flags) const {
   // 3 bits, so use 7 (111) to only pull out the flags we want
   const unsigned in_flags = ((7 << kFlagPosCompression) & flags)
                             >> kFlagPosCompression;
-  return static_cast<zlib::Algorithms>(in_flags);
+  return static_cast<zip::Algorithm>(in_flags);
 }
 
 
@@ -1417,14 +1417,14 @@ SqlAllChunks::SqlAllChunks(const CatalogDatabase &database) {
 bool SqlAllChunks::Open() { return true; }
 
 
-bool SqlAllChunks::Next(shash::Any *hash, zlib::Algorithms *compression_alg) {
+bool SqlAllChunks::Next(shash::Any *hash, zip::Algorithms *compression_alg) {
   if (!FetchRow()) {
     return false;
   }
 
   *hash = RetrieveHashBlob(0, static_cast<shash::Algorithms>(RetrieveInt(2)),
                            static_cast<shash::Suffix>(RetrieveInt(1)));
-  *compression_alg = static_cast<zlib::Algorithms>(RetrieveInt(3));
+  *compression_alg = static_cast<zip::Algorithms>(RetrieveInt(3));
   return true;
 }
 

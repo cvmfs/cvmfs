@@ -226,11 +226,12 @@ cvmfs_run_test() {
 
   echo "*** Create snapshot of repository with external data"
   CVMFS_TEST_615_REPLICA_NAME="$(get_stratum1_name $CVMFS_TEST_REPO)"
+  CVMFS_COMPRESSION_ALGORITHM=none \
   create_stratum1 $CVMFS_TEST_615_REPLICA_NAME          \
                   $CVMFS_TEST_USER                       \
                   $CVMFS_STRATUM0                        \
                   /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub || return 110
-  sudo cvmfs_server snapshot $CVMFS_TEST_615_REPLICA_NAME || return 111
+  sudo CVMFS_COMPRESSION_ALGORITHM=none cvmfs_server snapshot $CVMFS_TEST_615_REPLICA_NAME || return 111
   echo "*** Check integrity of replica"
   check_repository $CVMFS_TEST_615_REPLICA_NAME -i || return 112
 

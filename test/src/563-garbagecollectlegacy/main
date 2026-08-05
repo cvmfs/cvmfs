@@ -50,6 +50,7 @@ cvmfs_run_test() {
   import_repo $legacy_repo_name $CVMFS_TEST_USER \
     -l                                           \
     -s                                           \
+    -Z zlib                                      \
     -g > $import_log 2>&1 || return 4
   local cvmfs21_root_clgs=""
   local root_clg_after_import="$(get_current_root_catalog $legacy_repo_name)"

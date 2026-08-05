@@ -138,7 +138,7 @@ class Catalog : SingleCopy {
     return ListingMd5PathStat(NormalizePath(path), listing);
   }
   bool AllChunksBegin();
-  bool AllChunksNext(shash::Any *hash, zlib::Algorithms *compression_alg);
+  bool AllChunksNext(shash::Any *hash, zip::Algorithms *compression_alg);
   bool AllChunksEnd();
 
   inline bool ListPathChunks(const PathString &path,

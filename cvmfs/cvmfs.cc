@@ -68,7 +68,7 @@
 #include "catalog_mgr_client.h"
 #include "clientctx.h"
 #include "compat.h"
-#include "compression/compression.h"
+#include "compression/compressor.h"
 #include "crypto/crypto_util.h"
 #include "crypto/hash.h"
 #include "directory_entry.h"

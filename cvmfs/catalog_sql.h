@@ -20,7 +20,7 @@
 
 #include <string>
 
-#include "compression/compression.h"
+#include "compression/compressor.h"
 #include "crypto/hash.h"
 #include "directory_entry.h"
 #include "file_chunk.h"
@@ -193,7 +193,7 @@ class SqlDirent : public SqlCatalog {
   // hashes
   static const int kFlagPosHash = 8;
   // Compression methods, 3 bits starting at 2^11
-  // Corresponds to zlib::Algorithms
+  // Corresponds to zip::Algorithms
   static const int kFlagPosCompression = 11;
   /**
    * A transition point to a root catalog (instead of a nested catalog).  Used
@@ -226,7 +226,7 @@ class SqlDirent : public SqlCatalog {
   unsigned CreateDatabaseFlags(const DirectoryEntry &entry) const;
   void StoreHashAlgorithm(const shash::Algorithms algo, unsigned *flags) const;
   shash::Algorithms RetrieveHashAlgorithm(const unsigned flags) const;
-  zlib::Algorithms RetrieveCompressionAlgorithm(const unsigned flags) const;
+  zip::Algorithms RetrieveCompressionAlgorithm(const unsigned flags) const;
 
   /**
    * The hardlink information (hardlink group ID and linkcount) is saved in one
@@ -581,7 +581,7 @@ class SqlAllChunks : public SqlCatalog {
  public:
   explicit SqlAllChunks(const CatalogDatabase &database);
   bool Open();
-  bool Next(shash::Any *hash, zlib::Algorithms *compression_alg);
+  bool Next(shash::Any *hash, zip::Algorithms *compression_alg);
   bool Close();
 };
 

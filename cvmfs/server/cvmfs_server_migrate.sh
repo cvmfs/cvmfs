@@ -118,6 +118,7 @@ _migrate_2_1_7() {
   local temp_dir="${CVMFS_SPOOL_DIR}/tmp"
   local new_manifest="${temp_dir}/new_manifest"
 
+  CVMFS_COMPRESSION_ALGORITHM=$CVMFS_COMPRESSION_ALGORITHM \
   __swissknife migrate                                 \
     -v "2.1.7"                                         \
     -r ${CVMFS_STRATUM0}                               \

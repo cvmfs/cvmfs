@@ -113,7 +113,7 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
     }
   }
   if (args.find('Z') != args.end()) {
-    params.compression_alg = zlib::ParseCompressionAlgorithm(
+    params.compression_alg = zip::ParseCompressionAlgorithm(
         *args.find('Z')->second);
   }
   if (args.find('U') != args.end()) {
@@ -159,8 +159,8 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
   // from non-root (!= "/") paths
   params.base_directory = TrimString(params.base_directory, "/", kTrimAll);
 
-  const upload::SpoolerDefinition spooler_definition_catalogs(
-      spooler_definition.Dup2DefaultCompression());
+  upload::SpoolerDefinition spooler_definition_catalogs(spooler_definition);
+  spooler_definition_catalogs.compression_alg = zip::CompressionAlgFromEnv();
 
   params.spooler = upload::Spooler::Construct(spooler_definition,
                                               &publish_statistics);

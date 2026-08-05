@@ -9,7 +9,7 @@
  * On the repository side we have a catalogs directory that mimics the
  * shadow directory structure and stores compressed and uncompressed
  * versions of all catalogs.  The raw data are stored in the data
- * subdirectory in zlib-compressed form.  They are named with their SHA-1
+ * subdirectory in compressed form.  They are named with their SHA-1
  * hash of the compressed file (like in CVMFS client cache, but with a
  * 2-level cache hierarchy).  Symlinks from the catalog directory to the
  * data directory form the connection. If necessary, add a .htaccess file
@@ -128,8 +128,8 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
   }
 
   const upload::SpoolerDefinition sd(spooler_definition, hash_algorithm,
-                                     zlib::kZlibDefault);
-  const UniquePtr<upload::Spooler> spooler(upload::Spooler::Construct(sd));
+                                     zip::CompressionAlgFromEnv());
+  UniquePtr<upload::Spooler> spooler(upload::Spooler::Construct(sd));
   assert(spooler.IsValid());
 
   const UniquePtr<manifest::Manifest> manifest(
@@ -187,7 +187,8 @@ int swissknife::CommandUpload::Main(const swissknife::ArgumentList &args) {
     }
   }
 
-  const upload::SpoolerDefinition sd(spooler_definition, hash_algorithm);
+  const upload::SpoolerDefinition sd(spooler_definition, hash_algorithm,
+                                     zip::CompressionAlgFromEnv());
   upload::Spooler *spooler = upload::Spooler::Construct(sd);
   assert(spooler);
   spooler->Upload(source, dest);
@@ -209,7 +210,8 @@ int swissknife::CommandPeek::Main(const swissknife::ArgumentList &args) {
   const string spooler_definition = *args.find('r')->second;
 
   // Hash doesn't matter
-  const upload::SpoolerDefinition sd(spooler_definition, shash::kAny);
+  const upload::SpoolerDefinition sd(spooler_definition, shash::kAny,
+                                     zip::CompressionAlgFromEnv());
   upload::Spooler *spooler = upload::Spooler::Construct(sd);
   assert(spooler);
   const bool success = spooler->Peek(file_to_peek);
@@ -237,7 +239,8 @@ int swissknife::CommandRemove::Main(const ArgumentList &args) {
   const string spooler_definition = *args.find('r')->second;
 
   // Hash doesn't matter
-  const upload::SpoolerDefinition sd(spooler_definition, shash::kAny);
+  const upload::SpoolerDefinition sd(spooler_definition, shash::kAny,
+                                     zip::CompressionAlgFromEnv());
   upload::Spooler *spooler = upload::Spooler::Construct(sd);
   assert(spooler);
   spooler->RemoveAsync(file_to_delete);
@@ -680,8 +683,10 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     }
   }
   if (args.find('Z') != args.end()) {
-    params.compression_alg = zlib::ParseCompressionAlgorithm(
+    params.compression_alg = zip::ParseCompressionAlgorithm(
         *args.find('Z')->second);
+  } else {
+    params.compression_alg = zip::CompressionAlgFromEnv();
   }
 
   if (args.find('E') != args.end())
@@ -775,8 +780,8 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   }
   spooler_definition.num_upload_tasks = params.num_upload_tasks;
 
-  const upload::SpoolerDefinition spooler_definition_catalogs(
-      spooler_definition.Dup2DefaultCompression());
+  upload::SpoolerDefinition spooler_definition_catalogs(spooler_definition);
+  spooler_definition_catalogs.compression_alg = zip::CompressionAlgFromEnv();
 
   params.spooler = upload::Spooler::Construct(spooler_definition,
                                               &publish_statistics);

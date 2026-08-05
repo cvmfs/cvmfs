@@ -14,7 +14,8 @@
 #include <string>
 
 #include "cache_posix.h"
-#include "compression/compression.h"
+#include "compression/compressor.h"
+#include "compression/compressor_zlib.h"
 #include "crypto/hash.h"
 #include "quota.h"
 #include "testutil.h"
@@ -27,15 +28,31 @@ using namespace std;  // NOLINT
 class T_CacheManager : public ::testing::Test {
  protected:
   virtual void SetUp() {
+    copy_ = zip::Compressor::Construct(zip::kNoCompression);
     used_fds_ = GetNoUsedFds();
 
     tmp_path_ = CreateTempDir("./cvmfs_ut_cache_manager");
-    cache_mgr_ = PosixCacheManager::Create(tmp_path_, false);
+    cache_mgr_ = PosixCacheManager::Create(
+        tmp_path_, /*alien_cache=*/false,
+        /*rename_workaround=*/PosixCacheManager::kRenameNormal,
+        /*do_refcount=*/false);
+
     ASSERT_TRUE(cache_mgr_ != NULL);
-    alien_cache_mgr_ = PosixCacheManager::Create(tmp_path_, true);
+    alien_cache_mgr_ = PosixCacheManager::Create(
+        tmp_path_, /*alien_cache=*/true, /*rename_workaround=*/PosixCacheManager::kRenameNormal,
+        /*do_refcount=*/false);
     ASSERT_TRUE(alien_cache_mgr_ != NULL);
 
+    refcounted_mgr_tmp_path_ = CreateTempDir("./cvmfs_ut_refcounted_cache_manager");
+    refcounted_cache_mgr_ = PosixCacheManager::Create(
+        refcounted_mgr_tmp_path_, /*alien_cache=*/false,
+        /*rename_workaround=*/PosixCacheManager::kRenameNormal,
+        /*do_refcount=*/true);
+    ASSERT_TRUE(refcounted_cache_mgr_ != NULL);
+
     ASSERT_TRUE(cache_mgr_->CommitFromMem(
+        CacheManager::LabeledObject(hash_null_), NULL, 0));
+    ASSERT_TRUE(refcounted_cache_mgr_->CommitFromMem(
         CacheManager::LabeledObject(hash_null_), NULL, 0));
     unsigned char buf = 'A';
     hash_one_.digest[0] = 1;
@@ -104,11 +121,14 @@ class T_CacheManager : public ::testing::Test {
  protected:
   PosixCacheManager *cache_mgr_;
   PosixCacheManager *alien_cache_mgr_;
+  PosixCacheManager *refcounted_cache_mgr_;
   string tmp_path_;
+  string refcounted_mgr_tmp_path_;
   shash::Any hash_null_;
   shash::Any hash_one_;
   shash::Any hash_page_;
   unsigned used_fds_;
+  UniquePtr<zip::Compressor> copy_;
 };
 
 
@@ -278,23 +298,24 @@ class TestCacheManager : public CacheManager {
 
 
 TEST_F(T_CacheManager, ChecksumFd) {
+  zip::ZlibCompressor comp;
   shash::Any hash(shash::kSha1);
-  EXPECT_EQ(-EBADF, cache_mgr_->ChecksumFd(1000000, &hash));
+  EXPECT_EQ(-EBADF, cache_mgr_->ChecksumFd(1000000, &hash, &comp));
   int fd = cache_mgr_->Open(CacheManager::LabeledObject(hash_null_));
   EXPECT_GE(fd, 0);
-  EXPECT_EQ(0, cache_mgr_->ChecksumFd(fd, &hash));
+  EXPECT_EQ(0, cache_mgr_->ChecksumFd(fd, &hash, &comp));
   EXPECT_EQ("e8ec3d88b62ebf526e4e5a4ff6162a3aa48a6b78", hash.ToString());
   cache_mgr_->Close(fd);
 
   fd = cache_mgr_->Open(CacheManager::LabeledObject(hash_one_));
   EXPECT_GE(fd, 0);
-  EXPECT_EQ(0, cache_mgr_->ChecksumFd(fd, &hash));
+  EXPECT_EQ(0, cache_mgr_->ChecksumFd(fd, &hash, &comp));
   EXPECT_EQ("0bbd725a1003cd41b89b209f70e514f12f2a1062", hash.ToString());
   cache_mgr_->Close(fd);
 
   fd = cache_mgr_->Open(CacheManager::LabeledObject(hash_page_));
   EXPECT_GE(fd, 0);
-  EXPECT_EQ(0, cache_mgr_->ChecksumFd(fd, &hash));
+  EXPECT_EQ(0, cache_mgr_->ChecksumFd(fd, &hash, &comp));
   EXPECT_EQ("54b34b84872a06a373967f68726e29353d3fe7b2", hash.ToString());
   cache_mgr_->Close(fd);
 }
@@ -459,13 +480,12 @@ TEST_F(T_CacheManager, CommitTxnSizeMismatch) {
   EXPECT_GE(cache_mgr_->StartTxn(rnd_hash, 2, txn), 0);
   EXPECT_EQ(1U, cache_mgr_->Write(&content, 1, txn));
   EXPECT_EQ(-EIO, cache_mgr_->CommitTxn(txn));
-  unsigned char *buf;
-  unsigned buf_size;
-  EXPECT_TRUE(CopyPath2Mem(tmp_path_ + "/quarantaine/" + rnd_hash.ToString(),
-                           &buf, &buf_size));
-  EXPECT_EQ(1U, buf_size);
-  EXPECT_EQ(content, buf[0]);
-  free(buf);
+
+  zip::InputPath in_path(tmp_path_ + "/quarantaine/" + rnd_hash.ToString());
+  cvmfs::MemSink out_mem(0);
+  EXPECT_EQ(copy_->Compress(&in_path, &out_mem), zip::kStreamEnd);
+  EXPECT_EQ(1U, out_mem.pos());
+  EXPECT_EQ(content, out_mem.data()[0]);
 }
 
 
@@ -586,8 +606,9 @@ TEST_F(T_CacheManager, Create) {
   EXPECT_EQ(0700U, info.st_mode & 0x03FF);
   delete mgr;
 
-  CopyPath2Path(tmp_path_ + "/" + hash_null_.MakePath(),
-                path + "/cvmfscatalog.cache");
+  zip::InputPath in_path(tmp_path_ + "/" + hash_null_.MakePath());
+  cvmfs::PathSink out_path(path + "/cvmfscatalog.cache");
+  EXPECT_EQ(copy_->Compress(&in_path, &out_path), zip::kStreamEnd);
   EXPECT_EQ(NULL, PosixCacheManager::Create(path, false));
 }
 
@@ -628,9 +649,21 @@ TEST_F(T_CacheManager, Dup) {
   int fd = cache_mgr_->Open(CacheManager::LabeledObject(hash_null_));
   EXPECT_GE(fd, 0);
   int fd_dup = cache_mgr_->Dup(fd);
-  EXPECT_EQ(fd, fd_dup);
+  EXPECT_NE(fd, fd_dup);
   EXPECT_EQ(0, cache_mgr_->Close(fd));
   EXPECT_EQ(0, cache_mgr_->Close(fd_dup));
+}
+
+
+TEST_F(T_CacheManager, DupRefcounted) {
+  EXPECT_EQ(-EBADF, refcounted_cache_mgr_->Dup(-1));
+  int fd = refcounted_cache_mgr_->Open(CacheManager::LabeledObject(hash_null_));
+  EXPECT_GE(fd, 0);
+  int fd_dup = refcounted_cache_mgr_->Dup(fd);
+  EXPECT_EQ(fd, fd_dup);
+  EXPECT_EQ(0, refcounted_cache_mgr_->Close(fd));
+  EXPECT_EQ(0, refcounted_cache_mgr_->Close(fd_dup));
+  EXPECT_NE(0, refcounted_cache_mgr_->Close(fd_dup));
 }
 
 
@@ -736,7 +769,9 @@ TEST_F(T_CacheManager, Rename) {
   EXPECT_TRUE(FileExists(path_one));
   EXPECT_EQ(-ENOENT, cache_mgr_->Rename(path_null.c_str(), path_one.c_str()));
 
-  EXPECT_TRUE(CopyPath2Path(path_one, path_null));
+  zip::InputPath in_path(path_one);
+  cvmfs::PathSink out_path(path_null);
+  EXPECT_EQ(copy_->Compress(&in_path, &out_path), zip::kStreamEnd);
   cache_mgr_->rename_workaround_ = PosixCacheManager::kRenameLink;
   EXPECT_EQ(0, cache_mgr_->Rename(path_null.c_str(), path_one.c_str()));
   EXPECT_FALSE(FileExists(path_null));

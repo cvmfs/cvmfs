@@ -65,3 +65,26 @@ set (BUILTIN_EXTERNALS_EXCLUDE ${BUILTIN_EXTERNALS_EXCLUDE_DEFAULT} CACHE STRING
 
 option (ENABLE_ASAN             "Enable the Address Sanitizer"                                     OFF)
 option (CHECK_SYSTEM_HEADERS    "Check System for required headers"                                 OFF)
+
+list(APPEND COMPRESSION_OPTIONS zlib zstd none)
+set(COMPRESSION_DEFAULT_IF_UNSET "zlib" CACHE STRING "Assumed value for default `compression" FORCE)
+set(COMPRESSION_DEFAULT "${COMPRESSION_DEFAULT_IF_UNSET}" CACHE STRING "Which compression to use by default. Valid values: ${COMPRESSION_OPTIONS}. If unset, assumed ${COMPRESSION_DEFAULT_IF_UNSET}")
+
+if ("${COMPRESSION_DEFAULT}" STREQUAL "")
+  set(COMPRESSION_DEFAULT ${COMPRESSION_DEFAULT_IF_UNSET})
+endif()
+
+if (NOT ${COMPRESSION_DEFAULT} IN_LIST COMPRESSION_OPTIONS)
+  message(FATAL_ERROR "COMPRESSION_DEFAULT must be one of: ${COMPRESSION_OPTIONS}. Given: '${COMPRESSION_DEFAULT}'")
+endif()
+
+if ("${COMPRESSION_DEFAULT}" STREQUAL "zlib")
+  add_definitions(-DCVMFS_COMPRESSION_DEFAULT_ZLIB)
+else()
+  if ("${COMPRESSION_DEFAULT}" STREQUAL "none")
+    add_definitions(-DCVMFS_COMPRESSION_DEFAULT_NONE)
+  else()
+    add_definitions(-DCVMFS_COMPRESSION_DEFAULT_ZSTD)
+  endif()
+endif()
+add_definitions(-DCVMFS_COMPRESSION_DEFAULT=${COMPRESSION_DEFAULT})

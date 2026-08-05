@@ -58,6 +58,7 @@ cvmfs_run_test() {
   import_repo "$legacy_repo_name" "$CVMFS_TEST_USER" \
     -l                                               \
     -s                                               \
+    -Z zlib                                          \
     -g || return 4
 
   echo -n "get root hash of first new catalog... "

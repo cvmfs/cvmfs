@@ -8,9 +8,11 @@ cvmfs_run_test() {
 
   sudo sh -c "echo CVMFS_SHARED_CACHE=no > /etc/cvmfs/config.d/cms.cern.ch.local"
   cvmfs_mount atlas.cern.ch,lhcb.cern.ch,cms.cern.ch || return 1
-  sudo cvmfs_config fsck -j8 || return 2
-  # run quick check for empty files
-  sudo cvmfs_config fsck -q || return 3
+  # This is checking shared cache so there's no repo or domain context.
+  # But by the test design, we have cern.ch repos only, which we know use zlib right now.
+  export CVMFS_COMPRESSION_ALGORITHM=zlib CVMFS_DECOMPRESSION_ALGORITHM=zlib
+  sudo -E cvmfs_config fsck -j8 || return 2
+  unset CVMFS_COMPRESSION_ALGORITHM CVMFS_DECOMPRESSION_ALGORITHM
 
   cvmfs_umount atlas.cern.ch,lhcb.cern.ch,cms.cern.ch || return 10
 
@@ -20,9 +22,13 @@ cvmfs_run_test() {
   for f in $(sudo find "$cms_cachedir" -mindepth 2 -type f); do
     sudo truncate -s0 "$f"
   done
-  expect_exit_code 1 sudo cvmfs_config fsck -j8 -p || return 12
-  sudo mkdir -p "$cms_cachedir"/aa
-  sudo touch "$cms_cachedir"/aa/aaaaaaaa # made-up, too short hash
+  # This is checking shared cache so there's no repo or domain context.
+  # But by the test design, we have cern.ch repos only, which we know use zlib right now.
+  export CVMFS_COMPRESSION_ALGORITHM=zlib CVMFS_DECOMPRESSION_ALGORITHM=zlib
+  expect_exit_code 1 sudo -E cvmfs_config fsck -j8 -p || return 12
+  unset CVMFS_COMPRESSION_ALGORITHM CVMFS_DECOMPRESSION_ALGORITHM
+  sudo mkdir -p $cms_cachedir/aa
+  sudo touch $cms_cachedir/aa/aaaaaaaa # made-up, too short hash
   sudo cvmfs_config fsck -q && return 13
 
   return 0

@@ -5,7 +5,9 @@
 
 #include "catalog_mgr_ro.h"
 
-#include "compression/compression.h"
+#include "compression/compressor.h"
+#include "compression/decompressor_guess.h"
+#include "compression/input_path.h"
 #include "network/download.h"
 #include "network/sink_file.h"
 #include "util/exception.h"
@@ -41,6 +43,8 @@ SimpleCatalogManager::SimpleCatalogManager(
             "Local cache directory: %s",
             dir_cache_.c_str());
     }
+    copy_ = zip::Decompressor::Construct(zip::kNoCompression);
+
   } else {
     copy_to_tmp_dir_ = false;
   }
@@ -66,7 +70,11 @@ std::string SimpleCatalogManager::CopyCatalogToTempFile(
           cache_path.c_str());
   }
 
-  const bool retval = CopyPath2File(cache_path, fcatalog);
+  zip::InputPath in_path(cache_path);
+  cvmfs::FileSink out_file(fcatalog, false);
+
+  const bool retval = (copy_->DecompressStream(&in_path, &out_file)
+                                                            == zip::kStreamEnd);
   if (!retval) {
     unlink(tmp_path.c_str());
     PANIC(kLogStderr, "failed to read %s", cache_path.c_str());
@@ -130,8 +138,10 @@ LoadReturn SimpleCatalogManager::LoadCatalogByHash(
   ctlg_context->SetSqlitePath(tmp_path);
 
   cvmfs::FileSink filesink(fcatalog);
-  download::JobInfo download_catalog(&url, true, false, &effective_hash,
-                                     &filesink);
+
+  download::JobInfo download_catalog(
+      &url, new zip::GuessDecompressor(zip::ExpectedContentFormat::kSQLite3),
+      false, &effective_hash, &filesink);
   const download::Failures retval = download_manager_->Fetch(&download_catalog);
   fclose(fcatalog);
 

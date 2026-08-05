@@ -14,7 +14,7 @@
 #include "catalog_merge_tool.h"
 #include "catalog_mgr_ro.h"
 #include "catalog_mgr_rw.h"
-#include "compression/compression.h"
+#include "compression/compressor.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
 #include "network/download.h"
@@ -61,6 +61,7 @@ bool EditTags(const RepositoryTag &repo_tag, const std::string &repo_name,
   args['p'].Reset(new std::string(public_key_path));
   args['f'].Reset(new std::string(repo_name));
   args['e'].Reset(new std::string(params.hash_alg_str));
+  args['z'].Reset(new std::string(params.compression_alg_str));
   args['a'].Reset(new std::string(repo_tag.name()));
   args['D'].Reset(new std::string(repo_tag.description()));
   if (maintain_undo_tags) {
@@ -344,7 +345,7 @@ CommitProcessor::Result CommitProcessor::Process(
       // the catalog database, not of the compressed CAS object.  Compare
       // CommandCheck::FetchCatalog, which validates this column against the
       // size of the decompressed catalog.
-      download::JobInfo dl_job(&catalog_url, true, false, &expected,
+      download::JobInfo dl_job(&catalog_url, zip::DecompressionAlg::kGuessDecompression, false, &expected,
                                &catalog_sink);
       const download::Failures dl_ret =
           server_tool->download_manager()->Fetch(&dl_job);
@@ -539,8 +540,8 @@ CommitProcessor::Result CommitProcessor::Process(
                "Could not store publish statistics");
     }
     if (params.upload_stats_db) {
-      const upload::SpoolerDefinition sd(params.spooler_configuration,
-                                         shash::kAny);
+      upload::SpoolerDefinition sd(params.spooler_configuration, shash::kAny,
+                                   params.compression_alg);
       upload::Spooler *spooler = upload::Spooler::Construct(sd);
       if (!stats_db->UploadStatistics(spooler)) {
         LogCvmfs(kLogReceiver, kLogSyslogErr,

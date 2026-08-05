@@ -22,13 +22,16 @@
 #include <cstring>
 #include <string>
 
-#include "compression/compression.h"
+#include "compression/compressor.h"
+#include "compression/input_file.h"
 #include "crypto/hash.h"
+#include "network/sink_null.h"
 #include "util/atomic.h"
 #include "util/logging.h"
 #include "util/platform.h"
 #include "util/posix.h"
 #include "util/smalloc.h"
+#include "util/pointer.h"
 
 using namespace std;  // NOLINT
 
@@ -138,6 +141,9 @@ static void *MainCheck(void *data __attribute__((unused))) {
   string relative_path;
   string hash_name;
 
+  const UniquePtr<zip::Compressor>
+                        compress(zip::Compressor::Construct(zip::CompressionAlgFromEnv()));
+
   while (GetNextFile(&relative_path, &hash_name)) {
     const string path = *g_cache_dir + "/" + relative_path;
 
@@ -177,7 +183,9 @@ static void *MainCheck(void *data __attribute__((unused))) {
     const shash::Any expected_hash = shash::MkFromHexPtr(
         shash::HexPtr(hash_name));
     shash::Any hash(expected_hash.algorithm);
-    if (!zlib::CompressFd2Null(fd_src, &hash)) {
+    zip::InputFile input(fdopen(fd_src, "r"), true);
+    cvmfs::NullSink out_null;
+    if (compress->Compress(&input, &out_null, &hash) != zip::kStreamEnd) {
       LogCvmfs(kLogCvmfs, kLogStdout, "Error: could not compress %s",
                path.c_str());
       atomic_inc32(&g_num_err_operational);

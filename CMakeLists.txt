@@ -374,7 +374,8 @@ set (REQUIRED_HEADERS sys/xattr.h zlib.h netinet/in.h arpa/inet.h sys/socket.h
                       sys/un.h sys/time.h sys/uio.h sys/stat.h sys/types.h
                       sys/wait.h sys/select.h pthread.h termios.h utime.h
                       signal.h errno.h dirent.h unistd.h fcntl.h netdb.h
-                      syslog.h sys/resource.h execinfo.h poll.h pwd.h grp.h)
+                      syslog.h sys/resource.h execinfo.h poll.h pwd.h grp.h
+                    )
 set (OPTIONAL_HEADERS )
 if (NOT MACOSX)
   set (REQUIRED_HEADERS ${REQUIRED_HEADERS}
@@ -448,6 +449,9 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_SERVER OR BUILD_SERVER_DEBUG OR
 
   # Libnettle_* is set by externals/libnettle (system or vendored build)
   set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${Libnettle_INCLUDE_DIRS})
+
+  find_package (ZSTD REQUIRED)
+  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${ZSTD_INCLUDE_DIRS})
 endif ()
 
 

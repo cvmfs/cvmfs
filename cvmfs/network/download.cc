@@ -47,7 +47,8 @@
 #include <set>
 #include <utility>
 
-#include "compression/compression.h"
+#include "compression/decompressor.h"
+#include "compression/input_mem.h"
 #include "crypto/hash.h"
 #include "duplex_curl.h"  // IWYU pragma: keep
 #include "interrupt.h"
@@ -290,32 +291,9 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
     return num_bytes;
   }
 
-  if (info->compressed()) {
-    const zlib::StreamStates retval = zlib::DecompressZStream2Sink(
-        ptr, static_cast<int64_t>(num_bytes), info->GetZstreamPtr(),
-        info->sink());
-    if (retval == zlib::kStreamDataError) {
-      LogCvmfs(kLogDownload, kLogSyslogErr,
-               "(id %" PRId64 ") failed to decompress %s", info->id(),
-               info->url()->c_str());
-      info->SetErrorCode(kFailBadData);
-      return 0;
-    } else if (retval == zlib::kStreamIOError) {
-      LogCvmfs(kLogDownload, kLogSyslogErr,
-               "(id %" PRId64 ") decompressing %s, local IO error", info->id(),
-               info->url()->c_str());
-      info->SetErrorCode(kFailLocalIO);
-      return 0;
-    }
-  } else {
-    const int64_t written = info->sink()->Write(ptr, num_bytes);
-    if (written < 0 || static_cast<uint64_t>(written) != num_bytes) {
-      LogCvmfs(kLogDownload, kLogDebug,
-               "(id %" PRId64 ") "
-               "Failed to perform write of %zu bytes to sink %s with errno %ld",
-               info->id(), num_bytes, info->sink()->Describe().c_str(),
-               written);
-    }
+  zip::InputMem in_mem(reinterpret_cast<unsigned char*>(ptr), num_bytes);
+  if (!info->DecompressToSink(&in_mem)) {
+    return 0;
   }
 
   return num_bytes;
@@ -919,9 +897,7 @@ void DownloadManager::InitializeRequest(JobInfo *info, CURL *handle) {
   } else {
     info->SetNocache(false);
   }
-  if (info->compressed()) {
-    zlib::DecompressInit(info->GetZstreamPtr());
-  }
+  // info->ResetDecompression();
   if (info->expected_hash()) {
     assert(info->hash_context().buffer != NULL);
     shash::Init(info->hash_context());
@@ -1707,8 +1683,8 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     if (info->expected_hash()) {
       shash::Init(info->hash_context());
     }
-    if (info->compressed() && !defer_reset) {
-      zlib::DecompressInit(info->GetZstreamPtr());
+    if (!defer_reset) {
+      info->ResetDecompression();
     }
     if (defer_reset) {
       info->GetDataTubePtr()->EnqueueBack(new DataTubeElement(kActionReset));
@@ -1785,6 +1761,8 @@ verify_and_finalize_stop:
   // Finalize, flush destination file.
   ReleaseCredential(info);
 
+  info->ResetDecompression();
+
   // In parallel-decompress mode (data_tube_ valid) the caller has not yet
   // pushed bytes through the sink / zstream — those operations happen on
   // the caller thread when it pops the queued chunks. Flushing the sink
@@ -1795,8 +1773,6 @@ verify_and_finalize_stop:
     if (info->sink() != NULL && info->sink()->Flush() != 0) {
       info->SetErrorCode(kFailLocalIO);
     }
-    if (info->compressed())
-      zlib::DecompressFini(info->GetZstreamPtr());
   }
 
   if (info->headers()) {
@@ -2068,10 +2044,7 @@ Failures DownloadManager::Fetch(JobInfo *info) {
         // superseded by a retry / host fail-over (VerifyAndFinalize enqueued
         // this marker). Discard their — possibly corrupt — decompressed output
         // and start fresh so the next attempt's bytes are processed cleanly.
-        if (info->compressed()) {
-          zlib::DecompressFini(info->GetZstreamPtr());
-          zlib::DecompressInit(info->GetZstreamPtr());
-        }
+        info->ResetDecompression();
         if (info->sink() != NULL && info->sink()->Reset() != 0) {
           decompress_err = kFailLocalIO;
         } else {
@@ -2082,31 +2055,9 @@ Failures DownloadManager::Fetch(JobInfo *info) {
       }
 
       if (decompress_err == kFailOk && ele->size > 0) {
-        if (info->compressed()) {
-          const zlib::StreamStates retval = zlib::DecompressZStream2Sink(
-              ele->data, static_cast<int64_t>(ele->size),
-              info->GetZstreamPtr(), info->sink());
-          if (retval == zlib::kStreamDataError) {
-            LogCvmfs(kLogDownload, kLogSyslogErr,
-                     "(id %" PRId64 ") failed to decompress %s",
-                     info->id(), info->url()->c_str());
-            decompress_err = kFailBadData;
-          } else if (retval == zlib::kStreamIOError) {
-            LogCvmfs(kLogDownload, kLogSyslogErr,
-                     "(id %" PRId64 ") decompressing %s, local IO error",
-                     info->id(), info->url()->c_str());
-            decompress_err = kFailLocalIO;
-          }
-        } else {
-          const int64_t written = info->sink()->Write(ele->data, ele->size);
-          if (written < 0 ||
-              static_cast<uint64_t>(written) != ele->size) {
-            LogCvmfs(kLogDownload, kLogDebug,
-                     "(id %" PRId64 ") sink write failed for %s (%ld of %zu)",
-                     info->id(), info->url()->c_str(),
-                     static_cast<long>(written), ele->size);
-            decompress_err = kFailLocalIO;
-          }
+        zip::InputMem in_mem(reinterpret_cast<unsigned char*>(ele->data), ele->size);
+        if (!info->DecompressToSink(&in_mem)) {
+          decompress_err = kFailLocalIO;
         }
       }
       delete ele;
@@ -2120,9 +2071,6 @@ Failures DownloadManager::Fetch(JobInfo *info) {
       if (info->sink() != NULL && info->sink()->Flush() != 0) {
         decompress_err = kFailLocalIO;
       }
-    }
-    if (info->compressed()) {
-      zlib::DecompressFini(info->GetZstreamPtr());
     }
     if (result == kFailOk && decompress_err != kFailOk) {
       result = decompress_err;
@@ -2545,7 +2493,8 @@ void DownloadManager::ProbeHosts() {
   string url;
 
   cvmfs::MemSink memsink;
-  JobInfo info(&url, false, false, NULL, &memsink);
+  JobInfo info(&url, zip::DecompressionAlg::kNoCompression, false, NULL,
+               &memsink);
   for (retries = 0; retries < 2; ++retries) {
     for (i = 0; i < host_chain.size(); ++i) {
       url = host_chain[i] + "/.cvmfspublished";
@@ -2629,8 +2578,9 @@ bool DownloadManager::GeoSortServers(std::vector<std::string> *servers,
              "(manager '%s') requesting ordered server list from %s",
              name_.c_str(), url.c_str());
     cvmfs::MemSink memsink;
-    JobInfo info(&url, false, false, NULL, &memsink);
-    const Failures result = Fetch(&info);
+    JobInfo info(&url, zip::DecompressionAlg::kNoCompression, false, NULL,
+                 &memsink);
+    Failures result = Fetch(&info);
     if (result == kFailOk) {
       const string order(reinterpret_cast<char *>(memsink.data()),
                          memsink.pos());

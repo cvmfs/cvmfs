@@ -11,7 +11,7 @@
 #include <map>
 #include <string>
 
-#include "compression/compression.h"
+#include "compression/compressor.h"
 #include "crypto/hash.h"
 #include "sync_union.h"
 #include "upload_spooler_definition.h"
@@ -134,7 +134,7 @@ class SettingsTransaction {
       : layout_revision_(0)
       , in_enter_session_(false)
       , hash_algorithm_(shash::kShake128)
-      , compression_algorithm_(zlib::kZlibDefault)
+      , compression_algorithm_(zip::kDefault)
       , ttl_second_(240)
       , is_garbage_collectable_(true)
       , is_volatile_(false)
@@ -187,7 +187,7 @@ class SettingsTransaction {
   bool in_enter_session() const { return in_enter_session_(); }
   shash::Any base_hash() const { return base_hash_(); }
   shash::Algorithms hash_algorithm() const { return hash_algorithm_(); }
-  zlib::Algorithms compression_algorithm() const {
+  zip::Algorithms compression_algorithm() const {
     return compression_algorithm_();
   }
   uint32_t ttl_second() const { return ttl_second_(); }
@@ -239,7 +239,7 @@ class SettingsTransaction {
    */
   Setting<shash::Any> base_hash_;
   Setting<shash::Algorithms> hash_algorithm_;
-  Setting<zlib::Algorithms> compression_algorithm_;
+  Setting<zip::Algorithms> compression_algorithm_;
   Setting<uint32_t> ttl_second_;
   Setting<bool> is_garbage_collectable_;
   Setting<bool> is_volatile_;

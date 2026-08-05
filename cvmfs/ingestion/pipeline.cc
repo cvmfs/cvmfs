@@ -239,7 +239,7 @@ void ScrubbingPipeline::OnFileProcessed(
 void ScrubbingPipeline::Process(IngestionSource *source,
                                 shash::Algorithms hash_algorithm,
                                 shash::Suffix hash_suffix) {
-  FileItem *file_item = new FileItem(source, 0, 0, 0, zlib::kNoCompression,
+  FileItem *file_item = new FileItem(source, 0, 0, 0, zip::kNoCompression,
                                      hash_algorithm, hash_suffix,
                                      false, /* may_have_chunks */
                                      true /* hash_legacy_bulk_chunk */);

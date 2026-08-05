@@ -127,10 +127,10 @@ class SyncItem {
   void SetExternalData(bool val) { external_data_ = val; }
   void SetDirectIo(bool val) { direct_io_ = val; }
 
-  inline zlib::Algorithms GetCompressionAlgorithm() const {
+  inline zip::Algorithms GetCompressionAlgorithm() const {
     return compression_algorithm_;
   }
-  inline void SetCompressionAlgorithm(const zlib::Algorithms &alg) {
+  inline void SetCompressionAlgorithm(const zip::Algorithms &alg) {
     compression_algorithm_ = alg;
     has_compression_algorithm_ = true;
   }
@@ -322,7 +322,7 @@ class SyncItem {
   FileChunkList *graft_chunklist_;
 
   // The compression algorithm for the file
-  zlib::Algorithms compression_algorithm_;
+  zip::Algorithms compression_algorithm_;
   // The compression algorithm has been set explicitly
   bool has_compression_algorithm_;
 

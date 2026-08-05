@@ -9,7 +9,7 @@
 
 #include <string>
 
-#include "compression/compression.h"
+#include "compression/compressor.h"
 #include "crypto/hash.h"
 #include "manifest.h"
 
@@ -88,11 +88,11 @@ class CacheManager : SingleCopy {
    * object, if necessary.
    */
   struct Label {
-    Label()
-        : flags(0)
-        , size(kSizeUnknown)
-        , zip_algorithm(zlib::kZlibDefault)
-        , range_offset(-1) { }
+    Label() : flags(0)
+            , size(kSizeUnknown)
+            , zip_algorithm(zip::DecompressionAlg::kInvalid)
+            , range_offset(-1)
+    {}
 
     bool IsCatalog() const { return flags & kLabelCatalog; }
     bool IsPinned() const { return flags & kLabelPinned; }
@@ -123,7 +123,7 @@ class CacheManager : SingleCopy {
 
     int flags;
     uint64_t size;  ///< unzipped size, if known
-    zlib::Algorithms zip_algorithm;
+    zip::Algorithms zip_algorithm;
     off_t range_offset;
     /**
      * The logical path on the mountpoint connected to the object. For meta-
@@ -184,7 +184,7 @@ class CacheManager : SingleCopy {
 
   virtual void Spawn() = 0;
 
-  int ChecksumFd(int fd, shash::Any *id);
+  int ChecksumFd(int fd, shash::Any *id, zip::Compressor *comp);
   int OpenPinned(const LabeledObject &object);
   bool Open2Mem(const LabeledObject &object, unsigned char **buffer,
                 uint64_t *size);

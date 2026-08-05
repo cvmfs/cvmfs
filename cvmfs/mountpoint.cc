@@ -378,7 +378,6 @@ FileSystem::PosixCacheSettings FileSystem::DeterminePosixCacheSettings(
   return settings;
 }
 
-
 bool FileSystem::DetermineNfsMode() {
   string optarg;
 
@@ -681,11 +680,11 @@ CacheManager *FileSystem::SetupExternalCacheMgr(const string &instance) {
   return cache_mgr;
 }
 
-
 CacheManager *FileSystem::SetupPosixCacheMgr(const string &instance) {
   const PosixCacheSettings settings = DeterminePosixCacheSettings(instance);
   if (!CheckPosixCacheSettings(settings))
     return NULL;
+
   UniquePtr<PosixCacheManager> cache_mgr(PosixCacheManager::Create(
       settings.cache_path, settings.is_alien,
       settings.avoid_rename ? PosixCacheManager::kRenameLink
@@ -1621,7 +1620,7 @@ void MountPoint::SetupPartialReplica() {
   // Probe for the partial replication spec file
   const string spec_url = primary_url + "/.cvmfs_partial_replication";
   cvmfs::MemSink spec_memsink;
-  download::JobInfo probe_job(&spec_url, false, false, NULL, &spec_memsink);
+  download::JobInfo probe_job(&spec_url, zip::DecompressionAlg::kNoCompression, false, NULL, &spec_memsink);
   const download::Failures probe_result = download_mgr_->Fetch(&probe_job);
 
   if (probe_result != download::kFailOk) {
@@ -1922,6 +1921,7 @@ bool MountPoint::FetchHistory(std::string *history_path) {
   CacheManager::Label label;
   label.flags = CacheManager::kLabelHistory;
   label.path = fqrn_;
+  label.zip_algorithm = zip::DecompressionAlg::kGuessDecompression;
   const int fd = fetcher_->Fetch(
       CacheManager::LabeledObject(history_hash, label));
   if (fd < 0) {
