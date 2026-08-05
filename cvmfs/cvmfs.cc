@@ -756,13 +756,15 @@ static void ReplyNegative(const catalog::DirectoryEntry &dirent,
   if (dirent.GetSpecial() == catalog::kDirentNegative) {
     fuse_reply_err(req, ENOENT);
   } else {
-    const char *name = dirent.name().c_str();
-    const char *link = dirent.symlink().c_str();
+    // name() and symlink() return by value, so the strings have to be kept
+    // alive across the log call; c_str() on the temporaries would dangle.
+    const NameString name = dirent.name();
+    const LinkString link = dirent.symlink();
 
     LogCvmfs(
         kLogCvmfs, kLogDebug | kLogSyslogErr,
         "EIO (02): CVMFS-specific metadata not found for name=%s symlink=%s",
-        name ? name : "<unset>", link ? link : "<unset>");
+        name.c_str(), link.c_str());
 
     perf::Inc(file_system_->n_eio_total());
     perf::Inc(file_system_->n_eio_02());
