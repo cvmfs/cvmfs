@@ -517,7 +517,7 @@ struct CallbackTest {
 shash::Any CallbackTest::result_content_hash;
 std::string CallbackTest::result_local_path;
 FileChunkList CallbackTest::result_chunk_list;
-std::atomic<int64_t> CallbackTest::counter = 0;
+std::atomic<int64_t> CallbackTest::counter(0);
 }  // anonymous namespace
 
 TEST_F(T_IngestionStress, ProcessingCallbackForSmallFile) {
@@ -599,3 +599,4 @@ TEST_F(T_IngestionStress, RealWorldSlow) {
     free(buffers[i]);
   }
 }
+ 

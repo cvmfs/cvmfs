@@ -16,7 +16,7 @@
 
 namespace download {
 
-std::atomic<int64_t> JobInfo::next_uuid = 0;
+std::atomic<int64_t> JobInfo::next_uuid(0);
 
 JobInfo::JobInfo(const std::string *u, const bool c, const bool ph,
                  const shash::Any *h, cvmfs::Sink *s) {
@@ -305,3 +305,4 @@ std::string JobInfo::GetInfoHeaderContents(const std::string &templ) {
 }
 
 }  // namespace download
+                        

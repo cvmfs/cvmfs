@@ -627,6 +627,26 @@ class InodeTracker {
       num_hits_path.store(0);
       num_misses_path.store(0);
     }
+    Statistics(const Statistics &reference)
+        : num_inserts(reference.num_inserts.load())
+        , num_removes(reference.num_removes.load())
+        , num_references(reference.num_references.load())
+        , num_hits_inode(reference.num_hits_inode.load())
+        , num_hits_path(reference.num_hits_path.load())
+        , num_misses_path(reference.num_misses_path.load()) { }
+
+    Statistics &operator=(const Statistics &reference) {
+      if (this != &reference) {
+        num_inserts.store(reference.num_inserts.load());
+        num_removes.store(reference.num_removes.load());
+        num_references.store(reference.num_references.load());
+        num_hits_inode.store(reference.num_hits_inode.load());
+        num_hits_path.store(reference.num_hits_path.load());
+        num_misses_path.store(reference.num_misses_path.load());
+      }
+      return *(this);
+    }
+
     std::string Print() {
       return "inserts: " + StringifyInt(num_inserts.load())
              + "  removes: " + StringifyInt(num_removes.load())

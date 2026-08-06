@@ -474,7 +474,7 @@ bool T_Uploaders<S3Uploader>::IsS3() const {
 }
 
 template<class UploadersT>
-std::atomic<int64_t> T_Uploaders<UploadersT>::gSeed = 0;
+std::atomic<int64_t> T_Uploaders<UploadersT>::gSeed(0);
 
 // Shold be larger than the number of regular retries
 template<class UploadersT>
@@ -987,3 +987,4 @@ TYPED_TEST(T_Uploaders, PlaceBootstrappingShortcut) {
 }
 
 }  // namespace upload
+                      
