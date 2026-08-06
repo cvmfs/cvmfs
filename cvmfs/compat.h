@@ -268,7 +268,7 @@ class InodeTracker {
     std::atomic<int64_t> num_ancient_hits;
     std::atomic<int64_t> num_ancient_misses;
   };
-  Statistics GetStatistics() { return statistics_; }
+  const Statistics &GetStatistics() { return statistics_; }
 
   InodeTracker() { assert(false); }
   explicit InodeTracker(const InodeTracker &other) { assert(false); }
@@ -923,3 +923,4 @@ void Migrate(ChunkTables *old_tables, ::ChunkTables *new_tables);
 }  // namespace compat
 
 #endif  // CVMFS_COMPAT_H_
+

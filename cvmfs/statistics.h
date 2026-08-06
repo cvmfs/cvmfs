@@ -26,6 +26,7 @@ namespace perf {
 class Counter {
  public:
   Counter() { counter_.store(0); }
+  Counter(const Counter &cref) { counter_.store(cref.counter_.load()); }
   void Inc() { counter_.fetch_add(1); }
   void Dec() { counter_.fetch_sub(1); }
   int64_t Get() { return counter_.load(); }
@@ -237,3 +238,4 @@ class MultiRecorder {
 #endif
 
 #endif  // CVMFS_STATISTICS_H_
+
