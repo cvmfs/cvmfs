@@ -2647,6 +2647,15 @@ find_or_build_cvmfs_preload() {
   return 1
 }
 
+await_gateway_port_listened() {
+  # Wait for the gateway to be ready: `status` only confirms the VM is up,
+  # not that the HTTP listener on :4929 is accepting connections.  Probe the
+  # API endpoint directly so callers of acquire-lease don't race startup.
+  if ! curl -v -f --retry 30 --retry-max-time 30 --retry-connrefused -o /dev/null -m 2 http://localhost:4929/api/v1/repos; then
+      echo "Gateway failed to become ready within 30 seconds" >&2
+      return 1
+  fi
+}
 
 # Sets up the CVMFS repository gateway application
 set_up_repository_gateway() {
@@ -2708,13 +2717,7 @@ EOF
     echo "  Starting repository gateway"
     sudo $gateway_script start
 
-    # Wait for the gateway to be ready: `status` only confirms the VM is up,
-    # not that the HTTP listener on :4929 is accepting connections.  Probe the
-    # API endpoint directly so callers of acquire-lease don't race startup.
-    if ! curl -v -f --retry 30 --retry-max-time 30 --retry-connrefused -o /dev/null -m 2 http://localhost:4929/api/v1/repos; then
-        echo "Gateway failed to start within 30 seconds" >&2
-        return 1
-    fi
+    await_gateway_port_listened
 }
 
 restart_repository_gateway() {
@@ -2730,12 +2733,7 @@ restart_repository_gateway() {
       sleep 1
     done
 
-    # status only confirms systemd sees the process as active, not that the
-    # HTTP listener on :4929 is accepting connections yet 
-    if ! curl -v -f --retry 30 --retry-max-time 30 --retry-connrefused -o /dev/null -m 2 http://localhost:4929/api/v1/repos; then
-      echo "Gateway failed to become ready within 30 seconds" >&2
-      return 1
-    fi
+    await_gateway_port_listened
 }
 
 gateway_rr() {
