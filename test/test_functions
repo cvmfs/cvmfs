@@ -2755,7 +2755,8 @@ gateway_rr() {
     echo Undefined operation
     return 1
   fi
-  sudo sed -i /usr/lib/systemd/system/cvmfs-gateway@.service -e '/^ExecStart/s:.*:'"$exec_line":
+  sudo sed -i /usr/lib/systemd/system/cvmfs-gateway@.service -e '/^ExecStart/s:.*:'"$exec_line\nEnvironment=_RR_TRACE_DIR=/tmp":
+
   sudo systemctl daemon-reload
   sudo systemctl restart cvmfs-gateway@root
 }
