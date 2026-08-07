@@ -102,6 +102,12 @@ class FileSystem : SingleCopy, public BootFactory {
   FRIEND_TEST(T_MountPoint, CheckInstanceName);
   FRIEND_TEST(T_MountPoint, CheckPosixCacheSettings);
   FRIEND_TEST(T_Cvmfs, Basics);
+  /**
+   * The mockfuse unit tests drive the fuse callbacks against a FileSystem that
+   * is constructed rather than booted: no sqlite VFS, no workspace, no cache
+   * directory.  See test/unittests/mockfuse/mock_mountpoint.h.
+   */
+  friend class MockFileSystem;
 
  public:
   enum Type {
@@ -492,6 +498,14 @@ class StatfsCache : SingleCopy {
  */
 class MountPoint : SingleCopy, public BootFactory {
   friend class T_BundleMgr;
+  /**
+   * The mockfuse unit tests drive the fuse callbacks against a MountPoint that
+   * is constructed rather than booted, so that no signature manager, download
+   * manager or catalog is needed.  The test double fills in the members the
+   * callbacks under test dereference.
+   * See test/unittests/mockfuse/mock_mountpoint.h.
+   */
+  friend class MockMountPoint;
 
  public:
   /**

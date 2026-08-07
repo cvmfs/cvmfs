@@ -12,13 +12,13 @@
 #include <nettle/ripemd160.h>
 #include <nettle/sha1.h>
 #include <nettle/sha2.h>
+#include <nettle/sha3.h>
 #include <nettle/version.h>
 #include <unistd.h>
 
 #include <cstdio>
 #include <cstring>
 
-#include "KeccakHash.h"
 #include "util/exception.h"
 
 
@@ -34,50 +34,47 @@ namespace {
 
 // nettle 4 dropped the digest_size parameter from the *_digest() functions.
 #if defined(NETTLE_VERSION_MAJOR) && (NETTLE_VERSION_MAJOR >= 4)
-void Md5Digest(md5_ctx *ctx, const unsigned digest_size, uint8_t *digest) {
-  assert(digest_size == MD5_DIGEST_SIZE);
-  (void)digest_size;
-  md5_digest(ctx, digest);
+void Md5Digest(md5_ctx *ctx, uint8_t *digest) {
+  nettle_md5_digest(ctx, digest);
 }
 
-void Sha1Digest(sha1_ctx *ctx, const unsigned digest_size, uint8_t *digest) {
-  assert(digest_size == SHA1_DIGEST_SIZE);
-  (void)digest_size;
-  sha1_digest(ctx, digest);
+void Sha1Digest(sha1_ctx *ctx, uint8_t *digest) {
+  nettle_sha1_digest(ctx, digest);
 }
 
-void Sha256Digest(sha256_ctx *ctx, const unsigned digest_size,
-                  uint8_t *digest) {
-  assert(digest_size == SHA256_DIGEST_SIZE);
-  (void)digest_size;
-  sha256_digest(ctx, digest);
+void Sha256Digest(sha256_ctx *ctx, uint8_t *digest) {
+  nettle_sha256_digest(ctx, digest);
 }
 
-void Ripemd160Digest(ripemd160_ctx *ctx, const unsigned digest_size,
-                     uint8_t *digest) {
-  assert(digest_size == RIPEMD160_DIGEST_SIZE);
-  (void)digest_size;
-  ripemd160_digest(ctx, digest);
-}
-#else
-void Md5Digest(md5_ctx *ctx, const unsigned digest_size, uint8_t *digest) {
-  md5_digest(ctx, digest_size, digest);
+void Ripemd160Digest(ripemd160_ctx *ctx, uint8_t *digest) {
+  nettle_ripemd160_digest(ctx, digest);
 }
 
-void Sha1Digest(sha1_ctx *ctx, const unsigned digest_size, uint8_t *digest) {
-  sha1_digest(ctx, digest_size, digest);
+#else  // nettle 3.x takes digest size as 2nd arg
+void Md5Digest(md5_ctx *ctx, uint8_t *digest) {
+  nettle_md5_digest(ctx, MD5_DIGEST_SIZE, digest);
 }
 
-void Sha256Digest(sha256_ctx *ctx, const unsigned digest_size,
-                  uint8_t *digest) {
-  sha256_digest(ctx, digest_size, digest);
+void Sha1Digest(sha1_ctx *ctx, uint8_t *digest) {
+  nettle_sha1_digest(ctx, SHA1_DIGEST_SIZE, digest);
 }
 
-void Ripemd160Digest(ripemd160_ctx *ctx, const unsigned digest_size,
-                     uint8_t *digest) {
-  ripemd160_digest(ctx, digest_size, digest);
+void Sha256Digest(sha256_ctx *ctx, uint8_t *digest) {
+  nettle_sha256_digest(ctx, SHA256_DIGEST_SIZE, digest);
 }
+
+void Ripemd160Digest(ripemd160_ctx *ctx, uint8_t *digest) {
+  nettle_ripemd160_digest(ctx, RIPEMD160_DIGEST_SIZE, digest);
+}
+
 #endif
+
+void Shake128Digest(sha3_128_ctx *ctx, uint8_t *digest) {
+  nettle_sha3_128_shake(ctx, kDigestSizes[kShake128], digest);
+}
+
+static_assert(sizeof(sha3_128_ctx) <= kMaxContextSize,
+              "SHAKE128 context exceeds allocated buffers");
 
 }  // namespace
 
@@ -207,7 +204,7 @@ unsigned GetContextSize(const Algorithms algorithm) {
     case kRmd160:
       return sizeof(ripemd160_ctx);
     case kShake128:
-      return sizeof(Keccak_HashInstance);
+      return sizeof(sha3_128_ctx);
     default:
       PANIC(kLogDebug | kLogSyslogErr,
             "tried to generate hash context for unspecified hash. Aborting...");
@@ -215,7 +212,6 @@ unsigned GetContextSize(const Algorithms algorithm) {
 }
 
 void Init(ContextPtr context) {
-  HashReturn keccak_result;
   switch (context.algorithm) {
     case kMd5:
       md5_init(reinterpret_cast<md5_ctx *>(context.buffer));
@@ -227,9 +223,7 @@ void Init(ContextPtr context) {
       ripemd160_init(reinterpret_cast<ripemd160_ctx *>(context.buffer));
       break;
     case kShake128:
-      keccak_result = Keccak_HashInitialize_SHAKE128(
-          reinterpret_cast<Keccak_HashInstance *>(context.buffer));
-      assert(keccak_result == SUCCESS);
+      sha3_128_init(reinterpret_cast<sha3_128_ctx *>(context.buffer));
       break;
     default:
       PANIC(NULL);  // Undefined hash
@@ -238,7 +232,6 @@ void Init(ContextPtr context) {
 
 void Update(const unsigned char *buffer, const unsigned buffer_length,
             ContextPtr context) {
-  HashReturn keccak_result;
   switch (context.algorithm) {
     case kMd5:
       md5_update(reinterpret_cast<md5_ctx *>(context.buffer),
@@ -253,11 +246,8 @@ void Update(const unsigned char *buffer, const unsigned buffer_length,
                        buffer_length, buffer);
       break;
     case kShake128:
-      assert(context.size == sizeof(Keccak_HashInstance));
-      keccak_result = Keccak_HashUpdate(
-          reinterpret_cast<Keccak_HashInstance *>(context.buffer), buffer,
-          buffer_length * 8);
-      assert(keccak_result == SUCCESS);
+      sha3_128_update(reinterpret_cast<sha3_128_ctx *>(context.buffer),
+                      buffer_length, buffer);
       break;
     default:
       PANIC(NULL);  // Undefined hash
@@ -265,27 +255,21 @@ void Update(const unsigned char *buffer, const unsigned buffer_length,
 }
 
 void Final(ContextPtr context, Any *any_digest) {
-  HashReturn keccak_result;
   switch (context.algorithm) {
     case kMd5:
-      Md5Digest(reinterpret_cast<md5_ctx *>(context.buffer), MD5_DIGEST_SIZE,
-                any_digest->digest);
+      Md5Digest(reinterpret_cast<md5_ctx *>(context.buffer), any_digest->digest);
       break;
     case kSha1:
       Sha1Digest(reinterpret_cast<sha1_ctx *>(context.buffer),
-                 SHA1_DIGEST_SIZE, any_digest->digest);
+                 any_digest->digest);
       break;
     case kRmd160:
       Ripemd160Digest(reinterpret_cast<ripemd160_ctx *>(context.buffer),
-                      RIPEMD160_DIGEST_SIZE, any_digest->digest);
+                      any_digest->digest);
       break;
     case kShake128:
-      keccak_result = Keccak_HashFinal(
-          reinterpret_cast<Keccak_HashInstance *>(context.buffer), NULL);
-      assert(keccak_result == SUCCESS);
-      keccak_result = Keccak_HashSqueeze(
-          reinterpret_cast<Keccak_HashInstance *>(context.buffer),
-          any_digest->digest, kDigestSizes[kShake128] * 8);
+      Shake128Digest(reinterpret_cast<sha3_128_ctx *>(context.buffer),
+                     any_digest->digest);
       break;
     default:
       PANIC(NULL);  // Undefined hash
@@ -400,7 +384,7 @@ Md5::Md5(const AsciiPtr ascii) {
   md5_init(&md5_state);
   md5_update(&md5_state, str->length(),
              reinterpret_cast<const uint8_t *>(&(*str)[0]));
-  Md5Digest(&md5_state, MD5_DIGEST_SIZE, digest);
+  Md5Digest(&md5_state, digest);
 }
 
 
@@ -410,7 +394,7 @@ Md5::Md5(const char *chars, const unsigned length) {
   md5_ctx md5_state;
   md5_init(&md5_state);
   md5_update(&md5_state, length, reinterpret_cast<const uint8_t *>(chars));
-  Md5Digest(&md5_state, MD5_DIGEST_SIZE, digest);
+  Md5Digest(&md5_state, digest);
 }
 
 
@@ -467,7 +451,7 @@ string Sha256File(const string &filename) {
   close(fd);
 
   unsigned char digest[SHA256_DIGEST_SIZE];
-  Sha256Digest(&ctx, SHA256_DIGEST_SIZE, digest);
+  Sha256Digest(&ctx, digest);
   return HexFromSha256(digest);
 }
 
@@ -476,7 +460,7 @@ string Sha256Mem(const unsigned char *buffer, const unsigned buffer_size) {
   sha256_ctx ctx;
   sha256_init(&ctx);
   sha256_update(&ctx, buffer_size, buffer);
-  Sha256Digest(&ctx, SHA256_DIGEST_SIZE, digest);
+  Sha256Digest(&ctx, digest);
   return HexFromSha256(digest);
 }
 
@@ -499,7 +483,7 @@ std::string Hmac256(const std::string &key,
     sha256_init(&ctx);
     sha256_update(&ctx, key_length,
                   reinterpret_cast<const unsigned char *>(key.data()));
-    Sha256Digest(&ctx, SHA256_DIGEST_SIZE, key_block);
+    Sha256Digest(&ctx, key_block);
   } else {
     if (key.length() > 0)
       memcpy(key_block, key.data(), key_length);
@@ -514,7 +498,7 @@ std::string Hmac256(const std::string &key,
   sha256_update(&ctx, block_size, pad_block);
   sha256_update(&ctx, content.length(),
                 reinterpret_cast<const unsigned char *>(content.data()));
-  Sha256Digest(&ctx, SHA256_DIGEST_SIZE, digest_inner);
+  Sha256Digest(&ctx, digest_inner);
 
   // Outer hash
   sha256_init(&ctx);
@@ -523,7 +507,7 @@ std::string Hmac256(const std::string &key,
   sha256_update(&ctx, block_size, pad_block);
   sha256_update(&ctx, SHA256_DIGEST_SIZE, digest_inner);
 
-  Sha256Digest(&ctx, SHA256_DIGEST_SIZE, digest);
+  Sha256Digest(&ctx, digest);
   if (raw_output)
     return string(reinterpret_cast<const char *>(digest), SHA256_DIGEST_SIZE);
   return HexFromSha256(digest);

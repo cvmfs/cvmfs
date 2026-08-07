@@ -41,7 +41,7 @@ TEST(T_Shash, ContextSize) {
     max_size = std::max(
         max_size, shash::GetContextSize(static_cast<shash::Algorithms>(i)));
   }
-  EXPECT_EQ(max_size, shash::kMaxContextSize);
+  EXPECT_LE(max_size, shash::kMaxContextSize);
 }
 
 TEST(T_Shash, TestVectors) {
