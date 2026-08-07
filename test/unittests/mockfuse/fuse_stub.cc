@@ -148,8 +148,7 @@ int fuse_lowlevel_notify_expire_entry(
     struct fuse_session *se __attribute__((unused)),
     fuse_ino_t parent __attribute__((unused)),
     const char *name __attribute__((unused)),
-    size_t namelen __attribute__((unused)),
-    enum fuse_expire_flags flags __attribute__((unused))) {
+    size_t namelen __attribute__((unused))) {
   return -1;
 }
 #endif
