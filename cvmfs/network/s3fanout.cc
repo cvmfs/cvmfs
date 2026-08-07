@@ -12,9 +12,11 @@
 #include <cassert>
 #include <cerrno>
 #include <cstring>
+#include <ctime>
 #include <utility>
 
 #include "crypto/hash.h"
+#include "json_document.h"
 #include "util/exception.h"
 #include "util/posix.h"
 #include "util/string.h"
@@ -293,6 +295,28 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
 
   if (num_bytes == 0)
     return 0;
+
+  if (info->azure_staged_upload) {
+    const uint64_t remaining =
+        info->azure_payload_size - info->azure_payload_pos;
+    if (remaining == 0)
+      return 0;
+    const size_t want =
+        static_cast<size_t>(std::min<uint64_t>(num_bytes, remaining));
+    if (info->request == JobInfo::kReqPutAzureBlockList) {
+      memcpy(ptr, info->azure_block_list_xml.data() + info->azure_payload_pos,
+             want);
+      info->azure_payload_pos += want;
+      return want;
+    }
+    const uint64_t absolute_offset =
+        info->azure_payload_origin_offset + info->azure_payload_pos;
+    const int64_t got = info->origin->ReadP(ptr, want, absolute_offset);
+    if (got <= 0)
+      return CURL_READFUNC_ABORT;
+    info->azure_payload_pos += static_cast<uint64_t>(got);
+    return static_cast<size_t>(got);
+  }
 
   const uint64_t read_bytes = info->origin->Read(ptr, num_bytes);
 
@@ -799,13 +823,163 @@ bool S3FanoutManager::MkV4Authz(const JobInfo &info,
   return true;
 }
 
+static size_t RecvCB(void *ptr, size_t size, size_t nmemb, void *userp) {
+  const size_t bytes = size * nmemb;
+  reinterpret_cast<string *>(userp)->append(static_cast<char *>(ptr), bytes);
+  return bytes;
+}
+
 /**
- * The Azure Blob authorization header according to
+ * Fetches (and caches) an OAuth2 bearer token for storage.azure.com from the
+ * Azure Instance Metadata Service.  Tokens are re-minted 5 minutes before the
+ * IMDS-reported expiry so long-running snapshots keep a valid credential.
+ */
+bool S3FanoutManager::RefreshAzureToken() const {
+  const MutexLockGuard guard(&azure_token_lock_);
+
+  if (!azure_token_.empty()
+      && (static_cast<uint64_t>(time(NULL)) + 300 < azure_token_expiry_)) {
+    return true;
+  }
+
+  string url = "http://169.254.169.254/metadata/identity/oauth2/token"
+               "?api-version=2018-02-01"
+               "&resource=https%3A%2F%2Fstorage.azure.com%2F";
+  if (!config_.azure_mi_client_id.empty())
+    url += "&client_id=" + config_.azure_mi_client_id;
+
+  CURL *curl = curl_easy_init();
+  if (curl == NULL)
+    return false;
+  string body;
+  curl_slist *clist = curl_slist_append(NULL, "Metadata: true");
+  curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+  curl_easy_setopt(curl, CURLOPT_HTTPHEADER, clist);
+  curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, RecvCB);
+  curl_easy_setopt(curl, CURLOPT_WRITEDATA, &body);
+  curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L);
+  curl_easy_setopt(curl, CURLOPT_NOPROXY, "169.254.169.254");
+  const CURLcode res = curl_easy_perform(curl);
+  long http_code = 0;  // NOLINT(runtime/int)
+  curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+  curl_slist_free_all(clist);
+  curl_easy_cleanup(curl);
+
+  if ((res != CURLE_OK) || (http_code != 200)) {
+    LogCvmfs(kLogS3Fanout, kLogStderr,
+             "Azure MSI token request failed (curl %d, http %ld)", res,
+             http_code);
+    return false;
+  }
+
+  const UniquePtr<JsonDocument> reply(JsonDocument::Create(body));
+  if (!reply.IsValid())
+    return false;
+  const JSON *token = JsonDocument::SearchInObject(reply->root(),
+                                                   "access_token", JSON_STRING);
+  const JSON *expires = JsonDocument::SearchInObject(reply->root(),
+                                                     "expires_on", JSON_STRING);
+  if ((token == NULL) || (expires == NULL))
+    return false;
+
+  azure_token_ = token->get<string>();
+  azure_token_expiry_ = String2Uint64(expires->get<string>());
+  return true;
+}
+
+/**
+ * The Azure Blob authorization header.  With a Shared Key (access/secret key)
+ * the signature is computed as per
  * https://docs.microsoft.com/en-us/rest/api/storageservices/authorize-with-shared-key
+ * With Managed Identity a bearer token from IMDS is used instead, which
+ * requires x-ms-version >= 2017-11-09.
  */
 bool S3FanoutManager::MkAzureAuthz(const JobInfo &info,
                                    vector<string> *headers) const {
   const string timestamp = RfcTimestamp();
+
+  const bool is_block = info.request == JobInfo::kReqPutAzureBlock;
+  const bool is_blocklist = info.request == JobInfo::kReqPutAzureBlockList;
+
+  if (is_block || is_blocklist) {
+    const string version = config_.azure_msi ? "2017-11-09" : "2011-08-18";
+    const string content_type =
+        is_block ? "application/octet-stream" : "application/xml";
+    const string content_length = StringifyInt(info.azure_payload_size);
+
+    // CanonicalizedHeaders: x-ms-* names lowercased and sorted lexically.
+    // Put Block carries no x-ms-blob-type; Put Block List additionally signs
+    // x-ms-blob-content-type, which sorts before x-ms-date.
+    string canonical_headers;
+    if (is_blocklist) {
+      canonical_headers = "x-ms-blob-content-type:"
+                          + info.azure_blob_content_type + "\n";
+    }
+    canonical_headers += "x-ms-date:" + timestamp + "\nx-ms-version:" + version;
+
+    // CanonicalizedResource: account/container/blob then sorted, UNESCAPED
+    // query parameters, one per line as "name:value".
+    const string base_resource = "/" + config_.access_key + "/"
+                                 + config_.bucket + "/" + info.object_key;
+    const string canonical_resource =
+        is_block ? base_resource + "\nblockid:"
+                       + info.azure_current_block_id_b64 + "\ncomp:block"
+                 : base_resource + "\ncomp:blocklist";
+
+    // Emit exactly the headers that are signed so the server recomputes the
+    // same signature. Content-Type is signed non-blank, so it must be sent.
+    headers->push_back("Content-Type: " + content_type);
+    if (is_blocklist) {
+      headers->push_back("x-ms-blob-content-type: "
+                         + info.azure_blob_content_type);
+    }
+    headers->push_back("x-ms-date: " + timestamp);
+    headers->push_back("x-ms-version: " + version);
+
+    if (config_.azure_msi) {
+      if (!RefreshAzureToken())
+        return false;
+      string bearer;
+      {
+        const MutexLockGuard guard(&azure_token_lock_);
+        bearer = azure_token_;
+      }
+      headers->push_back("Authorization: Bearer " + bearer);
+      return true;
+    }
+
+    // StringToSign field order (each terminated by \n): VERB, Content-Encoding,
+    // Content-Language, Content-Length, Content-MD5, Content-Type, Date,
+    // If-Modified-Since, If-Match, If-None-Match, If-Unmodified-Since, Range,
+    // then CanonicalizedHeaders + CanonicalizedResource.
+    const string string_to_sign = string("PUT\n\n\n") + content_length
+                                  + "\n\n" + content_type
+                                  + "\n\n\n\n\n\n\n" + canonical_headers + "\n"
+                                  + canonical_resource;
+    string signing_key;
+    if (!Debase64(config_.secret_key, &signing_key))
+      return false;
+    const string signature = shash::Hmac256(signing_key, string_to_sign, true);
+    headers->push_back("Authorization: SharedKey " + config_.access_key + ":"
+                       + Base64(signature));
+    return true;
+  }
+
+  if (config_.azure_msi) {
+    if (!RefreshAzureToken())
+      return false;
+    string bearer;
+    {
+      const MutexLockGuard guard(&azure_token_lock_);
+      bearer = azure_token_;
+    }
+    headers->push_back("x-ms-date: " + timestamp);
+    headers->push_back("x-ms-version: 2017-11-09");
+    headers->push_back("Authorization: Bearer " + bearer);
+    headers->push_back("x-ms-blob-type: BlockBlob");
+    return true;
+  }
+
   const string canonical_headers = "x-ms-blob-type:BlockBlob\nx-ms-date:"
                                    + timestamp + "\nx-ms-version:2011-08-18";
   const string canonical_resource = "/" + config_.access_key + "/"
@@ -838,6 +1012,92 @@ bool S3FanoutManager::MkAzureAuthz(const JobInfo &info,
                      + Base64(signature));
   headers->push_back("x-ms-blob-type: BlockBlob");
   return true;
+}
+
+/**
+ * Azure staged block-blob upload helpers.  A single-shot PUT Blob is capped at
+ * 64 MiB (SharedKey, x-ms-version 2011-08-18) or 256 MiB (MSI, 2017-11-09);
+ * larger objects are uploaded as a sequence of Put Block requests followed by
+ * a Put Block List commit.
+ */
+bool S3FanoutManager::ShouldUseAzureStagedUpload(const JobInfo &info) const {
+  if (config_.authz_method != kAuthzAzure)
+    return false;
+  return info.origin->GetSize() > AzureSinglePutLimit();
+}
+
+uint64_t S3FanoutManager::AzureSinglePutLimit() const {
+  return config_.azure_msi ? (256ULL * 1024 * 1024) : (64ULL * 1024 * 1024);
+}
+
+uint64_t S3FanoutManager::AzureBlockSize() const {
+  return config_.azure_msi ? (64ULL * 1024 * 1024) : (4ULL * 1024 * 1024);
+}
+
+/**
+ * Fixed-width base64 block id: identical length for every block so the commit
+ * ordering is unambiguous.  Index padded to 20 digits keeps ids well below the
+ * 64-byte pre-encode limit and constant width for all <50000 blocks.
+ */
+string S3FanoutManager::MkAzureBlockIdB64(uint64_t index) const {
+  string digits = StringifyUint(index);
+  if (digits.size() < 20)
+    digits = string(20 - digits.size(), '0') + digits;
+  return Base64("cvmfs-azblock-" + digits);
+}
+
+/**
+ * Escapes only the base64 alphabet's URL-unsafe characters.  The signer uses
+ * the UNESCAPED id; this escaped form is used in the request URL only.
+ */
+string S3FanoutManager::UrlEscapeBlockId(const string &b64) const {
+  string out;
+  out.reserve(b64.size() + 8);
+  for (unsigned i = 0; i < b64.size(); ++i) {
+    switch (b64[i]) {
+      case '+': out += "%2B"; break;
+      case '/': out += "%2F"; break;
+      case '=': out += "%3D"; break;
+      default:  out += b64[i];
+    }
+  }
+  return out;
+}
+
+void S3FanoutManager::BeginAzureStagedUpload(JobInfo *info) const {
+  info->azure_staged_upload = true;
+  info->azure_staged_original_req = JobInfo::kReqPutCas;
+  // Capture the original blob content-type before switching request type so it
+  // can be re-applied on the commit via x-ms-blob-content-type.
+  info->request = JobInfo::kReqPutCas;
+  info->azure_blob_content_type = GetContentType(*info);
+  info->azure_block_size = AzureBlockSize();
+  const uint64_t size = info->origin->GetSize();
+  info->azure_block_count =
+      (size + info->azure_block_size - 1) / info->azure_block_size;
+  info->azure_block_idx = 0;
+  PrepareAzureBlockRequest(info);
+}
+
+void S3FanoutManager::PrepareAzureBlockRequest(JobInfo *info) const {
+  info->azure_current_block_id_b64 = MkAzureBlockIdB64(info->azure_block_idx);
+  info->azure_current_block_id_url =
+      UrlEscapeBlockId(info->azure_current_block_id_b64);
+  info->azure_payload_origin_offset =
+      info->azure_block_idx * info->azure_block_size;
+  const uint64_t size = info->origin->GetSize();
+  info->azure_payload_size = std::min<uint64_t>(
+      info->azure_block_size, size - info->azure_payload_origin_offset);
+  info->azure_payload_pos = 0;
+  info->request = JobInfo::kReqPutAzureBlock;
+}
+
+void S3FanoutManager::BuildAzureBlockListXml(JobInfo *info) const {
+  string xml = "<?xml version=\"1.0\" encoding=\"utf-8\"?><BlockList>";
+  for (uint64_t i = 0; i < info->azure_block_count; ++i)
+    xml += "<Latest>" + MkAzureBlockIdB64(i) + "</Latest>";
+  xml += "</BlockList>";
+  info->azure_block_list_xml = xml;
 }
 
 void S3FanoutManager::InitializeDnsSettingsCurl(CURL *handle,
@@ -988,6 +1248,8 @@ string S3FanoutManager::GetRequestString(const JobInfo &info) const {
     case JobInfo::kReqPutDotCvmfs:
     case JobInfo::kReqPutHtml:
     case JobInfo::kReqPutBucket:
+    case JobInfo::kReqPutAzureBlock:
+    case JobInfo::kReqPutAzureBlockList:
       return "PUT";
     case JobInfo::kReqDelete:
       return "DELETE";
@@ -1014,6 +1276,10 @@ string S3FanoutManager::GetContentType(const JobInfo &info) const {
     case JobInfo::kReqPutBucket:
     case JobInfo::kReqDeleteMulti:
       return "text/xml";
+    case JobInfo::kReqPutAzureBlock:
+      return "application/octet-stream";
+    case JobInfo::kReqPutAzureBlockList:
+      return "application/xml";
     default:
       PANIC(NULL);
   }
@@ -1076,8 +1342,11 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
     assert(retval == CURLE_OK);
     retval = curl_easy_setopt(handle, CURLOPT_NOBODY, 0);
     assert(retval == CURLE_OK);
-    retval = curl_easy_setopt(handle, CURLOPT_INFILESIZE_LARGE,
-                              static_cast<curl_off_t>(info->origin->GetSize()));
+    const curl_off_t infilesize =
+        info->azure_staged_upload
+            ? static_cast<curl_off_t>(info->azure_payload_size)
+            : static_cast<curl_off_t>(info->origin->GetSize());
+    retval = curl_easy_setopt(handle, CURLOPT_INFILESIZE_LARGE, infilesize);
     assert(retval == CURLE_OK);
 
     if (info->request == JobInfo::kReqPutDotCvmfs) {
@@ -1188,6 +1457,10 @@ void S3FanoutManager::SetUrlOptions(JobInfo *info) const {
   string url = MkUrl(info->object_key);
   if (info->request == JobInfo::kReqDeleteMulti)
     url += "?delete";
+  else if (info->request == JobInfo::kReqPutAzureBlock)
+    url += "?comp=block&blockid=" + info->azure_current_block_id_url;
+  else if (info->request == JobInfo::kReqPutAzureBlockList)
+    url += "?comp=blocklist";
   retval = curl_easy_setopt(curl_handle, CURLOPT_URL, url.c_str());
   assert(retval == CURLE_OK);
 
@@ -1314,7 +1587,11 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
       && (info->request == JobInfo::kReqHeadPut)) {
     LogCvmfs(kLogS3Fanout, kLogDebug, "not found: %s, uploading",
              info->object_key.c_str());
-    info->request = JobInfo::kReqPutCas;
+    if (ShouldUseAzureStagedUpload(*info)) {
+      BeginAzureStagedUpload(info);
+    } else {
+      info->request = JobInfo::kReqPutCas;
+    }
     curl_slist_free_all(info->http_headers);
     info->http_headers = NULL;
     const s3fanout::Failures init_failure = InitializeRequest(
@@ -1330,6 +1607,36 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     // Reset origin
     info->origin->Rewind();
     return true;  // Again, Put
+  }
+
+  // Azure staged block-blob upload: on a successful Put Block, advance to the
+  // next block or, after the last block, issue the Put Block List commit.  The
+  // same easy handle is re-driven by MainUpload, so the request must be fully
+  // re-initialized (new URL, signature and INFILESIZE per block).
+  if ((info->error_code == kFailOk) && info->azure_staged_upload
+      && (info->request == JobInfo::kReqPutAzureBlock)) {
+    if (info->azure_block_idx + 1 < info->azure_block_count) {
+      ++info->azure_block_idx;
+      PrepareAzureBlockRequest(info);
+    } else {
+      BuildAzureBlockListXml(info);
+      info->request = JobInfo::kReqPutAzureBlockList;
+      info->azure_payload_origin_offset = 0;
+      info->azure_payload_size = info->azure_block_list_xml.size();
+      info->azure_payload_pos = 0;
+    }
+    curl_slist_free_all(info->http_headers);
+    info->http_headers = NULL;
+    const s3fanout::Failures init_failure = InitializeRequest(
+        info, info->curl_handle);
+    if (init_failure != s3fanout::kFailOk) {
+      PANIC(kLogStderr,
+            "Failed to initialize CURL handle "
+            "(error: %d - %s | errno: %d)",
+            init_failure, Code2Ascii(init_failure), errno);
+    }
+    SetUrlOptions(info);
+    return true;  // Put next block / commit block list
   }
 
   // Determination if failed request should be repeated
@@ -1348,6 +1655,12 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
       info->origin->Rewind();
       if (info->request == JobInfo::kReqDeleteMulti)
         info->response_body.clear();
+    } else if (info->azure_staged_upload
+               && ((info->request == JobInfo::kReqPutAzureBlock)
+                   || (info->request == JobInfo::kReqPutAzureBlockList))) {
+      // Re-stream the same block/commit body from its window start; the block
+      // id is unchanged so an uncommitted block is simply replaced.
+      info->azure_payload_pos = 0;
     }
     Backoff(info);
     info->error_code = kFailOk;
@@ -1382,6 +1695,10 @@ S3FanoutManager::S3FanoutManager(const S3Config &config) : config_(config) {
   curl_handle_lock_ = reinterpret_cast<pthread_mutex_t *>(
       smalloc(sizeof(pthread_mutex_t)));
   retval = pthread_mutex_init(curl_handle_lock_, NULL);
+  assert(retval == 0);
+
+  azure_token_expiry_ = 0;
+  retval = pthread_mutex_init(&azure_token_lock_, NULL);
   assert(retval == 0);
 
   active_requests_ = new set<JobInfo *>;
@@ -1443,6 +1760,7 @@ S3FanoutManager::~S3FanoutManager() {
   free(jobs_todo_lock_);
   pthread_mutex_destroy(curl_handle_lock_);
   free(curl_handle_lock_);
+  pthread_mutex_destroy(&azure_token_lock_);
 
   if (atomic_xadd32(&multi_threaded_, 0) == 1) {
     // Shutdown I/O thread
