@@ -1063,9 +1063,10 @@ cvmfs_showconfig() {
         value=${value//@org@/$org}
         value=${value//@fqrn@/$fqrn}
       fi
-      # short mode: hide only never-set parameters
-      if [ $short_output -eq 1 ] && [ -z "$value" ] \
-         && [[ " $set_vars " != *" $jvar "* ]]; then
+      # short mode: hide the parameters the configuration does not set. The
+      # cache directory derived above is not one of them; a parameter set to
+      # an empty value is.
+      if [ $short_output -eq 1 ] && [[ " $set_vars " != *" $jvar "* ]]; then
         continue
       fi
       printf ',\n  "%s": %s' "$jvar" "$(json_string "$value")"
@@ -1078,7 +1079,9 @@ cvmfs_showconfig() {
   local var=
   while read var; do
     if [ "x$var" = "xCVMFS_CACHE_DIR" ]; then
-      if [ ! -z "$CVMFS_CACHE_DIR" -o $short_output -eq 0 ]; then
+      # Derived in cvmfs_readconfig; in short mode it shows up only when the
+      # configuration set it explicitly (as in the JSON output above).
+      if [ $short_output -eq 0 ] || [[ " $set_vars " == *" $var "* ]]; then
         echo "CVMFS_CACHE_DIR=$CVMFS_CACHE_DIR"
       fi
       continue
@@ -1126,30 +1129,13 @@ cvmfs_validate() {
   fi
 
   local fqrn; fqrn=$(cvmfs_mkfqrn $org)
-  org=$(cvmfs_getorg $fqrn)
   cvmfs_readconfig $fqrn || die "Failed to read CernVM-FS configuration of $fqrn"
 
-  # Dump the merged configuration as a JSON object onto the schema. Parameters
-  # with empty values count as unset to comply to the schema and are dropped.
-  local name value sep=""
-  local json="{"
-  for name in $(echo "$CVMFS_PARMS" | grep -o '^[A-Za-z0-9_]*=' | tr -d '=' \
-                  | grep '^CVMFS_\|^X509_\|^CERNVM_' | sort -u); do
-    # First unset the variable to avoid picking up a value from the environment
-    unset "$name"
-    eval "$(echo "$CVMFS_PARMS" | grep "^${name}=")"
-    value="${!name}"
-    [ -z "$value" ] && continue
-    value="${value//@org@/$org}"
-    value="${value//@fqrn@/$fqrn}"
-    json="$json$sep
-  $(json_string "$name"): $(json_string "$value")"
-    sep=","
-  done
-  json="$json
-}"
-
-  echo "$json" | "$validator_bin" -d '#ClientConfig'
+  # Dump the merged configuration onto the schema. showconfig -j -s emits
+  # exactly the parameters the configuration sets, every value as a JSON
+  # string; the validator converts the ones the schema declares as integers
+  # or booleans.
+  cvmfs_showconfig -j -s "$fqrn" | "$validator_bin" -d '#ClientConfig'
   if [ $? -ne 0 ]; then
     echo "Configuration of $fqrn is invalid"
     return 1

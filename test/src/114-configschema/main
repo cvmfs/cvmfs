@@ -10,7 +10,9 @@ cleanup() {
 }
 
 # Sources config files in a clean shell, emits CVMFS_*/X509_*/CERNVM_* as
-# JSON. Empty values are dropped (unset).
+# JSON. Empty values are dropped (unset). Every value is emitted as a JSON
+# string, mirroring the emission of cvmfs_config and cvmfs_server; the
+# validator converts the ones the schema declares as integers or booleans.
 dump_config_json() {
   env -i PATH="$PATH" /bin/bash -c '
     set -a
@@ -55,7 +57,9 @@ check_config() {
   return 0
 }
 
-# One named-type case (verdict, #Definition, value)
+# One named-type case (verdict, #Definition, value). The value is always
+# emitted as a JSON string; the validator coerces it for integer-typed
+# definitions.
 check_type() {
   local verdict="$1" defn="$2" value="$3"
   printf '"%s"\n' "$value" > "$type_json"
@@ -157,17 +161,6 @@ cvmfs_run_test() {
   local type_json="$CVMFS_TEST114_TMPDIR/type.json"
   local num_types=0 num_types_failed=0
 
-  check_type accept '#Bool' yEs
-  check_type accept '#Bool' ON
-  check_type accept '#Bool' 1
-  check_type accept '#Bool' TRUE
-  check_type accept '#Bool' no
-  check_type accept '#Bool' Off
-  check_type accept '#Bool' 0
-  check_type accept '#Bool' false
-  check_type reject '#Bool' maybe
-  check_type reject '#Bool' 2
-  check_type reject '#Bool' yesp
   check_type accept '#FQRN' atlas.cern.ch
   check_type accept '#FQRN' sw.hsf.org
   check_type reject '#FQRN' atlas
@@ -354,6 +347,33 @@ EOF
   check_rule reject CVMFS_SYNCFS_LEVEL server CVMFS_SYNCFS_LEVEL=aggressive
   check_rule accept - server CVMFS_UPDATEGEO_SOURCE=maxmind
   check_rule reject CVMFS_UPDATEGEO_SOURCE server CVMFS_UPDATEGEO_SOURCE=google
+
+  # Boolean parameters are plain CUE bools; the validator maps the shell
+  # spellings onto true/false (options.cc: IsOn / IsOff).
+  check_rule accept - client CVMFS_CLAIM_OWNERSHIP=yEs
+  check_rule accept - client CVMFS_CLAIM_OWNERSHIP=ON
+  check_rule accept - client CVMFS_CLAIM_OWNERSHIP=1
+  check_rule accept - client CVMFS_CLAIM_OWNERSHIP=TRUE
+  check_rule accept - client CVMFS_CLAIM_OWNERSHIP=no
+  check_rule accept - client CVMFS_CLAIM_OWNERSHIP=Off
+  check_rule accept - client CVMFS_CLAIM_OWNERSHIP=0
+  check_rule accept - client CVMFS_CLAIM_OWNERSHIP=false
+  check_rule reject CVMFS_CLAIM_OWNERSHIP client CVMFS_CLAIM_OWNERSHIP=maybe
+  check_rule reject CVMFS_CLAIM_OWNERSHIP client CVMFS_CLAIM_OWNERSHIP=2
+  check_rule reject CVMFS_CLAIM_OWNERSHIP client CVMFS_CLAIM_OWNERSHIP=yesp
+  check_rule accept - client CVMFS_STRICT_MOUNT=1 CVMFS_REPOSITORIES=atlas.cern.ch
+  check_rule accept - client CVMFS_ALIEN_CACHE=/gpfs/alien CVMFS_SHARED_CACHE=NO CVMFS_QUOTA_LIMIT=-1
+  # Only parameters the schema declares as bool/int are converted: values
+  # that merely look like one keep their spelling.
+  check_rule accept - client CVMFS_REPOSITORY_TAG=yes
+  check_rule accept - client CVMFS_REPOSITORY_TAG=2024
+  check_rule accept - client CVMFS_SYSLOG_PREFIX=true
+  check_rule reject CVMFS_DNS_SERVER client CVMFS_DNS_SERVER=yes
+  check_rule accept - client CVMFS_DNS_SERVER=137.138.17.5
+  check_rule accept - server CVMFS_CREATOR_VERSION=2.11.0-1
+  check_rule reject CVMFS_GARBAGE_COLLECTION server CVMFS_GARBAGE_COLLECTION=yes
+  check_rule accept - client CVMFS_PARTIAL_REPLICA_MODE=no
+  check_rule reject CVMFS_PARTIAL_REPLICA_MODE client CVMFS_PARTIAL_REPLICA_MODE=yes
 
   # Patterns inlined on a single field (no longer named types): boundary
   # checks on the field itself.

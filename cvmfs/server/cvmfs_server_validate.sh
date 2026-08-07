@@ -50,6 +50,8 @@ __do_validate() {
     eval "$(grep "^${varname}=" "$server_conf" | tail -n 1)"
     eval "value=\$$varname"
     [ -z "$value" ] && continue
+    # Every value is emitted as a JSON string; the validator converts the
+    # ones the schema declares as integers or booleans.
     json="$json$sep
   $(_validate_json_string "$varname"): $(_validate_json_string "$value")"
     sep=","
