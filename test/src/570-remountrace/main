@@ -140,7 +140,10 @@ cvmfs_run_test() {
 
   echo "trying to publish with forced remount (might confuse the culprit)"
   local publish_log_5="${scratch_dir}/publish_5.log"
-  publish_repo $CVMFS_TEST_REPO > $publish_log_5 || return 20
+  # publish may present an interactive prompt, or not
+  set +o pipefail
+  echo y | publish_repo $CVMFS_TEST_REPO > $publish_log_5 || return 20
+  set -o pipefail
 
   echo "check for the error message"
   cat $publish_log_5 | grep 'WARNING.*open read-only' || return 21
