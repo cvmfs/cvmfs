@@ -26,18 +26,46 @@
 #define NOTE_ALIGN(sz) (((sz) + 3) & ~3)
 #define PAGE_SIZE 4096UL
 
-// x86_64 register and ELF struct layout constants
-#define X86_64_NGREG          27
-#define X86_64_REG_RIP        16
-#define X86_64_REG_RSP        19
-#define X86_64_REG_RBP        4
-#define X86_64_PRSTATUS_SIZE  336
-#define X86_64_PRSTATUS_PID   32
-#define X86_64_PRSTATUS_REG   112
-#define X86_64_PRPSINFO_SIZE  136
-#define X86_64_PRPSINFO_PID   24
-#define X86_64_PRPSINFO_FNAME 40
-#define X86_64_PRPSINFO_ARGS  56
+/**
+ * Architecture descriptor: captures ELF machine type, register counts,
+ * register indices, and note-struct byte offsets that vary between CPU
+ * architectures.  Adding a new arch (e.g. aarch64) only requires
+ * defining a new static const instance — no other code changes needed.
+ */
+typedef struct {
+  const char *name;           /**< human-readable, e.g. "x86_64"        */
+  uint16_t    elf_machine;    /**< ELF e_machine, e.g. EM_X86_64       */
+  size_t      ngreg;          /**< number of general-purpose registers  */
+  size_t      reg_ip;         /**< index of instruction pointer in regs */
+  size_t      reg_sp;         /**< index of stack pointer in regs       */
+  size_t      reg_fp;         /**< index of frame pointer in regs       */
+  size_t      prstatus_size;  /**< total size of NT_PRSTATUS descriptor */
+  size_t      prstatus_pid;   /**< byte offset of pr_pid in prstatus    */
+  size_t      prstatus_reg;   /**< byte offset of pr_reg in prstatus    */
+  size_t      prpsinfo_size;  /**< total size of NT_PRPSINFO descriptor */
+  size_t      prpsinfo_pid;   /**< byte offset of pr_pid in prpsinfo    */
+  size_t      prpsinfo_fname; /**< byte offset of pr_fname in prpsinfo  */
+  size_t      prpsinfo_args;  /**< byte offset of pr_psargs in prpsinfo */
+} arch_desc_t;
+
+static const arch_desc_t arch_x86_64 = {
+  "x86_64",
+  EM_X86_64,
+  27,   /* ngreg          */
+  16,   /* reg_ip  (RIP)  */
+  19,   /* reg_sp  (RSP)  */
+  4,    /* reg_fp  (RBP)  */
+  336,  /* prstatus_size  */
+  32,   /* prstatus_pid   */
+  112,  /* prstatus_reg   */
+  136,  /* prpsinfo_size  */
+  24,   /* prpsinfo_pid   */
+  40,   /* prpsinfo_fname */
+  56    /* prpsinfo_args  */
+};
+
+/** Active architecture descriptor (future: detect via uname and select). */
+static const arch_desc_t *g_arch = &arch_x86_64;
 
 /**
  * Dump level controls which memory regions are written to the core.
