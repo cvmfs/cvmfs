@@ -480,12 +480,24 @@ std::unordered_map<string, string> load_config(const string &config_file) {
   return config_map;
 }
 
-string retrieve_config(std::unordered_map<string, string> &config_map,
-                       const string &key) {
+static bool retrieve_config(std::unordered_map<string, string> &config_map,
+                            const string &key, string &out,
+                            const char *default_val) {
   auto kv = config_map.find(key);
-  CUSTOM_ASSERT(kv != config_map.end(), "Parameter %s not found in config",
-                key.c_str());
-  return kv->second;
+  if (kv != config_map.end()) {
+    out = kv->second;
+    return true;
+  }
+  if (default_val) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "Parameter %s not found in config, using default value %s",
+             key.c_str(), default_val);
+    out = default_val;
+    return true;
+  }
+  LogCvmfs(kLogCvmfs, kLogStderr, "Parameter %s not found in config",
+           key.c_str());
+  return false;
 }
 
 static vector<string> get_file_list(string &path) {
@@ -637,18 +649,18 @@ int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
   if (args.find('g') != args.end()) {
     g_gateway_url = *args.find('g')->second;
   } else {
-    g_gateway_url = retrieve_config(config_map, "CVMFS_GATEWAY");
+    if (!retrieve_config(config_map, "CVMFS_GATEWAY", g_gateway_url, NULL)) { return 1; }
   }
   if (args.find('w') != args.end()) {
     stratum0 = *args.find('w')->second;
   } else {
-    stratum0 = retrieve_config(config_map, "CVMFS_STRATUM0");
+    if (!retrieve_config(config_map, "CVMFS_STRATUM0", stratum0, NULL)) { return 1; }
   }
 
   if (args.find('@') != args.end()) {
     proxy = *args.find('@')->second;
   } else {
-    proxy = retrieve_config(config_map, "CVMFS_HTTP_PROXY");
+    if (!retrieve_config(config_map, "CVMFS_HTTP_PROXY", proxy, "DIRECT")) { return 1; }
   }
 
   string lease_path = "";
