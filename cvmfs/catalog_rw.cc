@@ -162,7 +162,13 @@ void WritableCatalog::AddEntry(const DirectoryEntry &entry,
   }
   assert(retval);
   retval = sql_insert_->Execute();
-  assert(retval);
+  // Name the row before dying: the usual cause is re-adding an existing path,
+  // and a bare assert here says only "catalog_rw.cc:165".
+  if (!retval) {
+    PANIC(kLogStderr, "failed to add '%s' (parent '%s') to catalog '%s': %s",
+          entry_path.c_str(), parent_path.c_str(), mountpoint().c_str(),
+          database().GetLastErrorMsg().c_str());
+  }
   sql_insert_->Reset();
 
   delta_counters_.Increment(effective_entry);
