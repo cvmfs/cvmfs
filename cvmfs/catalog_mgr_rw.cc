@@ -526,10 +526,16 @@ bool WritableCatalogManager::HasDirectory(const std::string &name,
   const string directory_path = parent_path + "/" + name;
 
   SyncLock();
+  // Resolve the PARENT, then look the child up inside it. Resolving the child
+  // itself can mount a nested catalog rooted exactly there -- a synchronous
+  // Stratum 0 fetch, under this lock, blocking every pipeline thread.
   WritableCatalog *catalog;
   DirectoryEntry dirent;
-  const bool exists = FindCatalog(directory_path, &catalog, &dirent)
-                      && dirent.IsDirectory();
+  bool exists = false;
+  if (FindCatalog(parent_path, &catalog, NULL)) {
+    exists = catalog->LookupPath(PathString(directory_path), &dirent)
+             && dirent.IsDirectory();
+  }
   SyncUnlock();
   return exists;
 }
