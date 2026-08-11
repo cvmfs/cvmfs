@@ -115,6 +115,11 @@ class WritableCatalogManager : public SimpleCatalogManager {
   void AddDirectory(const DirectoryEntryBase &entry,
                     const XattrList &xattrs,
                     const std::string &parent_directory);
+  // Is this directory already in the catalogs?  Holds the same lock as the
+  // mutating calls, so it is safe to ask while the ingestion pipeline is
+  // adding files from its own threads.
+  bool HasDirectory(const std::string &name,
+                    const std::string &parent_directory);
   void TouchDirectory(const DirectoryEntryBase &entry,
                       const XattrList &xattrs,
                       const std::string &directory_path);

@@ -516,6 +516,25 @@ void WritableCatalogManager::AddDirectory(const DirectoryEntryBase &entry,
 }
 
 /**
+ * Reports whether a directory is already present in the catalogs.
+ * Uses SyncLock, the lock the mutating calls take, so it may be asked while
+ * the ingestion pipeline adds files from its own threads.
+ */
+bool WritableCatalogManager::HasDirectory(const std::string &name,
+                                          const std::string &parent_directory) {
+  const string parent_path = MakeRelativePath(parent_directory);
+  const string directory_path = parent_path + "/" + name;
+
+  SyncLock();
+  WritableCatalog *catalog;
+  DirectoryEntry dirent;
+  const bool exists = FindCatalog(directory_path, &catalog, &dirent)
+                      && dirent.IsDirectory();
+  SyncUnlock();
+  return exists;
+}
+
+/**
  * Add a new file to the catalogs.
  * @param entry a DirectoryEntry structure describing the new file
  * @param parent_directory the absolute path of the directory containing the

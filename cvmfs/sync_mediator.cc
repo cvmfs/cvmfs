@@ -1107,6 +1107,14 @@ void SyncMediator::RemoveFile(SharedPtr<SyncItem> entry) {
 }
 
 void SyncMediator::AddUnmaterializedDirectory(SharedPtr<SyncItem> entry) {
+  // A mountless (gateway) publish has no rdonly mount, so IsNew() calls every
+  // ancestor new and a second publish re-adds one: UNIQUE constraint failed.
+  // Ask the catalog instead -- via HasDirectory, which takes the writers' lock.
+  if (!params_->dry_run
+      && catalog_manager_->HasDirectory(entry->filename(),
+                                        entry->relative_parent_path())) {
+    return;
+  }
   AddDirectory(entry);
 }
 
