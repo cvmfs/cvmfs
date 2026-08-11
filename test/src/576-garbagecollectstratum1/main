@@ -3,17 +3,6 @@
 cvmfs_test_name="Garbage Collection on Replication Server"
 cvmfs_test_autofs_on_startup=false
 
-inflate_file() {
-  local destination_file=$1
-  local source_file=$2
-  local desired_file_size=$3
-
-  touch $destination_file
-  while [ $(stat -c %s $destination_file) -lt $desired_file_size ]; do
-    cat $source_file >> $destination_file
-  done
-}
-
 produce_files_1_in() {
   local working_dir=$1
   pushdir $working_dir
@@ -230,7 +219,7 @@ cvmfs_run_test() {
   produce_files_1_in $repo_dir || return 3
 
   echo "putting exactly the same stuff in the scratch spaces for comparison"
-  produce_files_1_in $reference_dir1 || return 4
+  cp -a "$repo_dir"/* $reference_dir1 || return 4
 
   echo "creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO > publish_1.log 2>&1 || return $?
@@ -248,8 +237,7 @@ cvmfs_run_test() {
   produce_files_2_in $repo_dir || return 5
 
   echo "putting exactly the same stuff in the scratch spaces for comparison"
-  produce_files_1_in $reference_dir2 || return 6
-  produce_files_2_in $reference_dir2 || return 6
+  cp -a "$repo_dir"/* $reference_dir2 || return 6
 
   echo "creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO > publish_2.log 2>&1 || return $?
@@ -267,9 +255,7 @@ cvmfs_run_test() {
   produce_files_3_in $repo_dir || return 7
 
   echo "putting exactly the same stuff in the scratch spaces for comparison"
-  produce_files_1_in $reference_dir3 || return 8
-  produce_files_2_in $reference_dir3 || return 8
-  produce_files_3_in $reference_dir3 || return 8
+  cp -a "$repo_dir"/* $reference_dir3 || return 8
 
   echo "creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO > publish_3.log 2>&1 || return $?
@@ -287,10 +273,7 @@ cvmfs_run_test() {
   produce_files_4_in $repo_dir || return 9
 
   echo "putting exactly the same stuff in the scratch spaces for comparison"
-  produce_files_1_in $reference_dir4 || return 10
-  produce_files_2_in $reference_dir4 || return 10
-  produce_files_3_in $reference_dir4 || return 10
-  produce_files_4_in $reference_dir4 || return 10
+  cp -a "$repo_dir"/* $reference_dir4 || return 10
 
   echo "creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO > publish_4.log 2>&1 || return $?

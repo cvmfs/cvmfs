@@ -10,17 +10,6 @@ CVMFS_TEST_660_TAR_FILE=tarfile.tar
 CVMFS_TEST_660_TAR_DIR=newTarDir
 CVMFS_TEST_660_REPO=
 
-inflate_file() {
-  local destination_file=$1
-  local source_file=$2
-  local desired_file_size=$3
-
-  touch $destination_file
-  while [ $(stat -c %s $destination_file) -lt $desired_file_size ]; do
-    cat $source_file >> $destination_file
-  done
-}
-
 test1() {
   local working_dir=$1
 
@@ -77,8 +66,29 @@ test5() {
   mkdir foo
   touch foo/.cvmfscatalog
   echo "smallfilesmallfile" > foo/smallfile
-  inflate_file foo/mediumfile foo/smallfile 100000     # 100kB file
-  inflate_file foo/bigfile foo/mediumfile   100000000  # 100MB file
+
+  # inflate_file() with random contents results in unstable n_chunks_added.
+  # For backwards compatibility, exactly same content is generated, with what acceleration is possible.
+  #inflate_file foo/mediumfile foo/smallfile 100000     # 100kB file
+  #inflate_file foo/bigfile foo/mediumfile   100000000  # 100MB file
+  local string_bytes=19
+  mediumfile_bytes=$(( (100000 + string_bytes - 1) / string_bytes * string_bytes ))
+  [[ $mediumfile_bytes == 100016 ]]
+  bigfile_bytes=$(( (100000000 + mediumfile_bytes - 1) / mediumfile_bytes * mediumfile_bytes ))
+  [[ $bigfile_bytes == 100016000 ]]
+
+  head -c $mediumfile_bytes > foo/mediumfile <(set +e; yes smallfilesmallfile; true)
+
+  [[ "$(stat -c %s foo/mediumfile)" == $mediumfile_bytes ]]
+  head -c $bigfile_bytes > foo/bigfile <(
+    set +e
+    while cat foo/mediumfile; do
+      true
+    done
+    true
+  )
+  [[ "$(stat -c %s foo/bigfile)" == $bigfile_bytes ]]
+
   popdir
 }
 
