@@ -113,10 +113,72 @@ func convertConfig(ctx *cue.Context, schema cue.Value, expr ast.Expr) {
 	}
 }
 
+// explain prints a parameter's name, whether it is required, and its
+// documentation.
+func explain(name, wanted string) int {
+	ctx := cuecontext.New()
+	schema := ctx.CompileString(clientSchemaSource, cue.Filename("cvmfs_client.cue")).
+		Unify(ctx.CompileString(serverSchemaSource, cue.Filename("cvmfs_server.cue")))
+
+	// The scopes name the definitions the way a user would, for message
+	// wording.
+	other, scope, otherScope := "#ServerConfig", "client", "server"
+	if wanted == other {
+		other, scope, otherScope = "#ClientConfig", "server", "client"
+	}
+
+	// Search the requested definition first, so that a parameter declared by
+	// both, such as CVMFS_USER, resolves to the one that was asked for.
+	for _, definition := range []string{wanted, other} {
+		fields, err := schema.LookupPath(cue.ParsePath(definition)).
+			Fields(cue.Optional(true))
+		if err != nil {
+			continue
+		}
+		for fields.Next() {
+			if fields.Selector().Unquoted() != name {
+				continue
+			}
+			if definition != wanted {
+				fmt.Fprintf(os.Stderr, "%s is a %s parameter, not a %s one\n",
+					name, otherScope, scope)
+				return 1
+			}
+
+			status := "required"
+			if fields.IsOptional() {
+				status = "optional"
+			}
+			if deflt, ok := fields.Value().Default(); ok {
+				status += fmt.Sprintf(", default %v", deflt)
+			}
+
+			description := "No description available."
+			attribute := fields.Value().Attribute("description")
+			if text, err := attribute.String(0); err == nil {
+				description = text
+			}
+
+			fmt.Printf("NAME\n       %s - %s configuration parameter, %s\n\n"+
+				"DESCRIPTION\n       %s\n",
+				name, scope, status, description)
+			return 0
+		}
+	}
+	fmt.Fprintf(os.Stderr, "no such configuration parameter: %s\n", name)
+	return 1
+}
+
 func main() {
 	definition := flag.String("d", "#ClientConfig",
 		"schema definition to validate against")
+	explainParam := flag.String("explain", "",
+		"print the documentation of a configuration parameter and exit")
 	flag.Parse()
+
+	if *explainParam != "" {
+		os.Exit(explain(*explainParam, *definition))
+	}
 
 	ctx := cuecontext.New()
 

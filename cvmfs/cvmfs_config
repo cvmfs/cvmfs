@@ -270,6 +270,8 @@ cvmfs_config_usage() {
   echo ""
   echo "  validate [<repository>]"
   echo ""
+  echo "  explain <parameter>"
+  echo ""
   echo "  stat [-v | <repository>]"
   echo ""
   echo "  status [-v(erbose, force detail output)] [<repository list>]"
@@ -1099,6 +1101,22 @@ cvmfs_showconfig() {
       [ $short_output -eq 0 ] && echo "${var}="
     fi
   done <<< "$all_vars"
+}
+
+
+cvmfs_explain() {
+  local name=$1
+  [ -n "$name" ] || die "Command explain: no parameter given"
+
+  # Find the validation binary (cvmfs_validator). Packaged installs (Debian,
+  # RPM/RedHat-family) put it under libexec/cvmfs; ArchLinux's CMake config
+  # instead uses lib/cvmfs.
+  local validator_bin="/usr/libexec/cvmfs/cvmfs_validator"
+  [ -x "$validator_bin" ] || validator_bin="/usr/lib/cvmfs/cvmfs_validator"
+  [ -x "$validator_bin" ] || die "no validation engine available; build \
+CernVM-FS with -DBUILD_CONFIG_VALIDATOR=ON"
+
+  "$validator_bin" -d '#ClientConfig' -explain "$name"
 }
 
 
@@ -2743,6 +2761,12 @@ case "$1" in
   validate)
     shift 1
     cvmfs_validate $@
+    RETVAL=$?
+    ;;
+
+  explain)
+    shift 1
+    cvmfs_explain $@
     RETVAL=$?
     ;;
 
