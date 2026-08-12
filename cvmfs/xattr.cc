@@ -53,15 +53,21 @@ XattrList *XattrList::CreateFromFile(const std::string &path) {
 
   // Retrieve extended attribute values
   XattrList *result = new XattrList();
-  char value_smallbuf[255];
+#ifdef CVMFS_GET_XATTR_FAST
+#define XATTR_FIXED_BUF_SIZE (64*1024)
+#else
+#define XATTR_FIXED_BUF_SIZE 255
+#endif
+  char value_buf_fixed[XATTR_FIXED_BUF_SIZE];
   for (unsigned i = 0; i < keys.size(); ++i) {
     if (keys[i].empty())
       continue;
 
-    char *buffer = value_smallbuf;
-    size_t sz_buffer = 255;
+    char *buffer = value_buf_fixed;
+    size_t sz_buffer = XATTR_FIXED_BUF_SIZE;
     ssize_t sz_value = platform_lgetxattr(path.c_str(), keys[i].c_str(), buffer,
                                           sz_buffer);
+#ifndef CVMFS_GET_XATTR_FAST
     // check if we need to allocate bigger buffer
     if ((sz_value < 0) && (errno == ERANGE)) {
       // query lgetxattr with size 0 to get proper buffer size
@@ -71,12 +77,16 @@ XattrList *XattrList::CreateFromFile(const std::string &path) {
       sz_value = platform_lgetxattr(path.c_str(), keys[i].c_str(), buffer,
                                     sz_buffer);
     }
+#endif
     if (sz_value >= 0)
       result->Set(keys[i], string(buffer, sz_value));
-    if (buffer != value_smallbuf)
+#ifndef CVMFS_GET_XATTR_FAST
+    if (buffer != value_buf_fixed)
         free(buffer);
+#endif
   }
   return result;
+#undef XATTR_FIXED_BUF_SIZE
 }
 
 
