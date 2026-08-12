@@ -402,7 +402,7 @@ ExternalCacheManager::ExternalCacheManager(int fd_connection,
 
 ExternalCacheManager::~ExternalCacheManager() {
   terminated_ = true;
-  MemoryFence();
+  std::atomic_thread_fence(std::memory_order_seq_cst);
   if (session_id_ >= 0) {
     cvmfs::MsgQuit msg_quit;
     msg_quit.set_session_id(session_id_);
