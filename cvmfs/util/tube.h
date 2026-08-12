@@ -279,7 +279,7 @@ class TubeGroup : SingleCopy {
     assert(is_active_);
     unsigned tube_idx = (tubes_.size() == 1)
                             ? 0
-                            : (atomic_xadd32(&round_robin_, 1) % tubes_.size());
+                            : (round_robin_.fetch_add(1) % tubes_.size());
     return tubes_[tube_idx]->EnqueueBack(item);
   }
 

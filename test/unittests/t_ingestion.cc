@@ -50,7 +50,7 @@ class TestTask : public TubeConsumer<DummyItem> {
 
  protected:
   virtual void Process(DummyItem *item) {
-    atomic_xadd32(&item->sum, item->summand);
+    item->sum.fetch_add(item->summand);
     cnt_process.fetch_add(1);
   }
   virtual void OnTerminate() { cnt_terminate.fetch_add(1); }

@@ -129,7 +129,7 @@ BlockItem::BlockItem(int64_t tag, ItemAllocator *allocator)
 BlockItem::~BlockItem() {
   if (data_)
     allocator_->Free(data_);
-  atomic_xadd64(&managed_bytes_, -static_cast<int64_t>(capacity_));
+  managed_bytes_.fetch_add(-static_cast<int64_t>(capacity_));
 }
 
 
@@ -153,7 +153,7 @@ void BlockItem::MakeData(uint32_t capacity) {
   type_ = kBlockData;
   capacity_ = capacity;
   data_ = reinterpret_cast<unsigned char *>(allocator_->Malloc(capacity_));
-  atomic_xadd64(&managed_bytes_, static_cast<int64_t>(capacity_));
+  managed_bytes_.fetch_add(static_cast<int64_t>(capacity_));
 }
 
 
@@ -186,14 +186,14 @@ void BlockItem::MakeDataCopy(const unsigned char *data, uint32_t size) {
   capacity_ = size_ = size;
   data_ = reinterpret_cast<unsigned char *>(allocator_->Malloc(capacity_));
   memcpy(data_, data, size);
-  atomic_xadd64(&managed_bytes_, static_cast<int64_t>(capacity_));
+  managed_bytes_.fetch_add(static_cast<int64_t>(capacity_));
 }
 
 
 void BlockItem::Reset() {
   assert(type_ == kBlockData);
 
-  atomic_xadd64(&managed_bytes_, -static_cast<int64_t>(capacity_));
+  managed_bytes_.fetch_add(-static_cast<int64_t>(capacity_));
   allocator_->Free(data_);
   data_ = NULL;
   size_ = capacity_ = 0;

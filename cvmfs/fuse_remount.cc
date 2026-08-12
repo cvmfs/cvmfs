@@ -335,7 +335,7 @@ void FuseRemounter::TryFinish(const shash::Any &root_hash) {
   mountpoint_->path_cache()->Resume();
   mountpoint_->md5path_cache()->Resume();
 
-  atomic_xadd32(&drainout_mode_, -2);  // 2 --> 0, end of drainout mode
+  drainout_mode_.fetch_add(-2);  // 2 --> 0, end of drainout mode
 
   if ((retval == catalog::kLoadFail) || (retval == catalog::kLoadNoSpace)) {
     // Can temporarily "escape" offline mode if update came from updated

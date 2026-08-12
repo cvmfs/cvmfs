@@ -67,7 +67,7 @@ void Tracer::Activate(const int buffer_size,
 int32_t Tracer::DoTrace(const int event,
                         const PathString &path,
                         const string &msg) {
-  const int32_t my_seq_no = atomic_xadd32(&seq_no_, 1);
+  const int32_t my_seq_no = seq_no_.fetch_add(1);
   timeval now;
   gettimeofday(&now, NULL);
   const int pos = my_seq_no % buffer_size_;
@@ -205,7 +205,7 @@ void *Tracer::MainFlush(void *data) {
     }
     retval = fflush(f);
     assert(retval == 0);
-    atomic_xadd32(&tracer->flushed_, i);
+    tracer->flushed_.fetch_add(i);
     atomic_cas32(&tracer->flush_immediately_, 1, 0);
 
     {

@@ -393,7 +393,7 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
 
   void OnChildFinished(const int &a, CatalogJob *job) {
     // atomic_xadd32 returns value before subtraction -> needs to equal 1
-    if (atomic_xadd32(&job->children_unprocessed, -1) == 1) {
+    if (job->children_unprocessed.fetch_add(-1) == 1) {
       post_job_queue_.EnqueueFront(job);
     }
   }

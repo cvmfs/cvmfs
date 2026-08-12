@@ -199,11 +199,9 @@ class CachePlugin {
 
   static void *MainProcessRequests(void *data);
 
-  inline uint64_t NextSessionId() {
-    return atomic_xadd64(&next_session_id_, 1);
-  }
-  inline uint64_t NextTxnId() { return atomic_xadd64(&next_txn_id_, 1); }
-  inline uint64_t NextLstId() { return atomic_xadd64(&next_lst_id_, 1); }
+  inline uint64_t NextSessionId() { return next_session_id_.fetch_add(1); }
+  inline uint64_t NextTxnId() { return next_txn_id_.fetch_add(1); }
+  inline uint64_t NextLstId() { return next_lst_id_.fetch_add(1); }
   static inline uint32_t HashUniqueRequest(const UniqueRequest &req) {
     return MurmurHash2(&req, sizeof(req), 0x07387a4f);
   }

@@ -467,7 +467,7 @@ struct UploadStreamHandle {
 
   explicit UploadStreamHandle(const CallbackTN *commit_callback)
       : commit_callback(commit_callback)
-      , tag(atomic_xadd64(&g_upload_stream_tag, 1)) { }
+      , tag(g_upload_stream_tag.fetch_add(1)) { }
   virtual ~UploadStreamHandle() { }
 
   const CallbackTN *commit_callback;

@@ -141,7 +141,7 @@ static void *MainCheck(void *data __attribute__((unused))) {
   while (GetNextFile(&relative_path, &hash_name)) {
     const string path = *g_cache_dir + "/" + relative_path;
 
-    const int n = atomic_xadd32(&g_num_files, 1);
+    const int n = g_num_files.fetch_add(1);
     if (g_verbose)
       LogCvmfs(kLogCvmfs, kLogStdout, "Checking file %s", path.c_str());
     if (!g_verbose && ((n % 1000) == 0))

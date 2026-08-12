@@ -1448,7 +1448,7 @@ S3FanoutManager::~S3FanoutManager() {
   pthread_mutex_destroy(curl_handle_lock_);
   free(curl_handle_lock_);
 
-  if (atomic_xadd32(&multi_threaded_, 0) == 1) {
+  if (multi_threaded_.fetch_add(0) == 1) {
     // Shutdown I/O thread
     char buf = 'T';
     WritePipe(pipe_terminate_[1], &buf, 1);
