@@ -72,7 +72,7 @@ int32_t Tracer::DoTrace(const int event,
   gettimeofday(&now, NULL);
   const int pos = my_seq_no % buffer_size_;
 
-  while (my_seq_no - atomic_read32(&flushed_) >= buffer_size_) {
+  while (my_seq_no - flushed_.load() >= buffer_size_) {
     timespec timeout;
     int retval;
     GetTimespecRel(25, &timeout);
@@ -89,7 +89,7 @@ int32_t Tracer::DoTrace(const int event,
   ring_buffer_[pos].msg = msg;
   atomic_inc32(&commit_buffer_[pos]);
 
-  if (my_seq_no - atomic_read32(&flushed_) == flush_threshold_) {
+  if (my_seq_no - flushed_.load() == flush_threshold_) {
     const MutexLockGuard m(&sig_flush_mutex_);
     const int err_code
         __attribute__((unused)) = pthread_cond_signal(&sig_flush_);
@@ -106,7 +106,7 @@ void Tracer::Flush() {
 
   const int32_t save_seq_no = DoTrace(kEventFlush, PathString("Tracer", 6),
                                       "flushed ring buffer");
-  while (atomic_read32(&flushed_) <= save_seq_no) {
+  while (flushed_.load() <= save_seq_no) {
     timespec timeout;
     int retval;
 
@@ -150,24 +150,42 @@ void *Tracer::MainFlush(void *data) {
   struct timespec timeout;
 
   do {
-    while (
-        (atomic_read32(&tracer->terminate_flush_thread_) == 0)
-        && (atomic_read32(&tracer->flush_immediately_) == 0)
-        && (atomic_read32(&tracer->seq_no_) - atomic_read32(&tracer->flushed_)
-            <= tracer->flush_threshold_)) {
+    while ((tracer->terminate_flush_thread_.load() == 0)
+           && (tracer->flush_immediately_.load() == 0)
+           && ((tracer->seq_no_).load() - (tracer->flushed_).load()
+               <= tracer->flush_threshold_)) {
       tracer->GetTimespecRel(2000, &timeout);
       retval = pthread_cond_timedwait(&tracer->sig_flush_,
                                       &tracer->sig_flush_mutex_, &timeout);
       assert(retval != EINVAL);
     }
 
-    const int base = atomic_read32(&tracer->flushed_) % tracer->buffer_size_;
+    const int base = tracer->flushed_.load() % tracer->buffer_size_;
     int pos, i = 0;
     while ((i <= tracer->flush_threshold_)
-           && (atomic_read32(
-                   &tracer->commit_buffer_[pos = ((base + i)
-                                                  % tracer->buffer_size_)])
-               == 1)) {
+               .load()
+               .load()
+               .load()
+               .load()
+               .load()
+               .load()
+               .load()
+               .load()
+               .load()
+               .load()
+               .load()
+               .load()
+           &.load()
+           &.load().load()(
+                   .load() a.load() t.load() o.load() m.load() i.load()
+                       c.load() _.load() r.load() e.load() a.load() d
+                   .load() 3.load() 2.load()(
+                           .load()
+                           .load()
+                           & tracer
+                           ->commit_buffer_[pos = ((base + i)
+                                                   % tracer->buffer_size_)])
+                   == 1)) {
       string tmp;
       tmp = StringifyTimeval(tracer->ring_buffer_[pos].time_stamp);
       retval = tracer->WriteCsvFile(f, tmp);
@@ -195,9 +213,8 @@ void *Tracer::MainFlush(void *data) {
       retval = pthread_cond_broadcast(&tracer->sig_continue_trace_);
       assert(retval == 0);
     }
-  } while (
-      (atomic_read32(&tracer->terminate_flush_thread_) == 0)
-      || (atomic_read32(&tracer->flushed_) < atomic_read32(&tracer->seq_no_)));
+  } while ((tracer->terminate_flush_thread_.load() == 0)
+           || ((tracer->flushed_).load() < (tracer->seq_no_).load()));
 
   retval = fclose(f);
   assert(retval == 0);

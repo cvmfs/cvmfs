@@ -566,7 +566,7 @@ void CommandMigrate::PrintStatusMessage(const PendingCatalog *catalog,
                                         const shash::Any &content_hash,
                                         const std::string &message) {
   atomic_inc32(&catalogs_processed_);
-  const unsigned int processed = (atomic_read32(&catalogs_processed_) * 100)
+  const unsigned int processed = (catalogs_processed_.load() * 100)
                                  / catalog_count_;
   LogCvmfs(kLogCatalog, kLogStdout, "[%d%%] %s %sC %s", processed,
            message.c_str(), content_hash.ToString().c_str(),

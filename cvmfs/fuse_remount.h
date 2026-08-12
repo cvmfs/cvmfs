@@ -58,11 +58,10 @@ class FuseRemounter : SingleCopy {
   void TryFinish(const shash::Any &root_hash = shash::Any());
   void EnterMaintenanceMode();
   bool IsCaching() {
-    return (atomic_read32(&maintenance_mode_) == 0)
-           && (atomic_read32(&drainout_mode_) == 0);
+    return (maintenance_mode_.load() == 0) && (drainout_mode_.load() == 0);
   }
-  bool IsInDrainoutMode() { return atomic_read32(&drainout_mode_) == 2; }
-  bool IsInMaintenanceMode() { return atomic_read32(&maintenance_mode_) == 1; }
+  bool IsInDrainoutMode() { return drainout_mode_.load() == 2; }
+  bool IsInMaintenanceMode() { return maintenance_mode_.load() == 1; }
 
   Fence *fence() { return fence_; }
   time_t catalogs_valid_until() { return catalogs_valid_until_; }

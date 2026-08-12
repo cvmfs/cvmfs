@@ -474,7 +474,7 @@ int main(int argc, char **argv) {
              "Running unsupervised. Quit by SIGINT (CTRL+C)");
     atomic_init32(&g_terminated);
     signal(SIGINT, handle_sigint);
-    while (atomic_read32(&g_terminated) == 0)
+    while (g_terminated.load() == 0)
       sleep(1);
   }
 

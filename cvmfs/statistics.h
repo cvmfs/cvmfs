@@ -28,7 +28,7 @@ class Counter {
   Counter() { atomic_init64(&counter_); }
   void Inc() { atomic_inc64(&counter_); }
   void Dec() { atomic_dec64(&counter_); }
-  int64_t Get() { return atomic_read64(&counter_); }
+  int64_t Get() { return counter_.load(); }
   void Set(const int64_t val) { atomic_write64(&counter_, val); }
   int64_t Xadd(const int64_t delta) { return atomic_xadd64(&counter_, delta); }
 

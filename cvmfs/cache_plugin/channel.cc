@@ -674,7 +674,7 @@ void CachePlugin::HandleStore(cvmfs::MsgStoreReq *msg_req,
 }
 
 
-bool CachePlugin::IsRunning() { return atomic_read32(&running_) != 0; }
+bool CachePlugin::IsRunning() { return running_.load() != 0; }
 
 
 bool CachePlugin::Listen(const string &locator) {

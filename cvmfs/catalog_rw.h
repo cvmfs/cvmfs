@@ -133,7 +133,7 @@ class WritableCatalog : public Catalog {
     return static_cast<WritableCatalog *>(parent);
   }
 
-  int dirty_children() const { return atomic_read32(&dirty_children_); }
+  int dirty_children() const { return dirty_children_.load(); }
   void set_dirty_children(const int count) {
     atomic_write32(&dirty_children_, count);
   }

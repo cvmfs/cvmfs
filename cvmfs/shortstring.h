@@ -198,8 +198,8 @@ class ShortString {
     return ShortString(this->GetChars() + start_at, length - start_at);
   }
 
-  static uint64_t num_instances() { return atomic_read64(&num_instances_); }
-  static uint64_t num_overflows() { return atomic_read64(&num_overflows_); }
+  static uint64_t num_instances() { return num_instances_.load(); }
+  static uint64_t num_overflows() { return num_overflows_.load(); }
 
   operator bool() const { return not IsEmpty(); }
 

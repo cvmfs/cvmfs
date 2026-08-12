@@ -189,7 +189,7 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
     }
     free(threads_process_);
 
-    if (atomic_read32(&num_errors_))
+    if (num_errors_.load())
       return false;
 
     assert(catalogs_processing_.size() == 0);

@@ -181,7 +181,7 @@ void *FuseInvalidator::MainInvalidator(void *data) {
     if ((invalidator->fuse_session_ == NULL) || !HasFuseNotifyInval()) {
       while (platform_monotonic_time() < deadline) {
         SafeSleepMs(kCheckTimeoutFreqMs);
-        if (atomic_read32(&invalidator->terminated_) == 1) {
+        if (invalidator->terminated_.load() == 1) {
           LogCvmfs(kLogCvmfs, kLogDebug,
                    "cancel cache eviction due to termination");
           break;
@@ -222,7 +222,7 @@ void *FuseInvalidator::MainInvalidator(void *data) {
                    "cancel cache eviction after %u entries due to timeout", i);
           break;
         }
-        if (atomic_read32(&invalidator->terminated_) == 1) {
+        if (invalidator->terminated_.load() == 1) {
           LogCvmfs(kLogCvmfs, kLogDebug,
                    "cancel cache eviction due to termination");
           break;
@@ -260,7 +260,7 @@ void *FuseInvalidator::MainInvalidator(void *data) {
                   entry_name.GetChars(), entry_name.GetLength());
 
       if ((++i % kCheckTimeoutFreqOps) == 0) {
-        if (atomic_read32(&invalidator->terminated_) == 1) {
+        if (invalidator->terminated_.load() == 1) {
           LogCvmfs(kLogCvmfs, kLogDebug,
                    "cancel cache eviction due to termination");
           break;

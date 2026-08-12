@@ -201,9 +201,9 @@ class PolymorphicConstructionImpl {
     //   fully initialized!
     // See StackOverflow:
     // http://stackoverflow.com/questions/8097439/lazy-initialized-caching-how-do-i-make-it-thread-safe
-    if (atomic_read32(&needs_init_)) {
+    if (needs_init_.load()) {
       MutexLockGuard m(&init_mutex_);
-      if (atomic_read32(&needs_init_)) {
+      if (needs_init_.load()) {
         AbstractProductT::RegisterPlugins();
         atomic_dec32(&needs_init_);
       }

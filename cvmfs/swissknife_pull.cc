@@ -376,8 +376,8 @@ bool CommandPull::Pull(const shash::Any &catalog_hash,
     return true;
   }
 
-  const int64_t gauge_chunks = atomic_read64(&overall_chunks);
-  const int64_t gauge_new = atomic_read64(&overall_new);
+  const int64_t gauge_chunks = overall_chunks.load();
+  const int64_t gauge_new = overall_new.load();
 
   // Download and uncompress catalog
   shash::Any chunk_hash;
@@ -470,14 +470,14 @@ bool CommandPull::Pull(const shash::Any &catalog_hash,
       atomic_inc64(&chunk_queue);
     }
     catalog->AllChunksEnd();
-    while (atomic_read64(&chunk_queue) != 0) {
+    while (chunk_queue.load() != 0) {
       SafeSleepMs(100);
     }
     LogCvmfs(kLogCvmfs, kLogStdout,
              " fetched %" PRId64 " new chunks out of "
              "%" PRId64 " unique chunks",
-             atomic_read64(&overall_new) - gauge_new,
-             atomic_read64(&overall_chunks) - gauge_chunks);
+             overall_new.load() - gauge_new,
+             overall_chunks.load() - gauge_chunks);
   }
 
   retval = PullRecursion(catalog, path);
@@ -977,7 +977,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   WaitForStorage();
   LogCvmfs(kLogCvmfs, kLogStdout,
            "Fetched %" PRId64 " new chunks out of %" PRId64 " processed chunks",
-           atomic_read64(&overall_new), atomic_read64(&overall_chunks));
+           (overall_new).load(), atomic_read64(&overall_chunks));
   result = 0;
 
 fini:

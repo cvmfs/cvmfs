@@ -126,7 +126,7 @@ bool GatewayUploader::PlaceBootstrappingShortcut(
 }
 
 unsigned int GatewayUploader::GetNumberOfErrors() const {
-  return atomic_read32(&num_errors_);
+  return num_errors_.load();
 }
 
 void GatewayUploader::DoUpload(const std::string &remote_path,

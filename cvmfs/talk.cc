@@ -618,22 +618,22 @@ void *TalkManager::MainResponder(void *data) {
           page_cache_stats = mount_point->page_cache_tracker()->GetStatistics();
       mount_point->statistics()
           ->Lookup("inode_tracker.n_insert")
-          ->Set(atomic_read64(&inode_stats.num_inserts));
+          ->Set(inode_stats.num_inserts.load());
       mount_point->statistics()
           ->Lookup("inode_tracker.n_remove")
-          ->Set(atomic_read64(&inode_stats.num_removes));
+          ->Set(inode_stats.num_removes.load());
       mount_point->statistics()
           ->Lookup("inode_tracker.no_reference")
-          ->Set(atomic_read64(&inode_stats.num_references));
+          ->Set(inode_stats.num_references.load());
       mount_point->statistics()
           ->Lookup("inode_tracker.n_hit_inode")
-          ->Set(atomic_read64(&inode_stats.num_hits_inode));
+          ->Set(inode_stats.num_hits_inode.load());
       mount_point->statistics()
           ->Lookup("inode_tracker.n_hit_path")
-          ->Set(atomic_read64(&inode_stats.num_hits_path));
+          ->Set(inode_stats.num_hits_path.load());
       mount_point->statistics()
           ->Lookup("inode_tracker.n_miss_path")
-          ->Set(atomic_read64(&inode_stats.num_misses_path));
+          ->Set(inode_stats.num_misses_path.load());
       mount_point->statistics()
           ->Lookup("dentry_tracker.n_insert")
           ->Set(dentry_stats.num_insert);
@@ -1251,22 +1251,22 @@ string TalkManager::FormatPrometheusMetrics(MountPoint &mount_point,
   // Update statistics manually
   mount_point.statistics()
       ->Lookup("inode_tracker.n_insert")
-      ->Set(atomic_read64(&inode_stats.num_inserts));
+      ->Set(inode_stats.num_inserts.load());
   mount_point.statistics()
       ->Lookup("inode_tracker.n_remove")
-      ->Set(atomic_read64(&inode_stats.num_removes));
+      ->Set(inode_stats.num_removes.load());
   mount_point.statistics()
       ->Lookup("inode_tracker.no_reference")
-      ->Set(atomic_read64(&inode_stats.num_references));
+      ->Set(inode_stats.num_references.load());
   mount_point.statistics()
       ->Lookup("inode_tracker.n_hit_inode")
-      ->Set(atomic_read64(&inode_stats.num_hits_inode));
+      ->Set(inode_stats.num_hits_inode.load());
   mount_point.statistics()
       ->Lookup("inode_tracker.n_hit_path")
-      ->Set(atomic_read64(&inode_stats.num_hits_path));
+      ->Set(inode_stats.num_hits_path.load());
   mount_point.statistics()
       ->Lookup("inode_tracker.n_miss_path")
-      ->Set(atomic_read64(&inode_stats.num_misses_path));
+      ->Set(inode_stats.num_misses_path.load());
   mount_point.statistics()
       ->Lookup("dentry_tracker.n_insert")
       ->Set(dentry_stats.num_insert);
@@ -1295,22 +1295,22 @@ string TalkManager::FormatPrometheusMetrics(MountPoint &mount_point,
   // Inode tracker metrics
   format_metric("cvmfs_internal_inode_tracker_inserts_total", "counter",
                 "Number of inode tracker insertions.", "repo=\"" + fqrn + "\"",
-                StringifyInt(atomic_read64(&inode_stats.num_inserts)));
+                StringifyInt(inode_stats.num_inserts.load()));
   format_metric("cvmfs_internal_inode_tracker_removes_total", "counter",
                 "Number of inode tracker removals.", "repo=\"" + fqrn + "\"",
-                StringifyInt(atomic_read64(&inode_stats.num_removes)));
+                StringifyInt(inode_stats.num_removes.load()));
   format_metric("cvmfs_internal_inode_tracker_references", "gauge",
                 "Number of inode tracker references.", "repo=\"" + fqrn + "\"",
-                StringifyInt(atomic_read64(&inode_stats.num_references)));
+                StringifyInt(inode_stats.num_references.load()));
   format_metric("cvmfs_internal_inode_tracker_hits_inode_total", "counter",
                 "Number of inode tracker inode hits.", "repo=\"" + fqrn + "\"",
-                StringifyInt(atomic_read64(&inode_stats.num_hits_inode)));
+                StringifyInt(inode_stats.num_hits_inode.load()));
   format_metric("cvmfs_internal_inode_tracker_hits_path_total", "counter",
                 "Number of inode tracker path hits.", "repo=\"" + fqrn + "\"",
-                StringifyInt(atomic_read64(&inode_stats.num_hits_path)));
+                StringifyInt(inode_stats.num_hits_path.load()));
   format_metric("cvmfs_internal_inode_tracker_misses_path_total", "counter",
                 "Number of inode tracker path misses.", "repo=\"" + fqrn + "\"",
-                StringifyInt(atomic_read64(&inode_stats.num_misses_path)));
+                StringifyInt(inode_stats.num_misses_path.load()));
 
   // Dentry tracker metrics
   format_metric("cvmfs_internal_dentry_tracker_inserts_total", "counter",
