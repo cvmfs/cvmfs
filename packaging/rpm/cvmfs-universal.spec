@@ -66,8 +66,10 @@
 %define hardlink /usr/bin/hardlink
 %endif
 
-%define __strip /bin/true
-%define debug_package %{nil}
+# Move DWARF to -debuginfo while keeping .symtab for watchdog backtraces.
+%global _find_debuginfo_opts -g
+# Prevent the later brp pass from stripping .symtab.
+%global __brp_strip %{nil}
 %if 0%{?el6} || 0%{?el5} || 0%{?el4}
 %define __os_install_post %{nil}
 %endif
@@ -155,7 +157,9 @@ Requires: zlib
 %if !0%{?suse_version}
 Requires: protobuf
 %endif
-Requires: gdb
+# gdb and matching debug symbols add details to watchdog crash reports.
+Recommends: gdb
+Recommends: %{name}-debuginfo%{?_isa} = %{version}-%{release}
 %if 0%{?suse_version}
 Requires: libarchive13
 %else
