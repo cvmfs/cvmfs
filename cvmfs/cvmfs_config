@@ -268,6 +268,10 @@ cvmfs_config_usage() {
   echo ""
   echo "  showconfig [-s(hort output, only parameters set in the configuration)] [-j|--json] [<repository>]"
   echo ""
+  echo "  validate [<repository>]"
+  echo ""
+  echo "  explain <parameter>"
+  echo ""
   echo "  stat [-v | <repository>]"
   echo ""
   echo "  status [-v(erbose, force detail output)] [<repository list>]"
@@ -1037,13 +1041,13 @@ cvmfs_showconfig() {
     return $retval
   fi
 
-  local setting=
+  local name=
   local all_vars=
   local set_vars=          # names present in the config file
-  while read setting; do
-    [ "x${setting:0:6}" != "xCVMFS_" ] && continue
-    set_vars="$set_vars ${setting%%=*}"
-  done <<< "$CVMFS_PARMS"
+  for name in $(echo "$CVMFS_PARMS" | grep -o '^[A-Za-z0-9_]*=' | tr -d '=' \
+                  | grep '^CVMFS_\|^X509_\|^CERNVM_' | sort -u); do
+    set_vars="$set_vars $name"
+  done
   all_vars="$(echo $set_vars $var_list | tr ' ' '\n' | sort -u)"
 
   if [ $json_output -eq 1 ]; then
@@ -1061,9 +1065,10 @@ cvmfs_showconfig() {
         value=${value//@org@/$org}
         value=${value//@fqrn@/$fqrn}
       fi
-      # short mode: hide only never-set parameters
-      if [ $short_output -eq 1 ] && [ -z "$value" ] \
-         && [[ " $set_vars " != *" $jvar "* ]]; then
+      # short mode: hide the parameters the configuration does not set. The
+      # cache directory derived above is not one of them; a parameter set to
+      # an empty value is.
+      if [ $short_output -eq 1 ] && [[ " $set_vars " != *" $jvar "* ]]; then
         continue
       fi
       printf ',\n  "%s": %s' "$jvar" "$(json_string "$value")"
@@ -1076,7 +1081,9 @@ cvmfs_showconfig() {
   local var=
   while read var; do
     if [ "x$var" = "xCVMFS_CACHE_DIR" ]; then
-      if [ ! -z "$CVMFS_CACHE_DIR" -o $short_output -eq 0 ]; then
+      # Derived in cvmfs_readconfig; in short mode it shows up only when the
+      # configuration set it explicitly (as in the JSON output above).
+      if [ $short_output -eq 0 ] || [[ " $set_vars " == *" $var "* ]]; then
         echo "CVMFS_CACHE_DIR=$CVMFS_CACHE_DIR"
       fi
       continue
@@ -1094,6 +1101,65 @@ cvmfs_showconfig() {
       [ $short_output -eq 0 ] && echo "${var}="
     fi
   done <<< "$all_vars"
+}
+
+
+cvmfs_explain() {
+  local name=$1
+  [ -n "$name" ] || die "Command explain: no parameter given"
+
+  # Find the validation binary (cvmfs_validator). Packaged installs (Debian,
+  # RPM/RedHat-family) put it under libexec/cvmfs; ArchLinux's CMake config
+  # instead uses lib/cvmfs.
+  local validator_bin="/usr/libexec/cvmfs/cvmfs_validator"
+  [ -x "$validator_bin" ] || validator_bin="/usr/lib/cvmfs/cvmfs_validator"
+  [ -x "$validator_bin" ] || die "no validation engine available; build \
+CernVM-FS with -DBUILD_CONFIG_VALIDATOR=ON"
+
+  "$validator_bin" -d '#ClientConfig' -explain "$name"
+}
+
+
+cvmfs_validate() {
+  local org=$1
+
+  # Find the validation binary (cvmfs_validator). Packaged installs (Debian,
+  # RPM/RedHat-family) put it under libexec/cvmfs; ArchLinux's CMake config
+  # instead uses lib/cvmfs.
+  local validator_bin="/usr/libexec/cvmfs/cvmfs_validator"
+  [ -x "$validator_bin" ] || validator_bin="/usr/lib/cvmfs/cvmfs_validator"
+  [ -x "$validator_bin" ] || validator_bin=
+  if [ -z "$validator_bin" ]; then
+    echo "Error: no validation engine available"
+    echo "Build CernVM-FS with -DBUILD_CONFIG_VALIDATOR=ON"
+    return 1
+  fi
+
+  cvmfs_readconfig || die "Failed to read CernVM-FS configuration"
+
+  # Without a repository argument, validate all configured repositories
+  if [ -z "$org" ]; then
+    local entry retval=0
+    for entry in $(list_repos); do
+      cvmfs_validate $entry || retval=1
+    done
+    return $retval
+  fi
+
+  local fqrn; fqrn=$(cvmfs_mkfqrn $org)
+  cvmfs_readconfig $fqrn || die "Failed to read CernVM-FS configuration of $fqrn"
+
+  # Dump the merged configuration onto the schema. showconfig -j -s emits
+  # exactly the parameters the configuration sets, every value as a JSON
+  # string; the validator converts the ones the schema declares as integers
+  # or booleans.
+  cvmfs_showconfig -j -s "$fqrn" | "$validator_bin" -d '#ClientConfig'
+  if [ $? -ne 0 ]; then
+    echo "Configuration of $fqrn is invalid"
+    return 1
+  fi
+  echo "Configuration of $fqrn is valid"
+  return 0
 }
 
 
@@ -2689,6 +2755,18 @@ case "$1" in
   showconfig)
     shift 1
     cvmfs_showconfig $@
+    RETVAL=$?
+    ;;
+
+  validate)
+    shift 1
+    cvmfs_validate $@
+    RETVAL=$?
+    ;;
+
+  explain)
+    shift 1
+    cvmfs_explain $@
     RETVAL=$?
     ;;
 

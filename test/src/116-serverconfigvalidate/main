@@ -1,0 +1,49 @@
+#!/bin/bash
+
+cvmfs_test_name="cvmfs_server validate accepts and rejects real server configs"
+cvmfs_test_suites="quick"
+
+cvmfs_run_test() {
+  logfile=$1
+
+  local repo="test116.cern.ch"
+  local repo_dir="/etc/cvmfs/repositories.d/$repo"
+  local output retval
+
+  trap "sudo rm -rf '$repo_dir'" EXIT HUP INT TERM
+
+  echo "*** validate must accept a correct server config"
+  sudo mkdir -p "$repo_dir"
+  sudo sh -c "cat > $repo_dir/server.conf" << EOF
+CVMFS_CREATOR_VERSION=143
+CVMFS_REPOSITORY_NAME=$repo
+CVMFS_REPOSITORY_TYPE=stratum0
+CVMFS_USER=$(whoami)
+CVMFS_STRATUM0=http://localhost/cvmfs/$repo
+CVMFS_SPOOL_DIR=/var/spool/cvmfs/$repo
+CVMFS_UNION_DIR=/cvmfs/$repo
+CVMFS_UNION_FS_TYPE=overlayfs
+CVMFS_UPSTREAM_STORAGE=local,/srv/cvmfs/$repo/data/txn,/srv/cvmfs/$repo
+EOF
+  # load_repo_config (cvmfs_server_common.sh) always sources client.conf for
+  # stratum0 repos alongside server.conf, just like a real mkfs-created repo.
+  sudo sh -c "cat > $repo_dir/client.conf" << EOF
+CVMFS_CACHE_BASE=/var/spool/cvmfs/$repo/client
+CVMFS_QUOTA_LIMIT=4000
+CVMFS_SERVER_URL=file:///srv/cvmfs/$repo
+CVMFS_HTTP_PROXY=DIRECT
+EOF
+  output=$(cvmfs_server validate "$repo") && retval=0 || retval=$?
+  echo "$output"
+  [ $retval -eq 0 ] || return 1
+  echo "$output" | grep -q "Configuration of $repo is valid" || return 2
+
+  echo "*** validate must reject an invalid CVMFS_UNION_FS_TYPE"
+  sudo sed -i "s/CVMFS_UNION_FS_TYPE=overlayfs/CVMFS_UNION_FS_TYPE=zfs/" "$repo_dir/server.conf"
+  output=$(cvmfs_server validate "$repo") && retval=0 || retval=$?
+  echo "$output"
+  [ $retval -ne 0 ] || return 3
+  echo "$output" | grep -q "Configuration of $repo is invalid" || return 4
+
+  return 0
+}

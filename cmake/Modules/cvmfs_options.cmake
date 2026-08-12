@@ -30,6 +30,7 @@ option (BUILD_LIBFUSE2          "Build the libraries for libfuse2 support"      
 option (BUILD_GATEWAY           "Build cvmfs_gateway, requires go compiler"                        OFF)
 option (BUILD_DUCC              "Build cvmfs_ducc, requires go compiler"                           OFF)
 option (BUILD_SNAPSHOTTER       "Build cvmfs_snapshotter, it requires a go compiler"               OFF)
+option (BUILD_CONFIG_VALIDATOR  "Build cvmfs_validator, requires go compiler"                      OFF)
 option (BUILD_ALL               "Build client, server, lib, preload, shrinkwrap, unit tests"       OFF)
 if (BUILD_ALL)
   set (BUILD_CVMFS ON)
