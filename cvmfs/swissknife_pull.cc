@@ -977,7 +977,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   WaitForStorage();
   LogCvmfs(kLogCvmfs, kLogStdout,
            "Fetched %" PRId64 " new chunks out of %" PRId64 " processed chunks",
-           (overall_new).load(), atomic_read64(&overall_chunks));
+           (overall_new).load(), overall_chunks.load());
   result = 0;
 
 fini:
