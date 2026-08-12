@@ -217,8 +217,10 @@ static void *MainCheck(void *data __attribute__((unused))) {
               g_num_err_fixed.fetch_add(1);
 
               // Changes made, we have to rebuild the managed cache db
-              atomic_cas32(&g_force_rebuild, 0, 1);
-              atomic_cas32(&g_modified_cache, 0, 1);
+              int32_t expected_val = 0;
+              g_force_rebuild.compare_exchange_strong(expected_val, 1);
+              int32_t expected_val = 0;
+              g_modified_cache.compare_exchange_strong(expected_val, 1);
             } else {
               g_num_err_unfixed.fetch_add(1);
             }
@@ -257,7 +259,8 @@ int main(int argc, char **argv) {
         g_fix_errors = true;
         break;
       case 'f':
-        atomic_cas32(&g_force_rebuild, 0, 1);
+        int32_t expected_val = 0;
+        g_force_rebuild.compare_exchange_strong(expected_val, 1);
         break;
       case 'j':
         g_num_threads = atoi(optarg);

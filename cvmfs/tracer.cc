@@ -110,7 +110,8 @@ void Tracer::Flush() {
     timespec timeout;
     int retval;
 
-    atomic_cas32(&flush_immediately_, 0, 1);
+    int32_t expected_val = 0;
+    flush_immediately_.compare_exchange_strong(expected_val, 1);
     {
       const MutexLockGuard m(&sig_flush_mutex_);
       retval = pthread_cond_signal(&sig_flush_);
@@ -206,7 +207,8 @@ void *Tracer::MainFlush(void *data) {
     retval = fflush(f);
     assert(retval == 0);
     tracer->flushed_.fetch_add(i);
-    atomic_cas32(&tracer->flush_immediately_, 1, 0);
+    int32_t expected_val = 1;
+    tracer->flush_immediately_.compare_exchange_strong(expected_val, 0);
 
     {
       const MutexLockGuard l(&tracer->sig_continue_trace_mutex_);

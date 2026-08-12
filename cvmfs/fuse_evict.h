@@ -60,7 +60,10 @@ class FuseInvalidator : SingleCopy {
     void WaitFor();
 
    private:
-    void SetDone() { atomic_cas32(status_, 0, 1); }
+    void SetDone() {
+      int32_t expected_val = 0;
+      status_.compare_exchange_strong(expected_val, 1);
+    }
 
     unsigned timeout_s_;
     std::atomic<int32_t> *status_;

@@ -41,7 +41,10 @@ class Fence : public SingleCopy {
 
   void Leave() { counter_.fetch_sub(1); }
 
-  void Close() { atomic_cas32(&blocking_, 0, 1); }
+  void Close() {
+    int32_t expected_val = 0;
+    blocking_.compare_exchange_strong(expected_val, 1);
+  }
 
   /**
    * Close and let live critical regions exit
@@ -53,7 +56,10 @@ class Fence : public SingleCopy {
     }
   }
 
-  void Open() { atomic_cas32(&blocking_, 1, 0); }
+  void Open() {
+    int32_t expected_val = 1;
+    blocking_.compare_exchange_strong(expected_val, 0);
+  }
 
  private:
   static const unsigned kBusyWaitBackoffMs = 100;

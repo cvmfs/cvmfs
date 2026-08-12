@@ -877,7 +877,8 @@ void CachePlugin::ProcessRequests(unsigned num_workers) {
                                     this);
   assert(retval == 0);
   NotifySupervisor(CacheTransport::kReadyNotification);
-  atomic_cas32(&running_, 0, 1);
+  int32_t expected_val = 0;
+  running_.compare_exchange_strong(expected_val, 1);
 }
 
 
@@ -900,7 +901,8 @@ void CachePlugin::Terminate() {
     char terminate = kSignalTerminate;
     WritePipe(pipe_ctrl_[1], &terminate, 1);
     pthread_join(thread_io_, NULL);
-    atomic_cas32(&running_, 1, 0);
+    int32_t expected_val = 1;
+    running_.compare_exchange_strong(expected_val, 0);
   }
 }
 
