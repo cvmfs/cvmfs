@@ -163,30 +163,11 @@ void *Tracer::MainFlush(void *data) {
 
     const int base = tracer->flushed_.load() % tracer->buffer_size_;
     int pos, i = 0;
-    while ((i <= tracer->flush_threshold_)
-               .load()
-               .load()
-               .load()
-               .load()
-               .load()
-               .load()
-               .load()
-               .load()
-               .load()
-               .load()
-               .load()
-               .load()
-           &.load()
-           &.load().load()(
-                   .load() a.load() t.load() o.load() m.load() i.load()
-                       c.load() _.load() r.load() e.load() a.load() d
-                   .load() 3.load() 2.load()(
-                           .load()
-                           .load()
-                           & tracer
-                           ->commit_buffer_[pos = ((base + i)
-                                                   % tracer->buffer_size_)])
-                   == 1)) {
+    while (
+        (i <= tracer->flush_threshold_)
+        && ((tracer->commit_buffer_[pos = ((base + i) % tracer->buffer_size_)])
+                .load()
+            == 1)) {
       string tmp;
       tmp = StringifyTimeval(tracer->ring_buffer_[pos].time_stamp);
       retval = tracer->WriteCsvFile(f, tmp);
@@ -303,3 +284,4 @@ int Tracer::WriteCsvFile(FILE *fp, const string &field) {
 
   return 0;
 }
+
