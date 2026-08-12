@@ -8,11 +8,11 @@
 #include <pthread.h>
 #include <stdint.h>
 
+#include <atomic>
 #include <cassert>
 #include <cstddef>
 #include <vector>
 
-#include "util/atomic.h"
 #include "util/mutex.h"
 #include "util/single_copy.h"
 
@@ -286,7 +286,7 @@ class TubeGroup : SingleCopy {
  private:
   bool is_active_;
   std::vector<Tube<ItemT> *> tubes_;
-  atomic_int32 round_robin_;
+  std::atomic<int32_t> round_robin_;
 };
 
 #endif  // CVMFS_UTIL_TUBE_H_

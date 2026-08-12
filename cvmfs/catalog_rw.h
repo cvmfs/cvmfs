@@ -157,7 +157,7 @@ class WritableCatalog : public Catalog {
   DeltaCounters delta_counters_;
 
   // parallel commit state
-  mutable atomic_int32 dirty_children_;
+  mutable std::atomic<int32_t> dirty_children_;
 
   inline void SetDirty() {
     if (!dirty_)

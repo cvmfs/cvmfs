@@ -10,7 +10,7 @@
 #include "util/concurrency.h"
 #include "util/exception.h"
 
-atomic_int64 ItemAllocator::total_allocated_ = 0;
+std::atomic<int64_t> ItemAllocator::total_allocated_ = 0;
 
 
 void ItemAllocator::Free(void *ptr) {

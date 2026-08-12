@@ -8,11 +8,10 @@
 #include <pthread.h>
 #include <stdint.h>
 
+#include <atomic>
 #include <map>
 #include <string>
 #include <vector>
-
-#include "util/atomic.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
@@ -42,7 +41,7 @@ class Counter {
   std::string ToString();
 
  private:
-  atomic_int64 counter_;
+  std::atomic<int64_t> counter_;
 };
 
 // perf::Func(Counter) is more clear to read in the code
@@ -83,7 +82,7 @@ class Statistics {
       atomic_init32(&refcnt);
       atomic_inc32(&refcnt);
     }
-    atomic_int32 refcnt;
+    std::atomic<int32_t> refcnt;
     Counter counter;
     std::string desc;
   };

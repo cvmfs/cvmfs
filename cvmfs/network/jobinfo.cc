@@ -2,20 +2,21 @@
  * This file is part of the CernVM File System.
  */
 
+#include "jobinfo.h"
+
 #include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
 #include <stdint.h>
 #include <sys/stat.h>
 
-#include "jobinfo.h"
 #include "util/capabilities.h"
 #include "util/logging.h"
 #include "util/string.h"
 
 namespace download {
 
-atomic_int64 JobInfo::next_uuid = 0;
+std::atomic<int64_t> JobInfo::next_uuid = 0;
 
 JobInfo::JobInfo(const std::string *u, const bool c, const bool ph,
                  const shash::Any *h, cvmfs::Sink *s) {
@@ -131,7 +132,7 @@ std::string EscapeHeader(const std::string &header) {
   return escaped;
 }
 
-} // namespace
+}  // namespace
 
 /*
  * Return the filled-in template of CVMFS_INFO_HEADER
@@ -158,145 +159,145 @@ std::string JobInfo::GetInfoHeaderContents(const std::string &templ) {
   for (std::string::const_iterator i = templ.begin(); i != templ.end(); i++) {
     const char c = *i;
     switch (parsemode) {
-    case kParseModeDefault:
-      if (c == '%') {
-        parsemode = kParseModeAfterPercent;
-        key = "";
-      } else {
-        answer += c;
-      }
-      break;
-    case kParseModeAfterPercent:
-      if (c == '{') {
-        parsemode = kParseModeInKey;
-      } else {
-        parsemode = kParseModeDefault;
-        answer += '%';
-        answer += c;
-      }
-      break;
-    case kParseModeInKey:
-      if (c != '}') {
-        key += c;
-      } else {
-        parsemode = kParseModeDefault;
-        if (key == "path") {
-          if (path_info_ != NULL) {
-            answer += EscapeHeader(*path_info_);
-          } else {
-            answer += "-";
-          }
-        } else if (key == "pid") {
-          if (pid_ != static_cast<pid_t>(-1)) {
-            answer += StringifyInt(pid_);
-          } else {
-            answer += "-";
-          }
-        } else if (key == "uid") {
-          if (uid_ != static_cast<uid_t>(-1)) {
-            answer += StringifyInt(uid_);
-          } else {
-            answer += "-";
-          }
-        } else if (key == "gid") {
-          if (gid_ != static_cast<gid_t>(-1)) {
-            answer += StringifyInt(gid_);
-          } else {
-            answer += "-";
-          }
-        } else if (key.substr(0, 4) == "env:") {
-          if (!env_attempted) {
-            env_attempted = true;
-#ifndef __APPLE__
+      case kParseModeDefault:
+        if (c == '%') {
+          parsemode = kParseModeAfterPercent;
+          key = "";
+        } else {
+          answer += c;
+        }
+        break;
+      case kParseModeAfterPercent:
+        if (c == '{') {
+          parsemode = kParseModeInKey;
+        } else {
+          parsemode = kParseModeDefault;
+          answer += '%';
+          answer += c;
+        }
+        break;
+      case kParseModeInKey:
+        if (c != '}') {
+          key += c;
+        } else {
+          parsemode = kParseModeDefault;
+          if (key == "path") {
+            if (path_info_ != NULL) {
+              answer += EscapeHeader(*path_info_);
+            } else {
+              answer += "-";
+            }
+          } else if (key == "pid") {
             if (pid_ != static_cast<pid_t>(-1)) {
-              ObtainDacReadSearchCapability();
-              ObtainSysPtraceCapability();
-              const std::string fname = "/proc/" +
-                                        StringifyInt(pid_) +
-                                        "/environ";
-              const int fd = open(fname.c_str(), O_RDONLY);
-              if (fd != -1) {
-                // Unfortunately fstat does not show the size so need to
-                // read it to find out the size
-                ssize_t n;
-                int size = 0;
-                char buf[BUFSIZ];
-                while ((n = read(fd, buf, BUFSIZ)) > 0) {
-                  size += static_cast<int>(n);
-                }
-                if ((n >= 0) && (size > 0)) {
-                  if (lseek(fd, 0, SEEK_SET) >= 0) {
-                    envbuf.resize(size);
-                    if (read(fd, envbuf.data(), size) > 0) {
-                      LogCvmfs(kLogDownload, kLogDebug,
-                        "(job id %" PRId64 ") read %d bytes from %s",
-                        id_, size, fname.c_str());
-                    } else {
-                      envbuf.clear();
+              answer += StringifyInt(pid_);
+            } else {
+              answer += "-";
+            }
+          } else if (key == "uid") {
+            if (uid_ != static_cast<uid_t>(-1)) {
+              answer += StringifyInt(uid_);
+            } else {
+              answer += "-";
+            }
+          } else if (key == "gid") {
+            if (gid_ != static_cast<gid_t>(-1)) {
+              answer += StringifyInt(gid_);
+            } else {
+              answer += "-";
+            }
+          } else if (key.substr(0, 4) == "env:") {
+            if (!env_attempted) {
+              env_attempted = true;
+#ifndef __APPLE__
+              if (pid_ != static_cast<pid_t>(-1)) {
+                ObtainDacReadSearchCapability();
+                ObtainSysPtraceCapability();
+                const std::string fname = "/proc/" + StringifyInt(pid_)
+                                          + "/environ";
+                const int fd = open(fname.c_str(), O_RDONLY);
+                if (fd != -1) {
+                  // Unfortunately fstat does not show the size so need to
+                  // read it to find out the size
+                  ssize_t n;
+                  int size = 0;
+                  char buf[BUFSIZ];
+                  while ((n = read(fd, buf, BUFSIZ)) > 0) {
+                    size += static_cast<int>(n);
+                  }
+                  if ((n >= 0) && (size > 0)) {
+                    if (lseek(fd, 0, SEEK_SET) >= 0) {
+                      envbuf.resize(size);
+                      if (read(fd, envbuf.data(), size) > 0) {
+                        LogCvmfs(kLogDownload, kLogDebug,
+                                 "(job id %" PRId64 ") read %d bytes from %s",
+                                 id_, size, fname.c_str());
+                      } else {
+                        envbuf.clear();
+                      }
                     }
                   }
-                }
-                close(fd);
-              } else {
-                LogCvmfs(kLogDownload, kLogDebug,
-                  "(job id %" PRId64 ") unable to open %s: %s",
-                  id_, fname.c_str(), strerror(errno));
-              }
-              DropSysPtraceCapability();
-              DropDacReadSearchCapability();
-            }
-#endif
-          }
-          if (!envbuf.empty()) {
-            const char * const var = key.c_str() + 4; // everything after "env:"
-            const char *varp = var;
-            std::string val = "";
-            MatchMode matchmode = kMatchModeMatching;
-            const char * const endp = envbuf.data() + envbuf.size();
-            for (const char *p = envbuf.data(); p < endp; p++) {
-              switch (matchmode) {
-              case kMatchModeSkipping:
-                // skipping to next null character
-                if (*p == '\0') {
-                  varp = var;
-                  matchmode = kMatchModeMatching;
-                }
-                break;
-              case kMatchModeMatching:
-                // matching variable name
-                if (*p == '\0') {
-                  // premature end without an '='
-                  varp = var;
-                } else if (*varp == *p) {
-                  // so far so good
-                  ++varp;
-                } else if ((*varp == '\0') && (*p == '=')) {
-                  // matched
-                  matchmode = kMatchModeCollecting;
+                  close(fd);
                 } else {
-                  // didn't match
-                  matchmode = kMatchModeSkipping;
+                  LogCvmfs(kLogDownload, kLogDebug,
+                           "(job id %" PRId64 ") unable to open %s: %s", id_,
+                           fname.c_str(), strerror(errno));
                 }
-                break;
-              case kMatchModeCollecting:
-                // matched, collecting value
-                if (*p == '\0') {
-                  // all done
-                  p = endp;
-                  break;
-                }
-                val += *p;
-                break;
+                DropSysPtraceCapability();
+                DropDacReadSearchCapability();
               }
+#endif
             }
-            if (val != "") {
-              answer += ' ';
-              answer += EscapeHeader(val);
+            if (!envbuf.empty()) {
+              const char * const var = key.c_str()
+                                       + 4;  // everything after "env:"
+              const char *varp = var;
+              std::string val = "";
+              MatchMode matchmode = kMatchModeMatching;
+              const char * const endp = envbuf.data() + envbuf.size();
+              for (const char *p = envbuf.data(); p < endp; p++) {
+                switch (matchmode) {
+                  case kMatchModeSkipping:
+                    // skipping to next null character
+                    if (*p == '\0') {
+                      varp = var;
+                      matchmode = kMatchModeMatching;
+                    }
+                    break;
+                  case kMatchModeMatching:
+                    // matching variable name
+                    if (*p == '\0') {
+                      // premature end without an '='
+                      varp = var;
+                    } else if (*varp == *p) {
+                      // so far so good
+                      ++varp;
+                    } else if ((*varp == '\0') && (*p == '=')) {
+                      // matched
+                      matchmode = kMatchModeCollecting;
+                    } else {
+                      // didn't match
+                      matchmode = kMatchModeSkipping;
+                    }
+                    break;
+                  case kMatchModeCollecting:
+                    // matched, collecting value
+                    if (*p == '\0') {
+                      // all done
+                      p = endp;
+                      break;
+                    }
+                    val += *p;
+                    break;
+                }
+              }
+              if (val != "") {
+                answer += ' ';
+                answer += EscapeHeader(val);
+              }
             }
           }
         }
-      }
-      break;
+        break;
     }
   }
 

@@ -16,6 +16,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <atomic>
 #include <cstdlib>
 #include <cstring>
 #include <string>
@@ -28,14 +29,13 @@
 #include "manifest.h"
 #include "manifest_fetch.h"
 #include "network/download.h"
-#include "network/sink_path.h"
 #include "network/sink_mem.h"
+#include "network/sink_path.h"
 #include "object_fetcher.h"
 #include "path_filters/inclusion_spec.h"
 #include "path_filters/relaxed_path_filter.h"
 #include "reflog.h"
 #include "upload.h"
-#include "util/atomic.h"
 #include "util/exception.h"
 #include "util/logging.h"
 #include "util/posix.h"
@@ -106,9 +106,9 @@ pthread_mutex_t lock_pipe = PTHREAD_MUTEX_INITIALIZER;
 unsigned retries = 3;
 catalog::RelaxedPathFilter *pathfilter = NULL;
 catalog::InclusionSpec *inclusion_spec = NULL;
-atomic_int64 overall_chunks;
-atomic_int64 overall_new;
-atomic_int64 chunk_queue;
+std::atomic<int64_t> overall_chunks;
+std::atomic<int64_t> overall_new;
+std::atomic<int64_t> chunk_queue;
 bool preload_cache = false;
 string *preload_cachedir = NULL;
 bool inspect_existing_catalogs = false;
@@ -325,7 +325,7 @@ bool CommandPull::PullRecursion(catalog::Catalog *catalog,
                i->mountpoint.c_str());
       shash::Any previous_catalog_hash;  // expected to be null for subcatalog
       const bool retval = Pull(i->hash, i->mountpoint.ToString(),
-                         previous_catalog_hash);
+                               previous_catalog_hash);
       if (!retval)
         return false;
     }
@@ -557,8 +557,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
                "Options -d and -E are mutually exclusive");
       return 1;
     }
-    inclusion_spec =
-        catalog::InclusionSpec::Create(*args.find('E')->second);
+    inclusion_spec = catalog::InclusionSpec::Create(*args.find('E')->second);
     if (inclusion_spec == NULL || !inclusion_spec->IsValid()) {
       LogCvmfs(kLogCvmfs, kLogStderr,
                "Failed to parse inclusion spec from '%s'",
@@ -966,8 +965,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
         const std::string &spec_content = inclusion_spec->content();
         StoreBuffer(
             reinterpret_cast<const unsigned char *>(spec_content.data()),
-            spec_content.size(),
-            ".cvmfs_partial_replication", false);
+            spec_content.size(), ".cvmfs_partial_replication", false);
         LogCvmfs(kLogCvmfs, kLogStdout,
                  "Uploaded partial replication spec to backend");
       }

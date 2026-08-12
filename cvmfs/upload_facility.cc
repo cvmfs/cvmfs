@@ -13,7 +13,7 @@
 
 namespace upload {
 
-atomic_int64 UploadStreamHandle::g_upload_stream_tag = 0;
+std::atomic<int64_t> UploadStreamHandle::g_upload_stream_tag = 0;
 
 AbstractUploader::UploadJob::UploadJob(UploadStreamHandle *handle,
                                        UploadBuffer buffer,

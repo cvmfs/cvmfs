@@ -7,6 +7,7 @@
 
 #include <pthread.h>
 
+#include <atomic>
 #include <cassert>
 #include <cerrno>
 #include <cstdio>
@@ -14,7 +15,6 @@
 #include <cstring>
 #include <string>
 
-#include "util/atomic.h"
 #include "util/concurrency.h"
 #include "util/posix.h"
 #include "util/string.h"
@@ -32,7 +32,7 @@ void Tracer::Activate(const int buffer_size,
          && flush_threshold_ < buffer_size_);
 
   ring_buffer_ = new BufferEntry[buffer_size_];
-  commit_buffer_ = new atomic_int32[buffer_size_];
+  commit_buffer_ = new std::atomic<int32_t>[buffer_size_];
   for (int i = 0; i < buffer_size_; i++)
     atomic_init32(&commit_buffer_[i]);
 

@@ -7,12 +7,12 @@
 
 #include <stdint.h>
 
+#include <atomic>
 #include <map>
 
 #include "ingestion/item.h"
 #include "ingestion/task.h"
 #include "smallhash.h"
-#include "util/atomic.h"
 #include "util/murmur.hxx"
 #include "util/posix.h"
 #include "util/tube.h"
@@ -80,7 +80,7 @@ class TaskChunk : public TubeConsumer<BlockItem> {
    * Every new chunk increases the tag sequence counter that is used to annotate
    * BlockItems.
    */
-  static atomic_int64 tag_seq_;
+  static std::atomic<int64_t> tag_seq_;
 
   TubeGroup<BlockItem> *tubes_out_;
   ItemAllocator *allocator_;

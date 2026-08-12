@@ -328,7 +328,7 @@ catalog::DirectoryEntry catalog::DirectoryEntryTestFactory::Make(
 //------------------------------------------------------------------------------
 
 
-atomic_int32 MockCatalog::instances;
+std::atomic<int32_t> MockCatalog::instances;
 
 const std::string MockCatalog::rhs = "f9d87ae2cc46be52b324335ff05fae4c1a7c4dd4";
 const shash::Any MockCatalog::root_hash = shash::Any(
@@ -539,8 +539,8 @@ MockObjectFetcher::Failures MockObjectFetcher::FetchManifest(
     manifest::Manifest **manifest) {
   const uint64_t catalog_size = 0;
   const std::string root_path = "";
-  *manifest = new manifest::Manifest(
-      MockCatalog::root_hash, catalog_size, root_path);
+  *manifest = new manifest::Manifest(MockCatalog::root_hash, catalog_size,
+                                     root_path);
   (*manifest)->set_history(MockHistory::root_hash);
   return MockObjectFetcher::kFailOk;
 }

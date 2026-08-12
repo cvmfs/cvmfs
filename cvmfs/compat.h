@@ -11,6 +11,7 @@
 #include <sched.h>
 #include <stdint.h>
 
+#include <atomic>
 #include <cassert>
 #include <google/sparse_hash_map>
 #include <string>
@@ -22,7 +23,6 @@
 #include "glue_buffer.h"
 #include "shortstring.h"
 #include "util/algorithm.h"
-#include "util/atomic.h"
 
 namespace compat {
 
@@ -260,13 +260,13 @@ class InodeTracker {
       assert(false);
       return "";
     }
-    atomic_int64 num_inserts;
-    atomic_int64 num_dangling_try;
-    atomic_int64 num_double_add;
-    atomic_int64 num_removes;
-    atomic_int64 num_references;
-    atomic_int64 num_ancient_hits;
-    atomic_int64 num_ancient_misses;
+    std::atomic<int64_t> num_inserts;
+    std::atomic<int64_t> num_dangling_try;
+    std::atomic<int64_t> num_double_add;
+    std::atomic<int64_t> num_removes;
+    std::atomic<int64_t> num_references;
+    std::atomic<int64_t> num_ancient_hits;
+    std::atomic<int64_t> num_ancient_misses;
   };
   Statistics GetStatistics() { return statistics_; }
 
@@ -505,12 +505,12 @@ class InodeTracker {
   struct Statistics {
     Statistics() { assert(false); }
     std::string Print() { assert(false); }
-    atomic_int64 num_inserts;
-    atomic_int64 num_removes;
-    atomic_int64 num_references;
-    atomic_int64 num_hits_inode;
-    atomic_int64 num_hits_path;
-    atomic_int64 num_misses_path;
+    std::atomic<int64_t> num_inserts;
+    std::atomic<int64_t> num_removes;
+    std::atomic<int64_t> num_references;
+    std::atomic<int64_t> num_hits_inode;
+    std::atomic<int64_t> num_hits_path;
+    std::atomic<int64_t> num_misses_path;
   };
   Statistics GetStatistics() { assert(false); }
 
@@ -709,12 +709,12 @@ class InodeTracker {
   struct Statistics {
     Statistics() { assert(false); }
     std::string Print() { assert(false); }
-    atomic_int64 num_inserts;
-    atomic_int64 num_removes;
-    atomic_int64 num_references;
-    atomic_int64 num_hits_inode;
-    atomic_int64 num_hits_path;
-    atomic_int64 num_misses_path;
+    std::atomic<int64_t> num_inserts;
+    std::atomic<int64_t> num_removes;
+    std::atomic<int64_t> num_references;
+    std::atomic<int64_t> num_hits_inode;
+    std::atomic<int64_t> num_hits_path;
+    std::atomic<int64_t> num_misses_path;
   };
   Statistics GetStatistics() { assert(false); }
 

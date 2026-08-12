@@ -39,6 +39,7 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <atomic>
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
@@ -56,7 +57,6 @@
 #include "sanitizer.h"
 #include "ssl.h"
 #include "util/algorithm.h"
-#include "util/atomic.h"
 #include "util/exception.h"
 #include "util/logging.h"
 #include "util/posix.h"
@@ -1681,10 +1681,8 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
              "(manager '%s' - id %" PRId64 ") "
              "Trying again on same curl handle, %s"
              "error code %d%s",
-             name_.c_str(), info->id(),
-             same_url_retry ? "same url, " : "",
-             info->error_code(),
-             info->nocache() ? ", no cache" : "");
+             name_.c_str(), info->id(), same_url_retry ? "same url, " : "",
+             info->error_code(), info->nocache() ? ", no cache" : "");
     // Reset internal state and destination. In parallel-decompress mode the
     // sink and zstream are owned by the caller thread (it pops and decompresses
     // the queued chunks). Resetting them here would race the caller and, worse,

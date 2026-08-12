@@ -5,12 +5,12 @@
 #ifndef CVMFS_CATALOG_TRAVERSAL_PARALLEL_H_
 #define CVMFS_CATALOG_TRAVERSAL_PARALLEL_H_
 
+#include <atomic>
 #include <stack>
 #include <string>
 #include <vector>
 
 #include "catalog_traversal.h"
-#include "util/atomic.h"
 #include "util/exception.h"
 #include "util/tube.h"
 
@@ -69,7 +69,7 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
 
     void WakeParents() { this->NotifyListeners(0); }
 
-    atomic_int32 children_unprocessed;
+    std::atomic<int32_t> children_unprocessed;
   };
 
  public:
@@ -177,8 +177,8 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
     threads_process_ = reinterpret_cast<pthread_t *>(
         smalloc(sizeof(pthread_t) * num_threads_));
     for (unsigned int i = 0; i < num_threads_; ++i) {
-      int const retval = pthread_create(&threads_process_[i], NULL, MainProcessQueue,
-                                  this);
+      int const retval = pthread_create(&threads_process_[i], NULL,
+                                        MainProcessQueue, this);
       if (retval != 0)
         PANIC(kLogStderr, "failed to create thread");
     }
@@ -248,7 +248,8 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
       FinalizeJob(job);
       return;
     }
-    NestedCatalogList const catalog_list = job->catalog->ListOwnNestedCatalogs();
+    NestedCatalogList const catalog_list = job->catalog
+                                               ->ListOwnNestedCatalogs();
     unsigned int num_children;
     // Ensure that pushed children won't call ProcessJobPost on this job
     // before this function finishes
@@ -405,7 +406,7 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
   TraversalType effective_traversal_type_;
 
   pthread_t *threads_process_;
-  atomic_int32 num_errors_;
+  std::atomic<int32_t> num_errors_;
 
   Tube<CatalogJob> pre_job_queue_;
   Tube<CatalogJob> post_job_queue_;

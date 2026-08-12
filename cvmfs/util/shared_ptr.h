@@ -5,10 +5,9 @@
 #ifndef CVMFS_UTIL_SHARED_PTR_H_
 #define CVMFS_UTIL_SHARED_PTR_H_
 
+#include <atomic>
 #include <cstdint>
 #include <cstdlib>
-
-#include "util/atomic.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
@@ -27,7 +26,7 @@ class SharedPtr {
   template<class Y>
   explicit SharedPtr(Y *p) {
     value_ = static_cast<element_type *>(p);
-    count_ = new atomic_int64;
+    count_ = new std::atomic<int64_t>;
     atomic_write64(count_, 1);
   }
 
@@ -96,7 +95,7 @@ class SharedPtr {
   void Reset(Y *p) {
     Reset();
     value_ = static_cast<element_type *>(p);
-    count_ = new atomic_int64;
+    count_ = new std::atomic<int64_t>;
     atomic_write64(count_, 1);
   }
 
@@ -112,7 +111,7 @@ class SharedPtr {
     return value_;
   }
 
-  atomic_int64 *GetCountPtr() const { return count_; }
+  std::atomic<int64_t> *GetCountPtr() const { return count_; }
 
   bool Unique() const {  // never throws
     return count_ && (atomic_read64(count_) == 1);
@@ -124,7 +123,7 @@ class SharedPtr {
 
  private:
   element_type *value_;
-  atomic_int64 *count_;
+  std::atomic<int64_t> *count_;
 };
 
 template<class T, class U>

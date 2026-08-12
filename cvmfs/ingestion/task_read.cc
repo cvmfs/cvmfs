@@ -18,7 +18,7 @@
 #include "util/smalloc.h"
 
 
-atomic_int64 TaskRead::tag_seq_ = 0;
+std::atomic<int64_t> TaskRead::tag_seq_ = 0;
 
 
 void TaskRead::Process(FileItem *item) {

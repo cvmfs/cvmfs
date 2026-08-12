@@ -2,6 +2,7 @@
  * This file is part of the CernVM File System.
  */
 
+#include <atomic>
 #include <cassert>
 #include <cstdlib>
 #include <set>
@@ -17,7 +18,6 @@
 #include "ingestion/item_mem.h"
 #include "ingestion/pipeline.h"
 #include "testutil.h"
-#include "util/atomic.h"
 #include "util/prng.h"
 #include "util/smalloc.h"
 #include "util/string.h"
@@ -509,7 +509,7 @@ struct CallbackTest {
     atomic_inc64(&counter);
   }
 
-  static atomic_int64 counter;
+  static std::atomic<int64_t> counter;
   static shash::Any result_content_hash;
   static std::string result_local_path;
   static FileChunkList result_chunk_list;
@@ -517,7 +517,7 @@ struct CallbackTest {
 shash::Any CallbackTest::result_content_hash;
 std::string CallbackTest::result_local_path;
 FileChunkList CallbackTest::result_chunk_list;
-atomic_int64 CallbackTest::counter = 0;
+std::atomic<int64_t> CallbackTest::counter = 0;
 }  // anonymous namespace
 
 TEST_F(T_IngestionStress, ProcessingCallbackForSmallFile) {

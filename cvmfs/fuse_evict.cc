@@ -24,7 +24,8 @@ using namespace std;  // NOLINT
 
 FuseInvalidator::Handle::Handle(unsigned timeout_s)
     : timeout_s_((timeout_s == 0) ? 0 : (timeout_s + kTimeoutSafetyMarginSec)) {
-  status_ = reinterpret_cast<atomic_int32 *>(smalloc(sizeof(atomic_int32)));
+  status_ = reinterpret_cast<std::atomic<int32_t> *>(
+      smalloc(sizeof(std::atomic<int32_t>)));
   atomic_init32(status_);
 }
 

@@ -17,6 +17,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <atomic>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -24,7 +25,6 @@
 
 #include "compression/compression.h"
 #include "crypto/hash.h"
-#include "util/atomic.h"
 #include "util/logging.h"
 #include "util/platform.h"
 #include "util/posix.h"
@@ -42,11 +42,11 @@ enum Errors {
 };
 
 string *g_cache_dir;
-atomic_int32 g_num_files;
-atomic_int32 g_num_err_fixed;
-atomic_int32 g_num_err_unfixed;
-atomic_int32 g_num_err_operational;
-atomic_int32 g_num_tmp_catalog;
+std::atomic<int32_t> g_num_files;
+std::atomic<int32_t> g_num_err_fixed;
+std::atomic<int32_t> g_num_err_unfixed;
+std::atomic<int32_t> g_num_err_operational;
+std::atomic<int32_t> g_num_tmp_catalog;
 /**
  * Traversal of the file system tree is serialized.
  */
@@ -58,8 +58,8 @@ string *g_current_dir; /**< Current cache sub directory */
 int g_num_threads = 1;
 bool g_fix_errors = false;
 bool g_verbose = false;
-atomic_int32 g_force_rebuild;
-atomic_int32 g_modified_cache;
+std::atomic<int32_t> g_force_rebuild;
+std::atomic<int32_t> g_modified_cache;
 
 
 static void Usage() {
