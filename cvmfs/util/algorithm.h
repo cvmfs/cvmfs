@@ -12,6 +12,7 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
@@ -153,12 +154,12 @@ class CVMFS_EXPORT Log2Histogram {
 
     for (i = 1; i <= n; i++) {
       if (value < this->boundary_values_[i]) {
-        (this->bins_[i].fetch_add(1));
+        (this->bins_[i]->fetch_add(1));
         return;
       }
     }
 
-    (this->bins_[0].fetch_add(1));  // add to overflow bin.
+    (this->bins_[0]->fetch_add(1));  // add to overflow bin.
   }
 
   /**
@@ -168,7 +169,7 @@ class CVMFS_EXPORT Log2Histogram {
     uint64_t n = 0;
     unsigned int i;
     for (i = 0; i <= this->bins_.size() - 1; i++) {
-      n += static_cast<unsigned int>((this->bins_[i].load()));
+      n += static_cast<unsigned int>((this->bins_[i]->load()));
     }
     return n;
   }
@@ -183,7 +184,7 @@ class CVMFS_EXPORT Log2Histogram {
   void PrintLog2Histogram();
 
  private:
-  std::vector<std::atomic<int32_t> > bins_;
+  std::vector<std::unique_ptr<std::atomic<int32_t> > > bins_;
   // boundary_values_ handle the largest value a certain
   // bin can store in itself.
   std::vector<unsigned int> boundary_values_;
@@ -195,7 +196,8 @@ class CVMFS_EXPORT Log2Histogram {
  */
 class CVMFS_EXPORT UTLog2Histogram {
  public:
-  std::vector<std::atomic<int32_t> > GetBins(const Log2Histogram &h);
+  const std::vector<std::unique_ptr<std::atomic<int32_t> > > &GetBins(
+      const Log2Histogram &h);
 };
 
 
@@ -222,3 +224,4 @@ class CVMFS_EXPORT HighPrecisionTimer : SingleCopy {
 #endif
 
 #endif  // CVMFS_UTIL_ALGORITHM_H_
+
