@@ -55,14 +55,14 @@ class FuseInvalidator : SingleCopy {
    public:
     explicit Handle(unsigned timeout_s);
     ~Handle();
-    bool IsDone() const { return status_.load() == 1; }
-    void Reset() { status_.store(0); }
+    bool IsDone() const { return status_->load() == 1; }
+    void Reset() { status_->store(0); }
     void WaitFor();
 
    private:
     void SetDone() {
       int32_t expected_val = 0;
-      status_.compare_exchange_strong(expected_val, 1);
+      status_->compare_exchange_strong(expected_val, 1);
     }
 
     unsigned timeout_s_;
@@ -137,3 +137,4 @@ class FuseInvalidator : SingleCopy {
 };  // class FuseInvalidator
 
 #endif  // CVMFS_FUSE_EVICT_H_
+

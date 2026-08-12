@@ -27,13 +27,13 @@ class SharedPtr {
   explicit SharedPtr(Y *p) {
     value_ = static_cast<element_type *>(p);
     count_ = new std::atomic<int64_t>;
-    count_.store(1);
+    count_->store(1);
   }
 
   ~SharedPtr() {  // never throws
     if (count_) {
-      count_.fetch_sub(1);
-      if (count_.load() == 0) {
+      count_->fetch_sub(1);
+      if (count_->load() == 0) {
         delete value_;
         delete count_;
       }
@@ -43,7 +43,7 @@ class SharedPtr {
   SharedPtr(SharedPtr const &r)
       : value_(r.value_), count_(r.count_) {  // never throws
     if (count_) {
-      count_.fetch_add(1);
+      count_->fetch_add(1);
     }
   }
 
@@ -51,7 +51,7 @@ class SharedPtr {
   explicit SharedPtr(SharedPtr<Y> const &r)
       : value_(r.value_), count_(r.count_) {  // never throws
     if (count_) {
-      count_.fetch_add(1);
+      count_->fetch_add(1);
     }
   }
 
@@ -63,7 +63,7 @@ class SharedPtr {
     value_ = r.value_;
     count_ = r.count_;
     if (count_) {
-      count_.fetch_add(1);
+      count_->fetch_add(1);
     }
     return *this;
   }
@@ -74,15 +74,15 @@ class SharedPtr {
     value_ = r.Get();
     count_ = r.GetCountPtr();
     if (count_) {
-      count_.fetch_add(1);
+      count_->fetch_add(1);
     }
     return *this;
   }
 
   void Reset() {  // never throws
     if (count_) {
-      count_.fetch_sub(1);
-      if (count_.load() == 0) {
+      count_->fetch_sub(1);
+      if (count_->load() == 0) {
         delete value_;
         delete count_;
       }
@@ -96,7 +96,7 @@ class SharedPtr {
     Reset();
     value_ = static_cast<element_type *>(p);
     count_ = new std::atomic<int64_t>;
-    count_.store(1);
+    count_->store(1);
   }
 
   T &operator*() const {  // never throws
@@ -114,11 +114,11 @@ class SharedPtr {
   std::atomic<int64_t> *GetCountPtr() const { return count_; }
 
   bool Unique() const {  // never throws
-    return count_ && (count_.load() == 1);
+    return count_ && (count_->load() == 1);
   }
 
   int64_t UseCount() const {  // never throws
-    return count_ ? count_.load() : -1;
+    return count_ ? count_->load() : -1;
   }
 
  private:
@@ -174,3 +174,4 @@ SharedPtr<T> ReinterpretPointerCast(SharedPtr<U> const &r) {  // never throws
 #endif
 
 #endif  // CVMFS_UTIL_SHARED_PTR_H_
+
