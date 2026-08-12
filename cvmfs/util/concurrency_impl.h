@@ -498,7 +498,7 @@ void ConcurrentWorkers<WorkerT>::RunCallbackThread() {
     this->NotifyListeners(callback_job.data);
 
     // remove the job from the pending 'list' and add it to the ready 'list'
-    atomic_dec32(&jobs_pending_);
+    jobs_pending_.fetch_sub(1);
     jobs_processed_.fetch_add(1);
 
     // signal the Spooler that all jobs are done...

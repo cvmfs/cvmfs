@@ -288,7 +288,7 @@ static void *MainWorker(void *data) {
     }
     if (atomic_xadd64(&overall_chunks, 1) % 1000 == 0)
       LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, ".");
-    atomic_dec64(&chunk_queue);
+    chunk_queue.fetch_sub(1);
   }
   return NULL;
 }

@@ -79,7 +79,7 @@ class CallGuard {
   }
   ~CallGuard() {
     if (!drainout_)
-      atomic_dec32(&num_inflight_calls_);
+      num_inflight_calls_.fetch_sub(1);
   }
   static void Drainout() {
     atomic_cas32(&global_drainout_, 0, 1);
@@ -110,7 +110,7 @@ int PosixCacheManager::AbortTxn(void *txn) {
   close(transaction->fd);
   const int result = unlink(transaction->tmp_path.c_str());
   transaction->~Transaction();
-  atomic_dec32(&no_inflight_txns_);
+  no_inflight_txns_.fetch_sub(1);
   if (result == -1)
     return -errno;
   return 0;
@@ -150,7 +150,7 @@ int PosixCacheManager::CommitTxn(void *txn) {
   if (result < 0) {
     unlink(transaction->tmp_path.c_str());
     transaction->~Transaction();
-    atomic_dec32(&no_inflight_txns_);
+    no_inflight_txns_.fetch_sub(1);
     return result;
   }
 
@@ -168,7 +168,7 @@ int PosixCacheManager::CommitTxn(void *txn) {
                     cache_path_ + "/quarantaine/" + transaction->id.ToString());
       unlink(transaction->tmp_path.c_str());
       transaction->~Transaction();
-      atomic_dec32(&no_inflight_txns_);
+      no_inflight_txns_.fetch_sub(1);
       return -EIO;
     }
   }
@@ -183,7 +183,7 @@ int PosixCacheManager::CommitTxn(void *txn) {
                transaction->id.ToString().c_str());
       unlink(transaction->tmp_path.c_str());
       transaction->~Transaction();
-      atomic_dec32(&no_inflight_txns_);
+      no_inflight_txns_.fetch_sub(1);
       return -ENOSPC;
     }
   }
@@ -214,7 +214,7 @@ int PosixCacheManager::CommitTxn(void *txn) {
     }
   }
   transaction->~Transaction();
-  atomic_dec32(&no_inflight_txns_);
+  no_inflight_txns_.fetch_sub(1);
   return result;
 }
 
@@ -564,7 +564,7 @@ int PosixCacheManager::StartTxn(const shash::Any &id,
 
   no_inflight_txns_.fetch_add(1);
   if (cache_mode_ == kCacheReadOnly) {
-    atomic_dec32(&no_inflight_txns_);
+    no_inflight_txns_.fetch_sub(1);
     return -EROFS;
   }
 
@@ -574,7 +574,7 @@ int PosixCacheManager::StartTxn(const shash::Any &id,
                "file too big for lru cache (%" PRIu64 " "
                "requested but only %" PRIu64 " bytes free)",
                size, quota_mgr_->GetMaxFileSize());
-      atomic_dec32(&no_inflight_txns_);
+      no_inflight_txns_.fetch_sub(1);
       return -ENOSPC;
     }
 
@@ -611,7 +611,7 @@ int PosixCacheManager::StartTxn(const shash::Any &id,
   transaction->fd = mkstemp(template_path);
   if (transaction->fd == -1) {
     transaction->~Transaction();
-    atomic_dec32(&no_inflight_txns_);
+    no_inflight_txns_.fetch_sub(1);
     return -errno;
   }
 

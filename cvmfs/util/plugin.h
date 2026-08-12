@@ -205,7 +205,7 @@ class PolymorphicConstructionImpl {
       MutexLockGuard m(&init_mutex_);
       if (needs_init_.load()) {
         AbstractProductT::RegisterPlugins();
-        atomic_dec32(&needs_init_);
+        needs_init_.fetch_sub(1);
       }
     }
 

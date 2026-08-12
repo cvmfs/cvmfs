@@ -27,7 +27,7 @@ class Counter {
  public:
   Counter() { counter_.store(0); }
   void Inc() { counter_.fetch_add(1); }
-  void Dec() { atomic_dec64(&counter_); }
+  void Dec() { counter_.fetch_sub(1); }
   int64_t Get() { return counter_.load(); }
   void Set(const int64_t val) { atomic_write64(&counter_, val); }
   int64_t Xadd(const int64_t delta) { return atomic_xadd64(&counter_, delta); }
