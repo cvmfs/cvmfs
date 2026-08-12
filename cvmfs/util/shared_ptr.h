@@ -43,7 +43,7 @@ class SharedPtr {
   SharedPtr(SharedPtr const &r)
       : value_(r.value_), count_(r.count_) {  // never throws
     if (count_) {
-      atomic_inc64(count_);
+      count_.fetch_add(1);
     }
   }
 
@@ -51,7 +51,7 @@ class SharedPtr {
   explicit SharedPtr(SharedPtr<Y> const &r)
       : value_(r.value_), count_(r.count_) {  // never throws
     if (count_) {
-      atomic_inc64(count_);
+      count_.fetch_add(1);
     }
   }
 
@@ -63,7 +63,7 @@ class SharedPtr {
     value_ = r.value_;
     count_ = r.count_;
     if (count_) {
-      atomic_inc64(count_);
+      count_.fetch_add(1);
     }
     return *this;
   }
@@ -74,7 +74,7 @@ class SharedPtr {
     value_ = r.Get();
     count_ = r.GetCountPtr();
     if (count_) {
-      atomic_inc64(count_);
+      count_.fetch_add(1);
     }
     return *this;
   }

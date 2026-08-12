@@ -536,8 +536,8 @@ class InodeTracker {
       assert(found);
     }
     // Unlock();
-    // if (found) atomic_inc64(&statistics_.num_hits_path);
-    // else atomic_inc64(&statistics_.num_misses_path);
+    // if (found) statistics_.num_hits_path.fetch_add(1);
+    // else statistics_.num_misses_path.fetch_add(1);
     return found;
   }
 
@@ -740,8 +740,8 @@ class InodeTracker {
       assert(found);
     }
     // Unlock();
-    // if (found) atomic_inc64(&statistics_.num_hits_path);
-    // else atomic_inc64(&statistics_.num_misses_path);
+    // if (found) statistics_.num_hits_path.fetch_add(1);
+    // else statistics_.num_misses_path.fetch_add(1);
     return found;
   }
 

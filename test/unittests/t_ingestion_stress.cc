@@ -506,7 +506,7 @@ struct CallbackTest {
 
   static void CallbackCount(const upload::SpoolerResult &result) {
     EXPECT_EQ(0, result.return_code);
-    atomic_inc64(&counter);
+    counter.fetch_add(1);
   }
 
   static std::atomic<int64_t> counter;

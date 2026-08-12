@@ -27,24 +27,24 @@ class ShortString {
  public:
   ShortString() : long_string_(NULL), length_(0) {
 #ifdef DEBUGMSG
-    atomic_inc64(&num_instances_);
+    num_instances_.fetch_add(1);
 #endif
   }
   ShortString(const ShortString &other) : long_string_(NULL) {
 #ifdef DEBUGMSG
-    atomic_inc64(&num_instances_);
+    num_instances_.fetch_add(1);
 #endif
     Assign(other);
   }
   ShortString(const char *chars, const unsigned length) : long_string_(NULL) {
 #ifdef DEBUGMSG
-    atomic_inc64(&num_instances_);
+    num_instances_.fetch_add(1);
 #endif
     Assign(chars, length);
   }
   explicit ShortString(const std::string &std_string) : long_string_(NULL) {
 #ifdef DEBUGMSG
-    atomic_inc64(&num_instances_);
+    num_instances_.fetch_add(1);
 #endif
     Assign(std_string.data(), std_string.length());
   }
@@ -63,7 +63,7 @@ class ShortString {
     this->length_ = length;
     if (length > StackSize) {
 #ifdef DEBUGMSG
-      atomic_inc64(&num_overflows_);
+      num_overflows_.fetch_add(1);
 #endif
       long_string_ = new std::string(chars, length);
     } else {
@@ -85,7 +85,7 @@ class ShortString {
     const unsigned new_length = this->length_ + length;
     if (new_length > StackSize) {
 #ifdef DEBUGMSG
-      atomic_inc64(&num_overflows_);
+      num_overflows_.fetch_add(1);
 #endif
       long_string_ = new std::string();
       long_string_->reserve(new_length);

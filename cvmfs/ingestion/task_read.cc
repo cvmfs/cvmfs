@@ -24,7 +24,7 @@ std::atomic<int64_t> TaskRead::tag_seq_ = 0;
 void TaskRead::Process(FileItem *item) {
   BackoffThrottle throttle(kThrottleInitMs, kThrottleMaxMs, kThrottleResetMs);
   if ((high_watermark_ > 0) && (BlockItem::managed_bytes() > high_watermark_)) {
-    atomic_inc64(&n_block_);
+    n_block_.fetch_add(1);
     do {
       throttle.Throttle();
     } while (BlockItem::managed_bytes() > low_watermark_);

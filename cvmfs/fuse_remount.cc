@@ -38,7 +38,7 @@ FuseRemounter::Status FuseRemounter::ChangeRoot(const shash::Any &root_hash) {
     LogCvmfs(kLogCvmfs, kLogDebug, "chroot, draining out meta-data caches");
     invalidator_handle_.Reset();
     invalidator_->InvalidateInodes(&invalidator_handle_);
-    atomic_inc32(&drainout_mode_);
+    drainout_mode_.fetch_add(1);
     // drainout_mode_ == 2, IsInDrainoutMode is now 'true'
   } else {
     LogCvmfs(kLogCvmfs, kLogDebug, "already in drainout mode, leaving");
@@ -91,7 +91,7 @@ FuseRemounter::Status FuseRemounter::Check() {
                  "draining out meta-data caches");
         invalidator_handle_.Reset();
         invalidator_->InvalidateInodes(&invalidator_handle_);
-        atomic_inc32(&drainout_mode_);
+        drainout_mode_.fetch_add(1);
         // drainout_mode_ == 2, IsInDrainoutMode is now 'true'
       } else {
         LogCvmfs(kLogCvmfs, kLogDebug, "already in drainout mode, leaving");

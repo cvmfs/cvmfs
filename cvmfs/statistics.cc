@@ -52,7 +52,7 @@ Statistics *Statistics::Fork() {
                                             iEnd = counters_.end();
        i != iEnd;
        ++i) {
-    atomic_inc32(&i->second->refcnt);
+    i->second->refcnt.fetch_add(1);
   }
   child->counters_ = counters_;
 

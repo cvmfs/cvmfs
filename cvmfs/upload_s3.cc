@@ -323,7 +323,7 @@ void *S3Uploader::MainCollectResults(void *data) {
                    s3fanout::Code2Ascii(info->error_code));
         }
         reply_code = 99;
-        atomic_inc32(&uploader->io_errors_);
+        uploader->io_errors_.fetch_add(1);
       }
     }
     if (info->request == s3fanout::JobInfo::kReqDeleteMulti) {
@@ -339,7 +339,7 @@ void *S3Uploader::MainCollectResults(void *data) {
                    "S3 multi-delete error for key '%s': %s - %s",
                    error_keys[i].c_str(), error_codes[i].c_str(),
                    error_messages[i].c_str());
-          atomic_inc32(&uploader->io_errors_);
+          uploader->io_errors_.fetch_add(1);
           failed_keys.insert(error_keys[i]);
         }
       }

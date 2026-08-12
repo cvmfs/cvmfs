@@ -73,7 +73,7 @@ class CallGuard {
     const int32_t global_drainout = global_drainout_.load();
     drainout_ = (global_drainout != 0);
     if (!drainout_)
-      atomic_inc32(&num_inflight_calls_);
+      num_inflight_calls_.fetch_add(1);
   }
   ~CallGuard() {
     if (!drainout_)
@@ -560,7 +560,7 @@ int PosixCacheManager::StartTxn(const shash::Any &id,
   if (!EnsureCacheDirectories())
     return -EIO;
 
-  atomic_inc32(&no_inflight_txns_);
+  no_inflight_txns_.fetch_add(1);
   if (cache_mode_ == kCacheReadOnly) {
     atomic_dec32(&no_inflight_txns_);
     return -EROFS;

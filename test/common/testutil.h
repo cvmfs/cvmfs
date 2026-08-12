@@ -400,7 +400,7 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
     string name = root_path.substr(pos + 1, string::npos);
     File mountpoint_file(shash::Any(), 4096, parent_path, name);
     files_.push_back(mountpoint_file);
-    atomic_inc32(&MockCatalog::instances);
+    MockCatalog::instances.fetch_add(1);
   }
 
   MockCatalog(const MockCatalog &other)
@@ -418,7 +418,7 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
       , children_(other.children_)
       , files_(other.files_)
       , chunks_(other.chunks_) {
-    atomic_inc32(&MockCatalog::instances);
+    MockCatalog::instances.fetch_add(1);
   }
 
   ~MockCatalog() { atomic_dec32(&MockCatalog::instances); }

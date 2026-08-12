@@ -178,7 +178,7 @@ CachePlugin::CachePlugin(uint64_t capabilities)
   next_txn_id_.store(0);
   next_lst_id_.store(0);
   // Don't use listing id zero
-  atomic_inc64(&next_lst_id_);
+  next_lst_id_.fetch_add(1);
   txn_ids_.Init(128, UniqueRequest(), HashUniqueRequest);
   memset(&thread_io_, 0, sizeof(thread_io_));
   MakePipe(pipe_ctrl_);

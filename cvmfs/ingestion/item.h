@@ -65,7 +65,7 @@ class FileItem : SingleCopy {
 
   void set_size(uint64_t val) { size_ = val; }
   void set_may_have_chunks(bool val) { may_have_chunks_ = val; }
-  void set_is_fully_chunked() { atomic_inc32(&is_fully_chunked_); }
+  void set_is_fully_chunked() { is_fully_chunked_.fetch_add(1); }
   bool is_fully_chunked() { return is_fully_chunked_.load() != 0; }
   uint64_t nchunks_in_fly() { return nchunks_in_fly_.load(); }
 
@@ -80,7 +80,7 @@ class FileItem : SingleCopy {
   bool GetSize(uint64_t *size) { return source_->GetSize(size); }
 
   // Called by ChunkItem constructor, decremented when a chunk is registered
-  void IncNchunksInFly() { atomic_inc64(&nchunks_in_fly_); }
+  void IncNchunksInFly() { nchunks_in_fly_.fetch_add(1); }
   void RegisterChunk(const FileChunk &file_chunk);
   bool IsProcessed() {
     return is_fully_chunked() && (nchunks_in_fly_.load() == 0);

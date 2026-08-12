@@ -1972,7 +1972,7 @@ void DownloadManager::Spawn() {
                                     static_cast<void *>(this));
   assert(retval == 0);
 
-  atomic_inc32(&multi_threaded_);
+  multi_threaded_.fetch_add(1);
 
   if (health_check_.UseCount() > 0) {
     LogCvmfs(kLogDownload, kLogDebug,

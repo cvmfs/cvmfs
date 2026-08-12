@@ -240,7 +240,7 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
 
   void ProcessJobPre(CatalogJob *job) {
     if (!this->PrepareCatalog(job)) {
-      atomic_inc32(&num_errors_);
+      num_errors_.fetch_add(1);
       NotifyFinished();
       return;
     }
@@ -264,7 +264,7 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
         atomic_write32(&job->children_unprocessed, num_children);
       }
       if (!this->CloseCatalog(false, job)) {
-        atomic_inc32(&num_errors_);
+        num_errors_.fetch_add(1);
         NotifyFinished();
       }
     }
@@ -353,7 +353,7 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
     // Save time by keeping catalog open when suitable
     if (job->catalog == NULL) {
       if (!this->ReopenCatalog(job)) {
-        atomic_inc32(&num_errors_);
+        num_errors_.fetch_add(1);
         NotifyFinished();
         return;
       }
@@ -366,7 +366,7 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
     }
     if (!this->no_close_) {
       if (!this->CloseCatalog(true, job)) {
-        atomic_inc32(&num_errors_);
+        num_errors_.fetch_add(1);
         NotifyFinished();
         return;
       }

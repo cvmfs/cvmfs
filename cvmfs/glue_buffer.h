@@ -606,7 +606,7 @@ class InodeTracker {
         }
         tracker_->inode_ex_map_.Erase(inode);
         tracker_->path_map_.Erase(md5path);
-        atomic_inc64(&tracker_->statistics_.num_removes);
+        tracker_->statistics_.num_removes.fetch_add(1);
       }
       atomic_xadd64(&tracker_->statistics_.num_references, -int32_t(by));
       return removed;
@@ -660,7 +660,7 @@ class InodeTracker {
 
     atomic_xadd64(&statistics_.num_references, by);
     if (is_new_inode)
-      atomic_inc64(&statistics_.num_inserts);
+      statistics_.num_inserts.fetch_add(1);
   }
 
   void VfsGet(const InodeEx inode_ex, const PathString &path) {
@@ -680,9 +680,9 @@ class InodeTracker {
     Unlock();
 
     if (found) {
-      atomic_inc64(&statistics_.num_hits_path);
+      statistics_.num_hits_path.fetch_add(1);
     } else {
-      atomic_inc64(&statistics_.num_misses_path);
+      statistics_.num_misses_path.fetch_add(1);
     }
     return found;
   }
@@ -691,7 +691,7 @@ class InodeTracker {
     Lock();
     const uint64_t inode = path_map_.LookupInodeByPath(path);
     Unlock();
-    atomic_inc64(&statistics_.num_hits_inode);
+    statistics_.num_hits_inode.fetch_add(1);
     return inode;
   }
 

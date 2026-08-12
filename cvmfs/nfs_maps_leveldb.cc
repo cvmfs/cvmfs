@@ -63,7 +63,7 @@ void NfsMapsLeveldb::ForkAwareEnv::Schedule(void (*function)(void *),
   funcarg->function = function;
   funcarg->arg = arg;
   funcarg->env = this;
-  atomic_inc32(&num_bg_threads_);
+  num_bg_threads_.fetch_add(1);
   pthread_t bg_thread;
   int retval = pthread_create(&bg_thread, NULL, MainFakeThread, funcarg);
   assert(retval == 0);
