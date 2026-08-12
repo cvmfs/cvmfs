@@ -77,8 +77,8 @@ class FuseRemounter : SingleCopy {
   void SetAlarm(int timeout);
 
   bool EnterCriticalSection() {
-    return int32_t expected_val = 0;
-    critical_section_.compare_exchange_strong(expected_val, 1);
+    int32_t expected_val = 0;
+    return critical_section_.compare_exchange_strong(expected_val, 1);
   }
   void LeaveCriticalSection() { critical_section_.fetch_sub(1); /* 1 -> 0 */ }
 
@@ -144,3 +144,4 @@ class FuseRemounter : SingleCopy {
 };  // class FuseRemounter
 
 #endif  // CVMFS_FUSE_REMOUNT_H_
+
