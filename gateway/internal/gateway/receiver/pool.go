@@ -161,7 +161,19 @@ M:
 
 		func() {
 			t0 := time.Now()
-			receiver, err := NewReceiver(task.Context(), pool.workerExec, pool.mock, pool.smgr)
+			var extraArgs []string
+			var leasePath string
+			switch t := task.(type) {
+			case payloadTask:
+				leasePath = t.leasePath
+			case commitTask:
+				leasePath = t.leasePath
+			}
+			if leasePath != "" {
+				extraArgs = append(extraArgs, "-l", leasePath)
+			}
+
+			receiver, err := NewReceiver(task.Context(), pool.workerExec, pool.mock, pool.smgr, extraArgs...)
 			if err != nil {
 				task.Reply() <- err
 				return
