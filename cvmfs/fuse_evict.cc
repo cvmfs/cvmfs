@@ -26,7 +26,7 @@ FuseInvalidator::Handle::Handle(unsigned timeout_s)
     : timeout_s_((timeout_s == 0) ? 0 : (timeout_s + kTimeoutSafetyMarginSec)) {
   status_ = reinterpret_cast<std::atomic<int32_t> *>(
       smalloc(sizeof(std::atomic<int32_t>)));
-  status_.store(0);
+  status_->store(0);
 }
 
 
