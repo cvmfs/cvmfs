@@ -76,7 +76,10 @@ class FuseRemounter : SingleCopy {
   bool HasRemountTrigger() { return pipe_remount_trigger_[0] >= 0; }
   void SetAlarm(int timeout);
 
-  bool EnterCriticalSection() { return atomic_cas32(&critical_section_, 0, 1); }
+  bool EnterCriticalSection() {
+    return int32_t expected_val = 0;
+    critical_section_.compare_exchange_strong(expected_val, 1);
+  }
   void LeaveCriticalSection() { critical_section_.fetch_sub(1); /* 1 -> 0 */ }
 
   void SetOfflineMode(bool value);

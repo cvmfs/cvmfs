@@ -33,7 +33,8 @@ FuseRemounter::Status FuseRemounter::ChangeRoot(const shash::Any &root_hash) {
   if (IsInMaintenanceMode())
     return kStatusMaintenance;
 
-  if (atomic_cas32(&drainout_mode_, 0, 1)) {
+  if (int32_t expected_val = 0;
+      drainout_mode_.compare_exchange_strong(expected_val, 1)) {
     // As of this point, fuse callbacks return zero as cache timeout
     LogCvmfs(kLogCvmfs, kLogDebug, "chroot, draining out meta-data caches");
     invalidator_handle_.Reset();
@@ -84,7 +85,8 @@ FuseRemounter::Status FuseRemounter::Check() {
   switch (retval) {
     case catalog::kLoadNew:
       SetOfflineMode(false);
-      if (atomic_cas32(&drainout_mode_, 0, 1)) {
+      if (int32_t expected_val = 0;
+          drainout_mode_.compare_exchange_strong(expected_val, 1)) {
         // As of this point, fuse callbacks return zero as cache timeout
         LogCvmfs(kLogCvmfs, kLogDebug,
                  "new catalog revision available, "
@@ -145,7 +147,8 @@ FuseRemounter::Status FuseRemounter::CheckSynchronously() {
 
 void FuseRemounter::EnterMaintenanceMode() {
   fence_maintenance_.Drain();
-  atomic_cas32(&maintenance_mode_, 0, 1);
+  int32_t expected_val = 0;
+  maintenance_mode_.compare_exchange_strong(expected_val, 1);
   fence_maintenance_.Open();
 
   // All running Check() and TryFinish() methods returned.  Both methods now

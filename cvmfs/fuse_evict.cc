@@ -92,7 +92,8 @@ FuseInvalidator::FuseInvalidator(glue::InodeTracker *inode_tracker,
 
 
 FuseInvalidator::~FuseInvalidator() {
-  atomic_cas32(&terminated_, 0, 1);
+  int32_t expected_val = 0;
+  terminated_.compare_exchange_strong(expected_val, 1);
   if (spawned_) {
     QuitCommand *cmd = new (smalloc(sizeof(QuitCommand))) QuitCommand();
     channel_.PushBack(cmd);

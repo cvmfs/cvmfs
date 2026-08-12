@@ -80,7 +80,8 @@ class CallGuard {
       num_inflight_calls_.fetch_sub(1);
   }
   static void Drainout() {
-    atomic_cas32(&global_drainout_, 0, 1);
+    int32_t expected_val = 0;
+    global_drainout_.compare_exchange_strong(expected_val, 1);
     while (num_inflight_calls_.load() != 0)
       SafeSleepMs(50);
   }
