@@ -30,6 +30,9 @@ class Ingest : public Command {
     r.push_back(Parameter::Mandatory('N', "fully qualified repository name"));
 
     r.push_back(Parameter::Optional('T', "tar file to extract"));
+    // Path (regular file or FIFO) receiving one line per data object
+    // confirmed into S3.  Absent => not opened, nothing written.
+    r.push_back(Parameter::Optional('S', "object list output"));
     r.push_back(Parameter::Optional(
         'B', "base directory where to extract the tarfile"));
     r.push_back(

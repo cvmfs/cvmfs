@@ -171,7 +171,21 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
     s3_config_path = *args.find('3')->second;
   }
 
+  // Only the data uploader writes the list; the catalog uploader below is
+  // deliberately given none, or every object would be listed twice.
+  std::string object_list_path;
+  if (args.find('S') != args.end()) {
+    object_list_path = *args.find('S')->second;
+  }
+
   const bool use_s3_direct = !s3_config_path.empty();
+  if (!object_list_path.empty() && !use_s3_direct) {
+    // Only the S3 uploader produces the list, so without -3 nothing would
+    // write it.  cvmfs_server refuses this too; refuse for direct callers.
+    PrintError("Object list (-S) requires direct-to-S3 upload (-3)");
+    return 3;
+  }
+
   if (use_s3_direct
       && spooler_definition.driver_type != upload::SpoolerDefinition::Gateway) {
     // Do not silently fall back to the plain uploader: the caller asked for
@@ -186,7 +200,7 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
              "Swissknife Ingest: Using direct-to-S3 upload mode");
 
     upload::GatewayS3Uploader *gw_s3 = new upload::GatewayS3Uploader(
-        spooler_definition, s3_config_path, params.repo_name);
+        spooler_definition, s3_config_path, params.repo_name, object_list_path);
     if (!gw_s3->Initialize()) {
       PrintError("Failed to initialize GatewayS3 uploader");
       delete gw_s3;

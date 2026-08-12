@@ -124,6 +124,7 @@ cvmfs_server_ingest() {
   # config", 1/0 mean explicitly requested/refused on the command line
   local direct_s3=""
   local direct_s3_config=""
+  local object_list=""
 
   local force_native=0
   local force_external=0
@@ -191,6 +192,10 @@ cvmfs_server_ingest() {
         ;;
       --s3-config )
         direct_s3_config=$2
+        ;;
+      # Path (regular file or FIFO) for the confirmed-object list.
+      --object-list )
+        object_list=$2
         ;;
     esac
     shift
@@ -563,6 +568,12 @@ cvmfs_server_ingest() {
       direct_s3=0
     fi
   fi
+  # The list is produced by the S3 uploader, so without --direct-s3 there is
+  # nothing to write it.  Refuse rather than ignore.
+  if [ x"$object_list" != "x" ] && [ $direct_s3 -ne 1 ]; then
+    _abort
+    die "--object-list requires --direct-s3"
+  fi
   if [ $direct_s3 -eq 1 ]; then
     if [ x"$direct_s3_config" = "x" ]; then
       direct_s3_config="${CVMFS_INGEST_DIRECT_S3_CONFIG:-/etc/cvmfs/${name}.s3.conf}"
@@ -580,6 +591,9 @@ cvmfs_server_ingest() {
       die "Direct-to-S3 upload requested but S3 config '$direct_s3_config' does not exist"
     fi
     ingest_command="$ingest_command -3 $direct_s3_config"
+    if [ x"$object_list" != "x" ]; then
+      ingest_command="$ingest_command -S $object_list"
+    fi
     echo "Info: using direct-to-S3 upload for data objects ($direct_s3_config)"
   fi
 

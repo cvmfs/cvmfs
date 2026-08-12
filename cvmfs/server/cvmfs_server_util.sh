@@ -1443,6 +1443,7 @@ Supported Commands:
                   [--gc-db <path to GC SQLite database>]
                   [--direct-s3 | --no-direct-s3]
                   [--s3-config <path to S3 config file>]
+                  [--object-list <path to file or FIFO>]
                   <fully qualified name>
                   Extract the content of the tarfile inside the base directory,
                   in the same transaction it also delete the required folders.
@@ -1461,6 +1462,12 @@ Supported Commands:
                   /etc/cvmfs/<fully qualified name>.s3.conf.  The default can
                   be set with CVMFS_INGEST_DIRECT_S3 in the server config and
                   overridden per invocation with --no-direct-s3.
+                  Use --object-list to receive one line per data object as S3
+                  confirms it: \"<s3 key> ok created\", \"<s3 key> ok present\" or
+                  \"<s3 key> failed -\".  Intended for an inherited pipe passed
+                  as /proc/self/fd/<N>; a file or FIFO also works, but opening
+                  a FIFO blocks until a reader attaches.  A write error fails
+                  the publish.  Requires --direct-s3.
   ingestsql       -D <sqlite database>
                   [-l <lease path>] [-p <prefix>]
                   [-q <concurrent jobs>] [-n <create empty db file>]

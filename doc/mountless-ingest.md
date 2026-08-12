@@ -99,6 +99,7 @@ makes it easy to script ingest commands using the same paths.
 | `-f` | `--fast-delete` | Use fast deletion for nested catalogs |
 |      | `--direct-s3` / `--no-direct-s3` | Enable/disable direct-to-S3 data upload for this invocation (see below) |
 |      | `--s3-config` | S3 config file to use for direct-to-S3 data upload |
+|      | `--object-list` | File, pipe or FIFO receiving one line per data object as S3 confirms it (see below).  Requires `--direct-s3` |
 
 **Gateway mode restrictions:**
 - Only one `-d` / `--delete` path per invocation (gateway leases are path-scoped).
@@ -158,6 +159,40 @@ opt out again with `--no-direct-s3`.  The S3 config file defaults to
 Direct-to-S3 requires mountless gateway ingest; requesting it otherwise, or
 with a missing S3 config file, aborts the transaction with an error rather
 than silently falling back to the gateway.
+
+### The object list
+
+`--object-list <path>` writes one line per data object as S3 confirms it, so a
+caller can pre-warm Stratum 1 caches without re-deriving the object set:
+
+```
+<repository>/data/ab/cdef...P ok created
+<repository>/data/12/3456...   ok present
+<repository>/data/78/9abc...   failed -
+```
+
+Catalogs are not listed: they go through the gateway, not S3.  The option
+requires `--direct-s3` and is refused without it.
+
+The intended use is an **inherited anonymous pipe**, not a named FIFO: the
+caller creates a pipe, passes the write end to `cvmfs_server` as a file
+descriptor, and gives `--object-list /proc/self/fd/<N>`.  Both ends then exist
+before the publisher starts, so nothing blocks, there is no filesystem node to
+leave behind, and if the reader dies the publisher fails in order.
+
+A regular file and a named FIFO both work too, but note that opening a FIFO
+blocks until a reader attaches, with no timeout — the publishing lock and the
+gateway lease are already held at that point, so a FIFO with no reader hangs
+the publish.  A path that does not exist is created as a regular file.
+
+The reader must drain the pipe and do its work asynchronously.  The pipe buffer
+is 64 KiB, and a reader that stops draining blocks the thread that reaps S3
+completions, stalling the publish behind it.
+
+If the list cannot be written — the reader went away, the disk filled — the
+publish fails.  A silently truncated list would under-warm a cache with nothing
+to indicate it.  End-of-file alone does not mean success: it arrives on an
+aborted publish too, so check the exit status before acting on the list.
 
 You will see the log line:
 

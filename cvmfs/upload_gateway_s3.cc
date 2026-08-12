@@ -10,7 +10,12 @@
 
 #include "upload_gateway_s3.h"
 
+#include <signal.h>
+
 #include <cassert>
+#include <cerrno>
+#include <cstdio>
+#include <cstring>
 
 #include "options.h"
 #include "util/file_backed_buffer.h"
@@ -22,10 +27,13 @@ namespace upload {
 GatewayS3Uploader::GatewayS3Uploader(
     const SpoolerDefinition &spooler_definition,
     const std::string &s3_config_path,
-    const std::string &repo_alias)
+    const std::string &repo_alias,
+    const std::string &object_list_path)
     : GatewayUploader(spooler_definition)
     , s3_config_path_(s3_config_path)
     , repo_alias_(repo_alias)
+    , object_list_path_(object_list_path)
+    , object_list_(NULL)
     , s3fanout_mgr_()
     , collector_running_(false) {
   atomic_init32(&s3_errors_);
@@ -35,6 +43,12 @@ GatewayS3Uploader::~GatewayS3Uploader() {
   if (collector_running_) {
     s3fanout_mgr_->PushCompletedJob(NULL);  // signal termination
     pthread_join(thread_collect_results_, NULL);
+  }
+  // AFTER the join: the collector is the writer, and closing under it would
+  // write to a closed handle.  Closing releases a FIFO reader.
+  if (object_list_ != NULL) {
+    fclose(object_list_);
+    object_list_ = NULL;
   }
 }
 
@@ -127,6 +141,26 @@ bool GatewayS3Uploader::InitS3Manager() {
 
   if (options_manager.IsDefined("CVMFS_S3_PROXY")) {
     options_manager.GetValue("CVMFS_S3_PROXY", &s3config.proxy);
+  }
+
+  // Opened only when -S was given, and before anything is spawned so that a
+  // failure here still returns cleanly.  A FIFO blocks until its reader
+  // attaches, which is the intended handshake with the caller.
+  if (!object_list_path_.empty()) {
+    LogCvmfs(kLogUploadS3, kLogStdout,
+             "GatewayS3: opening object list '%s' "
+             "(blocks until a reader attaches if this is a FIFO)",
+             object_list_path_.c_str());
+    // Without this a reader that goes away kills the process by signal; the
+    // write returns EPIPE instead, and the publish then fails in order.
+    signal(SIGPIPE, SIG_IGN);
+    object_list_ = fopen(object_list_path_.c_str(), "w");
+    if (object_list_ == NULL) {
+      LogCvmfs(kLogUploadS3, kLogStderr,
+               "GatewayS3: cannot open object list '%s': %s",
+               object_list_path_.c_str(), strerror(errno));
+      return false;
+    }
   }
 
   s3fanout_mgr_.reset(new s3fanout::S3FanoutManager(s3config));
@@ -249,10 +283,32 @@ void *GatewayS3Uploader::MainCollectResults(void *data) {
       atomic_inc32(&uploader->s3_errors_);
     }
 
-    if (info->request == s3fanout::JobInfo::kReqHeadPut
-        && info->error_code == s3fanout::kFailOk) {
+    const bool was_duplicate = info->request == s3fanout::JobInfo::kReqHeadPut
+                               && info->error_code == s3fanout::kFailOk;
+    if (was_duplicate) {
       // HEAD indicated object exists — duplicate, no actual upload
       uploader->CountDuplicates();
+    }
+
+    // Confirmed by S3, not merely scheduled; this thread is the only writer.
+    // Flushed per line so a FIFO reader sees it immediately.  On failure the
+    // third column is "-": nothing was stored, so it is neither.
+    if (uploader->object_list_ != NULL) {
+      const bool ok = reply_code == 0;
+      const int rv = fprintf(
+          uploader->object_list_, "%s %s %s\n", info->object_key.c_str(),
+          ok ? "ok" : "failed",
+          !ok ? "-" : (was_duplicate ? "present" : "created"));
+      if ((rv < 0) || (fflush(uploader->object_list_) != 0)) {
+        // A silently truncated list would under-warm a cache with no way for
+        // the caller to tell, so stop writing and fail the publish instead.
+        LogCvmfs(kLogUploadS3, kLogStderr,
+                 "GatewayS3: object list write failed at '%s': %s",
+                 info->object_key.c_str(), strerror(errno));
+        atomic_inc32(&uploader->s3_errors_);
+        fclose(uploader->object_list_);
+        uploader->object_list_ = NULL;
+      }
     }
 
     uploader->Respond(
