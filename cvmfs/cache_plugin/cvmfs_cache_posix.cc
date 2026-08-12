@@ -472,7 +472,7 @@ int main(int argc, char **argv) {
   if (!cvmcache_is_supervised()) {
     LogCvmfs(kLogCache, kLogStdout,
              "Running unsupervised. Quit by SIGINT (CTRL+C)");
-    atomic_init32(&g_terminated);
+    g_terminated.store(0);
     signal(SIGINT, handle_sigint);
     while (g_terminated.load() == 0)
       sleep(1);

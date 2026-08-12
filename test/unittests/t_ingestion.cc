@@ -65,7 +65,7 @@ std::atomic<int32_t> TestTask::cnt_process = 0;
  * file catalog.
  */
 struct FnFileProcessed {
-  FnFileProcessed() { atomic_init64(&ncall); }
+  FnFileProcessed() { ncall.store(0); }
 
   void OnFileProcessed(const upload::SpoolerResult &spooler_result) {
     atomic_inc64(&ncall);
@@ -76,7 +76,7 @@ struct FnFileProcessed {
 
 
 struct FnFileHashed {
-  FnFileHashed() { atomic_init64(&ncall); }
+  FnFileHashed() { ncall.store(0); }
 
   void OnFileProcessed(const ScrubbingResult &scrubbing_result) {
     last_result = scrubbing_result;

@@ -1923,7 +1923,7 @@ DownloadManager::DownloadManager(const unsigned max_pool_handles,
     , opt_proxy_groups_reset_after_(0)
     , credentials_attachment_(NULL)
     , counters_(new Counters(statistics)) {
-  atomic_init32(&multi_threaded_);
+  multi_threaded_.store(0);
 
   lock_options_ = reinterpret_cast<pthread_mutex_t *>(
       smalloc(sizeof(pthread_mutex_t)));

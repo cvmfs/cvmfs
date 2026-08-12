@@ -620,12 +620,12 @@ class InodeTracker {
   // reloads.  Added manually in the fuse module initialization and in talk.cc.
   struct Statistics {
     Statistics() {
-      atomic_init64(&num_inserts);
-      atomic_init64(&num_removes);
-      atomic_init64(&num_references);
-      atomic_init64(&num_hits_inode);
-      atomic_init64(&num_hits_path);
-      atomic_init64(&num_misses_path);
+      num_inserts.store(0);
+      num_removes.store(0);
+      num_references.store(0);
+      num_hits_inode.store(0);
+      num_hits_path.store(0);
+      num_misses_path.store(0);
     }
     std::string Print() {
       return "inserts: " + StringifyInt(num_inserts.load())

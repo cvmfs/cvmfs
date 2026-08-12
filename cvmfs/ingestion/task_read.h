@@ -31,7 +31,7 @@ class TaskRead : public TubeConsumer<FileItem> {
       , allocator_(allocator)
       , low_watermark_(0)
       , high_watermark_(0) {
-    atomic_init64(&n_block_);
+    n_block_.store(0);
   }
 
   void SetWatermarks(uint64_t low, uint64_t high);

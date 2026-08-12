@@ -61,7 +61,7 @@ S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition)
   assert(spooler_definition.IsValid()
          && spooler_definition.driver_type == SpoolerDefinition::S3);
 
-  atomic_init32(&io_errors_);
+  io_errors_.store(0);
   const int mutex_ret = pthread_mutex_init(&delete_batch_mutex_, NULL);
   assert(mutex_ret == 0);
 

@@ -396,7 +396,7 @@ ExternalCacheManager::ExternalCacheManager(int fd_connection,
   retval = pthread_mutex_init(&lock_inflight_rpcs_, NULL);
   assert(retval == 0);
   memset(&thread_read_, 0, sizeof(thread_read_));
-  atomic_init64(&next_request_id_);
+  next_request_id_.store(0);
 }
 
 

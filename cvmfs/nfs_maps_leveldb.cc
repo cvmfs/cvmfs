@@ -37,7 +37,7 @@ using namespace std;  // NOLINT
 
 NfsMapsLeveldb::ForkAwareEnv::ForkAwareEnv(NfsMapsLeveldb *maps)
     : leveldb::EnvWrapper(leveldb::Env::Default()), maps_(maps) {
-  atomic_init32(&num_bg_threads_);
+  num_bg_threads_.store(0);
 }
 
 

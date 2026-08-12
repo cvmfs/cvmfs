@@ -116,8 +116,8 @@ class BuggyCacheManager : public CacheManager {
       , allow_open(false)
       , stall_in_ctrltxn(false)
       , allow_open_from_txn(false) {
-    atomic_init32(&waiting_in_ctrltxn);
-    atomic_init32(&continue_ctrltxn);
+    waiting_in_ctrltxn.store(0);
+    continue_ctrltxn.store(0);
   }
   virtual CacheManagerIds id() { return kUnknownCacheManager; }
   virtual std::string Describe() { return "test\n"; }

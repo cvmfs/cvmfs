@@ -35,8 +35,8 @@ FileItem::FileItem(IngestionSource *source,
     , chunks_(1) {
   const int retval = pthread_mutex_init(&lock_, NULL);
   assert(retval == 0);
-  atomic_init64(&nchunks_in_fly_);
-  atomic_init32(&is_fully_chunked_);
+  nchunks_in_fly_.store(0);
+  is_fully_chunked_.store(0);
 }
 
 FileItem::~FileItem() { pthread_mutex_destroy(&lock_); }

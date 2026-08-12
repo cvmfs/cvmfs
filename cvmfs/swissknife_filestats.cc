@@ -45,7 +45,7 @@ int CommandFileStats::Main(const ArgumentList &args) {
   }
 
   tmp_db_path_ = tmp_dir + "/cvmfs_filestats/";
-  atomic_init32(&num_downloaded_);
+  num_downloaded_.store(0);
 
   bool success = false;
   if (IsHttpUrl(repo_url)) {
@@ -70,7 +70,7 @@ int CommandFileStats::Main(const ArgumentList &args) {
 
 template<class ObjectFetcherT>
 bool CommandFileStats::Run(ObjectFetcherT *object_fetcher) {
-  atomic_init32(&finished_);
+  finished_.store(0);
 
   const string abs_path = GetAbsolutePath(db_path_);
   unlink(abs_path.c_str());

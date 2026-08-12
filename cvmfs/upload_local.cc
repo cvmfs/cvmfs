@@ -23,7 +23,7 @@ LocalUploader::LocalUploader(const SpoolerDefinition &spooler_definition)
   assert(spooler_definition.IsValid()
          && spooler_definition.driver_type == SpoolerDefinition::Local);
 
-  atomic_init32(&copy_errors_);
+  copy_errors_.store(0);
 }
 
 bool LocalUploader::WillHandle(const SpoolerDefinition &spooler_definition) {

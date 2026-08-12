@@ -334,7 +334,7 @@ const std::string MockCatalog::rhs = "f9d87ae2cc46be52b324335ff05fae4c1a7c4dd4";
 const shash::Any MockCatalog::root_hash = shash::Any(
     shash::kSha1, shash::HexPtr(MockCatalog::rhs), shash::kSuffixCatalog);
 
-void MockCatalog::ResetGlobalState() { atomic_init32(&MockCatalog::instances); }
+void MockCatalog::ResetGlobalState() { MockCatalog::instances.store(0); }
 
 MockCatalog *MockCatalog::AttachFreely(const std::string &root_path,
                                        const std::string &file,

@@ -605,9 +605,9 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   int result = 1;
 
   // Initialization
-  atomic_init64(&overall_chunks);
-  atomic_init64(&overall_new);
-  atomic_init64(&chunk_queue);
+  overall_chunks.store(0);
+  overall_new.store(0);
+  chunk_queue.store(0);
 
   const bool follow_redirects = false;
   const unsigned max_pool_handles = num_parallel + 1;

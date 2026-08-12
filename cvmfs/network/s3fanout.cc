@@ -16,9 +16,9 @@
 
 #include "crypto/hash.h"
 #include "util/exception.h"
+#include "util/platform.h"
 #include "util/posix.h"
 #include "util/string.h"
-#include "util/platform.h"
 
 using namespace std;  // NOLINT
 
@@ -33,9 +33,15 @@ static string XmlEscape(const string &input) {
   result.reserve(input.size());
   for (unsigned i = 0; i < input.size(); ++i) {
     switch (input[i]) {
-      case '&': result += "&amp;"; break;
-      case '<': result += "&lt;"; break;
-      default:  result += input[i]; break;
+      case '&':
+        result += "&amp;";
+        break;
+      case '<':
+        result += "&lt;";
+        break;
+      default:
+        result += input[i];
+        break;
     }
   }
   return result;
@@ -68,7 +74,8 @@ string MkV2CanonicalResource(const string &bucket, const string &object_key,
  * Uses Quiet mode so the response only contains errors, not successes.
  */
 string ComposeDeleteMultiXml(const vector<string> &keys) {
-  string xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Delete><Quiet>true</Quiet>";
+  string xml = "<?xml version=\"1.0\" "
+               "encoding=\"UTF-8\"?><Delete><Quiet>true</Quiet>";
   // ~70 bytes per <Object><Key>...</Key></Object> entry
   xml.reserve(xml.size() + keys.size() * 70 + 10);
   for (unsigned i = 0; i < keys.size(); ++i) {
@@ -99,8 +106,7 @@ unsigned ParseDeleteMultiResponse(const string &response,
     if (err_end == string::npos)
       break;
 
-    const string error_block = response.substr(err_start,
-                                                err_end - err_start);
+    const string error_block = response.substr(err_start, err_end - err_start);
     num_errors++;
 
     // Extract <Key>...</Key>
@@ -146,8 +152,8 @@ const unsigned S3FanoutManager::kThrottleReportIntervalSec = 10;
 const unsigned S3FanoutManager::kDefaultHTTPPort = 80;
 const unsigned S3FanoutManager::kDefaultHTTPSPort = 443;
 
-std::string S3FanoutManager::MkDotCvmfsCacheControlHeader(unsigned defaultMaxAge, int overrideMaxAge)
-{
+std::string S3FanoutManager::MkDotCvmfsCacheControlHeader(
+    unsigned defaultMaxAge, int overrideMaxAge) {
   const char *var;
   int max_age_sec;
   char *at_null_terminator_if_number;
@@ -162,8 +168,7 @@ std::string S3FanoutManager::MkDotCvmfsCacheControlHeader(unsigned defaultMaxAge
     var = getenv("CVMFS_MAX_TTL_SECS");
     if (var && var[0]) {
       max_age_sec = strtoll(var, &at_null_terminator_if_number, 10);
-      if (*at_null_terminator_if_number == '\0'
-          && max_age_sec >= 0) {
+      if (*at_null_terminator_if_number == '\0' && max_age_sec >= 0) {
         value_determined = true;
       }
     }
@@ -173,8 +178,7 @@ std::string S3FanoutManager::MkDotCvmfsCacheControlHeader(unsigned defaultMaxAge
     var = getenv("CVMFS_MAX_TTL");
     if (var && var[0]) {
       max_age_sec = strtoll(var, &at_null_terminator_if_number, 10);
-      if (*at_null_terminator_if_number == '\0'
-          && max_age_sec >= 0) {
+      if (*at_null_terminator_if_number == '\0' && max_age_sec >= 0) {
         max_age_sec *= 60;
         value_determined = true;
       }
@@ -758,9 +762,9 @@ bool S3FanoutManager::MkV4Authz(const JobInfo &info,
 
   const string canonical_request = GetRequestString(info) + "\n"
                                    + GetUriEncode(uri, false) + "\n"
-                                   + canonical_query + "\n"
-                                   + canonical_headers + "\n" + signed_headers
-                                   + "\n" + payload_hash;
+                                   + canonical_query + "\n" + canonical_headers
+                                   + "\n" + signed_headers + "\n"
+                                   + payload_hash;
 
   const string hash_request = shash::Sha256String(canonical_request.c_str());
 
@@ -1369,7 +1373,7 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
 }
 
 S3FanoutManager::S3FanoutManager(const S3Config &config) : config_(config) {
-  atomic_init32(&multi_threaded_);
+  multi_threaded_.store(0);
   MakePipe(pipe_terminate_);
   MakePipe(pipe_jobs_);
   MakePipe(pipe_completed_);

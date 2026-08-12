@@ -65,7 +65,7 @@ GatewayUploader::GatewayUploader(const SpoolerDefinition &spooler_definition)
     PANIC(kLogStderr, "Error in parsing the spooler definition");
   }
 
-  atomic_init32(&num_errors_);
+  num_errors_.store(0);
 }
 
 GatewayUploader::~GatewayUploader() {

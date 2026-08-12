@@ -43,7 +43,7 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
       : CatalogTraversalBase<ObjectFetcherT>(params)
       , num_threads_(params.num_threads)
       , serialize_callbacks_(params.serialize_callbacks) {
-    atomic_init32(&num_errors_);
+    num_errors_.store(0);
     shash::Any null_hash;
     null_hash.SetNull();
     catalogs_processing_.Init(1024, null_hash, hasher);
@@ -64,7 +64,7 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
                         CatalogTN *parent = NULL)
         : CatalogTraversal<ObjectFetcherT>::CatalogJob(path, hash, tree_level,
                                                        history_depth, parent) {
-      atomic_init32(&children_unprocessed);
+      children_unprocessed.store(0);
     }
 
     void WakeParents() { this->NotifyListeners(0); }
