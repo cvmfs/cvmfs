@@ -305,9 +305,9 @@ ConcurrentWorkers<WorkerT>::ConcurrentWorkers(
   assert(maximal_queue_length >= number_of_workers);
   assert(number_of_workers > 0);
 
-  atomic_init32(&jobs_pending_);
-  atomic_init32(&jobs_failed_);
-  atomic_init64(&jobs_processed_);
+  jobs_pending_.store(0);
+  jobs_failed_.store(0);
+  jobs_processed_.store(0);
 }
 
 

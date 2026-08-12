@@ -28,8 +28,8 @@ class Fence : public SingleCopy {
 
  public:
   Fence() {
-    atomic_init64(&counter_);
-    atomic_init32(&blocking_);
+    counter_.store(0);
+    blocking_.store(0);
   }
 
   void Enter() {

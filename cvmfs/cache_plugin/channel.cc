@@ -174,9 +174,9 @@ CachePlugin::CachePlugin(uint64_t capabilities)
     , num_workers_(0)
     , max_object_size_(kDefaultMaxObjectSize)
     , num_inlimbo_clients_(0) {
-  atomic_init64(&next_session_id_);
-  atomic_init64(&next_txn_id_);
-  atomic_init64(&next_lst_id_);
+  next_session_id_.store(0);
+  next_txn_id_.store(0);
+  next_lst_id_.store(0);
   // Don't use listing id zero
   atomic_inc64(&next_lst_id_);
   txn_ids_.Init(128, UniqueRequest(), HashUniqueRequest);

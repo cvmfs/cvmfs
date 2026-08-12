@@ -34,7 +34,7 @@ void Tracer::Activate(const int buffer_size,
   ring_buffer_ = new BufferEntry[buffer_size_];
   commit_buffer_ = new std::atomic<int32_t>[buffer_size_];
   for (int i = 0; i < buffer_size_; i++)
-    atomic_init32(&commit_buffer_[i]);
+    commit_buffer_[i].store(0);
 
   int retval;
   retval = pthread_cond_init(&sig_continue_trace_, NULL);
@@ -241,10 +241,10 @@ Tracer::Tracer()
     , ring_buffer_(NULL)
     , commit_buffer_(NULL) {
   memset(&thread_flush_, 0, sizeof(thread_flush_));
-  atomic_init32(&seq_no_);
-  atomic_init32(&flushed_);
-  atomic_init32(&terminate_flush_thread_);
-  atomic_init32(&flush_immediately_);
+  seq_no_.store(0);
+  flushed_.store(0);
+  terminate_flush_thread_.store(0);
+  flush_immediately_.store(0);
 }
 
 

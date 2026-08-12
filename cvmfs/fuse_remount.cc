@@ -171,9 +171,9 @@ FuseRemounter::FuseRemounter(MountPoint *mountpoint,
     , catalogs_valid_until_(MountPoint::kIndefiniteDeadline) {
   memset(&thread_remount_trigger_, 0, sizeof(thread_remount_trigger_));
   pipe_remount_trigger_[0] = pipe_remount_trigger_[1] = -1;
-  atomic_init32(&drainout_mode_);
-  atomic_init32(&maintenance_mode_);
-  atomic_init32(&critical_section_);
+  drainout_mode_.store(0);
+  maintenance_mode_.store(0);
+  critical_section_.store(0);
 }
 
 FuseRemounter::~FuseRemounter() {

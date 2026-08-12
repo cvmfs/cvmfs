@@ -154,8 +154,8 @@ class PosixCacheManager : public CacheManager {
       , do_refcount_(do_refcount)
       , fd_mgr_(new FdRefcountMgr())
       , cleanup_unused_first_(cleanup_unused_first) {
-    atomic_init32(&no_inflight_txns_);
-    atomic_init32(&cache_dirs_created_);
+    no_inflight_txns_.store(0);
+    cache_dirs_created_.store(0);
     pthread_mutex_init(&lock_cache_dirs_, NULL);
   }
 

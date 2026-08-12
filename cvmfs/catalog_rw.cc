@@ -39,7 +39,7 @@ WritableCatalog::WritableCatalog(const string &path,
     , sql_max_link_id_(NULL)
     , sql_inc_linkcount_(NULL)
     , dirty_(false) {
-  atomic_init32(&dirty_children_);
+  dirty_children_.store(0);
 }
 
 

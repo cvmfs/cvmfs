@@ -32,7 +32,7 @@ CommandMigrate::CommandMigrate()
     , uid_(0)
     , gid_(0)
     , root_catalog_(NULL) {
-  atomic_init32(&catalogs_processed_);
+  catalogs_processed_.store(0);
 }
 
 

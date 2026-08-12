@@ -97,7 +97,7 @@ BundleFileMgr *LoadBundleFromCvmfs(MountPoint *mp,
 
 BundleMgr::BundleMgr(MountPoint *mp)
     : mount_point_(mp), fetcher_threads_(), pool_size_(kDefaultBundlePoolSize) {
-  atomic_init32(&terminating_);
+  terminating_.store(0);
   pthread_mutex_init(&worker_read_mutex_, nullptr);
 
   // Pool size override via CVMFS_BUNDLE_POOL_SIZE

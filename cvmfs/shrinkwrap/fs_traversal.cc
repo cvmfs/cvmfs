@@ -663,7 +663,7 @@ int SyncInit(struct fs_traversal *src,
   perf::Statistics *pstats = GetSyncStatTemplate();
 
   // Initialization
-  atomic_init64(&copy_queue);
+  copy_queue.store(0);
 
   pthread_t *workers = NULL;
 

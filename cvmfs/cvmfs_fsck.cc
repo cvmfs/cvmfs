@@ -240,8 +240,8 @@ static void *MainCheck(void *data __attribute__((unused))) {
 
 
 int main(int argc, char **argv) {
-  atomic_init32(&g_force_rebuild);
-  atomic_init32(&g_modified_cache);
+  g_force_rebuild.store(0);
+  g_modified_cache.store(0);
   g_current_dir = new string();
 
   int c;
@@ -310,11 +310,11 @@ int main(int argc, char **argv) {
   closedir(dirp_txn);
 
   // Run workers to recalculate checksums
-  atomic_init32(&g_num_files);
-  atomic_init32(&g_num_err_fixed);
-  atomic_init32(&g_num_err_unfixed);
-  atomic_init32(&g_num_err_operational);
-  atomic_init32(&g_num_tmp_catalog);
+  g_num_files.store(0);
+  g_num_err_fixed.store(0);
+  g_num_err_unfixed.store(0);
+  g_num_err_operational.store(0);
+  g_num_tmp_catalog.store(0);
   pthread_t *workers = reinterpret_cast<pthread_t *>(
       smalloc(g_num_threads * sizeof(pthread_t)));
   if (!g_verbose)

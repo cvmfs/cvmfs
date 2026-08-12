@@ -34,9 +34,9 @@ namespace upload {
 class UploadCallbacks {
  public:
   UploadCallbacks() {
-    atomic_init32(&simple_upload_invocations);
-    atomic_init32(&streamed_upload_complete_invocations);
-    atomic_init32(&buffer_upload_complete_invocations);
+    simple_upload_invocations.store(0);
+    streamed_upload_complete_invocations.store(0);
+    buffer_upload_complete_invocations.store(0);
   }
 
   void SimpleUploadClosure(const UploaderResults &results,
@@ -698,7 +698,7 @@ TYPED_TEST(T_Uploaders, BatchedRemoveNoDeadlockSlow) {
   BatchedRemoveCtx ctx;
   ctx.uploader = this->uploader_;
   ctx.num_keys = kNumKeys;
-  atomic_init32(&ctx.done);
+  ctx.done.store(0);
 
   pthread_t worker;
   ASSERT_EQ(0, pthread_create(&worker, NULL, BatchedRemoveWorker, &ctx));

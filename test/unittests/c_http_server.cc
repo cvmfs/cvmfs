@@ -165,8 +165,8 @@ void HTTPRequestParser::FillContentLength() {
 
 
 MockHTTPServer::MockHTTPServer(int port) {
-  atomic_init32(&running_);
-  atomic_init32(&server_thread_ready_);
+  running_.store(0);
+  server_thread_ready_.store(0);
   server_port_ = port;
   callback_func_ = NULL;
   callback_data_ = NULL;

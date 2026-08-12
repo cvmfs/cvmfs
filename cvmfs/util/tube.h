@@ -244,7 +244,7 @@ class Tube : SingleCopy {
 template<class ItemT>
 class TubeGroup : SingleCopy {
  public:
-  TubeGroup() : is_active_(false) { atomic_init32(&round_robin_); }
+  TubeGroup() : is_active_(false) { round_robin_.store(0); }
 
   ~TubeGroup() {
     for (unsigned i = 0; i < tubes_.size(); ++i)

@@ -1373,7 +1373,7 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
 }
 
 S3FanoutManager::S3FanoutManager(const S3Config &config) : config_(config) {
-  atomic_init32(&multi_threaded_);
+  multi_threaded_.store(0);
   MakePipe(pipe_terminate_);
   MakePipe(pipe_jobs_);
   MakePipe(pipe_completed_);
