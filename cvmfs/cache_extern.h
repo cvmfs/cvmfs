@@ -298,7 +298,7 @@ class ExternalCacheManager : public CacheManager {
   static bool SpawnPlugin(const std::vector<std::string> &cmd_line);
 
   explicit ExternalCacheManager(int fd_connection, unsigned max_open_fds);
-  int64_t NextRequestId() { return atomic_xadd64(&next_request_id_, 1); }
+  int64_t NextRequestId() { return next_request_id_.fetch_add(1); }
   void CallRemotely(RpcJob *rpc_job);
   int ChangeRefcount(const shash::Any &id, int change_by);
   int DoOpen(const shash::Any &id);

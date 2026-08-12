@@ -286,7 +286,7 @@ static void *MainWorker(void *data) {
             (compression_alg == zlib::kZlibDefault) ? true : false);
       overall_new.fetch_add(1);
     }
-    if (atomic_xadd64(&overall_chunks, 1) % 1000 == 0)
+    if (overall_chunks.fetch_add(1) % 1000 == 0)
       LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, ".");
     chunk_queue.fetch_sub(1);
   }

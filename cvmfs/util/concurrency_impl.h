@@ -572,7 +572,7 @@ void ConcurrentWorkers<WorkerT>::TruncateJobQueue(const bool forget_pending) {
 
   // if desired, we remove the jobs from the pending 'list'
   if (forget_pending) {
-    atomic_xadd32(&jobs_pending_, -dropped_jobs);
+    jobs_pending_.fetch_add(-dropped_jobs);
   }
 }
 

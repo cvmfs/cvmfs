@@ -608,7 +608,7 @@ class InodeTracker {
         tracker_->path_map_.Erase(md5path);
         tracker_->statistics_.num_removes.fetch_add(1);
       }
-      atomic_xadd64(&tracker_->statistics_.num_references, -int32_t(by));
+      tracker_->statistics_.num_references.fetch_add(-int32_t(by));
       return removed;
     }
 
@@ -658,7 +658,7 @@ class InodeTracker {
     inode_ex_map_.Insert(inode_ex, md5path);
     Unlock();
 
-    atomic_xadd64(&statistics_.num_references, by);
+    statistics_.num_references.fetch_add(by);
     if (is_new_inode)
       statistics_.num_inserts.fetch_add(1);
   }

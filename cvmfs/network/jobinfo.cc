@@ -46,7 +46,7 @@ bool JobInfo::IsFileNotFound() {
 }
 
 void JobInfo::Init() {
-  id_ = atomic_xadd64(&next_uuid, 1);
+  id_ = next_uuid.fetch_add(1);
   pipe_job_results = NULL;
   url_ = NULL;
   compressed_ = false;

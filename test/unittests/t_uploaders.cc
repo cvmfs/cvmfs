@@ -86,7 +86,7 @@ class T_Uploaders : public FileSandbox {
   static std::atomic<int64_t> gSeed;
   struct StreamHandle {
     StreamHandle() : handle(NULL), content_hash(shash::kMd5) {
-      content_hash.Randomize(atomic_xadd64(&gSeed, 1));
+      content_hash.Randomize(gSeed.fetch_add(1));
     }
 
     UploadStreamHandle *handle;
