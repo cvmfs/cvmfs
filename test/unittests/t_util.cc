@@ -2175,10 +2175,10 @@ TEST(Log2Histogram, 2BinEmpty) {
 
   UTLog2Histogram unit_test;
 
-  std::vector<std::atomic<int32_t> > bins = unit_test.GetBins(log2hist);
+  auto &bins = unit_test.GetBins(log2hist);
   int res[3] = {3, 0, 0};
   for (int i = 0; i < 3; i++) {
-    EXPECT_EQ(res[i], bins[i].load());
+    EXPECT_EQ(res[i], bins[i]->load());
   }
 
   unsigned int q = log2hist.GetQuantile(0.5);
@@ -2196,10 +2196,10 @@ TEST(Log2Histogram, 2Bins) {
 
   UTLog2Histogram unit_test;
 
-  std::vector<std::atomic<int32_t> > bins = unit_test.GetBins(log2hist);
+  auto &bins = unit_test.GetBins(log2hist);
   int res[3] = {1, 3, 2};
   for (int i = 0; i < 3; i++) {
-    EXPECT_EQ(res[i], bins[i].load());
+    EXPECT_EQ(res[i], bins[i]->load());
   }
 }
 
@@ -2220,10 +2220,10 @@ TEST(Log2Histogram, 3Bins) {
 
   UTLog2Histogram unit_test;
 
-  std::vector<std::atomic<int32_t> > bins = unit_test.GetBins(log2hist);
+  auto &bins = unit_test.GetBins(log2hist);
   int res[4] = {1, 5, 2, 4};
   for (int i = 0; i < 4; i++) {
-    EXPECT_EQ(res[i], bins[i].load());
+    EXPECT_EQ(res[i], bins[i]->load());
   }
 }
 
@@ -2253,3 +2253,4 @@ TEST(Log2Histogram, Quantiles) {
     EXPECT_NEAR(q, expected, max_difference);
   }
 }
+
