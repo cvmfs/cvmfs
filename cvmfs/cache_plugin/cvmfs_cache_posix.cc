@@ -344,7 +344,7 @@ int posix_breadcrumb_load(const char *fqrn, cvmcache_breadcrumb *breadcrumb) {
 
 void handle_sigint(int sig) {
   cvmcache_terminate(g_ctx);
-  atomic_inc32(&g_terminated);
+  g_terminated.fetch_add(1);
 }
 
 }  // namespace

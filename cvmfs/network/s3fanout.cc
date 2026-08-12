@@ -1499,7 +1499,7 @@ void S3FanoutManager::Spawn() {
                                     static_cast<void *>(this));
   assert(retval == 0);
 
-  atomic_inc32(&multi_threaded_);
+  multi_threaded_.fetch_add(1);
 }
 
 const Statistics &S3FanoutManager::GetStatistics() { return *statistics_; }

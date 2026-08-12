@@ -87,7 +87,7 @@ int32_t Tracer::DoTrace(const int event,
   ring_buffer_[pos].code = event;
   ring_buffer_[pos].path = path;
   ring_buffer_[pos].msg = msg;
-  atomic_inc32(&commit_buffer_[pos]);
+  commit_buffer_[pos].fetch_add(1);
 
   if (my_seq_no - flushed_.load() == flush_threshold_) {
     const MutexLockGuard m(&sig_flush_mutex_);
@@ -257,7 +257,7 @@ Tracer::~Tracer() {
     DoTrace(kEventStop, PathString("Tracer", 6), "Destroying trace buffer...");
 
     // Trigger flushing and wait for it
-    atomic_inc32(&terminate_flush_thread_);
+    terminate_flush_thread_.fetch_add(1);
     {
       const MutexLockGuard m(&sig_flush_mutex_);
       retval = pthread_cond_signal(&sig_flush_);

@@ -88,7 +88,7 @@ bool CommandFileStats::Run(ObjectFetcherT *object_fetcher) {
 
   const bool ret = traversal.Traverse();
 
-  atomic_inc32(&finished_);
+  finished_.fetch_add(1);
   pthread_join(thread_processing_, NULL);
 
   db_->DestroyStatements();
@@ -101,7 +101,7 @@ void CommandFileStats::CatalogCallback(
   const int32_t num = num_downloaded_.load();
   const string out_path = tmp_db_path_ + StringifyInt(num + 1) + ".db";
   assert(CopyPath2Path(data.catalog->database_path(), out_path));
-  atomic_inc32(&num_downloaded_);
+  num_downloaded_.fetch_add(1);
 }
 
 void *CommandFileStats::MainProcessing(void *data) {

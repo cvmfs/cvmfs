@@ -284,7 +284,7 @@ static void *MainWorker(void *data) {
       fclose(fchunk);
       Store(tmp_file, chunk_hash,
             (compression_alg == zlib::kZlibDefault) ? true : false);
-      atomic_inc64(&overall_new);
+      overall_new.fetch_add(1);
     }
     if (atomic_xadd64(&overall_chunks, 1) % 1000 == 0)
       LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, ".");
@@ -467,7 +467,7 @@ bool CommandPull::Pull(const shash::Any &catalog_hash,
     while (catalog->AllChunksNext(&chunk_hash, &compression_alg)) {
       ChunkJob next_chunk(chunk_hash, compression_alg);
       WritePipe(pipe_chunks[1], &next_chunk, sizeof(next_chunk));
-      atomic_inc64(&chunk_queue);
+      chunk_queue.fetch_add(1);
     }
     catalog->AllChunksEnd();
     while (chunk_queue.load() != 0) {

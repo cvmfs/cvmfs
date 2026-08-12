@@ -36,7 +36,7 @@ class Fence : public SingleCopy {
     while (blocking_.load()) {
       SafeSleepMs(kBusyWaitBackoffMs);
     }
-    atomic_inc64(&counter_);
+    counter_.fetch_add(1);
   }
 
   void Leave() { atomic_dec64(&counter_); }

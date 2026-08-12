@@ -26,7 +26,7 @@ namespace perf {
 class Counter {
  public:
   Counter() { counter_.store(0); }
-  void Inc() { atomic_inc64(&counter_); }
+  void Inc() { counter_.fetch_add(1); }
   void Dec() { atomic_dec64(&counter_); }
   int64_t Get() { return counter_.load(); }
   void Set(const int64_t val) { atomic_write64(&counter_, val); }
@@ -80,7 +80,7 @@ class Statistics {
   struct CounterInfo {
     explicit CounterInfo(const std::string &desc) : desc(desc) {
       refcnt.store(0);
-      atomic_inc32(&refcnt);
+      refcnt.fetch_add(1);
     }
     std::atomic<int32_t> refcnt;
     Counter counter;

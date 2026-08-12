@@ -150,15 +150,15 @@ static void *MainCheck(void *data __attribute__((unused))) {
     if (relative_path[relative_path.length() - 1] == 'T') {
       LogCvmfs(kLogCvmfs, kLogStdout,
                "Warning: temporary file catalog %s found", path.c_str());
-      atomic_inc32(&g_num_tmp_catalog);
+      g_num_tmp_catalog.fetch_add(1);
       if (g_fix_errors) {
         if (unlink(relative_path.c_str()) == 0) {
           LogCvmfs(kLogCvmfs, kLogStdout, "Fix: %s unlinked", path.c_str());
-          atomic_inc32(&g_num_err_fixed);
+          g_num_err_fixed.fetch_add(1);
         } else {
           LogCvmfs(kLogCvmfs, kLogStdout, "Error: failed to unlink %s",
                    path.c_str());
-          atomic_inc32(&g_num_err_unfixed);
+          g_num_err_unfixed.fetch_add(1);
         }
       }
       continue;
@@ -167,7 +167,7 @@ static void *MainCheck(void *data __attribute__((unused))) {
     const int fd_src = open(relative_path.c_str(), O_RDONLY);
     if (fd_src < 0) {
       LogCvmfs(kLogCvmfs, kLogStdout, "Error: cannot open %s", path.c_str());
-      atomic_inc32(&g_num_err_operational);
+      g_num_err_operational.fetch_add(1);
       continue;
     }
     // Don't thrash kernel buffers
@@ -180,14 +180,14 @@ static void *MainCheck(void *data __attribute__((unused))) {
     if (!zlib::CompressFd2Null(fd_src, &hash)) {
       LogCvmfs(kLogCvmfs, kLogStdout, "Error: could not compress %s",
                path.c_str());
-      atomic_inc32(&g_num_err_operational);
+      g_num_err_operational.fetch_add(1);
     } else {
       if (hash != expected_hash) {
         // If the hashes don't match, try hashing the uncompressed file
         if (!shash::HashFile(relative_path, &hash)) {
           LogCvmfs(kLogCvmfs, kLogStdout, "Error: could not hash %s",
                    path.c_str());
-          atomic_inc32(&g_num_err_operational);
+          g_num_err_operational.fetch_add(1);
         }
         if (hash != expected_hash) {
           if (g_fix_errors) {
@@ -214,20 +214,20 @@ static void *MainCheck(void *data __attribute__((unused))) {
             }
 
             if (fixed) {
-              atomic_inc32(&g_num_err_fixed);
+              g_num_err_fixed.fetch_add(1);
 
               // Changes made, we have to rebuild the managed cache db
               atomic_cas32(&g_force_rebuild, 0, 1);
               atomic_cas32(&g_modified_cache, 0, 1);
             } else {
-              atomic_inc32(&g_num_err_unfixed);
+              g_num_err_unfixed.fetch_add(1);
             }
           } else {
             LogCvmfs(kLogCvmfs, kLogStdout,
                      "Error: %s has compressed checksum %s, "
                      "delete this file from cache directory!",
                      path.c_str(), hash.ToString().c_str());
-            atomic_inc32(&g_num_err_unfixed);
+            g_num_err_unfixed.fetch_add(1);
           }
         }
       }
@@ -344,12 +344,12 @@ int main(int argc, char **argv) {
     if (unlink("cachedb") == 0) {
       LogCvmfs(kLogCvmfs, kLogStdout,
                "Fix: managed cache db unlinked, will be rebuilt on next mount");
-      atomic_inc32(&g_num_err_fixed);
+      g_num_err_fixed.fetch_add(1);
     } else {
       if (errno != ENOENT) {
         LogCvmfs(kLogCvmfs, kLogStdout,
                  "Error: could not unlink managed cache database (%d)", errno);
-        atomic_inc32(&g_num_err_unfixed);
+        g_num_err_unfixed.fetch_add(1);
       }
     }
   }

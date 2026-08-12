@@ -341,7 +341,7 @@ bool handle_file(struct fs_traversal *src,
       FileCopy next_copy(src_ident, dest_data);
 
       WritePipe(pipe_chunks[1], &next_copy, sizeof(next_copy));
-      atomic_inc64(&copy_queue);
+      copy_queue.fetch_add(1);
     } else {
       if (!copyFile(src, src_ident, dest, dest_data, pstats)) {
         LogCvmfs(kLogCvmfs, kLogStderr, "Failed to copy %s->%s : %d : %s",

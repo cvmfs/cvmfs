@@ -153,12 +153,12 @@ class CVMFS_EXPORT Log2Histogram {
 
     for (i = 1; i <= n; i++) {
       if (value < this->boundary_values_[i]) {
-        atomic_inc32(&(this->bins_[i]));
+        (this->bins_[i].fetch_add(1));
         return;
       }
     }
 
-    atomic_inc32(&(this->bins_[0]));  // add to overflow bin.
+    (this->bins_[0].fetch_add(1));  // add to overflow bin.
   }
 
   /**

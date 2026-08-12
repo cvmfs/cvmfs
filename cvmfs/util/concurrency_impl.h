@@ -499,7 +499,7 @@ void ConcurrentWorkers<WorkerT>::RunCallbackThread() {
 
     // remove the job from the pending 'list' and add it to the ready 'list'
     atomic_dec32(&jobs_pending_);
-    atomic_inc64(&jobs_processed_);
+    jobs_processed_.fetch_add(1);
 
     // signal the Spooler that all jobs are done...
     if (jobs_pending_.load() == 0) {
@@ -532,7 +532,7 @@ void ConcurrentWorkers<WorkerT>::Schedule(WorkerJob job) {
 
   jobs_queue_.Enqueue(job);
   if (!job.is_death_sentence) {
-    atomic_inc32(&jobs_pending_);
+    jobs_pending_.fetch_add(1);
   }
 }
 
@@ -661,7 +661,7 @@ void ConcurrentWorkers<WorkerT>::JobDone(
 
   // check if the finished job was successful
   if (!success) {
-    atomic_inc32(&jobs_failed_);
+    jobs_failed_.fetch_add(1);
     LogCvmfs(kLogConcurrency, kLogWarning, "Job failed");
   }
 

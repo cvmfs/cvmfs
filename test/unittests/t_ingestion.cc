@@ -51,9 +51,9 @@ class TestTask : public TubeConsumer<DummyItem> {
  protected:
   virtual void Process(DummyItem *item) {
     atomic_xadd32(&item->sum, item->summand);
-    atomic_inc32(&cnt_process);
+    cnt_process.fetch_add(1);
   }
-  virtual void OnTerminate() { atomic_inc32(&cnt_terminate); }
+  virtual void OnTerminate() { cnt_terminate.fetch_add(1); }
 };
 std::atomic<int32_t> TestTask::cnt_terminate = 0;
 std::atomic<int32_t> TestTask::cnt_process = 0;
@@ -68,7 +68,7 @@ struct FnFileProcessed {
   FnFileProcessed() { ncall.store(0); }
 
   void OnFileProcessed(const upload::SpoolerResult &spooler_result) {
-    atomic_inc64(&ncall);
+    ncall.fetch_add(1);
   }
 
   std::atomic<int64_t> ncall;
@@ -80,7 +80,7 @@ struct FnFileHashed {
 
   void OnFileProcessed(const ScrubbingResult &scrubbing_result) {
     last_result = scrubbing_result;
-    atomic_inc64(&ncall);
+    ncall.fetch_add(1);
   }
 
   ScrubbingResult last_result;

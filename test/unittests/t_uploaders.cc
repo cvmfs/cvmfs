@@ -44,14 +44,14 @@ class UploadCallbacks {
     EXPECT_EQ(UploaderResults::kFileUpload, results.type);
     EXPECT_EQ(expected.return_code, results.return_code);
     EXPECT_EQ(expected.local_path, results.local_path);
-    atomic_inc32(&simple_upload_invocations);
+    simple_upload_invocations.fetch_add(1);
   }
 
   void StreamedUploadComplete(const UploaderResults &results, int return_code) {
     EXPECT_EQ(UploaderResults::kChunkCommit, results.type);
     EXPECT_EQ("", results.local_path);
     EXPECT_EQ(return_code, results.return_code);
-    atomic_inc32(&streamed_upload_complete_invocations);
+    streamed_upload_complete_invocations.fetch_add(1);
   }
 
   void BufferUploadComplete(const UploaderResults &results,
@@ -59,7 +59,7 @@ class UploadCallbacks {
     EXPECT_EQ(UploaderResults::kBufferUpload, results.type);
     EXPECT_EQ("", results.local_path);
     EXPECT_EQ(expected.return_code, results.return_code);
-    atomic_inc32(&buffer_upload_complete_invocations);
+    buffer_upload_complete_invocations.fetch_add(1);
   }
 
  public:
@@ -670,7 +670,7 @@ static void *BatchedRemoveWorker(void *arg) {
     ctx->uploader->RemoveAsync("regression_" + StringifyInt(i));
   }
   ctx->uploader->WaitForUpload();
-  atomic_inc32(&ctx->done);
+  ctx->done.fetch_add(1);
   return NULL;
 }
 }  // namespace

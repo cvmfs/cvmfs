@@ -148,7 +148,7 @@ class BuggyCacheManager : public CacheManager {
   virtual void CtrlTxn(const Label & /* label */, const int /* flags */,
                        void * /* txn */) {
     if (stall_in_ctrltxn) {
-      atomic_inc32(&waiting_in_ctrltxn);
+      waiting_in_ctrltxn.fetch_add(1);
       while (continue_ctrltxn.load() == 0) {
       }
       atomic_dec32(&waiting_in_ctrltxn);
@@ -373,7 +373,7 @@ void *TestFetchCollapse2(void *data) {
       if (iDownloadQueue->second->size() > 0) {
         // printf("open up %s", iDownloadQueue->first.ToString().c_str());
         bcm->stall_in_ctrltxn = false;
-        atomic_inc32(&bcm->continue_ctrltxn);
+        bcm->continue_ctrltxn.fetch_add(1);
       }
     }
     pthread_mutex_unlock(f->lock_queues_download_);
