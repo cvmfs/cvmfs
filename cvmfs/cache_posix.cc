@@ -291,7 +291,7 @@ bool PosixCacheManager::EnsureCacheDirectories() {
     }
   }
 
-  atomic_write32(&cache_dirs_created_, 1);
+  cache_dirs_created_.store(1);
   return true;
 }
 

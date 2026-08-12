@@ -56,7 +56,7 @@ class FuseInvalidator : SingleCopy {
     explicit Handle(unsigned timeout_s);
     ~Handle();
     bool IsDone() const { return status_.load() == 1; }
-    void Reset() { atomic_write32(status_, 0); }
+    void Reset() { status_.store(0); }
     void WaitFor();
 
    private:

@@ -90,7 +90,7 @@ bool SubscriberSSE::Subscribe(const std::string &topic) {
   return success;
 }
 
-void SubscriberSSE::Unsubscribe() { atomic_write32(&should_quit_, 1); }
+void SubscriberSSE::Unsubscribe() { should_quit_.store(1); }
 
 bool SubscriberSSE::ShouldQuit() const { return should_quit_.load(); }
 

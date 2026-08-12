@@ -261,7 +261,7 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
       } else {
         num_children = PushNestedCatalogs(job, catalog_list)
                        + PushPreviousRevision(job);
-        atomic_write32(&job->children_unprocessed, num_children);
+        job->children_unprocessed.store(num_children);
       }
       if (!this->CloseCatalog(false, job)) {
         num_errors_.fetch_add(1);
