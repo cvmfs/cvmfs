@@ -219,7 +219,7 @@ static void *MainCheck(void *data __attribute__((unused))) {
               // Changes made, we have to rebuild the managed cache db
               int32_t expected_val = 0;
               g_force_rebuild.compare_exchange_strong(expected_val, 1);
-              int32_t expected_val = 0;
+              expected_val = 0;
               g_modified_cache.compare_exchange_strong(expected_val, 1);
             } else {
               g_num_err_unfixed.fetch_add(1);
@@ -258,10 +258,10 @@ int main(int argc, char **argv) {
       case 'p':
         g_fix_errors = true;
         break;
-      case 'f':
+      case 'f': {
         int32_t expected_val = 0;
         g_force_rebuild.compare_exchange_strong(expected_val, 1);
-        break;
+      } break;
       case 'j':
         g_num_threads = atoi(optarg);
         if (g_num_threads < 1) {
@@ -375,3 +375,4 @@ int main(int argc, char **argv) {
 
   return retval;
 }
+
