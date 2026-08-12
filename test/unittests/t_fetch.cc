@@ -151,7 +151,7 @@ class BuggyCacheManager : public CacheManager {
       waiting_in_ctrltxn.fetch_add(1);
       while (continue_ctrltxn.load() == 0) {
       }
-      atomic_dec32(&waiting_in_ctrltxn);
+      waiting_in_ctrltxn.fetch_sub(1);
     }
   }
   virtual int64_t Write(const void *buf, uint64_t sz, void *txn) { return sz; }

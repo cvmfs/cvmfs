@@ -421,7 +421,7 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
     MockCatalog::instances.fetch_add(1);
   }
 
-  ~MockCatalog() { atomic_dec32(&MockCatalog::instances); }
+  ~MockCatalog() { MockCatalog::instances.fetch_sub(1); }
 
   /**
    * Adds a new catalog to the mounted children list

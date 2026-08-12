@@ -89,7 +89,7 @@ void NfsMapsLeveldb::ForkAwareEnv::SleepForMicroseconds(int micros) {
 void *NfsMapsLeveldb::ForkAwareEnv::MainFakeThread(void *data) {
   FuncArg *funcarg = reinterpret_cast<FuncArg *>(data);
   funcarg->function(funcarg->arg);
-  atomic_dec32(&(funcarg->env->num_bg_threads_));
+  (funcarg->env->num_bg_threads_.fetch_sub(1));
   delete funcarg;
   return NULL;
 }

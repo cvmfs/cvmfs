@@ -32,7 +32,7 @@ class SharedPtr {
 
   ~SharedPtr() {  // never throws
     if (count_) {
-      atomic_dec64(count_);
+      count_.fetch_sub(1);
       if (count_.load() == 0) {
         delete value_;
         delete count_;
@@ -81,7 +81,7 @@ class SharedPtr {
 
   void Reset() {  // never throws
     if (count_) {
-      atomic_dec64(count_);
+      count_.fetch_sub(1);
       if (count_.load() == 0) {
         delete value_;
         delete count_;

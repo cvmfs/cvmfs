@@ -200,7 +200,7 @@ void *Tracer::MainFlush(void *data) {
       retval |= (fputc(13, f) - 13) | (fputc(10, f) - 10);
       assert(retval == 0);
 
-      atomic_dec32(&tracer->commit_buffer_[pos]);
+      tracer->commit_buffer_[pos].fetch_sub(1);
       ++i;
     }
     retval = fflush(f);

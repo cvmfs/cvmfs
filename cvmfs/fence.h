@@ -39,7 +39,7 @@ class Fence : public SingleCopy {
     counter_.fetch_add(1);
   }
 
-  void Leave() { atomic_dec64(&counter_); }
+  void Leave() { counter_.fetch_sub(1); }
 
   void Close() { atomic_cas32(&blocking_, 0, 1); }
 

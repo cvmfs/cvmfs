@@ -55,7 +55,7 @@ void FileItem::RegisterChunk(const FileChunk &file_chunk) {
       bulk_hash_ = file_chunk.content_hash();
       break;
   }
-  atomic_dec64(&nchunks_in_fly_);
+  nchunks_in_fly_.fetch_sub(1);
 }
 
 

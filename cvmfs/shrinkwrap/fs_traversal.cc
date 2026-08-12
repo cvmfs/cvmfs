@@ -619,7 +619,7 @@ static void *MainWorker(void *data) {
     free(next_copy.src);
     free(next_copy.dest);
 
-    atomic_dec64(&copy_queue);
+    copy_queue.fetch_sub(1);
   }
   return NULL;
 }
