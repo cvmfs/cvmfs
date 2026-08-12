@@ -51,7 +51,7 @@ class BundleMgr : SingleCopy {
  public:
   explicit BundleMgr(MountPoint *mp);
   virtual ~BundleMgr() {
-    atomic_write32(&terminating_, 1);
+    terminating_.store(1);
     JoinDispatcher();
     JoinFetcherPool();
     pthread_mutex_destroy(&worker_read_mutex_);

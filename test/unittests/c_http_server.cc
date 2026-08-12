@@ -181,7 +181,7 @@ MockHTTPServer::~MockHTTPServer() {
 bool MockHTTPServer::Start() {
   if (running_.load())
     return false;
-  atomic_write32(&running_, 1);
+  running_.store(1);
   pthread_create(&server_thread_, NULL, Main, this);
   // wait for server thread to open the socket
   while (!server_thread_ready_.load()) {
@@ -193,7 +193,7 @@ bool MockHTTPServer::Start() {
 bool MockHTTPServer::Stop() {
   if (!running_.load())
     return false;
-  atomic_write32(&running_, 0);
+  running_.store(0);
   pthread_join(server_thread_, NULL);
   return true;
 }

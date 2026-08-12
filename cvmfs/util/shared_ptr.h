@@ -27,7 +27,7 @@ class SharedPtr {
   explicit SharedPtr(Y *p) {
     value_ = static_cast<element_type *>(p);
     count_ = new std::atomic<int64_t>;
-    atomic_write64(count_, 1);
+    count_.store(1);
   }
 
   ~SharedPtr() {  // never throws
@@ -96,7 +96,7 @@ class SharedPtr {
     Reset();
     value_ = static_cast<element_type *>(p);
     count_ = new std::atomic<int64_t>;
-    atomic_write64(count_, 1);
+    count_.store(1);
   }
 
   T &operator*() const {  // never throws
