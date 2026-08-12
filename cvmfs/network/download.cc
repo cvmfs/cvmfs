@@ -68,6 +68,8 @@ using namespace std;  // NOLINT
 
 namespace download {
 
+std::string ProxyCacheCounters::status_hdr("");
+
 /**
  * Returns the status if an interrupt happened for a given repository.
  *
@@ -1268,6 +1270,45 @@ void DownloadManager::UpdateStatistics(CURL *handle) {
   assert(retval == CURLE_OK);
   sum += static_cast<int64_t>(val);*/
   perf::Xadd(counters_->sz_transferred_bytes, sum);
+
+  if (!ProxyCacheCounters::status_hdr.empty()) {
+    bool unc = false;
+    LogCvmfs(kLogDownload, kLogDebug, "Looking for %s header",
+             ProxyCacheCounters::status_hdr.c_str());
+    struct curl_header *header;
+    CURLHcode hdr_res = curl_easy_header(handle, ProxyCacheCounters::status_hdr.c_str(),
+                                         0, CURLH_HEADER, -1, &header);
+    if (hdr_res == CURLHE_OK) {
+      LogCvmfs(kLogDownload, kLogDebug, "Got header %s: %s", header->name,
+               header->value);
+      // Increment the counters.
+      // Allow for trailing contents, e.g. per
+      // https://www.varnish-software.com/developers/tutorials/logging-cache-hits-misses-varnish/
+      if (!strncasecmp(header->value, "hit", 3)) {
+        perf::Inc(proxy_cache_counters_->n_hit);
+        perf::Xadd(proxy_cache_counters_->sz_hit, sum);
+      } else if (!strncasecmp(header->value, "miss", 4)) {
+        perf::Inc(proxy_cache_counters_->n_miss);
+        perf::Xadd(proxy_cache_counters_->sz_miss, sum);
+      } else {
+        // Proxy cache state indication not recognized
+        unc = true;
+      }
+    } else {
+      if (hdr_res == CURLHE_NOT_BUILT_IN) {
+        LogCvmfs(kLogDownload, kLogDebug,
+                 "libcurl header API not built in, proxy cache metrics won't "
+                 "work");
+      } else {
+        // Proxy cache state indication absent
+        unc = true;
+      }
+    }
+    if (unc) {
+      perf::Inc(proxy_cache_counters_->n_unc);
+      perf::Xadd(proxy_cache_counters_->sz_unc, sum);
+    }
+  }
 }
 
 
@@ -1846,6 +1887,7 @@ DownloadManager::~DownloadManager() {
     free(user_agent_);
 
   delete counters_;
+  delete proxy_cache_counters_;
   delete opt_host_.chain;
   delete opt_host_chain_rtt_;
   delete opt_proxy_groups_;
@@ -1924,7 +1966,9 @@ DownloadManager::DownloadManager(const unsigned max_pool_handles,
     , opt_timestamp_failover_proxies_(0)
     , opt_proxy_groups_reset_after_(0)
     , credentials_attachment_(NULL)
-    , counters_(new Counters(statistics)) {
+    , counters_(new Counters(statistics))
+    , proxy_cache_counters_(new ProxyCacheCounters(statistics))
+{
   atomic_init32(&multi_threaded_);
 
   lock_options_ = reinterpret_cast<pthread_mutex_t *>(
