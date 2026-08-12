@@ -36,7 +36,7 @@ class TaskRead : public TubeConsumer<FileItem> {
 
   void SetWatermarks(uint64_t low, uint64_t high);
 
-  uint64_t n_block() { return atomic_read64(&n_block_); }
+  uint64_t n_block() { return n_block_.load(); }
 
  protected:
   virtual void Process(FileItem *item);

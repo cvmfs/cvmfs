@@ -49,7 +49,7 @@ FuseRemounter::Status FuseRemounter::ChangeRoot(const shash::Any &root_hash) {
   BackoffThrottle throttle;
   do {
     TryFinish(root_hash);
-    drainout_code = atomic_read32(&drainout_mode_);
+    drainout_code = drainout_mode_.load();
     if (drainout_code == 0)
       break;
     throttle.Throttle();

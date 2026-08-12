@@ -573,7 +573,7 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
 
   inline unsigned int GetNumberOfWorkers() const { return number_of_workers_; }
   inline unsigned int GetNumberOfFailedJobs() const {
-    return atomic_read32(&jobs_failed_);
+    return jobs_failed_.load();
   }
 
   /**

@@ -292,9 +292,7 @@ bool S3Uploader::Create() {
 }
 
 
-unsigned int S3Uploader::GetNumberOfErrors() const {
-  return atomic_read32(&io_errors_);
-}
+unsigned int S3Uploader::GetNumberOfErrors() const { return io_errors_.load(); }
 
 
 /**
@@ -346,8 +344,10 @@ void *S3Uploader::MainCollectResults(void *data) {
         }
       }
       // Decrement jobs_in_flight_ once for the entire batch.
-      uploader->Respond(NULL, UploaderResults(UploaderResults::kRemove,
-                        (info->error_code != s3fanout::kFailOk) ? 99 : 0));
+      uploader->Respond(
+          NULL,
+          UploaderResults(UploaderResults::kRemove,
+                          (info->error_code != s3fanout::kFailOk) ? 99 : 0));
     } else if (info->request == s3fanout::JobInfo::kReqDelete) {
       uploader->Respond(NULL, UploaderResults());
     } else if (info->request == s3fanout::JobInfo::kReqHeadOnly) {
@@ -547,8 +547,7 @@ void S3Uploader::FlushDeleteBatch() const {
   if (pending_deletes_.empty())
     return;
 
-  LogCvmfs(kLogUploadS3, kLogDebug,
-           "Flushing batch delete of %lu objects",
+  LogCvmfs(kLogUploadS3, kLogDebug, "Flushing batch delete of %lu objects",
            pending_deletes_.size());
 
   // Build XML request body

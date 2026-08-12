@@ -502,7 +502,7 @@ void ConcurrentWorkers<WorkerT>::RunCallbackThread() {
     atomic_inc64(&jobs_processed_);
 
     // signal the Spooler that all jobs are done...
-    if (atomic_read32(&jobs_pending_) == 0) {
+    if (jobs_pending_.load() == 0) {
       pthread_cond_broadcast(&jobs_all_done_);
     }
   }
@@ -603,7 +603,7 @@ void ConcurrentWorkers<WorkerT>::Terminate() {
   pthread_join(callback_thread_, NULL);
 
   // check if we finished all pending jobs
-  const int pending = atomic_read32(&jobs_pending_);
+  const int pending = jobs_pending_.load();
   if (pending > 0) {
     LogCvmfs(kLogConcurrency, kLogWarning,
              "Job queue was not fully processed. "
@@ -613,7 +613,7 @@ void ConcurrentWorkers<WorkerT>::Terminate() {
   }
 
   // check if we had failed jobs
-  const int failed = atomic_read32(&jobs_failed_);
+  const int failed = jobs_failed_.load();
   if (failed > 0) {
     LogCvmfs(kLogConcurrency, kLogWarning, "We've had %d failed jobs.", failed);
   }
@@ -621,19 +621,19 @@ void ConcurrentWorkers<WorkerT>::Terminate() {
   // thanks, and good bye...
   LogCvmfs(kLogConcurrency, kLogVerboseMsg,
            "All workers stopped. They processed %ld jobs. Terminating...",
-           atomic_read64(&jobs_processed_));
+           jobs_processed_.load());
 }
 
 
 template<class WorkerT>
 void ConcurrentWorkers<WorkerT>::WaitForEmptyQueue() const {
   LogCvmfs(kLogConcurrency, kLogVerboseMsg,
-           "Waiting for %d jobs to be finished", atomic_read32(&jobs_pending_));
+           "Waiting for %d jobs to be finished", jobs_pending_.load());
 
   // wait until all pending jobs are processed
   {
     MutexLockGuard lock(jobs_all_done_mutex_);
-    while (atomic_read32(&jobs_pending_) > 0) {
+    while (jobs_pending_.load() > 0) {
       pthread_cond_wait(&jobs_all_done_, &jobs_all_done_mutex_);
     }
   }

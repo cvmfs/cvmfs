@@ -628,13 +628,12 @@ class InodeTracker {
       atomic_init64(&num_misses_path);
     }
     std::string Print() {
-      return "inserts: " + StringifyInt(atomic_read64(&num_inserts))
-             + "  removes: " + StringifyInt(atomic_read64(&num_removes))
-             + "  references: " + StringifyInt(atomic_read64(&num_references))
-             + "  hits(inode): " + StringifyInt(atomic_read64(&num_hits_inode))
-             + "  hits(path): " + StringifyInt(atomic_read64(&num_hits_path))
-             + "  misses(path): "
-             + StringifyInt(atomic_read64(&num_misses_path));
+      return "inserts: " + StringifyInt(num_inserts.load())
+             + "  removes: " + StringifyInt(num_removes.load())
+             + "  references: " + StringifyInt(num_references.load())
+             + "  hits(inode): " + StringifyInt(num_hits_inode.load())
+             + "  hits(path): " + StringifyInt(num_hits_path.load())
+             + "  misses(path): " + StringifyInt(num_misses_path.load());
     }
     std::atomic<int64_t> num_inserts;
     std::atomic<int64_t> num_removes;

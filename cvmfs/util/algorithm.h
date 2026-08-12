@@ -168,7 +168,7 @@ class CVMFS_EXPORT Log2Histogram {
     uint64_t n = 0;
     unsigned int i;
     for (i = 0; i <= this->bins_.size() - 1; i++) {
-      n += static_cast<unsigned int>(atomic_read32(&(this->bins_[i])));
+      n += static_cast<unsigned int>((this->bins_[i].load()));
     }
     return n;
   }

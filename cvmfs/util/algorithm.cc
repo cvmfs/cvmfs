@@ -118,7 +118,7 @@ unsigned int Log2Histogram::GetQuantile(float n) {
   unsigned int i = 0;
   for (i = 1; i <= this->bins_.size() - 1; i++) {
     const unsigned int bin_value = static_cast<unsigned int>(
-        atomic_read32(&(this->bins_[i])));
+        (this->bins_[i].load()));
     if (pivot <= bin_value) {
       normalized_pivot = static_cast<float>(pivot)
                          / static_cast<float>(bin_value);
@@ -156,17 +156,15 @@ std::string Log2Histogram::ToString() {
     max_right_boundary_count = std::max(max_right_boundary_count,
                                         CountDigits(boundary_values_[i] - 1));
     max_value_count = std::max(max_value_count,
-                               CountDigits(atomic_read32(&(this->bins_[i]))));
-    max_bins = std::max(
-        max_bins, static_cast<unsigned int>(atomic_read32(&(this->bins_[i]))));
-    total_sum_of_bins += static_cast<unsigned int>(
-        atomic_read32(&(this->bins_[i])));
+                               CountDigits((this->bins_[i].load())));
+    max_bins = std::max(max_bins,
+                        static_cast<unsigned int>((this->bins_[i].load())));
+    total_sum_of_bins += static_cast<unsigned int>((this->bins_[i].load()));
   }
 
-  max_bins = std::max(
-      max_bins, static_cast<unsigned int>(atomic_read32(&(this->bins_[0]))));
-  total_sum_of_bins += static_cast<unsigned int>(
-      atomic_read32(&(this->bins_[0])));
+  max_bins = std::max(max_bins,
+                      static_cast<unsigned int>((this->bins_[0].load())));
+  total_sum_of_bins += static_cast<unsigned int>((this->bins_[0].load()));
 
   if (total_sum_of_bins != 0) {
     max_stars = max_bins * total_stars / total_sum_of_bins;
@@ -234,7 +232,7 @@ std::string Log2Histogram::ToString() {
   for (i = 1; i <= this->bins_.size() - 1; i++) {
     unsigned int n_of_stars = 0;
     if (total_sum_of_bins != 0) {
-      n_of_stars = static_cast<unsigned int>(atomic_read32(&(this->bins_[i])))
+      n_of_stars = static_cast<unsigned int>((this->bins_[i].load()))
                    * total_stars / total_sum_of_bins;
     }
 
@@ -243,7 +241,7 @@ std::string Log2Histogram::ToString() {
              format.c_str(),
              boundary_values_[i - 1],
              boundary_values_[i] - 1,
-             static_cast<unsigned int>(atomic_read32(&this->bins_[i])),
+             static_cast<unsigned int>(this->bins_[i].load()),
              GenerateStars(n_of_stars).c_str());
     result_string += buffer;
     memset(buffer, 0, sizeof(buffer));
@@ -251,7 +249,7 @@ std::string Log2Histogram::ToString() {
 
   unsigned int n_of_stars = 0;
   if (total_sum_of_bins != 0) {
-    n_of_stars = static_cast<unsigned int>(atomic_read32(&(this->bins_[0])))
+    n_of_stars = static_cast<unsigned int>((this->bins_[0].load()))
                  * total_stars / total_sum_of_bins;
   }
 
@@ -259,7 +257,7 @@ std::string Log2Histogram::ToString() {
            kBufSize,
            overflow_format.c_str(),
            "overflow",
-           static_cast<unsigned int>(atomic_read32(&(this->bins_[0]))),
+           static_cast<unsigned int>((this->bins_[0].load())),
            GenerateStars(n_of_stars).c_str());
   result_string += buffer;
   memset(buffer, 0, sizeof(buffer));

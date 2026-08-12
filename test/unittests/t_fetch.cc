@@ -149,7 +149,7 @@ class BuggyCacheManager : public CacheManager {
                        void * /* txn */) {
     if (stall_in_ctrltxn) {
       atomic_inc32(&waiting_in_ctrltxn);
-      while (atomic_read32(&continue_ctrltxn) == 0) {
+      while (continue_ctrltxn.load() == 0) {
       }
       atomic_dec32(&waiting_in_ctrltxn);
     }
@@ -414,7 +414,7 @@ TEST_F(T_Fetcher, FetchCollapse) {
   EXPECT_EQ(0, pthread_create(&thread_collapse2, NULL, TestFetchCollapse2, &f));
 
   // Piggy-back onto existing download
-  while (atomic_read32(&bcm.waiting_in_ctrltxn) == 0) {
+  while (bcm.waiting_in_ctrltxn.load() == 0) {
   }
   fd = f.Fetch(CacheManager::LabeledObject(hash_catalog_, lbl));
   EXPECT_EQ(-EROFS, fd);

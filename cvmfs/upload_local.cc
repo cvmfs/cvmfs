@@ -31,7 +31,7 @@ bool LocalUploader::WillHandle(const SpoolerDefinition &spooler_definition) {
 }
 
 unsigned int LocalUploader::GetNumberOfErrors() const {
-  return atomic_read32(&copy_errors_);
+  return copy_errors_.load();
 }
 
 bool LocalUploader::Create() {

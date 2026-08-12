@@ -707,7 +707,7 @@ int SyncInit(struct fs_traversal *src,
   add_dir_for_sync(base, recursive);
   const int result = !SyncFull(src, dest, pstats, last_print_time);
 
-  while (atomic_read64(&copy_queue) != 0) {
+  while (copy_queue.load() != 0) {
     if (platform_monotonic_time() - last_print_time > stat_update_period_) {
       LogCvmfs(kLogCvmfs, kLogStdout, "%s",
                pstats->PrintList(perf::Statistics::kPrintSimple).c_str());

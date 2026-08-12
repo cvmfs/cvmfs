@@ -70,7 +70,7 @@ namespace {
 class CallGuard {
  public:
   CallGuard() {
-    const int32_t global_drainout = atomic_read32(&global_drainout_);
+    const int32_t global_drainout = global_drainout_.load();
     drainout_ = (global_drainout != 0);
     if (!drainout_)
       atomic_inc32(&num_inflight_calls_);
@@ -81,7 +81,7 @@ class CallGuard {
   }
   static void Drainout() {
     atomic_cas32(&global_drainout_, 0, 1);
-    while (atomic_read32(&num_inflight_calls_) != 0)
+    while (num_inflight_calls_.load() != 0)
       SafeSleepMs(50);
   }
 
@@ -245,11 +245,11 @@ bool PosixCacheManager::InitCacheDirectory(const string &cache_path) {
  * been validated and content is about to be stored (see #4217).
  */
 bool PosixCacheManager::EnsureCacheDirectories() {
-  if (atomic_read32(&cache_dirs_created_))
+  if (cache_dirs_created_.load())
     return true;
 
   const MutexLockGuard guard(lock_cache_dirs_);
-  if (atomic_read32(&cache_dirs_created_))
+  if (cache_dirs_created_.load())
     return true;
 
   const mode_t mode = alien_cache_ ? 0770 : 0700;
@@ -640,7 +640,7 @@ bool PosixCacheManager::StoreBreadcrumb(std::string fqrn,
 
 void PosixCacheManager::TearDown2ReadOnly() {
   cache_mode_ = kCacheReadOnly;
-  while (atomic_read32(&no_inflight_txns_) != 0)
+  while (no_inflight_txns_.load() != 0)
     SafeSleepMs(50);
 
   QuotaManager *old_manager = quota_mgr_;

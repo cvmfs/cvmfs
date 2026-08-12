@@ -73,7 +73,7 @@ void NfsMapsLeveldb::ForkAwareEnv::Schedule(void (*function)(void *),
 
 
 void NfsMapsLeveldb::ForkAwareEnv::WaitForBGThreads() {
-  while (atomic_read32(&num_bg_threads_) > 0)
+  while (num_bg_threads_.load() > 0)
     SafeSleepMs(100);
 }
 

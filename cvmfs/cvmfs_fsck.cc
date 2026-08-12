@@ -335,13 +335,12 @@ int main(int argc, char **argv) {
   free(workers);
   if (!g_verbose)
     LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "\n");
-  LogCvmfs(kLogCvmfs, kLogStdout, "Verified %d files",
-           atomic_read32(&g_num_files));
+  LogCvmfs(kLogCvmfs, kLogStdout, "Verified %d files", g_num_files.load());
 
-  if (atomic_read32(&g_num_tmp_catalog) > 0)
+  if (g_num_tmp_catalog.load() > 0)
     LogCvmfs(kLogCvmfs, kLogStdout, "Temporary file catalogs were found.");
 
-  if (atomic_read32(&g_force_rebuild)) {
+  if (g_force_rebuild.load()) {
     if (unlink("cachedb") == 0) {
       LogCvmfs(kLogCvmfs, kLogStdout,
                "Fix: managed cache db unlinked, will be rebuilt on next mount");
@@ -355,7 +354,7 @@ int main(int argc, char **argv) {
     }
   }
 
-  if (atomic_read32(&g_modified_cache)) {
+  if (g_modified_cache.load()) {
     LogCvmfs(kLogCvmfs, kLogStdout,
              "\n"
              "WARNING: There might by corrupted files in the kernel buffers.\n"
@@ -364,11 +363,11 @@ int main(int argc, char **argv) {
   }
 
   int retval = 0;
-  if (atomic_read32(&g_num_err_fixed) > 0)
+  if (g_num_err_fixed.load() > 0)
     retval |= kErrorFixed;
-  if (atomic_read32(&g_num_err_unfixed) > 0)
+  if (g_num_err_unfixed.load() > 0)
     retval |= kErrorUnfixed;
-  if (atomic_read32(&g_num_err_operational) > 0)
+  if (g_num_err_operational.load() > 0)
     retval |= kErrorOperational;
 
   return retval;

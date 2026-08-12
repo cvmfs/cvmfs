@@ -66,8 +66,8 @@ class FileItem : SingleCopy {
   void set_size(uint64_t val) { size_ = val; }
   void set_may_have_chunks(bool val) { may_have_chunks_ = val; }
   void set_is_fully_chunked() { atomic_inc32(&is_fully_chunked_); }
-  bool is_fully_chunked() { return atomic_read32(&is_fully_chunked_) != 0; }
-  uint64_t nchunks_in_fly() { return atomic_read64(&nchunks_in_fly_); }
+  bool is_fully_chunked() { return is_fully_chunked_.load() != 0; }
+  uint64_t nchunks_in_fly() { return nchunks_in_fly_.load(); }
 
   uint64_t GetNumChunks() { return chunks_.size(); }
   FileChunkList *GetChunksPtr() { return &chunks_; }
@@ -83,7 +83,7 @@ class FileItem : SingleCopy {
   void IncNchunksInFly() { atomic_inc64(&nchunks_in_fly_); }
   void RegisterChunk(const FileChunk &file_chunk);
   bool IsProcessed() {
-    return is_fully_chunked() && (atomic_read64(&nchunks_in_fly_) == 0);
+    return is_fully_chunked() && (nchunks_in_fly_.load() == 0);
   }
 
  private:
@@ -220,7 +220,7 @@ class BlockItem : SingleCopy {
   int64_t tag() { return tag_; }
   FileItem *file_item() { return file_item_; }
   ChunkItem *chunk_item() { return chunk_item_; }
-  static uint64_t managed_bytes() { return atomic_read64(&managed_bytes_); }
+  static uint64_t managed_bytes() { return managed_bytes_.load(); }
 
  private:
   /**
