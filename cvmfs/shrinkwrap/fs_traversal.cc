@@ -8,6 +8,7 @@
 #include <pthread.h>
 #include <stdio.h>
 
+#include <atomic>
 #include <fstream>
 #include <map>
 #include <vector>
@@ -18,7 +19,6 @@
 #include "shrinkwrap/posix/interface.h"
 #include "shrinkwrap/spec_tree.h"
 #include "statistics.h"
-#include "util/atomic.h"
 #include "util/concurrency.h"
 #include "util/logging.h"
 #include "util/platform.h"
@@ -85,7 +85,7 @@ uint64_t stat_update_period_ = 0;  // Off for testing
 int pipe_chunks[2];
 // required for concurrent reading
 pthread_mutex_t lock_pipe = PTHREAD_MUTEX_INITIALIZER;
-atomic_int64 copy_queue;
+std::atomic<int64_t> copy_queue;
 
 vector<RecDir *> dirs_;
 

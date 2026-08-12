@@ -7,13 +7,13 @@
 
 #include <pthread.h>
 
+#include <atomic>
 #include <ctime>
 
 #include "crypto/hash.h"
 #include "duplex_fuse.h"
 #include "fence.h"
 #include "fuse_evict.h"
-#include "util/atomic.h"
 #include "util/single_copy.h"
 
 namespace cvmfs {
@@ -127,18 +127,18 @@ class FuseRemounter : SingleCopy {
    * the handle of the FuseInvalidator is prepared, from one to two is the
    * actual move into drainout mode.
    */
-  atomic_int32 drainout_mode_;
+  std::atomic<int32_t> drainout_mode_;
   /**
    * in maintenance mode, cache timeout is 0 and catalogs are not reloaded.
    * Maintenance mode is entered when the fuse module gets reloaded.
    */
-  atomic_int32 maintenance_mode_;
+  std::atomic<int32_t> maintenance_mode_;
   /**
    * Only one thread must perform the actual remount (stopping user-level
    * caches, loading new catalog, etc.).  This is used to protect TyrFinish()
    * from concurrent execution.
    */
-  atomic_int32 critical_section_;
+  std::atomic<int32_t> critical_section_;
 };  // class FuseRemounter
 
 #endif  // CVMFS_FUSE_REMOUNT_H_

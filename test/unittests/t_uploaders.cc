@@ -7,6 +7,7 @@
 #include <gtest/gtest.h>
 #include <unistd.h>
 
+#include <atomic>
 #include <string>
 
 #include "c_file_sandbox.h"
@@ -17,7 +18,6 @@
 #include "upload_local.h"
 #include "upload_s3.h"
 #include "upload_spooler_definition.h"
-#include "util/atomic.h"
 #include "util/file_guard.h"
 #include "util/logging.h"
 #include "util/posix.h"
@@ -63,9 +63,9 @@ class UploadCallbacks {
   }
 
  public:
-  atomic_int32 simple_upload_invocations;
-  atomic_int32 streamed_upload_complete_invocations;
-  atomic_int32 buffer_upload_complete_invocations;
+  std::atomic<int32_t> simple_upload_invocations;
+  std::atomic<int32_t> streamed_upload_complete_invocations;
+  std::atomic<int32_t> buffer_upload_complete_invocations;
 };
 
 
@@ -83,7 +83,7 @@ class T_Uploaders : public FileSandbox {
  public:
   static const unsigned kTotal429Replies;
   static const unsigned k429ThrottleSec;
-  static atomic_int64 gSeed;
+  static std::atomic<int64_t> gSeed;
   struct StreamHandle {
     StreamHandle() : handle(NULL), content_hash(shash::kMd5) {
       content_hash.Randomize(atomic_xadd64(&gSeed, 1));
@@ -474,7 +474,7 @@ bool T_Uploaders<S3Uploader>::IsS3() const {
 }
 
 template<class UploadersT>
-atomic_int64 T_Uploaders<UploadersT>::gSeed = 0;
+std::atomic<int64_t> T_Uploaders<UploadersT>::gSeed = 0;
 
 // Shold be larger than the number of regular retries
 template<class UploadersT>
@@ -661,7 +661,7 @@ namespace {
 struct BatchedRemoveCtx {
   AbstractUploader *uploader;
   unsigned num_keys;
-  atomic_int32 done;
+  std::atomic<int32_t> done;
 };
 
 static void *BatchedRemoveWorker(void *arg) {
@@ -833,8 +833,8 @@ TYPED_TEST(T_Uploaders, SingleStreamedUpload) {
       atomic_read32(&(this->delegate_.streamed_upload_complete_invocations)));
 
   UploadStreamHandle *handle = this->uploader_->InitStreamedUpload(
-      AbstractUploader::MakeClosure(
-          &UploadCallbacks::StreamedUploadComplete, &this->delegate_, 0));
+      AbstractUploader::MakeClosure(&UploadCallbacks::StreamedUploadComplete,
+                                    &this->delegate_, 0));
   ASSERT_NE(static_cast<UploadStreamHandle *>(NULL), handle);
 
   EXPECT_EQ(
@@ -905,8 +905,8 @@ TYPED_TEST(T_Uploaders, MultipleStreamedUploadSlow) {
   typename TestFixture::BufferStreams::const_iterator iend = streams.end();
   for (; i != iend; ++i) {
     UploadStreamHandle *handle = this->uploader_->InitStreamedUpload(
-        AbstractUploader::MakeClosure(
-            &UploadCallbacks::StreamedUploadComplete, &this->delegate_, 0));
+        AbstractUploader::MakeClosure(&UploadCallbacks::StreamedUploadComplete,
+                                      &this->delegate_, 0));
     ASSERT_NE(static_cast<UploadStreamHandle *>(NULL), handle);
     i->second.handle = handle;
   }

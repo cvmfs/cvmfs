@@ -8,6 +8,7 @@
 #include <fcntl.h>
 #include <stdint.h>
 
+#include <atomic>
 #include <string>
 
 #include "ingestion/ingestion_source.h"
@@ -15,7 +16,6 @@
 #include "repository_tag.h"
 #include "statistics.h"
 #include "upload_spooler_definition.h"
-#include "util/atomic.h"
 #include "util/concurrency.h"
 #include "util/pointer.h"
 #include "util/posix.h"
@@ -463,7 +463,7 @@ class TaskUpload : public TubeConsumer<AbstractUploader::UploadJob> {
  */
 struct UploadStreamHandle {
   typedef AbstractUploader::CallbackTN CallbackTN;
-  static atomic_int64 g_upload_stream_tag;
+  static std::atomic<int64_t> g_upload_stream_tag;
 
   explicit UploadStreamHandle(const CallbackTN *commit_callback)
       : commit_callback(commit_callback)

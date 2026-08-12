@@ -8,13 +8,13 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 
+#include <atomic>
 #include <cstring>
 #include <string>
 
 #include "cache_plugin/libcvmfs_cache.h"
 #include "cache_posix.h"
 #include "smallhash.h"
-#include "util/atomic.h"
 #include "util/logging.h"
 #include "util/posix.h"
 #include "util/string.h"
@@ -158,7 +158,7 @@ SmallHashDynamic<uint64_t, Txn> *g_transactions;
 SmallHashDynamic<uint64_t, Listing> *g_listings;
 PosixCacheManager *g_cache_mgr;
 cvmcache_context *g_ctx;
-atomic_int32 g_terminated;
+std::atomic<int32_t> g_terminated;
 uint64_t g_pinned_size;
 uint64_t g_used_size;
 uint64_t g_capacity;

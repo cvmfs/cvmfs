@@ -16,6 +16,7 @@
 #ifdef __APPLE__
 #include <cstdlib>
 #endif
+#include <atomic>
 #include <cstring>
 #include <map>
 #include <new>
@@ -24,7 +25,6 @@
 
 #include "cache.pb.h"
 #include "crypto/hash.h"
-#include "util/atomic.h"
 #include "util/concurrency.h"
 #include "util/exception.h"
 #include "util/logging.h"

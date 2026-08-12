@@ -7,11 +7,11 @@
 
 #include <pthread.h>
 
+#include <atomic>
 #include <cassert>
 #include <cstddef>
 #include <vector>
 
-#include "util/atomic.h"
 #include "util/mutex.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
@@ -258,7 +258,7 @@ class PolymorphicConstructionImpl {
   static RegisteredPlugins registered_plugins_;
 
  private:
-  static atomic_int32 needs_init_;
+  static std::atomic<int32_t> needs_init_;
   static pthread_mutex_t init_mutex_;
 };
 
@@ -307,8 +307,8 @@ class PolymorphicConstruction<AbstractProductT, ParameterT, void>
 
 
 template<class AbstractProductT, typename ParameterT, typename InfoT>
-atomic_int32 PolymorphicConstructionImpl<AbstractProductT, ParameterT,
-                                         InfoT>::needs_init_ = 1;
+std::atomic<int32_t> PolymorphicConstructionImpl<AbstractProductT, ParameterT,
+                                                 InfoT>::needs_init_ = 1;
 
 template<class AbstractProductT, typename ParameterT, typename InfoT>
 pthread_mutex_t

@@ -9,11 +9,11 @@
 #include <pthread.h>
 #include <sys/time.h>
 
+#include <atomic>
 #include <cstdio>
 #include <string>
 
 #include "shortstring.h"
-#include "util/atomic.h"
 #include "util/single_copy.h"
 
 /**
@@ -109,7 +109,7 @@ class Tracer : SingleCopy {
    * the ring buffer memory, the respective flag is set to 1.  Flags are reset
    * to 0 by the flush thread.
    */
-  atomic_int32 *commit_buffer_;
+  std::atomic<int32_t> *commit_buffer_;
   pthread_t thread_flush_;
   pthread_cond_t sig_flush_;
   pthread_mutex_t sig_flush_mutex_;
@@ -119,14 +119,14 @@ class Tracer : SingleCopy {
    * Starts with 0 and gets incremented by each call to trace.  Contains the
    * first non-used sequence number.
    */
-  atomic_int32 seq_no_;
+  std::atomic<int32_t> seq_no_;
   /**
    * Starts with 0 and gets incremented by the flush thread.  Points to the
    * first non-flushed message. flushed <= seq_no holds.
    */
-  atomic_int32 flushed_;
-  atomic_int32 terminate_flush_thread_;
-  atomic_int32 flush_immediately_;
+  std::atomic<int32_t> flushed_;
+  std::atomic<int32_t> terminate_flush_thread_;
+  std::atomic<int32_t> flush_immediately_;
 };
 
 #endif  // CVMFS_TRACER_H_

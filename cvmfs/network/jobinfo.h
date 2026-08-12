@@ -62,7 +62,7 @@ struct DataTubeElement : SingleCopy {
  */
 class JobInfo {
  private:
-  static atomic_int64 next_uuid;
+  static std::atomic<int64_t> next_uuid;
   int64_t id_;
   /// Pipe used for the return value
   UniquePtr<Pipe<kPipeDownloadJobsResults> > pipe_job_results;

@@ -6,6 +6,8 @@
 #include <gtest/gtest.h>
 #include <pthread.h>
 
+#include <atomic>
+
 #include "backoff.h"
 #include "cache_posix.h"
 #include "crypto/hash.h"
@@ -13,7 +15,6 @@
 #include "network/download.h"
 #include "statistics.h"
 #include "testutil.h"
-#include "util/atomic.h"
 
 using namespace std;  // NOLINT
 
@@ -169,8 +170,8 @@ class BuggyCacheManager : public CacheManager {
   bool open_2nd_try;
   bool allow_open;
   bool stall_in_ctrltxn;
-  atomic_int32 waiting_in_ctrltxn;
-  atomic_int32 continue_ctrltxn;
+  std::atomic<int32_t> waiting_in_ctrltxn;
+  std::atomic<int32_t> continue_ctrltxn;
   bool allow_open_from_txn;
 };
 

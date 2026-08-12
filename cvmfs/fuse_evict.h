@@ -8,11 +8,12 @@
 #include <pthread.h>
 #include <stdint.h>
 
+#include <atomic>
+
 #include "bigvector.h"
 #include "duplex_fuse.h"
 #include "duplex_testing.h"
 #include "shortstring.h"
-#include "util/atomic.h"
 #include "util/concurrency.h"
 #include "util/single_copy.h"
 
@@ -62,7 +63,7 @@ class FuseInvalidator : SingleCopy {
     void SetDone() { atomic_cas32(status_, 0, 1); }
 
     unsigned timeout_s_;
-    atomic_int32 *status_;
+    std::atomic<int32_t> *status_;
   };
 
   struct Command {
@@ -126,7 +127,7 @@ class FuseInvalidator : SingleCopy {
    * An invalidation run can take some time.  Allow for early cancellation if
    * thread should be shut down.
    */
-  atomic_int32 terminated_;
+  std::atomic<int32_t> terminated_;
   BigVector<uint64_t> evict_list_;
 
   static bool g_fuse_notify_invalidation_;

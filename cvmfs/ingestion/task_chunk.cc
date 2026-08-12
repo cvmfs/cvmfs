@@ -15,7 +15,7 @@
  * chunking stage can safely overlap.  Nevertheless, debugging might be easier
  * if they don't.  So let's start with a high number.
  */
-atomic_int64 TaskChunk::tag_seq_ = 2 << 28;
+std::atomic<int64_t> TaskChunk::tag_seq_ = 2 << 28;
 
 /**
  * Consumes the stream of input blocks and produces new output blocks according

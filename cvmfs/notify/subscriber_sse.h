@@ -5,11 +5,11 @@
 #ifndef CVMFS_NOTIFY_SUBSCRIBER_SSE_H_
 #define CVMFS_NOTIFY_SUBSCRIBER_SSE_H_
 
+#include <atomic>
 #include <string>
 
 #include "duplex_curl.h"
 #include "subscriber.h"
-#include "util/atomic.h"
 
 namespace notify {
 
@@ -57,7 +57,7 @@ class SubscriberSSE : public Subscriber {
   std::string topic_;
   std::string buffer_;
 
-  mutable atomic_int32 should_quit_;
+  mutable std::atomic<int32_t> should_quit_;
 };
 
 }  // namespace notify

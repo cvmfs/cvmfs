@@ -5,17 +5,17 @@
 #ifndef CVMFS_SMALLHASH_H_
 #define CVMFS_SMALLHASH_H_
 
-#include "duplex_testing.h"
 #include <inttypes.h>
 #include <pthread.h>
 #include <stdint.h>
 
 #include <algorithm>
+#include <atomic>
 #include <cassert>
 #include <cstdlib>
 #include <new>
 
-#include "util/atomic.h"
+#include "duplex_testing.h"
 #include "util/murmur.hxx"
 #include "util/prng.h"
 #include "util/smalloc.h"

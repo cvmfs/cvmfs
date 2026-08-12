@@ -5,6 +5,7 @@
 #ifndef CVMFS_SWISSKNIFE_MIGRATE_H_
 #define CVMFS_SWISSKNIFE_MIGRATE_H_
 
+#include <atomic>
 #include <map>
 #include <string>
 #include <vector>
@@ -18,7 +19,6 @@
 #include "uid_map.h"
 #include "upload.h"
 #include "util/algorithm.h"
-#include "util/atomic.h"
 #include "util/concurrency.h"
 #include "util/future.h"
 #include "util/logging.h"
@@ -391,7 +391,7 @@ class CommandMigrate : public Command {
   unsigned int file_descriptor_limit_;
   CatalogStatisticsList catalog_statistics_list_;
   unsigned int catalog_count_;
-  atomic_int32 catalogs_processed_;
+  std::atomic<int32_t> catalogs_processed_;
   bool has_committed_new_revision_;
 
   uid_t uid_;

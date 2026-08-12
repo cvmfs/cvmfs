@@ -10,10 +10,9 @@
 #define CVMFS_SHORTSTRING_H_
 
 #include <algorithm>
+#include <atomic>
 #include <cstring>
 #include <string>
-
-#include "util/atomic.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
@@ -208,8 +207,8 @@ class ShortString {
   std::string *long_string_;
   char stack_[StackSize + 1];  // +1 to add a final '\0' if necessary
   unsigned char length_;
-  static atomic_int64 num_overflows_;
-  static atomic_int64 num_instances_;
+  static std::atomic<int64_t> num_overflows_;
+  static std::atomic<int64_t> num_instances_;
 };  // class ShortString
 
 typedef ShortString<kDefaultMaxPath, 0> PathString;
@@ -217,9 +216,9 @@ typedef ShortString<kDefaultMaxName, 1> NameString;
 typedef ShortString<kDefaultMaxLink, 2> LinkString;
 
 template<unsigned char StackSize, char Type>
-atomic_int64 ShortString<StackSize, Type>::num_overflows_ = 0;
+std::atomic<int64_t> ShortString<StackSize, Type>::num_overflows_ = 0;
 template<unsigned char StackSize, char Type>
-atomic_int64 ShortString<StackSize, Type>::num_instances_ = 0;
+std::atomic<int64_t> ShortString<StackSize, Type>::num_instances_ = 0;
 
 // See posix.cc for the std::string counterparts
 PathString GetParentPath(const PathString &path);
@@ -233,4 +232,3 @@ bool IsSubPath(const PathString &parent, const PathString &path);
 #endif
 
 #endif  // CVMFS_SHORTSTRING_H_
-

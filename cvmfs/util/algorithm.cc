@@ -4,7 +4,12 @@
  * Some common functions.
  */
 
+#include "util/algorithm.h"
+
+#include <sys/time.h>
+
 #include <algorithm>
+#include <atomic>
 #include <cassert>
 #include <cmath>
 #include <cstdint>
@@ -12,11 +17,8 @@
 #include <cstdlib>
 #include <cstring>
 #include <string>
-#include <sys/time.h>
 #include <vector>
 
-#include "util/algorithm.h"
-#include "util/atomic.h"
 #include "util/string.h"
 
 
@@ -101,7 +103,8 @@ Log2Histogram::Log2Histogram(unsigned int nbins) {
   }
 }
 
-std::vector<atomic_int32> UTLog2Histogram::GetBins(const Log2Histogram &h) {
+std::vector<std::atomic<int32_t> > UTLog2Histogram::GetBins(
+    const Log2Histogram &h) {
   return h.bins_;
 }
 

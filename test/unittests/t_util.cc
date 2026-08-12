@@ -13,6 +13,7 @@
 #include <sys/un.h>
 #include <unistd.h>
 
+#include <atomic>
 #include <cstring>
 #include <ctime>
 #include <limits>
@@ -21,7 +22,6 @@
 #include "shortstring.h"
 #include "testutil.h"
 #include "util/algorithm.h"
-#include "util/atomic.h"
 #include "util/file_guard.h"
 #include "util/mmap_file.h"
 #include "util/pipe.h"
@@ -1756,8 +1756,8 @@ TEST_F(T_Util, ExecuteBinary) {
   argv.push_back(message);
   pid_t gdb_pid = 0;
 
-  result = ExecuteBinary(
-      &fd_stdin, &fd_stdout, &fd_stderr, "/bin/echo", argv, false, &gdb_pid);
+  result = ExecuteBinary(&fd_stdin, &fd_stdout, &fd_stderr, "/bin/echo", argv,
+                         false, &gdb_pid);
   EXPECT_TRUE(result);
   ssize_t bytes_read = read(fd_stdout, buffer, message.length());
   EXPECT_EQ(static_cast<size_t>(bytes_read), message.length());
@@ -2175,7 +2175,7 @@ TEST(Log2Histogram, 2BinEmpty) {
 
   UTLog2Histogram unit_test;
 
-  std::vector<atomic_int32> bins = unit_test.GetBins(log2hist);
+  std::vector<std::atomic<int32_t> > bins = unit_test.GetBins(log2hist);
   int res[3] = {3, 0, 0};
   for (int i = 0; i < 3; i++) {
     EXPECT_EQ(res[i], atomic_read32(&bins[i]));
@@ -2196,7 +2196,7 @@ TEST(Log2Histogram, 2Bins) {
 
   UTLog2Histogram unit_test;
 
-  std::vector<atomic_int32> bins = unit_test.GetBins(log2hist);
+  std::vector<std::atomic<int32_t> > bins = unit_test.GetBins(log2hist);
   int res[3] = {1, 3, 2};
   for (int i = 0; i < 3; i++) {
     EXPECT_EQ(res[i], atomic_read32(&bins[i]));
@@ -2220,7 +2220,7 @@ TEST(Log2Histogram, 3Bins) {
 
   UTLog2Histogram unit_test;
 
-  std::vector<atomic_int32> bins = unit_test.GetBins(log2hist);
+  std::vector<std::atomic<int32_t> > bins = unit_test.GetBins(log2hist);
   int res[4] = {1, 5, 2, 4};
   for (int i = 0; i < 4; i++) {
     EXPECT_EQ(res[i], atomic_read32(&bins[i]));

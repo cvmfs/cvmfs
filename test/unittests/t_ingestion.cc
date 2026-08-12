@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#include <atomic>
 #include <cstdlib>
 #include <cstring>
 
@@ -23,7 +24,6 @@
 #include "ingestion/task_write.h"
 #include "testutil.h"
 #include "upload_facility.h"
-#include "util/atomic.h"
 #include "util/pointer.h"
 #include "util/posix.h"
 #include "util/smalloc.h"
@@ -37,15 +37,15 @@ class DummyItem {
   bool IsQuitBeacon() { return summand == -1; }
   explicit DummyItem(int s) : summand(s) { }
   int summand;
-  static atomic_int32 sum;
+  static std::atomic<int32_t> sum;
 };
-atomic_int32 DummyItem::sum = 0;
+std::atomic<int32_t> DummyItem::sum = 0;
 
 
 class TestTask : public TubeConsumer<DummyItem> {
  public:
-  static atomic_int32 cnt_terminate;
-  static atomic_int32 cnt_process;
+  static std::atomic<int32_t> cnt_terminate;
+  static std::atomic<int32_t> cnt_process;
   explicit TestTask(Tube<DummyItem> *tube) : TubeConsumer<DummyItem>(tube) { }
 
  protected:
@@ -55,8 +55,8 @@ class TestTask : public TubeConsumer<DummyItem> {
   }
   virtual void OnTerminate() { atomic_inc32(&cnt_terminate); }
 };
-atomic_int32 TestTask::cnt_terminate = 0;
-atomic_int32 TestTask::cnt_process = 0;
+std::atomic<int32_t> TestTask::cnt_terminate = 0;
+std::atomic<int32_t> TestTask::cnt_process = 0;
 }  // anonymous namespace
 
 
@@ -71,7 +71,7 @@ struct FnFileProcessed {
     atomic_inc64(&ncall);
   }
 
-  atomic_int64 ncall;
+  std::atomic<int64_t> ncall;
 };
 
 
@@ -84,7 +84,7 @@ struct FnFileHashed {
   }
 
   ScrubbingResult last_result;
-  atomic_int64 ncall;
+  std::atomic<int64_t> ncall;
 };
 
 

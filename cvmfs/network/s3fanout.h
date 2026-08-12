@@ -103,7 +103,7 @@ struct JobInfo : SingleCopy {
     kReqPutHtml,       // HTML file - display instead of downloading
     kReqPutBucket,     // bucket creation
     kReqDelete,
-    kReqDeleteMulti,   // S3 multi-object delete (POST /?delete)
+    kReqDeleteMulti,  // S3 multi-object delete (POST /?delete)
   };
 
   const std::string object_key;
@@ -235,7 +235,8 @@ class S3FanoutManager : SingleCopy {
   static const char *kCacheControlCas;          // Cache-Control: max-age=259200
   static const unsigned kLowSpeedLimit = 1024;  // Require at least 1kB/s
 
-  std::string MkDotCvmfsCacheControlHeader(unsigned defaultMaxAge=61, int overrideMaxAge=-1);
+  std::string MkDotCvmfsCacheControlHeader(unsigned defaultMaxAge = 61,
+                                           int overrideMaxAge = -1);
 
   static int CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
                                 void *userp, void *socketp);
@@ -309,7 +310,7 @@ class S3FanoutManager : SingleCopy {
   mutable std::pair<std::string, std::string> last_signing_key_;
 
   pthread_t thread_upload_;
-  atomic_int32 multi_threaded_;
+  std::atomic<int32_t> multi_threaded_;
 
   struct pollfd *watch_fds_;
   uint32_t watch_fds_size_;
@@ -347,7 +348,7 @@ class S3FanoutManager : SingleCopy {
    */
   SslCertificateStore ssl_certificate_store_;
 
-  std::string dot_cvmfs_cache_control_header;           // Cache-Control: max-age=...
+  std::string dot_cvmfs_cache_control_header;  // Cache-Control: max-age=...
 };  // S3FanoutManager
 
 std::string MkV2CanonicalResource(const std::string &bucket,
