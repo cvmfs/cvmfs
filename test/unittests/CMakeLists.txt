@@ -749,6 +749,7 @@ target_link_libraries (cvmfs_unittests_mockfuse
                        cvmfs_crypto
                        cvmfs_util
                        leveldb::leveldb
+                       ${FUSE3_LIBRARIES}
                        ${CVMFS_UNITTESTS_LINK_LIBRARIES})
 
 add_executable (cvmfs_unittests ${CVMFS_UNITTEST_SOURCES})
