@@ -1241,7 +1241,7 @@ string TalkManager::FormatPrometheusMetrics(MountPoint &mount_point,
                 StringifyInt(linkstring_overflows));
 
   // Tracker statistics (same as internal affairs does)
-  glue::InodeTracker::Statistics inode_stats = mount_point.inode_tracker()
+  const glue::InodeTracker::Statistics inode_stats = mount_point.inode_tracker()
                                                    ->GetStatistics();
   const glue::DentryTracker::Statistics
       dentry_stats = mount_point.dentry_tracker()->GetStatistics();
