@@ -22,6 +22,7 @@
 #include <errno.h>
 #include <stdint.h>
 #include <sys/types.h>
+#include <sys/utsname.h>
 
 #define NOTE_ALIGN(sz) (((sz) + 3) & ~3)
 #define PAGE_SIZE 4096UL
@@ -60,6 +61,7 @@ static const arch_desc_t arch_x86_64 = {
   112,  /* prstatus_reg   */
   136,  /* prpsinfo_size  */
   24,   /* prpsinfo_pid   */
+  40,   /* prpsinfo_fname */
   56    /* prpsinfo_args  */
 };
 
@@ -90,8 +92,32 @@ static const arch_desc_t arch_aarch64 = {
   56    /* prpsinfo_args                     */
 };
 
-/** Active architecture descriptor (future: detect via uname and select). */
+
+
+/* g_arch is set at startup by detect_arch() via uname(). */
 static const arch_desc_t *g_arch = &arch_x86_64;
+
+/**
+ * Detects the host CPU architecture via uname() and sets g_arch.
+ * Exits with an error if the architecture is unsupported.
+ */
+static void detect_arch(void) {
+  struct utsname u;
+  if (uname(&u) < 0) {
+    perror("uname");
+    exit(1);
+  }
+  if (strcmp(u.machine, "x86_64") == 0) {
+    g_arch = &arch_x86_64;
+  } else if (strcmp(u.machine, "aarch64") == 0) {
+    g_arch = &arch_aarch64;
+  } else {
+    fprintf(stderr, "Unsupported architecture: %s\n", u.machine);
+    fprintf(stderr, "Only x86_64 and aarch64 are supported.\n");
+    exit(1);
+  }
+}
+
 
 /**
  * Dump level controls which memory regions are written to the core.
@@ -122,9 +148,11 @@ typedef struct {
   char name[256];
 } mem_region_t;
 
+#define MAX_NGREG 34
+
 typedef struct {
   int tid;
-  unsigned long regs[X86_64_NGREG];
+  unsigned long regs[MAX_NGREG];
 } thread_info_t;
 
 /**
@@ -283,23 +311,35 @@ int read_thread_registers(int pid, int tid, unsigned long *regs) {
     if (i < 9) return -1;
   }
 
-  memset(regs, 0, X86_64_NGREG * sizeof(unsigned long));
+  memset(regs, 0, g_arch->ngreg * sizeof(unsigned long));
 
-  // Map syscall arguments to x86_64 user_regs_struct layout
-  regs[15] = nr;   // ORIG_RAX
-  regs[10] = nr;   // RAX
-  regs[14] = a0;   // RDI
-  regs[13] = a1;   // RSI
-  regs[12] = a2;   // RDX
-  regs[7]  = a3;   // R10
-  regs[9]  = a4;   // R8
-  regs[8]  = a5;   // R9
-  regs[X86_64_REG_RSP] = rsp;
-  regs[X86_64_REG_RIP] = rip;
+  /* SP and IP are always the last two fields in /proc/syscall output */
+  regs[g_arch->reg_sp] = rsp;
+  regs[g_arch->reg_ip] = rip;
 
-  // User-mode segment selectors
-  regs[17] = 0x33; // CS
-  regs[20] = 0x2b; // SS
+  /* Map syscall arguments into the architecture's register layout */
+  if (g_arch == &arch_x86_64) {
+    /* x86_64 syscall ABI: rax=nr, rdi=a0, rsi=a1, rdx=a2, r10=a3, r8=a4, r9=a5 */
+    regs[15] = nr;   /* ORIG_RAX */
+    regs[10] = nr;   /* RAX      */
+    regs[14] = a0;   /* RDI      */
+    regs[13] = a1;   /* RSI      */
+    regs[12] = a2;   /* RDX      */
+    regs[7]  = a3;   /* R10      */
+    regs[9]  = a4;   /* R8       */
+    regs[8]  = a5;   /* R9       */
+    regs[17] = 0x33; /* CS       */
+    regs[20] = 0x2b; /* SS       */
+  } else if (g_arch == &arch_aarch64) {
+    /* AArch64 syscall ABI: x8=nr, x0=a0, x1=a1, x2=a2, x3=a3, x4=a4, x5=a5 */
+    regs[8]  = nr;   /* x8  (syscall number) */
+    regs[0]  = a0;   /* x0                  */
+    regs[1]  = a1;   /* x1                  */
+    regs[2]  = a2;   /* x2                  */
+    regs[3]  = a3;   /* x3                  */
+    regs[4]  = a4;   /* x4                  */
+    regs[5]  = a5;   /* x5                  */
+  }
 
   return 0;
 }
@@ -588,16 +628,16 @@ int build_core(int pid, const char *output_path) {
   for (int i = 0; i < num_threads; i++) {
     printf("  TID %-6d  RIP=0x%016lx  RSP=0x%016lx",
          threads[i].tid,
-         threads[i].regs[X86_64_REG_RIP],
-         threads[i].regs[X86_64_REG_RSP]);
+         threads[i].regs[g_arch->reg_ip],
+         threads[i].regs[g_arch->reg_sp]);
 
     // Attempt RBP recovery if RBP is missing
-    const unsigned long rsp = threads[i].regs[X86_64_REG_RSP];
-    if (rsp != 0 && threads[i].regs[X86_64_REG_RBP] == 0) {
+    const unsigned long rsp = threads[i].regs[g_arch->reg_sp];
+    if (rsp != 0 && threads[i].regs[g_arch->reg_fp] == 0) {
       const unsigned long rbp = recover_rbp(mem_fd, rsp,
                       regions, num_regions);
       if (rbp != 0) {
-        threads[i].regs[X86_64_REG_RBP] = rbp;
+        threads[i].regs[g_arch->reg_fp] = rbp;
       } else {
         printf("  (RBP=0, no chain found)");
       }
@@ -622,12 +662,12 @@ int build_core(int pid, const char *output_path) {
 
   // NT_PRSTATUS: one per thread
   const size_t per_prstatus  = sizeof(Elf64_Nhdr) + 8
-             + NOTE_ALIGN(X86_64_PRSTATUS_SIZE);
+             + NOTE_ALIGN(g_arch->prstatus_size);
   const size_t total_prstatus = per_prstatus * num_threads;
 
   // NT_PRPSINFO
   const size_t prpsinfo_sz = sizeof(Elf64_Nhdr) + 8
-             + NOTE_ALIGN(X86_64_PRPSINFO_SIZE);
+             + NOTE_ALIGN(g_arch->prpsinfo_size);
 
   // NT_FILE: all file-backed regions (GDB needs this for .text reload)
   uint64_t file_count  = 0;
@@ -672,7 +712,7 @@ int build_core(int pid, const char *output_path) {
   ehdr.e_ident[EI_VERSION] = EV_CURRENT;
   ehdr.e_ident[EI_OSABI]   = ELFOSABI_LINUX;
   ehdr.e_type              = ET_CORE;
-  ehdr.e_machine           = EM_X86_64;
+  ehdr.e_machine           = g_arch->elf_machine;
   ehdr.e_version           = EV_CURRENT;
   ehdr.e_phoff             = sizeof(Elf64_Ehdr);
   ehdr.e_ehsize            = sizeof(Elf64_Ehdr);
@@ -718,31 +758,31 @@ int build_core(int pid, const char *output_path) {
 
   // NT_PRSTATUS (one per thread)
   for (int i = 0; i < num_threads; i++) {
-    unsigned char *prstatus = (unsigned char *)calloc(1, X86_64_PRSTATUS_SIZE);
+    unsigned char *prstatus = (unsigned char *)calloc(1, g_arch->prstatus_size);
     if (!prstatus) { fclose(core); return -1; }
 
-    *(pid_t *)(prstatus + X86_64_PRSTATUS_PID)
+    *(pid_t *)(prstatus + g_arch->prstatus_pid)
       = (pid_t)threads[i].tid;
 
-    memcpy(prstatus + X86_64_PRSTATUS_REG,
+    memcpy(prstatus + g_arch->prstatus_reg,
          threads[i].regs,
-         X86_64_NGREG * sizeof(unsigned long));
+         g_arch->ngreg * sizeof(unsigned long));
 
     write_note(core, 1 /* NT_PRSTATUS */,
-           prstatus, X86_64_PRSTATUS_SIZE);
+           prstatus, g_arch->prstatus_size);
     free(prstatus);
   }
 
   // NT_PRPSINFO
   {
-    unsigned char *prpsinfo = (unsigned char *)calloc(1, X86_64_PRPSINFO_SIZE);
+    unsigned char *prpsinfo = (unsigned char *)calloc(1, g_arch->prpsinfo_size);
     if (!prpsinfo) { fclose(core); return -1; }
 
     prpsinfo[0] = 2;    // pr_state = TASK_UNINTERRUPTIBLE
     prpsinfo[1] = 'D';  // pr_sname
 
     // pr_pid
-    *(pid_t *)(prpsinfo + X86_64_PRPSINFO_PID)
+    *(pid_t *)(prpsinfo + g_arch->prpsinfo_pid)
       = (pid_t)pid;
 
     // Read cmdline for pr_fname and pr_psargs
@@ -768,12 +808,12 @@ int build_core(int pid, const char *output_path) {
     char *sp = strchr(bn, ' ');
     size_t nlen = sp ? (size_t)(sp - bn) : strlen(bn);
     if (nlen > 15) nlen = 15;
-    memcpy(prpsinfo + X86_64_PRPSINFO_FNAME, bn, nlen);
+    memcpy(prpsinfo + g_arch->prpsinfo_fname, bn, nlen);
 
-    memcpy(prpsinfo + X86_64_PRPSINFO_ARGS, cmdline, 80);
+    memcpy(prpsinfo + g_arch->prpsinfo_args, cmdline, 80);
 
     write_note(core, 3 /* NT_PRPSINFO */,
-           prpsinfo, X86_64_PRPSINFO_SIZE);
+           prpsinfo, g_arch->prpsinfo_size);
     free(prpsinfo);
   }
 
@@ -893,6 +933,7 @@ int build_core(int pid, const char *output_path) {
 }
 
 int main(int argc, char *argv[]) {
+  detect_arch();  /* auto-select x86_64 or aarch64 */
   int argi = 1;
   while (argi < argc && argv[argi][0] == '-') {
     if (!strcmp(argv[argi], "--standard")) {
