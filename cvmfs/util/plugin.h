@@ -308,7 +308,7 @@ class PolymorphicConstruction<AbstractProductT, ParameterT, void>
 
 template<class AbstractProductT, typename ParameterT, typename InfoT>
 std::atomic<int32_t> PolymorphicConstructionImpl<AbstractProductT, ParameterT,
-                                                 InfoT>::needs_init_ = 1;
+                                                 InfoT>::needs_init_(1);
 
 template<class AbstractProductT, typename ParameterT, typename InfoT>
 pthread_mutex_t
@@ -329,3 +329,4 @@ typename PolymorphicConstructionImpl<AbstractProductT, ParameterT,
 #endif
 
 #endif  // CVMFS_UTIL_PLUGIN_H_
+
