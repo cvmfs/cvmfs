@@ -552,11 +552,6 @@ static unsigned long recover_rbp(int mem_fd,
 
   free(stack_buf);
 
-  if (best_rbp) {
-    printf("  RBP recovered: 0x%016lx (chain depth: %d)\n",
-         best_rbp, best_depth);
-  }
-
   return best_rbp;
 }
 
@@ -593,18 +588,9 @@ size_t write_note(FILE *out, uint32_t type,
  * performs heuristic RBP recovery, then writes a GDB-compatible core file.
  */
 int build_core(int pid, const char *output_path) {
-  printf("---- dcoredumper ----\n");
-  printf("Target PID:   %d\n", pid);
-  printf("Output:       %s\n", output_path);
-  printf("Architecture: x86_64\n");
-  printf("Dump level:   %s\n",
-         g_level == DUMP_STANDARD ? "standard" : "full");
-  printf("\n");
-
   mem_region_t *regions = NULL;
   const int num_regions = parse_maps(pid, &regions);
   if (num_regions < 0) return -1;
-  printf("Memory regions: %d\n", num_regions);
 
   // Open /proc/pid/mem for RBP heuristic and memory dump
   char mem_path[64];
@@ -623,14 +609,7 @@ int build_core(int pid, const char *output_path) {
     free(regions); close(mem_fd);
     return -1;
   }
-  printf("Threads:        %d\n\n", num_threads);
-
   for (int i = 0; i < num_threads; i++) {
-    printf("  TID %-6d  RIP=0x%016lx  RSP=0x%016lx",
-         threads[i].tid,
-         threads[i].regs[g_arch->reg_ip],
-         threads[i].regs[g_arch->reg_sp]);
-
     // Attempt RBP recovery if RBP is missing
     const unsigned long rsp = threads[i].regs[g_arch->reg_sp];
     if (rsp != 0 && threads[i].regs[g_arch->reg_fp] == 0) {
@@ -638,13 +617,9 @@ int build_core(int pid, const char *output_path) {
                       regions, num_regions);
       if (rbp != 0) {
         threads[i].regs[g_arch->reg_fp] = rbp;
-      } else {
-        printf("  (RBP=0, no chain found)");
       }
     }
-    printf("\n");
   }
-  printf("\n");
 
   char  *auxv_data = NULL;
   size_t auxv_sz   = 0;
@@ -852,19 +827,10 @@ int build_core(int pid, const char *output_path) {
   }
 
   // Dump memory contents page-by-page to isolate guard page failures
-
-  printf("Dumping memory:\n");
-  size_t total_read   = 0;
-  size_t total_zeroed = 0;
-
   for (int i = 0; i < num_regions; i++) {
     if (!should_dump_region(&regions[i])) continue;
 
     const size_t seg_size = regions[i].end - regions[i].start;
-    printf("  0x%lx-0x%lx %-40s ... ",
-         regions[i].start, regions[i].end,
-         regions[i].name[0] ? regions[i].name : "(anon)");
-    fflush(stdout);
 
     char          buf[PAGE_SIZE];
     unsigned long addr         = regions[i].start;
@@ -898,14 +864,6 @@ int build_core(int pid, const char *output_path) {
       rem  -= chunk;
     }
 
-    total_read   += region_read;
-    total_zeroed += region_zero;
-
-    if (region_zero > 0) {
-      printf("partial (%zu read, %zu zeroed)\n",
-           region_read, region_zero);
-    } else {
-      printf("OK (%zu bytes)\n", region_read);
     }
   }
 
@@ -916,18 +874,7 @@ int build_core(int pid, const char *output_path) {
   free(threads);
   free(auxv_data);
 
-  printf("\n----- Summary ----\n");
-  printf("Threads:  %d\n", num_threads);
-  printf("Regions:  %d total, %d dumped\n", num_regions, loadable);
-  printf("Memory:   %zu bytes read, %zu bytes zeroed\n",
-       total_read, total_zeroed);
-  printf("Output:   %s\n\n", output_path);
-  printf("Load with:\n");
-  printf("  gdb /path/to/binary %s\n", output_path);
-  printf("  (gdb) thread apply all bt\n\n");
-  printf("RBP recovery: heuristic frame-pointer chain scan\n");
-  printf("If backtraces are short, the binary may lack frame\n");
-  printf("pointers. Recompile with -fno-omit-frame-pointer.\n");
+  printf("Core dump successfully saved to %s\n", output_path);
 
   return 0;
 }
@@ -941,9 +888,9 @@ int main(int argc, char *argv[]) {
     } else if (!strcmp(argv[argi], "--full")) {
       g_level = DUMP_FULL;
     } else if (!strcmp(argv[argi], "--help") ||
-              !strcmp(argv[argi], "-h")) {
+               !strcmp(argv[argi], "-h")) {
       printf(
-"Usage: dcoredumper [OPTIONS] <pid> <output.core>\n"
+"Usage: cvmfs_dcoredumper [OPTIONS] <pid> <output.core>\n"
 "\n"
 "Constructs an ELF core dump from a D-state process\n"
 "without ptrace. Reads /proc/<pid>/ interfaces directly.\n"
@@ -956,8 +903,8 @@ int main(int argc, char *argv[]) {
 "Requires root on kernel 6.x (for /proc/pid/syscall access).\n"
 "\n"
 "Example:\n"
-"  sudo dcoredumper 1234 /tmp/hung.core\n"
-"  sudo dcoredumper --full 1234 /tmp/hung.core\n"
+"  sudo cvmfs_dcoredumper 1234 /tmp/hung.core\n"
+"  sudo cvmfs_dcoredumper --full 1234 /tmp/hung.core\n"
 "  gdb /usr/bin/cvmfs2 /tmp/hung.core\n"
 "  (gdb) thread apply all bt\n"
       );
