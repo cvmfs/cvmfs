@@ -1,0 +1,88 @@
+# Example CI job proving the Azure-MSI publish path with no Azure VM.
+# Drop into .github/workflows/ (adjust paths to where these files live in-tree,
+# e.g. test/azure-msi/). Two jobs:
+#   * emulator-smoke : no CVMFS build; proves Azurite + mock IMDS accept the exact
+#                      CVMFS-shaped MSI requests (fast, always runnable).
+#   * publisher-e2e  : builds cvmfs-server (with the IMDS-endpoint patch) and runs a
+#                      real cvmfs_server publish against the emulator over MSI.
+name: azure-msi-emulation
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  emulator-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate Azurite TLS cert
+        working-directory: test/azure-msi
+        run: |
+          mkdir -p certs
+          openssl req -x509 -newkey rsa:2048 -nodes \
+            -keyout certs/azurite-key.pem -out certs/azurite-cert.pem -days 3650 \
+            -subj "/CN=127.0.0.1" -addext "subjectAltName=IP:127.0.0.1,DNS:localhost"
+
+      - name: Start emulator (Azurite --oauth basic + mock IMDS)
+        working-directory: test/azure-msi
+        run: docker compose up -d
+
+      - name: Verify CVMFS-shaped MSI requests are accepted
+        working-directory: test/azure-msi
+        run: |
+          for _ in $(seq 1 30); do
+            [ "$(curl -sk -o /dev/null -w '%{http_code}' \
+                 https://127.0.0.1:10000/devstoreaccount1?comp=list)" != "000" ] && break
+            sleep 1
+          done
+          python3 verify_msi_path.py
+
+      - name: Teardown
+        if: always()
+        working-directory: test/azure-msi
+        run: docker compose down -v
+
+  publisher-e2e:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake g++ libssl-dev libcurl4-openssl-dev \
+            zlib1g-dev libfuse-dev libattr1-dev uuid-dev libcap-dev python3 \
+            unzip pkg-config apache2 openssl
+
+      - name: Apply IMDS-endpoint override and build cvmfs-server
+        run: |
+          git apply test/azure-msi/s3fanout-imds-endpoint.patch
+          mkdir build && cd build
+          cmake -DBUILD_SERVER=ON -DBUILD_CVMFS=OFF -DBUILD_LIBCVMFS=OFF ..
+          make -j"$(nproc)"
+          sudo make install
+
+      - name: Start emulator
+        working-directory: test/azure-msi
+        run: |
+          mkdir -p certs
+          openssl req -x509 -newkey rsa:2048 -nodes \
+            -keyout certs/azurite-key.pem -out certs/azurite-cert.pem -days 3650 \
+            -subj "/CN=127.0.0.1" -addext "subjectAltName=IP:127.0.0.1,DNS:localhost"
+          docker compose up -d
+          for _ in $(seq 1 30); do
+            [ "$(curl -sk -o /dev/null -w '%{http_code}' \
+                 https://127.0.0.1:10000/devstoreaccount1?comp=list)" != "000" ] && break
+            sleep 1
+          done
+
+      - name: Publish to the Azure-Blob emulator over MSI
+        working-directory: test/azure-msi
+        run: sudo -E ./publish-e2e.sh
+
+      - name: Teardown
+        if: always()
+        working-directory: test/azure-msi
+        run: docker compose down -v

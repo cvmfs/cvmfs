@@ -1,0 +1,60 @@
+From: Hugo Meiland <hugo.meiland@microsoft.com>
+Subject: [PATCH] s3: make the Azure IMDS endpoint overridable (for CI/testing)
+
+On a real Azure VM the Instance Metadata Service always lives at the link-local
+address 169.254.169.254, so RefreshAzureToken() hard-codes it. That hard-coding
+is the single thing that makes the MSI path impossible to exercise off-Azure
+(e.g. in CI against a mock IMDS + Azurite).
+
+This adds a tiny, opt-in override: if the environment variable
+CVMFS_AZURE_IMDS_ENDPOINT is set and non-empty, its value is used as the IMDS
+base URL (scheme://host[:port]); otherwise behaviour is byte-for-byte identical
+to before. The proxy-bypass (CURLOPT_NOPROXY) is derived from the same base so
+it keeps working for both the default link-local host and an override host.
+
+No functional change on a real Azure VM (the variable is unset there).
+
+Apply on top of PR #4379 (branch feature-azblob_msi):
+    git apply s3fanout-imds-endpoint.patch
+
+---
+ cvmfs/network/s3fanout.cc | 20 +++++++++++++++++---
+ 1 file changed, 17 insertions(+), 3 deletions(-)
+
+diff --git a/cvmfs/network/s3fanout.cc b/cvmfs/network/s3fanout.cc
+--- a/cvmfs/network/s3fanout.cc
++++ b/cvmfs/network/s3fanout.cc
+@@ bool S3FanoutManager::RefreshAzureToken() const {
+-  string url = "http://169.254.169.254/metadata/identity/oauth2/token"
+-               "?api-version=2018-02-01"
+-               "&resource=https%3A%2F%2Fstorage.azure.com%2F";
++  // On a real Azure VM the IMDS endpoint is always the link-local address.
++  // It can be overridden via CVMFS_AZURE_IMDS_ENDPOINT (e.g. to point at a
++  // mock IMDS in CI); unset => identical behaviour to before.
++  const char *imds_env = getenv("CVMFS_AZURE_IMDS_ENDPOINT");
++  const string imds_base = (imds_env != NULL && imds_env[0] != '\0')
++                           ? string(imds_env)
++                           : string("http://169.254.169.254");
++  string url = imds_base + "/metadata/identity/oauth2/token"
++               "?api-version=2018-02-01"
++               "&resource=https%3A%2F%2Fstorage.azure.com%2F";
+   if (!config_.azure_mi_client_id.empty())
+     url += "&client_id=" + config_.azure_mi_client_id;
+ 
+   CURL *curl = curl_easy_init();
+   if (curl == NULL)
+     return false;
+@@ curl_easy_setopt(curl, CURLOPT_WRITEDATA, &body);
+   curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L);
+-  curl_easy_setopt(curl, CURLOPT_NOPROXY, "169.254.169.254");
++  // Bypass any proxy for the IMDS host (default link-local, or override host).
++  string imds_host = imds_base;
++  const size_t scheme_end = imds_host.find("://");
++  if (scheme_end != string::npos)
++    imds_host = imds_host.substr(scheme_end + 3);
++  imds_host = imds_host.substr(0, imds_host.find('/'));   // strip path
++  imds_host = imds_host.substr(0, imds_host.find(':'));   // strip port
++  curl_easy_setopt(curl, CURLOPT_NOPROXY, imds_host.c_str());
+   const CURLcode res = curl_easy_perform(curl);
+-- 
+2.40.0
