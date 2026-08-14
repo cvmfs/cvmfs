@@ -33,19 +33,19 @@
  * defining a new static const instance — no other code changes needed.
  */
 typedef struct {
-  const char *name;           /**< human-readable, e.g. "x86_64"        */
-  uint16_t    elf_machine;    /**< ELF e_machine, e.g. EM_X86_64       */
-  size_t      ngreg;          /**< number of general-purpose registers  */
-  size_t      reg_ip;         /**< index of instruction pointer in regs */
-  size_t      reg_sp;         /**< index of stack pointer in regs       */
-  size_t      reg_fp;         /**< index of frame pointer in regs       */
-  size_t      prstatus_size;  /**< total size of NT_PRSTATUS descriptor */
-  size_t      prstatus_pid;   /**< byte offset of pr_pid in prstatus    */
-  size_t      prstatus_reg;   /**< byte offset of pr_reg in prstatus    */
-  size_t      prpsinfo_size;  /**< total size of NT_PRPSINFO descriptor */
-  size_t      prpsinfo_pid;   /**< byte offset of pr_pid in prpsinfo    */
-  size_t      prpsinfo_fname; /**< byte offset of pr_fname in prpsinfo  */
-  size_t      prpsinfo_args;  /**< byte offset of pr_psargs in prpsinfo */
+  const char *name;           /* human-readable, e.g. "x86_64"        */
+  uint16_t    elf_machine;    /* ELF e_machine, e.g. EM_X86_64        */
+  size_t      ngreg;          /* number of general-purpose registers  */
+  size_t      reg_ip;         /* index of instruction pointer in regs */
+  size_t      reg_sp;         /* index of stack pointer in regs       */
+  size_t      reg_fp;         /* index of frame pointer in regs       */
+  size_t      prstatus_size;  /* total size of NT_PRSTATUS descriptor */
+  size_t      prstatus_pid;   /* byte offset of pr_pid in prstatus    */
+  size_t      prstatus_reg;   /* byte offset of pr_reg in prstatus    */
+  size_t      prpsinfo_size;  /* total size of NT_PRPSINFO descriptor */
+  size_t      prpsinfo_pid;   /* byte offset of pr_pid in prpsinfo    */
+  size_t      prpsinfo_fname; /* byte offset of pr_fname in prpsinfo  */
+  size_t      prpsinfo_args;  /* byte offset of pr_psargs in prpsinfo */
 } arch_desc_t;
 
 static const arch_desc_t arch_x86_64 = {
@@ -60,8 +60,34 @@ static const arch_desc_t arch_x86_64 = {
   112,  /* prstatus_reg   */
   136,  /* prpsinfo_size  */
   24,   /* prpsinfo_pid   */
-  40,   /* prpsinfo_fname */
   56    /* prpsinfo_args  */
+};
+
+/**
+ * AArch64 (ARM64) architecture descriptor.
+ *
+ * Register layout in elf_prstatus.pr_reg (struct user_pt_regs):
+ *   [0..30]  x0–x30  (x30 = link register / LR)
+ *   [31]     sp
+ *   [32]     pc
+ *   [33]     pstate
+ *
+ * Syscall ABI: x8=nr, x0=a0, x1=a1, x2=a2, x3=a3, x4=a4, x5=a5
+ */
+static const arch_desc_t arch_aarch64 = {
+  "aarch64",
+  EM_AARCH64,
+  34,   /* ngreg: x0-x30 + sp + pc + pstate */
+  32,   /* reg_ip (PC)                       */
+  31,   /* reg_sp (SP)                       */
+  29,   /* reg_fp (FP = x29)                 */
+  392,  /* prstatus_size                     */
+  32,   /* prstatus_pid                      */
+  112,  /* prstatus_reg                      */
+  136,  /* prpsinfo_size                     */
+  24,   /* prpsinfo_pid                      */
+  40,   /* prpsinfo_fname                    */
+  56    /* prpsinfo_args                     */
 };
 
 /** Active architecture descriptor (future: detect via uname and select). */
