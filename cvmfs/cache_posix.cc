@@ -91,8 +91,8 @@ class CallGuard {
   static std::atomic<int32_t> global_drainout_;
   static std::atomic<int32_t> num_inflight_calls_;
 };
-std::atomic<int32_t> CallGuard::num_inflight_calls_ = 0;
-std::atomic<int32_t> CallGuard::global_drainout_ = 0;
+std::atomic<int32_t> CallGuard::num_inflight_calls_(0);
+std::atomic<int32_t> CallGuard::global_drainout_(0);
 
 }  // anonymous namespace
 
@@ -684,3 +684,4 @@ int64_t PosixCacheManager::Write(const void *buf, uint64_t size, void *txn) {
   transaction->size += written;
   return written;
 }
+ 
