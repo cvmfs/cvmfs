@@ -228,6 +228,26 @@ void SyncMediator::Remove(SharedPtr<SyncItem> entry, bool fast_delete) {
     return;
   }
 
+  // A mountless publisher (cvmfs_server connect-gw -P) has no rdonly view, so
+  // the Was* checks above cannot type the entry: the stat returns ENOENT and
+  // every branch falls through.  For a fast delete of a nested-catalog
+  // mountpoint the catalog itself is the authority — a transition point is by
+  // definition a directory — and RemoveDirectoryRecursively's fast path is
+  // catalog-driven, needing no filesystem below it.
+  //
+  // The existence probe must come first: IsTransitionPoint() PANICs on a path
+  // the catalog does not have, and a path that is in neither the rdonly view
+  // nor the catalog must keep producing the warning below, not an abort.
+  if (fast_delete) {
+    catalog::DirectoryEntry probe;
+    if (catalog_manager_->LookupPath("/" + entry->GetRelativePath(),
+                                     catalog::kLookupDefault, &probe)
+        && catalog_manager_->IsTransitionPoint(entry->GetRelativePath())) {
+      RemoveDirectoryRecursively(entry, fast_delete);
+      return;
+    }
+  }
+
   PrintWarning("'" + entry->GetRelativePath()
                + "' cannot be deleted. Unrecognized file type.");
 }
