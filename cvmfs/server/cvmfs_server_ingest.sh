@@ -266,7 +266,7 @@ cvmfs_server_ingest() {
   if [ x"$user" != "x" ]; then
     uid=$(id -u "$user")
 
-    if [ x"$uid" = xi* ]; then
+    if [ x"$uid" = "x" ]; then
       die "User set but no valid user name given"
     fi
   fi
@@ -279,15 +279,18 @@ cvmfs_server_ingest() {
     fi
   fi
   # only user set: get gid from user
-  if [ x"$group" != "x" ]; then
+  if [ x"$user" != "x" ] && [ x"$group" = "x" ]; then
     gid=$(id -g "$user")
+    if [ x"$gid" = "x" ]; then
+      die "Cannot determine the group of user '$user'"
+    fi
   fi
   # use default cvmfs repo owner
   if [ x"$user" = "x" ] && [ x"$group" = "x" ] && [ $keep_ownership = false ]; then
     uid=$(id -u "$CVMFS_USER")
     gid=$(id -g "$CVMFS_USER")
 
-    if [ x"$uid" = xi* ]; then
+    if [ x"$uid" = "x" ] || [ x"$gid" = "x" ]; then
       die "Default CVMFS_USER $CVMFS_USER for the repo does not exist"
     fi
   fi
