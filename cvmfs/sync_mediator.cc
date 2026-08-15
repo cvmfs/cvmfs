@@ -231,13 +231,23 @@ void SyncMediator::Remove(SharedPtr<SyncItem> entry, bool fast_delete) {
   // A mountless publisher (cvmfs_server connect-gw -P) has no rdonly view, so
   // the Was* checks above cannot type the entry: the stat returns ENOENT and
   // every branch falls through.  For a fast delete of a nested-catalog
-  // mountpoint the catalog itself is the authority — a transition point is by
-  // definition a directory — and RemoveDirectoryRecursively's fast path is
-  // catalog-driven, needing no filesystem below it.
+  // mountpoint the catalog itself is the authority -- a transition point is
+  // by definition a directory -- and RemoveDirectoryRecursively's fast path
+  // is catalog-driven, needing no filesystem below it.
   //
   // The existence probe must come first: IsTransitionPoint() PANICs on a path
   // the catalog does not have, and a path that is in neither the rdonly view
   // nor the catalog must keep producing the warning below, not an abort.
+  //
+  // Known limitation: a path the catalog HAS but that is not a transition
+  // point (plain directory, file, symlink) still falls through to the
+  // warning, and the publish commits a revision that deleted nothing, exit 0.
+  // Making that fatal would wedge a --gc-db batch on a permanently failing
+  // row (the rows are marked deleted only after a successful run), and
+  // deleting such entries from the catalog alone is untested here -- so the
+  // narrow fix stays narrow.  Fast delete on a mountless publisher supports
+  // leaf nested-catalog mountpoints (see below), which is what tarball ingest
+  // publishes.
   if (fast_delete) {
     catalog::DirectoryEntry probe;
     if (catalog_manager_->LookupPath("/" + entry->GetRelativePath(),
