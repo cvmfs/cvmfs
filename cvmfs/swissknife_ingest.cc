@@ -144,9 +144,31 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
 
   const bool upload_statsdb = (args.count('I') > 0);
 
+  // -n runs without the statistics database.  Opening it is not free:
+  // OpenStandardDB creates the file when absent, prunes and vacuums it on
+  // every open, and PANICs when the path is not writable -- so an
+  // unprivileged or containerised ingest that has no
+  // /var/spool/cvmfs/<repo> aborts in a code path unrelated to the content
+  // it was asked to ingest.  The file is also shared by every ingest of the
+  // same repository on a host, and no sqlite busy handler is installed, so
+  // concurrent runs contend at statement preparation; in an assert-enabled
+  // build that is fatal.
+  //
+  // The switch suppresses statistics unconditionally and knows nothing about
+  // what kind of run this is.  Using it on a real publish yields no row and
+  // no upload, which is the caller's responsibility, not this flag's.
+  const bool no_statsdb = (args.count('n') > 0);
+  if (no_statsdb && upload_statsdb) {
+    PrintError("Swissknife Ingest: -n (no statistics database) and -I (upload "
+               "statistics database) are mutually exclusive");
+    return 3;
+  }
+
   perf::StatisticsTemplate publish_statistics("publish", this->statistics());
-  StatisticsDatabase *stats_db = StatisticsDatabase::OpenStandardDB(
-      params.repo_name);
+  StatisticsDatabase *stats_db = NULL;
+  if (!no_statsdb) {
+    stats_db = StatisticsDatabase::OpenStandardDB(params.repo_name);
+  }
 
   upload::SpoolerDefinition spooler_definition(
       params.spooler_definition, hash_algorithm, params.compression_alg,
@@ -323,9 +345,11 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
 
   if (!mediator.Commit(manifest.get())) {
     PrintError("Swissknife Ingest: something went wrong during sync");
-    stats_db->StorePublishStatistics(this->statistics(), start_time, false);
-    if (upload_statsdb) {
-      stats_db->UploadStatistics(params.spooler);
+    if (stats_db != NULL) {
+      stats_db->StorePublishStatistics(this->statistics(), start_time, false);
+      if (upload_statsdb) {
+        stats_db->UploadStatistics(params.spooler);
+      }
     }
     return 5;
   }
@@ -353,16 +377,20 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
   if (!spooler_catalogs->FinalizeSession(true, old_root_hash, new_root_hash,
                                          params.repo_tag)) {
     PrintError("Swissknife Ingest: Failed to commit the transaction.");
-    stats_db->StorePublishStatistics(this->statistics(), start_time, false);
-    if (upload_statsdb) {
-      stats_db->UploadStatistics(params.spooler);
+    if (stats_db != NULL) {
+      stats_db->StorePublishStatistics(this->statistics(), start_time, false);
+      if (upload_statsdb) {
+        stats_db->UploadStatistics(params.spooler);
+      }
     }
     return 9;
   }
 
-  stats_db->StorePublishStatistics(this->statistics(), start_time, true);
-  if (upload_statsdb) {
-    stats_db->UploadStatistics(params.spooler);
+  if (stats_db != NULL) {
+    stats_db->StorePublishStatistics(this->statistics(), start_time, true);
+    if (upload_statsdb) {
+      stats_db->UploadStatistics(params.spooler);
+    }
   }
 
   delete params.spooler;
