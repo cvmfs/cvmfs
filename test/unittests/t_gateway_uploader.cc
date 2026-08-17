@@ -101,7 +101,7 @@ TEST_F(T_GatewayUploader, ConstructThroughSpooler) {
       zlib::kZlibDefault, false, 0, 0, 0,
       "/var/spool/cvmfs/test.cern.ch/session_token_some_path");
   std::unique_ptr<upload::Spooler>
-spooler(upload::Spooler::Construct(definition)); EXPECT_TRUE(spooler.IsValid());
+spooler(upload::Spooler::Construct(definition)); EXPECT_TRUE(spooler.get() != nullptr);
   EXPECT_EQ(spooler->backend_name(), "HTTP");
 }
 */
