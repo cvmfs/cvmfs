@@ -1791,7 +1791,7 @@ TEST_F(T_Util, ManagedExecCommandLine) {
   pid_t pid;
   int fd_stdout[2];
   int fd_stdin[2];
-  std::unique_ptr<unsigned char> buffer(
+  std::unique_ptr<unsigned char, decltype(&free)> buffer(
       static_cast<unsigned char *>(scalloc(100, 1)));
   MakePipe(fd_stdout);
   MakePipe(fd_stdin);
