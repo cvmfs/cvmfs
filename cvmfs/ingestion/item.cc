@@ -99,7 +99,7 @@ void ChunkItem::ReleaseCompressor() { compressor_.Destroy(); }
 
 //------------------------------------------------------------------------------
 
-std::atomic<int64_t> BlockItem::managed_bytes_ = 0;
+std::atomic<int64_t> BlockItem::managed_bytes_(0);
 
 
 BlockItem::BlockItem(ItemAllocator *allocator)
@@ -224,3 +224,4 @@ uint32_t BlockItem::Write(void *buf, uint32_t count) {
   size_ += nbytes;
   return nbytes;
 }
+ 

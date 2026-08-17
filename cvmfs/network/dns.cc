@@ -193,7 +193,7 @@ std::string AddDefaultScheme(const std::string &proxy) {
 //------------------------------------------------------------------------------
 
 
-std::atomic<int64_t> Host::global_id_ = 0;
+std::atomic<int64_t> Host::global_id_(0);
 
 const set<string> &Host::ViewBestAddresses(IpPreference preference) const {
   if (((preference == kIpPreferSystem) || (preference == kIpPreferV4))
@@ -1325,3 +1325,4 @@ NormalResolver::~NormalResolver() {
 }
 
 }  // namespace dns
+                   

@@ -18,7 +18,7 @@
 #include "util/smalloc.h"
 
 
-std::atomic<int64_t> TaskRead::tag_seq_ = 0;
+std::atomic<int64_t> TaskRead::tag_seq_(0);
 
 
 void TaskRead::Process(FileItem *item) {
@@ -82,3 +82,4 @@ void TaskRead::SetWatermarks(uint64_t low, uint64_t high) {
   low_watermark_ = low;
   high_watermark_ = high;
 }
+ 

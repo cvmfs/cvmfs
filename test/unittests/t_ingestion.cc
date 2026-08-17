@@ -39,7 +39,7 @@ class DummyItem {
   int summand;
   static std::atomic<int32_t> sum;
 };
-std::atomic<int32_t> DummyItem::sum = 0;
+std::atomic<int32_t> DummyItem::sum(0);
 
 
 class TestTask : public TubeConsumer<DummyItem> {
@@ -55,8 +55,8 @@ class TestTask : public TubeConsumer<DummyItem> {
   }
   virtual void OnTerminate() { cnt_terminate.fetch_add(1); }
 };
-std::atomic<int32_t> TestTask::cnt_terminate = 0;
-std::atomic<int32_t> TestTask::cnt_process = 0;
+std::atomic<int32_t> TestTask::cnt_terminate(0);
+std::atomic<int32_t> TestTask::cnt_process(0);
 }  // anonymous namespace
 
 
@@ -839,3 +839,4 @@ TEST_F(T_Ingestion, Scrubbing) {
   EXPECT_EQ("/dev/null", fn_hashed.last_result.path);
   EXPECT_EQ(null_hash, fn_hashed.last_result.hash);
 }
+ 
