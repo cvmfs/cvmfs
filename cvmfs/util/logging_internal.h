@@ -137,9 +137,17 @@ enum LogSource {
   kLogBundleMgr
 };
 
-const int kLogWarning = kLogStdout | kLogShowSource | kLogNormal;
-const int kLogInfoMsg = kLogStdout | kLogShowSource | kLogInform;
-const int kLogVerboseMsg = kLogStdout | kLogShowSource | kLogVerbose;
+/**
+ * The static_cast selects the built-in operator| for the first pair of
+ * operands, which keeps these three integral constant expressions. Without
+ * it the overloads above make them dynamically initialised globals.
+ */
+const int kLogWarning =
+    static_cast<int>(kLogStdout) | kLogShowSource | kLogNormal;  // NOLINT
+const int kLogInfoMsg =
+    static_cast<int>(kLogStdout) | kLogShowSource | kLogInform;  // NOLINT
+const int kLogVerboseMsg =
+    static_cast<int>(kLogStdout) | kLogShowSource | kLogVerbose;  // NOLINT
 
 struct CVMFS_EXPORT LogBufferEntry {
   LogBufferEntry(LogSource s, int m, const std::string &msg)
