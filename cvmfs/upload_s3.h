@@ -7,6 +7,7 @@
 
 #include <pthread.h>
 
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
@@ -15,7 +16,6 @@
 #include "upload_facility.h"
 #include "util/atomic.h"
 #include "util/file_backed_buffer.h"
-#include "util/pointer.h"
 #include "util/single_copy.h"
 
 namespace upload {
@@ -25,11 +25,11 @@ struct S3StreamHandle : public UploadStreamHandle {
                  uint64_t in_memory_threshold,
                  const std::string &tmp_dir = "/tmp/")
       : UploadStreamHandle(commit_callback) {
-    buffer = FileBackedBuffer::Create(in_memory_threshold, tmp_dir);
+    buffer.reset(FileBackedBuffer::Create(in_memory_threshold, tmp_dir));
   }
 
   // Ownership is later transferred to the S3 fanout
-  UniquePtr<FileBackedBuffer> buffer;
+  std::unique_ptr<FileBackedBuffer> buffer;
 };
 
 /**
@@ -77,7 +77,7 @@ class S3Uploader : public AbstractUploader {
 
   // Only for testing
   s3fanout::S3FanoutManager *GetS3FanoutManager() {
-    return s3fanout_mgr_.weak_ref();
+    return s3fanout_mgr_.get();
   }
 
  private:
@@ -121,7 +121,7 @@ class S3Uploader : public AbstractUploader {
   s3fanout::JobInfo *CreateJobInfo(const std::string &path) const;
   void FlushDeleteBatch() const;
 
-  mutable UniquePtr<s3fanout::S3FanoutManager> s3fanout_mgr_;
+  mutable std::unique_ptr<s3fanout::S3FanoutManager> s3fanout_mgr_;
   std::string repository_alias_;
   std::string host_name_port_;
   std::string host_name_;

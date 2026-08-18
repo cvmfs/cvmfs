@@ -4,11 +4,11 @@
 
 #include "subscriber_sse.h"
 
+#include <memory>
 #include <vector>
 
 #include "url.h"
 #include "util/logging.h"
-#include "util/pointer.h"
 #include "util/string.h"
 
 namespace {
@@ -30,9 +30,9 @@ SubscriberSSE::SubscriberSSE(const std::string &server_url)
 SubscriberSSE::~SubscriberSSE() { }
 
 bool SubscriberSSE::Subscribe(const std::string &topic) {
-  const UniquePtr<Url> url(Url::Parse(server_url_));
+  const std::unique_ptr<Url> url(Url::Parse(server_url_));
 
-  if (!url.IsValid()) {
+  if (url.get() == nullptr) {
     LogCvmfs(kLogCvmfs, kLogError,
              "SubscriberSSE - could not parse notification server url: %s\n",
              server_url_.c_str());

@@ -4,9 +4,10 @@
 
 #include "swissknife_lease_json.h"
 
+#include <memory>
+
 #include "json_document.h"
 #include "util/logging.h"
-#include "util/pointer.h"
 
 // TODO(@vvolkl): refactor
 LeaseReply ParseAcquireReplyWithRevision(const CurlBuffer &buffer,
@@ -17,8 +18,8 @@ LeaseReply ParseAcquireReplyWithRevision(const CurlBuffer &buffer,
     return kLeaseReplyFailure;
   }
 
-  const UniquePtr<JsonDocument> reply(JsonDocument::Create(buffer.data));
-  if (!reply.IsValid() || !reply->IsValid()) {
+  const std::unique_ptr<JsonDocument> reply(JsonDocument::Create(buffer.data));
+  if (reply.get() == nullptr || !reply->IsValid()) {
     return kLeaseReplyFailure;
   }
 
@@ -76,8 +77,8 @@ LeaseReply ParseAcquireReply(const CurlBuffer &buffer,
     return kLeaseReplyFailure;
   }
 
-  const UniquePtr<JsonDocument> reply(JsonDocument::Create(buffer.data));
-  if (!reply.IsValid() || !reply->IsValid()) {
+  const std::unique_ptr<JsonDocument> reply(JsonDocument::Create(buffer.data));
+  if (reply.get() == nullptr || !reply->IsValid()) {
     return kLeaseReplyFailure;
   }
 
@@ -125,8 +126,9 @@ LeaseReply ParseDropReply(const CurlBuffer &buffer) {
     return kLeaseReplyFailure;
   }
 
-  const UniquePtr<const JsonDocument> reply(JsonDocument::Create(buffer.data));
-  if (!reply.IsValid() || !reply->IsValid()) {
+  const std::unique_ptr<const JsonDocument> reply(
+      JsonDocument::Create(buffer.data));
+  if (reply.get() == nullptr || !reply->IsValid()) {
     return kLeaseReplyFailure;
   }
 

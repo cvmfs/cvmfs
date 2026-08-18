@@ -8,6 +8,7 @@
 #include <fcntl.h>
 #include <stdint.h>
 
+#include <memory>
 #include <string>
 
 #include "ingestion/ingestion_source.h"
@@ -17,7 +18,6 @@
 #include "upload_spooler_definition.h"
 #include "util/atomic.h"
 #include "util/concurrency.h"
-#include "util/pointer.h"
 #include "util/posix.h"
 #include "util/tube.h"
 
@@ -433,7 +433,7 @@ class AbstractUploader
   mutable SynchronizingCounter<int32_t> jobs_in_flight_;
   TubeGroup<UploadJob> tubes_upload_;
   TubeConsumerGroup<UploadJob> tasks_upload_;
-  mutable UniquePtr<UploadCounters> counters_;
+  mutable std::unique_ptr<UploadCounters> counters_;
 };  // class AbstractUploader
 
 

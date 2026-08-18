@@ -209,11 +209,11 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
 
   // 3) Get remote root catalog (fails if remote catalog is older)
   manifest::Failures manifest_failure;
-  UniquePtr<CachedManifestEnsemble> ensemble(
+  std::unique_ptr<CachedManifestEnsemble> ensemble(
       new CachedManifestEnsemble(fetcher_->cache_mgr(), this));
-  manifest_failure = manifest::Fetch(
-      "", repo_name_, local_newest_timestamp, &local_newest_hash,
-      signature_mgr_, fetcher_->download_mgr(), ensemble.weak_ref());
+  manifest_failure = manifest::Fetch("", repo_name_, local_newest_timestamp,
+                                     &local_newest_hash, signature_mgr_,
+                                     fetcher_->download_mgr(), ensemble.get());
 
   if (manifest_failure == manifest::kFailOk) {
     // server has newest revision or no valid local revision
@@ -229,7 +229,7 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
       fixed_alt_root_catalog_ = ensemble->manifest->has_alt_catalog_path();
 
       result->TakeManifestEnsemble(
-          static_cast<manifest::ManifestEnsemble *>(ensemble.Release()));
+          static_cast<manifest::ManifestEnsemble *>(ensemble.release()));
       offline_mode_ = false;
 
       return catalog::kLoadNew;
@@ -310,8 +310,8 @@ LoadReturn ClientCatalogManager::LoadCatalogByHash(
       // if coming from server: update breadcrumb
       if (ctlg_context->root_ctlg_location() == kCtlgLocationServer) {
         // Keep a copy of the manifest, it backs the repo_metainfo xattr
-        manifest_ = new manifest::Manifest(
-            *ctlg_context->manifest_ensemble()->manifest);
+        manifest_.reset(new manifest::Manifest(
+            *ctlg_context->manifest_ensemble()->manifest));
 
         // Store new manifest and certificate
         CacheManager::Label label;

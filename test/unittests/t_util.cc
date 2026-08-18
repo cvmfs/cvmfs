@@ -622,12 +622,12 @@ TEST_F(T_Util, ReadHalfPipeTimeout) {
 
 TEST_F(T_Util, ClosePipe) {
   int fd[2];
-  UniquePtr<void> buffer_output(scalloc(20, sizeof(char)));
+  std::unique_ptr<void, decltype(&free)> buffer_output(
+      scalloc(20, sizeof(char)), free);
   MakePipe(fd);
   ClosePipe(fd);
   ASSERT_DEATH(WritePipe(fd[1], to_write.c_str(), to_write.length()), ".*");
-  ASSERT_DEATH(ReadPipe(fd[0], buffer_output.weak_ref(), to_write.length()),
-               ".*");
+  ASSERT_DEATH(ReadPipe(fd[0], buffer_output.get(), to_write.length()), ".*");
 }
 
 
@@ -1756,8 +1756,8 @@ TEST_F(T_Util, ExecuteBinary) {
   argv.push_back(message);
   pid_t gdb_pid = 0;
 
-  result = ExecuteBinary(
-      &fd_stdin, &fd_stdout, &fd_stderr, "/bin/echo", argv, false, &gdb_pid);
+  result = ExecuteBinary(&fd_stdin, &fd_stdout, &fd_stderr, "/bin/echo", argv,
+                         false, &gdb_pid);
   EXPECT_TRUE(result);
   ssize_t bytes_read = read(fd_stdout, buffer, message.length());
   EXPECT_EQ(static_cast<size_t>(bytes_read), message.length());
@@ -1791,8 +1791,8 @@ TEST_F(T_Util, ManagedExecCommandLine) {
   pid_t pid;
   int fd_stdout[2];
   int fd_stdin[2];
-  UniquePtr<unsigned char> buffer(
-      static_cast<unsigned char *>(scalloc(100, 1)));
+  std::unique_ptr<unsigned char, decltype(&free)> buffer(
+      static_cast<unsigned char *>(scalloc(100, 1)),free);
   MakePipe(fd_stdout);
   MakePipe(fd_stdin);
   string message = "CVMFS";
@@ -1811,9 +1811,9 @@ TEST_F(T_Util, ManagedExecCommandLine) {
                         true /* double_fork */, &pid);
   ASSERT_TRUE(success);
   close(fd_stdout[1]);
-  ssize_t bytes_read = read(fd_stdout[0], buffer.weak_ref(), message.length());
+  ssize_t bytes_read = read(fd_stdout[0], buffer.get(), message.length());
   EXPECT_EQ(static_cast<size_t>(bytes_read), message.length());
-  string result(reinterpret_cast<char *>(buffer.weak_ref()));
+  string result(reinterpret_cast<char *>(buffer.get()));
   ASSERT_EQ(message, result);
   close(fd_stdout[0]);
 }
@@ -1824,8 +1824,8 @@ TEST_F(T_Util, ManagedExecClearEnv) {
   pid_t pid;
   int fd_stdout[2];
   int fd_stdin[2];
-  UniquePtr<unsigned char> buffer(
-      static_cast<unsigned char *>(scalloc(100, 1)));
+  std::unique_ptr<unsigned char, decltype(&free)> buffer(
+      static_cast<unsigned char *>(scalloc(100, 1)),free);
   MakePipe(fd_stdout);
   MakePipe(fd_stdin);
   vector<string> command_line;
@@ -1842,7 +1842,7 @@ TEST_F(T_Util, ManagedExecClearEnv) {
                         true /* double_fork */, &pid);
   close(fd_stdout[1]);
   ASSERT_TRUE(success);
-  ssize_t bytes_read = read(fd_stdout[0], buffer.weak_ref(), 64);
+  ssize_t bytes_read = read(fd_stdout[0], buffer.get(), 64);
 
   // env will be cleared (normally it is way larger than 64 bytes)
   // debug mode: there will be a log message in similar to 25-byte long:

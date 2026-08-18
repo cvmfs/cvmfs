@@ -7,6 +7,7 @@
 #include <time.h>
 
 #include <cctype>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -27,7 +28,6 @@
 #include "swissknife_history.h"
 #include "util/algorithm.h"
 #include "util/logging.h"
-#include "util/pointer.h"
 #include "util/posix.h"
 #include "util/raii_temp_dir.h"
 #include "util/string.h"
@@ -49,10 +49,8 @@ PathString RemoveRepoName(const PathString &lease_path) {
 bool EditTags(const RepositoryTag &repo_tag, const std::string &repo_name,
               const receiver::Params &params, const std::string &temp_dir,
               const std::string &manifest_path,
-              const std::string &public_key_path,
-              const std::string &proxy,
-              const time_t auto_tag_threshold,
-              const bool maintain_undo_tags) {
+              const std::string &public_key_path, const std::string &proxy,
+              const time_t auto_tag_threshold, const bool maintain_undo_tags) {
   swissknife::ArgumentList args;
   args['r'].Reset(new std::string(params.spooler_configuration));
   args['w'].Reset(new std::string(params.stratum0));
@@ -80,7 +78,7 @@ bool EditTags(const RepositoryTag &repo_tag, const std::string &repo_name,
     args['c'].Reset(new std::string(StringifyInt(auto_tag_threshold)));
   }
 
-  const UniquePtr<swissknife::CommandEditTag> edit_cmd(
+  const std::unique_ptr<swissknife::CommandEditTag> edit_cmd(
       new swissknife::CommandEditTag());
   const int ret = edit_cmd->Main(args);
 
@@ -221,7 +219,7 @@ CommitProcessor::Result CommitProcessor::Process(
     return kError;
   }
 
-  const UniquePtr<ServerTool> server_tool(new ServerTool());
+  const std::unique_ptr<ServerTool> server_tool(new ServerTool());
 
   if (!server_tool->InitDownloadManager(true, params.proxy)) {
     LogCvmfs(
@@ -242,12 +240,12 @@ CommitProcessor::Result CommitProcessor::Process(
   }
 
   const shash::Any manifest_base_hash;
-  const UniquePtr<manifest::Manifest> manifest_tgt(
+  const std::unique_ptr<manifest::Manifest> manifest_tgt(
       server_tool->FetchRemoteManifest(params.stratum0, repo_name,
                                        manifest_base_hash));
 
   // Current catalog from the gateway machine
-  if (!manifest_tgt.IsValid()) {
+  if (manifest_tgt.get() == nullptr) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
              "CommitProcessor - error: Could not open repository manifest");
     return kError;
@@ -288,7 +286,7 @@ CommitProcessor::Result CommitProcessor::Process(
              "(skipping DiffRec)",
              lease_path.c_str());
 
-    const UniquePtr<RaiiTempDir> graft_temp_dir(
+    const std::unique_ptr<RaiiTempDir> graft_temp_dir(
         RaiiTempDir::Create(temp_dir_root));
     const std::string graft_temp = graft_temp_dir->dir();
 
@@ -304,17 +302,17 @@ CommitProcessor::Result CommitProcessor::Process(
         params.generate_legacy_bulk_chunks, params.use_file_chunking,
         params.min_chunk_size, params.avg_chunk_size, params.max_chunk_size,
         "dummy_token", "dummy_key");
-    const UniquePtr<upload::Spooler> spooler(
+    const std::unique_ptr<upload::Spooler> spooler(
         upload::Spooler::Construct(definition, &stats_tmpl));
 
-    const UniquePtr<catalog::WritableCatalogManager> output_mgr(
+    const std::unique_ptr<catalog::WritableCatalogManager> output_mgr(
         new catalog::WritableCatalogManager(
             manifest_tgt->catalog_hash(), params.stratum0, graft_temp,
-            spooler.weak_ref(), server_tool->download_manager(),
+            spooler.get(), server_tool->download_manager(),
             params.enforce_limits, params.nested_kcatalog_limit,
-            params.root_kcatalog_limit, params.file_mbyte_limit,
-            statistics_, params.use_autocatalogs, params.max_weight,
-            params.min_weight, cache_dir_));
+            params.root_kcatalog_limit, params.file_mbyte_limit, statistics_,
+            params.use_autocatalogs, params.max_weight, params.min_weight,
+            cache_dir_));
     if (!output_mgr->Init()) {
       LogCvmfs(kLogReceiver, kLogSyslogErr,
                "CommitProcessor - error: Could not initialize catalog manager "
@@ -333,8 +331,8 @@ CommitProcessor::Result CommitProcessor::Process(
     // database.  TryGraftNestedCatalog downloads the catalog once more
     // internally via LoadFreeCatalog; the probe writes outside the local cache
     // directory, so that second fetch does not hit the cache.
-    const std::string catalog_url =
-        params.stratum0 + "/data/" + new_root_hash.MakePath();
+    const std::string catalog_url = params.stratum0 + "/data/"
+                                    + new_root_hash.MakePath();
     const std::string catalog_tmp = graft_temp + "/catalog_size";
     {
       cvmfs::PathSink catalog_sink(catalog_tmp);
@@ -346,8 +344,8 @@ CommitProcessor::Result CommitProcessor::Process(
       // size of the decompressed catalog.
       download::JobInfo dl_job(&catalog_url, true, false, &expected,
                                &catalog_sink);
-      const download::Failures dl_ret =
-          server_tool->download_manager()->Fetch(&dl_job);
+      const download::Failures dl_ret = server_tool->download_manager()->Fetch(
+          &dl_job);
       if (dl_ret != download::kFailOk) {
         LogCvmfs(kLogReceiver, kLogSyslogErr,
                  "CommitProcessor - error: failed to download catalog %s "
@@ -381,7 +379,7 @@ CommitProcessor::Result CommitProcessor::Process(
     }
 
     // Commit updates manifest_tgt in-place (new root hash, revision++, etc.)
-    if (!output_mgr->Commit(false, 0, manifest_tgt.weak_ref())) {
+    if (!output_mgr->Commit(false, 0, manifest_tgt.get())) {
       LogCvmfs(kLogReceiver, kLogSyslogErr,
                "CommitProcessor - error: Could not commit grafted catalog");
       return kMergeFailure;
@@ -390,8 +388,9 @@ CommitProcessor::Result CommitProcessor::Process(
     // Export the updated manifest to a temp file for CreateNewTag/SigningTool.
     new_manifest_path = CreateTempPath(temp_dir_root, 0600);
     if (!manifest_tgt->Export(new_manifest_path)) {
-      LogCvmfs(kLogReceiver, kLogSyslogErr,
-               "CommitProcessor - error: Could not export manifest after graft");
+      LogCvmfs(
+          kLogReceiver, kLogSyslogErr,
+          "CommitProcessor - error: Could not export manifest after graft");
       return kError;
     }
     new_manifest_hash = manifest_tgt->catalog_hash();
@@ -407,7 +406,7 @@ CommitProcessor::Result CommitProcessor::Process(
                      catalog::SimpleCatalogManager>
         merge_tool(params.stratum0, old_root_hash, new_root_hash,
                    relative_lease_path, temp_dir_root,
-                   server_tool->download_manager(), manifest_tgt.weak_ref(),
+                   server_tool->download_manager(), manifest_tgt.get(),
                    statistics_, cache_dir_);
     if (!merge_tool.Init()) {
       LogCvmfs(kLogReceiver, kLogSyslogErr,
@@ -422,7 +421,7 @@ CommitProcessor::Result CommitProcessor::Process(
     }
   }
 
-  const UniquePtr<RaiiTempDir> raii_temp_dir(
+  const std::unique_ptr<RaiiTempDir> raii_temp_dir(
       RaiiTempDir::Create(temp_dir_root));
   const std::string temp_dir = raii_temp_dir->dir();
 
@@ -493,7 +492,7 @@ CommitProcessor::Result CommitProcessor::Process(
   std::vector<shash::Any> reflog_catalogs;
   reflog_catalogs.push_back(new_root_hash);
 
-  SigningTool signing_tool(server_tool.weak_ref());
+  SigningTool signing_tool(server_tool.get());
   const SigningTool::Result res = signing_tool.Run(
       new_manifest_path, params.stratum0, params.spooler_configuration,
       temp_dir, certificate, private_key, repo_name, "", "",

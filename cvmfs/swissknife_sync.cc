@@ -129,26 +129,28 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
 
   const upload::SpoolerDefinition sd(spooler_definition, hash_algorithm,
                                      zlib::kZlibDefault);
-  const UniquePtr<upload::Spooler> spooler(upload::Spooler::Construct(sd));
-  assert(spooler.IsValid());
+  const std::unique_ptr<upload::Spooler> spooler(
+      upload::Spooler::Construct(sd));
+  assert(spooler.get() != nullptr);
 
-  const UniquePtr<manifest::Manifest> manifest(
+  const std::unique_ptr<manifest::Manifest> manifest(
       catalog::WritableCatalogManager::CreateRepository(
-          dir_temp, volatile_content, voms_authz, spooler.weak_ref()));
-  if (!manifest.IsValid()) {
+          dir_temp, volatile_content, voms_authz, spooler.get()));
+  if (manifest.get() == nullptr) {
     PrintError("Swissknife Sync: Failed to create new repository");
     return 1;
   }
 
-  UniquePtr<manifest::Reflog> reflog(CreateEmptyReflog(dir_temp, repo_name));
-  if (!reflog.IsValid()) {
+  std::unique_ptr<manifest::Reflog> reflog(
+      CreateEmptyReflog(dir_temp, repo_name));
+  if (reflog.get() == nullptr) {
     PrintError("Swissknife Sync: Failed to create fresh Reflog");
     return 1;
   }
 
   reflog->DropDatabaseFileOwnership();
   const string reflog_path = reflog->database_file();
-  reflog.Destroy();
+  reflog.reset();
   shash::Any reflog_hash(hash_algorithm);
   manifest::Reflog::HashDatabase(reflog_path, &reflog_hash);
   spooler->UploadReflog(reflog_path);
@@ -589,7 +591,8 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
                                  getpid());
   assert(path_size > 0);
   assert(path_size < PATH_MAX);
-  const UniquePtr<Watchdog> watchdog(Watchdog::Create(NULL, false /* needs_read_environ */));
+  const std::unique_ptr<Watchdog> watchdog(
+      Watchdog::Create(NULL, false /* needs_read_environ */));
   watchdog->Spawn(std::string(watchdog_path));
 
   SyncParameters params;
@@ -782,9 +785,10 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
                                               &publish_statistics);
   if (NULL == params.spooler)
     return 3;
-  const UniquePtr<upload::Spooler> spooler_catalogs(upload::Spooler::Construct(
-      spooler_definition_catalogs, &publish_statistics));
-  if (!spooler_catalogs.IsValid())
+  const std::unique_ptr<upload::Spooler> spooler_catalogs(
+      upload::Spooler::Construct(spooler_definition_catalogs,
+                                 &publish_statistics));
+  if (spooler_catalogs.get() == nullptr)
     return 3;
 
   const bool follow_redirects = (args.count('L') > 0);
@@ -803,21 +807,21 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
    * remote root hashes. We proceed by loading the remote manifest but we give
    * an empty base hash.
    */
-  UniquePtr<manifest::Manifest> manifest;
+  std::unique_ptr<manifest::Manifest> manifest;
   if (params.branched_catalog) {
     // Throw-away manifest
-    manifest = new manifest::Manifest(shash::Any(), 0, "");
+    manifest.reset(new manifest::Manifest(shash::Any(), 0, ""));
   } else if (params.virtual_dir_actions
              != catalog::VirtualCatalog::kActionNone) {
-    manifest = this->OpenLocalManifest(params.manifest_path);
+    manifest.reset(this->OpenLocalManifest(params.manifest_path));
     params.base_hash = manifest->catalog_hash();
   } else {
     // TODO(jblomer): revert to params.base_hash if spooler driver type is not
     // upload::SpoolerDefinition::Gateway
-    manifest = FetchRemoteManifest(params.stratum0, params.repo_name,
-                                   shash::Any());
+    manifest.reset(
+        FetchRemoteManifest(params.stratum0, params.repo_name, shash::Any()));
   }
-  if (!manifest.IsValid()) {
+  if (manifest.get() == nullptr) {
     return 3;
   }
 
@@ -828,7 +832,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
 
   catalog::WritableCatalogManager catalog_manager(
       params.base_hash, params.stratum0, params.dir_temp,
-      spooler_catalogs.weak_ref(), download_manager(), params.enforce_limits,
+      spooler_catalogs.get(), download_manager(), params.enforce_limits,
       params.nested_kcatalog_limit, params.root_kcatalog_limit,
       params.file_mbyte_limit, statistics(), params.is_balanced,
       params.max_weight, params.min_weight, params.cache_dir);
@@ -874,8 +878,8 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     sync->Traverse();
   } else {
     assert(!manifest->history().IsNull());
-    catalog::VirtualCatalog virtual_catalog(
-        manifest.weak_ref(), download_manager(), &catalog_manager, &params);
+    catalog::VirtualCatalog virtual_catalog(manifest.get(), download_manager(),
+                                            &catalog_manager, &params);
     virtual_catalog.Generate(params.virtual_dir_actions);
   }
 
@@ -907,7 +911,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     catalog_manager.SetVOMSAuthz(new_authz);
   }
 
-  if (!mediator.Commit(manifest.weak_ref())) {
+  if (!mediator.Commit(manifest.get())) {
     PrintError("Swissknife Sync: Something went wrong during sync");
     if (!params.dry_run) {
       stats_db->StorePublishStatistics(this->statistics(), start_time, false);
