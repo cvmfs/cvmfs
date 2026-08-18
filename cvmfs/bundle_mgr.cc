@@ -96,10 +96,8 @@ BundleFileMgr *LoadBundleFromCvmfs(MountPoint *mp,
 }  // namespace
 
 BundleMgr::BundleMgr(MountPoint *mp)
-    : mount_point_(mp)
-    , fetcher_threads_()
-    , pool_size_(kDefaultBundlePoolSize) {
-  atomic_init32(&terminating_);
+    : mount_point_(mp), fetcher_threads_(), pool_size_(kDefaultBundlePoolSize) {
+  terminating_.store(0);
   pthread_mutex_init(&worker_read_mutex_, nullptr);
 
   // Pool size override via CVMFS_BUNDLE_POOL_SIZE
@@ -365,7 +363,7 @@ void *BundleMgr::MainBundleMgrDispatcher(void *data) {
     const PathString path = mgr->ReceivePath(rfd);
     // While terminating, drain the queue without processing so that
     // unmounting does not wait for spec downloads
-    if (atomic_read32(&mgr->terminating_) == 0)
+    if (mgr->terminating_.load() == 0)
       mgr->ProcessTrigger(path);
   }
 
@@ -410,7 +408,7 @@ void *BundleMgr::MainBundleMgrFetcher(void *data) {
         }
         // While terminating, drain the queue without fetching so that
         // unmounting does not wait for pending downloads
-        if (atomic_read32(&mgr->terminating_) == 0)
+        if (mgr->terminating_.load() == 0)
           mgr->FetchPath(path);
       } break;
       case Command::kTerminate:
@@ -457,8 +455,7 @@ bool BundleMgr::TrySendPath(int fd, const PathString &path) const {
     return true;
   if ((n < 0) && not(errno == EAGAIN || errno == EWOULDBLOCK)) {
     LogCvmfs(kLogBundleMgr, kLogDebug,
-             "write() on the work queue failed unexpectedly (errno=%d)",
-             errno);
+             "write() on the work queue failed unexpectedly (errno=%d)", errno);
   }
   return false;
 }

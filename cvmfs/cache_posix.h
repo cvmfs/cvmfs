@@ -9,14 +9,14 @@
 #include <stdint.h>
 #include <sys/types.h>
 
+#include <atomic>
 #include <string>
 
 #include "cache.h"
-#include "util/pointer.h"
 #include "duplex_testing.h"
 #include "fd_refcount_mgr.h"
 #include "manifest_fetch.h"
-#include "util/atomic.h"
+#include "util/pointer.h"
 
 namespace catalog {
 class DirectoryEntry;
@@ -154,8 +154,8 @@ class PosixCacheManager : public CacheManager {
       , do_refcount_(do_refcount)
       , fd_mgr_(new FdRefcountMgr())
       , cleanup_unused_first_(cleanup_unused_first) {
-    atomic_init32(&no_inflight_txns_);
-    atomic_init32(&cache_dirs_created_);
+    no_inflight_txns_.store(0);
+    cache_dirs_created_.store(0);
     pthread_mutex_init(&lock_cache_dirs_, NULL);
   }
 
@@ -175,7 +175,7 @@ class PosixCacheManager : public CacheManager {
    * descriptors from transactions are closed.  This is indicated by a zero
    * value in this variable.
    */
-  atomic_int32 no_inflight_txns_;
+  std::atomic<int32_t> no_inflight_txns_;
 
   static const char kMagicRefcount = 123;
   static const char kMagicNoRefcount = '\0';
@@ -198,12 +198,12 @@ class PosixCacheManager : public CacheManager {
    */
   bool is_tmpfs_;
   /**
-   * Set to 1 by EnsureCacheDirectories() once the on-disk cache skeleton exists.
-   * For alien caches the skeleton is created lazily on the first write, so this
-   * starts at 0 and the flag is checked (lock-free) on every StartTxn().  See
-   * issue #4217.
+   * Set to 1 by EnsureCacheDirectories() once the on-disk cache skeleton
+   * exists. For alien caches the skeleton is created lazily on the first write,
+   * so this starts at 0 and the flag is checked (lock-free) on every
+   * StartTxn().  See issue #4217.
    */
-  atomic_int32 cache_dirs_created_;
+  std::atomic<int32_t> cache_dirs_created_;
   /**
    * Serializes the one-time skeleton creation in EnsureCacheDirectories().
    */
@@ -218,4 +218,3 @@ class PosixCacheManager : public CacheManager {
 };  // class PosixCacheManager
 
 #endif  // CVMFS_CACHE_POSIX_H_
-

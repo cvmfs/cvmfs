@@ -8,6 +8,7 @@
 #include <inttypes.h>
 #include <pthread.h>
 
+#include <atomic>
 #include <cassert>
 #include <map>
 #include <string>
@@ -20,7 +21,6 @@
 #include "manifest_fetch.h"
 #include "statistics.h"
 #include "util/algorithm.h"
-#include "util/atomic.h"
 #include "util/logging.h"
 #include "util/platform.h"
 
@@ -535,4 +535,3 @@ class InodeNfsGenerationAnnotation : public InodeAnnotation {
 #include "catalog_mgr_impl.h"
 
 #endif  // CVMFS_CATALOG_MGR_H_
-

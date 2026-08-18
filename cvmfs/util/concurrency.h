@@ -7,6 +7,7 @@
 
 #include <pthread.h>
 
+#include <atomic>
 #include <cassert>
 #include <cstddef>
 #include <queue>
@@ -14,7 +15,6 @@
 #include <vector>
 
 #include "util/async.h"
-#include "util/atomic.h"
 #include "util/export.h"
 #include "util/mutex.h"
 #include "util/single_copy.h"
@@ -573,7 +573,7 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
 
   inline unsigned int GetNumberOfWorkers() const { return number_of_workers_; }
   inline unsigned int GetNumberOfFailedJobs() const {
-    return atomic_read32(&jobs_failed_);
+    return jobs_failed_.load();
   }
 
   /**
@@ -688,9 +688,9 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
   // job queue
   typedef FifoChannel<WorkerJob> JobQueue;
   JobQueue jobs_queue_;
-  mutable atomic_int32 jobs_pending_;
-  mutable atomic_int32 jobs_failed_;
-  mutable atomic_int64 jobs_processed_;
+  mutable std::atomic<int32_t> jobs_pending_;
+  mutable std::atomic<int32_t> jobs_failed_;
+  mutable std::atomic<int64_t> jobs_processed_;
 
   // callback channel
   typedef FifoChannel<CallbackJob> CallbackQueue;

@@ -8,6 +8,7 @@
 #include <limits.h>
 #include <pthread.h>
 
+#include <atomic>
 #include <cstddef>
 #include <memory>
 #include <type_traits>
@@ -17,7 +18,6 @@
 #include "file_bundle.h"
 #include "mountpoint.h"
 #include "shortstring.h"
-#include "util/atomic.h"
 #include "util/posix.h"
 #include "util/single_copy.h"
 
@@ -51,7 +51,7 @@ class BundleMgr : SingleCopy {
  public:
   explicit BundleMgr(MountPoint *mp);
   virtual ~BundleMgr() {
-    atomic_write32(&terminating_, 1);
+    terminating_.store(1);
     JoinDispatcher();
     JoinFetcherPool();
     pthread_mutex_destroy(&worker_read_mutex_);
@@ -168,7 +168,7 @@ class BundleMgr : SingleCopy {
    * Set on destruction: queued work is drained but no longer processed, so
    * that unmounting does not wait for pending downloads.
    */
-  atomic_int32 terminating_;
+  std::atomic<int32_t> terminating_;
   bool is_valid_ = true;
 };
 #endif  // CVMFS_BUNDLE_MGR_H_

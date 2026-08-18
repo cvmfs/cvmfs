@@ -16,6 +16,7 @@
 #ifdef __APPLE__
 #include <cstdlib>
 #endif
+#include <atomic>
 #include <cstring>
 #include <map>
 #include <new>
@@ -24,7 +25,6 @@
 
 #include "cache.pb.h"
 #include "crypto/hash.h"
-#include "util/atomic.h"
 #include "util/concurrency.h"
 #include "util/exception.h"
 #include "util/logging.h"
@@ -396,13 +396,13 @@ ExternalCacheManager::ExternalCacheManager(int fd_connection,
   retval = pthread_mutex_init(&lock_inflight_rpcs_, NULL);
   assert(retval == 0);
   memset(&thread_read_, 0, sizeof(thread_read_));
-  atomic_init64(&next_request_id_);
+  next_request_id_.store(0);
 }
 
 
 ExternalCacheManager::~ExternalCacheManager() {
   terminated_ = true;
-  MemoryFence();
+  std::atomic_thread_fence(std::memory_order_seq_cst);
   if (session_id_ >= 0) {
     cvmfs::MsgQuit msg_quit;
     msg_quit.set_session_id(session_id_);

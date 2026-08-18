@@ -7,6 +7,7 @@
 #include <pthread.h>
 #include <stdint.h>
 
+#include <atomic>
 #include <cassert>
 #include <map>
 #include <set>
@@ -18,7 +19,6 @@
 #include "crypto/hash.h"
 #include "manifest.h"
 #include "smallhash.h"
-#include "util/atomic.h"
 #include "util/murmur.hxx"
 #include "util/single_copy.h"
 
@@ -199,11 +199,9 @@ class CachePlugin {
 
   static void *MainProcessRequests(void *data);
 
-  inline uint64_t NextSessionId() {
-    return atomic_xadd64(&next_session_id_, 1);
-  }
-  inline uint64_t NextTxnId() { return atomic_xadd64(&next_txn_id_, 1); }
-  inline uint64_t NextLstId() { return atomic_xadd64(&next_lst_id_, 1); }
+  inline uint64_t NextSessionId() { return next_session_id_.fetch_add(1); }
+  inline uint64_t NextTxnId() { return next_txn_id_.fetch_add(1); }
+  inline uint64_t NextLstId() { return next_lst_id_.fetch_add(1); }
   static inline uint32_t HashUniqueRequest(const UniqueRequest &req) {
     return MurmurHash2(&req, sizeof(req), 0x07387a4f);
   }
@@ -241,7 +239,7 @@ class CachePlugin {
   uint64_t capabilities_;
   int fd_socket_;
   int fd_socket_lock_;
-  atomic_int32 running_;
+  std::atomic<int32_t> running_;
   unsigned num_workers_;
   unsigned max_object_size_;
   /**
@@ -250,9 +248,9 @@ class CachePlugin {
    */
   uint64_t num_inlimbo_clients_;
   std::string name_;
-  atomic_int64 next_session_id_;
-  atomic_int64 next_txn_id_;
-  atomic_int64 next_lst_id_;
+  std::atomic<int64_t> next_session_id_;
+  std::atomic<int64_t> next_txn_id_;
+  std::atomic<int64_t> next_lst_id_;
   SmallHashDynamic<UniqueRequest, uint64_t> txn_ids_;
   std::set<int> connections_;
   std::map<uint64_t, SessionInfo> sessions_;

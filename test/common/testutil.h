@@ -8,6 +8,7 @@
 #include <gtest/gtest.h>
 #include <sys/types.h>
 
+#include <atomic>
 #include <ctime>
 #include <limits>
 #include <map>
@@ -22,7 +23,6 @@
 #include "ingestion/ingestion_source.h"
 #include "object_fetcher.h"
 #include "upload_facility.h"
-#include "util/atomic.h"
 
 pid_t GetParentPid(const pid_t pid);
 std::string GetProcessname(const pid_t pid);
@@ -306,7 +306,7 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
  public:
   static const std::string rhs;
   static const shash::Any root_hash;
-  static atomic_int32 instances;
+  static std::atomic<int32_t> instances;
 
  public:
   struct NestedCatalog {
@@ -400,7 +400,7 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
     string name = root_path.substr(pos + 1, string::npos);
     File mountpoint_file(shash::Any(), 4096, parent_path, name);
     files_.push_back(mountpoint_file);
-    atomic_inc32(&MockCatalog::instances);
+    MockCatalog::instances.fetch_add(1);
   }
 
   MockCatalog(const MockCatalog &other)
@@ -418,10 +418,10 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
       , children_(other.children_)
       , files_(other.files_)
       , chunks_(other.chunks_) {
-    atomic_inc32(&MockCatalog::instances);
+    MockCatalog::instances.fetch_add(1);
   }
 
-  ~MockCatalog() { atomic_dec32(&MockCatalog::instances); }
+  ~MockCatalog() { MockCatalog::instances.fetch_sub(1); }
 
   /**
    * Adds a new catalog to the mounted children list

@@ -37,7 +37,7 @@ using namespace std;  // NOLINT
 
 NfsMapsLeveldb::ForkAwareEnv::ForkAwareEnv(NfsMapsLeveldb *maps)
     : leveldb::EnvWrapper(leveldb::Env::Default()), maps_(maps) {
-  atomic_init32(&num_bg_threads_);
+  num_bg_threads_.store(0);
 }
 
 
@@ -63,7 +63,7 @@ void NfsMapsLeveldb::ForkAwareEnv::Schedule(void (*function)(void *),
   funcarg->function = function;
   funcarg->arg = arg;
   funcarg->env = this;
-  atomic_inc32(&num_bg_threads_);
+  num_bg_threads_.fetch_add(1);
   pthread_t bg_thread;
   int retval = pthread_create(&bg_thread, NULL, MainFakeThread, funcarg);
   assert(retval == 0);
@@ -73,7 +73,7 @@ void NfsMapsLeveldb::ForkAwareEnv::Schedule(void (*function)(void *),
 
 
 void NfsMapsLeveldb::ForkAwareEnv::WaitForBGThreads() {
-  while (atomic_read32(&num_bg_threads_) > 0)
+  while (num_bg_threads_.load() > 0)
     SafeSleepMs(100);
 }
 
@@ -89,7 +89,7 @@ void NfsMapsLeveldb::ForkAwareEnv::SleepForMicroseconds(int micros) {
 void *NfsMapsLeveldb::ForkAwareEnv::MainFakeThread(void *data) {
   FuncArg *funcarg = reinterpret_cast<FuncArg *>(data);
   funcarg->function(funcarg->arg);
-  atomic_dec32(&(funcarg->env->num_bg_threads_));
+  (funcarg->env->num_bg_threads_.fetch_sub(1));
   delete funcarg;
   return NULL;
 }

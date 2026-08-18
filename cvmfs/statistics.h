@@ -8,11 +8,10 @@
 #include <pthread.h>
 #include <stdint.h>
 
+#include <atomic>
 #include <map>
 #include <string>
 #include <vector>
-
-#include "util/atomic.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
@@ -26,12 +25,13 @@ namespace perf {
  */
 class Counter {
  public:
-  Counter() { atomic_init64(&counter_); }
-  void Inc() { atomic_inc64(&counter_); }
-  void Dec() { atomic_dec64(&counter_); }
-  int64_t Get() { return atomic_read64(&counter_); }
-  void Set(const int64_t val) { atomic_write64(&counter_, val); }
-  int64_t Xadd(const int64_t delta) { return atomic_xadd64(&counter_, delta); }
+  Counter() { counter_.store(0); }
+  Counter(const Counter &cref) { counter_.store(cref.counter_.load()); }
+  void Inc() { counter_.fetch_add(1); }
+  void Dec() { counter_.fetch_sub(1); }
+  int64_t Get() { return counter_.load(); }
+  void Set(const int64_t val) { counter_.store(val); }
+  int64_t Xadd(const int64_t delta) { return counter_.fetch_add(delta); }
 
   std::string Print();
   std::string PrintK();
@@ -42,7 +42,7 @@ class Counter {
   std::string ToString();
 
  private:
-  atomic_int64 counter_;
+  std::atomic<int64_t> counter_;
 };
 
 // perf::Func(Counter) is more clear to read in the code
@@ -80,10 +80,10 @@ class Statistics {
   Statistics &operator=(const Statistics &other);
   struct CounterInfo {
     explicit CounterInfo(const std::string &desc) : desc(desc) {
-      atomic_init32(&refcnt);
-      atomic_inc32(&refcnt);
+      refcnt.store(0);
+      refcnt.fetch_add(1);
     }
-    atomic_int32 refcnt;
+    std::atomic<int32_t> refcnt;
     Counter counter;
     std::string desc;
   };
@@ -238,3 +238,4 @@ class MultiRecorder {
 #endif
 
 #endif  // CVMFS_STATISTICS_H_
+

@@ -33,12 +33,13 @@ FuseRemounter::Status FuseRemounter::ChangeRoot(const shash::Any &root_hash) {
   if (IsInMaintenanceMode())
     return kStatusMaintenance;
 
-  if (atomic_cas32(&drainout_mode_, 0, 1)) {
+  if (int32_t expected_val = 0;
+      drainout_mode_.compare_exchange_strong(expected_val, 1)) {
     // As of this point, fuse callbacks return zero as cache timeout
     LogCvmfs(kLogCvmfs, kLogDebug, "chroot, draining out meta-data caches");
     invalidator_handle_.Reset();
     invalidator_->InvalidateInodes(&invalidator_handle_);
-    atomic_inc32(&drainout_mode_);
+    drainout_mode_.fetch_add(1);
     // drainout_mode_ == 2, IsInDrainoutMode is now 'true'
   } else {
     LogCvmfs(kLogCvmfs, kLogDebug, "already in drainout mode, leaving");
@@ -49,7 +50,7 @@ FuseRemounter::Status FuseRemounter::ChangeRoot(const shash::Any &root_hash) {
   BackoffThrottle throttle;
   do {
     TryFinish(root_hash);
-    drainout_code = atomic_read32(&drainout_mode_);
+    drainout_code = drainout_mode_.load();
     if (drainout_code == 0)
       break;
     throttle.Throttle();
@@ -84,14 +85,15 @@ FuseRemounter::Status FuseRemounter::Check() {
   switch (retval) {
     case catalog::kLoadNew:
       SetOfflineMode(false);
-      if (atomic_cas32(&drainout_mode_, 0, 1)) {
+      if (int32_t expected_val = 0;
+          drainout_mode_.compare_exchange_strong(expected_val, 1)) {
         // As of this point, fuse callbacks return zero as cache timeout
         LogCvmfs(kLogCvmfs, kLogDebug,
                  "new catalog revision available, "
                  "draining out meta-data caches");
         invalidator_handle_.Reset();
         invalidator_->InvalidateInodes(&invalidator_handle_);
-        atomic_inc32(&drainout_mode_);
+        drainout_mode_.fetch_add(1);
         // drainout_mode_ == 2, IsInDrainoutMode is now 'true'
       } else {
         LogCvmfs(kLogCvmfs, kLogDebug, "already in drainout mode, leaving");
@@ -145,7 +147,8 @@ FuseRemounter::Status FuseRemounter::CheckSynchronously() {
 
 void FuseRemounter::EnterMaintenanceMode() {
   fence_maintenance_.Drain();
-  atomic_cas32(&maintenance_mode_, 0, 1);
+  int32_t expected_val = 0;
+  maintenance_mode_.compare_exchange_strong(expected_val, 1);
   fence_maintenance_.Open();
 
   // All running Check() and TryFinish() methods returned.  Both methods now
@@ -171,9 +174,9 @@ FuseRemounter::FuseRemounter(MountPoint *mountpoint,
     , catalogs_valid_until_(MountPoint::kIndefiniteDeadline) {
   memset(&thread_remount_trigger_, 0, sizeof(thread_remount_trigger_));
   pipe_remount_trigger_[0] = pipe_remount_trigger_[1] = -1;
-  atomic_init32(&drainout_mode_);
-  atomic_init32(&maintenance_mode_);
-  atomic_init32(&critical_section_);
+  drainout_mode_.store(0);
+  maintenance_mode_.store(0);
+  critical_section_.store(0);
 }
 
 FuseRemounter::~FuseRemounter() {
@@ -335,7 +338,7 @@ void FuseRemounter::TryFinish(const shash::Any &root_hash) {
   mountpoint_->path_cache()->Resume();
   mountpoint_->md5path_cache()->Resume();
 
-  atomic_xadd32(&drainout_mode_, -2);  // 2 --> 0, end of drainout mode
+  drainout_mode_.fetch_add(-2);  // 2 --> 0, end of drainout mode
 
   if ((retval == catalog::kLoadFail) || (retval == catalog::kLoadNoSpace)) {
     // Can temporarily "escape" offline mode if update came from updated

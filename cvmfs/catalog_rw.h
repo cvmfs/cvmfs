@@ -133,13 +133,9 @@ class WritableCatalog : public Catalog {
     return static_cast<WritableCatalog *>(parent);
   }
 
-  int dirty_children() const { return atomic_read32(&dirty_children_); }
-  void set_dirty_children(const int count) {
-    atomic_write32(&dirty_children_, count);
-  }
-  int DecrementDirtyChildren() {
-    return atomic_xadd32(&dirty_children_, -1) - 1;
-  }
+  int dirty_children() const { return dirty_children_.load(); }
+  void set_dirty_children(const int count) { dirty_children_.store(count); }
+  int DecrementDirtyChildren() { return dirty_children_.fetch_add(-1) - 1; }
 
  private:
   SqlDirentInsert *sql_insert_;
@@ -157,7 +153,7 @@ class WritableCatalog : public Catalog {
   DeltaCounters delta_counters_;
 
   // parallel commit state
-  mutable atomic_int32 dirty_children_;
+  mutable std::atomic<int32_t> dirty_children_;
 
   inline void SetDirty() {
     if (!dirty_)

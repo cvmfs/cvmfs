@@ -16,6 +16,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <atomic>
 #include <cstdlib>
 #include <cstring>
 #include <string>
@@ -28,14 +29,13 @@
 #include "manifest.h"
 #include "manifest_fetch.h"
 #include "network/download.h"
-#include "network/sink_path.h"
 #include "network/sink_mem.h"
+#include "network/sink_path.h"
 #include "object_fetcher.h"
 #include "path_filters/inclusion_spec.h"
 #include "path_filters/relaxed_path_filter.h"
 #include "reflog.h"
 #include "upload.h"
-#include "util/atomic.h"
 #include "util/exception.h"
 #include "util/logging.h"
 #include "util/posix.h"
@@ -106,9 +106,9 @@ pthread_mutex_t lock_pipe = PTHREAD_MUTEX_INITIALIZER;
 unsigned retries = 3;
 catalog::RelaxedPathFilter *pathfilter = NULL;
 catalog::InclusionSpec *inclusion_spec = NULL;
-atomic_int64 overall_chunks;
-atomic_int64 overall_new;
-atomic_int64 chunk_queue;
+std::atomic<int64_t> overall_chunks;
+std::atomic<int64_t> overall_new;
+std::atomic<int64_t> chunk_queue;
 bool preload_cache = false;
 string *preload_cachedir = NULL;
 bool inspect_existing_catalogs = false;
@@ -284,11 +284,11 @@ static void *MainWorker(void *data) {
       fclose(fchunk);
       Store(tmp_file, chunk_hash,
             (compression_alg == zlib::kZlibDefault) ? true : false);
-      atomic_inc64(&overall_new);
+      overall_new.fetch_add(1);
     }
-    if (atomic_xadd64(&overall_chunks, 1) % 1000 == 0)
+    if (overall_chunks.fetch_add(1) % 1000 == 0)
       LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, ".");
-    atomic_dec64(&chunk_queue);
+    chunk_queue.fetch_sub(1);
   }
   return NULL;
 }
@@ -325,7 +325,7 @@ bool CommandPull::PullRecursion(catalog::Catalog *catalog,
                i->mountpoint.c_str());
       shash::Any previous_catalog_hash;  // expected to be null for subcatalog
       const bool retval = Pull(i->hash, i->mountpoint.ToString(),
-                         previous_catalog_hash);
+                               previous_catalog_hash);
       if (!retval)
         return false;
     }
@@ -376,8 +376,8 @@ bool CommandPull::Pull(const shash::Any &catalog_hash,
     return true;
   }
 
-  const int64_t gauge_chunks = atomic_read64(&overall_chunks);
-  const int64_t gauge_new = atomic_read64(&overall_new);
+  const int64_t gauge_chunks = overall_chunks.load();
+  const int64_t gauge_new = overall_new.load();
 
   // Download and uncompress catalog
   shash::Any chunk_hash;
@@ -467,17 +467,17 @@ bool CommandPull::Pull(const shash::Any &catalog_hash,
     while (catalog->AllChunksNext(&chunk_hash, &compression_alg)) {
       ChunkJob next_chunk(chunk_hash, compression_alg);
       WritePipe(pipe_chunks[1], &next_chunk, sizeof(next_chunk));
-      atomic_inc64(&chunk_queue);
+      chunk_queue.fetch_add(1);
     }
     catalog->AllChunksEnd();
-    while (atomic_read64(&chunk_queue) != 0) {
+    while (chunk_queue.load() != 0) {
       SafeSleepMs(100);
     }
     LogCvmfs(kLogCvmfs, kLogStdout,
              " fetched %" PRId64 " new chunks out of "
              "%" PRId64 " unique chunks",
-             atomic_read64(&overall_new) - gauge_new,
-             atomic_read64(&overall_chunks) - gauge_chunks);
+             overall_new.load() - gauge_new,
+             overall_chunks.load() - gauge_chunks);
   }
 
   retval = PullRecursion(catalog, path);
@@ -557,8 +557,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
                "Options -d and -E are mutually exclusive");
       return 1;
     }
-    inclusion_spec =
-        catalog::InclusionSpec::Create(*args.find('E')->second);
+    inclusion_spec = catalog::InclusionSpec::Create(*args.find('E')->second);
     if (inclusion_spec == NULL || !inclusion_spec->IsValid()) {
       LogCvmfs(kLogCvmfs, kLogStderr,
                "Failed to parse inclusion spec from '%s'",
@@ -606,9 +605,9 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   int result = 1;
 
   // Initialization
-  atomic_init64(&overall_chunks);
-  atomic_init64(&overall_new);
-  atomic_init64(&chunk_queue);
+  overall_chunks.store(0);
+  overall_new.store(0);
+  chunk_queue.store(0);
 
   const bool follow_redirects = false;
   const unsigned max_pool_handles = num_parallel + 1;
@@ -966,8 +965,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
         const std::string &spec_content = inclusion_spec->content();
         StoreBuffer(
             reinterpret_cast<const unsigned char *>(spec_content.data()),
-            spec_content.size(),
-            ".cvmfs_partial_replication", false);
+            spec_content.size(), ".cvmfs_partial_replication", false);
         LogCvmfs(kLogCvmfs, kLogStdout,
                  "Uploaded partial replication spec to backend");
       }
@@ -979,7 +977,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   WaitForStorage();
   LogCvmfs(kLogCvmfs, kLogStdout,
            "Fetched %" PRId64 " new chunks out of %" PRId64 " processed chunks",
-           atomic_read64(&overall_new), atomic_read64(&overall_chunks));
+           (overall_new).load(), overall_chunks.load());
   result = 0;
 
 fini:

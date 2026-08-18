@@ -15,7 +15,7 @@
  * chunking stage can safely overlap.  Nevertheless, debugging might be easier
  * if they don't.  So let's start with a high number.
  */
-atomic_int64 TaskChunk::tag_seq_ = 2 << 28;
+std::atomic<int64_t> TaskChunk::tag_seq_ = 2 << 28;
 
 /**
  * Consumes the stream of input blocks and produces new output blocks according
@@ -34,7 +34,7 @@ void TaskChunk::Process(BlockItem *input_block) {
     // This needs to be fixed up later in the pipeline by the write task.
     if (file_item->may_have_chunks()) {
       chunk_info.next_chunk = new ChunkItem(file_item, 0);
-      chunk_info.output_tag_chunk = atomic_xadd64(&tag_seq_, 1);
+      chunk_info.output_tag_chunk = tag_seq_.fetch_add(1);
       if (file_item->has_legacy_bulk_chunk()) {
         chunk_info.bulk_chunk = new ChunkItem(file_item, 0);
       }
@@ -45,7 +45,7 @@ void TaskChunk::Process(BlockItem *input_block) {
     if (chunk_info.bulk_chunk != NULL) {
       chunk_info.bulk_chunk->MakeBulkChunk();
       chunk_info.bulk_chunk->set_size(file_item->size());
-      chunk_info.output_tag_bulk = atomic_xadd64(&tag_seq_, 1);
+      chunk_info.output_tag_bulk = tag_seq_.fetch_add(1);
     }
     tag_map_.Insert(input_tag, chunk_info);
   }
@@ -125,7 +125,7 @@ void TaskChunk::Process(BlockItem *input_block) {
             tubes_out_->Dispatch(block_stop);
 
             chunk_info.next_chunk = new ChunkItem(file_item, cut_mark);
-            chunk_info.output_tag_chunk = atomic_xadd64(&tag_seq_, 1);
+            chunk_info.output_tag_chunk = tag_seq_.fetch_add(1);
           }
           offset_in_block = cut_mark_in_block;
         }

@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#include <atomic>
 #include <cstdlib>
 #include <cstring>
 
@@ -23,7 +24,6 @@
 #include "ingestion/task_write.h"
 #include "testutil.h"
 #include "upload_facility.h"
-#include "util/atomic.h"
 #include "util/pointer.h"
 #include "util/posix.h"
 #include "util/smalloc.h"
@@ -37,26 +37,26 @@ class DummyItem {
   bool IsQuitBeacon() { return summand == -1; }
   explicit DummyItem(int s) : summand(s) { }
   int summand;
-  static atomic_int32 sum;
+  static std::atomic<int32_t> sum;
 };
-atomic_int32 DummyItem::sum = 0;
+std::atomic<int32_t> DummyItem::sum(0);
 
 
 class TestTask : public TubeConsumer<DummyItem> {
  public:
-  static atomic_int32 cnt_terminate;
-  static atomic_int32 cnt_process;
+  static std::atomic<int32_t> cnt_terminate;
+  static std::atomic<int32_t> cnt_process;
   explicit TestTask(Tube<DummyItem> *tube) : TubeConsumer<DummyItem>(tube) { }
 
  protected:
   virtual void Process(DummyItem *item) {
-    atomic_xadd32(&item->sum, item->summand);
-    atomic_inc32(&cnt_process);
+    item->sum.fetch_add(item->summand);
+    cnt_process.fetch_add(1);
   }
-  virtual void OnTerminate() { atomic_inc32(&cnt_terminate); }
+  virtual void OnTerminate() { cnt_terminate.fetch_add(1); }
 };
-atomic_int32 TestTask::cnt_terminate = 0;
-atomic_int32 TestTask::cnt_process = 0;
+std::atomic<int32_t> TestTask::cnt_terminate(0);
+std::atomic<int32_t> TestTask::cnt_process(0);
 }  // anonymous namespace
 
 
@@ -65,26 +65,26 @@ atomic_int32 TestTask::cnt_process = 0;
  * file catalog.
  */
 struct FnFileProcessed {
-  FnFileProcessed() { atomic_init64(&ncall); }
+  FnFileProcessed() { ncall.store(0); }
 
   void OnFileProcessed(const upload::SpoolerResult &spooler_result) {
-    atomic_inc64(&ncall);
+    ncall.fetch_add(1);
   }
 
-  atomic_int64 ncall;
+  std::atomic<int64_t> ncall;
 };
 
 
 struct FnFileHashed {
-  FnFileHashed() { atomic_init64(&ncall); }
+  FnFileHashed() { ncall.store(0); }
 
   void OnFileProcessed(const ScrubbingResult &scrubbing_result) {
     last_result = scrubbing_result;
-    atomic_inc64(&ncall);
+    ncall.fetch_add(1);
   }
 
   ScrubbingResult last_result;
-  atomic_int64 ncall;
+  std::atomic<int64_t> ncall;
 };
 
 
@@ -125,9 +125,9 @@ TEST_F(T_Ingestion, TaskBasic) {
   DummyItem i3(3);
 
   task_group_.Spawn();
-  EXPECT_EQ(0, atomic_read32(&TestTask::cnt_terminate));
-  EXPECT_EQ(0, atomic_read32(&TestTask::cnt_process));
-  EXPECT_EQ(0, atomic_read32(&DummyItem::sum));
+  EXPECT_EQ(0, TestTask::cnt_terminate.load());
+  EXPECT_EQ(0, TestTask::cnt_process.load());
+  EXPECT_EQ(0, DummyItem::sum.load());
 
   tube_.EnqueueBack(&i1);
   tube_.EnqueueBack(&i2);
@@ -135,11 +135,10 @@ TEST_F(T_Ingestion, TaskBasic) {
 
   tube_.Wait();
   task_group_.Terminate();
-  EXPECT_EQ(static_cast<int>(kNumTasks),
-            atomic_read32(&TestTask::cnt_terminate));
+  EXPECT_EQ(static_cast<int>(kNumTasks), TestTask::cnt_terminate.load());
 
-  EXPECT_EQ(6, atomic_read32(&DummyItem::sum));
-  EXPECT_EQ(3, atomic_read32(&TestTask::cnt_process));
+  EXPECT_EQ(6, DummyItem::sum.load());
+  EXPECT_EQ(3, TestTask::cnt_process.load());
 }
 
 
@@ -149,9 +148,9 @@ TEST_F(T_Ingestion, TaskStress) {
   DummyItem i3(3);
 
   task_group_.Spawn();
-  EXPECT_EQ(0, atomic_read32(&TestTask::cnt_terminate));
-  EXPECT_EQ(0, atomic_read32(&TestTask::cnt_process));
-  EXPECT_EQ(0, atomic_read32(&DummyItem::sum));
+  EXPECT_EQ(0, TestTask::cnt_terminate.load());
+  EXPECT_EQ(0, TestTask::cnt_process.load());
+  EXPECT_EQ(0, DummyItem::sum.load());
 
   for (unsigned i = 0; i < 10000; ++i) {
     tube_.EnqueueBack(&i1);
@@ -161,11 +160,10 @@ TEST_F(T_Ingestion, TaskStress) {
 
   tube_.Wait();
   task_group_.Terminate();
-  EXPECT_EQ(static_cast<int>(kNumTasks),
-            atomic_read32(&TestTask::cnt_terminate));
+  EXPECT_EQ(static_cast<int>(kNumTasks), TestTask::cnt_terminate.load());
 
-  EXPECT_EQ(10000 * 6, atomic_read32(&DummyItem::sum));
-  EXPECT_EQ(10000 * 3, atomic_read32(&TestTask::cnt_process));
+  EXPECT_EQ(10000 * 6, DummyItem::sum.load());
+  EXPECT_EQ(10000 * 3, TestTask::cnt_process.load());
 }
 
 
@@ -794,7 +792,7 @@ TEST_F(T_Ingestion, PipelineNull) {
   pipeline_straight->Process(new FileIngestionSource(std::string("/dev/null")),
                              true);
   pipeline_straight->WaitFor();
-  EXPECT_EQ(1, atomic_read64(&fn_processed.ncall));
+  EXPECT_EQ(1, fn_processed.ncall.load());
   EXPECT_EQ(1U, uploader_->results.size());
   shash::Any hash_null(spooler_definition.hash_algorithm);
   shash::HashString("", &hash_null);
@@ -837,7 +835,8 @@ TEST_F(T_Ingestion, Scrubbing) {
   pipeline_scrubbing->Process(new FileIngestionSource(std::string("/dev/null")),
                               shash::kShake128, shash::kSuffixNone);
   pipeline_scrubbing->WaitFor();
-  EXPECT_EQ(1, atomic_read64(&fn_hashed.ncall));
+  EXPECT_EQ(1, fn_hashed.ncall.load());
   EXPECT_EQ("/dev/null", fn_hashed.last_result.path);
   EXPECT_EQ(null_hash, fn_hashed.last_result.hash);
 }
+ 

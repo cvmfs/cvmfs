@@ -24,8 +24,9 @@ using namespace std;  // NOLINT
 
 FuseInvalidator::Handle::Handle(unsigned timeout_s)
     : timeout_s_((timeout_s == 0) ? 0 : (timeout_s + kTimeoutSafetyMarginSec)) {
-  status_ = reinterpret_cast<atomic_int32 *>(smalloc(sizeof(atomic_int32)));
-  atomic_init32(status_);
+  status_ = reinterpret_cast<std::atomic<int32_t> *>(
+      smalloc(sizeof(std::atomic<int32_t>)));
+  status_->store(0);
 }
 
 
@@ -72,7 +73,7 @@ FuseInvalidator::FuseInvalidator(MountPoint *mount_point,
     , spawned_(false) {
   g_fuse_notify_invalidation_ = fuse_notify_invalidation;
   memset(&thread_invalidator_, 0, sizeof(thread_invalidator_));
-  atomic_init32(&terminated_);
+  terminated_.store(0);
 }
 
 FuseInvalidator::FuseInvalidator(glue::InodeTracker *inode_tracker,
@@ -86,12 +87,13 @@ FuseInvalidator::FuseInvalidator(glue::InodeTracker *inode_tracker,
     , spawned_(false) {
   g_fuse_notify_invalidation_ = fuse_notify_invalidation;
   memset(&thread_invalidator_, 0, sizeof(thread_invalidator_));
-  atomic_init32(&terminated_);
+  terminated_.store(0);
 }
 
 
 FuseInvalidator::~FuseInvalidator() {
-  atomic_cas32(&terminated_, 0, 1);
+  int32_t expected_val = 0;
+  terminated_.compare_exchange_strong(expected_val, 1);
   if (spawned_) {
     QuitCommand *cmd = new (smalloc(sizeof(QuitCommand))) QuitCommand();
     channel_.PushBack(cmd);
@@ -202,7 +204,7 @@ void *FuseInvalidator::MainInvalidator(void *data) {
         || !HasFuseNotifyInval()) {
       while (platform_monotonic_time() < deadline) {
         SafeSleepMs(kCheckTimeoutFreqMs);
-        if (atomic_read32(&invalidator->terminated_) == 1) {
+        if (invalidator->terminated_.load() == 1) {
           LogCvmfs(kLogCvmfs, kLogDebug,
                    "cancel cache eviction due to termination");
           break;
@@ -254,7 +256,7 @@ void *FuseInvalidator::MainInvalidator(void *data) {
                    "cancel cache eviction after %u entries due to timeout", i);
           break;
         }
-        if (atomic_read32(&invalidator->terminated_) == 1) {
+        if (invalidator->terminated_.load() == 1) {
           LogCvmfs(kLogCvmfs, kLogDebug,
                    "cancel cache eviction due to termination");
           break;
@@ -307,7 +309,7 @@ void *FuseInvalidator::MainInvalidator(void *data) {
                   entry_name.GetLength());
 
       if ((++i % kCheckTimeoutFreqOps) == 0) {
-        if (atomic_read32(&invalidator->terminated_) == 1) {
+        if (invalidator->terminated_.load() == 1) {
           LogCvmfs(kLogCvmfs, kLogDebug,
                    "cancel cache eviction due to termination");
           break;

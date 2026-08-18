@@ -35,8 +35,8 @@ FileItem::FileItem(IngestionSource *source,
     , chunks_(1) {
   const int retval = pthread_mutex_init(&lock_, NULL);
   assert(retval == 0);
-  atomic_init64(&nchunks_in_fly_);
-  atomic_init32(&is_fully_chunked_);
+  nchunks_in_fly_.store(0);
+  is_fully_chunked_.store(0);
 }
 
 FileItem::~FileItem() { pthread_mutex_destroy(&lock_); }
@@ -55,7 +55,7 @@ void FileItem::RegisterChunk(const FileChunk &file_chunk) {
       bulk_hash_ = file_chunk.content_hash();
       break;
   }
-  atomic_dec64(&nchunks_in_fly_);
+  nchunks_in_fly_.fetch_sub(1);
 }
 
 
@@ -99,7 +99,7 @@ void ChunkItem::ReleaseCompressor() { compressor_.Destroy(); }
 
 //------------------------------------------------------------------------------
 
-atomic_int64 BlockItem::managed_bytes_ = 0;
+std::atomic<int64_t> BlockItem::managed_bytes_(0);
 
 
 BlockItem::BlockItem(ItemAllocator *allocator)
@@ -129,7 +129,7 @@ BlockItem::BlockItem(int64_t tag, ItemAllocator *allocator)
 BlockItem::~BlockItem() {
   if (data_)
     allocator_->Free(data_);
-  atomic_xadd64(&managed_bytes_, -static_cast<int64_t>(capacity_));
+  managed_bytes_.fetch_add(-static_cast<int64_t>(capacity_));
 }
 
 
@@ -153,7 +153,7 @@ void BlockItem::MakeData(uint32_t capacity) {
   type_ = kBlockData;
   capacity_ = capacity;
   data_ = reinterpret_cast<unsigned char *>(allocator_->Malloc(capacity_));
-  atomic_xadd64(&managed_bytes_, static_cast<int64_t>(capacity_));
+  managed_bytes_.fetch_add(static_cast<int64_t>(capacity_));
 }
 
 
@@ -186,14 +186,14 @@ void BlockItem::MakeDataCopy(const unsigned char *data, uint32_t size) {
   capacity_ = size_ = size;
   data_ = reinterpret_cast<unsigned char *>(allocator_->Malloc(capacity_));
   memcpy(data_, data, size);
-  atomic_xadd64(&managed_bytes_, static_cast<int64_t>(capacity_));
+  managed_bytes_.fetch_add(static_cast<int64_t>(capacity_));
 }
 
 
 void BlockItem::Reset() {
   assert(type_ == kBlockData);
 
-  atomic_xadd64(&managed_bytes_, -static_cast<int64_t>(capacity_));
+  managed_bytes_.fetch_add(-static_cast<int64_t>(capacity_));
   allocator_->Free(data_);
   data_ = NULL;
   size_ = capacity_ = 0;
@@ -224,3 +224,4 @@ uint32_t BlockItem::Write(void *buf, uint32_t count) {
   size_ += nbytes;
   return nbytes;
 }
+ 

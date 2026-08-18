@@ -7,13 +7,13 @@
 
 #include <pthread.h>
 
+#include <atomic>
 #include <string>
 #include <utility>
 #include <vector>
 
 #include "network/s3fanout.h"
 #include "upload_facility.h"
-#include "util/atomic.h"
 #include "util/file_backed_buffer.h"
 #include "util/pointer.h"
 #include "util/single_copy.h"
@@ -142,7 +142,7 @@ class S3Uploader : public AbstractUploader {
   std::string proxy_;
 
   const std::string temporary_path_;
-  mutable atomic_int32 io_errors_;
+  mutable std::atomic<int32_t> io_errors_;
   pthread_t thread_collect_results_;
 
   std::string x_amz_acl_;

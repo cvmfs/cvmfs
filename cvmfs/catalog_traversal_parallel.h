@@ -5,12 +5,12 @@
 #ifndef CVMFS_CATALOG_TRAVERSAL_PARALLEL_H_
 #define CVMFS_CATALOG_TRAVERSAL_PARALLEL_H_
 
+#include <atomic>
 #include <stack>
 #include <string>
 #include <vector>
 
 #include "catalog_traversal.h"
-#include "util/atomic.h"
 #include "util/exception.h"
 #include "util/tube.h"
 
@@ -43,7 +43,7 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
       : CatalogTraversalBase<ObjectFetcherT>(params)
       , num_threads_(params.num_threads)
       , serialize_callbacks_(params.serialize_callbacks) {
-    atomic_init32(&num_errors_);
+    num_errors_.store(0);
     shash::Any null_hash;
     null_hash.SetNull();
     catalogs_processing_.Init(1024, null_hash, hasher);
@@ -64,12 +64,12 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
                         CatalogTN *parent = NULL)
         : CatalogTraversal<ObjectFetcherT>::CatalogJob(path, hash, tree_level,
                                                        history_depth, parent) {
-      atomic_init32(&children_unprocessed);
+      children_unprocessed.store(0);
     }
 
     void WakeParents() { this->NotifyListeners(0); }
 
-    atomic_int32 children_unprocessed;
+    std::atomic<int32_t> children_unprocessed;
   };
 
  public:
@@ -177,8 +177,8 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
     threads_process_ = reinterpret_cast<pthread_t *>(
         smalloc(sizeof(pthread_t) * num_threads_));
     for (unsigned int i = 0; i < num_threads_; ++i) {
-      int const retval = pthread_create(&threads_process_[i], NULL, MainProcessQueue,
-                                  this);
+      int const retval = pthread_create(&threads_process_[i], NULL,
+                                        MainProcessQueue, this);
       if (retval != 0)
         PANIC(kLogStderr, "failed to create thread");
     }
@@ -189,7 +189,7 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
     }
     free(threads_process_);
 
-    if (atomic_read32(&num_errors_))
+    if (num_errors_.load())
       return false;
 
     assert(catalogs_processing_.size() == 0);
@@ -240,7 +240,7 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
 
   void ProcessJobPre(CatalogJob *job) {
     if (!this->PrepareCatalog(job)) {
-      atomic_inc32(&num_errors_);
+      num_errors_.fetch_add(1);
       NotifyFinished();
       return;
     }
@@ -248,7 +248,8 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
       FinalizeJob(job);
       return;
     }
-    NestedCatalogList const catalog_list = job->catalog->ListOwnNestedCatalogs();
+    NestedCatalogList const catalog_list = job->catalog
+                                               ->ListOwnNestedCatalogs();
     unsigned int num_children;
     // Ensure that pushed children won't call ProcessJobPost on this job
     // before this function finishes
@@ -260,10 +261,10 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
       } else {
         num_children = PushNestedCatalogs(job, catalog_list)
                        + PushPreviousRevision(job);
-        atomic_write32(&job->children_unprocessed, num_children);
+        job->children_unprocessed.store(num_children);
       }
       if (!this->CloseCatalog(false, job)) {
-        atomic_inc32(&num_errors_);
+        num_errors_.fetch_add(1);
         NotifyFinished();
       }
     }
@@ -352,7 +353,7 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
     // Save time by keeping catalog open when suitable
     if (job->catalog == NULL) {
       if (!this->ReopenCatalog(job)) {
-        atomic_inc32(&num_errors_);
+        num_errors_.fetch_add(1);
         NotifyFinished();
         return;
       }
@@ -365,7 +366,7 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
     }
     if (!this->no_close_) {
       if (!this->CloseCatalog(true, job)) {
-        atomic_inc32(&num_errors_);
+        num_errors_.fetch_add(1);
         NotifyFinished();
         return;
       }
@@ -392,7 +393,7 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
 
   void OnChildFinished(const int &a, CatalogJob *job) {
     // atomic_xadd32 returns value before subtraction -> needs to equal 1
-    if (atomic_xadd32(&job->children_unprocessed, -1) == 1) {
+    if (job->children_unprocessed.fetch_add(-1) == 1) {
       post_job_queue_.EnqueueFront(job);
     }
   }
@@ -405,7 +406,7 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
   TraversalType effective_traversal_type_;
 
   pthread_t *threads_process_;
-  atomic_int32 num_errors_;
+  std::atomic<int32_t> num_errors_;
 
   Tube<CatalogJob> pre_job_queue_;
   Tube<CatalogJob> post_job_queue_;

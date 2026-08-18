@@ -10,6 +10,7 @@
 #include <stdint.h>
 #include <unistd.h>
 
+#include <atomic>
 #include <cstdio>
 #include <map>
 #include <set>
@@ -27,7 +28,6 @@
 #include "network/sharding_policy.h"
 #include "ssl.h"
 #include "statistics.h"
-#include "util/atomic.h"
 #include "util/pipe.h"
 #include "util/pointer.h"
 #include "util/prng.h"
@@ -311,7 +311,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   char *user_agent_;
 
   pthread_t thread_download_;
-  atomic_int32 multi_threaded_;
+  std::atomic<int32_t> multi_threaded_;
   UniquePtr<Pipe<kPipeThreadTerminator> > pipe_terminate_;
 
   UniquePtr<Pipe<kPipeDownloadJobs> > pipe_jobs_;

@@ -5,8 +5,9 @@
 #ifndef CVMFS_FENCE_H_
 #define CVMFS_FENCE_H_
 
+#include <atomic>
+
 #include "duplex_testing.h"
-#include "util/atomic.h"
 #include "util/posix.h"
 #include "util/single_copy.h"
 
@@ -27,32 +28,38 @@ class Fence : public SingleCopy {
 
  public:
   Fence() {
-    atomic_init64(&counter_);
-    atomic_init32(&blocking_);
+    counter_.store(0);
+    blocking_.store(0);
   }
 
   void Enter() {
-    while (atomic_read32(&blocking_)) {
+    while (blocking_.load()) {
       SafeSleepMs(kBusyWaitBackoffMs);
     }
-    atomic_inc64(&counter_);
+    counter_.fetch_add(1);
   }
 
-  void Leave() { atomic_dec64(&counter_); }
+  void Leave() { counter_.fetch_sub(1); }
 
-  void Close() { atomic_cas32(&blocking_, 0, 1); }
+  void Close() {
+    int32_t expected_val = 0;
+    blocking_.compare_exchange_strong(expected_val, 1);
+  }
 
   /**
    * Close and let live critical regions exit
    */
   void Drain() {
     Close();
-    while (atomic_read64(&counter_) > 0) {
+    while (counter_.load() > 0) {
       SafeSleepMs(kBusyWaitBackoffMs);
     }
   }
 
-  void Open() { atomic_cas32(&blocking_, 1, 0); }
+  void Open() {
+    int32_t expected_val = 1;
+    blocking_.compare_exchange_strong(expected_val, 0);
+  }
 
  private:
   static const unsigned kBusyWaitBackoffMs = 100;
@@ -60,12 +67,12 @@ class Fence : public SingleCopy {
   /**
    * Number of active critical regions.
    */
-  atomic_int64 counter_;
+  std::atomic<int64_t> counter_;
 
   /**
    * A boolean that indicates if the fence is blocked.
    */
-  atomic_int32 blocking_;
+  std::atomic<int32_t> blocking_;
 };
 
 

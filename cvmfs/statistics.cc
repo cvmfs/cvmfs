@@ -52,7 +52,7 @@ Statistics *Statistics::Fork() {
                                             iEnd = counters_.end();
        i != iEnd;
        ++i) {
-    atomic_inc32(&i->second->refcnt);
+    i->second->refcnt.fetch_add(1);
   }
   child->counters_ = counters_;
 
@@ -181,7 +181,7 @@ Statistics::~Statistics() {
                                             iEnd = counters_.end();
        i != iEnd;
        ++i) {
-    const int32_t old_value = atomic_xadd32(&i->second->refcnt, -1);
+    const int32_t old_value = i->second->refcnt.fetch_add(-1);
     if (old_value == 1)
       delete i->second;
   }

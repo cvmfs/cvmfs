@@ -13,6 +13,7 @@
 #include <stdint.h>
 #include <sys/types.h>
 
+#include <atomic>
 #include <string>
 #include <vector>
 
@@ -21,7 +22,6 @@
 #include "crypto/hash.h"
 #include "shortstring.h"
 #include "smallhash.h"
-#include "util/atomic.h"
 #include "util/single_copy.h"
 
 /**

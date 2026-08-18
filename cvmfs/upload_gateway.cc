@@ -65,7 +65,7 @@ GatewayUploader::GatewayUploader(const SpoolerDefinition &spooler_definition)
     PANIC(kLogStderr, "Error in parsing the spooler definition");
   }
 
-  atomic_init32(&num_errors_);
+  num_errors_.store(0);
 }
 
 GatewayUploader::~GatewayUploader() {
@@ -111,7 +111,7 @@ void GatewayUploader::WaitForUpload() const {
 std::string GatewayUploader::name() const { return "HTTP"; }
 
 void GatewayUploader::DoRemoveAsync(const std::string & /*file_to_delete*/) {
-  atomic_inc32(&num_errors_);
+  num_errors_.fetch_add(1);
   Respond(NULL, UploaderResults());
 }
 
@@ -126,7 +126,7 @@ bool GatewayUploader::PlaceBootstrappingShortcut(
 }
 
 unsigned int GatewayUploader::GetNumberOfErrors() const {
-  return atomic_read32(&num_errors_);
+  return num_errors_.load();
 }
 
 void GatewayUploader::DoUpload(const std::string &remote_path,
@@ -254,6 +254,6 @@ int64_t GatewayUploader::DoGetObjectSize(const std::string &file_name) {
   return -EOPNOTSUPP;
 }
 
-void GatewayUploader::BumpErrors() const { atomic_inc32(&num_errors_); }
+void GatewayUploader::BumpErrors() const { num_errors_.fetch_add(1); }
 
 }  // namespace upload

@@ -10,10 +10,9 @@
 #define CVMFS_SHORTSTRING_H_
 
 #include <algorithm>
+#include <atomic>
 #include <cstring>
 #include <string>
-
-#include "util/atomic.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
@@ -28,24 +27,24 @@ class ShortString {
  public:
   ShortString() : long_string_(NULL), length_(0) {
 #ifdef DEBUGMSG
-    atomic_inc64(&num_instances_);
+    num_instances_.fetch_add(1);
 #endif
   }
   ShortString(const ShortString &other) : long_string_(NULL) {
 #ifdef DEBUGMSG
-    atomic_inc64(&num_instances_);
+    num_instances_.fetch_add(1);
 #endif
     Assign(other);
   }
   ShortString(const char *chars, const unsigned length) : long_string_(NULL) {
 #ifdef DEBUGMSG
-    atomic_inc64(&num_instances_);
+    num_instances_.fetch_add(1);
 #endif
     Assign(chars, length);
   }
   explicit ShortString(const std::string &std_string) : long_string_(NULL) {
 #ifdef DEBUGMSG
-    atomic_inc64(&num_instances_);
+    num_instances_.fetch_add(1);
 #endif
     Assign(std_string.data(), std_string.length());
   }
@@ -64,7 +63,7 @@ class ShortString {
     this->length_ = length;
     if (length > StackSize) {
 #ifdef DEBUGMSG
-      atomic_inc64(&num_overflows_);
+      num_overflows_.fetch_add(1);
 #endif
       long_string_ = new std::string(chars, length);
     } else {
@@ -86,7 +85,7 @@ class ShortString {
     const unsigned new_length = this->length_ + length;
     if (new_length > StackSize) {
 #ifdef DEBUGMSG
-      atomic_inc64(&num_overflows_);
+      num_overflows_.fetch_add(1);
 #endif
       long_string_ = new std::string();
       long_string_->reserve(new_length);
@@ -199,8 +198,8 @@ class ShortString {
     return ShortString(this->GetChars() + start_at, length - start_at);
   }
 
-  static uint64_t num_instances() { return atomic_read64(&num_instances_); }
-  static uint64_t num_overflows() { return atomic_read64(&num_overflows_); }
+  static uint64_t num_instances() { return num_instances_.load(); }
+  static uint64_t num_overflows() { return num_overflows_.load(); }
 
   operator bool() const { return not IsEmpty(); }
 
@@ -208,8 +207,8 @@ class ShortString {
   std::string *long_string_;
   char stack_[StackSize + 1];  // +1 to add a final '\0' if necessary
   unsigned char length_;
-  static atomic_int64 num_overflows_;
-  static atomic_int64 num_instances_;
+  static std::atomic<int64_t> num_overflows_;
+  static std::atomic<int64_t> num_instances_;
 };  // class ShortString
 
 typedef ShortString<kDefaultMaxPath, 0> PathString;
@@ -217,9 +216,9 @@ typedef ShortString<kDefaultMaxName, 1> NameString;
 typedef ShortString<kDefaultMaxLink, 2> LinkString;
 
 template<unsigned char StackSize, char Type>
-atomic_int64 ShortString<StackSize, Type>::num_overflows_ = 0;
+std::atomic<int64_t> ShortString<StackSize, Type>::num_overflows_(0);
 template<unsigned char StackSize, char Type>
-atomic_int64 ShortString<StackSize, Type>::num_instances_ = 0;
+std::atomic<int64_t> ShortString<StackSize, Type>::num_instances_(0);
 
 // See posix.cc for the std::string counterparts
 PathString GetParentPath(const PathString &path);
