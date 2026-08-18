@@ -1792,7 +1792,7 @@ TEST_F(T_Util, ManagedExecCommandLine) {
   int fd_stdout[2];
   int fd_stdin[2];
   std::unique_ptr<unsigned char, decltype(&free)> buffer(
-      static_cast<unsigned char *>(scalloc(100, 1)));
+      static_cast<unsigned char *>(scalloc(100, 1)),free);
   MakePipe(fd_stdout);
   MakePipe(fd_stdin);
   string message = "CVMFS";
