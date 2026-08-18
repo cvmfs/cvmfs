@@ -135,7 +135,7 @@ TEST_F(T_Compressor, EchoCompression) {
 TEST_F(T_Compressor, EchoCompressionLong) {
   compressor.reset(zlib::Compressor::Construct(zlib::kNoCompression));
   std::unique_ptr<unsigned char, decltype(&free)> compress_buf(reinterpret_cast<unsigned char *>(
-      smalloc(compressor->DeflateBound(long_size))));
+      smalloc(compressor->DeflateBound(long_size))),free);
   unsigned compress_pos = 0;
   bool deflate_finished = false;
   unsigned char *input = long_string;
