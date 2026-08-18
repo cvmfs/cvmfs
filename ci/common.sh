@@ -99,6 +99,7 @@ create_cvmfs_source_tarball() {
                       ${source_directory}/add-ons            \
                       ${source_directory}/cmake              \
                       ${source_directory}/cvmfs              \
+                      ${source_directory}/cvmfs-posix-tools  \
                       ${source_directory}/doc                \
                       ${source_directory}/externals          \
                       ${source_directory}/gateway            \

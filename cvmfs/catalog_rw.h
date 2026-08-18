@@ -52,6 +52,7 @@ class WritableCatalog : public Catalog {
                                        const bool is_not_root = false);
 
   void Transaction();
+  void TransactionUnlocked();
   void Commit();
 
   inline bool IsDirty() const { return dirty_; }
@@ -162,6 +163,12 @@ class WritableCatalog : public Catalog {
   inline void SetDirty() {
     if (!dirty_)
       Transaction();
+    dirty_ = true;
+  }
+
+  inline void SetDirtyUnlocked() {
+    if (!dirty_)
+      TransactionUnlocked();
     dirty_ = true;
   }
 

@@ -67,6 +67,12 @@ WritableCatalog::~WritableCatalog() {
 
 
 void WritableCatalog::Transaction() {
+  const MutexLockGuard m(lock_);
+  TransactionUnlocked();
+}
+
+
+void WritableCatalog::TransactionUnlocked() {
   LogCvmfs(kLogCatalog, kLogVerboseMsg, "opening SQLite transaction for '%s'",
            mountpoint().c_str());
   const bool retval = database().BeginTransaction();
@@ -77,6 +83,7 @@ void WritableCatalog::Transaction() {
 void WritableCatalog::Commit() {
   LogCvmfs(kLogCatalog, kLogVerboseMsg, "closing SQLite transaction for '%s'",
            mountpoint().c_str());
+  const MutexLockGuard m(lock_);
   const bool retval = database().CommitTransaction();
   assert(retval == true);
   dirty_ = false;
@@ -590,7 +597,7 @@ void WritableCatalog::UpdateNestedCatalog(const std::string &path,
                                           const uint64_t size,
                                           const DeltaCounters &child_counters) {
   const MutexLockGuard guard(lock_);
-  SetDirty();
+  SetDirtyUnlocked();
 
   child_counters.PopulateToParent(&delta_counters_);
 

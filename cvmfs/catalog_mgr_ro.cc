@@ -15,6 +15,100 @@ using namespace std;  // NOLINT
 
 namespace catalog {
 
+
+/**
+ * Loads a catalog via HTTP from Statum 0 into a temporary file.
+ * @param url_path the url of the catalog to load
+ * @param mount_point the file system path where the catalog should be mounted
+ * @param catalog_file a pointer to the string containing the full qualified
+ *                     name of the catalog afterwards
+ * @return 0 on success, different otherwise
+ */
+LoadReturn SimpleCatalogManager::LoadCatalog(const PathString  &mountpoint,
+                                            const shash::Any  &hash,
+                                            std::string       *catalog_path,
+                                            shash::Any        *catalog_hash, uint64_t *manifest_age)
+{
+  shash::Any const effective_hash = hash.IsNull() ? base_hash_ : hash;
+  assert(shash::kSuffixCatalog == effective_hash.suffix);
+  const string url = stratum0_ + "/data/" + effective_hash.MakePath();
+
+  std::string tmp_path = "";
+
+  FILE *fcatalog=NULL;
+
+  if (UseLocalCache()) {
+    tmp_path = dir_cache_ + "/"
+                           + effective_hash.MakePathWithoutSuffix();
+    *catalog_path = tmp_path;
+    *catalog_hash = hash;
+    // catalog is cached in "cache_dir/" + standard cvmfs file hierarchy
+    if (FileExists(tmp_path.c_str())) {
+      LogCvmfs(kLogCvmfs, kLogSyslog,
+               "LoadCatalog: serving catalog %s from cache",
+               effective_hash.ToString().c_str());
+      const std::string cache_path = tmp_path;
+      const std::string tmp_path = CopyCatalogToTempFile(cache_path);
+      *catalog_path = tmp_path;
+      return kLoadNew;
+    }
+    // file not cached yet
+    // open file to download into "cache_dir/" + standard cvmfs file hierarchy
+    // open temporary file to write it to, then atomically rename to destination
+    fcatalog = CreateTempFile(dir_temp_ + "/catalog", 0666, "w", &tmp_path);
+    if (!fcatalog) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "failed to create file in cache.server when loading %s",
+               url.c_str());
+      return kLoadFail;
+    }
+  } else {  // no local cache; just create a random tmp file for download
+    fcatalog = CreateTempFile(dir_temp_ + "/catalog", 0666, "w", &tmp_path);
+    if (!fcatalog) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "failed to create temp file when loading %s", url.c_str());
+      return kLoadFail;
+    }
+    *catalog_path=tmp_path;
+  }
+
+  cvmfs::FileSink filesink(fcatalog);
+  download::JobInfo download_catalog(&url, true, false,
+                                     &effective_hash, &filesink);
+
+  download::Failures const retval = download_manager_->Fetch(&download_catalog);
+  fclose(fcatalog);
+
+
+  if (retval != download::kFailOk) {
+    unlink(catalog_path->c_str());
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "failed to load %s from Stratum 0 (%d - %s)", url.c_str(), retval,
+             download::Code2Ascii(retval));
+      return kLoadFail;
+  }
+
+  if(UseLocalCache()) {
+    assert(tmp_path!="");
+    int const ret = rename( tmp_path.c_str(), catalog_path->c_str() );
+    if (ret!=0) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to rename %s to %s: errno= %d",
+               tmp_path.c_str(), catalog_path->c_str(), errno);
+      return kLoadFail;
+    }
+  }
+
+
+  // for writable catalog make copy in dir_temp_ that can be modified
+  if (UseLocalCache()) {
+    const std::string cache_path = *catalog_path;
+    const std::string tmp_path = CopyCatalogToTempFile(cache_path);
+    *catalog_path=tmp_path;
+  }
+  *catalog_hash = effective_hash;
+  return kLoadNew;
+}
+	
 SimpleCatalogManager::SimpleCatalogManager(
     const shash::Any &base_hash,
     const std::string &stratum0,
