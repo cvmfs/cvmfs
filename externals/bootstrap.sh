@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
-set -e
+set -x
+set -euo pipefail
 
 CRYPTO_VERSION=3.5.3
 IPADDRESS_VERSION=1.0.22
@@ -206,14 +207,14 @@ build_lib() {
 
 # Build a list of libs that need to be built
 # Check if BUILTIN_EXTERNALS_LIST is set and override missing_libs
-if [ x"$BUILTIN_EXTERNALS_LIST" != x"" ] && ! echo ";${BUILTIN_EXTERNALS_LIST};" | grep -qE ";(libarchive|vjson);"; then
+if [[ "${BUILTIN_EXTERNALS_LIST:-}" != "" ]] && ! echo ";${BUILTIN_EXTERNALS_LIST:-};" | grep -qE ";(libarchive|vjson);"; then
     # Convert semicolon-separated list to space-separated
-    missing_libs=$(echo "$BUILTIN_EXTERNALS_LIST" | tr ';' ' ')
+    missing_libs=$(echo "${BUILTIN_EXTERNALS_LIST:-}" | tr ';' ' ')
     echo "Bootstrap - Using custom externals list: $missing_libs"
 else
     missing_libs="libcrypto"
 
-    if [ x"$BUILD_GATEWAY" != x ] || [ x"$BUILD_DUCC" != x ] || [ x"$BUILD_SNAPSHOTTER" != x ]; then
+    if [[ "${BUILD_GATEWAY:-}" != '' ]] || [[ "${BUILD_DUCC:-}" != '' ]] || [[ "${BUILD_SNAPSHOTTER:-}" != '' ]]; then
         required_go_minor_version="23"
         if [ -n "$(command -v go)" ]; then
           go_minor_version=`go version | { read _ _ v _; echo ${v#go}; } | cut -d '.' -f2`
@@ -229,9 +230,9 @@ else
 fi
 
 # Apply exclusions if BUILTIN_EXTERNALS_EXCLUDE is set
-if [ x"$BUILTIN_EXTERNALS_EXCLUDE" != x"" ] && ! echo ";${BUILTIN_EXTERNALS_EXCLUDE};" | grep -qE ";(libarchive|json);"; then
+if ! echo ";${BUILTIN_EXTERNALS_EXCLUDE:-};" | grep -qE ";(libarchive|json);"; then
     # Convert semicolon-separated list to space-separated
-    exclude_libs=$(echo "$BUILTIN_EXTERNALS_EXCLUDE" | tr ';' ' ')
+    exclude_libs=$(echo "${BUILTIN_EXTERNALS_EXCLUDE:-}" | tr ';' ' ')
     echo "Bootstrap - Excluding libraries: $exclude_libs"
 
     # Remove each excluded library from missing_libs
@@ -245,6 +246,7 @@ if [ x"$BUILTIN_EXTERNALS_EXCLUDE" != x"" ] && ! echo ";${BUILTIN_EXTERNALS_EXCL
     echo "Bootstrap - Final externals list after exclusions: $missing_libs"
 fi
 
+existing_libs=
 if [ -f $externals_install_dir/.bootstrapDone ]; then
   existing_libs=$(cat $externals_install_dir/.bootstrapDone)
   for l in $existing_libs; do
@@ -279,11 +281,11 @@ mkdir -p $externals_install_dir/include
 mkdir -p $externals_install_dir/lib
 
 rm -f $externals_install_dir/.bootstrapDone
-for l in $existing_libs; do
+for l in ${existing_libs:-}; do
   echo $l >> $externals_install_dir/.bootstrapDone
 done
 
-if [ x"$missing_libs" != x ]; then
+if [[ "$missing_libs" != '' ]]; then
   echo "Building libraries: $missing_libs"
 fi
 

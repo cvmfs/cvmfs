@@ -283,7 +283,7 @@ if (BUILTIN_EXTERNALS)
 
     message (STATUS "running bootstrap.sh ...")
     execute_process (
-      COMMAND           sh ${CMAKE_SOURCE_DIR}/externals/bootstrap.sh
+      COMMAND           ${CMAKE_SOURCE_DIR}/externals/bootstrap.sh
       WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
       RESULT_VARIABLE   BOOTSTRAPPING_RESULT
     )
