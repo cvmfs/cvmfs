@@ -125,4 +125,60 @@ class SmallhashFilter : public AbstractHashFilter {
   bool frozen_;
 };
 
+
+//------------------------------------------------------------------------------
+
+
+/**
+ * Thread-safe AbstractHashFilter backed by MultiHash with per-shard locks.
+ */
+class ShardedHashFilter : public AbstractHashFilter {
+ public:
+  ShardedHashFilter() {
+    // zero_element is MD5("unobtanium")
+    const shash::Any zero_element(
+        shash::kMd5, shash::HexPtr("d61f853acc5a39e01f3906f73e31d256"));
+    // 255 is MultiHash's uint8_t shard-index limit; more shards reduce
+    // lock contention under concurrent access.
+    hashmap_.Init(255, zero_element, &ShardedHashFilter::hasher);
+  }
+
+  void Fill(const shash::Any &hash) { hashmap_.Insert(hash, true); }
+
+  bool Contains(const shash::Any &hash) const {
+    return hashmap_.Contains(hash);
+  }
+
+  /**
+   * Atomically checks if the hash is present; if not, inserts it.  Returns
+   * true if the hash was already present (duplicate).
+   */
+  bool ContainsOrInsert(const shash::Any &hash) {
+    return hashmap_.ContainsOrInsert(hash, true);
+  }
+
+  void Freeze() { }
+
+  /// Sum of per-shard sizes; takes all shard locks in turn, so the result
+  /// is only a snapshot and may be stale under concurrent mutation.
+  size_t Count() const {
+    uint32_t sizes[255];
+    hashmap_.GetSizes(sizes);
+    size_t total = 0;
+    for (uint32_t i = 0; i < hashmap_.num_hashmaps(); ++i) {
+      total += sizes[i];
+    }
+    return total;
+  }
+
+ private:
+  static uint32_t hasher(const shash::Any &key) {
+    // Don't start with the first bytes, because == is using them as well
+    return static_cast<uint32_t>(
+        *(reinterpret_cast<const uint32_t *>(key.digest) + 1));
+  }
+
+  MultiHash<shash::Any, bool> hashmap_;
+};
+
 #endif  // CVMFS_GARBAGE_COLLECTION_HASH_FILTER_H_
