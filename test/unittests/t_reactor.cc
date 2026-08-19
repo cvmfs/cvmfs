@@ -4,6 +4,8 @@
 
 #include <gtest/gtest.h>
 
+#include <memory>
+
 #include "crypto/hash.h"
 #include "json_document.h"
 #include "json_document_write.h"
@@ -14,7 +16,6 @@
 #include "repository_tag.h"
 #include "util/concurrency.h"
 #include "util/logging.h"
-#include "util/pointer.h"
 #include "util/string.h"
 
 using namespace receiver;  // NOLINT
@@ -70,9 +71,7 @@ class MockedReactor : public Reactor {
     return new MockedPayloadProcessor();
   }
 
-  CommitProcessor *MakeCommitProcessor() {
-    return new MockedCommitProcessor();
-  }
+  CommitProcessor *MakeCommitProcessor() { return new MockedCommitProcessor(); }
 };
 
 class T_Reactor : public ::testing::Test {
@@ -138,8 +137,8 @@ TEST_F(T_Reactor, kGenerateToken_kQuit) {
   std::string reply;
   ASSERT_TRUE(Reactor::ReadReply(from_reactor_[0], &reply));
 
-  UniquePtr<JsonDocument> json_reply(JsonDocument::Create(reply));
-  ASSERT_TRUE(json_reply.IsValid());
+  std::unique_ptr<JsonDocument> json_reply(JsonDocument::Create(reply));
+  ASSERT_TRUE(json_reply.get() != nullptr);
 
   // Send kQuit request
   ASSERT_TRUE(Reactor::WriteRequest(to_reactor_[1], Reactor::kQuit, ""));
@@ -164,8 +163,8 @@ TEST_F(T_Reactor, FullCycle) {
 
   std::string token, public_id, secret;
   {
-    UniquePtr<JsonDocument> json_reply(JsonDocument::Create(reply));
-    ASSERT_TRUE(json_reply.IsValid());
+    std::unique_ptr<JsonDocument> json_reply(JsonDocument::Create(reply));
+    ASSERT_TRUE(json_reply.get() != nullptr);
 
     // Extract the token, public_id and secret from the reply
     const JSON *token_json = JsonDocument::SearchInObject(json_reply->root(),
@@ -191,8 +190,8 @@ TEST_F(T_Reactor, FullCycle) {
   reply.clear();
   ASSERT_TRUE(Reactor::ReadReply(from_reactor_[0], &reply));
   {
-    UniquePtr<JsonDocument> json_reply(JsonDocument::Create(reply));
-    ASSERT_TRUE(json_reply.IsValid());
+    std::unique_ptr<JsonDocument> json_reply(JsonDocument::Create(reply));
+    ASSERT_TRUE(json_reply.get() != nullptr);
 
     // Extract the token, public_id and secret from the reply
     const JSON *id_json = JsonDocument::SearchInObject(json_reply->root(), "id",
@@ -213,8 +212,8 @@ TEST_F(T_Reactor, FullCycle) {
   reply.clear();
   ASSERT_TRUE(Reactor::ReadReply(from_reactor_[0], &reply));
   {
-    UniquePtr<JsonDocument> json_reply(JsonDocument::Create(reply));
-    ASSERT_TRUE(json_reply.IsValid());
+    std::unique_ptr<JsonDocument> json_reply(JsonDocument::Create(reply));
+    ASSERT_TRUE(json_reply.get() != nullptr);
 
     // Extract the token, public_id and secret from the reply
     const JSON *path_json = JsonDocument::SearchInObject(json_reply->root(),
@@ -286,18 +285,18 @@ TEST_F(T_Reactor, CommitForwardsDeleteTags) {
   request_terms.Add("tag_description", "");
   request_terms.Add("delete_tags", "old_tag1 old_tag2");
   // HandleCommit now requires a lease_expiration field; use a far-future
-  // deadline (year 2100) so the re-check in Process() does not trip in the mock.
+  // deadline (year 2100) so the re-check in Process() does not trip in the
+  // mock.
   request_terms.Add("lease_expiration", static_cast<int64_t>(4102444800LL));
   const std::string request = request_terms.GenerateString();
 
-  ASSERT_TRUE(
-      Reactor::WriteRequest(to_reactor_[1], Reactor::kCommit, request));
+  ASSERT_TRUE(Reactor::WriteRequest(to_reactor_[1], Reactor::kCommit, request));
 
   std::string reply;
   ASSERT_TRUE(Reactor::ReadReply(from_reactor_[0], &reply));
   {
-    UniquePtr<JsonDocument> json_reply(JsonDocument::Create(reply));
-    ASSERT_TRUE(json_reply.IsValid());
+    std::unique_ptr<JsonDocument> json_reply(JsonDocument::Create(reply));
+    ASSERT_TRUE(json_reply.get() != nullptr);
     const JSON *status_json = JsonDocument::SearchInObject(
         json_reply->root(), "status", JSON_STRING);
     ASSERT_TRUE(status_json);

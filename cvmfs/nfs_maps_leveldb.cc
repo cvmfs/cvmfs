@@ -20,6 +20,7 @@
 
 #include <cassert>
 #include <cstddef>
+#include <memory>
 
 #include "leveldb/cache.h"
 #include "leveldb/db.h"
@@ -28,7 +29,6 @@
 #include "util/concurrency.h"
 #include "util/exception.h"
 #include "util/logging.h"
-#include "util/pointer.h"
 #include "util/posix.h"
 #include "util/smalloc.h"
 
@@ -103,12 +103,12 @@ NfsMapsLeveldb *NfsMapsLeveldb::Create(const string &leveldb_dir,
                                        const bool rebuild,
                                        perf::Statistics *statistics) {
   assert(root_inode > 0);
-  UniquePtr<NfsMapsLeveldb> maps(new NfsMapsLeveldb());
+  std::unique_ptr<NfsMapsLeveldb> maps(new NfsMapsLeveldb());
   maps->n_db_added_ = statistics->Register("nfs.leveldb.n_added",
                                            "total number of issued inode");
 
   maps->root_inode_ = root_inode;
-  maps->fork_aware_env_ = new ForkAwareEnv(maps.weak_ref());
+  maps->fork_aware_env_ = new ForkAwareEnv(maps.get());
   leveldb::Status status;
   leveldb::Options leveldb_options;
   leveldb_options.create_if_missing = true;
@@ -169,7 +169,7 @@ NfsMapsLeveldb *NfsMapsLeveldb::Create(const string &leveldb_dir,
 
   maps->fork_aware_env_->WaitForBGThreads();
 
-  return maps.Release();
+  return maps.release();
 }
 
 void NfsMapsLeveldb::SetInodeResidue(unsigned residue_class,

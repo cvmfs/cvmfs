@@ -43,6 +43,7 @@
 #include <cstring>
 #include <limits>
 #include <map>
+#include <memory>
 #include <set>
 #include <string>
 #include <vector>
@@ -55,7 +56,6 @@
 #include "util/concurrency.h"
 #include "util/exception.h"
 #include "util/logging.h"
-#include "util/pointer.h"
 #include "util/posix.h"
 #include "util/smalloc.h"
 #include "util/string.h"
@@ -1253,9 +1253,9 @@ int PosixQuotaManager::MainCacheManager(int argc, char **argv) {
     assert(SetLimitCore(0));
   }
 
-  const UniquePtr<Watchdog> watchdog(
+  const std::unique_ptr<Watchdog> watchdog(
       Watchdog::Create(NULL, false /* needs_read_environ */));
-  assert(watchdog.IsValid());
+  assert(watchdog.get() != nullptr);
   watchdog->Spawn("./stacktrace.cachemgr");
 
   // Initialize pipe, open non-blocking as cvmfs is not yet connected
@@ -1399,8 +1399,9 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
 
     // Register a new mountpoint
     if (command_type == kRegisterMountpoint) {
-      const std::string mountpoint(&description_buffer[num_commands*kMaxDescription],
-                             command_buffer[num_commands].desc_length);
+      const std::string mountpoint(
+          &description_buffer[num_commands * kMaxDescription],
+          command_buffer[num_commands].desc_length);
       quota_mgr->mountpoints_.push_back(mountpoint);
       LogCvmfs(kLogQuota, kLogDebug | kLogSyslog,
                "Mountpoint %s registered in the group", mountpoint.c_str());
@@ -1409,7 +1410,11 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
 
     // Set Cleanup Policy
     if (command_type == kSetCleanupPolicy) {
-      quota_mgr->cleanup_unused_first_ = (description_buffer[num_commands * kMaxDescription] == 'S') ? true : false;
+      quota_mgr->cleanup_unused_first_ = (description_buffer[num_commands
+                                                             * kMaxDescription]
+                                          == 'S')
+                                             ? true
+                                             : false;
       continue;
     }
     // Mountpoints are returned immediately
@@ -2403,4 +2408,3 @@ std::vector<shash::Short> PosixQuotaManager::CollectAllOpenHashes() {
 #endif
   return open_files_;
 }
-

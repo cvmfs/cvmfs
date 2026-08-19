@@ -6,6 +6,7 @@
 #define CVMFS_SWISSKNIFE_MIGRATE_H_
 
 #include <map>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -22,7 +23,6 @@
 #include "util/concurrency.h"
 #include "util/future.h"
 #include "util/logging.h"
-#include "util/pointer.h"
 
 namespace catalog {
 class WritableCatalog;
@@ -401,10 +401,10 @@ class CommandMigrate : public Command {
   std::string nested_catalog_marker_tmp_path_;
   static catalog::DirectoryEntry nested_catalog_marker_;
 
-  UniquePtr<manifest::Manifest> manifest_upstream_;
-  UniquePtr<history::SqliteHistory> history_upstream_;
+  std::unique_ptr<manifest::Manifest> manifest_upstream_;
+  std::unique_ptr<history::SqliteHistory> history_upstream_;
   catalog::Catalog const *root_catalog_;
-  UniquePtr<upload::Spooler> spooler_;
+  std::unique_ptr<upload::Spooler> spooler_;
   PendingCatalogMap pending_catalogs_;
 
   StopWatch catalog_loading_stopwatch_;

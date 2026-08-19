@@ -7,13 +7,13 @@
 
 #include <pthread.h>
 
+#include <memory>
 #include <string>
 #include <vector>
 
 #include "pack.h"
 #include "repository_tag.h"
 #include "util/future.h"
-#include "util/pointer.h"
 #include "util/tube.h"
 
 namespace upload {
@@ -122,7 +122,7 @@ class SessionContext : public SessionContextBase {
  private:
   static void *UploadLoop(void *data);
 
-  UniquePtr<Tube<UploadJob> > upload_jobs_;
+  std::unique_ptr<Tube<UploadJob> > upload_jobs_;
 
   pthread_t worker_;
 

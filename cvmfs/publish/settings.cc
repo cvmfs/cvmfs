@@ -8,6 +8,7 @@
 #include <unistd.h>
 
 #include <cstdlib>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -16,7 +17,6 @@
 #include "publish/except.h"
 #include "publish/repository.h"
 #include "sanitizer.h"
-#include "util/pointer.h"
 #include "util/posix.h"
 #include "util/string.h"
 
@@ -478,7 +478,7 @@ SettingsPublisher *SettingsBuilder::CreateSettingsPublisherFromSession() {
   std::map<std::string, std::string> session_env = GetSessionEnvironment();
   const std::string fqrn = session_env["CVMFS_FQRN"];
 
-  UniquePtr<SettingsPublisher> settings_publisher(
+  std::unique_ptr<SettingsPublisher> settings_publisher(
       new SettingsPublisher(SettingsRepository(fqrn)));
   // TODO(jblomer): work in progress
   settings_publisher->GetTransaction()->SetInEnterSession(true);
@@ -506,7 +506,7 @@ SettingsPublisher *SettingsBuilder::CreateSettingsPublisherFromSession() {
   settings_publisher->GetTransaction()->SetUnionFsType("overlayfs");
   settings_publisher->SetOwner(geteuid(), getegid());
 
-  return settings_publisher.Release();
+  return settings_publisher.release();
 }
 
 void SettingsBuilder::ApplyOptionsFromServerPath(
@@ -614,7 +614,7 @@ SettingsPublisher *SettingsBuilder::CreateSettingsPublisher(
                    EPublish::kFailRepositoryType);
   }
 
-  UniquePtr<SettingsPublisher> settings_publisher(
+  std::unique_ptr<SettingsPublisher> settings_publisher(
       new SettingsPublisher(settings_repository));
 
   try {
@@ -635,7 +635,7 @@ SettingsPublisher *SettingsBuilder::CreateSettingsPublisher(
   ApplyOptionsFromServerPath(*options_mgr_, &*settings_publisher);
 
   // TODO(jblomer): process other parameters
-  return settings_publisher.Release();
+  return settings_publisher.release();
 }
 
 }  // namespace publish

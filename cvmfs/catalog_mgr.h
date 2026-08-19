@@ -94,14 +94,14 @@ struct CatalogContext {
       sqlite_path_("")
       , root_ctlg_revision_(-1ul)
       , root_ctlg_location_(kCtlgNoLocationNeeded)
-      , manifest_ensemble_(NULL) { }
+      , manifest_ensemble_(nullptr) { }
   CatalogContext(const shash::Any &hash, const PathString &mountpoint)
       : hash_(hash)
       , mountpoint_(mountpoint)
       , sqlite_path_("")
       , root_ctlg_revision_(-1ul)
       , root_ctlg_location_(kCtlgNoLocationNeeded)
-      , manifest_ensemble_(NULL) { }
+      , manifest_ensemble_(nullptr) { }
 
   CatalogContext(const shash::Any &hash, const PathString &mountpoint,
                  const RootCatalogLocation location)
@@ -110,7 +110,7 @@ struct CatalogContext {
       , sqlite_path_("")
       , root_ctlg_revision_(-1ul)
       , root_ctlg_location_(location)
-      , manifest_ensemble_(NULL) { }
+      , manifest_ensemble_(nullptr) { }
 
   bool IsRootCatalog() { return mountpoint_.IsEmpty(); }
 
@@ -123,7 +123,7 @@ struct CatalogContext {
   uint64_t root_ctlg_revision() const { return root_ctlg_revision_; }
   RootCatalogLocation root_ctlg_location() const { return root_ctlg_location_; }
   manifest::ManifestEnsemble *manifest_ensemble() const {
-    return manifest_ensemble_.weak_ref();
+    return manifest_ensemble_.get();
   }
 
   void SetHash(shash::Any hash) { hash_ = hash; }
@@ -141,7 +141,8 @@ struct CatalogContext {
    * Gives ownership to CatalogContext
    */
   void TakeManifestEnsemble(manifest::ManifestEnsemble *manifest_ensemble) {
-    manifest_ensemble_ = manifest_ensemble;
+    manifest_ensemble_ = std::unique_ptr<manifest::ManifestEnsemble>(
+        manifest_ensemble);
   }
 
 
@@ -157,7 +158,7 @@ struct CatalogContext {
   // root catalog: location is mandatory for LoadCatalogByHash()
   RootCatalogLocation root_ctlg_location_;
   // root catalog: if location = server mandatory for LoadCatalogByHash()
-  UniquePtr<manifest::ManifestEnsemble> manifest_ensemble_;
+  std::unique_ptr<manifest::ManifestEnsemble> manifest_ensemble_;
 };
 
 inline const char *Code2Ascii(const LoadReturn error) {
@@ -535,4 +536,3 @@ class InodeNfsGenerationAnnotation : public InodeAnnotation {
 #include "catalog_mgr_impl.h"
 
 #endif  // CVMFS_CATALOG_MGR_H_
-

@@ -8,13 +8,13 @@
 #include <pthread.h>
 
 #include <cassert>
+#include <memory>
 
 #include "authz/authz_session.h"
 #include "crypto/openssl_version.h"
 #include "duplex_curl.h"
 #include "util/concurrency.h"
 #include "util/logging.h"
-#include "util/pointer.h"
 
 using namespace std;  // NOLINT
 
@@ -160,9 +160,9 @@ bool AuthzAttachment::ConfigureCurlHandle(CURL *curl_handle,
   curl_easy_setopt(curl_handle, CURLOPT_FORBID_REUSE, 1);
   curl_easy_setopt(curl_handle, CURLOPT_SSL_SESSIONID_CACHE, 0);
 
-  const UniquePtr<AuthzToken> token(
+  const std::unique_ptr<AuthzToken> token(
       authz_session_manager_->GetTokenCopy(pid, membership_));
-  if (!token.IsValid()) {
+  if (token.get() == nullptr) {
     LogCvmfs(kLogAuthz, kLogDebug, "failed to get authz token for pid %d", pid);
     return false;
   }
@@ -200,7 +200,7 @@ bool AuthzAttachment::ConfigureCurlHandle(CURL *curl_handle,
     return false;
   }
 
-  UniquePtr<sslctx_info> parm(new sslctx_info);
+  std::unique_ptr<sslctx_info> parm(new sslctx_info);
 
   STACK_OF(X509_INFO) *sk = NULL;
   STACK_OF(X509) *certstack = sk_X509_new_null();
@@ -278,7 +278,7 @@ bool AuthzAttachment::ConfigureCurlHandle(CURL *curl_handle,
 
   AuthzToken *to_return = new AuthzToken();
   to_return->type = kTokenX509;
-  to_return->data = static_cast<void *>(parm.Release());
+  to_return->data = static_cast<void *>(parm.release());
   curl_easy_setopt(curl_handle, CURLOPT_SSL_CTX_DATA,
                    static_cast<sslctx_info *>(to_return->data));
   *info_data = to_return;

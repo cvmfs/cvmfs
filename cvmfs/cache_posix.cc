@@ -33,6 +33,8 @@
 #include <pthread.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+
+#include <memory>
 #ifndef __APPLE__
 #include <sys/statfs.h>
 #endif
@@ -43,6 +45,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+
 #include "crypto/hash.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
@@ -298,9 +301,9 @@ PosixCacheManager *PosixCacheManager::Create(
     const string &cache_path, const bool alien_cache,
     const RenameWorkarounds rename_workaround, const bool do_refcount,
     const bool cleanup_unused_first) {
-  UniquePtr<PosixCacheManager> cache_manager(new PosixCacheManager(
+  std::unique_ptr<PosixCacheManager> cache_manager(new PosixCacheManager(
       cache_path, alien_cache, do_refcount, cleanup_unused_first));
-  assert(cache_manager.IsValid());
+  assert(cache_manager.get() != nullptr);
 
   cache_manager->rename_workaround_ = rename_workaround;
 
@@ -309,7 +312,7 @@ PosixCacheManager *PosixCacheManager::Create(
     return NULL;
   }
 
-  return cache_manager.Release();
+  return cache_manager.release();
 }
 
 
@@ -341,7 +344,7 @@ string PosixCacheManager::Describe() {
 void *PosixCacheManager::DoSaveState() {
   if (do_refcount_) {
     SavedState *state = new SavedState();
-    state->fd_mgr = fd_mgr_->Clone();
+    state->fd_mgr = std::unique_ptr<FdRefcountMgr>(fd_mgr_->Clone());
     return state;
   }
   char *c = reinterpret_cast<char *>(smalloc(1));
@@ -359,7 +362,7 @@ int PosixCacheManager::DoRestoreState(void *data) {
                "Restoring refcount cache manager from "
                "refcounted posix cache manager");
 
-      fd_mgr_->AssignFrom(state->fd_mgr.weak_ref());
+      fd_mgr_->AssignFrom(state->fd_mgr.get());
     } else {
       LogCvmfs(kLogCache, kLogDebug,
                "Restoring refcount cache manager from "
@@ -376,7 +379,7 @@ int PosixCacheManager::DoRestoreState(void *data) {
              "Restoring non-refcount cache manager from "
              "refcounted posix cache manager - this "
              " is not possible, keep refcounting.");
-    fd_mgr_->AssignFrom(state->fd_mgr.weak_ref());
+    fd_mgr_->AssignFrom(state->fd_mgr.get());
     do_refcount_ = true;
   }
   return -1;
@@ -682,4 +685,3 @@ int64_t PosixCacheManager::Write(const void *buf, uint64_t size, void *txn) {
   transaction->size += written;
   return written;
 }
-

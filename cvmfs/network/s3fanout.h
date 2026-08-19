@@ -11,6 +11,7 @@
 #include <climits>
 #include <cstdlib>
 #include <map>
+#include <memory>
 #include <set>
 #include <string>
 #include <utility>
@@ -21,7 +22,6 @@
 #include "ssl.h"
 #include "util/concurrency.h"
 #include "util/file_backed_buffer.h"
-#include "util/pointer.h"
 #include "util/prng.h"
 #include "util/single_copy.h"
 #include "util/smalloc.h"
@@ -103,12 +103,12 @@ struct JobInfo : SingleCopy {
     kReqPutHtml,       // HTML file - display instead of downloading
     kReqPutBucket,     // bucket creation
     kReqDelete,
-    kReqDeleteMulti,   // S3 multi-object delete (POST /?delete)
+    kReqDeleteMulti,  // S3 multi-object delete (POST /?delete)
   };
 
   const std::string object_key;
   void *callback;  // Callback to be called when job is finished
-  UniquePtr<FileBackedBuffer> origin;
+  std::unique_ptr<FileBackedBuffer> origin;
 
   // One constructor per destination
   JobInfo(const std::string &object_key,
@@ -235,7 +235,8 @@ class S3FanoutManager : SingleCopy {
   static const char *kCacheControlCas;          // Cache-Control: max-age=259200
   static const unsigned kLowSpeedLimit = 1024;  // Require at least 1kB/s
 
-  std::string MkDotCvmfsCacheControlHeader(unsigned defaultMaxAge=61, int overrideMaxAge=-1);
+  std::string MkDotCvmfsCacheControlHeader(unsigned defaultMaxAge = 61,
+                                           int overrideMaxAge = -1);
 
   static int CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
                                 void *userp, void *socketp);
@@ -347,7 +348,7 @@ class S3FanoutManager : SingleCopy {
    */
   SslCertificateStore ssl_certificate_store_;
 
-  std::string dot_cvmfs_cache_control_header;           // Cache-Control: max-age=...
+  std::string dot_cvmfs_cache_control_header;  // Cache-Control: max-age=...
 };  // S3FanoutManager
 
 std::string MkV2CanonicalResource(const std::string &bucket,

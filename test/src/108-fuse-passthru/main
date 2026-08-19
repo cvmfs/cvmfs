@@ -1,7 +1,7 @@
 #!/bin/sh
 cvmfs_test_name="fuse-passthru"
 cvmfs_test_autofs_on_startup=false
-cvmfs_test_suites=""
+cvmfs_test_suites="quick"
 
 cleanup() {
   true

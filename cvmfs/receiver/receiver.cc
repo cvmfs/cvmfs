@@ -123,7 +123,7 @@ int main(int argc, char **argv) {
   SetLogDebugFile(debug_log);
 
   // Spawn monitoring process (watchdog)
-  UniquePtr<Watchdog> watchdog;
+  std::unique_ptr<Watchdog> watchdog;
   if (watchdog_out_dir != "") {
     if (!MkdirDeep(watchdog_out_dir, 0755)) {
       LogCvmfs(kLogReceiver, kLogSyslogErr | kLogStderr,
@@ -132,8 +132,8 @@ int main(int argc, char **argv) {
       return 1;
     }
     const std::string timestamp = GetGMTimestamp("%Y.%m.%d-%H.%M.%S");
-    watchdog = Watchdog::Create(NULL, false /* needs_read_environ */);
-    if (watchdog.IsValid() == false) {
+    watchdog.reset(Watchdog::Create(NULL, false /* needs_read_environ */));
+    if (watchdog.get() == nullptr) {
       LogCvmfs(kLogReceiver, kLogSyslogErr | kLogStderr,
                "Failed to initialize watchdog");
       return 1;

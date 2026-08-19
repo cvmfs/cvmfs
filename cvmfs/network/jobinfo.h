@@ -11,6 +11,7 @@
 #include <unistd.h>
 
 #include <cstdio>
+#include <memory>
 #include <string>
 
 #include "compression/compression.h"
@@ -19,7 +20,6 @@
 #include "network/network_errors.h"
 #include "network/sink.h"
 #include "util/pipe.h"
-#include "util/pointer.h"
 #include "util/tube.h"
 
 class InterruptCue;
@@ -65,10 +65,10 @@ class JobInfo {
   static atomic_int64 next_uuid;
   int64_t id_;
   /// Pipe used for the return value
-  UniquePtr<Pipe<kPipeDownloadJobsResults> > pipe_job_results;
+  std::unique_ptr<Pipe<kPipeDownloadJobsResults> > pipe_job_results;
   /// Tube (bounded thread-safe queue) to transport data from CURL callback
   /// to be decompressed in Fetch() instead of MainDownload()
-  UniquePtr<Tube<DataTubeElement> > data_tube_;
+  std::unique_ptr<Tube<DataTubeElement> > data_tube_;
   const std::string *url_;
   bool compressed_;
   bool probe_hosts_;
@@ -130,24 +130,26 @@ class JobInfo {
   JobInfo(const std::string *u, const bool ph);
 
   ~JobInfo() {
-    pipe_job_results.Destroy();
-    data_tube_.Destroy();
+    pipe_job_results.reset();
+    data_tube_.reset();
   }
 
   static bool EscapeUrlChar(unsigned char input, char output[3]);
 
   void CreatePipeJobResults() {
-    pipe_job_results = new Pipe<kPipeDownloadJobsResults>();
+    pipe_job_results = std::unique_ptr<Pipe<kPipeDownloadJobsResults> >(
+        new Pipe<kPipeDownloadJobsResults>());
   }
 
-  bool IsValidPipeJobResults() { return pipe_job_results.IsValid(); }
+  bool IsValidPipeJobResults() { return pipe_job_results.get() != nullptr; }
 
   void CreateDataTube() {
     // TODO(heretherebedragons) change to weighted queue
-    data_tube_ = new Tube<DataTubeElement>(500);
+    data_tube_ = std::unique_ptr<Tube<DataTubeElement> >(
+        new Tube<DataTubeElement>(500));
   }
 
-  bool IsValidDataTube() { return data_tube_.IsValid(); }
+  bool IsValidDataTube() { return data_tube_.get() != nullptr; }
 
   /**
    * Tells whether the error is because of a non-existing file. Should only
@@ -166,9 +168,9 @@ class JobInfo {
   CURL **GetCurlHandle() { return &curl_handle_; }
   shash::ContextPtr *GetHashContextPtr() { return &hash_context_; }
   Pipe<kPipeDownloadJobsResults> *GetPipeJobResultPtr() {
-    return pipe_job_results.weak_ref();
+    return pipe_job_results.get();
   }
-  Tube<DataTubeElement> *GetDataTubePtr() { return data_tube_.weak_ref(); }
+  Tube<DataTubeElement> *GetDataTubePtr() { return data_tube_.get(); }
 
   const std::string *url() const { return url_; }
   bool compressed() const { return compressed_; }
