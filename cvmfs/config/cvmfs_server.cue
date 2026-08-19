@@ -3,23 +3,16 @@
 // Field forms:
 //   NAME: T             required
 //   NAME?: T            optional
-//   NAME: T | *default  optional; carries a default because a dependency rule reads it
-//                       ("", 0 and false stand for "unset"; null where an
-//                       explicitly configured false must stay distinguishable)
+//   NAME: T | *default  optional; carries a default value
 
 package cvmfs
 
-// Switch parameters are booleans; the validator accepts yes/on/1/true and
-// no/off/0/false (case-insensitively) and maps them to true/false.
-
 #FQRN: =~"^[a-z0-9][a-z0-9.-]*\\.[a-z0-9-]+$"
 
-// Comma-separated list of fully qualified repository names.
-#FQRNList: =~"^[a-z0-9][a-z0-9.-]*\\.[a-z0-9-]+(,[a-z0-9][a-z0-9.-]*\\.[a-z0-9-]+)*$"
-#AbsPath:  =~"^/"
+#AbsPath:  =~"^/(?:[^/]+/)*[^/]*$"
 
 // Colon-separated list of absolute paths (files or directories).
-#AbsPathList: =~"^/[^:]*(:/[^:]*)*$"
+#AbsPathList: =~"^/(?:[^/:]+/)*[^/:]*(?::/(?:[^/:]+/)*[^/:]*)*$"
 
 // Unsigned integer, 0 allowed.
 #UInt: int & >=0
@@ -30,15 +23,13 @@ package cvmfs
 // Signed integer.
 #Int: int
 
-// Comma-separated list of unsigned integers.
-#UIntList: =~"^[0-9]+(,[0-9]+)*$"
-
-#IPv4: =~"^((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\\.){3}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$"
-#IPv6: =~"^(([0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4}|([0-9A-Fa-f]{1,4}:){1,7}:|([0-9A-Fa-f]{1,4}:){1,6}:[0-9A-Fa-f]{1,4}|([0-9A-Fa-f]{1,4}:){1,5}(:[0-9A-Fa-f]{1,4}){1,2}|([0-9A-Fa-f]{1,4}:){1,4}(:[0-9A-Fa-f]{1,4}){1,3}|([0-9A-Fa-f]{1,4}:){1,3}(:[0-9A-Fa-f]{1,4}){1,4}|([0-9A-Fa-f]{1,4}:){1,2}(:[0-9A-Fa-f]{1,4}){1,5}|[0-9A-Fa-f]{1,4}:(:[0-9A-Fa-f]{1,4}){1,6}|:((:[0-9A-Fa-f]{1,4}){1,7}|:))$"
+#IPv4: =~"^((25[0-5]|(2[0-4]|1\\d|[1-9]|)\\d)\\.?\\b){4}$"
+#IPv6: =~"^((([0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4}|([0-9A-Fa-f]{1,4}:){1,7}:|([0-9A-Fa-f]{1,4}:){1,6}:[0-9A-Fa-f]{1,4}|([0-9A-Fa-f]{1,4}:){1,5}(:[0-9A-Fa-f]{1,4}){1,2}|([0-9A-Fa-f]{1,4}:){1,4}(:[0-9A-Fa-f]{1,4}){1,3}|([0-9A-Fa-f]{1,4}:){1,3}(:[0-9A-Fa-f]{1,4}){1,4}|([0-9A-Fa-f]{1,4}:){1,2}(:[0-9A-Fa-f]{1,4}){1,5}|[0-9A-Fa-f]{1,4}:(:[0-9A-Fa-f]{1,4}){1,6}|:((:[0-9A-Fa-f]{1,4}){1,7}|:))|(([0-9A-Fa-f]{1,4}:){6}|::([0-9A-Fa-f]{1,4}:){0,5}|([0-9A-Fa-f]{1,4}:){1}:([0-9A-Fa-f]{1,4}:){0,4}|([0-9A-Fa-f]{1,4}:){2}:([0-9A-Fa-f]{1,4}:){0,3}|([0-9A-Fa-f]{1,4}:){3}:([0-9A-Fa-f]{1,4}:){0,2}|([0-9A-Fa-f]{1,4}:){4}:([0-9A-Fa-f]{1,4}:){0,1}|([0-9A-Fa-f]{1,4}:){5}:)((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\\.){3}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9]))$"
 #IP:   #IPv4 | #IPv6
 
-// RFC 1123 hostname (also matches IPv4 literals).
-#Hostname: =~"^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?(\\.[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$"
+// RFC 1123 hostname. A label may start with a digit, but the last one must
+// be alphabetic, so dotted-decimal and bare numbers are not hostnames.
+#Hostname: =~"^([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.)*[A-Za-z]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?$"
 #Host:     #Hostname | #IP
 
 // TCP port, 1-65535.
@@ -47,15 +38,8 @@ package cvmfs
 // Single HTTP(S) URL; no whitespace or chain separators allowed.
 #URL: =~"(?i)^https?://[^ \\t;|,]+$"
 
-// Chain of HTTP(S) URLs: ';' separates failover groups,
-// '|' separates load-balanced members within a group.
-#URLChain: =~"(?i)^https?://[^ \\t;|]+([;|]https?://[^ \\t;|]+)*$"
-
-// Proxy chain: ';' separates failover groups, '|' load-balanced members.
-// An entry is DIRECT (no proxy), auto (WPAD/PAC discovery, wpad.cc) or a
-// proxy address with optional scheme and port.
+// DIRECT, auto (WPAD/PAC discovery) or an address with optional scheme/port.
 _#proxyEntry: "(DIRECT|auto|(https?://)?[A-Za-z0-9._-]+(:[0-9]{1,5})?)"
-#ProxyChain:  =~"(?i)^\(_#proxyEntry)([;|]\(_#proxyEntry))*$"
 
 // Date threshold as understood by `date -d`, e.g. "3 days ago".
 #TimeSpan: =~"^[0-9]+ +(second|minute|hour|day|week|month|year)s? +ago$"
@@ -63,12 +47,7 @@ _#proxyEntry: "(DIRECT|auto|(https?://)?[A-Za-z0-9._-]+(:[0-9]{1,5})?)"
 // POSIX user name.
 #UserName: =~"^[A-Za-z_][A-Za-z0-9._-]*$"
 
-// Cache quota in MB; -1 means unlimited.
-#QuotaLimit: int & >=-1
-
-// ===========================================================================
 // Server configuration
-// ===========================================================================
 
 #ServerConfig: {
 	CVMFS_AUTO_GC: bool | *false @description("Enables the automatic garbage collection on publish and snapshot.")
@@ -78,11 +57,11 @@ _#proxyEntry: "(DIRECT|auto|(https?://)?[A-Za-z0-9._-]+(:[0-9]{1,5})?)"
 	CVMFS_AUTO_TAG?: bool @description("Creates a generic revision tag for each published revision (if set to true).")
 	CVMFS_AUTO_TAG_TIMESPAN?: #TimeSpan @description("Date-threshold for automatic tags, after which auto tags get removed (for example: \"4 days ago\").")
 	CVMFS_AUTOCATALOGS?: bool @description("Enable/disable automatic catalog management using autocatalogs.")
-	CVMFS_AUTOCATALOGS_MAX_WEIGHT: #PosInt | *0 @description("Maximum number of entries in an autocatalog to be considered overflowed. Default value: 100000 (see also CVMFS_AUTOCATALOGS).")
-	CVMFS_AUTOCATALOGS_MIN_WEIGHT: #PosInt | *0 @description("Minimum number of entries in an autocatalog to be considered underflowed. Default value: 1000 (see also CVMFS_AUTOCATALOGS).")
+	CVMFS_AUTOCATALOGS_MAX_WEIGHT: #PosInt | *100000 @description("Maximum number of entries in an autocatalog to be considered overflowed. Default value: 100000 (see also CVMFS_AUTOCATALOGS).")
+	CVMFS_AUTOCATALOGS_MIN_WEIGHT: #PosInt | *1000 @description("Minimum number of entries in an autocatalog to be considered underflowed. Default value: 1000 (see also CVMFS_AUTOCATALOGS).")
 	CVMFS_AVG_CHUNK_SIZE: #PosInt | *8388608 @description("Desired Average size of a file chunk in bytes (see also CVMFS_USE_FILE_CHUNKING).")
 	CVMFS_CATALOG_ALT_PATHS?: bool @description("Enable/disable generation of catalog bootstrapping shortcuts during publishing. (Useful when backend directory /data is not publicly accessible)")
-	CVMFS_CHECK_ALL_MIN_DAYS?: #UInt @description("Minimum number of days between checking each repository with `cvmfs_server check -a`. Default value: 30.")
+	CVMFS_CHECK_ALL_MIN_DAYS: #UInt | *30 @description("Minimum number of days between checking each repository with `cvmfs_server check -a`. Default value: 30.")
 	CVMFS_COMPRESSION_ALGORITHM?: "default" | "zlib" | "none" @description("Compression algorithm to be used during publishing (currently either 'default' or 'none'; \"zlib\" is accepted as an alias of \"default\", compression.cc).")
 	CVMFS_CREATOR_VERSION: =~"^[0-9]+(\\.[0-9]+(\\.[0-9]+)?)?(-[0-9]+)?$" @description("The CernVM-FS version that was used to create this repository (do not change manually).")
 	CVMFS_DONT_CHECK_OVERLAYFS_VERSION?: string @description("Disable checking of OverlayFS version before usage. (see Requirements for a new Repository) Presence-only; any value disables the check (cvmfs_server_util.sh).")
@@ -90,7 +69,7 @@ _#proxyEntry: "(DIRECT|auto|(https?://)?[A-Za-z0-9._-]+(:[0-9]{1,5})?)"
 	CVMFS_ENFORCE_LIMITS?: bool @description("Set to true to cause exceeding *LIMIT variables to be fatal to a publish instead of a warning.")
 	CVMFS_EXTENDED_GC_STATS?: bool @description("Set to true to keep track of the volume of garbage collected files (increases GC running time).")
 	CVMFS_EXTERNAL_DATA?: bool @description("Set to true to mark repository to contain external data that is served from an external HTTP server.")
-	CVMFS_FILE_MBYTE_LIMIT?: #PosInt @description("Maximum number of megabytes for a published file, default value: 1024 (see also CVMFS_ENFORCE_LIMITS).")
+	CVMFS_FILE_MBYTE_LIMIT: #PosInt | *1024 @description("Maximum number of megabytes for a published file, default value: 1024 (see also CVMFS_ENFORCE_LIMITS).")
 	CVMFS_FORCE_REMOUNT_WARNING?: bool @description("Enable/disable warning through wall and grace period before forcefully remounting a CernVM-FS repository on the release manager machine.")
 	CVMFS_GARBAGE_COLLECTION: "true" | "false" | *"" @description("Enables repository garbage collection (Stratum 0 only, if set to true).")
 	CVMFS_GC_DELETION_LOG?: #AbsPath @description("Log file path to track all garbage collected objects during sweeping for bookkeeping or debugging.")
@@ -116,7 +95,7 @@ _#proxyEntry: "(DIRECT|auto|(https?://)?[A-Za-z0-9._-]+(:[0-9]{1,5})?)"
 	CVMFS_SNAPSHOT_GROUP?: =~"^[A-Za-z0-9_-]+$" @description("Group name for subset of repositories used with `cvmfs_server snapshot -a -g`. Added with `cvmfs_server add-replica -g`.")
 	CVMFS_SPOOL_DIR: #AbsPath @description("Location of the upstream spooler scratch directories; the read-only CernVM-FS mount point and copy-on-write storage reside here.")
 	CVMFS_STATISTICS_DB?: #AbsPath @description("Set a custom path for the publisher statistics database.")
-	CVMFS_STATS_DB_DAYS_TO_KEEP?: #UInt @description("Sets the pruning interval for the publisher statistics database (365 by default).")
+	CVMFS_STATS_DB_DAYS_TO_KEEP: #UInt | *365 @description("Sets the pruning interval for the publisher statistics database (365 by default).")
 	CVMFS_STRATUM0: #URL @description("URL of the master copy (stratum0) of this specific repository.")
 	CVMFS_STRATUM1: #URL | *"" @description("URL of the Stratum1 HTTP server for this specific repository.")
 	CVMFS_SYNCFS_LEVEL?: "none" | "default" | "cautious" @description("Controls how often sync will be called by cvmfs_server operations. Possible levels are 'none', 'default', 'cautious'.")
@@ -154,21 +133,21 @@ _#proxyEntry: "(DIRECT|auto|(https?://)?[A-Za-z0-9._-]+(:[0-9]{1,5})?)"
 	X509_CERT_BUNDLE?: #AbsPath @description("Bundle file with CA certificates for HTTPS connections (see Large-Scale Data CernVM-FS).")
 	X509_CERT_DIR?: #AbsPath @description("Directory file with CA certificates for HTTPS connections, defaults to /etc/grid-security/certificates (see Large-Scale Data CernVM-FS).")
 
-	// --- Deprecated --------------------------------------------------
+	// Deprecated
 	CVMFS_GENERATE_LEGACY_BULK_CHUNKS?: bool @description("Deprecated, set to true to enable generation of whole-file objects for large files.")
 	CVMFS_IGNORE_XDIR_HARDLINKS?: bool @description("Deprecated, defaults to true. If cross-directory hardlinks are found, automatically break the hardlinks instead of aborting.")
 
-	// --- Dead: no longer read by any code -----------------------------
+	// Dead: no longer read by any code
 	CVMFS_AUFS_WARNING?: bool @description("The AUFS kernel-deadlock check this guarded was removed in commit 04be280b5 (\"Remove: potential kernel deadlock warning\", 2015). No read site remains anywhere in cvmfs/ or mount/; setting this parameter has no effect.")
 	CVMFS_CATALOG_ENTRY_WARN_THRESHOLD?: #UInt @description("The mechanism this fed (catalog_entry_warn_threshold in swissknife sync, the -j flag, CheckParams' \">10000\" validation) was replaced by CVMFS_ROOT_KCATALOG_LIMIT / CVMFS_NESTED_KCATALOG_LIMIT in commit 87bb14c9e (\"change warn threshold to limits\", 2017); -j was later reused for an unrelated switch (CVMFS_ENABLE_MTIME_NS). Setting this parameter has no effect.")
 
-	// --- Undocumented ----------
+	// Undocumented
 	CVMFS_MASTERKEYCARD_PIN?: string @description("PIN of the master key card, if used.")
 	CVMFS_ASYNC_SCRATCH_CLEANUP?: bool @description("Asynchronous cleanup of the scratch area after publishing.")
 	CVMFS_SERVER_USE_CATALOG_CACHE?: bool @description("Use the catalog cache of the server (params.cc; undocumented).")
 	CVMFS_PASSTHROUGH?: bool @description("Fuse passthrough for the server-side mount (undocumented).")
 	CVMFS_PUBLISH_VERSIONS_IN_META_FILE?: bool @description("Publish CVMFS versions into the repository meta file (undocumented).")
-	CVMFS_GC_DB_BATCH_SIZE?: #Int | *1000 @description("Batch size of the GC SQLite operations (undocumented).")
+	CVMFS_GC_DB_BATCH_SIZE: #Int | *1000 @description("Batch size of the GC SQLite operations (undocumented).")
 	CVMFS_MAX_PARALLEL_SNAPSHOTS?: #PosInt @description("Maximum parallel snapshots in snapshot -a.")
 	CVMFS_PARTIAL_REPLICATION: "true" | "false" | *"" @description("Partial replication of a repository; the scripts compare against the literal string \"true\" (cvmfs_server_snapshot.sh; undocumented).")
 	CVMFS_PARTIAL_REPLICATION_SPEC: #AbsPath | *"" @description("Path of the spec file for partial replication (undocumented).")
@@ -205,39 +184,30 @@ _#proxyEntry: "(DIRECT|auto|(https?://)?[A-Za-z0-9._-]+(:[0-9]{1,5})?)"
 	CVMFS_DEFAULT_MIN_CHUNK_SIZE?:              #PosInt @description("Built-in default for CVMFS_MIN_CHUNK_SIZE, used when the repository sets none (cvmfs_server_coda.sh).")
 	CVMFS_DEFAULT_USE_FILE_CHUNKING?:           bool @description("Built-in default for CVMFS_USE_FILE_CHUNKING, used when the repository sets none (cvmfs_server_coda.sh).")
 
-	// ===================================================================
 	// Cross-parameter dependency rules
-	// ===================================================================
 
 	if CVMFS_AUTO_GC && CVMFS_REPOSITORY_TYPE == "stratum0" {
 		_rule_auto_gc_requires_garbage_collection: true & (CVMFS_GARBAGE_COLLECTION == "true")
 	}
 
-	// Chunk size sanity: MIN <= AVG <= MAX (CUE-only rule; cross-parameter
-	// comparisons aren't expressible in JSON Schema draft-7). Unset values
-	// compare against the defaults cvmfs_server seeds on every publish.
+	// Chunk size sanity: MIN <= AVG <= MAX. Cross-parameter comparisons like
+	// these are the reason for CUE: JSON Schema draft-7 cannot express them.
 	_rule_min_chunk_size_le_avg_chunk_size: true & (CVMFS_MIN_CHUNK_SIZE <= CVMFS_AVG_CHUNK_SIZE)
 	_rule_avg_chunk_size_le_max_chunk_size: true & (CVMFS_AVG_CHUNK_SIZE <= CVMFS_MAX_CHUNK_SIZE)
-	// Autocatalog underflow threshold must not exceed the overflow
-	// threshold (catalog auto-balancing). CUE-only rule, as above.
-	if CVMFS_AUTOCATALOGS_MIN_WEIGHT != 0 && CVMFS_AUTOCATALOGS_MAX_WEIGHT != 0 {
-		_rule_autocatalogs_min_weight_le_max_weight: true & (CVMFS_AUTOCATALOGS_MIN_WEIGHT <= CVMFS_AUTOCATALOGS_MAX_WEIGHT)
-	}
+	// Autocatalog underflow threshold must not exceed the overflow one.
+	_rule_autocatalogs_min_weight_le_max_weight: true & (CVMFS_AUTOCATALOGS_MIN_WEIGHT <= CVMFS_AUTOCATALOGS_MAX_WEIGHT)
 
-	// Replicas always get their Stratum 1 URL written by `cvmfs_server
-	// add-replica` (cvmfs_server_add_replica.sh).
+	// `cvmfs_server add-replica` always writes the Stratum 1 URL.
 	if CVMFS_REPOSITORY_TYPE == "stratum1" {
 		_rule_stratum1_requires_stratum1_url: true & (CVMFS_STRATUM1 != "")
 	}
 
-	// CVMFS_REPLICA_ACTIVE is only evaluated on replicas
-	// (cvmfs_server_common.sh: is_stratum1 gate).
+	// Only evaluated on replicas.
 	if CVMFS_REPLICA_ACTIVE != null {
 		_rule_replica_active_requires_stratum1: true & (CVMFS_REPOSITORY_TYPE == "stratum1")
 	}
 
-	// Partial replication dies without a spec file
-	// (cvmfs_server_snapshot.sh).
+	// Partial replication dies without a spec file.
 	if CVMFS_PARTIAL_REPLICATION == "true" {
 		_rule_partial_replication_requires_spec: true & (CVMFS_PARTIAL_REPLICATION_SPEC != "")
 	}

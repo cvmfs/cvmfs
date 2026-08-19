@@ -41,14 +41,29 @@ var (
 	falseRe   = regexp.MustCompile(`^(?i:no|off|0|false)$`)
 )
 
-// fieldKind returns the type the schema expects for a parameter name.
-func fieldKind(ctx *cue.Context, schema cue.Value, name string) cue.Kind {
-	key := ctx.CompileString(fmt.Sprintf("{%q: _}", name))
-	resolved := schema.Unify(key).LookupPath(cue.MakePath(cue.Str(name)))
-	if !resolved.Exists() {
-		return cue.BottomKind
+// fieldKinds returns the type the schema expects at each parameter name.
+// Collected in one pass, because resolving them one at a time is far too slow.
+func fieldKinds(ctx *cue.Context, schema cue.Value) func(name string) cue.Kind {
+	declared := make(map[string]cue.Kind)
+	if fields, err := schema.Fields(cue.Optional(true)); err == nil {
+		for fields.Next() {
+			declared[fields.Selector().Unquoted()] = fields.Value().IncompleteKind()
+		}
 	}
-	return resolved.IncompleteKind()
+
+	return func(name string) cue.Kind {
+		if kind, ok := declared[name]; ok {
+			return kind
+		}
+
+		// A pattern may still match, e.g. CVMFS_CACHE_<name>_SIZE.
+		key := ctx.CompileString(fmt.Sprintf("{%q: _}", name))
+		resolved := schema.Unify(key).LookupPath(cue.MakePath(cue.Str(name)))
+		if !resolved.Exists() {
+			return cue.BottomKind
+		}
+		return resolved.IncompleteKind()
+	}
 }
 
 // convertLit turns a string value into an int or bool if the schema wants
@@ -78,7 +93,7 @@ func convertLit(lit *ast.BasicLit, kind cue.Kind) {
 
 // convertConfig fixes up every value in the parsed configuration to match
 // the schema, and drops empty ones.
-func convertConfig(ctx *cue.Context, schema cue.Value, expr ast.Expr) {
+func convertConfig(kindOf func(string) cue.Kind, schema cue.Value, expr ast.Expr) {
 	switch expr := expr.(type) {
 	case *ast.StructLit:
 		var kept []ast.Decl
@@ -101,7 +116,7 @@ func convertConfig(ctx *cue.Context, schema cue.Value, expr ast.Expr) {
 			}
 
 			if name, _, err := ast.LabelName(field.Label); err == nil {
-				convertLit(lit, fieldKind(ctx, schema, name))
+				convertLit(lit, kindOf(name))
 			}
 			kept = append(kept, decl)
 		}
@@ -145,12 +160,13 @@ func explain(name, wanted string) int {
 				return 1
 			}
 
+			// A field with a default can be left out too, so it reads optional.
 			status := "required"
 			if fields.IsOptional() {
 				status = "optional"
 			}
 			if deflt, ok := fields.Value().Default(); ok {
-				status += fmt.Sprintf(", default %v", deflt)
+				status = fmt.Sprintf("optional, default %v", deflt)
 			}
 
 			description := "No description available."
@@ -215,7 +231,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "error parsing configuration JSON: %v\n", err)
 		os.Exit(2)
 	}
-	convertConfig(ctx, schema, expr)
+	convertConfig(fieldKinds(ctx, schema), schema, expr)
 
 	config := ctx.BuildExpr(expr)
 	if err := config.Err(); err != nil {

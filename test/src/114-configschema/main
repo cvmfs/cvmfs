@@ -271,15 +271,26 @@ EOF
   check_rule reject _rule_alien_cache_conflicts_with_shared_cache client CVMFS_ALIEN_CACHE=/gpfs/alien CVMFS_SHARED_CACHE=yes CVMFS_QUOTA_LIMIT=-1
   check_rule reject _rule_alien_cache_requires_unmanaged_quota client CVMFS_ALIEN_CACHE=/gpfs/alien CVMFS_SHARED_CACHE=no CVMFS_QUOTA_LIMIT=4000
   check_rule accept - client CVMFS_ALIEN_CACHE=/gpfs/alien CVMFS_SHARED_CACHE=no CVMFS_QUOTA_LIMIT=-1
-  check_rule reject - client CVMFS_STRICT_MOUNT=
-  check_rule reject CVMFS_QUOTA_LIMIT client CVMFS_QUOTA_LIMIT=
-  check_rule reject CVMFS_SHARED_CACHE client CVMFS_SHARED_CACHE=
-  check_rule reject CVMFS_CACHE_BASE client CVMFS_CACHE_BASE=
-  check_rule reject CVMFS_NFILES client CVMFS_NFILES=
-  check_rule reject CVMFS_TIMEOUT client CVMFS_TIMEOUT=
+  # Unset is legal wherever the client itself supplies a built-in default,
+  # whether that default is false or a concrete value.
+  check_rule accept - client CVMFS_STRICT_MOUNT=
+  check_rule accept - client CVMFS_SHARED_CACHE=
+  check_rule accept - client CVMFS_CHECK_PERMISSIONS=
+  check_rule accept - client CVMFS_QUOTA_LIMIT=
+  check_rule accept - client CVMFS_CACHE_BASE=
+  check_rule accept - client CVMFS_NFILES=
+  check_rule accept - client CVMFS_TIMEOUT=
+  check_rule accept - client CVMFS_TIMEOUT_DIRECT=
+  check_rule accept - client CVMFS_MOUNT_DIR=
+  check_rule accept - client CVMFS_RELOAD_SOCKETS=
+  # Only the two parameters the client cannot mount without stay required
+  # (mount.cvmfs.cc: "CVMFS_USER required"; mountpoint.cc: kFailWpad).
   check_rule reject - client CVMFS_USER=
-  check_rule reject _rule_cleanup_nonopenlru_requires_refcount client CVMFS_CACHE_CLEANUP_NONOPENLRU=yes
+  check_rule reject - client CVMFS_HTTP_PROXY=
+  check_rule reject - client CVMFS_SERVER_URL=
+  check_rule accept - client CVMFS_CACHE_CLEANUP_NONOPENLRU=yes
   check_rule accept - client CVMFS_CACHE_CLEANUP_NONOPENLRU=yes CVMFS_CACHE_REFCOUNT=yes
+  check_rule reject _rule_cleanup_nonopenlru_requires_refcount client CVMFS_CACHE_CLEANUP_NONOPENLRU=yes CVMFS_CACHE_REFCOUNT=no
   check_rule reject _rule_nfs_shared_requires_nfs_source client CVMFS_NFS_SHARED=/var/nfsmaps
   check_rule accept - client CVMFS_NFS_SHARED=/var/nfsmaps CVMFS_NFS_SOURCE=yes
   check_rule reject _rule_nfs_interleaved_inodes_require_nfs_source client CVMFS_NFS_INTERLEAVED_INODES=0%2
@@ -316,6 +327,8 @@ EOF
   check_rule reject _rule_min_chunk_size_le_avg_chunk_size server CVMFS_MIN_CHUNK_SIZE=99999999
   check_rule reject _rule_autocatalogs_min_weight_le_max_weight server CVMFS_AUTOCATALOGS_MIN_WEIGHT=200000 CVMFS_AUTOCATALOGS_MAX_WEIGHT=100000
   check_rule accept - server CVMFS_AUTOCATALOGS_MIN_WEIGHT=1000 CVMFS_AUTOCATALOGS_MAX_WEIGHT=200000
+  check_rule reject _rule_autocatalogs_min_weight_le_max_weight server CVMFS_AUTOCATALOGS_MIN_WEIGHT=200000
+  check_rule reject _rule_autocatalogs_min_weight_le_max_weight server CVMFS_AUTOCATALOGS_MAX_WEIGHT=500
   check_rule reject _rule_stratum1_requires_stratum1_url server CVMFS_REPOSITORY_TYPE=stratum1
   check_rule reject _rule_replica_active_requires_stratum1 server CVMFS_REPLICA_ACTIVE=no
   check_rule accept - server CVMFS_REPLICA_ACTIVE=no CVMFS_REPOSITORY_TYPE=stratum1 CVMFS_STRATUM1=http://s1.cern.ch/cvmfs/sw.cvmfs.io
