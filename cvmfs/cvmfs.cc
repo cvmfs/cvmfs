@@ -1787,14 +1787,8 @@ static void cvmfs_statfs(fuse_req_t req, fuse_ino_t ino) {
   fuse_reply_statfs(req, info);
 }
 
-#ifdef __APPLE__
 static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
-                           size_t size, uint32_t position)
-#else
-static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
-                           size_t size)
-#endif
-{
+                           size_t size) {
   const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
   FuseInterruptCue ic(&req);
   const ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid,

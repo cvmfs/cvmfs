@@ -286,20 +286,10 @@ static void stub_statfs(fuse_req_t req, fuse_ino_t ino) {
 }
 
 
-#ifdef __APPLE__
 static void stub_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
-                          size_t size, uint32_t position)
-#else
-static void stub_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
-                          size_t size)
-#endif
-{
+                          size_t size) {
   const FenceGuard fence_guard(fence_reload_);
-#ifdef __APPLE__
-  cvmfs_exports_->cvmfs_operations.getxattr(req, ino, name, size, position);
-#else
   cvmfs_exports_->cvmfs_operations.getxattr(req, ino, name, size);
-#endif
 }
 
 
@@ -1065,6 +1055,7 @@ int FuseMain(int argc, char *argv[]) {
     }
   }
 
+#ifndef __APPLE__
   if (!premounted_ && !suid_mode_ && getuid() == 0 && premount_fuse_) {
     // If not already premounted or using suid mode, premount the fuse
     // mountpoint to avoid the need for fusermount.
@@ -1126,6 +1117,7 @@ int FuseMain(int argc, char *argv[]) {
       }
     }
   }
+#endif
 
   struct fuse_lowlevel_ops loader_operations;
   SetFuseOperations(&loader_operations);
@@ -1349,6 +1341,7 @@ int FuseMain(int argc, char *argv[]) {
   return retval;
 
 cleanup:
+#ifndef __APPLE__
   if (dounmount && !delegated_unmount) {
     if (!SwitchCredentials(0, getgid(), true /* temporarily */)) {
       LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
@@ -1363,6 +1356,7 @@ cleanup:
                   mount_point_->c_str(), repository_name_->c_str());
     }
   }
+#endif
   if (premount_fd >= 0) close(premount_fd);
 
   delete repository_name_;
