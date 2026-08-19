@@ -1,4 +1,7 @@
-#!/bin/sh
+#!/bin/bash
+set -x
+set -eu
+# pipefail breaks ISA assignment, not worth it here
 
 # We install libcrypto into ${EXTERNALS_INSTALL_LOCATION}/crypto in order
 # to not taint the standard include / library paths with it. The LibreSSL

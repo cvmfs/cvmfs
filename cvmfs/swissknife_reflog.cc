@@ -90,7 +90,7 @@ int CommandReconstructReflog::Main(const ArgumentList &args) {
   ObjectFetcher object_fetcher(repo_name, repo_url, tmp_dir, download_manager(),
                                signature_manager());
 
-  UniquePtr<manifest::Manifest> manifest;
+  std::unique_ptr<manifest::Manifest> manifest;
   const ObjectFetcher::Failures retval = object_fetcher.FetchManifest(
       &manifest);
   if (retval != ObjectFetcher::kFailOk) {
@@ -102,22 +102,22 @@ int CommandReconstructReflog::Main(const ArgumentList &args) {
   }
 
   const upload::SpoolerDefinition spooler_definition(spooler, shash::kAny);
-  const UniquePtr<upload::AbstractUploader> uploader(
+  const std::unique_ptr<upload::AbstractUploader> uploader(
       upload::AbstractUploader::Construct(spooler_definition));
 
-  if (!uploader.IsValid()) {
+  if (uploader.get() == nullptr) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to initialize spooler for '%s'",
              spooler.c_str());
     return 1;
   }
 
-  UniquePtr<manifest::Reflog> reflog(CreateEmptyReflog(tmp_dir, repo_name));
+  std::unique_ptr<manifest::Reflog> reflog(
+      CreateEmptyReflog(tmp_dir, repo_name));
   reflog->TakeDatabaseFileOwnership();
 
   reflog->BeginTransaction();
-  AddStaticManifestObjects(reflog.weak_ref(), manifest.weak_ref());
-  RootChainWalker walker(manifest.weak_ref(), &object_fetcher,
-                         reflog.weak_ref());
+  AddStaticManifestObjects(reflog.get(), manifest.get());
+  RootChainWalker walker(manifest.get(), &object_fetcher, reflog.get());
   walker.FindObjectsAndPopulateReflog();
   reflog->CommitTransaction();
 
@@ -125,7 +125,7 @@ int CommandReconstructReflog::Main(const ArgumentList &args) {
 
   reflog->DropDatabaseFileOwnership();
   const std::string reflog_db = reflog->database_file();
-  reflog.Destroy();
+  reflog.reset();
   uploader->UploadFile(reflog_db, ".cvmfsreflog");
   shash::Any reflog_hash(manifest->GetHashAlgorithm());
   manifest::Reflog::HashDatabase(reflog_db, &reflog_hash);
@@ -180,10 +180,13 @@ void RootChainWalker::FindObjectsAndPopulateReflog() {
 
 void RootChainWalker::WalkRootCatalogs(const shash::Any &root_catalog_hash) {
   shash::Any current_hash = root_catalog_hash;
-  UniquePtr<CatalogTN> current_catalog;
+  std::unique_ptr<CatalogTN> current_catalog;
 
   while (!current_hash.IsNull() && !reflog_->ContainsCatalog(current_hash)
-         && (current_catalog = FetchCatalog(current_hash)).IsValid()) {
+         && (current_catalog = std::unique_ptr<CatalogTN>(
+                 FetchCatalog(current_hash)))
+                    .get()
+                != nullptr) {
     LogCvmfs(kLogCvmfs, kLogStdout, "Catalog: %s Revision: %" PRIu64,
              current_hash.ToString().c_str(), current_catalog->GetRevision());
 
@@ -197,14 +200,17 @@ void RootChainWalker::WalkRootCatalogs(const shash::Any &root_catalog_hash) {
 
 void RootChainWalker::WalkHistories(const shash::Any &history_hash) {
   shash::Any current_hash = history_hash;
-  UniquePtr<HistoryTN> current_history;
+  std::unique_ptr<HistoryTN> current_history;
 
   while (!current_hash.IsNull() && !reflog_->ContainsHistory(current_hash)
-         && (current_history = FetchHistory(current_hash)).IsValid()) {
+         && (current_history = std::unique_ptr<HistoryTN>(
+                 FetchHistory(current_hash)))
+                    .get()
+                != nullptr) {
     LogCvmfs(kLogCvmfs, kLogStdout, "History: %s",
              current_hash.ToString().c_str());
 
-    const bool cancel = WalkCatalogsInHistory(current_history.weak_ref());
+    const bool cancel = WalkCatalogsInHistory(current_history.get());
     const bool success = reflog_->AddHistory(current_hash);
     assert(success);
 

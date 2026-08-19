@@ -275,7 +275,7 @@ class T_ObjectFetcher : public ::testing::Test {
     // create manifest
     const uint64_t catalog_size = 0;
     const std::string root_path = "";
-    UniquePtr<manifest::Manifest> manifest(
+    std::unique_ptr<manifest::Manifest> manifest(
         new manifest::Manifest(root_hash, catalog_size, root_path));
     manifest->set_history(history_hash);
     manifest->set_certificate(certificate_hash);
@@ -346,8 +346,8 @@ class T_ObjectFetcher : public ::testing::Test {
 
   void CreateHistory(shash::Any *content_hash,
                      const shash::Any &previous_revision = shash::Any()) {
-    return CreateHistory(
-        type<ObjectFetcherT>(), content_hash, previous_revision);
+    return CreateHistory(type<ObjectFetcherT>(), content_hash,
+                         previous_revision);
   }
 
   void CreateCatalog(shash::Any *content_hash, const std::string &root_path) {
@@ -434,7 +434,7 @@ class T_ObjectFetcher : public ::testing::Test {
 
   void CreateReflog(const type<LocalObjectFetcher<> > type_spec,
                     shash::Any *content_hash) {
-    UniquePtr<manifest::Reflog> reflog(
+    std::unique_ptr<manifest::Reflog> reflog(
         manifest::Reflog::Create(reflog_path, fqrn));
     content_hash->algorithm = shash::kSha1;
     manifest::Reflog::HashDatabase(reflog_path, content_hash);
@@ -442,7 +442,7 @@ class T_ObjectFetcher : public ::testing::Test {
 
   void CreateReflog(const type<HttpObjectFetcher<> > type_spec,
                     shash::Any *content_hash) {
-    UniquePtr<manifest::Reflog> reflog(
+    std::unique_ptr<manifest::Reflog> reflog(
         manifest::Reflog::Create(reflog_path, fqrn));
     content_hash->algorithm = shash::kSha1;
     manifest::Reflog::HashDatabase(reflog_path, content_hash);
@@ -639,8 +639,8 @@ TYPED_TEST_CASE(T_ObjectFetcher, ObjectFetcherTypes);
 
 
 TYPED_TEST(T_ObjectFetcher, InitializeSlow) {
-  UniquePtr<TypeParam> object_fetcher(TestFixture::GetObjectFetcher());
-  EXPECT_TRUE(object_fetcher.IsValid());
+  std::unique_ptr<TypeParam> object_fetcher(TestFixture::GetObjectFetcher());
+  EXPECT_TRUE(object_fetcher.get() != nullptr);
   if (TestFixture::NeedsFilesystemSandbox()) {
     EXPECT_EQ(0u, TestFixture::CountTemporaryFiles());
   }
@@ -648,8 +648,8 @@ TYPED_TEST(T_ObjectFetcher, InitializeSlow) {
 
 
 TYPED_TEST(T_ObjectFetcher, FetchManifestSlow) {
-  UniquePtr<TypeParam> object_fetcher(TestFixture::GetObjectFetcher());
-  ASSERT_TRUE(object_fetcher.IsValid());
+  std::unique_ptr<TypeParam> object_fetcher(TestFixture::GetObjectFetcher());
+  ASSERT_TRUE(object_fetcher.get() != nullptr);
 
   manifest::Manifest *manifest = NULL;
   typename TypeParam::Failures retval = object_fetcher->FetchManifest(
@@ -661,12 +661,12 @@ TYPED_TEST(T_ObjectFetcher, FetchManifestSlow) {
   EXPECT_EQ(TestFixture::history_hash, manifest->history());
   delete manifest;
 
-  UniquePtr<manifest::Manifest> manifest_ptr;
-  EXPECT_FALSE(manifest_ptr.IsValid());
+  std::unique_ptr<manifest::Manifest> manifest_ptr;
+  EXPECT_FALSE(manifest_ptr.get() != nullptr);
   typename TypeParam::Failures retval2 = object_fetcher->FetchManifest(
       &manifest_ptr);
   EXPECT_EQ(TypeParam::kFailOk, retval2);
-  ASSERT_TRUE(manifest_ptr.IsValid());
+  ASSERT_TRUE(manifest_ptr.get() != nullptr);
 
   EXPECT_EQ(TestFixture::root_hash, manifest_ptr->catalog_hash());
   EXPECT_EQ(TestFixture::history_hash, manifest_ptr->history());
@@ -678,8 +678,8 @@ TYPED_TEST(T_ObjectFetcher, FetchManifestSlow) {
 
 
 TYPED_TEST(T_ObjectFetcher, FetchHistorySlow) {
-  UniquePtr<TypeParam> object_fetcher(TestFixture::GetObjectFetcher());
-  ASSERT_TRUE(object_fetcher.IsValid());
+  std::unique_ptr<TypeParam> object_fetcher(TestFixture::GetObjectFetcher());
+  ASSERT_TRUE(object_fetcher.get() != nullptr);
 
   EXPECT_TRUE(object_fetcher->HasHistory());
 
@@ -694,12 +694,12 @@ TYPED_TEST(T_ObjectFetcher, FetchHistorySlow) {
     EXPECT_EQ(0u, TestFixture::CountTemporaryFiles());
   }
 
-  UniquePtr<typename TypeParam::HistoryTN> history_ptr;
-  EXPECT_FALSE(history_ptr.IsValid());
+  std::unique_ptr<typename TypeParam::HistoryTN> history_ptr;
+  EXPECT_FALSE(history_ptr.get() != nullptr);
   typename TypeParam::Failures retval2 = object_fetcher->FetchHistory(
       &history_ptr);
   EXPECT_EQ(TypeParam::kFailOk, retval2);
-  ASSERT_TRUE(history_ptr.IsValid());
+  ASSERT_TRUE(history_ptr.get() != nullptr);
 
   if (TestFixture::NeedsFilesystemSandbox()) {
     EXPECT_LE(1u, TestFixture::CountTemporaryFiles());
@@ -708,8 +708,8 @@ TYPED_TEST(T_ObjectFetcher, FetchHistorySlow) {
 
 
 TYPED_TEST(T_ObjectFetcher, FetchLegacyHistorySlow) {
-  UniquePtr<TypeParam> object_fetcher(TestFixture::GetObjectFetcher());
-  ASSERT_TRUE(object_fetcher.IsValid());
+  std::unique_ptr<TypeParam> object_fetcher(TestFixture::GetObjectFetcher());
+  ASSERT_TRUE(object_fetcher.get() != nullptr);
 
   typename TypeParam::HistoryTN *history = NULL;
   typename TypeParam::Failures retval = object_fetcher->FetchHistory(
@@ -727,12 +727,12 @@ TYPED_TEST(T_ObjectFetcher, FetchLegacyHistorySlow) {
     EXPECT_EQ(0u, TestFixture::CountTemporaryFiles());
   }
 
-  UniquePtr<typename TypeParam::HistoryTN> history_ptr;
-  EXPECT_FALSE(history_ptr.IsValid());
+  std::unique_ptr<typename TypeParam::HistoryTN> history_ptr;
+  EXPECT_FALSE(history_ptr.get() != nullptr);
   typename TypeParam::Failures retval2 = object_fetcher->FetchHistory(
       &history_ptr, TestFixture::previous_history_hash);
   EXPECT_EQ(TypeParam::kFailOk, retval2);
-  ASSERT_TRUE(history_ptr.IsValid());
+  ASSERT_TRUE(history_ptr.get() != nullptr);
   EXPECT_TRUE(history_ptr->previous_revision().IsNull());
   if (TestFixture::NeedsFilesystemSandbox()) {
     EXPECT_LE(1u, TestFixture::CountTemporaryFiles());
@@ -741,15 +741,15 @@ TYPED_TEST(T_ObjectFetcher, FetchLegacyHistorySlow) {
 
 
 TYPED_TEST(T_ObjectFetcher, FetchInvalidHistorySlow) {
-  UniquePtr<TypeParam> object_fetcher(TestFixture::GetObjectFetcher());
-  ASSERT_TRUE(object_fetcher.IsValid());
+  std::unique_ptr<TypeParam> object_fetcher(TestFixture::GetObjectFetcher());
+  ASSERT_TRUE(object_fetcher.get() != nullptr);
 
-  UniquePtr<typename TypeParam::HistoryTN> history;
-  EXPECT_FALSE(history.IsValid());
+  std::unique_ptr<typename TypeParam::HistoryTN> history;
+  EXPECT_FALSE(history.get() != nullptr);
   typename TypeParam::Failures retval = object_fetcher->FetchHistory(
       &history,
       h("400d35465f179a4acacb5fe749e6ce20a0bbdb84", shash::kSuffixHistory));
-  EXPECT_FALSE(history.IsValid());
+  EXPECT_FALSE(history.get() != nullptr);
   typename TypeParam::Failures expected_failure =
       (TestFixture::IsHttpObjectFetcher())
           ? TypeParam::kFailNetwork    // HttpObjectFetcher is used via file://
@@ -764,8 +764,8 @@ TYPED_TEST(T_ObjectFetcher, FetchInvalidHistorySlow) {
 
 
 TYPED_TEST(T_ObjectFetcher, FetchCatalogSlow) {
-  UniquePtr<TypeParam> object_fetcher(TestFixture::GetObjectFetcher());
-  ASSERT_TRUE(object_fetcher.IsValid());
+  std::unique_ptr<TypeParam> object_fetcher(TestFixture::GetObjectFetcher());
+  ASSERT_TRUE(object_fetcher.get() != nullptr);
 
   typename TypeParam::CatalogTN *catalog = NULL;
   typename TypeParam::Failures retval = object_fetcher->FetchCatalog(
@@ -784,12 +784,12 @@ TYPED_TEST(T_ObjectFetcher, FetchCatalogSlow) {
     EXPECT_EQ(0u, TestFixture::CountTemporaryFiles());
   }
 
-  UniquePtr<typename TypeParam::CatalogTN> catalog_ptr;
-  EXPECT_FALSE(catalog_ptr.IsValid());
+  std::unique_ptr<typename TypeParam::CatalogTN> catalog_ptr;
+  EXPECT_FALSE(catalog_ptr.get() != nullptr);
   typename TypeParam::Failures retval2 = object_fetcher->FetchCatalog(
       TestFixture::root_hash, "", &catalog_ptr);
   EXPECT_EQ(TypeParam::kFailOk, retval2);
-  ASSERT_TRUE(catalog_ptr.IsValid());
+  ASSERT_TRUE(catalog_ptr.get() != nullptr);
 
   EXPECT_EQ("", catalog_ptr->mountpoint().ToString());
   EXPECT_EQ(TestFixture::catalog_revision, catalog_ptr->revision());
@@ -801,8 +801,8 @@ TYPED_TEST(T_ObjectFetcher, FetchCatalogSlow) {
 
 
 TYPED_TEST(T_ObjectFetcher, FetchReflogSlow) {
-  UniquePtr<TypeParam> object_fetcher(TestFixture::GetObjectFetcher());
-  ASSERT_TRUE(object_fetcher.IsValid());
+  std::unique_ptr<TypeParam> object_fetcher(TestFixture::GetObjectFetcher());
+  ASSERT_TRUE(object_fetcher.get() != nullptr);
 
   typename TypeParam::ReflogTN *reflog = NULL;
   typename TypeParam::Failures retval = object_fetcher->FetchReflog(
@@ -818,12 +818,12 @@ TYPED_TEST(T_ObjectFetcher, FetchReflogSlow) {
     EXPECT_EQ(0u, TestFixture::CountTemporaryFiles());
   }
 
-  UniquePtr<typename TypeParam::ReflogTN> reflog_ptr;
-  EXPECT_FALSE(reflog_ptr.IsValid());
+  std::unique_ptr<typename TypeParam::ReflogTN> reflog_ptr;
+  EXPECT_FALSE(reflog_ptr.get() != nullptr);
   typename TypeParam::Failures retval2 = object_fetcher->FetchReflog(
       TestFixture::reflog_hash, &reflog_ptr);
   EXPECT_EQ(TypeParam::kFailOk, retval2);
-  ASSERT_TRUE(reflog_ptr.IsValid());
+  ASSERT_TRUE(reflog_ptr.get() != nullptr);
 
   if (TestFixture::NeedsFilesystemSandbox()) {
     EXPECT_LE(0u, TestFixture::CountTemporaryFiles());
@@ -837,8 +837,8 @@ TYPED_TEST(T_ObjectFetcher, FetchReflogSlow) {
 
 
 TYPED_TEST(T_ObjectFetcher, FetchInvalidCatalogSlow) {
-  UniquePtr<TypeParam> object_fetcher(TestFixture::GetObjectFetcher());
-  ASSERT_TRUE(object_fetcher.IsValid());
+  std::unique_ptr<TypeParam> object_fetcher(TestFixture::GetObjectFetcher());
+  ASSERT_TRUE(object_fetcher.get() != nullptr);
 
   shash::Any invalid_clg = h("5739dc30f42525a261b2f4b383b220df3e36f04d",
                              shash::kSuffixCatalog);
@@ -859,12 +859,12 @@ TYPED_TEST(T_ObjectFetcher, FetchInvalidCatalogSlow) {
     EXPECT_EQ(0u, TestFixture::CountTemporaryFiles());
   }
 
-  UniquePtr<typename TypeParam::CatalogTN> catalog_ptr;
-  EXPECT_FALSE(catalog_ptr.IsValid());
+  std::unique_ptr<typename TypeParam::CatalogTN> catalog_ptr;
+  EXPECT_FALSE(catalog_ptr.get() != nullptr);
   typename TypeParam::Failures retval2 = object_fetcher->FetchCatalog(
       invalid_clg, "", &catalog_ptr);
   EXPECT_EQ(expected_failure, retval2) << "code: " << Code2Ascii(retval2);
-  EXPECT_FALSE(catalog_ptr.IsValid());
+  EXPECT_FALSE(catalog_ptr.get() != nullptr);
 
   if (TestFixture::NeedsFilesystemSandbox()) {
     EXPECT_LE(0u, TestFixture::CountTemporaryFiles());
@@ -881,52 +881,52 @@ TYPED_TEST(T_ObjectFetcher, AutoCleanupFetchedFilesSlow) {
   size_t files = 0;
   EXPECT_EQ(files, TestFixture::CountTemporaryFiles());
 
-  UniquePtr<TypeParam> object_fetcher(TestFixture::GetObjectFetcher());
-  ASSERT_TRUE(object_fetcher.IsValid());
+  std::unique_ptr<TypeParam> object_fetcher(TestFixture::GetObjectFetcher());
+  ASSERT_TRUE(object_fetcher.get() != nullptr);
 
-  UniquePtr<manifest::Manifest> manifest;
-  UniquePtr<typename TypeParam::CatalogTN> catalog;
-  UniquePtr<typename TypeParam::HistoryTN> history;
+  std::unique_ptr<manifest::Manifest> manifest;
+  std::unique_ptr<typename TypeParam::CatalogTN> catalog;
+  std::unique_ptr<typename TypeParam::HistoryTN> history;
   typename TypeParam::Failures retval;
 
   retval = object_fetcher->FetchManifest(&manifest);
   EXPECT_EQ(TypeParam::kFailOk, retval);
-  ASSERT_TRUE(manifest.IsValid());
+  ASSERT_TRUE(manifest.get() != nullptr);
   EXPECT_EQ(files, TestFixture::CountTemporaryFiles());
 
   retval = object_fetcher->FetchCatalog(TestFixture::root_hash, "", &catalog);
   EXPECT_EQ(TypeParam::kFailOk, retval);
-  ASSERT_TRUE(catalog.IsValid());
+  ASSERT_TRUE(catalog.get() != nullptr);
 
   EXPECT_LT(files, TestFixture::CountTemporaryFiles());
   files = TestFixture::CountTemporaryFiles();
 
   retval = object_fetcher->FetchHistory(&history);
   EXPECT_EQ(TypeParam::kFailOk, retval);
-  ASSERT_TRUE(history.IsValid());
+  ASSERT_TRUE(history.get() != nullptr);
 
   EXPECT_LT(files, TestFixture::CountTemporaryFiles());
   files = TestFixture::CountTemporaryFiles();
 
-  delete object_fetcher.Release();
+  delete object_fetcher.release();
   EXPECT_EQ(files, TestFixture::CountTemporaryFiles());
 
-  delete history.Release();
+  delete history.release();
   EXPECT_GT(files, TestFixture::CountTemporaryFiles());
   files = TestFixture::CountTemporaryFiles();
 
-  delete catalog.Release();
+  delete catalog.release();
   EXPECT_GT(files, TestFixture::CountTemporaryFiles());
   EXPECT_EQ(0u, TestFixture::CountTemporaryFiles());
 }
 
 
 TYPED_TEST(T_ObjectFetcher, LoadBrokenDatabaseObjectsSlow) {
-  UniquePtr<TypeParam> object_fetcher(TestFixture::GetObjectFetcher());
-  ASSERT_TRUE(object_fetcher.IsValid());
+  std::unique_ptr<TypeParam> object_fetcher(TestFixture::GetObjectFetcher());
+  ASSERT_TRUE(object_fetcher.get() != nullptr);
 
-  UniquePtr<typename TypeParam::CatalogTN> catalog;
-  UniquePtr<typename TypeParam::HistoryTN> history;
+  std::unique_ptr<typename TypeParam::CatalogTN> catalog;
+  std::unique_ptr<typename TypeParam::HistoryTN> history;
   typename TypeParam::Failures retval;
   const typename TypeParam::Failures
       expected_error = TestFixture::IsHttpObjectFetcher()
@@ -942,7 +942,7 @@ TYPED_TEST(T_ObjectFetcher, LoadBrokenDatabaseObjectsSlow) {
   EXPECT_EQ(expected_error, retval)
       << "expected: " << Code2Ascii(expected_error) << std::endl
       << "actual:   " << Code2Ascii(retval);
-  EXPECT_FALSE(catalog.IsValid());
+  EXPECT_FALSE(catalog.get() != nullptr);
   EXPECT_EQ(0u, TestFixture::CountTemporaryFiles());
 
   retval = object_fetcher->FetchHistory(&history,
@@ -950,6 +950,6 @@ TYPED_TEST(T_ObjectFetcher, LoadBrokenDatabaseObjectsSlow) {
   EXPECT_EQ(expected_error, retval)
       << "expected: " << Code2Ascii(expected_error) << std::endl
       << "actual:   " << Code2Ascii(retval);
-  EXPECT_FALSE(history.IsValid());
+  EXPECT_FALSE(history.get() != nullptr);
   EXPECT_EQ(0u, TestFixture::CountTemporaryFiles());
 }

@@ -132,7 +132,7 @@ unsigned int GatewayUploader::GetNumberOfErrors() const {
 void GatewayUploader::DoUpload(const std::string &remote_path,
                                IngestionSource *source,
                                const CallbackTN *callback) {
-  const UniquePtr<GatewayStreamHandle> handle(
+  const std::unique_ptr<GatewayStreamHandle> handle(
       new GatewayStreamHandle(callback, session_context_->NewBucket()));
 
   const bool rvb = source->Open();

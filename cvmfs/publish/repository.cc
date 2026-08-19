@@ -8,6 +8,7 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdlib>
+#include <memory>
 
 #include "catalog_mgr_ro.h"
 #include "catalog_mgr_rw.h"
@@ -33,7 +34,6 @@
 #include "upload.h"
 #include "upload_spooler_definition.h"
 #include "util/logging.h"
-#include "util/pointer.h"
 #include "whitelist.h"
 
 // TODO(jblomer): Remove Me
@@ -274,14 +274,13 @@ void Publisher::ConstructSpoolers() {
                               .gw_session_token();
   sd.key_file = settings_.keychain().gw_key_path();
 
-  spooler_files_ = upload::Spooler::Construct(sd,
-                                              statistics_publish_.weak_ref());
+  spooler_files_ = upload::Spooler::Construct(sd, statistics_publish_.get());
   if (spooler_files_ == NULL)
     throw EPublish("could not initialize file spooler");
 
   const upload::SpoolerDefinition sd_catalogs(sd.Dup2DefaultCompression());
-  spooler_catalogs_ = upload::Spooler::Construct(
-      sd_catalogs, statistics_publish_.weak_ref());
+  spooler_catalogs_ = upload::Spooler::Construct(sd_catalogs,
+                                                 statistics_publish_.get());
   if (spooler_catalogs_ == NULL) {
     delete spooler_files_;
     throw EPublish("could not initialize catalog spooler");
@@ -477,7 +476,7 @@ void Publisher::PushWhitelist() {
 
 
 Publisher *Publisher::Create(const SettingsPublisher &settings) {
-  UniquePtr<Publisher> publisher(new Publisher(settings, false));
+  std::unique_ptr<Publisher> publisher(new Publisher(settings, false));
 
   LogCvmfs(kLogCvmfs, publisher->llvl_ | kLogStdout | kLogNoLinebreak,
            "Creating Key Chain... ");
@@ -504,11 +503,11 @@ Publisher *Publisher::Create(const SettingsPublisher &settings) {
 
   // Re-create from empty repository in order to properly initialize
   // parent Repository object
-  publisher = new Publisher(settings);
+  publisher = std::unique_ptr<Publisher>(new Publisher(settings));
 
   LogCvmfs(kLogCvmfs, publisher->llvl_ | kLogStdout, "done");
 
-  return publisher.Release();
+  return publisher.release();
 }
 
 void Publisher::ExportKeychain() {
@@ -661,8 +660,8 @@ Publisher::Publisher(const SettingsPublisher &settings, const bool exists)
   // for abort under disk-full conditions), so initialize them before the
   // early return below.
   if (settings.is_managed())
-    managed_node_ = new ManagedNode(this);
-  session_ = new Session(settings_, llvl_);
+    managed_node_ = std::unique_ptr<ManagedNode>(new ManagedNode(this));
+  session_ = std::unique_ptr<Session>(new Session(settings_, llvl_));
 
   if (!exists)
     return;

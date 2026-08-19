@@ -4,6 +4,7 @@
 
 #include "signing_tool.h"
 
+#include <memory>
 #include <string>
 
 #include "manifest.h"
@@ -12,7 +13,6 @@
 #include "server_tool.h"
 #include "upload.h"
 #include "util/exception.h"
-#include "util/pointer.h"
 
 namespace {
 
@@ -42,8 +42,8 @@ SigningTool::Result SigningTool::Run(
     }
   }
 
-  UniquePtr<upload::Spooler> spooler;
-  UniquePtr<manifest::Manifest> manifest;
+  std::unique_ptr<upload::Spooler> spooler;
+  std::unique_ptr<manifest::Manifest> manifest;
 
   if (!DirectoryExists(temp_dir)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "%s does not exist", temp_dir.c_str());
@@ -64,8 +64,9 @@ SigningTool::Result SigningTool::Run(
                                server_tool_->signature_manager());
 
   // Load Manifest
-  manifest = manifest::Manifest::LoadFile(manifest_path);
-  if (!manifest.IsValid()) {
+  manifest = std::unique_ptr<manifest::Manifest>(
+      manifest::Manifest::LoadFile(manifest_path));
+  if (manifest.get() == nullptr) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Failed to parse manifest");
     return kError;
   }
@@ -79,16 +80,17 @@ SigningTool::Result SigningTool::Run(
   // Connect to the spooler
   const upload::SpoolerDefinition sd(spooler_definition,
                                      manifest->GetHashAlgorithm());
-  spooler = upload::Spooler::Construct(sd);
-  if (!spooler.IsValid()) {
+  spooler = std::unique_ptr<upload::Spooler>(upload::Spooler::Construct(sd));
+  if (spooler.get() == nullptr) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Failed to setup upload spooler");
     return kInitError;
   }
 
-  UniquePtr<manifest::Reflog> reflog;
+  std::unique_ptr<manifest::Reflog> reflog;
   if (!reflog_hash.IsNull()) {
-    reflog = server_tool_->FetchReflog(&object_fetcher, repo_name, reflog_hash);
-    if (!reflog.IsValid()) {
+    reflog.reset(
+        server_tool_->FetchReflog(&object_fetcher, repo_name, reflog_hash));
+    if (reflog.get() == nullptr) {
       LogCvmfs(kLogCvmfs, kLogStderr, "reflog missing");
       return kReflogMissing;
     }
@@ -133,7 +135,7 @@ SigningTool::Result SigningTool::Run(
   }
 
   // Update Reflog database
-  if (reflog.IsValid()) {
+  if (reflog.get() != nullptr) {
     reflog->BeginTransaction();
 
     if (!reflog->AddCatalog(manifest->catalog_hash())) {
@@ -178,7 +180,7 @@ SigningTool::Result SigningTool::Run(
     // upload Reflog database
     reflog->DropDatabaseFileOwnership();
     const std::string reflog_db_file = reflog->database_file();
-    reflog.Destroy();
+    reflog.reset();
     spooler->UploadReflog(reflog_db_file);
     spooler->WaitForUpload();
     reflog_hash.algorithm = manifest->GetHashAlgorithm();

@@ -404,7 +404,6 @@ set(CVMFS_UNITTEST_SOURCES
   t_trim_string.cc
   t_tube.cc
   t_uid_map.cc
-  t_unique_ptr.cc
   t_upload_facility.cc
   t_uploaders.cc
   t_gateway_uploader.cc

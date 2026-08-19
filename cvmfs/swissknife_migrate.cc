@@ -135,8 +135,8 @@ int CommandMigrate::Main(const ArgumentList &args) {
   // Create an upstream spooler
   temporary_directory_ = tmp_dir;
   const upload::SpoolerDefinition spooler_definition(spooler, shash::kSha1);
-  spooler_ = upload::Spooler::Construct(spooler_definition);
-  if (!spooler_.IsValid()) {
+  spooler_.reset(upload::Spooler::Construct(spooler_definition));
+  if (spooler_.get() == nullptr) {
     Error("Failed to create upstream Spooler.");
     return 5;
   }
@@ -321,7 +321,7 @@ bool CommandMigrate::UpdateUndoTags(PendingCatalog *root_catalog,
   bool retval = CopyPath2Path(filename_old, filename_new);
   if (!retval)
     return false;
-  UniquePtr<history::SqliteHistory> history(
+  std::unique_ptr<history::SqliteHistory> history(
       history::SqliteHistory::OpenWritable(filename_new));
   history->TakeDatabaseFileOwnership();
 
@@ -352,7 +352,7 @@ bool CommandMigrate::UpdateUndoTags(PendingCatalog *root_catalog,
 
   history->SetPreviousRevision(manifest_upstream_->history());
   history->DropDatabaseFileOwnership();
-  history.Destroy();
+  history.reset();
 
   Future<shash::Any> history_hash_new;
   upload::Spooler::CallbackPtr callback = spooler_->RegisterListener(
@@ -421,7 +421,7 @@ bool CommandMigrate::DoMigrationAndCommit(
     manifest.set_revision(new_catalog->GetRevision());
 
     // Commit the new (migrated) repository revision...
-    if (history_upstream_.IsValid()) {
+    if (history_upstream_.get() != nullptr) {
       shash::Any history_hash(manifest_upstream_->history());
       LogCvmfs(kLogCatalog, kLogStdout | kLogNoLinebreak,
                "Updating repository tag database... ");
@@ -899,9 +899,9 @@ bool CommandMigrate::MigrationWorker_20x::CreateNewEmptyCatalog(
   {
     // TODO(rmeusel): Attach catalog should work with an open catalog database
     // as well, to remove this inefficiency
-    const UniquePtr<catalog::CatalogDatabase> new_clg_db(
+    const std::unique_ptr<catalog::CatalogDatabase> new_clg_db(
         catalog::CatalogDatabase::Create(clg_db_path));
-    if (!new_clg_db.IsValid()
+    if (new_clg_db.get() == nullptr
         || !new_clg_db->InsertInitialValues(root_path, volatile_content, "")) {
       Error("Failed to create database for new catalog");
       unlink(clg_db_path.c_str());

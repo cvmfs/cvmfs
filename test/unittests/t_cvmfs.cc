@@ -38,7 +38,6 @@
 #include "options.h"
 #include "shortstring.h"
 #include "talk.h"
-#include "util/pointer.h"
 
 using ::testing::_;
 using ::testing::DoAll;

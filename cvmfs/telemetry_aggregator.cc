@@ -8,11 +8,12 @@
 #include <poll.h>
 #include <unistd.h>
 
+#include <memory>
+
 #include "glue_buffer.h"
 #include "telemetry_aggregator_influx.h"
 #include "util/exception.h"
 #include "util/logging.h"
-#include "util/pointer.h"
 #include "util/posix.h"
 namespace perf {
 
@@ -22,14 +23,15 @@ TelemetryAggregator *TelemetryAggregator::Create(Statistics *statistics,
                                                  MountPoint *mount_point,
                                                  const std::string &fqrn,
                                                  const TelemetrySelector type) {
-  UniquePtr<TelemetryAggregatorInflux> telemetryInflux;
-  UniquePtr<TelemetryAggregator> *telemetry;
+  std::unique_ptr<TelemetryAggregatorInflux> telemetryInflux;
+  std::unique_ptr<TelemetryAggregator> *telemetry;
 
   switch (type) {
     case kTelemetryInflux:
-      telemetryInflux = new TelemetryAggregatorInflux(
-          statistics, send_rate, options_mgr, mount_point, fqrn);
-      telemetry = reinterpret_cast<UniquePtr<TelemetryAggregator> *>(
+      telemetryInflux = std::unique_ptr<TelemetryAggregatorInflux>(
+          new TelemetryAggregatorInflux(statistics, send_rate, options_mgr,
+                                        mount_point, fqrn));
+      telemetry = reinterpret_cast<std::unique_ptr<TelemetryAggregator> *>(
           &telemetryInflux);
       break;
     default:
@@ -39,7 +41,7 @@ TelemetryAggregator *TelemetryAggregator::Create(Statistics *statistics,
       break;
   }
 
-  if (telemetry->weak_ref()->is_zombie_) {
+  if (telemetry->get()->is_zombie_) {
     LogCvmfs(kLogTelemetry, kLogDebug | kLogSyslogErr,
              "Requested telemetry will NOT be used. "
              "It was not constructed correctly.");
@@ -47,7 +49,7 @@ TelemetryAggregator *TelemetryAggregator::Create(Statistics *statistics,
   }
 
   LogCvmfs(kLogTelemetry, kLogDebug, "TelemetryAggregator created.");
-  return telemetry->Release();
+  return telemetry->release();
 }
 
 TelemetryAggregator::~TelemetryAggregator() {

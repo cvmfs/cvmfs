@@ -4,22 +4,22 @@
 
 #include <gtest/gtest.h>
 
+#include <memory>
 #include <utility>
 
 #include "json_document.h"
 #include "json_document_write.h"
-#include "util/pointer.h"
 
 TEST(T_Json, Empty) {
-  UniquePtr<JsonDocument> json(JsonDocument::Create("{}"));
-  EXPECT_TRUE(json.IsValid());
+  std::unique_ptr<JsonDocument> json(JsonDocument::Create("{}"));
+  EXPECT_TRUE(json.get() != nullptr);
   EXPECT_EQ("{}", json->PrintCanonical());
-  UniquePtr<JsonDocument> json2(JsonDocument::Create(""));
-  EXPECT_FALSE(json2.IsValid());
+  std::unique_ptr<JsonDocument> json2(JsonDocument::Create(""));
+  EXPECT_FALSE(json2.get() != nullptr);
 }
 
 TEST(T_Json, Complex) {
-  UniquePtr<JsonDocument> json(JsonDocument::Create(
+  std::unique_ptr<JsonDocument> json(JsonDocument::Create(
       "{\"string\": \"a string with spaces\",\n"
       " \"number\": 42,\n"
       " \"float\": 0.1,\n"
@@ -27,7 +27,7 @@ TEST(T_Json, Complex) {
       " \"void\": null,\n"
       " \"vector\": [true, false, null, 0.0, 7, \"foo\", [1, 2], {}, []],\n"
       " \"compound\": {\"a\": 2, \"b\": [1, 2, 3], \"c\": {}}}"));
-  EXPECT_TRUE(json.IsValid());
+  EXPECT_TRUE(json.get() != nullptr);
   EXPECT_EQ("{\"compound\":{\"a\":2,\"b\":[1,2,3],\"c\":{}},"
             "\"float\":0.1,"
             "\"number\":42,"
@@ -39,17 +39,17 @@ TEST(T_Json, Complex) {
 }
 
 TEST(T_Json, StringEscape) {
-  UniquePtr<JsonDocument> json(JsonDocument::Create(
+  std::unique_ptr<JsonDocument> json(JsonDocument::Create(
       "{\"string\": \"a \\\"string\\\" with special chars\"}"));
-  ASSERT_TRUE(json.IsValid());
+  ASSERT_TRUE(json.get() != nullptr);
   EXPECT_EQ("{\"string\":\"a \\\"string\\\" with special chars\"}",
             json->PrintCanonical());
 }
 
 TEST(T_Json, SearchInObject) {
-  UniquePtr<JsonDocument> json(JsonDocument::Create(
+  std::unique_ptr<JsonDocument> json(JsonDocument::Create(
       "{\"string\": \"a \\\"string\\\" with special chars\"}"));
-  ASSERT_TRUE(json.IsValid());
+  ASSERT_TRUE(json.get() != nullptr);
   const JSON *result = json->SearchInObject(
       json->root(), "string", JSON_STRING);
   EXPECT_TRUE(result != NULL);
@@ -75,6 +75,6 @@ TEST(T_Json, GenerateValidJsonString) {
             "\"f4\":\"v\\n4\",\"integer\":12}",
             output);
 
-  UniquePtr<JsonDocument> json(JsonDocument::Create(output));
-  ASSERT_TRUE(json.IsValid());
+  std::unique_ptr<JsonDocument> json(JsonDocument::Create(output));
+  ASSERT_TRUE(json.get() != nullptr);
 }
