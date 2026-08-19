@@ -21,12 +21,12 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdlib>
+#include <memory>
 
 #include "statistics.h"
 #include "util/concurrency.h"
 #include "util/exception.h"
 #include "util/logging.h"
-#include "util/pointer.h"
 #include "util/posix.h"
 #include "util/prng.h"
 #include "util/smalloc.h"
@@ -76,7 +76,7 @@ NfsMapsSqlite *NfsMapsSqlite::Create(const string &db_dir,
                                      const bool rebuild,
                                      perf::Statistics *statistics) {
   assert(root_inode > 0);
-  UniquePtr<NfsMapsSqlite> maps(new NfsMapsSqlite());
+  std::unique_ptr<NfsMapsSqlite> maps(new NfsMapsSqlite());
   maps->n_db_added_ = statistics->Register("nfs.sqlite.n_added",
                                            "total number of issued inode");
   maps->n_db_seq_ = statistics->Register("nfs.sqlite.n_seq",
@@ -156,7 +156,7 @@ NfsMapsSqlite *NfsMapsSqlite::Create(const string &db_dir,
     sqlite3_finalize(stmt);
   }
 
-  return maps.Release();
+  return maps.release();
 }
 
 

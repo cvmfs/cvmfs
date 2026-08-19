@@ -7,6 +7,7 @@
 
 #include <unistd.h>
 
+#include <memory>
 #include <string>
 
 #include "crypto/signature.h"
@@ -16,7 +17,6 @@
 #include "publish/settings.h"
 #include "sanitizer.h"
 #include "upload_spooler_definition.h"
-#include "util/pointer.h"
 #include "util/posix.h"
 
 namespace publish {
@@ -119,7 +119,7 @@ int CmdMkfs::Main(const Options &options) {
 
   // TODO(jblomer): for local backend we need to create the path as root and
   // then hand it over
-  const UniquePtr<Publisher> publisher(Publisher::Create(settings));
+  const std::unique_ptr<Publisher> publisher(Publisher::Create(settings));
   // if (options.Has("no-apache"))
 
   LogCvmfs(kLogCvmfs, kLogStdout, "PUBLIC MASTER KEY:\n%s",

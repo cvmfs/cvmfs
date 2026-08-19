@@ -14,12 +14,12 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <memory>
 
 #include "crypto/hash.h"
 #include "util/concurrency.h"
 #include "util/exception.h"
 #include "util/platform.h"
-#include "util/pointer.h"
 #include "util/smalloc.h"
 #include "util/string.h"
 #include "util/uuid.h"
@@ -72,11 +72,11 @@ Key *Key::CreateFromString(const string &key) {
   const unsigned size = key.size();
   if ((size == 0) || (size > kMaxSize))
     return NULL;
-  UniquePtr<Key> result(new Key());
+  std::unique_ptr<Key> result(new Key());
   result->size_ = size;
   result->data_ = reinterpret_cast<unsigned char *>(smalloc(size));
   memcpy(result->data_, key.data(), size);
-  return result.Release();
+  return result.release();
 }
 
 
@@ -191,7 +191,8 @@ bool Cipher::Decrypt(const string &ciphertext,
   if (algorithm > kNone)
     return false;
 
-  const UniquePtr<Cipher> cipher(Create(static_cast<Algorithms>(algorithm)));
+  const std::unique_ptr<Cipher> cipher(
+      Create(static_cast<Algorithms>(algorithm)));
   if (key.size() != cipher->key_size())
     return false;
   *plaintext += cipher->DoDecrypt(ciphertext.substr(1), key);
@@ -228,8 +229,8 @@ string CipherAes256Cbc::DoDecrypt(const string &ciphertext, const Key &key) {
   if ((padding_value == 0) || (padding_value > AES_BLOCK_SIZE))
     return "";
   for (unsigned i = 2; i <= padding_value; ++i) {
-    if (static_cast<unsigned char>(plaintext[plaintext.length() - i]) !=
-        padding_value) {
+    if (static_cast<unsigned char>(plaintext[plaintext.length() - i])
+        != padding_value) {
       return "";
     }
   }
@@ -253,8 +254,8 @@ string CipherAes256Cbc::DoEncrypt(const string &plaintext, const Key &key) {
   // cipher length: IV + plaintext length + padding
   const size_t length_tail = plaintext.length() % AES_BLOCK_SIZE;
   const size_t length_padding = AES_BLOCK_SIZE - length_tail;
-  const size_t length_cipher = AES_BLOCK_SIZE + plaintext.length() +
-                               length_padding;
+  const size_t length_cipher = AES_BLOCK_SIZE + plaintext.length()
+                               + length_padding;
 
   ciphertext.resize(length_cipher);
 
@@ -275,8 +276,8 @@ string CipherAes256Cbc::DoEncrypt(const string &plaintext, const Key &key) {
            length_tail);
   }
   memset(padding_block + length_tail, length_padding, length_padding);
-  CBC_ENCRYPT(&cbc_ctx, aes256_encrypt, AES_BLOCK_SIZE,
-              padding_block, padding_block);
+  CBC_ENCRYPT(&cbc_ctx, aes256_encrypt, AES_BLOCK_SIZE, padding_block,
+              padding_block);
 
   return ciphertext;
 }
@@ -289,8 +290,8 @@ string CipherAes256Cbc::DoEncrypt(const string &plaintext, const Key &key) {
 shash::Md5 CipherAes256Cbc::GenerateIv(const Key &key) {
   // The UUID is random but not necessarily cryptographically random.  That
   // saves the entropy pool.
-  const UniquePtr<cvmfs::Uuid> uuid(cvmfs::Uuid::Create(""));
-  assert(uuid.IsValid());
+  const std::unique_ptr<cvmfs::Uuid> uuid(cvmfs::Uuid::Create(""));
+  assert(uuid.get() != nullptr);
 
   // Now make it unpredictable, using an HMAC with the encryption key.
   shash::Any hmac(shash::kMd5);

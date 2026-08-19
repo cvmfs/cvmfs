@@ -5,9 +5,9 @@
 #include <gtest/gtest.h>
 
 #include <limits>
+#include <memory>
 #include <vector>
 
-#include "util/pointer.h"
 #include "util/smalloc.h"
 
 using namespace std;  // NOLINT
@@ -37,9 +37,9 @@ TEST(T_Smalloc, SmallRealloc) {
 }
 
 TEST(T_Smalloc, BigRealloc) {
-  UniquePtr<void> mem(smalloc(kSmallAllocation));
-  ASSERT_DEATH(mem = srealloc(mem.weak_ref(), kBigAllocation), ".*");
-  EXPECT_NE(static_cast<void *>(NULL), mem.weak_ref());
+  std::unique_ptr<void, decltype(&free)> mem(smalloc(kSmallAllocation), free);
+  ASSERT_DEATH(mem.reset(srealloc(mem.get(), kBigAllocation)), ".*");
+  EXPECT_NE(static_cast<void *>(NULL), mem.get());
 }
 
 TEST(T_Smalloc, SmallCalloc) {

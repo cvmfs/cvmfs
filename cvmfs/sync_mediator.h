@@ -27,6 +27,7 @@
 #include <pthread.h>
 
 #include <map>
+#include <memory>
 #include <stack>
 #include <string>
 #include <vector>
@@ -38,7 +39,6 @@
 #include "statistics.h"
 #include "swissknife_sync.h"
 #include "sync_item.h"
-#include "util/pointer.h"
 #include "util/shared_ptr.h"
 #include "xattr.h"
 
@@ -328,9 +328,9 @@ class SyncMediator : public virtual AbstractSyncMediator {
    * By default, files have no extended attributes.
    */
   XattrList default_xattrs_;
-  UniquePtr<perf::FsCounters> counters_;
+  std::unique_ptr<perf::FsCounters> counters_;
 
-  UniquePtr<SyncDiffReporter> reporter_;
+  std::unique_ptr<SyncDiffReporter> reporter_;
 };  // class SyncMediator
 
 }  // namespace publish

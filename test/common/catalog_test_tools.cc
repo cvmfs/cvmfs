@@ -274,25 +274,25 @@ bool CatalogTestTool::Init() {
   CreateKeys(stratum0_, &public_key_, &hash_cert);
   CreateWhitelist(stratum0_);
 
-  spooler_ = CreateSpooler("local," + temp_dir_ + "," + stratum0_);
-  if (!spooler_.IsValid()) {
+  spooler_.reset(CreateSpooler("local," + temp_dir_ + "," + stratum0_));
+  if (spooler_.get() == nullptr) {
     return false;
   }
 
-  manifest_ = CreateRepository(temp_dir_, spooler_.weak_ref());
+  manifest_.reset(CreateRepository(temp_dir_, spooler_.get()));
 
-  if (!manifest_.IsValid()) {
+  if (manifest_.get() == nullptr) {
     return false;
   }
 
   shash::Any history_hash(shash::kSha1);
-  CreateHistory(stratum0_, manifest_.weak_ref(), &history_hash);
+  CreateHistory(stratum0_, manifest_.get(), &history_hash);
 
   manifest_->set_certificate(hash_cert);
   manifest_->set_history(history_hash);
   manifest_->set_repository_name("keys.cern.ch");
   manifest_->set_publish_timestamp(time(NULL));
-  CreateManifest(stratum0_, manifest_.weak_ref());
+  CreateManifest(stratum0_, manifest_.get());
 
 
   history_.clear();
@@ -302,17 +302,17 @@ bool CatalogTestTool::Init() {
 }
 
 void CatalogTestTool::UpdateManifest() {
-  CreateManifest(stratum0_, manifest_.weak_ref());
+  CreateManifest(stratum0_, manifest_.get());
 }
 
 // Note: we always apply the dir spec to the revision corresponding to the
 // original, empty repository.
 bool CatalogTestTool::Apply(const std::string &id, const DirSpec &spec) {
-  statistics_ = new perf::Statistics();
-  catalog_mgr_ = CreateCatalogMgr(
-      history_.front().second, "file://" + stratum0_, temp_dir_,
-      spooler_.weak_ref(), download_manager(), statistics_.weak_ref());
-  if (!catalog_mgr_.IsValid()) {
+  statistics_.reset(new perf::Statistics());
+  catalog_mgr_.reset(CreateCatalogMgr(
+      history_.front().second, "file://" + stratum0_, temp_dir_, spooler_.get(),
+      download_manager(), statistics_.get()));
+  if (catalog_mgr_.get() == nullptr) {
     return false;
   }
 
@@ -335,7 +335,7 @@ bool CatalogTestTool::Apply(const std::string &id, const DirSpec &spec) {
   }
 
 
-  if (!catalog_mgr_->Commit(false, 0, manifest_.weak_ref())) {
+  if (!catalog_mgr_->Commit(false, 0, manifest_.get())) {
     return false;
   }
 
@@ -346,11 +346,11 @@ bool CatalogTestTool::Apply(const std::string &id, const DirSpec &spec) {
 
 bool CatalogTestTool::ApplyAtRootHash(const shash::Any &root_hash,
                                       const DirSpec &spec) {
-  statistics_ = new perf::Statistics();
-  catalog_mgr_ = CreateCatalogMgr(root_hash, "file://" + stratum0_, temp_dir_,
-                                  spooler_.weak_ref(), download_manager(),
-                                  statistics_.weak_ref());
-  if (!catalog_mgr_.IsValid()) {
+  statistics_.reset(new perf::Statistics());
+  catalog_mgr_.reset(CreateCatalogMgr(root_hash, "file://" + stratum0_,
+                                      temp_dir_, spooler_.get(),
+                                      download_manager(), statistics_.get()));
+  if (catalog_mgr_.get() == nullptr) {
     return false;
   }
 
@@ -372,7 +372,7 @@ bool CatalogTestTool::ApplyAtRootHash(const shash::Any &root_hash,
     catalog_mgr_->CreateNestedCatalog(*it);
   }
 
-  if (!catalog_mgr_->Commit(false, 0, manifest_.weak_ref())) {
+  if (!catalog_mgr_->Commit(false, 0, manifest_.get())) {
     return false;
   }
 
@@ -383,10 +383,10 @@ bool CatalogTestTool::LookupNestedCatalogHash(const shash::Any &root_hash,
                                               const std::string &path,
                                               char **nc_hash) {
   perf::Statistics stats;
-  UniquePtr<catalog::WritableCatalogManager> catalog_mgr(
+  std::unique_ptr<catalog::WritableCatalogManager> catalog_mgr(
       CreateCatalogMgr(root_hash, "file://" + stratum0_, temp_dir_,
-                       spooler_.weak_ref(), download_manager(), &stats));
-  if (!catalog_mgr.IsValid()) {
+                       spooler_.get(), download_manager(), &stats));
+  if (catalog_mgr.get() == nullptr) {
     return false;
   }
 
@@ -418,10 +418,10 @@ bool CatalogTestTool::FindEntry(const shash::Any &root_hash,
                                 const std::string &path,
                                 catalog::DirectoryEntry *entry) {
   perf::Statistics stats;
-  UniquePtr<catalog::WritableCatalogManager> catalog_mgr(
+  std::unique_ptr<catalog::WritableCatalogManager> catalog_mgr(
       CreateCatalogMgr(root_hash, "file://" + stratum0_, temp_dir_,
-                       spooler_.weak_ref(), download_manager(), &stats));
-  if (!catalog_mgr.IsValid()) {
+                       spooler_.get(), download_manager(), &stats));
+  if (catalog_mgr.get() == nullptr) {
     return false;
   }
 
@@ -437,15 +437,15 @@ bool CatalogTestTool::FindEntry(const shash::Any &root_hash,
 bool CatalogTestTool::DirSpecAtRootHash(const shash::Any &root_hash,
                                         DirSpec *spec) {
   perf::Statistics stats;
-  UniquePtr<catalog::WritableCatalogManager> catalog_mgr(
+  std::unique_ptr<catalog::WritableCatalogManager> catalog_mgr(
       CreateCatalogMgr(root_hash, "file://" + stratum0_, temp_dir_,
-                       spooler_.weak_ref(), download_manager(), &stats));
+                       spooler_.get(), download_manager(), &stats));
 
-  if (!catalog_mgr.IsValid()) {
+  if (catalog_mgr.get() == nullptr) {
     return false;
   }
 
-  return ExportDirSpec("", catalog_mgr.weak_ref(), spec);
+  return ExportDirSpec("", catalog_mgr.get(), spec);
 }
 
 CatalogTestTool::~CatalogTestTool() { }
@@ -487,9 +487,9 @@ void CatalogTestTool::CreateHistory(string repo_path_,
                                     shash::Any *history_hash) {
   const string history_path = CreateTempPath(repo_path_ + "/history", 0600);
   {
-    UniquePtr<history::SqliteHistory> history(
+    std::unique_ptr<history::SqliteHistory> history(
         history::SqliteHistory::Create(history_path, "keys.cern.ch"));
-    ASSERT_TRUE(history.IsValid());
+    ASSERT_TRUE(history.get() != nullptr);
     history::History::Tag tag;
     tag.name = "snapshot";
     tag.root_hash = manifest->catalog_hash();
@@ -505,7 +505,7 @@ void CatalogTestTool::CreateHistory(string repo_path_,
 
 void CatalogTestTool::CreateManifest(string repo_path_,
                                      manifest::Manifest *manifest) {
-  UniquePtr<signature::SignatureManager> signature_mgr(
+  std::unique_ptr<signature::SignatureManager> signature_mgr(
       new signature::SignatureManager());
   signature_mgr->Init();
   ASSERT_TRUE(signature_mgr->LoadCertificatePath(repo_path_ + "/testrepo.crt"));

@@ -5,6 +5,7 @@
 #ifndef CVMFS_PUBLISH_REPOSITORY_H_
 #define CVMFS_PUBLISH_REPOSITORY_H_
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -13,7 +14,6 @@
 #include "publish/settings.h"
 #include "repository_util.h"
 #include "upload_spooler_result.h"
-#include "util/pointer.h"
 #include "util/single_copy.h"
 
 namespace catalog {
@@ -325,7 +325,7 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   const SettingsPublisher &settings() const { return settings_; }
   const ServerFlagFile &in_transaction() const { return in_transaction_; }
   const ServerLockFile &is_publishing() const { return is_publishing_; }
-  Session *session() const { return session_.weak_ref(); }
+  Session *session() const { return session_.get(); }
   const upload::Spooler *spooler_files() const { return spooler_files_; }
   const upload::Spooler *spooler_catalogs() const { return spooler_catalogs_; }
 
@@ -370,7 +370,7 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   void TransactionImpl();
 
   SettingsPublisher settings_;
-  UniquePtr<perf::StatisticsTemplate> statistics_publish_;
+  std::unique_ptr<perf::StatisticsTemplate> statistics_publish_;
   /**
    * The log level, set to kLogNone if settings_.is_silent() == true
    */
@@ -385,8 +385,8 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
    * implemented, the lease should be dropped after the last successful write
    * operation.
    */
-  UniquePtr<Session> session_;
-  UniquePtr<ManagedNode> managed_node_;
+  std::unique_ptr<Session> session_;
+  std::unique_ptr<ManagedNode> managed_node_;
 
   upload::Spooler *spooler_files_;
   upload::Spooler *spooler_catalogs_;

@@ -72,7 +72,9 @@
 #include "crypto/crypto_util.h"
 #include "crypto/hash.h"
 #include "directory_entry.h"
-//#include "duplex_fuse.h"
+// #include "duplex_fuse.h"
+#include <memory>
+
 #include "fence.h"
 #include "fetch.h"
 #include "file_chunk.h"
@@ -105,7 +107,6 @@
 #include "util/exception.h"
 #include "util/logging.h"
 #include "util/mutex.h"
-#include "util/pointer.h"
 #include "util/posix.h"
 #include "util/smalloc.h"
 #include "util/string.h"
@@ -133,7 +134,8 @@ typedef struct fuse_passthru_ctx {
   int backing_id;
   int refcount;
 } fuse_passthru_ctx_t;
-static std::unordered_map<fuse_ino_t, fuse_passthru_ctx_t> *fuse_passthru_tracker = NULL;
+static std::unordered_map<fuse_ino_t, fuse_passthru_ctx_t>
+    *fuse_passthru_tracker = NULL;
 pthread_mutex_t fuse_passthru_tracker_lock = PTHREAD_MUTEX_INITIALIZER;
 #endif
 
@@ -747,13 +749,15 @@ static void ReplyNegative(const catalog::DirectoryEntry &dirent,
   if (dirent.GetSpecial() == catalog::kDirentNegative) {
     fuse_reply_err(req, ENOENT);
   } else {
-    const char *name = dirent.name().c_str();
-    const char *link = dirent.symlink().c_str();
+    // name() and symlink() return by value, so the strings have to be kept
+    // alive across the log call; c_str() on the temporaries would dangle.
+    const NameString name = dirent.name();
+    const LinkString link = dirent.symlink();
 
     LogCvmfs(
         kLogCvmfs, kLogDebug | kLogSyslogErr,
         "EIO (02): CVMFS-specific metadata not found for name=%s symlink=%s",
-        name ? name : "<unset>", link ? link : "<unset>");
+        name.c_str(), link.c_str());
 
     perf::Inc(file_system_->n_eio_total());
     perf::Inc(file_system_->n_eio_02());
@@ -1258,9 +1262,9 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
       chunk_tables->Unlock();
 
       // Retrieve File chunks from the catalog
-      UniquePtr<FileChunkList> chunks(new FileChunkList());
+      std::unique_ptr<FileChunkList> chunks(new FileChunkList());
       if (!catalog_mgr->ListFileChunks(path, dirent.hash_algorithm(),
-                                       chunks.weak_ref())
+                                       chunks.get())
           || chunks->IsEmpty()) {
         fuse_remounter_->fence()->Leave();
         LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
@@ -1277,7 +1281,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
       // Check again to avoid race
       if (!chunk_tables->inode2chunks.Contains(unique_inode)) {
         chunk_tables->inode2chunks.Insert(
-            unique_inode, FileChunkReflist(chunks.Release(), path,
+            unique_inode, FileChunkReflist(chunks.release(), path,
                                            dirent.compression_algorithm(),
                                            dirent.IsExternalFile()));
         chunk_tables->inode2references.Insert(unique_inode, 1);
@@ -1356,18 +1360,19 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
       FillOpenFlags(open_directives, fi);
 #ifdef FUSE_CAP_PASSTHROUGH
       if (loader_exports_->fuse_passthrough) {
-        if(!dirent.IsChunkedFile()) {
-          /* "Currently there should be only one backing id per node / backing file."
-           * So says libfuse documentation on fuse_passthrough_open().
-           * So we reuse and refcount backing id based on inode.
-           * Passthrough can be used with libfuse methods open, opendir, create,
-           * but since CVMFS is read-only and has synthesizes its directories,
-           * we only need to handle it in `open`. */
+        if (!dirent.IsChunkedFile()) {
+          /* "Currently there should be only one backing id per node / backing
+           * file." So says libfuse documentation on fuse_passthrough_open(). So
+           * we reuse and refcount backing id based on inode. Passthrough can be
+           * used with libfuse methods open, opendir, create, but since CVMFS is
+           * read-only and has synthesizes its directories, we only need to
+           * handle it in `open`. */
           int backing_id;
           pthread_mutex_lock(&fuse_passthru_tracker_lock);
           auto iter = fuse_passthru_tracker->find(ino);
           if (iter == fuse_passthru_tracker->end()) {
-            auto pair_with_iterator = fuse_passthru_tracker->emplace(ino, fuse_passthru_ctx_t());
+            auto pair_with_iterator = fuse_passthru_tracker->emplace(
+                ino, fuse_passthru_ctx_t());
             assert(pair_with_iterator.second == true);
             iter = pair_with_iterator.first;
             fuse_passthru_ctx_t &entry = iter->second;
@@ -1692,7 +1697,6 @@ static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
     }
 #ifdef FUSE_CAP_PASSTHROUGH
     if (loader_exports_->fuse_passthrough) {
-
       if (fi->backing_id != 0) {
         int ret;
         pthread_mutex_lock(&fuse_passthru_tracker_lock);
@@ -1705,7 +1709,8 @@ static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
         if (entry.refcount == 0) {
           ret = fuse_passthrough_close(req, fi->backing_id);
           if (ret < 0) {
-            LogCvmfs(kLogCvmfs, kLogDebug, "fuse_passthrough_close(fd=%ld) failed: %d", fd, ret);
+            LogCvmfs(kLogCvmfs, kLogDebug,
+                     "fuse_passthrough_close(fd=%ld) failed: %d", fd, ret);
             assert(false);
           }
           fuse_passthru_tracker->erase(iter);
@@ -2603,7 +2608,7 @@ static void Spawn() {
 
   // Start the helper before dropping capabilities, if it isn't running
   cvmfs::mount_point_->authz_fetcher()->CheckHelper(
-                                        cvmfs::mount_point_->membership_req());
+      cvmfs::mount_point_->membership_req());
 
   if ((getuid() != 0) && SetuidCapabilityPermitted()) {
     LogCvmfs(kLogCvmfs, kLogDebug, "Reducing to minimum capabilities");
@@ -2612,14 +2617,15 @@ static void Spawn() {
     const std::vector<cap_value_t> nocaps;
     if (NeedsReadEnviron()) {
       // Reserve the capabilities to read process environments
-      const std::vector<cap_value_t> reservecaps = {CAP_DAC_READ_SEARCH, CAP_SYS_PTRACE};
+      const std::vector<cap_value_t> reservecaps = {CAP_DAC_READ_SEARCH,
+                                                    CAP_SYS_PTRACE};
       assert(ClearPermittedCapabilities(reservecaps, nocaps));
     } else {
       assert(ClearPermittedCapabilities(nocaps, nocaps));
     }
   } else {
     LogCvmfs(kLogCvmfs, kLogDebug, "Not clearing capabilities, uid %d euid%d",
-                                   getuid(), geteuid());
+             getuid(), geteuid());
   }
 
   cvmfs::fuse_remounter_->Spawn();
@@ -3123,9 +3129,8 @@ static bool RestoreState(const int fd_progress,
       SendMsg2Socket(fd_progress, "Restoring watchdog listener state... ");
       WatchdogState *watchdog_state = static_cast<WatchdogState *>(
           saved_states[i]->state);
-      cvmfs::watchdog_ = Watchdog::Create(auto_umount::UmountOnExit,
-                                          NeedsReadEnviron(),
-                                          watchdog_state);
+      cvmfs::watchdog_ = Watchdog::Create(
+          auto_umount::UmountOnExit, NeedsReadEnviron(), watchdog_state);
       assert(cvmfs::watchdog_ != NULL);
       SendMsg2Socket(fd_progress, " done\n");
     }
@@ -3250,4 +3255,3 @@ static void __attribute__((destructor)) LibraryExit() {
   delete g_cvmfs_exports;
   g_cvmfs_exports = NULL;
 }
-

@@ -10,6 +10,8 @@ set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${GTEST_INCLUDE_DIRS})
 
 set (CVMFS_SOURCE_DIR "${CMAKE_SOURCE_DIR}/cvmfs")
 set (CVMFS_UNITTEST_COMMON_CFLAGS "-DCVMFS_LIBCVMFS -D_FILE_OFFSET_BITS=64 -fexceptions")
+set (CVMFS_UNITTEST_MOCKFUSE_CFLAGS
+     "-DCVMFS_FUSE_MODULE -DCVMFS_USE_LIBFUSE=3 -D_FILE_OFFSET_BITS=64 -fexceptions")
 
 #
 # Protobuf generated sources
@@ -402,7 +404,6 @@ set(CVMFS_UNITTEST_SOURCES
   t_trim_string.cc
   t_tube.cc
   t_uid_map.cc
-  t_unique_ptr.cc
   t_upload_facility.cc
   t_uploaders.cc
   t_gateway_uploader.cc
@@ -584,6 +585,9 @@ set(CVMFS_UNITTEST_MOCKFUSE_SOURCES
   ../common/testutil.cc
   ../common/catalog_test_tools.cc
 
+  # libfuse3 stub
+  mockfuse/fuse_stub.cc
+
   t_cvmfs.cc
   ${CVMFS_SOURCE_DIR}/acl.cc
   ${CVMFS_SOURCE_DIR}/authz/authz.cc
@@ -650,6 +654,8 @@ set(CVMFS_UNITTEST_MOCKFUSE_SOURCES
   ${CVMFS_SOURCE_DIR}/manifest_fetch.cc
   ${CVMFS_SOURCE_DIR}/monitor.cc
   ${CVMFS_SOURCE_DIR}/mountpoint.cc
+  ${CVMFS_SOURCE_DIR}/nfs_maps_leveldb.cc
+  ${CVMFS_SOURCE_DIR}/nfs_maps_sqlite.cc
   ${CVMFS_SOURCE_DIR}/network/dns.cc
   ${CVMFS_SOURCE_DIR}/network/download.cc
   ${CVMFS_SOURCE_DIR}/network/jobinfo.cc
@@ -734,12 +740,14 @@ endif ()
 add_executable (cvmfs_unittests_mockfuse ${CVMFS_UNITTEST_MOCKFUSE_SOURCES})
 add_dependencies (cvmfs_unittests_mockfuse cache.pb.generated-unittests)
 set_target_properties (cvmfs_unittests_mockfuse PROPERTIES
-	COMPILE_FLAGS "${CVMFS_UNITTEST_COMMON_CFLAGS}  -g"
+	COMPILE_FLAGS "${CVMFS_UNITTEST_MOCKFUSE_CFLAGS} -g"
 )
+# Build this target with the production fuse3 view, but keep stubbed reply
+# entry points so tests can call callbacks without a live fuse session.
 target_link_libraries (cvmfs_unittests_mockfuse
                        cvmfs_crypto
                        cvmfs_util
-		       ${FUSE3_LIBRARIES}
+                       leveldb::leveldb
                        ${CVMFS_UNITTESTS_LINK_LIBRARIES})
 
 add_executable (cvmfs_unittests ${CVMFS_UNITTEST_SOURCES})
@@ -786,11 +794,12 @@ endif ()
 # For `make check`
 #
 add_test (NAME cvmfs_unittests COMMAND cvmfs_unittests --gtest_filter=-*Slow)
+add_test (NAME cvmfs_unittests_mockfuse COMMAND cvmfs_unittests_mockfuse)
 # The `check` convenience target is not created when BUILD_QC_TESTS is on (see
 # top-level CMakeLists.txt), because Abseil (pulled in by FuzzTest) claims that
 # target name.
 if (TARGET check)
-  add_dependencies (check cvmfs_unittests)
+  add_dependencies (check cvmfs_unittests cvmfs_unittests_mockfuse)
 endif ()
 
 endif (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)

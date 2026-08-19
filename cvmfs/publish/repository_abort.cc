@@ -41,7 +41,7 @@ namespace publish {
 
 void Publisher::WipeScratchArea() {
   // TODO(jblomer): implement for enter shell etc.
-  if (!managed_node_.IsValid())
+  if (managed_node_.get() == nullptr)
     return;
 
   managed_node_->ClearScratch();
@@ -54,16 +54,16 @@ void Publisher::Abort() {
     if (session_->has_lease()) {
       LogCvmfs(kLogCvmfs, kLogSyslogWarn, "removing stale session token for %s",
                settings_.fqrn().c_str());
-      TrySessionDrop(session_.weak_ref(), settings_.ignore_invalid_lease());
+      TrySessionDrop(session_.get(), settings_.ignore_invalid_lease());
     }
     throw EPublish(
         "Repository " + settings_.fqrn() + " is not in a transaction",
         EPublish::kFailTransactionState);
   }
 
-  TrySessionDrop(session_.weak_ref(), settings_.ignore_invalid_lease());
+  TrySessionDrop(session_.get(), settings_.ignore_invalid_lease());
 
-  if (managed_node_.IsValid()) {
+  if (managed_node_.get() != nullptr) {
     // We already checked for is_publishing and in_transaction.  Normally, at
     // this point we do want to repair the mount points of a repository
     // in transaction

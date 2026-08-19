@@ -16,6 +16,7 @@
 #include <cassert>
 #include <ctime>
 #include <map>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -38,7 +39,6 @@
 #include "upload_spooler_definition.h"
 #include "upload_spooler_result.h"
 #include "util/logging.h"
-#include "util/pointer.h"
 #include "util/posix.h"
 #include "util/string.h"
 #include "xattr.h"
@@ -65,19 +65,20 @@ ParameterList CommandOverlay::GetParams() const {
 
   // Overlay-specific parameters
   r.push_back(Parameter::Mandatory('l', "comma-separated layer paths "
-               "(bottom-to-top order)"));
+                                        "(bottom-to-top order)"));
   r.push_back(Parameter::Mandatory('d', "destination subdirectory path in "
-               "repository for the merged overlay"));
+                                        "repository for the merged overlay"));
   r.push_back(Parameter::Optional('e', "hash algorithm (default: sha1)"));
   r.push_back(Parameter::Optional('Z', "compression algorithm "
-               "(default: zlib)"));
+                                       "(default: zlib)"));
   r.push_back(Parameter::Optional('@', "proxy URL"));
   r.push_back(Parameter::Switch('L', "follow HTTP redirects"));
-  r.push_back(Parameter::Optional('c', "OCI image config JSON file path "
-               "(when provided, Singularity .singularity.d dotfiles are "
-               "injected into the merged overlay)"));
+  r.push_back(Parameter::Optional(
+      'c', "OCI image config JSON file path "
+           "(when provided, Singularity .singularity.d dotfiles are "
+           "injected into the merged overlay)"));
   r.push_back(Parameter::Switch('S', "skip Singularity dotfile injection "
-               "even when an OCI config is provided"));
+                                     "even when an OCI config is provided"));
   return r;
 }
 
@@ -89,7 +90,8 @@ bool CommandOverlay::IsWhiteoutFile(const string &name) {
 
 string CommandOverlay::GetWhiteoutTarget(const string &name) {
   // ".wh." is 4 characters
-  if (name.length() <= 4) return "";
+  if (name.length() <= 4)
+    return "";
   return name.substr(4);
 }
 
@@ -99,13 +101,12 @@ bool CommandOverlay::IsOpaqueMarker(const string &name) {
 }
 
 
-bool CommandOverlay::ReadCatalogEntries(
-    catalog::Catalog *catalog,
-    const string &catalog_root_path,
-    const string &relative_prefix,
-    const string &repo_base,
-    const string &temp_dir,
-    map<string, OverlayEntry> *entries) {
+bool CommandOverlay::ReadCatalogEntries(catalog::Catalog *catalog,
+                                        const string &catalog_root_path,
+                                        const string &relative_prefix,
+                                        const string &repo_base,
+                                        const string &temp_dir,
+                                        map<string, OverlayEntry> *entries) {
   // List entries at this path in the catalog
   catalog::DirectoryEntryList listing;
   const PathString ps_path(catalog_root_path.data(),
@@ -129,10 +130,12 @@ bool CommandOverlay::ReadCatalogEntries(
       continue;
     }
 
-    const string child_catalog_path =
-        catalog_root_path.empty() ? "/" + name : catalog_root_path + "/" + name;
-    const string child_relative =
-        relative_prefix.empty() ? name : relative_prefix + "/" + name;
+    const string child_catalog_path = catalog_root_path.empty()
+                                          ? "/" + name
+                                          : catalog_root_path + "/" + name;
+    const string child_relative = relative_prefix.empty()
+                                      ? name
+                                      : relative_prefix + "/" + name;
 
     OverlayEntry oe;
     oe.entry = dirent;
@@ -181,8 +184,8 @@ bool CommandOverlay::ReadCatalogEntries(
           }
         }
 
-        if (!ReadCatalogEntries(nested, child_catalog_path,
-                                child_relative, repo_base, temp_dir, entries)) {
+        if (!ReadCatalogEntries(nested, child_catalog_path, child_relative,
+                                repo_base, temp_dir, entries)) {
           delete nested;
           return false;
         }
@@ -198,8 +201,8 @@ bool CommandOverlay::ReadCatalogEntries(
           }
         }
 
-        if (!ReadCatalogEntries(catalog, child_catalog_path,
-                                child_relative, repo_base, temp_dir, entries)) {
+        if (!ReadCatalogEntries(catalog, child_catalog_path, child_relative,
+                                repo_base, temp_dir, entries)) {
           return false;
         }
       }
@@ -211,24 +214,24 @@ bool CommandOverlay::ReadCatalogEntries(
 }
 
 
-void CommandOverlay::MergeLayer(
-    const map<string, OverlayEntry> &layer_entries,
-    map<string, OverlayEntry> *merged) const {
+void CommandOverlay::MergeLayer(const map<string, OverlayEntry> &layer_entries,
+                                map<string, OverlayEntry> *merged) const {
   // First pass: collect whiteouts and opaque directories
   vector<string> whiteout_targets;
   vector<string> opaque_dirs;
 
   for (map<string, OverlayEntry>::const_iterator it = layer_entries.begin();
-       it != layer_entries.end(); ++it) {
+       it != layer_entries.end();
+       ++it) {
     const OverlayEntry &oe = it->second;
     const string &path = it->first;
 
     if (oe.is_whiteout) {
       // Whiteout: mark the target for deletion from lower layers
-      const string target_name = GetWhiteoutTarget(
-          GetFileName(path));
-      const string target_path =
-          oe.parent.empty() ? target_name : oe.parent + "/" + target_name;
+      const string target_name = GetWhiteoutTarget(GetFileName(path));
+      const string target_path = oe.parent.empty()
+                                     ? target_name
+                                     : oe.parent + "/" + target_name;
       whiteout_targets.push_back(target_path);
       continue;
     }
@@ -252,7 +255,8 @@ void CommandOverlay::MergeLayer(
     // Remove children of this directory from merged (lower layer entries)
     vector<string> to_remove;
     for (map<string, OverlayEntry>::iterator it = merged->begin();
-         it != merged->end(); ++it) {
+         it != merged->end();
+         ++it) {
       if (HasPrefix(it->first, prefix, false)) {
         to_remove.push_back(it->first);
       }
@@ -273,7 +277,8 @@ void CommandOverlay::MergeLayer(
     // Remove all children of the target
     vector<string> to_remove;
     for (map<string, OverlayEntry>::iterator it = merged->begin();
-         it != merged->end(); ++it) {
+         it != merged->end();
+         ++it) {
       if (HasPrefix(it->first, prefix, false)) {
         to_remove.push_back(it->first);
       }
@@ -285,7 +290,8 @@ void CommandOverlay::MergeLayer(
 
   // Second pass: add/override entries from this layer
   for (map<string, OverlayEntry>::const_iterator it = layer_entries.begin();
-       it != layer_entries.end(); ++it) {
+       it != layer_entries.end();
+       ++it) {
     const OverlayEntry &oe = it->second;
     const string &path = it->first;
 
@@ -307,16 +313,16 @@ void CommandOverlay::MergeLayer(
 // Static file contents for /.singularity.d — these mirror the Go
 // constants in singularity/dotfiles.go (originally from Sylabs/Singularity).
 
-static const char *const kSingExec =
-    "#!/bin/sh\n"
-    "for script in /.singularity.d/env/*.sh; do\n"
-    "    if [ -f \"$script\" ]; then\n"
-    "        . \"$script\"\n"
-    "    fi\n"
-    "done\n"
-    "exec \"$@\"\n";
+static const char * const
+    kSingExec = "#!/bin/sh\n"
+                "for script in /.singularity.d/env/*.sh; do\n"
+                "    if [ -f \"$script\" ]; then\n"
+                "        . \"$script\"\n"
+                "    fi\n"
+                "done\n"
+                "exec \"$@\"\n";
 
-static const char *const kSingRun =
+static const char * const kSingRun =
     "#!/bin/sh\n"
     "for script in /.singularity.d/env/*.sh; do\n"
     "    if [ -f \"$script\" ]; then\n"
@@ -324,10 +330,13 @@ static const char *const kSingRun =
     "    fi\n"
     "done\n"
     "if test -n \"${SINGULARITY_APPNAME:-}\"; then\n"
-    "    if test -x \"/scif/apps/${SINGULARITY_APPNAME:-}/scif/runscript\"; then\n"
-    "        exec \"/scif/apps/${SINGULARITY_APPNAME:-}/scif/runscript\" \"$@\"\n"
+    "    if test -x \"/scif/apps/${SINGULARITY_APPNAME:-}/scif/runscript\"; "
+    "then\n"
+    "        exec \"/scif/apps/${SINGULARITY_APPNAME:-}/scif/runscript\" "
+    "\"$@\"\n"
     "    else\n"
-    "        echo \"No Singularity runscript for contained app: ${SINGULARITY_APPNAME:-}\"\n"
+    "        echo \"No Singularity runscript for contained app: "
+    "${SINGULARITY_APPNAME:-}\"\n"
     "        exit 1\n"
     "    fi\n"
     "elif test -x \"/.singularity.d/runscript\"; then\n"
@@ -337,7 +346,7 @@ static const char *const kSingRun =
     "    exec /bin/sh \"$@\"\n"
     "fi\n";
 
-static const char *const kSingShell =
+static const char * const kSingShell =
     "#!/bin/sh\n"
     "for script in /.singularity.d/env/*.sh; do\n"
     "    if [ -f \"$script\" ]; then\n"
@@ -346,7 +355,8 @@ static const char *const kSingShell =
     "done\n"
     "if test -n \"$SINGULARITY_SHELL\" -a -x \"$SINGULARITY_SHELL\"; then\n"
     "    exec $SINGULARITY_SHELL \"$@\"\n"
-    "    echo \"ERROR: Failed running shell as defined by '\\$SINGULARITY_SHELL'\" 1>&2\n"
+    "    echo \"ERROR: Failed running shell as defined by "
+    "'\\$SINGULARITY_SHELL'\" 1>&2\n"
     "    exit 1\n"
     "elif test -x /bin/bash; then\n"
     "    SHELL=/bin/bash\n"
@@ -362,21 +372,21 @@ static const char *const kSingShell =
     "fi\n"
     "exit 1\n";
 
-static const char *const kSingStart =
-    "#!/bin/sh\n"
-    "# if we are here start notify PID 1 to continue\n"
-    "# DON'T REMOVE\n"
-    "kill -CONT 1\n"
-    "for script in /.singularity.d/env/*.sh; do\n"
-    "    if [ -f \"$script\" ]; then\n"
-    "        . \"$script\"\n"
-    "    fi\n"
-    "done\n"
-    "if test -x \"/.singularity.d/startscript\"; then\n"
-    "    exec \"/.singularity.d/startscript\"\n"
-    "fi\n";
+static const char * const
+    kSingStart = "#!/bin/sh\n"
+                 "# if we are here start notify PID 1 to continue\n"
+                 "# DON'T REMOVE\n"
+                 "kill -CONT 1\n"
+                 "for script in /.singularity.d/env/*.sh; do\n"
+                 "    if [ -f \"$script\" ]; then\n"
+                 "        . \"$script\"\n"
+                 "    fi\n"
+                 "done\n"
+                 "if test -x \"/.singularity.d/startscript\"; then\n"
+                 "    exec \"/.singularity.d/startscript\"\n"
+                 "fi\n";
 
-static const char *const kSingTest =
+static const char * const kSingTest =
     "#!/bin/sh\n"
     "for script in /.singularity.d/env/*.sh; do\n"
     "    if [ -f \"$script\" ]; then\n"
@@ -397,22 +407,24 @@ static const char *const kSingTest =
     "    exec /bin/sh -c true\n"
     "fi\n";
 
-static const char *const kSingEnv01Base =
+static const char * const kSingEnv01Base =
     "#!/bin/sh\n"
     "# \n"
     "# Copyright (c) 2017, SingularityWare, LLC. All rights reserved.\n"
     "# Copyright (c) 2015-2017, Gregory M. Kurtzer. All rights reserved.\n"
     "# \n"
     "# Copyright (c) 2016-2017, The Regents of the University of California,\n"
-    "# through Lawrence Berkeley National Laboratory (subject to receipt of any\n"
-    "# required approvals from the U.S. Dept. of Energy).  All rights reserved.\n"
+    "# through Lawrence Berkeley National Laboratory (subject to receipt of "
+    "any\n"
+    "# required approvals from the U.S. Dept. of Energy).  All rights "
+    "reserved.\n"
     "# \n";
 
-static const char *const kSingEnv90 =
-    "#!/bin/sh\n"
-    "# Custom environment shell code should follow\n";
+static const char * const
+    kSingEnv90 = "#!/bin/sh\n"
+                 "# Custom environment shell code should follow\n";
 
-static const char *const kSingEnv95Apps =
+static const char * const kSingEnv95Apps =
     "#!/bin/sh\n"
     "#\n"
     "# Copyright (c) 2017, SingularityWare, LLC. All rights reserved.\n"
@@ -429,23 +441,31 @@ static const char *const kSingEnv95Apps =
     "            PATH=\"/scif/apps/${SINGULARITY_APPNAME:-}/bin:$PATH\"\n"
     "        fi\n"
     "        if test -d \"/scif/apps/${SINGULARITY_APPNAME:-}/lib\"; then\n"
-    "            LD_LIBRARY_PATH=\"/scif/apps/${SINGULARITY_APPNAME:-}/lib:$LD_LIBRARY_PATH\"\n"
+    "            "
+    "LD_LIBRARY_PATH=\"/scif/apps/${SINGULARITY_APPNAME:-}/"
+    "lib:$LD_LIBRARY_PATH\"\n"
     "            export LD_LIBRARY_PATH\n"
     "        fi\n"
-    "        if [ -f \"/scif/apps/${SINGULARITY_APPNAME:-}/scif/env/01-base.sh\" ]; then\n"
-    "            . \"/scif/apps/${SINGULARITY_APPNAME:-}/scif/env/01-base.sh\"\n"
+    "        if [ -f "
+    "\"/scif/apps/${SINGULARITY_APPNAME:-}/scif/env/01-base.sh\" ]; then\n"
+    "            . "
+    "\"/scif/apps/${SINGULARITY_APPNAME:-}/scif/env/01-base.sh\"\n"
     "        fi\n"
-    "        if [ -f \"/scif/apps/${SINGULARITY_APPNAME:-}/scif/env/90-environment.sh\" ]; then\n"
-    "            . \"/scif/apps/${SINGULARITY_APPNAME:-}/scif/env/90-environment.sh\"\n"
+    "        if [ -f "
+    "\"/scif/apps/${SINGULARITY_APPNAME:-}/scif/env/90-environment.sh\" ]; "
+    "then\n"
+    "            . "
+    "\"/scif/apps/${SINGULARITY_APPNAME:-}/scif/env/90-environment.sh\"\n"
     "        fi\n"
     "        export PATH\n"
     "    else\n"
-    "        echo \"Could not locate the container application: ${SINGULARITY_APPNAME}\"\n"
+    "        echo \"Could not locate the container application: "
+    "${SINGULARITY_APPNAME}\"\n"
     "        exit 1\n"
     "    fi\n"
     "fi\n";
 
-static const char *const kSingEnv99Base =
+static const char * const kSingEnv99Base =
     "#!/bin/sh\n"
     "# \n"
     "# Copyright (c) 2017, SingularityWare, LLC. All rights reserved.\n"
@@ -459,7 +479,7 @@ static const char *const kSingEnv99Base =
     "PS1=\"Singularity> \"\n"
     "export LD_LIBRARY_PATH PS1\n";
 
-static const char *const kSingEnv99Runtimevars =
+static const char * const kSingEnv99Runtimevars =
     "#!/bin/sh\n"
     "if [ -n \"${SING_USER_DEFINED_PREPEND_PATH:-}\" ]; then\n"
     "\tPATH=\"${SING_USER_DEFINED_PREPEND_PATH}:${PATH}\"\n"
@@ -475,8 +495,7 @@ static const char *const kSingEnv99Runtimevars =
     "\t  SING_USER_DEFINED_PATH\n"
     "export PATH\n";
 
-static const char *const kSingStartscript =
-    "#!/bin/sh\n";
+static const char * const kSingStartscript = "#!/bin/sh\n";
 
 
 string CommandOverlay::ShellEscape(const string &s) {
@@ -491,16 +510,16 @@ string CommandOverlay::ShellEscape(const string &s) {
 string CommandOverlay::ArgsQuoted(const vector<string> &args) {
   string quoted;
   for (size_t i = 0; i < args.size(); ++i) {
-    if (i > 0) quoted += " ";
+    if (i > 0)
+      quoted += " ";
     quoted += "\"" + ShellEscape(args[i]) + "\"";
   }
   return quoted;
 }
 
 
-string CommandOverlay::GenerateRunscript(
-    const vector<string> &entrypoint,
-    const vector<string> &cmd) {
+string CommandOverlay::GenerateRunscript(const vector<string> &entrypoint,
+                                         const vector<string> &cmd) {
   string script = "#!/bin/sh\n";
   if (!entrypoint.empty()) {
     script += "OCI_ENTRYPOINT='" + ArgsQuoted(entrypoint) + "'\n";
@@ -513,38 +532,38 @@ string CommandOverlay::GenerateRunscript(
     script += "OCI_CMD=''\n";
   }
   script +=
-    "CMDLINE_ARGS=\"\"\n"
-    "# prepare command line arguments for evaluation\n"
-    "for arg in \"$@\"; do\n"
-    "    CMDLINE_ARGS=\"${CMDLINE_ARGS} \\\"$arg\\\"\"\n"
-    "done\n"
-    "# ENTRYPOINT only - run entrypoint plus args\n"
-    "if [ -z \"$OCI_CMD\" ] && [ -n \"$OCI_ENTRYPOINT\" ]; then\n"
-    "    if [ $# -gt 0 ]; then\n"
-    "        SINGULARITY_OCI_RUN=\"${OCI_ENTRYPOINT} ${CMDLINE_ARGS}\"\n"
-    "    else\n"
-    "        SINGULARITY_OCI_RUN=\"${OCI_ENTRYPOINT}\"\n"
-    "    fi\n"
-    "fi\n"
-    "# CMD only - run CMD or override with args\n"
-    "if [ -n \"$OCI_CMD\" ] && [ -z \"$OCI_ENTRYPOINT\" ]; then\n"
-    "    if [ $# -gt 0 ]; then\n"
-    "        SINGULARITY_OCI_RUN=\"${CMDLINE_ARGS}\"\n"
-    "    else\n"
-    "        SINGULARITY_OCI_RUN=\"${OCI_CMD}\"\n"
-    "    fi\n"
-    "fi\n"
-    "# ENTRYPOINT and CMD - run ENTRYPOINT with CMD as default args\n"
-    "# override with user provided args\n"
-    "if [ $# -gt 0 ]; then\n"
-    "    SINGULARITY_OCI_RUN=\"${OCI_ENTRYPOINT} ${CMDLINE_ARGS}\"\n"
-    "else\n"
-    "    SINGULARITY_OCI_RUN=\"${OCI_ENTRYPOINT} ${OCI_CMD}\"\n"
-    "fi\n"
-    "# Evaluate shell expressions first and set arguments accordingly,\n"
-    "# then execute final command as first container process\n"
-    "eval \"set ${SINGULARITY_OCI_RUN}\"\n"
-    "exec \"$@\"\n";
+      "CMDLINE_ARGS=\"\"\n"
+      "# prepare command line arguments for evaluation\n"
+      "for arg in \"$@\"; do\n"
+      "    CMDLINE_ARGS=\"${CMDLINE_ARGS} \\\"$arg\\\"\"\n"
+      "done\n"
+      "# ENTRYPOINT only - run entrypoint plus args\n"
+      "if [ -z \"$OCI_CMD\" ] && [ -n \"$OCI_ENTRYPOINT\" ]; then\n"
+      "    if [ $# -gt 0 ]; then\n"
+      "        SINGULARITY_OCI_RUN=\"${OCI_ENTRYPOINT} ${CMDLINE_ARGS}\"\n"
+      "    else\n"
+      "        SINGULARITY_OCI_RUN=\"${OCI_ENTRYPOINT}\"\n"
+      "    fi\n"
+      "fi\n"
+      "# CMD only - run CMD or override with args\n"
+      "if [ -n \"$OCI_CMD\" ] && [ -z \"$OCI_ENTRYPOINT\" ]; then\n"
+      "    if [ $# -gt 0 ]; then\n"
+      "        SINGULARITY_OCI_RUN=\"${CMDLINE_ARGS}\"\n"
+      "    else\n"
+      "        SINGULARITY_OCI_RUN=\"${OCI_CMD}\"\n"
+      "    fi\n"
+      "fi\n"
+      "# ENTRYPOINT and CMD - run ENTRYPOINT with CMD as default args\n"
+      "# override with user provided args\n"
+      "if [ $# -gt 0 ]; then\n"
+      "    SINGULARITY_OCI_RUN=\"${OCI_ENTRYPOINT} ${CMDLINE_ARGS}\"\n"
+      "else\n"
+      "    SINGULARITY_OCI_RUN=\"${OCI_ENTRYPOINT} ${OCI_CMD}\"\n"
+      "fi\n"
+      "# Evaluate shell expressions first and set arguments accordingly,\n"
+      "# then execute final command as first container process\n"
+      "eval \"set ${SINGULARITY_OCI_RUN}\"\n"
+      "exec \"$@\"\n";
   return script;
 }
 
@@ -563,8 +582,8 @@ string CommandOverlay::GenerateEnvScript(const vector<string> &env) {
       if (key == "PATH") {
         script += "export PATH=\"" + ShellEscape(val) + "\"\n";
       } else {
-        script += "export " + key + "=\"${" + key + ":-\""
-                + ShellEscape(val) + "\"}\"\n";
+        script += "export " + key + "=\"${" + key + ":-\"" + ShellEscape(val)
+                  + "\"}\"\n";
       }
     }
   }
@@ -603,7 +622,8 @@ class SingularitySpoolerSink {
 
   bool GetHash(const string &path, shash::Any *hash) const {
     const map<string, shash::Any>::const_iterator it = hashes_.find(path);
-    if (it == hashes_.end()) return false;
+    if (it == hashes_.end())
+      return false;
     *hash = it->second;
     return true;
   }
@@ -625,9 +645,8 @@ OverlayEntry CommandOverlay::MakeFileEntry(const string &path,
   typename upload::Spooler::CallbackPtr cb = spooler->RegisterListener(
       &SingularitySpoolerSink::OnFileProcessed, &sink);
 
-  spooler->Process(
-      new StringIngestionSource(content, path),
-      false /* no chunking */);
+  spooler->Process(new StringIngestionSource(content, path),
+                   false /* no chunking */);
   spooler->WaitForUpload();
   spooler->UnregisterListener(cb);
 
@@ -684,23 +703,22 @@ bool CommandOverlay::InjectSingularityDotfiles(
   // ---------------------------------------------------------------
   const int fd = open(oci_config_path.c_str(), O_RDONLY);
   if (fd < 0) {
-    LogCvmfs(kLogCvmfs, kLogStderr,
-             "Failed to open OCI config file %s", oci_config_path.c_str());
+    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to open OCI config file %s",
+             oci_config_path.c_str());
     return false;
   }
   string config_json;
   if (!SafeReadToString(fd, &config_json)) {
     close(fd);
-    LogCvmfs(kLogCvmfs, kLogStderr,
-             "Failed to read OCI config from %s", oci_config_path.c_str());
+    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to read OCI config from %s",
+             oci_config_path.c_str());
     return false;
   }
   close(fd);
 
-  const UniquePtr<JsonDocument> json(JsonDocument::Create(config_json));
-  if (!json.IsValid()) {
-    LogCvmfs(kLogCvmfs, kLogStderr,
-             "Failed to parse OCI config JSON from %s",
+  const std::unique_ptr<JsonDocument> json(JsonDocument::Create(config_json));
+  if (json.get() == nullptr) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to parse OCI config JSON from %s",
              oci_config_path.c_str());
     return false;
   }
@@ -710,31 +728,34 @@ bool CommandOverlay::InjectSingularityDotfiles(
   vector<string> cmd;
   vector<string> env;
 
-  const JSON *config_obj =
-      JsonDocument::SearchInObject(json->root(), "config", JSON_OBJECT);
+  const JSON *config_obj = JsonDocument::SearchInObject(json->root(), "config",
+                                                        JSON_OBJECT);
   if (config_obj != NULL) {
-    const JSON *ep_arr =
-        JsonDocument::SearchInObject(config_obj, "Entrypoint", JSON_ARRAY);
+    const JSON *ep_arr = JsonDocument::SearchInObject(config_obj, "Entrypoint",
+                                                      JSON_ARRAY);
     if (ep_arr != NULL) {
-      for (JSON::const_iterator it = ep_arr->begin();
-           it != ep_arr->end(); ++it) {
-        if (it->is_string()) entrypoint.push_back(it->get<string>());
+      for (JSON::const_iterator it = ep_arr->begin(); it != ep_arr->end();
+           ++it) {
+        if (it->is_string())
+          entrypoint.push_back(it->get<string>());
       }
     }
-    const JSON *cmd_arr =
-        JsonDocument::SearchInObject(config_obj, "Cmd", JSON_ARRAY);
+    const JSON *cmd_arr = JsonDocument::SearchInObject(config_obj, "Cmd",
+                                                       JSON_ARRAY);
     if (cmd_arr != NULL) {
-      for (JSON::const_iterator it = cmd_arr->begin();
-           it != cmd_arr->end(); ++it) {
-        if (it->is_string()) cmd.push_back(it->get<string>());
+      for (JSON::const_iterator it = cmd_arr->begin(); it != cmd_arr->end();
+           ++it) {
+        if (it->is_string())
+          cmd.push_back(it->get<string>());
       }
     }
-    const JSON *env_arr =
-        JsonDocument::SearchInObject(config_obj, "Env", JSON_ARRAY);
+    const JSON *env_arr = JsonDocument::SearchInObject(config_obj, "Env",
+                                                       JSON_ARRAY);
     if (env_arr != NULL) {
-      for (JSON::const_iterator it = env_arr->begin();
-           it != env_arr->end(); ++it) {
-        if (it->is_string()) env.push_back(it->get<string>());
+      for (JSON::const_iterator it = env_arr->begin(); it != env_arr->end();
+           ++it) {
+        if (it->is_string())
+          env.push_back(it->get<string>());
       }
     }
   }
@@ -747,25 +768,21 @@ bool CommandOverlay::InjectSingularityDotfiles(
   // ---------------------------------------------------------------
   // 2.  Create directory entries
   // ---------------------------------------------------------------
-  (*merged)[".singularity.d"] =
-      MakeDirEntry(".singularity.d", "");
-  (*merged)[".singularity.d/libs"] =
-      MakeDirEntry(".singularity.d/libs", ".singularity.d");
-  (*merged)[".singularity.d/actions"] =
-      MakeDirEntry(".singularity.d/actions", ".singularity.d");
-  (*merged)[".singularity.d/env"] =
-      MakeDirEntry(".singularity.d/env", ".singularity.d");
+  (*merged)[".singularity.d"] = MakeDirEntry(".singularity.d", "");
+  (*merged)[".singularity.d/libs"] = MakeDirEntry(".singularity.d/libs",
+                                                  ".singularity.d");
+  (*merged)[".singularity.d/actions"] = MakeDirEntry(".singularity.d/actions",
+                                                     ".singularity.d");
+  (*merged)[".singularity.d/env"] = MakeDirEntry(".singularity.d/env",
+                                                 ".singularity.d");
 
   // Also create common FHS directories if missing
-  const char *fhs_dirs[] = {
-      "dev", "proc", "root", "var", "var/tmp", "tmp", "etc", "sys", "home",
-      NULL};
+  const char *fhs_dirs[] = {"dev", "proc", "root", "var",  "var/tmp",
+                            "tmp", "etc",  "sys",  "home", NULL};
   for (int i = 0; fhs_dirs[i] != NULL; ++i) {
     const string d = fhs_dirs[i];
     if (merged->find(d) == merged->end()) {
-      const string par = (d.find('/') != string::npos)
-                             ? GetParentPath(d)
-                             : "";
+      const string par = (d.find('/') != string::npos) ? GetParentPath(d) : "";
       (*merged)[d] = MakeDirEntry(d, par);
     }
   }
@@ -774,89 +791,82 @@ bool CommandOverlay::InjectSingularityDotfiles(
   // 3.  Create file entries (content is uploaded via spooler)
   // ---------------------------------------------------------------
   // Action scripts
-  (*merged)[".singularity.d/actions/exec"] =
-      MakeFileEntry(".singularity.d/actions/exec",
-                    ".singularity.d/actions", kSingExec, spooler);
-  (*merged)[".singularity.d/actions/run"] =
-      MakeFileEntry(".singularity.d/actions/run",
-                    ".singularity.d/actions", kSingRun, spooler);
-  (*merged)[".singularity.d/actions/shell"] =
-      MakeFileEntry(".singularity.d/actions/shell",
-                    ".singularity.d/actions", kSingShell, spooler);
-  (*merged)[".singularity.d/actions/start"] =
-      MakeFileEntry(".singularity.d/actions/start",
-                    ".singularity.d/actions", kSingStart, spooler);
-  (*merged)[".singularity.d/actions/test"] =
-      MakeFileEntry(".singularity.d/actions/test",
-                    ".singularity.d/actions", kSingTest, spooler);
+  (*merged)[".singularity.d/actions/exec"] = MakeFileEntry(
+      ".singularity.d/actions/exec", ".singularity.d/actions", kSingExec,
+      spooler);
+  (*merged)[".singularity.d/actions/run"] = MakeFileEntry(
+      ".singularity.d/actions/run", ".singularity.d/actions", kSingRun,
+      spooler);
+  (*merged)[".singularity.d/actions/shell"] = MakeFileEntry(
+      ".singularity.d/actions/shell", ".singularity.d/actions", kSingShell,
+      spooler);
+  (*merged)[".singularity.d/actions/start"] = MakeFileEntry(
+      ".singularity.d/actions/start", ".singularity.d/actions", kSingStart,
+      spooler);
+  (*merged)[".singularity.d/actions/test"] = MakeFileEntry(
+      ".singularity.d/actions/test", ".singularity.d/actions", kSingTest,
+      spooler);
 
   // Environment scripts
-  (*merged)[".singularity.d/env/01-base.sh"] =
-      MakeFileEntry(".singularity.d/env/01-base.sh",
-                    ".singularity.d/env", kSingEnv01Base, spooler);
-  (*merged)[".singularity.d/env/90-environment.sh"] =
-      MakeFileEntry(".singularity.d/env/90-environment.sh",
-                    ".singularity.d/env", kSingEnv90, spooler);
-  (*merged)[".singularity.d/env/91-environment.sh"] =
-      MakeFileEntry(".singularity.d/env/91-environment.sh",
-                    ".singularity.d/env", kSingEnv90, spooler);
-  (*merged)[".singularity.d/env/95-apps.sh"] =
-      MakeFileEntry(".singularity.d/env/95-apps.sh",
-                    ".singularity.d/env", kSingEnv95Apps, spooler);
-  (*merged)[".singularity.d/env/99-base.sh"] =
-      MakeFileEntry(".singularity.d/env/99-base.sh",
-                    ".singularity.d/env", kSingEnv99Base, spooler);
-  (*merged)[".singularity.d/env/99-runtimevars.sh"] =
-      MakeFileEntry(".singularity.d/env/99-runtimevars.sh",
-                    ".singularity.d/env", kSingEnv99Runtimevars, spooler);
+  (*merged)[".singularity.d/env/01-base.sh"] = MakeFileEntry(
+      ".singularity.d/env/01-base.sh", ".singularity.d/env", kSingEnv01Base,
+      spooler);
+  (*merged)[".singularity.d/env/90-environment.sh"] = MakeFileEntry(
+      ".singularity.d/env/90-environment.sh", ".singularity.d/env", kSingEnv90,
+      spooler);
+  (*merged)[".singularity.d/env/91-environment.sh"] = MakeFileEntry(
+      ".singularity.d/env/91-environment.sh", ".singularity.d/env", kSingEnv90,
+      spooler);
+  (*merged)[".singularity.d/env/95-apps.sh"] = MakeFileEntry(
+      ".singularity.d/env/95-apps.sh", ".singularity.d/env", kSingEnv95Apps,
+      spooler);
+  (*merged)[".singularity.d/env/99-base.sh"] = MakeFileEntry(
+      ".singularity.d/env/99-base.sh", ".singularity.d/env", kSingEnv99Base,
+      spooler);
+  (*merged)[".singularity.d/env/99-runtimevars.sh"] = MakeFileEntry(
+      ".singularity.d/env/99-runtimevars.sh", ".singularity.d/env",
+      kSingEnv99Runtimevars, spooler);
 
   // OCI-config-dependent files
   const string runscript = GenerateRunscript(entrypoint, cmd);
-  (*merged)[".singularity.d/runscript"] =
-      MakeFileEntry(".singularity.d/runscript",
-                    ".singularity.d", runscript, spooler);
-  (*merged)[".singularity.d/startscript"] =
-      MakeFileEntry(".singularity.d/startscript",
-                    ".singularity.d", kSingStartscript, spooler);
+  (*merged)[".singularity.d/runscript"] = MakeFileEntry(
+      ".singularity.d/runscript", ".singularity.d", runscript, spooler);
+  (*merged)[".singularity.d/startscript"] = MakeFileEntry(
+      ".singularity.d/startscript", ".singularity.d", kSingStartscript,
+      spooler);
 
   const string env_script = GenerateEnvScript(env);
-  (*merged)[".singularity.d/env/10-docker2singularity.sh"] =
-      MakeFileEntry(".singularity.d/env/10-docker2singularity.sh",
-                    ".singularity.d/env", env_script, spooler);
+  (*merged)[".singularity.d/env/10-docker2singularity.sh"] = MakeFileEntry(
+      ".singularity.d/env/10-docker2singularity.sh", ".singularity.d/env",
+      env_script, spooler);
 
   // ---------------------------------------------------------------
   // 4.  Create symlinks
   // ---------------------------------------------------------------
   // Only create if not already present from a layer
   if (merged->find("singularity") == merged->end()) {
-    (*merged)["singularity"] =
-        MakeSymlinkEntry("singularity", "",
-                         ".singularity.d/runscript");
+    (*merged)["singularity"] = MakeSymlinkEntry("singularity", "",
+                                                ".singularity.d/runscript");
   }
   if (merged->find(".run") == merged->end()) {
-    (*merged)[".run"] =
-        MakeSymlinkEntry(".run", "",
-                         ".singularity.d/actions/run");
+    (*merged)[".run"] = MakeSymlinkEntry(".run", "",
+                                         ".singularity.d/actions/run");
   }
   if (merged->find(".shell") == merged->end()) {
-    (*merged)[".shell"] =
-        MakeSymlinkEntry(".shell", "",
-                         ".singularity.d/actions/shell");
+    (*merged)[".shell"] = MakeSymlinkEntry(".shell", "",
+                                           ".singularity.d/actions/shell");
   }
   if (merged->find(".exec") == merged->end()) {
-    (*merged)[".exec"] =
-        MakeSymlinkEntry(".exec", "",
-                         ".singularity.d/actions/exec");
+    (*merged)[".exec"] = MakeSymlinkEntry(".exec", "",
+                                          ".singularity.d/actions/exec");
   }
   if (merged->find(".test") == merged->end()) {
-    (*merged)[".test"] =
-        MakeSymlinkEntry(".test", "",
-                         ".singularity.d/actions/test");
+    (*merged)[".test"] = MakeSymlinkEntry(".test", "",
+                                          ".singularity.d/actions/test");
   }
   if (merged->find("environment") == merged->end()) {
-    (*merged)["environment"] =
-        MakeSymlinkEntry("environment", "",
-                         ".singularity.d/env/90-environment.sh");
+    (*merged)["environment"] = MakeSymlinkEntry(
+        "environment", "", ".singularity.d/env/90-environment.sh");
   }
 
   LogCvmfs(kLogCvmfs, kLogStdout,
@@ -873,13 +883,14 @@ bool CommandOverlay::PublishMergedEntries(
   // expect parent_directory without leading '/' because MakeRelativePath
   // (called internally) prepends it.  Create a stripped copy for add calls.
   const string dest_path_rel = (!dest_path.empty() && dest_path[0] == '/')
-      ? dest_path.substr(1) : dest_path;
+                                   ? dest_path.substr(1)
+                                   : dest_path;
 
   // Ensure the destination directory itself exists in the catalog.
   // Check if dest_path already exists; if not, create it.
   catalog::DirectoryEntry dest_dirent;
   if (!catalog_mgr->LookupPath(dest_path, catalog::kLookupDefault,
-                                &dest_dirent)) {
+                               &dest_dirent)) {
     // Create the destination directory (and any missing parents)
     // Walk up to find the deepest existing ancestor
     vector<string> dirs_to_create;
@@ -887,7 +898,7 @@ bool CommandOverlay::PublishMergedEntries(
     while (!check_path.empty() && check_path != "/") {
       catalog::DirectoryEntry check_dirent;
       if (catalog_mgr->LookupPath(check_path, catalog::kLookupDefault,
-                                   &check_dirent)) {
+                                  &check_dirent)) {
         break;
       }
       dirs_to_create.push_back(check_path);
@@ -915,36 +926,37 @@ bool CommandOverlay::PublishMergedEntries(
       new_dir.linkcount_ = 2;
 
       catalog_mgr->AddDirectory(new_dir, XattrList(), parent);
-      LogCvmfs(kLogCvmfs, kLogDebug,
-               "Created destination directory: %s", dir.c_str());
+      LogCvmfs(kLogCvmfs, kLogDebug, "Created destination directory: %s",
+               dir.c_str());
     }
   }
 
   // Add entries in sorted order. The map is sorted lexicographically,
   // so parent directories appear before their children.
   for (map<string, OverlayEntry>::const_iterator it = merged.begin();
-       it != merged.end(); ++it) {
+       it != merged.end();
+       ++it) {
     const OverlayEntry &oe = it->second;
 
     // Build parent path without leading '/' for AddDirectory/AddFile
     // (MakeRelativePath inside those functions adds it back)
     const string parent_path = oe.parent.empty()
-        ? dest_path_rel
-        : dest_path_rel + "/" + oe.parent;
+                                   ? dest_path_rel
+                                   : dest_path_rel + "/" + oe.parent;
 
     if (oe.entry.IsDirectory()) {
       catalog_mgr->AddDirectory(oe.entry, oe.xattrs, parent_path);
     } else {
       catalog_mgr->AddFile(
-          static_cast<const catalog::DirectoryEntryBase &>(oe.entry),
-          oe.xattrs, parent_path);
+          static_cast<const catalog::DirectoryEntryBase &>(oe.entry), oe.xattrs,
+          parent_path);
     }
   }
 
   // Turn the destination directory into a nested catalog so that the overlay
   // content lives in its own catalog database file.
 
-  // Add a .cvmfscatalog marker file 
+  // Add a .cvmfscatalog marker file
   catalog::DirectoryEntryBase catalog_marker;
   catalog_marker.name_ = NameString(".cvmfscatalog");
   catalog_marker.mode_ = (S_IFREG | 0666);
@@ -955,16 +967,16 @@ bool CommandOverlay::PublishMergedEntries(
   catalog_marker.linkcount_ = 1;
   // Hash of the compressed empty file
   catalog_marker.checksum_ = shash::MkFromHexPtr(
-            shash::HexPtr("e8ec3d88b62ebf526e4e5a4ff6162a3aa48a6b78"),
-            shash::kSuffixNone);  // hash of ""
+      shash::HexPtr("e8ec3d88b62ebf526e4e5a4ff6162a3aa48a6b78"),
+      shash::kSuffixNone);  // hash of ""
   catalog_mgr->AddFile(catalog_marker, XattrList(), dest_path_rel);
   // CreateNestedCatalog calls MakeRelativePath internally which prepends '/'.
   // Pass the stripped version to avoid a double leading slash.
   catalog_mgr->CreateNestedCatalog(dest_path_rel);
 
   LogCvmfs(kLogCvmfs, kLogStdout,
-           "Published %zu entries under %s (nested catalog)",
-           merged.size(), dest_path.c_str());
+           "Published %zu entries under %s (nested catalog)", merged.size(),
+           dest_path.c_str());
   return true;
 }
 
@@ -997,8 +1009,7 @@ catalog::Catalog *CommandOverlay::LoadCatalogForPath(
     catalog_path = temp_dir + "/" + root_hash.ToString();
 
     if (!zlib::DecompressPath2Path(source_path, catalog_path)) {
-      LogCvmfs(kLogCvmfs, kLogStderr,
-               "Failed to decompress catalog %s from %s",
+      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to decompress catalog %s from %s",
                root_hash.ToString().c_str(), source_path.c_str());
       return NULL;
     }
@@ -1007,8 +1018,7 @@ catalog::Catalog *CommandOverlay::LoadCatalogForPath(
   catalog::Catalog *catalog = catalog::Catalog::AttachFreely(
       subdirectory, catalog_path, root_hash);
   if (catalog == NULL) {
-    LogCvmfs(kLogCvmfs, kLogStderr,
-             "Failed to attach catalog for path %s",
+    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to attach catalog for path %s",
              subdirectory.c_str());
     unlink(catalog_path.c_str());
     return NULL;
@@ -1039,19 +1049,20 @@ catalog::Catalog *CommandOverlay::FindCatalogForLayer(
 
   // Verify layer_path starts with the mountpoint (or mountpoint is empty
   // for the root catalog)
-  if (!mountpoint.empty() && layer_path.substr(0, mountpoint.length())
-                                                            != mountpoint) {
+  if (!mountpoint.empty()
+      && layer_path.substr(0, mountpoint.length()) != mountpoint) {
     return NULL;
   }
 
   // Get the suffix of layer_path below the mountpoint
-  const string suffix = mountpoint.empty() ? layer_path
-                                           : layer_path.substr(
-                                                 mountpoint.length());
+  const string suffix = mountpoint.empty()
+                            ? layer_path
+                            : layer_path.substr(mountpoint.length());
   const vector<string> components = SplitString(suffix, '/');
   string prefix = mountpoint;
   for (size_t i = 0; i < components.size(); ++i) {
-    if (components[i].empty()) continue;
+    if (components[i].empty())
+      continue;
     prefix += "/" + components[i];
 
     catalog::DirectoryEntry dir_entry;
@@ -1069,19 +1080,19 @@ catalog::Catalog *CommandOverlay::FindCatalogForLayer(
         return NULL;
       }
 
-      catalog::Catalog *nested = LoadCatalogForPath(
-          repo_base, prefix, temp_dir, nested_hash);
+      catalog::Catalog *nested = LoadCatalogForPath(repo_base, prefix, temp_dir,
+                                                    nested_hash);
       if (nested == NULL) {
-        LogCvmfs(kLogCvmfs, kLogStderr,
-                 "Failed to load nested catalog at %s", prefix.c_str());
+        LogCvmfs(kLogCvmfs, kLogStderr, "Failed to load nested catalog at %s",
+                 prefix.c_str());
         return NULL;
       }
       loaded_catalogs->push_back(nested);
 
       // Recurse: the layer path may be directly in this nested catalog
       // or in an even deeper nested catalog
-      return FindCatalogForLayer(
-          repo_base, temp_dir, nested, layer_path, loaded_catalogs);
+      return FindCatalogForLayer(repo_base, temp_dir, nested, layer_path,
+                                 loaded_catalogs);
     }
   }
 
@@ -1097,9 +1108,8 @@ int CommandOverlay::Main(const ArgumentList &args) {
   const string stratum0 = *args.find('w')->second;
   const string temp_dir = MakeCanonicalPath(*args.find('t')->second);
   const string manifest_path = *args.find('o')->second;
-  const shash::Any base_hash =
-      shash::MkFromHexPtr(shash::HexPtr(*args.find('b')->second),
-                          shash::kSuffixCatalog);
+  const shash::Any base_hash = shash::MkFromHexPtr(
+      shash::HexPtr(*args.find('b')->second), shash::kSuffixCatalog);
   const string public_keys = *args.find('K')->second;
   const string repo_name = *args.find('N')->second;
 
@@ -1123,20 +1133,19 @@ int CommandOverlay::Main(const ArgumentList &args) {
   }
   zlib::Algorithms compression_alg = zlib::kZlibDefault;
   if (args.find('Z') != args.end()) {
-    compression_alg = zlib::ParseCompressionAlgorithm(
-        *args.find('Z')->second);
+    compression_alg = zlib::ParseCompressionAlgorithm(*args.find('Z')->second);
   }
 
-  const string oci_config_path =
-      (args.count('c') > 0) ? *args.find('c')->second : "";
+  const string oci_config_path = (args.count('c') > 0) ? *args.find('c')->second
+                                                       : "";
   const bool skip_singularity = (args.count('S') > 0);
 
   // Gateway lease: empty for a directly-writable (S3/local) upstream, set when
   // committing through a repository gateway (mountless publishing).
-  const string session_token_file =
-      (args.count('P') > 0) ? *args.find('P')->second : "";
-  const string key_file =
-      (args.count('H') > 0) ? *args.find('H')->second : "";
+  const string session_token_file = (args.count('P') > 0)
+                                        ? *args.find('P')->second
+                                        : "";
+  const string key_file = (args.count('H') > 0) ? *args.find('H')->second : "";
 
   // Parse comma-separated layer paths
   const vector<string> layers = SplitString(layers_str, ',');
@@ -1156,24 +1165,22 @@ int CommandOverlay::Main(const ArgumentList &args) {
 
   const upload::SpoolerDefinition spooler_definition(
       spooler_definition_str, hash_algorithm, compression_alg,
-      false /* generate_legacy_bulk_chunks */,
-      false /* use_file_chunking */,
-      0, 0, 0 /* chunk sizes: unused */,
-      session_token_file, key_file);
+      false /* generate_legacy_bulk_chunks */, false /* use_file_chunking */, 0,
+      0, 0 /* chunk sizes: unused */, session_token_file, key_file);
 
   const upload::SpoolerDefinition spooler_definition_catalogs(
       spooler_definition.Dup2DefaultCompression());
 
-  const UniquePtr<upload::Spooler> spooler_files(
+  const std::unique_ptr<upload::Spooler> spooler_files(
       upload::Spooler::Construct(spooler_definition, &publish_statistics));
-  if (!spooler_files.IsValid()) {
+  if (spooler_files.get() == nullptr) {
     PrintError("Failed to create file spooler");
     return 3;
   }
-  const UniquePtr<upload::Spooler> spooler_catalogs(
+  const std::unique_ptr<upload::Spooler> spooler_catalogs(
       upload::Spooler::Construct(spooler_definition_catalogs,
                                  &publish_statistics));
-  if (!spooler_catalogs.IsValid()) {
+  if (spooler_catalogs.get() == nullptr) {
     PrintError("Failed to create catalog spooler");
     return 3;
   }
@@ -1191,9 +1198,9 @@ int CommandOverlay::Main(const ArgumentList &args) {
   }
 
   // Fetch repository manifest
-  const UniquePtr<manifest::Manifest> manifest(
+  const std::unique_ptr<manifest::Manifest> manifest(
       FetchRemoteManifest(stratum0, repo_name, base_hash));
-  if (!manifest.IsValid()) {
+  if (manifest.get() == nullptr) {
     PrintError("Failed to load repository manifest");
     return 3;
   }
@@ -1204,8 +1211,8 @@ int CommandOverlay::Main(const ArgumentList &args) {
 
   // Load root catalog for reading layer entries
   map<string, OverlayEntry> merged;
-  catalog::Catalog *root_catalog = LoadCatalogForPath(
-      stratum0, "", temp_dir, manifest->catalog_hash());
+  catalog::Catalog *root_catalog = LoadCatalogForPath(stratum0, "", temp_dir,
+                                                      manifest->catalog_hash());
   if (root_catalog == NULL) {
     PrintError("Failed to load root catalog");
     return 1;
@@ -1215,16 +1222,16 @@ int CommandOverlay::Main(const ArgumentList &args) {
   for (size_t i = 0; i < layers.size(); ++i) {
     string layer_path = MakeCanonicalPath(layers[i]);
     // Ensure layer path starts with exactly one '/'
-    while (layer_path.length() > 1
-           && layer_path[0] == '/' && layer_path[1] == '/') {
+    while (layer_path.length() > 1 && layer_path[0] == '/'
+           && layer_path[1] == '/') {
       layer_path = layer_path.substr(1);
     }
     if (layer_path.empty() || layer_path[0] != '/') {
       layer_path = "/" + layer_path;
     }
 
-    LogCvmfs(kLogCvmfs, kLogStdout, "Processing layer %zu: %s",
-             i, layer_path.c_str());
+    LogCvmfs(kLogCvmfs, kLogStdout, "Processing layer %zu: %s", i,
+             layer_path.c_str());
 
     map<string, OverlayEntry> layer_entries;
 
@@ -1258,8 +1265,7 @@ int CommandOverlay::Main(const ArgumentList &args) {
       uint64_t nested_size;
       if (!layer_catalog->FindNested(ps_layer_path, &nested_hash,
                                      &nested_size)) {
-        LogCvmfs(kLogCvmfs, kLogStderr,
-                 "Failed to find nested catalog for %s",
+        LogCvmfs(kLogCvmfs, kLogStderr, "Failed to find nested catalog for %s",
                  layer_path.c_str());
         for (size_t j = 0; j < loaded_catalogs.size(); ++j)
           delete loaded_catalogs[j];
@@ -1270,8 +1276,7 @@ int CommandOverlay::Main(const ArgumentList &args) {
       catalog::Catalog *nested_catalog = LoadCatalogForPath(
           stratum0, layer_path, temp_dir, nested_hash);
       if (nested_catalog == NULL) {
-        LogCvmfs(kLogCvmfs, kLogStderr,
-                 "Failed to load nested catalog for %s",
+        LogCvmfs(kLogCvmfs, kLogStderr, "Failed to load nested catalog for %s",
                  layer_path.c_str());
         for (size_t j = 0; j < loaded_catalogs.size(); ++j)
           delete loaded_catalogs[j];
@@ -1279,12 +1284,12 @@ int CommandOverlay::Main(const ArgumentList &args) {
         return 1;
       }
 
-      ReadCatalogEntries(nested_catalog, layer_path, "",
-                         stratum0, temp_dir, &layer_entries);
+      ReadCatalogEntries(nested_catalog, layer_path, "", stratum0, temp_dir,
+                         &layer_entries);
       delete nested_catalog;
     } else {
-      ReadCatalogEntries(layer_catalog, layer_path, "",
-                         stratum0, temp_dir, &layer_entries);
+      ReadCatalogEntries(layer_catalog, layer_path, "", stratum0, temp_dir,
+                         &layer_entries);
     }
 
     // Clean up any intermediate catalogs loaded during hierarchy walk
@@ -1304,28 +1309,22 @@ int CommandOverlay::Main(const ArgumentList &args) {
 
   // Inject Singularity dotfiles if requested
   if (!oci_config_path.empty() && !skip_singularity) {
-    if (!InjectSingularityDotfiles(oci_config_path,
-                                   spooler_files.weak_ref(), &merged)) {
+    if (!InjectSingularityDotfiles(oci_config_path, spooler_files.get(),
+                                   &merged)) {
       PrintError("Failed to inject Singularity dotfiles");
       return 4;
     }
   }
 
   // Set up WritableCatalogManager and publish merged entries
-  LogCvmfs(kLogCvmfs, kLogStdout,
-           "Publishing %zu merged entries under %s",
+  LogCvmfs(kLogCvmfs, kLogStdout, "Publishing %zu merged entries under %s",
            merged.size(), dest_path.c_str());
 
   catalog::WritableCatalogManager catalog_manager(
-      base_hash, stratum0, temp_dir,
-      spooler_catalogs.weak_ref(), download_manager(),
-      false /* enforce_limits */,
-      0 /* nested_kcatalog_limit */,
-      0 /* root_kcatalog_limit */,
-      0 /* file_mbyte_limit */,
-      statistics(),
-      false /* is_balanceable */,
-      0 /* max_weight */, 0 /* min_weight */);
+      base_hash, stratum0, temp_dir, spooler_catalogs.get(), download_manager(),
+      false /* enforce_limits */, 0 /* nested_kcatalog_limit */,
+      0 /* root_kcatalog_limit */, 0 /* file_mbyte_limit */, statistics(),
+      false /* is_balanceable */, 0 /* max_weight */, 0 /* min_weight */);
   catalog_manager.Init();
 
   if (!PublishMergedEntries(&catalog_manager, merged, dest_path)) {
@@ -1335,7 +1334,7 @@ int CommandOverlay::Main(const ArgumentList &args) {
 
   // Commit catalog changes and produce updated manifest
   catalog_manager.PrecalculateListings();
-  if (!catalog_manager.Commit(false, 0, manifest.weak_ref())) {
+  if (!catalog_manager.Commit(false, 0, manifest.get())) {
     PrintError("Failed to commit catalog changes");
     return 5;
   }
@@ -1359,8 +1358,8 @@ int CommandOverlay::Main(const ArgumentList &args) {
     return 6;
   }
 
-  LogCvmfs(kLogCvmfs, kLogStdout,
-           "Overlay published successfully to %s", dest_path.c_str());
+  LogCvmfs(kLogCvmfs, kLogStdout, "Overlay published successfully to %s",
+           dest_path.c_str());
   return 0;
 }
 
