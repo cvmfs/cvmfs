@@ -48,27 +48,17 @@ const unsigned FuseInvalidator::kCheckTimeoutFreqOps = 256;
 bool FuseInvalidator::g_fuse_notify_invalidation_ = true;
 
 bool FuseInvalidator::HasFuseNotifyInval() {
-  /**
-   * Technically, also libfuse 2.8 has support.  Libfuse 2.8 comes with EL6,
-   * which had bugs reported related to the fuse_notify_inval_...() functions.
-   * Since just waiting for the timeout works perfectly fine, there is no reason
-   * to optimize for forced cache eviction too aggressively.
-   *
-   * TODO(jblomer): could we have libfuse 2.9 or higher with a very old kernel
-   * that doesn't support active invalidation?  How old does the kernel need
-   * to be?  Probably that situation is never triggered in practice.
-   */
-  return FuseInvalidator::g_fuse_notify_invalidation_ && (FUSE_VERSION >= 29);
+  return FuseInvalidator::g_fuse_notify_invalidation_;
 }
 
 
 FuseInvalidator::FuseInvalidator(MountPoint *mount_point,
-                                 void **fuse_channel_or_session,
+                                 struct fuse_session **fuse_session,
                                  bool fuse_notify_invalidation)
     : mount_point_(mount_point)
     , inode_tracker_(mount_point->inode_tracker())
     , dentry_tracker_(mount_point->dentry_tracker())
-    , fuse_channel_or_session_(fuse_channel_or_session)
+    , fuse_session_(fuse_session)
     , spawned_(false) {
   g_fuse_notify_invalidation_ = fuse_notify_invalidation;
   memset(&thread_invalidator_, 0, sizeof(thread_invalidator_));
@@ -77,12 +67,12 @@ FuseInvalidator::FuseInvalidator(MountPoint *mount_point,
 
 FuseInvalidator::FuseInvalidator(glue::InodeTracker *inode_tracker,
                                  glue::DentryTracker *dentry_tracker,
-                                 void **fuse_channel_or_session,
+                                 struct fuse_session **fuse_session,
                                  bool fuse_notify_invalidation)
     : mount_point_(NULL)
     , inode_tracker_(inode_tracker)
     , dentry_tracker_(dentry_tracker)
-    , fuse_channel_or_session_(fuse_channel_or_session)
+    , fuse_session_(fuse_session)
     , spawned_(false) {
   g_fuse_notify_invalidation_ = fuse_notify_invalidation;
   memset(&thread_invalidator_, 0, sizeof(thread_invalidator_));
@@ -149,7 +139,7 @@ void *FuseInvalidator::MainInvalidator(void *data) {
     InvalDentryCommand
         *inval_dentry_command = dynamic_cast<InvalDentryCommand *>(command);
     if (inval_dentry_command) {
-      if (invalidator->fuse_channel_or_session_ == NULL) {
+      if (invalidator->fuse_session_ == NULL) {
         if (!reported_missing_inval_support) {
           LogCvmfs(kLogCvmfs, kLogSyslogWarn,
                    "missing fuse support for dentry invalidation "
@@ -165,21 +155,10 @@ void *FuseInvalidator::MainInvalidator(void *data) {
       LogCvmfs(kLogCvmfs, kLogDebug, "evicting single dentry %" PRIu64 "/%s",
                inval_dentry_command->parent_ino,
                inval_dentry_command->name.ToString().c_str());
-#if CVMFS_USE_LIBFUSE == 2
       fuse_lowlevel_notify_inval_entry(
-          *reinterpret_cast<struct fuse_chan **>(
-              invalidator->fuse_channel_or_session_),
-          inval_dentry_command->parent_ino,
+          *invalidator->fuse_session_, inval_dentry_command->parent_ino,
           inval_dentry_command->name.GetChars(),
           inval_dentry_command->name.GetLength());
-#else
-      fuse_lowlevel_notify_inval_entry(
-          *reinterpret_cast<struct fuse_session **>(
-              invalidator->fuse_channel_or_session_),
-          inval_dentry_command->parent_ino,
-          inval_dentry_command->name.GetChars(),
-          inval_dentry_command->name.GetLength());
-#endif
       inval_dentry_command->~InvalDentryCommand();
       free(inval_dentry_command);
       continue;
@@ -198,8 +177,7 @@ void *FuseInvalidator::MainInvalidator(void *data) {
     const uint64_t deadline = platform_monotonic_time() + handle->timeout_s_;
 
     // Fallback: drainout by timeout
-    if ((invalidator->fuse_channel_or_session_ == NULL)
-        || !HasFuseNotifyInval()) {
+    if ((invalidator->fuse_session_ == NULL) || !HasFuseNotifyInval()) {
       while (platform_monotonic_time() < deadline) {
         SafeSleepMs(kCheckTimeoutFreqMs);
         if (atomic_read32(&invalidator->terminated_) == 1) {
@@ -230,19 +208,8 @@ void *FuseInvalidator::MainInvalidator(void *data) {
         inode = FUSE_ROOT_ID;
       // Can fail, e.g. the inode might be already evicted
 
-      int dbg_retval;
-
-#if CVMFS_USE_LIBFUSE == 2
-      dbg_retval = fuse_lowlevel_notify_inval_inode(
-          *reinterpret_cast<struct fuse_chan **>(
-              invalidator->fuse_channel_or_session_),
-          inode, 0, 0);
-#else
-      dbg_retval = fuse_lowlevel_notify_inval_inode(
-          *reinterpret_cast<struct fuse_session **>(
-              invalidator->fuse_channel_or_session_),
-          inode, 0, 0);
-#endif
+      const int dbg_retval = fuse_lowlevel_notify_inval_inode(
+          *invalidator->fuse_session_, inode, 0, 0);
       LogCvmfs(kLogCvmfs, kLogDebug,
                "evicting inode %" PRIu64 " with retval: %d", inode, dbg_retval);
 
@@ -271,10 +238,6 @@ void *FuseInvalidator::MainInvalidator(void *data) {
     NameString entry_name;
     i = 0;
 
-#if CVMFS_USE_LIBFUSE == 2
-    int (*notify_func)(struct fuse_chan *, fuse_ino_t, const char *, size_t);
-    notify_func = &fuse_lowlevel_notify_inval_entry;
-#else
     int (*notify_func)(struct fuse_session *, fuse_ino_t, const char *, size_t);
     notify_func = &fuse_lowlevel_notify_inval_entry;
 #if FUSE_VERSION >= FUSE_MAKE_VERSION(3, 16)
@@ -286,25 +249,14 @@ void *FuseInvalidator::MainInvalidator(void *data) {
       notify_func = &fuse_lowlevel_notify_expire_entry;
     }
 #endif
-#endif
 
     while (
         dentries_copy->NextEntry(&dentry_cursor, &entry_parent, &entry_name)) {
       LogCvmfs(kLogCvmfs, kLogDebug, "evicting dentry %lu --> %s", entry_parent,
                entry_name.c_str());
       // Can fail, e.g. the entry might be already evicted
-#if CVMFS_USE_LIBFUSE == 2
-      struct fuse_chan
-          *channel_or_session = *reinterpret_cast<struct fuse_chan **>(
-              invalidator->fuse_channel_or_session_);
-#else
-      struct fuse_session
-          *channel_or_session = *reinterpret_cast<struct fuse_session **>(
-              invalidator->fuse_channel_or_session_);
-#endif
-
-      notify_func(channel_or_session, entry_parent, entry_name.GetChars(),
-                  entry_name.GetLength());
+      notify_func(*invalidator->fuse_session_, entry_parent,
+                  entry_name.GetChars(), entry_name.GetLength());
 
       if ((++i % kCheckTimeoutFreqOps) == 0) {
         if (atomic_read32(&invalidator->terminated_) == 1) {

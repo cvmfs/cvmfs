@@ -55,16 +55,10 @@ _remove_client() {
   done
   rm -f "$pkgdir/etc/cvmfs/config.sh" "$pkgdir/etc/autofs/auto.cvmfs" \
     "$pkgdir/etc/cvmfs/default.conf"
-  rm -f "$pkgdir/usr/lib/libcvmfs_fuse.so" \
-    "$pkgdir/usr/lib/libcvmfs_fuse.so.$pkgver" \
-    "$pkgdir/usr/lib/libcvmfs_fuse_debug.so" \
-    "$pkgdir/usr/lib/libcvmfs_fuse_debug.so.$pkgver" \
-    "$pkgdir/usr/lib/libcvmfs_fuse3.so" \
+  rm -f "$pkgdir/usr/lib/libcvmfs_fuse3.so" \
     "$pkgdir/usr/lib/libcvmfs_fuse3.so.$pkgver" \
     "$pkgdir/usr/lib/libcvmfs_fuse3_debug.so" \
     "$pkgdir/usr/lib/libcvmfs_fuse3_debug.so.$pkgver" \
-    "$pkgdir/usr/lib/libcvmfs_fuse_stub.so" \
-    "$pkgdir/usr/lib/libcvmfs_fuse_stub.so.$pkgver" \
     "$pkgdir/usr/lib/libcvmfs_fuse3_stub.so" \
     "$pkgdir/usr/lib/libcvmfs_fuse3_stub.so.$pkgver"
   rm -rf "$pkgdir/etc/cvmfs/default.d" "$pkgdir/usr/lib/cvmfs" \

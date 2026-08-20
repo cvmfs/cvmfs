@@ -159,11 +159,11 @@ void FuseRemounter::EnterMaintenanceMode() {
 
 FuseRemounter::FuseRemounter(MountPoint *mountpoint,
                              cvmfs::InodeGenerationInfo *inode_generation_info,
-                             void **fuse_channel_or_session,
+                             struct fuse_session **fuse_session,
                              bool fuse_notify_invalidation)
     : mountpoint_(mountpoint)
     , inode_generation_info_(inode_generation_info)
-    , invalidator_(new FuseInvalidator(mountpoint, fuse_channel_or_session,
+    , invalidator_(new FuseInvalidator(mountpoint, fuse_session,
                                        fuse_notify_invalidation))
     , invalidator_handle_(static_cast<int>(mountpoint->kcache_timeout_sec()))
     , fence_(new Fence())
