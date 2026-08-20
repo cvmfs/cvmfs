@@ -1,9 +1,8 @@
 /**
  * This file is part of the CernVM File System.
  *
- * The Fuse module entry point. Dynamically selects either the libfuse3
- * cvmfs fuse module or the libfuse2 one, depending on the availability and on
- * the mount options.
+ * The Fuse module entry point. Loads the cvmfs fuse module (libcvmfs_fuse3),
+ * in debug or normal flavour depending on the mount options.
  *
  */
 
@@ -37,7 +36,6 @@ int main(int argc, char **argv) {
   }
 
   bool debug = false;
-  unsigned enforce_libfuse = 0;
   int c;
   opterr = 0;
   while ((c = getopt(optc, optv, "do:")) != -1) {
@@ -51,15 +49,6 @@ int main(int argc, char **argv) {
           if (mount_options[i] == "debug") {
             debug = true;
           }
-
-          if (HasPrefix(mount_options[i], "libfuse=", false /*ign_case*/)) {
-            std::vector<std::string> t = SplitString(mount_options[i], '=');
-            enforce_libfuse = String2Uint64(t[1]);
-            if (debug) {
-              LogCvmfs(kLogCvmfs, kLogDebug | kLogStdout,
-                       "Debug: enforcing libfuse version %u", enforce_libfuse);
-            }
-          }
         }
         break;
     }
@@ -71,19 +60,9 @@ int main(int argc, char **argv) {
   }
   free(optv);
 
-  const std::string libname_fuse2 = platform_libname("cvmfs_fuse_stub");
   const std::string libname_fuse3 = platform_libname("cvmfs_fuse3_stub");
 
   std::string error_messages;
-
-  if (enforce_libfuse > 0) {
-    if ((enforce_libfuse < 2) || (enforce_libfuse > 3)) {
-      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
-               "Error: invalid libfuse version '%u', valid values are 2 or 3.",
-               enforce_libfuse);
-      return 1;
-    }
-  }
 
   std::string local_lib_path = "./";
   if (getenv("CVMFS_LIBRARY_PATH") != NULL) {
@@ -92,24 +71,15 @@ int main(int argc, char **argv) {
       local_lib_path.push_back('/');
   }
 
-  // Try loading libfuse3 module, else fallback to version 2
   std::vector<std::string> library_paths;
-  if ((enforce_libfuse == 0) || (enforce_libfuse == 3)) {
-    library_paths.push_back(local_lib_path + libname_fuse3);
-    library_paths.push_back("/usr/lib/" + libname_fuse3);
-    library_paths.push_back("/usr/lib64/" + libname_fuse3);
+  library_paths.push_back(local_lib_path + libname_fuse3);
+  library_paths.push_back("/usr/lib/" + libname_fuse3);
+  library_paths.push_back("/usr/lib64/" + libname_fuse3);
 #ifdef __APPLE__
-    library_paths.push_back("/usr/local/lib/" + libname_fuse3);
+  // Since OS X El Capitan (10.11) came with SIP, we needed to relocate our
+  // binaries from /usr/... to /usr/local/...
+  library_paths.push_back("/usr/local/lib/" + libname_fuse3);
 #endif
-  }
-  if ((enforce_libfuse == 0) || (enforce_libfuse == 2)) {
-    library_paths.push_back(local_lib_path + libname_fuse2);
-    library_paths.push_back("/usr/lib/" + libname_fuse2);
-    library_paths.push_back("/usr/lib64/" + libname_fuse2);
-#ifdef __APPLE__
-    library_paths.push_back("/usr/local/lib/" + libname_fuse2);
-#endif
-  }
 
   void *library_handle;
   std::vector<std::string>::const_iterator i = library_paths.begin();

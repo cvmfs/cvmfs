@@ -72,15 +72,6 @@ cd $copied_source
 
 . /etc/os-release
 VERSION_NUMBER=$(echo ${VERSION_ID} | tr -d '.')
-# libfuse2 packaging is disabled: libfuse-dev is not available in the build
-# environment and libfuse3 is used on all supported platforms.
-BUILD_LIBFUSE2=no
-if [ "${BUILD_LIBFUSE2}" = "yes" ]; then
-  sed -i -e "s/^#BUILD_LIBFUSE2//g" debian/control
-  sed -i -e "s/^#BUILD_LIBFUSE2/BUILD_LIBFUSE2/g" debian/rules
-fi
-
-
 cpu_cores=$(get_number_of_cpu_cores)
 echo "do the build (with $cpu_cores cores)..."
 dch -v $cvmfs_version -M "bumped upstream version number"

@@ -463,7 +463,7 @@ cvmfs_chksetup() {
   done
 
   if [ "$sys_arch" = "Darwin" ]; then
-    cvmfs_libs="libcvmfs_fuse.dylib libcvmfs_fuse_debug.dylib"
+    cvmfs_libs="libcvmfs_fuse3.dylib libcvmfs_fuse3_debug.dylib"
   else
     cvmfs_libs="libcvmfs_fuse3.so libcvmfs_fuse3_debug.so"
   fi
@@ -1334,16 +1334,34 @@ cvmfs_status() {
 
 
 
+_cvmfs_is_libfuse2_pid() {
+  # libfuse2 support has been removed; the fuse3-only cvmfs_fuse3.so cannot
+  # take over a mount that is still running against libcvmfs_fuse.so, so
+  # reload must skip such mounts instead of tearing them down.
+  local pid="$1"
+  [ "x$sys_arch" = "xLinux" ] || return 1
+  [ -n "$pid" ] && [ -r "/proc/$pid/maps" ] || return 1
+  grep -qE 'libcvmfs_fuse(_debug)?\.so' "/proc/$pid/maps" 2>/dev/null
+}
+
 _cvmfs_reload_pause() {
   # Helper function to put a particular repository in sleep mode
   local mountpoint="$1"
   local debug_flag=""
- 
+
   cd "$mountpoint" 2>/dev/null || return
   get_attr fqrn ${mountpoint}; fqrn=$attr_value
   get_attr pid ${mountpoint}; pid=$attr_value
   if [ -z "$fqrn" ] || [ -z "$pid" ]; then
     # This repository must have been unmounted just now
+    cd /
+    return 1
+  fi
+
+  if _cvmfs_is_libfuse2_pid "$pid"; then
+    echo "WARNING: ${fqrn} on ${mountpoint} (pid ${pid}) is still running on" \
+         "libfuse2, which is no longer supported.  Skipping reload; unmount" \
+         "and remount this repository to switch it to libfuse3." 1>&2
     cd /
     return 1
   fi
@@ -1399,6 +1417,14 @@ cvmfs_reload() {
 
     if [ "x${CVMFS_DEBUGLOG}" != "x" ]; then
       debug_flag="--debug"
+    fi
+
+    get_attr pid "${CVMFS_MOUNT_DIR}/${fqrn}"; pid=$attr_value
+    if _cvmfs_is_libfuse2_pid "$pid"; then
+      echo "WARNING: ${fqrn} (pid ${pid}) is still running on libfuse2," \
+           "which is no longer supported.  Refusing to reload; unmount and" \
+           "remount this repository to switch it to libfuse3." 1>&2
+      return 1
     fi
 
     cvmfs2 __RELOAD__ ${CVMFS_RELOAD_SOCKETS}/cvmfs.$fqrn ${debug_flag}
