@@ -158,16 +158,17 @@ typedef std::vector<LoadEvent *> EventList;
  * CernVM-FS 2.8.2 --> Version 5, add device_id
  * CernVM-FS 2.14.0 --> Version 6, no change to fields, but signifies that the
  *                      main watchdog process does not restart during reload
+ * CernVM-FS 2.15.0 --> Version 7, fuse_channel_or_session --> fuse_session
  */
 struct LoaderExports {
   LoaderExports()
-      : version(6)
+      : version(7)
       , size(sizeof(LoaderExports))
       , boot_time(0)
       , foreground(false)
       , disable_watchdog(false)
       , simple_options_parsing(false)
-      , fuse_channel_or_session(NULL)
+      , fuse_session(NULL)
       , fuse_passthrough(false)
   { }
 
@@ -195,12 +196,10 @@ struct LoaderExports {
   bool simple_options_parsing;
 
   // added with CernVM-FS 2.4.0 (LoaderExports Version: 4)
-  // As of CernVM-FS 2.7, this has been rebranded from
-  // struct fuse_chan **fuse_channel  to
-  // void **fuse_channel_or_session
-  // in order to work with both libfuse2 and libfuse3.  Since the removal of
-  // libfuse2 support it always points to a struct fuse_session *.
-  void **fuse_channel_or_session;
+  // Renamed and retyped with CernVM-FS 2.15.0 (LoaderExports Version: 7).
+  // The pointer indirection lets the FUSE module access the session created by
+  // the loader after the module has been initialized.
+  struct fuse_session **fuse_session;
 
   bool fuse_passthrough;
 

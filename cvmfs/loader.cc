@@ -924,6 +924,7 @@ int FuseMain(int argc, char *argv[]) {
   const bool delegated_unmount = (!suid_mode_ && !disable_watchdog_);
   bool dounmount = false;
   int premount_fd = -1;
+  struct fuse_session *session = NULL;
 
   // Drop credentials, most likely temporarily since by default there is
   // a watchdog
@@ -1012,9 +1013,7 @@ int FuseMain(int argc, char *argv[]) {
   delete options_manager;
   options_manager = NULL;
 
-  struct fuse_session *session;
-  loader_exports_->fuse_channel_or_session = reinterpret_cast<void **>(
-      &session);
+  loader_exports_->fuse_session = &session;
 
   // Load and initialize cvmfs library
   LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,

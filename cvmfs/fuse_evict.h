@@ -78,7 +78,7 @@ class FuseInvalidator : SingleCopy {
   };
 
   FuseInvalidator(MountPoint *mountpoint,
-                  void **fuse_channel_or_session,
+                  struct fuse_session **fuse_session,
                   bool fuse_notify_invalidation);
   ~FuseInvalidator();
   void Spawn();
@@ -93,7 +93,7 @@ class FuseInvalidator : SingleCopy {
    */
   FuseInvalidator(glue::InodeTracker *inode_tracker,
                   glue::DentryTracker *dentry_tracker,
-                  void **fuse_channel_or_session,
+                  struct fuse_session **fuse_session,
                   bool fuse_notify_invalidation);
   /**
    * Add one second to the caller-provided timeout to be on the safe side.
@@ -115,11 +115,7 @@ class FuseInvalidator : SingleCopy {
 
   glue::InodeTracker *inode_tracker_;
   glue::DentryTracker *dentry_tracker_;
-  /**
-   * Points to the loader's struct fuse_session *.  Kept as void ** because the
-   * loader interface predates the libfuse2 removal.
-   */
-  void **fuse_channel_or_session_;
+  struct fuse_session **fuse_session_;
   bool spawned_;
   Channel<Command> channel_;
   pthread_t thread_invalidator_;

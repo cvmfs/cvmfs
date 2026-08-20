@@ -2267,9 +2267,7 @@ void UnregisterQuotaListener() {
 }
 
 bool SendFuseFd(const std::string &socket_path) {
-  const int fuse_fd = fuse_session_fd(
-      *reinterpret_cast<struct fuse_session **>(
-          loader_exports_->fuse_channel_or_session));
+  const int fuse_fd = fuse_session_fd(*loader_exports_->fuse_session);
   assert(fuse_fd >= 0);
   const int sock_fd = ConnectSocket(socket_path);
   if (sock_fd < 0) {
@@ -2527,9 +2525,9 @@ static int Init(const loader::LoaderExports *loader_exports) {
   LogCvmfs(kLogCvmfs, kLogDebug, "root inode is %" PRIu64,
            uint64_t(cvmfs::mount_point_->catalog_mgr()->GetRootInode()));
 
-  void **channel_or_session = NULL;
+  struct fuse_session **fuse_session = NULL;
   if (loader_exports->version >= 4) {
-    channel_or_session = loader_exports->fuse_channel_or_session;
+    fuse_session = loader_exports->fuse_session;
   }
 
   bool fuse_notify_invalidation = true;
@@ -2541,7 +2539,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
     }
   }
   cvmfs::fuse_remounter_ = new FuseRemounter(
-      cvmfs::mount_point_, &cvmfs::inode_generation_info_, channel_or_session,
+      cvmfs::mount_point_, &cvmfs::inode_generation_info_, fuse_session,
       fuse_notify_invalidation);
 
   // Control & command interface

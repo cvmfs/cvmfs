@@ -53,12 +53,12 @@ bool FuseInvalidator::HasFuseNotifyInval() {
 
 
 FuseInvalidator::FuseInvalidator(MountPoint *mount_point,
-                                 void **fuse_channel_or_session,
+                                 struct fuse_session **fuse_session,
                                  bool fuse_notify_invalidation)
     : mount_point_(mount_point)
     , inode_tracker_(mount_point->inode_tracker())
     , dentry_tracker_(mount_point->dentry_tracker())
-    , fuse_channel_or_session_(fuse_channel_or_session)
+    , fuse_session_(fuse_session)
     , spawned_(false) {
   g_fuse_notify_invalidation_ = fuse_notify_invalidation;
   memset(&thread_invalidator_, 0, sizeof(thread_invalidator_));
@@ -67,12 +67,12 @@ FuseInvalidator::FuseInvalidator(MountPoint *mount_point,
 
 FuseInvalidator::FuseInvalidator(glue::InodeTracker *inode_tracker,
                                  glue::DentryTracker *dentry_tracker,
-                                 void **fuse_channel_or_session,
+                                 struct fuse_session **fuse_session,
                                  bool fuse_notify_invalidation)
     : mount_point_(NULL)
     , inode_tracker_(inode_tracker)
     , dentry_tracker_(dentry_tracker)
-    , fuse_channel_or_session_(fuse_channel_or_session)
+    , fuse_session_(fuse_session)
     , spawned_(false) {
   g_fuse_notify_invalidation_ = fuse_notify_invalidation;
   memset(&thread_invalidator_, 0, sizeof(thread_invalidator_));
@@ -139,7 +139,7 @@ void *FuseInvalidator::MainInvalidator(void *data) {
     InvalDentryCommand
         *inval_dentry_command = dynamic_cast<InvalDentryCommand *>(command);
     if (inval_dentry_command) {
-      if (invalidator->fuse_channel_or_session_ == NULL) {
+      if (invalidator->fuse_session_ == NULL) {
         if (!reported_missing_inval_support) {
           LogCvmfs(kLogCvmfs, kLogSyslogWarn,
                    "missing fuse support for dentry invalidation "
@@ -156,9 +156,7 @@ void *FuseInvalidator::MainInvalidator(void *data) {
                inval_dentry_command->parent_ino,
                inval_dentry_command->name.ToString().c_str());
       fuse_lowlevel_notify_inval_entry(
-          *reinterpret_cast<struct fuse_session **>(
-              invalidator->fuse_channel_or_session_),
-          inval_dentry_command->parent_ino,
+          *invalidator->fuse_session_, inval_dentry_command->parent_ino,
           inval_dentry_command->name.GetChars(),
           inval_dentry_command->name.GetLength());
       inval_dentry_command->~InvalDentryCommand();
@@ -179,8 +177,7 @@ void *FuseInvalidator::MainInvalidator(void *data) {
     const uint64_t deadline = platform_monotonic_time() + handle->timeout_s_;
 
     // Fallback: drainout by timeout
-    if ((invalidator->fuse_channel_or_session_ == NULL)
-        || !HasFuseNotifyInval()) {
+    if ((invalidator->fuse_session_ == NULL) || !HasFuseNotifyInval()) {
       while (platform_monotonic_time() < deadline) {
         SafeSleepMs(kCheckTimeoutFreqMs);
         if (atomic_read32(&invalidator->terminated_) == 1) {
@@ -212,9 +209,7 @@ void *FuseInvalidator::MainInvalidator(void *data) {
       // Can fail, e.g. the inode might be already evicted
 
       const int dbg_retval = fuse_lowlevel_notify_inval_inode(
-          *reinterpret_cast<struct fuse_session **>(
-              invalidator->fuse_channel_or_session_),
-          inode, 0, 0);
+          *invalidator->fuse_session_, inode, 0, 0);
       LogCvmfs(kLogCvmfs, kLogDebug,
                "evicting inode %" PRIu64 " with retval: %d", inode, dbg_retval);
 
@@ -260,12 +255,8 @@ void *FuseInvalidator::MainInvalidator(void *data) {
       LogCvmfs(kLogCvmfs, kLogDebug, "evicting dentry %lu --> %s", entry_parent,
                entry_name.c_str());
       // Can fail, e.g. the entry might be already evicted
-      struct fuse_session
-          *channel_or_session = *reinterpret_cast<struct fuse_session **>(
-              invalidator->fuse_channel_or_session_);
-
-      notify_func(channel_or_session, entry_parent, entry_name.GetChars(),
-                  entry_name.GetLength());
+      notify_func(*invalidator->fuse_session_, entry_parent,
+                  entry_name.GetChars(), entry_name.GetLength());
 
       if ((++i % kCheckTimeoutFreqOps) == 0) {
         if (atomic_read32(&invalidator->terminated_) == 1) {
