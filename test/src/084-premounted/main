@@ -52,7 +52,7 @@ EOF
   CVMFS_TEST084_MOUNTPOINT="$workdir/mountpoint"
   echo "*** mounting on $CVMFS_TEST084_MOUNTPOINT"
   mkdir $CVMFS_TEST084_MOUNTPOINT
-  $CVMFS_TEST084_FUSEPREMOUNT /usr/bin/cvmfs2 -o debug,libfuse=3,config=sft.config sft.cern.ch $CVMFS_TEST084_MOUNTPOINT &> $workdir/cvm-test-084-mount.log || return 10
+  $CVMFS_TEST084_FUSEPREMOUNT /usr/bin/cvmfs2 -o debug,config=sft.config sft.cern.ch $CVMFS_TEST084_MOUNTPOINT &> $workdir/cvm-test-084-mount.log || return 10
   echo "*** listing repository mounted at $CVMFS_TEST084_MOUNTPOINT"
   ls -lah "$CVMFS_TEST084_MOUNTPOINT" > $workdir/cvm-test-084-repo-listing.log  || return 12
   echo "*** checking dirtab in  $CVMFS_TEST084_MOUNTPOINT"

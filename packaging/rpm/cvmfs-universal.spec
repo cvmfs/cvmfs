@@ -44,11 +44,6 @@
 %define systemd_autofs_patch 1
 %endif
 
-%define build_fuse2 1
-%if 0%{?fedora} >= 42 || 0%{?rhel} >= 10
-%define build_fuse2 0
-%endif
-
 
 %if 0%{?sle15} || 0%{?rhel} >= 8 || 0%{?fedora} >= 31
 %define cvmfs_python_devel python3-devel
@@ -108,9 +103,6 @@ BuildRequires: help2man
 BuildRequires: valgrind-devel
 %endif
 BuildRequires: cmake
-%if 0%{?build_fuse2}
-BuildRequires: fuse-devel
-%endif
 BuildRequires: fuse3-devel >= 3.3.0
 BuildRequires: libattr-devel
 # nettle is optional in the same sense as protobuf below: the build uses a
@@ -166,9 +158,6 @@ Requires: libarchive
 # Account for different package names
 %if 0%{?suse_version}
 Requires: aaa_base
-%if 0%{?build_fuse2} 
-Requires: libfuse2
-%endif
 Requires: glibc
   %if 0%{?suse_version} < 1500
 Requires: pwdutils
@@ -232,7 +221,7 @@ Summary: CernVM-FS common libraries
 Common utility libraries for CernVM-FS packages
 
 %package fuse3
-Summary: additional libraries to enable libfuse3 support
+Summary: libraries implementing the CernVM-FS fuse module
 Group: Applications/System
 Requires: cvmfs-libs = %{version}-%{release}
 # fuse library package name differs on suse
@@ -400,10 +389,6 @@ BUILD_CONFIG_VALIDATOR=no
 %if 0%{?build_config_validator}
 BUILD_CONFIG_VALIDATOR=yes
 %endif
-BUILD_LIBFUSE2=no
-%if 0%{?build_fuse2}
-BUILD_LIBFUSE2=yes
-%endif
 BUILD_UNITTESTS=no
 INSTALL_UNITTESTS=no
 %if 0%{?build_testing}
@@ -425,7 +410,6 @@ cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} \
   -DBUILD_SNAPSHOTTER=$BUILD_SNAPSHOTTER \
   -DBUILD_CONFIG_VALIDATOR=$BUILD_CONFIG_VALIDATOR \
   -DINSTALL_UNITTESTS=$INSTALL_UNITTESTS \
-  -DBUILD_LIBFUSE2=$BUILD_LIBFUSE2 \
   -DCMAKE_INSTALL_PREFIX:PATH=/usr .
 
 make %{?_smp_mflags}
@@ -686,14 +670,6 @@ systemctl daemon-reload
 %files
 %defattr(-,root,root)
 %{_bindir}/cvmfs2
-%if 0%{?build_fuse2} 
-%{_libdir}/libcvmfs_fuse_stub.so
-%{_libdir}/libcvmfs_fuse_stub.so.%{base_version}
-%{_libdir}/libcvmfs_fuse.so
-%{_libdir}/libcvmfs_fuse.so.%{base_version}
-%{_libdir}/libcvmfs_fuse_debug.so
-%{_libdir}/libcvmfs_fuse_debug.so.%{base_version}
-%endif
 %{_bindir}/cvmfs_talk
 %{_bindir}/cvmfs_fsck
 %{_bindir}/cvmfs_config

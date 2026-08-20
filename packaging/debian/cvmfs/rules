@@ -6,12 +6,6 @@
 export DH_VERBOSE=1
 
 
-# Check if we should build libfuse2 support.
-# Turn it off for all platforms first supported in 2.13 and newer
-BUILD_LIBFUSE2 := 'no'
-# modified in ci/cvmfs/deb.sh
-#BUILD_LIBFUSE2 := 'yes'
-
 CVMFS_BUILD_UNITTESTS ?= no
 
 # Detect Go once; gateway and snapshotter packages are only built when available.
@@ -45,7 +39,6 @@ Makefile:
 		-DBUILD_GATEWAY=$(BUILD_GO) \
 		-DBUILD_SNAPSHOTTER=$(BUILD_GO) \
 		-DBUILD_CONFIG_VALIDATOR=$(BUILD_GO) \
-		-DBUILD_LIBFUSE2=$(BUILD_LIBFUSE2) \
 		-DCMAKE_INSTALL_PREFIX:PATH=/usr \
 		.
 
@@ -66,14 +59,6 @@ clean:
 	dh_clean
 
 debian/%.install: debian/%.install.in
-	if [ $(BUILD_LIBFUSE2) = "no"  ]; then \
-    sed  -i 's;^usr/lib/libcvmfs_fuse_stub.so.@CVMFS_VERSION@;;g' $< ; \
-    sed  -i 's;^usr/lib/libcvmfs_fuse_stub.so;;g' $< ; \
-    sed  -i 's;^usr/lib/libcvmfs_fuse.so.@CVMFS_VERSION@;;g' $< ; \
-    sed  -i 's;^usr/lib/libcvmfs_fuse.so;;g' $< ; \
-    sed  -i 's;^usr/lib/libcvmfs_fuse_debug.so.@CVMFS_VERSION@;;g' $< ;  \
-    sed  -i 's;^usr/lib/libcvmfs_fuse_debug.so;;g' $< ;  \
-  fi
 	if [ $(BUILD_GO) = "no"  ]; then \
     sed  -i 's;^usr/libexec/cvmfs/cvmfs_validator;;g' $< ; \
   fi

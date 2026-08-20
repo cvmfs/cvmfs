@@ -26,7 +26,6 @@ option (BUILD_STRESS_TESTS      "Build the stress tests"                        
 option (BUILD_DOCUMENTATION     "Build the CernVM-FS documentation using Doxygen"                   OFF)
 option (BUILD_MANPAGES          "Build the CernVM-FS manpages"                                      ${BUILD_MANPAGES_DEFAULT})
 option (BUILD_COVERAGE          "Compile to collect code coverage reports"                         OFF)
-option (BUILD_LIBFUSE2          "Build the libraries for libfuse2 support"                         OFF)
 option (BUILD_GATEWAY           "Build cvmfs_gateway, requires go compiler"                        OFF)
 option (BUILD_DUCC              "Build cvmfs_ducc, requires go compiler"                           OFF)
 option (BUILD_SNAPSHOTTER       "Build cvmfs_snapshotter, it requires a go compiler"               OFF)
