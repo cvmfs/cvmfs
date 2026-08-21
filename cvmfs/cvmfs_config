@@ -266,7 +266,8 @@ cvmfs_config_usage() {
   fi
   echo "  chksetup"
   echo ""
-  echo "  showconfig [-s(hort output, only parameters set in the configuration)] [-j|--json] [<repository>]"
+  echo "  showconfig [-s(hort output, only parameters set in the" \
+       "configuration)] [-j|--json] [<repository>|<mountpoint>]"
   echo ""
   echo "  stat [-v | <repository>]"
   echo ""
@@ -1029,9 +1030,18 @@ cvmfs_showconfig() {
     return 0
   fi
 
-  fqrn=`cvmfs_mkfqrn $org`
-  org=`cvmfs_getorg $fqrn`
-  cvmfs_readconfig $fqrn || die "Failed to read CernVM-FS configuration"
+  local mount_prefix="${CVMFS_MOUNT_DIR%/}/"
+  if [[ "$org" == "$mount_prefix"* ]]; then
+    org=${org#"$mount_prefix"}
+    org=${org%/}
+  fi
+  if [[ -z "$org" || "$org" == */* ]]; then
+    die "Invalid repository path"
+  fi
+
+  fqrn=$(cvmfs_mkfqrn "$org")
+  org=$(cvmfs_getorg "$fqrn")
+  cvmfs_readconfig "$fqrn" || die "Failed to read CernVM-FS configuration"
   retval=$?
   if [ $retval -ne 0 ]; then
     return $retval
@@ -1084,10 +1094,10 @@ cvmfs_showconfig() {
     line=$(echo "$CVMFS_PARMS" | grep "^${var}=")
     if [ "x$line" != "x" ]; then
       if [ "x$org" != "x" ]; then
-        line=`echo "$line" | sed s/@org@/$org/g`
+        line=${line//@org@/$org}
       fi
       if [ "x$fqrn" != "x" ]; then
-        line=`echo "$line" | sed s/@fqrn@/$fqrn/g`
+        line=${line//@fqrn@/$fqrn}
       fi
       echo "$line"
     else
