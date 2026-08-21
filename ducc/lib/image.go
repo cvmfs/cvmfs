@@ -19,8 +19,8 @@ import (
 	"time"
 
 	"github.com/aoliveti/curling"
-	"github.com/docker/docker/image"
 	"github.com/olekukonko/tablewriter"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	log "github.com/sirupsen/logrus"
 
 	cvmfs "github.com/cvmfs/ducc/cvmfs"
@@ -57,7 +57,7 @@ type Image struct {
 	IsThin           bool
 	TagWildcard      bool
 	Manifest         *da.Manifest
-	OCIImage         *image.Image
+	OCIImage         *ocispec.Image
 	ManifestList     *da.ManifestList
 	rawManifestBytes []byte // cached raw wire bytes of the resolved manifest
 }
@@ -483,7 +483,7 @@ func (img *Image) GetManifest() (da.Manifest, error) {
 	return *manifest, nil
 }
 
-func (img *Image) GetOCIImage() (config image.Image, err error) {
+func (img *Image) GetOCIImage() (config ocispec.Image, err error) {
 	if img.OCIImage != nil {
 		return *img.OCIImage, nil
 	}
