@@ -102,7 +102,7 @@ cvmfs_run_test() {
 
   # A repository mountpoint must resolve like the repository name in both
   # output formats.
-  local plain_by_name plain_by_path plain_by_path_slash
+  local plain_by_name plain_by_path plain_by_path_slash plain_by_name_slash
   local json_by_name json_by_path line mount_dir
   local short_by_name short_by_path
   plain_by_name=$(cvmfs_config showconfig grid.cern.ch) || retval=47
@@ -128,25 +128,29 @@ cvmfs_run_test() {
   diff <(printf '%s\n' "$plain_by_name" | normalize_plain) \
        <(printf '%s\n' "$plain_by_path_slash" | normalize_plain) \
        || retval=53
+  plain_by_name_slash=$(cvmfs_config showconfig grid.cern.ch/) || retval=54
+  diff <(printf '%s\n' "$plain_by_name" | normalize_plain) \
+       <(printf '%s\n' "$plain_by_name_slash" | normalize_plain) \
+       || retval=55
 
-  json_by_name=$(cvmfs_config showconfig -j grid.cern.ch) || retval=54
+  json_by_name=$(cvmfs_config showconfig -j grid.cern.ch) || retval=56
   json_by_path=$(cvmfs_config showconfig -j \
-    "${mount_dir%/}/grid.cern.ch") || retval=55
+    "${mount_dir%/}/grid.cern.ch") || retval=57
   diff <(printf '%s\n' "$json_by_name" | normalize_json) \
-       <(printf '%s\n' "$json_by_path" | normalize_json) || retval=56
+       <(printf '%s\n' "$json_by_path" | normalize_json) || retval=58
   jq -e '.CVMFS_REPOSITORY_NAME == "grid.cern.ch"' \
-    <<< "$json_by_path" >/dev/null || retval=57
+    <<< "$json_by_path" >/dev/null || retval=59
 
-  short_by_name=$(cvmfs_config showconfig -s grid.cern.ch) || retval=58
+  short_by_name=$(cvmfs_config showconfig -s grid.cern.ch) || retval=60
   short_by_path=$(cvmfs_config showconfig -s \
-    "${mount_dir%/}/grid.cern.ch") || retval=59
+    "${mount_dir%/}/grid.cern.ch") || retval=61
   diff <(printf '%s\n' "$short_by_name" | normalize_plain) \
-       <(printf '%s\n' "$short_by_path" | normalize_plain) || retval=60
+       <(printf '%s\n' "$short_by_path" | normalize_plain) || retval=62
 
   expect_exit_code 1 cvmfs_config showconfig \
-    "${mount_dir%/}/grid.cern.ch/subdir" || retval=61
+    "${mount_dir%/}/grid.cern.ch/subdir" || retval=63
   expect_exit_code 1 cvmfs_config showconfig \
-    /tmp/grid.cern.ch || retval=62
+    /tmp/grid.cern.ch || retval=64
 
   cvmfs_umount grid.cern.ch || retval=5
 
