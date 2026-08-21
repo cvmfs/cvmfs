@@ -135,9 +135,11 @@ CVMFS_VERSION_SEQUENCE=1842 \
 ```
 
 The optional legacy nightly-build argument is still accepted and is treated as
-the development-version sequence. The checked-in RPM spec uses the parseable
-placeholder `Version: 0`; the RPM packaging script writes the concrete version
-before creating an RPM or SRPM.
+the development-version sequence. The RPM spec's `Version` comes from the
+`cvmfs_version` RPM macro; the packaging scripts pass it with `rpmbuild
+--define "cvmfs_version ..."` rather than editing the spec file. Without that
+define — e.g. when parsing the spec directly with `dnf builddep` — it falls
+back to the plain `VERSION` file, staged as `Source3` next to the spec.
 
 ## Build a source tarball
 

@@ -84,12 +84,10 @@ create_cvmfs_source_tarball ${CVMFS_SOURCE_LOCATION} \
 # copy RPM spec file and SELinux module files in place and cd there
 echo "copying RPM package specification and dependencies..."
 cp ${rpm_src_dir}/$spec_file $CVMFS_RESULT_LOCATION
-# Store a concrete version in the spec so an SRPM can be rebuilt without Git.
-sed -i -e "s/^Version: .*/Version: ${cvmfs_version}/" \
-  "$CVMFS_RESULT_LOCATION/$spec_file"
 cp ${rpm_src_dir}/cvmfs.te \
    ${rpm_src_dir}/cvmfs.fc \
    $CVMFS_RESULT_LOCATION/SOURCES
+cp ${CVMFS_SOURCE_LOCATION}/VERSION $CVMFS_RESULT_LOCATION/SOURCES
 cd  $CVMFS_RESULT_LOCATION
 
 echo "creating package: $cvmfs_version"
@@ -98,6 +96,7 @@ default_arch=$(get_default_compiler_arch)
 echo "building ($default_arch)..."
 rpmbuild --define="_topdir $CVMFS_RESULT_LOCATION"        \
          --define="_tmppath ${CVMFS_RESULT_LOCATION}/TMP" \
+         --define="cvmfs_version ${cvmfs_version}"        \
          --target="$default_arch"                         \
          -ba $spec_file
 

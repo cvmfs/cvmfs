@@ -69,9 +69,11 @@
 
 Summary: CernVM File System
 Name: cvmfs
-# Package scripts replace this placeholder before creating an RPM or SRPM.
-# Keeping it valid lets tools such as `dnf builddep` parse this source spec.
-Version: 0
+# Build scripts pass the resolved version via `rpmbuild --define "cvmfs_version ..."`.
+# Without that define, fall back to the plain VERSION file (staged as Source3)
+# so this spec stays parseable on its own, e.g. for `dnf builddep`.
+%{!?cvmfs_version: %define cvmfs_version %(cat %{_sourcedir}/VERSION 2>/dev/null || echo 0)}
+Version: %{cvmfs_version}
 %global base_version %(echo %{version} | cut -d'~' -f1)
 Release: 1%{?dist}
 URL: https://cernvm.cern.ch/fs/
@@ -80,6 +82,7 @@ Source0: https://ecsft.cern.ch/dist/cvmfs/%{name}-%{version}/%{name}-%{version}.
 Source1: cvmfs.te
 Source2: cvmfs.fc
 %endif
+Source3: VERSION
 Group: Applications/System
 License: BSD
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
