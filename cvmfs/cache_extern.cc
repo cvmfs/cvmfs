@@ -133,7 +133,7 @@ int ExternalCacheManager::ChangeRefcount(const shash::Any &id, int change_by) {
   msg_refcount.set_change_by(change_by);
   RpcJob rpc_job(&msg_refcount);
   CallRemotely(&rpc_job);
-  msg_refcount.release_object_id();
+  (void)msg_refcount.release_object_id();
 
   cvmfs::MsgRefcountReply *msg_reply = rpc_job.msg_refcount_reply();
   return Ack2Errno(msg_reply->status());
@@ -446,7 +446,7 @@ int ExternalCacheManager::Flush(bool do_commit, Transaction *transaction) {
   rpc_job.set_attachment_send(transaction->buffer, transaction->buf_pos);
   // TODO(jblomer): allow for out of order chunk upload
   CallRemotely(&rpc_job);
-  msg_store.release_object_id();
+  (void)msg_store.release_object_id();
 
   cvmfs::MsgStoreReply *msg_reply = rpc_job.msg_store_reply();
   if (msg_reply->status() == cvmfs::STATUS_OK) {
@@ -478,7 +478,7 @@ int64_t ExternalCacheManager::GetSize(int fd) {
   msg_info.set_allocated_object_id(&object_id);
   RpcJob rpc_job(&msg_info);
   CallRemotely(&rpc_job);
-  msg_info.release_object_id();
+  (void)msg_info.release_object_id();
 
   cvmfs::MsgObjectInfoReply *msg_reply = rpc_job.msg_object_info_reply();
   if (msg_reply->status() == cvmfs::STATUS_OK) {
@@ -614,7 +614,7 @@ int64_t ExternalCacheManager::Pread(int fd,
     rpc_job.set_attachment_recv(reinterpret_cast<char *>(buf) + nbytes,
                                 batch_size);
     CallRemotely(&rpc_job);
-    msg_read.release_object_id();
+    (void)msg_read.release_object_id();
 
     cvmfs::MsgReadReply *msg_reply = rpc_job.msg_read_reply();
     if (msg_reply->status() == cvmfs::STATUS_OK) {
@@ -658,7 +658,7 @@ int ExternalCacheManager::Reset(void *txn) {
   msg_abort.set_allocated_object_id(&object_id);
   RpcJob rpc_job(&msg_abort);
   CallRemotely(&rpc_job);
-  msg_abort.release_object_id();
+  (void)msg_abort.release_object_id();
   cvmfs::MsgStoreReply *msg_reply = rpc_job.msg_store_reply();
   transaction->transaction_id = NextRequestId();
   transaction->flushed = false;
@@ -715,8 +715,8 @@ bool ExternalCacheManager::StoreBreadcrumb(const manifest::Manifest &manifest) {
   msg_breadcrumb_store.set_allocated_breadcrumb(&breadcrumb);
   RpcJob rpc_job(&msg_breadcrumb_store);
   CallRemotely(&rpc_job);
-  msg_breadcrumb_store.release_breadcrumb();
-  breadcrumb.release_hash();
+  (void)msg_breadcrumb_store.release_breadcrumb();
+  (void)breadcrumb.release_hash();
 
   cvmfs::MsgBreadcrumbReply *msg_reply = rpc_job.msg_breadcrumb_reply();
   return msg_reply->status() == cvmfs::STATUS_OK;

@@ -40,6 +40,11 @@
 #include "util/smalloc.h"
 #include "util/string.h"
 
+// c-ares 1.x deprecates the classic ares_parse_*/ares_search/ares_getsock/
+// ares_get_servers entry points. They remain functional; migrating to the
+// ares_dns_record API is a separate, testable change. Accept them for now.
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+
 using namespace std;  // NOLINT
 
 namespace dns {
