@@ -69,10 +69,13 @@
 
 Summary: CernVM File System
 Name: cvmfs
+# Staged early so %{SOURCE3} below resolves to its path (rpm defines that
+# macro as each Source tag is parsed).
+Source3: VERSION
 # Build scripts pass the resolved version via `rpmbuild --define "cvmfs_version ..."`.
 # Without that define, fall back to the plain VERSION file (staged as Source3)
 # so this spec stays parseable on its own, e.g. for `dnf builddep`.
-%{!?cvmfs_version: %define cvmfs_version %(cat %{_sourcedir}/VERSION 2>/dev/null || echo 0)}
+%{!?cvmfs_version: %define cvmfs_version %(cat %{SOURCE3} 2>/dev/null || echo 0)}
 Version: %{cvmfs_version}
 %global base_version %(echo %{version} | cut -d'~' -f1)
 Release: 1%{?dist}
@@ -82,7 +85,6 @@ Source0: https://ecsft.cern.ch/dist/cvmfs/%{name}-%{version}/%{name}-%{version}.
 Source1: cvmfs.te
 Source2: cvmfs.fc
 %endif
-Source3: VERSION
 Group: Applications/System
 License: BSD
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
@@ -197,8 +199,8 @@ Requires: util-linux
 Requires: cvmfs-config
 Requires: cvmfs-libs = %{version}-%{release}
 Requires: cvmfs-fuse3 = %{version}-%{release}
-Provides: group(cvmfs)
-Provides: user(cvmfs)
+Provides: group(cvmfs) = %{version}-%{release}
+Provides: user(cvmfs) = %{version}-%{release}
 
 # SELinux integration
 # These are needed to build the selinux policy module.
