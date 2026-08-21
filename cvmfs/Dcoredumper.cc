@@ -12,20 +12,25 @@
  *   (gdb) thread apply all bt
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <cstdint>
+#include <cerrno>
+#include <string>
+#include <vector>
+
 #include <fcntl.h>
 #include <unistd.h>
 #include <dirent.h>
 #include <elf.h>
-#include <errno.h>
-#include <stdint.h>
 #include <sys/types.h>
 #include <sys/utsname.h>
 
-#define NOTE_ALIGN(sz) (((sz) + 3) & ~3)
-#define PAGE_SIZE 4096UL
+using namespace std;  // NOLINT
+
+constexpr size_t NoteAlign(size_t sz) { return (sz + 3) & ~3; }
+constexpr size_t kPageSize = 4096;
 
 /**
  * Architecture descriptor: captures ELF machine type, register counts,
@@ -148,11 +153,11 @@ typedef struct {
   char name[256];
 } mem_region_t;
 
-#define MAX_NGREG 34
+constexpr size_t kMaxNgreg = 34;
 
 typedef struct {
   int tid;
-  unsigned long regs[MAX_NGREG];
+  unsigned long regs[kMaxNgreg];
 } thread_info_t;
 
 /**
@@ -573,13 +578,13 @@ size_t write_note(FILE *out, uint32_t type,
   fwrite(desc,        desc_sz,      1, out);
 
   // Pad descriptor to 4-byte boundary
-  const size_t pad = NOTE_ALIGN(desc_sz) - desc_sz;
+  const size_t pad = NoteAlign(desc_sz) - desc_sz;
   if (pad > 0) {
     char zeros[4] = {0};
     fwrite(zeros, pad, 1, out);
   }
 
-  return sizeof(nhdr) + 8 + NOTE_ALIGN(desc_sz);
+  return sizeof(nhdr) + 8 + NoteAlign(desc_sz);
 }
 
 /**
@@ -637,12 +642,12 @@ int build_core(int pid, const char *output_path) {
 
   // NT_PRSTATUS: one per thread
   const size_t per_prstatus  = sizeof(Elf64_Nhdr) + 8
-             + NOTE_ALIGN(g_arch->prstatus_size);
+             + NoteAlign(g_arch->prstatus_size);
   const size_t total_prstatus = per_prstatus * num_threads;
 
   // NT_PRPSINFO
   const size_t prpsinfo_sz = sizeof(Elf64_Nhdr) + 8
-             + NOTE_ALIGN(g_arch->prpsinfo_size);
+             + NoteAlign(g_arch->prpsinfo_size);
 
   // NT_FILE: all file-backed regions (GDB needs this for .text reload)
   uint64_t file_count  = 0;
@@ -658,13 +663,13 @@ int build_core(int pid, const char *output_path) {
             + (file_count * 24)
             + strings_len;
   const size_t file_note_sz = sizeof(Elf64_Nhdr) + 8
-            + NOTE_ALIGN(file_desc_sz);
+            + NoteAlign(file_desc_sz);
 
   // NT_AUXV
   size_t auxv_note_sz = 0;
   if (auxv_data) {
     auxv_note_sz = sizeof(Elf64_Nhdr) + 8
-           + NOTE_ALIGN(auxv_sz);
+           + NoteAlign(auxv_sz);
   }
 
   const size_t all_notes_sz = total_prstatus + prpsinfo_sz
@@ -725,7 +730,7 @@ int build_core(int pid, const char *output_path) {
     phdr.p_flags  = PF_R;
     if (regions[i].writable)   phdr.p_flags |= PF_W;
     if (regions[i].executable) phdr.p_flags |= PF_X;
-    phdr.p_align  = PAGE_SIZE;
+    phdr.p_align  = kPageSize;
 
     fwrite(&phdr, sizeof(phdr), 1, core);
     cur_offset += seg_size;
@@ -799,7 +804,7 @@ int build_core(int pid, const char *output_path) {
 
     uint64_t *hdr = (uint64_t *)file_desc;
     hdr[0] = file_count;
-    hdr[1] = PAGE_SIZE;
+    hdr[1] = kPageSize;
 
     uint64_t *entries = &hdr[2];
     char     *strtab  = (char *)&entries[file_count * 3];
@@ -810,7 +815,7 @@ int build_core(int pid, const char *output_path) {
       if (regions[i].name[0] != '/') continue;
       entries[idx * 3 + 0] = regions[i].start;
       entries[idx * 3 + 1] = regions[i].end;
-      entries[idx * 3 + 2] = regions[i].offset / PAGE_SIZE;  // in pages
+      entries[idx * 3 + 2] = regions[i].offset / kPageSize;  // in pages
       strcpy(sp2, regions[i].name);
       sp2 += strlen(regions[i].name) + 1;
       idx++;
@@ -832,14 +837,14 @@ int build_core(int pid, const char *output_path) {
 
     const size_t seg_size = regions[i].end - regions[i].start;
 
-    char          buf[PAGE_SIZE];
+    char          buf[kPageSize];
     unsigned long addr         = regions[i].start;
     size_t        rem          = seg_size;
     size_t        region_read  = 0;
     size_t        region_zero  = 0;
 
     while (rem > 0) {
-      const size_t chunk = rem > PAGE_SIZE ? PAGE_SIZE : rem;
+      const size_t chunk = rem > kPageSize ? kPageSize : rem;
 
       const ssize_t n = pread(mem_fd, buf, chunk, (off_t)addr);
 
