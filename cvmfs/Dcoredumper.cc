@@ -38,7 +38,7 @@ constexpr size_t kPageSize = 4096;
  * architectures.  Adding a new arch (e.g. aarch64) only requires
  * defining a new static const instance — no other code changes needed.
  */
-typedef struct {
+struct ArchDesc {
   const char *name;           /* human-readable, e.g. "x86_64"        */
   uint16_t    elf_machine;    /* ELF e_machine, e.g. EM_X86_64        */
   size_t      ngreg;          /* number of general-purpose registers  */
@@ -52,9 +52,9 @@ typedef struct {
   size_t      prpsinfo_pid;   /* byte offset of pr_pid in prpsinfo    */
   size_t      prpsinfo_fname; /* byte offset of pr_fname in prpsinfo  */
   size_t      prpsinfo_args;  /* byte offset of pr_psargs in prpsinfo */
-} arch_desc_t;
+};
 
-static const arch_desc_t arch_x86_64 = {
+static const ArchDesc arch_x86_64 = {
   "x86_64",
   EM_X86_64,
   27,   /* ngreg          */
@@ -81,7 +81,7 @@ static const arch_desc_t arch_x86_64 = {
  *
  * Syscall ABI: x8=nr, x0=a0, x1=a1, x2=a2, x3=a3, x4=a4, x5=a5
  */
-static const arch_desc_t arch_aarch64 = {
+static const ArchDesc arch_aarch64 = {
   "aarch64",
   EM_AARCH64,
   34,   /* ngreg: x0-x30 + sp + pc + pstate */
@@ -100,7 +100,7 @@ static const arch_desc_t arch_aarch64 = {
 
 
 /* g_arch is set at startup by detect_arch() via uname(). */
-static const arch_desc_t *g_arch = &arch_x86_64;
+static const ArchDesc *g_arch = &arch_x86_64;
 
 /**
  * Detects the host CPU architecture via uname() and sets g_arch.
@@ -129,12 +129,12 @@ static void detect_arch(void) {
  * NT_FILE always covers all file-backed regions regardless of level
  * so GDB can reload .text from disk.
  */
-typedef enum {
-  DUMP_STANDARD,  /**< skip read-only file-backed regions (default) */
-  DUMP_FULL       /**< dump everything readable */
-} dump_level_t;
+enum DumpLevel {
+  kDumpStandard,  /**< skip read-only file-backed regions (default) */
+  kDumpFull       /**< dump everything readable */
+};
 
-static dump_level_t g_level = DUMP_STANDARD;
+static DumpLevel g_level = kDumpStandard;
 
 /**
  * Path of the main executable, detected from the first file-backed
@@ -143,7 +143,7 @@ static dump_level_t g_level = DUMP_STANDARD;
  */
 static char g_exe_path[256] = "";
 
-typedef struct {
+struct MemRegion {
   unsigned long start;
   unsigned long end;
   unsigned long offset;   // file offset (from maps)
@@ -151,33 +151,33 @@ typedef struct {
   int writable;
   int executable;
   char name[256];
-} mem_region_t;
+};
 
 constexpr size_t kMaxNgreg = 34;
 
-typedef struct {
+struct ThreadInfo {
   int tid;
   unsigned long regs[kMaxNgreg];
-} thread_info_t;
+};
 
 /**
  * Decides whether a memory region should be included in the core dump.
  * Skips kernel-mapped regions that cause EIO on pread().
  *
- * In DUMP_STANDARD mode, read-only file-backed regions of shared
+ * In kDumpStandard mode, read-only file-backed regions of shared
  * libraries are skipped because GDB can reload them from disk via
  * NT_FILE.  The dynamic linker and main executable are always kept
  * because GDB needs _DYNAMIC -> DT_DEBUG -> r_debug -> link_map
  * from the linker's memory to discover shared libraries.
  */
-static int should_dump_region(const mem_region_t *r) {
+static int should_dump_region(const MemRegion *r) {
   if (!r->readable) return 0;
   if (strstr(r->name, "[vvar]"))        return 0;
   if (strstr(r->name, "[vvar_vclock]")) return 0;
   if (strstr(r->name, "[vsyscall]"))    return 0;
 
   switch (g_level) {
-  case DUMP_STANDARD:
+  case kDumpStandard:
     // Always keep the dynamic linker (ld-linux).
     if (strstr(r->name, "/ld-linux") ||
         strstr(r->name, "/ld-musl")  ||
@@ -197,17 +197,17 @@ static int should_dump_region(const mem_region_t *r) {
     // stack, heap, vdso)
     return 1;
 
-  case DUMP_FULL:
+  case kDumpFull:
   default:
     return 1;
   }
 }
 
 /**
- * Parses /proc/<pid>/maps into an array of mem_region_t.
+ * Parses /proc/<pid>/maps into an array of MemRegion.
  * The first file-backed path is saved as the executable path.
  */
-int parse_maps(int pid, mem_region_t **regions_out) {
+int parse_maps(int pid, MemRegion **regions_out) {
   char path[64];
   snprintf(path, sizeof(path), "/proc/%d/maps", pid);
   FILE *f = fopen(path, "r");
@@ -215,15 +215,15 @@ int parse_maps(int pid, mem_region_t **regions_out) {
 
   int cap = 256;
   int count = 0;
-  mem_region_t *regions = (mem_region_t *)malloc(cap * sizeof(mem_region_t));
+  MemRegion *regions = (MemRegion *)malloc(cap * sizeof(MemRegion));
   if (!regions) { fclose(f); return -1; }
 
   char line[512];
   while (fgets(line, sizeof(line), f)) {
     if (count == cap) {
       cap *= 2;
-      mem_region_t *tmp = (mem_region_t *)realloc(regions,
-                    cap * sizeof(mem_region_t));
+      MemRegion *tmp = (MemRegion *)realloc(regions,
+                    cap * sizeof(MemRegion));
       if (!tmp) { free(regions); fclose(f); return -1; }
       regions = tmp;
     }
@@ -354,7 +354,7 @@ int read_thread_registers(int pid, int tid, unsigned long *regs) {
  * their register state.  The main thread (TID == PID) is placed first
  * so GDB treats it as the current thread.
  */
-int enumerate_threads(int pid, thread_info_t **threads_out) {
+int enumerate_threads(int pid, ThreadInfo **threads_out) {
   char path[64];
   snprintf(path, sizeof(path), "/proc/%d/task", pid);
 
@@ -363,7 +363,7 @@ int enumerate_threads(int pid, thread_info_t **threads_out) {
 
   int cap = 64;
   int count = 0;
-  thread_info_t *threads = (thread_info_t *)malloc(cap * sizeof(thread_info_t));
+  ThreadInfo *threads = (ThreadInfo *)malloc(cap * sizeof(ThreadInfo));
   if (!threads) { closedir(dir); return -1; }
 
   struct dirent *entry;
@@ -372,14 +372,14 @@ int enumerate_threads(int pid, thread_info_t **threads_out) {
 
     if (count == cap) {
       cap *= 2;
-      thread_info_t *tmp = (thread_info_t *)realloc(threads,
-                     cap * sizeof(thread_info_t));
+      ThreadInfo *tmp = (ThreadInfo *)realloc(threads,
+                     cap * sizeof(ThreadInfo));
       if (!tmp) { free(threads); closedir(dir); return -1; }
       threads = tmp;
     }
 
     const int tid = atoi(entry->d_name);
-    memset(&threads[count], 0, sizeof(thread_info_t));
+    memset(&threads[count], 0, sizeof(ThreadInfo));
     threads[count].tid = tid;
 
     const int ret = read_thread_registers(pid, tid,
@@ -403,7 +403,7 @@ int enumerate_threads(int pid, thread_info_t **threads_out) {
   // GDB treats the first NT_PRSTATUS as the "current" thread
   for (int i = 1; i < count; i++) {
     if (threads[i].tid == pid) {
-      const thread_info_t tmp = threads[0];
+      const ThreadInfo tmp = threads[0];
       threads[0] = threads[i];
       threads[i] = tmp;
       break;
@@ -456,7 +456,7 @@ int read_auxv(int pid, char **data_out, size_t *sz_out) {
  * longest valid chain is selected as the recovered RBP.
  */
 static int is_executable_addr(unsigned long addr,
-                const mem_region_t *regions,
+                const MemRegion *regions,
                 int num_regions) {
   for (int i = 0; i < num_regions; i++) {
     if (regions[i].executable &&
@@ -478,7 +478,7 @@ static int walk_fp_chain(unsigned long rbp_candidate,
              int mem_fd,
              unsigned long stack_lo,
              unsigned long stack_hi,
-             const mem_region_t *regions,
+             const MemRegion *regions,
              int num_regions,
              int max_depth) {
   unsigned long fp = rbp_candidate;
@@ -513,7 +513,7 @@ static int walk_fp_chain(unsigned long rbp_candidate,
 /** Scans the stack for the best RBP candidate.  Returns 0 if none found. */
 static unsigned long recover_rbp(int mem_fd,
                  unsigned long rsp,
-                 const mem_region_t *regions,
+                 const MemRegion *regions,
                  int num_regions) {
   // Find stack region containing RSP
   unsigned long stack_lo = 0, stack_hi = 0;
@@ -593,7 +593,7 @@ size_t write_note(FILE *out, uint32_t type,
  * performs heuristic RBP recovery, then writes a GDB-compatible core file.
  */
 int build_core(int pid, const char *output_path) {
-  mem_region_t *regions = NULL;
+  MemRegion *regions = NULL;
   const int num_regions = parse_maps(pid, &regions);
   if (num_regions < 0) return -1;
 
@@ -607,7 +607,7 @@ int build_core(int pid, const char *output_path) {
     return -1;
   }
 
-  thread_info_t *threads = NULL;
+  ThreadInfo *threads = NULL;
   const int num_threads = enumerate_threads(pid, &threads);
   if (num_threads <= 0) {
     fprintf(stderr, "No threads found — is PID %d alive?\n", pid);
@@ -889,9 +889,9 @@ int main(int argc, char *argv[]) {
   int argi = 1;
   while (argi < argc && argv[argi][0] == '-') {
     if (!strcmp(argv[argi], "--standard")) {
-      g_level = DUMP_STANDARD;
+      g_level = kDumpStandard;
     } else if (!strcmp(argv[argi], "--full")) {
-      g_level = DUMP_FULL;
+      g_level = kDumpFull;
     } else if (!strcmp(argv[argi], "--help") ||
                !strcmp(argv[argi], "-h")) {
       printf(
