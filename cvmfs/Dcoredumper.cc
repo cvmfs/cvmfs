@@ -98,32 +98,6 @@ static const ArchDesc arch_aarch64 = {
 };
 
 
-
-/* g_arch is set at startup by detect_arch() via uname(). */
-static const ArchDesc *g_arch = &arch_x86_64;
-
-/**
- * Detects the host CPU architecture via uname() and sets g_arch.
- * Exits with an error if the architecture is unsupported.
- */
-static void detect_arch(void) {
-  struct utsname u;
-  if (uname(&u) < 0) {
-    perror("uname");
-    exit(1);
-  }
-  if (strcmp(u.machine, "x86_64") == 0) {
-    g_arch = &arch_x86_64;
-  } else if (strcmp(u.machine, "aarch64") == 0) {
-    g_arch = &arch_aarch64;
-  } else {
-    fprintf(stderr, "Unsupported architecture: %s\n", u.machine);
-    fprintf(stderr, "Only x86_64 and aarch64 are supported.\n");
-    exit(1);
-  }
-}
-
-
 /**
  * Dump level controls which memory regions are written to the core.
  * NT_FILE always covers all file-backed regions regardless of level
@@ -134,14 +108,39 @@ enum DumpLevel {
   kDumpFull       /**< dump everything readable */
 };
 
-static DumpLevel g_level = kDumpStandard;
+/**
+ * Runtime context for the core dumper.  Initialized in main() and
+ * passed to all functions that previously used global state.
+ */
+struct DumperContext {
+  const ArchDesc *arch;
+  DumpLevel level;
+  char exe_path[256];
+};
 
 /**
- * Path of the main executable, detected from the first file-backed
- * region in /proc/pid/maps.  Used by should_dump_region() to always
- * keep the executable's regions in standard mode.
+ * Detects the host CPU architecture via uname() and sets ctx->arch.
+ * Returns false if the architecture is unsupported.
  */
-static char g_exe_path[256] = "";
+static bool detect_arch(DumperContext *ctx) {
+  struct utsname u;
+  if (uname(&u) < 0) {
+    perror("uname");
+    return false;
+  }
+  if (strcmp(u.machine, "x86_64") == 0) {
+    ctx->arch = &arch_x86_64;
+  } else if (strcmp(u.machine, "aarch64") == 0) {
+    ctx->arch = &arch_aarch64;
+  } else {
+    fprintf(stderr, "Unsupported architecture: %s\n", u.machine);
+    fprintf(stderr, "Only x86_64 and aarch64 are supported.\n");
+    return false;
+  }
+  return true;
+}
+
+
 
 struct MemRegion {
   unsigned long start;
@@ -170,13 +169,14 @@ struct ThreadInfo {
  * because GDB needs _DYNAMIC -> DT_DEBUG -> r_debug -> link_map
  * from the linker's memory to discover shared libraries.
  */
-static int should_dump_region(const MemRegion *r) {
+static int should_dump_region(const MemRegion *r,
+                              const DumperContext *ctx) {
   if (!r->readable) return 0;
   if (strstr(r->name, "[vvar]"))        return 0;
   if (strstr(r->name, "[vvar_vclock]")) return 0;
   if (strstr(r->name, "[vsyscall]"))    return 0;
 
-  switch (g_level) {
+  switch (ctx->level) {
   case kDumpStandard:
     // Always keep the dynamic linker (ld-linux).
     if (strstr(r->name, "/ld-linux") ||
@@ -185,7 +185,7 @@ static int should_dump_region(const MemRegion *r) {
       return 1;
 
     // Always keep the main executable's regions.
-    if (g_exe_path[0] && strcmp(r->name, g_exe_path) == 0)
+    if (ctx->exe_path[0] && strcmp(r->name, ctx->exe_path) == 0)
       return 1;
 
     // Skip large read-only file-backed regions (.text, .rodata)
@@ -207,7 +207,7 @@ static int should_dump_region(const MemRegion *r) {
  * Parses /proc/<pid>/maps into an array of MemRegion.
  * The first file-backed path is saved as the executable path.
  */
-int parse_maps(int pid, MemRegion **regions_out) {
+int parse_maps(int pid, MemRegion **regions_out, DumperContext *ctx) {
   char path[64];
   snprintf(path, sizeof(path), "/proc/%d/maps", pid);
   FILE *f = fopen(path, "r");
@@ -257,9 +257,9 @@ int parse_maps(int pid, MemRegion **regions_out) {
 
     // First file-backed region in maps is the main executable.
     // Save its path so should_dump_region() can always keep it.
-    if (g_exe_path[0] == '\0' && p[0] == '/') {
-      strncpy(g_exe_path, p, sizeof(g_exe_path) - 1);
-      g_exe_path[sizeof(g_exe_path) - 1] = '\0';
+    if (ctx->exe_path[0] == '\0' && p[0] == '/') {
+      strncpy(ctx->exe_path, p, sizeof(ctx->exe_path) - 1);
+      ctx->exe_path[sizeof(ctx->exe_path) - 1] = '\0';
     }
 
     count++;
@@ -274,7 +274,8 @@ int parse_maps(int pid, MemRegion **regions_out) {
  * Reads register state for a single thread from /proc/<pid>/task/<tid>/syscall.
  * Returns 0 on success, -2 if thread is running (not in syscall), -1 on error.
  */
-int read_thread_registers(int pid, int tid, unsigned long *regs) {
+int read_thread_registers(int pid, int tid, unsigned long *regs,
+                          const DumperContext *ctx) {
   char path[128];
   snprintf(path, sizeof(path),
        "/proc/%d/task/%d/syscall", pid, tid);
@@ -316,14 +317,14 @@ int read_thread_registers(int pid, int tid, unsigned long *regs) {
     if (i < 9) return -1;
   }
 
-  memset(regs, 0, g_arch->ngreg * sizeof(unsigned long));
+  memset(regs, 0, ctx->arch->ngreg * sizeof(unsigned long));
 
   /* SP and IP are always the last two fields in /proc/syscall output */
-  regs[g_arch->reg_sp] = rsp;
-  regs[g_arch->reg_ip] = rip;
+  regs[ctx->arch->reg_sp] = rsp;
+  regs[ctx->arch->reg_ip] = rip;
 
   /* Map syscall arguments into the architecture's register layout */
-  if (g_arch == &arch_x86_64) {
+  if (ctx->arch == &arch_x86_64) {
     /* x86_64 syscall ABI: rax=nr, rdi=a0, rsi=a1, rdx=a2, r10=a3, r8=a4, r9=a5 */
     regs[15] = nr;   /* ORIG_RAX */
     regs[10] = nr;   /* RAX      */
@@ -335,7 +336,7 @@ int read_thread_registers(int pid, int tid, unsigned long *regs) {
     regs[8]  = a5;   /* R9       */
     regs[17] = 0x33; /* CS       */
     regs[20] = 0x2b; /* SS       */
-  } else if (g_arch == &arch_aarch64) {
+  } else if (ctx->arch == &arch_aarch64) {
     /* AArch64 syscall ABI: x8=nr, x0=a0, x1=a1, x2=a2, x3=a3, x4=a4, x5=a5 */
     regs[8]  = nr;   /* x8  (syscall number) */
     regs[0]  = a0;   /* x0                  */
@@ -354,7 +355,8 @@ int read_thread_registers(int pid, int tid, unsigned long *regs) {
  * their register state.  The main thread (TID == PID) is placed first
  * so GDB treats it as the current thread.
  */
-int enumerate_threads(int pid, ThreadInfo **threads_out) {
+int enumerate_threads(int pid, ThreadInfo **threads_out,
+                      const DumperContext *ctx) {
   char path[64];
   snprintf(path, sizeof(path), "/proc/%d/task", pid);
 
@@ -383,7 +385,7 @@ int enumerate_threads(int pid, ThreadInfo **threads_out) {
     threads[count].tid = tid;
 
     const int ret = read_thread_registers(pid, tid,
-                    threads[count].regs);
+                    threads[count].regs, ctx);
     if (ret == 0) {
       count++;
     } else if (ret == -2) {
@@ -592,9 +594,9 @@ size_t write_note(FILE *out, uint32_t type,
  * Gathers memory maps, thread registers, and auxiliary vector from /proc,
  * performs heuristic RBP recovery, then writes a GDB-compatible core file.
  */
-int build_core(int pid, const char *output_path) {
+int build_core(int pid, const char *output_path, DumperContext *ctx) {
   MemRegion *regions = NULL;
-  const int num_regions = parse_maps(pid, &regions);
+  const int num_regions = parse_maps(pid, &regions, ctx);
   if (num_regions < 0) return -1;
 
   // Open /proc/pid/mem for RBP heuristic and memory dump
@@ -608,7 +610,7 @@ int build_core(int pid, const char *output_path) {
   }
 
   ThreadInfo *threads = NULL;
-  const int num_threads = enumerate_threads(pid, &threads);
+  const int num_threads = enumerate_threads(pid, &threads, ctx);
   if (num_threads <= 0) {
     fprintf(stderr, "No threads found — is PID %d alive?\n", pid);
     free(regions); close(mem_fd);
@@ -616,12 +618,12 @@ int build_core(int pid, const char *output_path) {
   }
   for (int i = 0; i < num_threads; i++) {
     // Attempt RBP recovery if RBP is missing
-    const unsigned long rsp = threads[i].regs[g_arch->reg_sp];
-    if (rsp != 0 && threads[i].regs[g_arch->reg_fp] == 0) {
+    const unsigned long rsp = threads[i].regs[ctx->arch->reg_sp];
+    if (rsp != 0 && threads[i].regs[ctx->arch->reg_fp] == 0) {
       const unsigned long rbp = recover_rbp(mem_fd, rsp,
                       regions, num_regions);
       if (rbp != 0) {
-        threads[i].regs[g_arch->reg_fp] = rbp;
+        threads[i].regs[ctx->arch->reg_fp] = rbp;
       }
     }
   }
@@ -635,19 +637,19 @@ int build_core(int pid, const char *output_path) {
   // Count dumpable regions
   int loadable = 0;
   for (int i = 0; i < num_regions; i++) {
-    if (should_dump_region(&regions[i])) loadable++;
+    if (should_dump_region(&regions[i], ctx)) loadable++;
   }
 
   // Calculate note section sizes
 
   // NT_PRSTATUS: one per thread
   const size_t per_prstatus  = sizeof(Elf64_Nhdr) + 8
-             + NoteAlign(g_arch->prstatus_size);
+             + NoteAlign(ctx->arch->prstatus_size);
   const size_t total_prstatus = per_prstatus * num_threads;
 
   // NT_PRPSINFO
   const size_t prpsinfo_sz = sizeof(Elf64_Nhdr) + 8
-             + NoteAlign(g_arch->prpsinfo_size);
+             + NoteAlign(ctx->arch->prpsinfo_size);
 
   // NT_FILE: all file-backed regions (GDB needs this for .text reload)
   uint64_t file_count  = 0;
@@ -692,7 +694,7 @@ int build_core(int pid, const char *output_path) {
   ehdr.e_ident[EI_VERSION] = EV_CURRENT;
   ehdr.e_ident[EI_OSABI]   = ELFOSABI_LINUX;
   ehdr.e_type              = ET_CORE;
-  ehdr.e_machine           = g_arch->elf_machine;
+  ehdr.e_machine           = ctx->arch->elf_machine;
   ehdr.e_version           = EV_CURRENT;
   ehdr.e_phoff             = sizeof(Elf64_Ehdr);
   ehdr.e_ehsize            = sizeof(Elf64_Ehdr);
@@ -716,7 +718,7 @@ int build_core(int pid, const char *output_path) {
   // PT_LOAD program headers (one per dumpable region)
   size_t cur_offset = data_offset;
   for (int i = 0; i < num_regions; i++) {
-    if (!should_dump_region(&regions[i])) continue;
+    if (!should_dump_region(&regions[i], ctx)) continue;
 
     const size_t seg_size = regions[i].end - regions[i].start;
 
@@ -738,31 +740,31 @@ int build_core(int pid, const char *output_path) {
 
   // NT_PRSTATUS (one per thread)
   for (int i = 0; i < num_threads; i++) {
-    unsigned char *prstatus = (unsigned char *)calloc(1, g_arch->prstatus_size);
+    unsigned char *prstatus = (unsigned char *)calloc(1, ctx->arch->prstatus_size);
     if (!prstatus) { fclose(core); return -1; }
 
-    *(pid_t *)(prstatus + g_arch->prstatus_pid)
+    *(pid_t *)(prstatus + ctx->arch->prstatus_pid)
       = (pid_t)threads[i].tid;
 
-    memcpy(prstatus + g_arch->prstatus_reg,
+    memcpy(prstatus + ctx->arch->prstatus_reg,
          threads[i].regs,
-         g_arch->ngreg * sizeof(unsigned long));
+         ctx->arch->ngreg * sizeof(unsigned long));
 
     write_note(core, 1 /* NT_PRSTATUS */,
-           prstatus, g_arch->prstatus_size);
+           prstatus, ctx->arch->prstatus_size);
     free(prstatus);
   }
 
   // NT_PRPSINFO
   {
-    unsigned char *prpsinfo = (unsigned char *)calloc(1, g_arch->prpsinfo_size);
+    unsigned char *prpsinfo = (unsigned char *)calloc(1, ctx->arch->prpsinfo_size);
     if (!prpsinfo) { fclose(core); return -1; }
 
     prpsinfo[0] = 2;    // pr_state = TASK_UNINTERRUPTIBLE
     prpsinfo[1] = 'D';  // pr_sname
 
     // pr_pid
-    *(pid_t *)(prpsinfo + g_arch->prpsinfo_pid)
+    *(pid_t *)(prpsinfo + ctx->arch->prpsinfo_pid)
       = (pid_t)pid;
 
     // Read cmdline for pr_fname and pr_psargs
@@ -788,17 +790,17 @@ int build_core(int pid, const char *output_path) {
     char *sp = strchr(bn, ' ');
     size_t nlen = sp ? (size_t)(sp - bn) : strlen(bn);
     if (nlen > 15) nlen = 15;
-    memcpy(prpsinfo + g_arch->prpsinfo_fname, bn, nlen);
+    memcpy(prpsinfo + ctx->arch->prpsinfo_fname, bn, nlen);
 
-    memcpy(prpsinfo + g_arch->prpsinfo_args, cmdline, 80);
+    memcpy(prpsinfo + ctx->arch->prpsinfo_args, cmdline, 80);
 
     write_note(core, 3 /* NT_PRPSINFO */,
-           prpsinfo, g_arch->prpsinfo_size);
+           prpsinfo, ctx->arch->prpsinfo_size);
     free(prpsinfo);
   }
 
   // NT_FILE: file-to-address mappings so GDB can load .text from disk
-  {
+  if (file_count > 0) {
     char *file_desc = (char *)calloc(1, file_desc_sz);
     if (!file_desc) { fclose(core); return -1; }
 
@@ -808,9 +810,9 @@ int build_core(int pid, const char *output_path) {
 
     uint64_t *entries = &hdr[2];
     char     *strtab  = (char *)&entries[file_count * 3];
-    int       idx     = 0;
     char     *sp2     = strtab;
 
+    int idx = 0;
     for (int i = 0; i < num_regions; i++) {
       if (regions[i].name[0] != '/') continue;
       entries[idx * 3 + 0] = regions[i].start;
@@ -828,12 +830,13 @@ int build_core(int pid, const char *output_path) {
 
   // NT_AUXV
   if (auxv_data) {
-    write_note(core, 6 /* NT_AUXV */, auxv_data, auxv_sz);
+    write_note(core, 6 /* NT_AUXV */,
+           auxv_data, auxv_sz);
   }
 
-  // Dump memory contents page-by-page to isolate guard page failures
+  // Finally, write the actual memory contents
   for (int i = 0; i < num_regions; i++) {
-    if (!should_dump_region(&regions[i])) continue;
+    if (!should_dump_region(&regions[i], ctx)) continue;
 
     const size_t seg_size = regions[i].end - regions[i].start;
 
@@ -841,40 +844,31 @@ int build_core(int pid, const char *output_path) {
     unsigned long addr         = regions[i].start;
     size_t        rem          = seg_size;
     size_t        region_read  = 0;
-    size_t        region_zero  = 0;
 
     while (rem > 0) {
       const size_t chunk = rem > kPageSize ? kPageSize : rem;
 
       const ssize_t n = pread(mem_fd, buf, chunk, (off_t)addr);
 
-      if (n <= 0) {
-        // Guard page or unmapped — zero-fill this chunk
+      if (n > 0) {
+        fwrite(buf, n, 1, core);
+        region_read += n;
+        addr += n;
+        rem  -= n;
+      } else {
+        // pad with zeros if pread fails (e.g. unreadable page in VMA)
         memset(buf, 0, chunk);
         fwrite(buf, chunk, 1, core);
-        region_zero += chunk;
-      } else {
-        fwrite(buf, n, 1, core);
-        if ((size_t)n < chunk) {
-          // Short read — pad remainder with zeros
-          const size_t shortfall = chunk - n;
-          memset(buf, 0, shortfall);
-          fwrite(buf, shortfall, 1, core);
-          region_zero += shortfall;
-        }
-        region_read += n;
+        region_read += chunk;
+        addr += chunk;
+        rem  -= chunk;
       }
-
-      addr += chunk;
-      rem  -= chunk;
-    }
-
     }
   }
 
-  // ---- Cleanup ----
   fclose(core);
   close(mem_fd);
+
   free(regions);
   free(threads);
   free(auxv_data);
@@ -885,13 +879,18 @@ int build_core(int pid, const char *output_path) {
 }
 
 int main(int argc, char *argv[]) {
-  detect_arch();  /* auto-select x86_64 or aarch64 */
+  DumperContext ctx;
+  ctx.level = kDumpStandard;
+  memset(ctx.exe_path, 0, sizeof(ctx.exe_path));
+
+  if (!detect_arch(&ctx)) return 1;
+
   int argi = 1;
   while (argi < argc && argv[argi][0] == '-') {
     if (!strcmp(argv[argi], "--standard")) {
-      g_level = kDumpStandard;
+      ctx.level = kDumpStandard;
     } else if (!strcmp(argv[argi], "--full")) {
-      g_level = kDumpFull;
+      ctx.level = kDumpFull;
     } else if (!strcmp(argv[argi], "--help") ||
                !strcmp(argv[argi], "-h")) {
       printf(
@@ -944,5 +943,5 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  return build_core(pid, argv[argi + 1]);
+  return build_core(pid, argv[argi + 1], &ctx);
 }
