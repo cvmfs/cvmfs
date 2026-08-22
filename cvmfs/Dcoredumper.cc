@@ -4,10 +4,11 @@
  * Constructs an ELF core dump from a D-state (TASK_UNINTERRUPTIBLE)
  * process by reading /proc/<pid>/ interfaces directly.
  *
- * Requires root (tightened /proc/pid/syscall access).
+ * Supports x86_64 and aarch64 (auto-detected at runtime).
+ * Requires root.
  *
  * Usage:
- *   dcoredumper <pid> <output.core>
+ *   cvmfs_dcoredumper [--standard|--full] <pid> <output.core>
  *   gdb /path/to/binary <output.core>
  *   (gdb) thread apply all bt
  */
@@ -146,9 +147,9 @@ struct MemRegion {
   unsigned long start;
   unsigned long end;
   unsigned long offset;   // file offset (from maps)
-  int readable;
-  int writable;
-  int executable;
+  bool readable;
+  bool writable;
+  bool executable;
   string name;
 };
 
@@ -169,12 +170,12 @@ struct ThreadInfo {
  * because GDB needs _DYNAMIC -> DT_DEBUG -> r_debug -> link_map
  * from the linker's memory to discover shared libraries.
  */
-static int should_dump_region(const MemRegion *r,
+static bool should_dump_region(const MemRegion *r,
                               const DumperContext *ctx) {
-  if (!r->readable) return 0;
-  if (r->name.find("[vvar]") != string::npos)        return 0;
-  if (r->name.find("[vvar_vclock]") != string::npos) return 0;
-  if (r->name.find("[vsyscall]") != string::npos)    return 0;
+  if (!r->readable) return false;
+  if (r->name.find("[vvar]") != string::npos)        return false;
+  if (r->name.find("[vvar_vclock]") != string::npos) return false;
+  if (r->name.find("[vsyscall]") != string::npos)    return false;
 
   switch (ctx->level) {
   case kDumpStandard:
@@ -182,24 +183,24 @@ static int should_dump_region(const MemRegion *r,
     if (r->name.find("/ld-linux") != string::npos ||
         r->name.find("/ld-musl") != string::npos  ||
         r->name.find("/ld.so") != string::npos)
-      return 1;
+      return true;
 
     // Always keep the main executable's regions.
     if (ctx->exe_path[0] && r->name == ctx->exe_path)
-      return 1;
+      return true;
 
     // Skip large read-only file-backed regions (.text, .rodata)
     // of OTHER shared libraries — GDB reloads from disk via NT_FILE
     if (!r->name.empty() && r->name[0] == '/' && !r->writable)
-      return 0;
+      return false;
 
     // Keep everything else (writable file-backed, anonymous,
     // stack, heap, vdso)
-    return 1;
+    return true;
 
   case kDumpFull:
   default:
-    return 1;
+    return true;
   }
 }
 
@@ -420,19 +421,19 @@ vector<char> read_auxv(int pid) {
  * and *(candidate) chains to another stack address.  The candidate with the
  * longest valid chain is selected as the recovered RBP.
  */
-static int is_executable_addr(unsigned long addr,
+static bool is_executable_addr(unsigned long addr,
                 const MemRegion *regions,
                 int num_regions) {
   for (int i = 0; i < num_regions; i++) {
     if (regions[i].executable &&
       addr >= regions[i].start &&
       addr < regions[i].end)
-      return 1;
+      return true;
   }
-  return 0;
+  return false;
 }
 
-static int is_stack_addr(unsigned long addr,
+static bool is_stack_addr(unsigned long addr,
              unsigned long stack_lo,
              unsigned long stack_hi) {
   return addr > stack_lo && addr < stack_hi;
@@ -698,31 +699,28 @@ int build_core(int pid, const char *output_path, DumperContext *ctx) {
 
   // NT_PRSTATUS (one per thread)
   for (int i = 0; i < num_threads; i++) {
-    unsigned char *prstatus = (unsigned char *)calloc(1, ctx->arch->prstatus_size);
-    if (!prstatus) { fclose(core); return -1; }
+    vector<unsigned char> prstatus(ctx->arch->prstatus_size, 0);
 
-    *(pid_t *)(prstatus + ctx->arch->prstatus_pid)
+    *(pid_t *)(prstatus.data() + ctx->arch->prstatus_pid)
       = (pid_t)threads[i].tid;
 
-    memcpy(prstatus + ctx->arch->prstatus_reg,
+    memcpy(prstatus.data() + ctx->arch->prstatus_reg,
          threads[i].regs,
          ctx->arch->ngreg * sizeof(unsigned long));
 
     write_note(core, 1 /* NT_PRSTATUS */,
-           prstatus, ctx->arch->prstatus_size);
-    free(prstatus);
+           prstatus.data(), ctx->arch->prstatus_size);
   }
 
   // NT_PRPSINFO
   {
-    unsigned char *prpsinfo = (unsigned char *)calloc(1, ctx->arch->prpsinfo_size);
-    if (!prpsinfo) { fclose(core); return -1; }
+    vector<unsigned char> prpsinfo(ctx->arch->prpsinfo_size, 0);
 
     prpsinfo[0] = 2;    // pr_state = TASK_UNINTERRUPTIBLE
     prpsinfo[1] = 'D';  // pr_sname
 
     // pr_pid
-    *(pid_t *)(prpsinfo + ctx->arch->prpsinfo_pid)
+    *(pid_t *)(prpsinfo.data() + ctx->arch->prpsinfo_pid)
       = (pid_t)pid;
 
     // Read cmdline for pr_fname and pr_psargs
@@ -748,21 +746,19 @@ int build_core(int pid, const char *output_path, DumperContext *ctx) {
     char *sp = strchr(bn, ' ');
     size_t nlen = sp ? (size_t)(sp - bn) : strlen(bn);
     if (nlen > 15) nlen = 15;
-    memcpy(prpsinfo + ctx->arch->prpsinfo_fname, bn, nlen);
+    memcpy(prpsinfo.data() + ctx->arch->prpsinfo_fname, bn, nlen);
 
-    memcpy(prpsinfo + ctx->arch->prpsinfo_args, cmdline, 80);
+    memcpy(prpsinfo.data() + ctx->arch->prpsinfo_args, cmdline, 80);
 
     write_note(core, 3 /* NT_PRPSINFO */,
-           prpsinfo, ctx->arch->prpsinfo_size);
-    free(prpsinfo);
+           prpsinfo.data(), ctx->arch->prpsinfo_size);
   }
 
   // NT_FILE: file-to-address mappings so GDB can load .text from disk
   if (file_count > 0) {
-    char *file_desc = (char *)calloc(1, file_desc_sz);
-    if (!file_desc) { fclose(core); return -1; }
+    vector<char> file_desc(file_desc_sz, 0);
 
-    uint64_t *hdr = (uint64_t *)file_desc;
+    uint64_t *hdr = (uint64_t *)file_desc.data();
     hdr[0] = file_count;
     hdr[1] = kPageSize;
 
@@ -782,8 +778,7 @@ int build_core(int pid, const char *output_path, DumperContext *ctx) {
     }
 
     write_note(core, 0x46494c45 /* NT_FILE */,
-           file_desc, file_desc_sz);
-    free(file_desc);
+           file_desc.data(), file_desc_sz);
   }
 
   // NT_AUXV
@@ -852,15 +847,16 @@ int main(int argc, char *argv[]) {
       printf(
 "Usage: cvmfs_dcoredumper [OPTIONS] <pid> <output.core>\n"
 "\n"
-"Constructs an ELF core dump from a D-state process\n"
-"without ptrace. Reads /proc/<pid>/ interfaces directly.\n"
+"Constructs an ELF core dump from a D-state (uninterruptible sleep)\n"
+"process without ptrace. Reads /proc/<pid>/ interfaces directly.\n"
+"Supports x86_64 and aarch64 (auto-detected).\n"
 "\n"
 "Options:\n"
 "  --standard   skip read-only file-backed regions (default)\n"
 "  --full       dump all readable regions\n"
-"  --help       this message\n"
+"  -h, --help   show this help message\n"
 "\n"
-"Requires root on kernel 6.x (for /proc/pid/syscall access).\n"
+"Requires root.\n"
 "\n"
 "Example:\n"
 "  sudo cvmfs_dcoredumper 1234 /tmp/hung.core\n"
