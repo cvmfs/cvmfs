@@ -149,7 +149,7 @@ struct MemRegion {
   int readable;
   int writable;
   int executable;
-  char name[256];
+  string name;
 };
 
 constexpr size_t kMaxNgreg = 34;
@@ -172,25 +172,25 @@ struct ThreadInfo {
 static int should_dump_region(const MemRegion *r,
                               const DumperContext *ctx) {
   if (!r->readable) return 0;
-  if (strstr(r->name, "[vvar]"))        return 0;
-  if (strstr(r->name, "[vvar_vclock]")) return 0;
-  if (strstr(r->name, "[vsyscall]"))    return 0;
+  if (r->name.find("[vvar]") != string::npos)        return 0;
+  if (r->name.find("[vvar_vclock]") != string::npos) return 0;
+  if (r->name.find("[vsyscall]") != string::npos)    return 0;
 
   switch (ctx->level) {
   case kDumpStandard:
     // Always keep the dynamic linker (ld-linux).
-    if (strstr(r->name, "/ld-linux") ||
-        strstr(r->name, "/ld-musl")  ||
-        strstr(r->name, "/ld.so"))
+    if (r->name.find("/ld-linux") != string::npos ||
+        r->name.find("/ld-musl") != string::npos  ||
+        r->name.find("/ld.so") != string::npos)
       return 1;
 
     // Always keep the main executable's regions.
-    if (ctx->exe_path[0] && strcmp(r->name, ctx->exe_path) == 0)
+    if (ctx->exe_path[0] && r->name == ctx->exe_path)
       return 1;
 
     // Skip large read-only file-backed regions (.text, .rodata)
     // of OTHER shared libraries — GDB reloads from disk via NT_FILE
-    if (r->name[0] == '/' && !r->writable)
+    if (!r->name.empty() && r->name[0] == '/' && !r->writable)
       return 0;
 
     // Keep everything else (writable file-backed, anonymous,
@@ -207,34 +207,22 @@ static int should_dump_region(const MemRegion *r,
  * Parses /proc/<pid>/maps into an array of MemRegion.
  * The first file-backed path is saved as the executable path.
  */
-int parse_maps(int pid, MemRegion **regions_out, DumperContext *ctx) {
+vector<MemRegion> parse_maps(int pid, DumperContext *ctx) {
+  vector<MemRegion> regions;
   char path[64];
   snprintf(path, sizeof(path), "/proc/%d/maps", pid);
   FILE *f = fopen(path, "r");
-  if (!f) { perror("Cannot open maps"); return -1; }
-
-  int cap = 256;
-  int count = 0;
-  MemRegion *regions = (MemRegion *)malloc(cap * sizeof(MemRegion));
-  if (!regions) { fclose(f); return -1; }
+  if (!f) { perror("Cannot open maps"); return regions; }
 
   char line[512];
   while (fgets(line, sizeof(line), f)) {
-    if (count == cap) {
-      cap *= 2;
-      MemRegion *tmp = (MemRegion *)realloc(regions,
-                    cap * sizeof(MemRegion));
-      if (!tmp) { free(regions); fclose(f); return -1; }
-      regions = tmp;
-    }
-
     unsigned long start, end, offset;
     char perms[5];
     unsigned int major, minor;
     unsigned long inode;
     char name[256] = "";
 
-    /** 
+    /**
      * /proc/pid/maps format:
      * addr-addr perms offset major:minor inode [name]
      * major:minor are HEX (use %x not %d)
@@ -243,17 +231,17 @@ int parse_maps(int pid, MemRegion **regions_out, DumperContext *ctx) {
          &start, &end, perms, &offset,
          &major, &minor, &inode, name);
 
-    regions[count].start      = start;
-    regions[count].end        = end;
-    regions[count].offset     = offset;
-    regions[count].readable   = (perms[0] == 'r');
-    regions[count].writable   = (perms[1] == 'w');
-    regions[count].executable = (perms[2] == 'x');
+    MemRegion r;
+    r.start      = start;
+    r.end        = end;
+    r.offset     = offset;
+    r.readable   = (perms[0] == 'r');
+    r.writable   = (perms[1] == 'w');
+    r.executable = (perms[2] == 'x');
 
     char *p = name;
     while (*p == ' ') p++;
-    strncpy(regions[count].name, p, 255);
-    regions[count].name[255] = '\0';
+    r.name = p;
 
     // First file-backed region in maps is the main executable.
     // Save its path so should_dump_region() can always keep it.
@@ -262,12 +250,11 @@ int parse_maps(int pid, MemRegion **regions_out, DumperContext *ctx) {
       ctx->exe_path[sizeof(ctx->exe_path) - 1] = '\0';
     }
 
-    count++;
+    regions.push_back(r);
   }
 
   fclose(f);
-  *regions_out = regions;
-  return count;
+  return regions;
 }
 
 /**
@@ -355,95 +342,71 @@ int read_thread_registers(int pid, int tid, unsigned long *regs,
  * their register state.  The main thread (TID == PID) is placed first
  * so GDB treats it as the current thread.
  */
-int enumerate_threads(int pid, ThreadInfo **threads_out,
-                      const DumperContext *ctx) {
+vector<ThreadInfo> enumerate_threads(int pid,
+                                     const DumperContext *ctx) {
+  vector<ThreadInfo> threads;
   char path[64];
   snprintf(path, sizeof(path), "/proc/%d/task", pid);
 
   DIR *dir = opendir(path);
-  if (!dir) { perror("Cannot open task dir"); return -1; }
-
-  int cap = 64;
-  int count = 0;
-  ThreadInfo *threads = (ThreadInfo *)malloc(cap * sizeof(ThreadInfo));
-  if (!threads) { closedir(dir); return -1; }
+  if (!dir) { perror("Cannot open task dir"); return threads; }
 
   struct dirent *entry;
   while ((entry = readdir(dir))) {
     if (entry->d_name[0] == '.') continue;
 
-    if (count == cap) {
-      cap *= 2;
-      ThreadInfo *tmp = (ThreadInfo *)realloc(threads,
-                     cap * sizeof(ThreadInfo));
-      if (!tmp) { free(threads); closedir(dir); return -1; }
-      threads = tmp;
-    }
-
     const int tid = atoi(entry->d_name);
-    memset(&threads[count], 0, sizeof(ThreadInfo));
-    threads[count].tid = tid;
+    ThreadInfo t;
+    memset(&t, 0, sizeof(t));
+    t.tid = tid;
 
-    const int ret = read_thread_registers(pid, tid,
-                    threads[count].regs, ctx);
+    const int ret = read_thread_registers(pid, tid, t.regs, ctx);
     if (ret == 0) {
-      count++;
+      threads.push_back(t);
     } else if (ret == -2) {
-      // Thread is running in userspace, not blocked
       fprintf(stderr,
         "  note: TID %d running (not in syscall),"
         " registers unavailable\n", tid);
-      count++;
+      threads.push_back(t);
     } else {
       fprintf(stderr,
         "  warning: TID %d: cannot read registers"
         " (permission denied? try root)\n", tid);
-      count++;
+      threads.push_back(t);
     }
   }
 
   // GDB treats the first NT_PRSTATUS as the "current" thread
-  for (int i = 1; i < count; i++) {
-    if (threads[i].tid == pid) {
+  for (size_t j = 1; j < threads.size(); j++) {
+    if (threads[j].tid == pid) {
       const ThreadInfo tmp = threads[0];
-      threads[0] = threads[i];
-      threads[i] = tmp;
+      threads[0] = threads[j];
+      threads[j] = tmp;
       break;
     }
   }
 
   closedir(dir);
-  *threads_out = threads;
-  return count;
+  return threads;
 }
 
 /** Reads /proc/<pid>/auxv (auxiliary vector needed by GDB for symbol resolution). */
-int read_auxv(int pid, char **data_out, size_t *sz_out) {
+vector<char> read_auxv(int pid) {
+  vector<char> data;
   char path[64];
   snprintf(path, sizeof(path), "/proc/%d/auxv", pid);
 
   const int fd = open(path, O_RDONLY);
-  if (fd < 0) return -1;
+  if (fd < 0) return data;
 
-  size_t cap = 4096;
-  char *data = (char *)malloc(cap);
-  size_t sz = 0;
+  char buf[4096];
   ssize_t n;
-
-  while ((n = read(fd, data + sz, cap - sz)) > 0) {
-    sz += n;
-    if (sz == cap) {
-      cap *= 2;
-      char *tmp = (char *)realloc(data, cap);
-      if (!tmp) { free(data); close(fd); return -1; }
-      data = tmp;
-    }
+  while ((n = read(fd, buf, sizeof(buf))) > 0) {
+    data.insert(data.end(), buf, buf + n);
   }
 
   close(fd);
-  *data_out = data;
-  *sz_out = sz;
-  return 0;
+  return data;
 }
 
 /**
@@ -532,18 +495,17 @@ static unsigned long recover_rbp(int mem_fd,
   size_t scan_size = stack_hi - rsp;
   if (scan_size > 4096) scan_size = 4096;
 
-  unsigned char *stack_buf = (unsigned char *)malloc(scan_size);
-  if (!stack_buf) return 0;
+  vector<unsigned char> stack_buf(scan_size);
 
-  const ssize_t nr = pread(mem_fd, stack_buf, scan_size, (off_t)rsp);
-  if (nr < 16) { free(stack_buf); return 0; }
+  const ssize_t nr = pread(mem_fd, stack_buf.data(), scan_size, (off_t)rsp);
+  if (nr < 16) return 0;
 
   unsigned long best_rbp = 0;
   int           best_depth = 0;
 
   for (size_t off = 0; off + 8 <= (size_t)nr; off += 8) {
     unsigned long val;
-    memcpy(&val, stack_buf + off, 8);
+    memcpy(&val, stack_buf.data() + off, 8);
 
     if (!is_stack_addr(val, rsp, stack_hi))
       continue;
@@ -556,8 +518,6 @@ static unsigned long recover_rbp(int mem_fd,
       best_rbp   = val;
     }
   }
-
-  free(stack_buf);
 
   return best_rbp;
 }
@@ -595,9 +555,9 @@ size_t write_note(FILE *out, uint32_t type,
  * performs heuristic RBP recovery, then writes a GDB-compatible core file.
  */
 int build_core(int pid, const char *output_path, DumperContext *ctx) {
-  MemRegion *regions = NULL;
-  const int num_regions = parse_maps(pid, &regions, ctx);
-  if (num_regions < 0) return -1;
+  vector<MemRegion> regions = parse_maps(pid, ctx);
+  const int num_regions = static_cast<int>(regions.size());
+  if (num_regions == 0) return -1;
 
   // Open /proc/pid/mem for RBP heuristic and memory dump
   char mem_path[64];
@@ -605,15 +565,14 @@ int build_core(int pid, const char *output_path, DumperContext *ctx) {
   const int mem_fd = open(mem_path, O_RDONLY);
   if (mem_fd < 0) {
     perror("Cannot open /proc/pid/mem (run as root)");
-    free(regions);
     return -1;
   }
 
-  ThreadInfo *threads = NULL;
-  const int num_threads = enumerate_threads(pid, &threads, ctx);
+  vector<ThreadInfo> threads = enumerate_threads(pid, ctx);
+  const int num_threads = static_cast<int>(threads.size());
   if (num_threads <= 0) {
     fprintf(stderr, "No threads found — is PID %d alive?\n", pid);
-    free(regions); close(mem_fd);
+    close(mem_fd);
     return -1;
   }
   for (int i = 0; i < num_threads; i++) {
@@ -621,16 +580,16 @@ int build_core(int pid, const char *output_path, DumperContext *ctx) {
     const unsigned long rsp = threads[i].regs[ctx->arch->reg_sp];
     if (rsp != 0 && threads[i].regs[ctx->arch->reg_fp] == 0) {
       const unsigned long rbp = recover_rbp(mem_fd, rsp,
-                      regions, num_regions);
+                      regions.data(), num_regions);
       if (rbp != 0) {
         threads[i].regs[ctx->arch->reg_fp] = rbp;
       }
     }
   }
 
-  char  *auxv_data = NULL;
-  size_t auxv_sz   = 0;
-  if (read_auxv(pid, &auxv_data, &auxv_sz) < 0) {
+  vector<char> auxv_data = read_auxv(pid);
+  const size_t auxv_sz = auxv_data.size();
+  if (auxv_sz == 0) {
     fprintf(stderr, "warning: could not read auxv\n");
   }
 
@@ -655,9 +614,9 @@ int build_core(int pid, const char *output_path, DumperContext *ctx) {
   uint64_t file_count  = 0;
   size_t   strings_len = 0;
   for (int i = 0; i < num_regions; i++) {
-    if (regions[i].name[0] == '/') {
+    if (!regions[i].name.empty() && regions[i].name[0] == '/') {
       file_count++;
-      strings_len += strlen(regions[i].name) + 1;
+      strings_len += regions[i].name.size() + 1;
     }
   }
   // NT_FILE descriptor: count + page_size + entries + filenames
@@ -669,7 +628,7 @@ int build_core(int pid, const char *output_path, DumperContext *ctx) {
 
   // NT_AUXV
   size_t auxv_note_sz = 0;
-  if (auxv_data) {
+  if (!auxv_data.empty()) {
     auxv_note_sz = sizeof(Elf64_Nhdr) + 8
            + NoteAlign(auxv_sz);
   }
@@ -680,8 +639,7 @@ int build_core(int pid, const char *output_path, DumperContext *ctx) {
   FILE *core = fopen(output_path, "wb");
   if (!core) {
     perror("Cannot create output file");
-    close(mem_fd); free(regions); free(threads);
-    free(auxv_data);
+    close(mem_fd);
     return -1;
   }
 
@@ -814,12 +772,12 @@ int build_core(int pid, const char *output_path, DumperContext *ctx) {
 
     int idx = 0;
     for (int i = 0; i < num_regions; i++) {
-      if (regions[i].name[0] != '/') continue;
+      if (regions[i].name.empty() || regions[i].name[0] != '/') continue;
       entries[idx * 3 + 0] = regions[i].start;
       entries[idx * 3 + 1] = regions[i].end;
       entries[idx * 3 + 2] = regions[i].offset / kPageSize;  // in pages
-      strcpy(sp2, regions[i].name);
-      sp2 += strlen(regions[i].name) + 1;
+      memcpy(sp2, regions[i].name.c_str(), regions[i].name.size() + 1);
+      sp2 += regions[i].name.size() + 1;
       idx++;
     }
 
@@ -829,9 +787,9 @@ int build_core(int pid, const char *output_path, DumperContext *ctx) {
   }
 
   // NT_AUXV
-  if (auxv_data) {
+  if (!auxv_data.empty()) {
     write_note(core, 6 /* NT_AUXV */,
-           auxv_data, auxv_sz);
+           auxv_data.data(), auxv_sz);
   }
 
   // Finally, write the actual memory contents
@@ -869,9 +827,7 @@ int build_core(int pid, const char *output_path, DumperContext *ctx) {
   fclose(core);
   close(mem_fd);
 
-  free(regions);
-  free(threads);
-  free(auxv_data);
+  // vectors clean up automatically
 
   printf("Core dump successfully saved to %s\n", output_path);
 
