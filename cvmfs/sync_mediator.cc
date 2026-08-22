@@ -243,6 +243,24 @@ void SyncMediator::Remove(SharedPtr<SyncItem> entry, bool fast_delete) {
     if (catalog_manager_->LookupPath("/" + entry->GetRelativePath(),
                                      catalog::kLookupDefault, &probe)
         && catalog_manager_->IsTransitionPoint(entry->GetRelativePath())) {
+      // A fast delete by path removes an entire nested-catalog subtree with no
+      // filesystem to bound it, so restrict it to a LEAF nested catalog -- one
+      // that mounts no child catalogs.  A structural node (the repository root,
+      // or a directory that aggregates many published catalogs) is never a
+      // leaf, so a crafted request cannot wipe everything beneath it; a
+      // published entry is a single dedicated leaf catalog.
+      std::string subcatalog_path;
+      shash::Any hash;
+      const std::string absolute_path = "/" + entry->GetRelativePath();
+      PathString ps_path;
+      ps_path.Assign(absolute_path.data(), absolute_path.length());
+      const catalog::Counters counters = catalog_manager_->LookupCounters(
+          ps_path, &subcatalog_path, &hash);
+      if (hash.IsNull() || counters.self.nested_catalogs != 0) {
+        PrintWarning("'" + entry->GetRelativePath()
+                     + "' cannot be deleted: not a leaf nested catalog");
+        return;
+      }
       RemoveDirectoryRecursively(entry, fast_delete);
       return;
     }
