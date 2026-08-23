@@ -1432,9 +1432,9 @@ void DownloadManager::ProcessLink(JobInfo *info) {
     info->SetLink("");
     LogCvmfs(kLogDownload, kLogDebug | kLogSyslog,
                  "(manager '%s' - id %" PRId64 ") "
-                 "received %d hosts from metalink server, starting with %s",
+                 "received %zu hosts from metalink server, starting with %s",
                  name_.c_str(), info->id(),
-                 static_cast<int>(host_list.size()),
+                 host_list.size(),
                  host_list[0].c_str());
   }
 }
