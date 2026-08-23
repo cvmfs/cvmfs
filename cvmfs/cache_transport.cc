@@ -106,29 +106,29 @@ void CacheTransport::Frame::Release() {
   if (owns_msg_typed_)
     return;
 
-  msg_rpc_.release_msg_refcount_req();
-  msg_rpc_.release_msg_refcount_reply();
-  msg_rpc_.release_msg_read_req();
-  msg_rpc_.release_msg_read_reply();
-  msg_rpc_.release_msg_object_info_req();
-  msg_rpc_.release_msg_object_info_reply();
-  msg_rpc_.release_msg_store_req();
-  msg_rpc_.release_msg_store_abort_req();
-  msg_rpc_.release_msg_store_reply();
-  msg_rpc_.release_msg_handshake();
-  msg_rpc_.release_msg_handshake_ack();
-  msg_rpc_.release_msg_quit();
-  msg_rpc_.release_msg_ioctl();
-  msg_rpc_.release_msg_info_req();
-  msg_rpc_.release_msg_info_reply();
-  msg_rpc_.release_msg_shrink_req();
-  msg_rpc_.release_msg_shrink_reply();
-  msg_rpc_.release_msg_list_req();
-  msg_rpc_.release_msg_list_reply();
-  msg_rpc_.release_msg_detach();
-  msg_rpc_.release_msg_breadcrumb_store_req();
-  msg_rpc_.release_msg_breadcrumb_load_req();
-  msg_rpc_.release_msg_breadcrumb_reply();
+  (void)msg_rpc_.release_msg_refcount_req();
+  (void)msg_rpc_.release_msg_refcount_reply();
+  (void)msg_rpc_.release_msg_read_req();
+  (void)msg_rpc_.release_msg_read_reply();
+  (void)msg_rpc_.release_msg_object_info_req();
+  (void)msg_rpc_.release_msg_object_info_reply();
+  (void)msg_rpc_.release_msg_store_req();
+  (void)msg_rpc_.release_msg_store_abort_req();
+  (void)msg_rpc_.release_msg_store_reply();
+  (void)msg_rpc_.release_msg_handshake();
+  (void)msg_rpc_.release_msg_handshake_ack();
+  (void)msg_rpc_.release_msg_quit();
+  (void)msg_rpc_.release_msg_ioctl();
+  (void)msg_rpc_.release_msg_info_req();
+  (void)msg_rpc_.release_msg_info_reply();
+  (void)msg_rpc_.release_msg_shrink_req();
+  (void)msg_rpc_.release_msg_shrink_reply();
+  (void)msg_rpc_.release_msg_list_req();
+  (void)msg_rpc_.release_msg_list_reply();
+  (void)msg_rpc_.release_msg_detach();
+  (void)msg_rpc_.release_msg_breadcrumb_store_req();
+  (void)msg_rpc_.release_msg_breadcrumb_load_req();
+  (void)msg_rpc_.release_msg_breadcrumb_reply();
 }
 
 
@@ -525,8 +525,9 @@ void CacheTransport::SendNonBlocking(struct iovec *iov, unsigned iovcnt) {
 
 void CacheTransport::SendFrame(CacheTransport::Frame *frame) {
   cvmfs::MsgRpc *msg_rpc = frame->GetMsgRpc();
-  const int32_t size = msg_rpc->ByteSize();
-  assert(size > 0);
+  const size_t byte_size = msg_rpc->ByteSizeLong();
+  assert((byte_size > 0) && (byte_size <= kMaxMsgSize));
+  const uint32_t size = static_cast<uint32_t>(byte_size);
 #ifdef __APPLE__
   void *buffer = smalloc(size);
 #else

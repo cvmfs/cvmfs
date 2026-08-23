@@ -40,6 +40,14 @@
 #include "util/smalloc.h"
 #include "util/string.h"
 
+// c-ares 1.28.0 deprecates the ares_parse_* / ares_seach /
+// / ares_getsock / ares_get_servers functions in favor of the new
+// new ares_dns_record API (ares_dns_parse, ares_search_dnsrec,
+// ares_get_servers_csv, ARES_OPT_EVENT_THREAD/ARES_OPT_SOCK_STATE_CB).
+// The new API is not supported yet by AlmaLinux 8's system c-ares (1.13)
+// though, so we will wait with the migration until Almalinux 8 is EOL (2029).
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+
 using namespace std;  // NOLINT
 
 namespace dns {
