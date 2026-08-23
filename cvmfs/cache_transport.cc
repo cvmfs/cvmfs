@@ -525,8 +525,9 @@ void CacheTransport::SendNonBlocking(struct iovec *iov, unsigned iovcnt) {
 
 void CacheTransport::SendFrame(CacheTransport::Frame *frame) {
   cvmfs::MsgRpc *msg_rpc = frame->GetMsgRpc();
-  const int32_t size = static_cast<int32_t>(msg_rpc->ByteSizeLong());
-  assert(size > 0);
+  const size_t byte_size = msg_rpc->ByteSizeLong();
+  assert((byte_size > 0) && (byte_size <= kMaxMsgSize));
+  const uint32_t size = static_cast<uint32_t>(byte_size);
 #ifdef __APPLE__
   void *buffer = smalloc(size);
 #else
