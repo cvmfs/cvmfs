@@ -6,6 +6,8 @@
 // mirroring currently open files.  Only objects with reference count zero may
 // be removed from the store.
 
+syntax = "proto2";
+
 package cvmfs;
 
 option optimize_for = LITE_RUNTIME;
