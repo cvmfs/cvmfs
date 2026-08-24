@@ -1891,7 +1891,7 @@ cvmfs_bugreport() {
 
 
 die() {
-  echo -e $1 >&2
+  echo -e "$1" >&2
   exit 1
 }
 
