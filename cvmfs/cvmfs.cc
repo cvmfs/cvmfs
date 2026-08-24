@@ -2617,9 +2617,13 @@ static void Spawn() {
       // Reserve the capabilities to read process environments
       const std::vector<cap_value_t> reservecaps = {CAP_DAC_READ_SEARCH,
                                                     CAP_SYS_PTRACE};
-      assert(ClearPermittedCapabilities(reservecaps, nocaps));
+      if (!ClearPermittedCapabilities(reservecaps, nocaps))
+        PANIC(kLogStderr | kLogSyslogErr,
+              "Failed to reduce process capabilities");
     } else {
-      assert(ClearPermittedCapabilities(nocaps, nocaps));
+      if (!ClearPermittedCapabilities(nocaps, nocaps))
+        PANIC(kLogStderr | kLogSyslogErr,
+              "Failed to clear process capabilities");
     }
   } else {
     LogCvmfs(kLogCvmfs, kLogDebug, "Not clearing capabilities, uid %d euid%d",
