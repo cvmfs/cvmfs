@@ -699,8 +699,6 @@ class CustomDelegate {
 };
 
 TEST_F(T_FsTraversal, BlockDevice) {
-  // don't rely on the host's /dev containing block device nodes (it
-  // typically won't inside a container); create our own instead
   const std::string dev_dir = testbed_path_ + "/blockdev_test";
   ASSERT_EQ(0, mkdir(dev_dir.c_str(), 0755)) << "errno: " << errno;
   const std::string dev_path = dev_dir + "/blockdev0";
