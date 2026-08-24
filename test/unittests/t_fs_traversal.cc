@@ -11,6 +11,10 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#if !defined(__APPLE__)
+#include <sys/sysmacros.h>
+#endif  // __APPLE__
+
 #include <map>
 #include <string>
 
@@ -695,15 +699,24 @@ class CustomDelegate {
 };
 
 TEST_F(T_FsTraversal, BlockDevice) {
-  CustomDelegate delegate("/dev");
-  FileSystemTraversal<CustomDelegate> traverse(&delegate, "/dev", false);
+  // don't rely on the host's /dev containing block device nodes (it
+  // typically won't inside a container); create our own instead
+  const std::string dev_dir = testbed_path_ + "/blockdev_test";
+  ASSERT_EQ(0, mkdir(dev_dir.c_str(), 0755)) << "errno: " << errno;
+  const std::string dev_path = dev_dir + "/blockdev0";
+  const int retval = mknod(dev_path.c_str(), S_IFBLK | 0644, makedev(1, 1));
+  if (retval != 0 && errno == EPERM) {
+    GTEST_SKIP() << "insufficient privileges to create a block device node "
+                    "(no CAP_MKNOD)";
+  }
+  ASSERT_EQ(0, retval) << "errno: " << errno;
+
+  CustomDelegate delegate(dev_dir);
+  FileSystemTraversal<CustomDelegate> traverse(&delegate, dev_dir, false);
   traverse.fn_new_block_dev = &CustomDelegate::BlockDevice;
   traverse.fn_ignore_file = &CustomDelegate::CheckPermissions;
-  traverse.Recurse("/dev");
-  if (delegate.num_block_dev == 0) {
-    GTEST_SKIP() << "no block devices found under /dev "
-                    "(likely running in a container)";
-  }
+  traverse.Recurse(dev_dir);
+  EXPECT_EQ(1, delegate.num_block_dev);
 }
 
 TEST_F(T_FsTraversal, CharacterDevice) {
