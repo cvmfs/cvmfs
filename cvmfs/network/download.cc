@@ -1258,11 +1258,11 @@ bool DownloadManager::ValidateProxyIpsUnlocked(const string &url,
  * Adds transfer time and downloaded bytes to the global counters.
  */
 void DownloadManager::UpdateStatistics(CURL *handle) {
-  double val;
+  curl_off_t val;
   int retval;
   int64_t sum = 0;
 
-  retval = curl_easy_getinfo(handle, CURLINFO_SIZE_DOWNLOAD, &val);
+  retval = curl_easy_getinfo(handle, CURLINFO_SIZE_DOWNLOAD_T, &val);
   assert(retval == CURLE_OK);
   sum += static_cast<int64_t>(val);
   /*retval = curl_easy_getinfo(handle, CURLINFO_HEADER_SIZE, &val);
@@ -1432,7 +1432,7 @@ void DownloadManager::ProcessLink(JobInfo *info) {
     info->SetLink("");
     LogCvmfs(kLogDownload, kLogDebug | kLogSyslog,
                  "(manager '%s' - id %" PRId64 ") "
-                 "received %d hosts from metalink server, starting with %s",
+                 "received %zu hosts from metalink server, starting with %s",
                  name_.c_str(), info->id(),
                  host_list.size(),
                  host_list[0].c_str());

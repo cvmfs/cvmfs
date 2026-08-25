@@ -97,7 +97,10 @@ FetchContent_Declare(
   DOWNLOAD_DIR ${EXTERNALS_DOWNLOAD_LOCATION}
   INSTALL_DIR ${EXTERNALS_INSTALL_LOCATION}
   EXCLUDE_FROM_ALL
-  FIND_PACKAGE_ARGS
+  # Require 7.55.0+: needed for CURLINFO_SIZE_DOWNLOAD_T/CURLINFO_SIZE_UPLOAD_T
+  # (used in download.cc). All currently supported platforms should have a newer libcurl, 
+  # but better to be explicit, that lets us fall back to the vendored copy.
+  FIND_PACKAGE_ARGS 7.55.0
 )
 
 FetchContent_MakeAvailable(CURL)

@@ -19,22 +19,52 @@ message ("Running CMake version ${CMAKE_VERSION}")
 #
 # The version numbers
 #
-# DON'T DELETE
-## CVMFS_VERSION 2.15.0
-## CVMFS_PRERELEASE ~pre1
-#---------------------
-set (CernVM-FS_VERSION_MAJOR 2)
-set (CernVM-FS_VERSION_MINOR 15)
-set (CernVM-FS_VERSION_PATCH 0)
-set (CernVM-FS_VERSION_STRING "${CernVM-FS_VERSION_MAJOR}.${CernVM-FS_VERSION_MINOR}.${CernVM-FS_VERSION_PATCH}")
+# VERSION contains the next release's numeric version.  get_version.sh adds
+# tag or Git development information and also supports source archives and an
+# explicit CVMFS_VERSION_OVERRIDE.
+set (CVMFS_VERSION_OVERRIDE "" CACHE STRING "Override the detected CernVM-FS version")
+set (CVMFS_VERSION_ORDER "" CACHE STRING "Override the development-version order")
+set (CVMFS_VERSION_SEQUENCE "" CACHE STRING "Set the development-version sequence")
+set (CVMFS_VERSION_TIMESTAMP "" CACHE STRING "Override the development-version timestamp")
+set (_CVMFS_VERSION_ENV "")
+foreach (_CVMFS_VERSION_VARIABLE
+         CVMFS_VERSION_OVERRIDE CVMFS_VERSION_ORDER
+         CVMFS_VERSION_SEQUENCE CVMFS_VERSION_TIMESTAMP)
+  if (NOT "${${_CVMFS_VERSION_VARIABLE}}" STREQUAL "")
+    list (APPEND _CVMFS_VERSION_ENV
+          "${_CVMFS_VERSION_VARIABLE}=${${_CVMFS_VERSION_VARIABLE}}")
+  endif ()
+endforeach ()
+execute_process (
+  COMMAND ${CMAKE_COMMAND} -E env ${_CVMFS_VERSION_ENV}
+          "${CMAKE_SOURCE_DIR}/cmake/get_version.sh" "${CMAKE_SOURCE_DIR}"
+  OUTPUT_VARIABLE CernVM-FS_BUILD_VERSION
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+  RESULT_VARIABLE CVMFS_VERSION_RESULT
+)
+if (NOT CVMFS_VERSION_RESULT EQUAL 0)
+  message (FATAL_ERROR "Failed to determine the CernVM-FS version")
+endif ()
+if (NOT CernVM-FS_BUILD_VERSION MATCHES
+    "^([0-9]+)\\.([0-9]+)\\.([0-9]+)([~+][0-9A-Za-z.+~]+)?$")
+  message (FATAL_ERROR "Invalid CernVM-FS version: ${CernVM-FS_BUILD_VERSION}")
+endif ()
+set (CernVM-FS_VERSION_MAJOR ${CMAKE_MATCH_1})
+set (CernVM-FS_VERSION_MINOR ${CMAKE_MATCH_2})
+set (CernVM-FS_VERSION_PATCH ${CMAKE_MATCH_3})
+# Keep shared-library versions and installation paths numeric and stable.
+set (CernVM-FS_VERSION_STRING
+     "${CernVM-FS_VERSION_MAJOR}.${CernVM-FS_VERSION_MINOR}.${CernVM-FS_VERSION_PATCH}")
+message ("CernVM-FS version ${CernVM-FS_BUILD_VERSION}")
+
 if (CMAKE_VERSION VERSION_LESS "3.12.0")
-  add_definitions(-DCVMFS_VERSION="${CernVM-FS_VERSION_STRING}")
+  add_definitions(-DCVMFS_VERSION="${CernVM-FS_BUILD_VERSION}")
   add_definitions(-DCVMFS_VERSION_MAJOR=${CernVM-FS_VERSION_MAJOR})
   add_definitions(-DCVMFS_VERSION_MINOR=${CernVM-FS_VERSION_MINOR})
   add_definitions(-DCVMFS_VERSION_PATCH=${CernVM-FS_VERSION_PATCH})
   add_definitions(-DCVMFS_PATCH_LEVEL="0")
 else()
-  add_compile_definitions(CVMFS_VERSION="${CernVM-FS_VERSION_STRING}")
+  add_compile_definitions(CVMFS_VERSION="${CernVM-FS_BUILD_VERSION}")
   add_compile_definitions(CVMFS_VERSION_MAJOR=${CernVM-FS_VERSION_MAJOR})
   add_compile_definitions(CVMFS_VERSION_MINOR=${CernVM-FS_VERSION_MINOR})
   add_compile_definitions(CVMFS_VERSION_PATCH=${CernVM-FS_VERSION_PATCH})

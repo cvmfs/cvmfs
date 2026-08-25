@@ -1204,9 +1204,9 @@ void S3FanoutManager::SetUrlOptions(JobInfo *info) const {
  * Adds transfer time and uploaded bytes to the global counters.
  */
 void S3FanoutManager::UpdateStatistics(CURL *handle) {
-  double val;
+  curl_off_t val;
 
-  if (curl_easy_getinfo(handle, CURLINFO_SIZE_UPLOAD, &val) == CURLE_OK)
+  if (curl_easy_getinfo(handle, CURLINFO_SIZE_UPLOAD_T, &val) == CURLE_OK)
     statistics_->transferred_bytes += val;
 }
 

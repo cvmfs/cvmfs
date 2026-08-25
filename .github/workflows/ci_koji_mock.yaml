@@ -33,7 +33,7 @@ jobs:
                 rpm-build \
                 rpmdevtools
 
-              version=$(awk "/^Version:/ { print \$2; exit }" packaging/rpm/cvmfs-universal.spec)
+              version=$(./cmake/get_version.sh /src)
 
               rm -rf dist rpmbuild mock-result
               mkdir -p dist rpmbuild/SOURCES rpmbuild/SRPMS mock-result
@@ -44,12 +44,14 @@ jobs:
               test -f "$tarball"
 
               cp "$tarball" rpmbuild/SOURCES/
-              cp packaging/rpm/cvmfs.te packaging/rpm/cvmfs.fc rpmbuild/SOURCES/
+              cp packaging/rpm/cvmfs.te packaging/rpm/cvmfs.fc VERSION rpmbuild/SOURCES/
+              cp packaging/rpm/cvmfs-universal.spec rpmbuild/cvmfs-universal.spec
 
-              rpmbuild -bs packaging/rpm/cvmfs-universal.spec \
+              rpmbuild -bs rpmbuild/cvmfs-universal.spec \
                 --define "_topdir /src/rpmbuild" \
                 --define "_sourcedir /src/rpmbuild/SOURCES" \
-                --define "_srcrpmdir /src/rpmbuild/SRPMS"
+                --define "_srcrpmdir /src/rpmbuild/SRPMS" \
+                --define "cvmfs_version ${version}"
 
               srpm=$(find rpmbuild/SRPMS -name "*.src.rpm" -print -quit)
               test -n "$srpm"

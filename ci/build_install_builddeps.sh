@@ -197,24 +197,41 @@ list_deps_deb() {
   | extract_deps_from_stanza true | sort -u
 }
 
+# extract_rpm_deps <spec> <rpmspec-query-flag> <tag>
+# Requires rpmspec (part of the 'rpm-build' package) to correctly expand
+# macros/conditionals. Parsing the raw spec text without it would silently
+# union every distro variant's requirements together (e.g. both gcc4 and
+# gcc, both sysvinit and systemd) and leave macros like %{cvmfs_go} and
+# %{version}-%{release} unresolved, so that is not offered as a fallback.
+extract_rpm_deps() {
+  local spec="$1" query_flag="$2" tag="$3" out=""
+  check_available rpmspec || \
+    die "rpmspec not found (part of the 'rpm-build' package) -- install it first, e.g. 'dnf install rpm-build' or 'zypper install rpm-build'"
+
+  out="$(rpmspec -q "$query_flag" "$spec" 2>/dev/null || true)"
+  if [ -z "$out" ]; then
+    # Older rpm without -q --buildrequires/--requires support: --parse still
+    # expands macros/conditionals correctly, just without the per-dependency
+    # splitting that -q provides.
+    out="$(rpmspec --parse "$spec" 2>/dev/null | grep -E "^${tag}:" || true)"
+    out="$(echo "$out" | sed -E "s/^${tag}:[[:space:]]*//" | tr -s '[:space:]' '\n')"
+  fi
+  echo "$out" \
+    | sed -E 's/[[:space:]]*(<=|>=|<|>|=).*$//' \
+    | grep -v '^/' \
+    | sed -e '/^$/d' | sort -u
+}
+
 list_deps_rpm() {
   local spec="$1"
   [ -f "$spec" ] || die "RPM spec file not found at $spec"
 
   echo "# Build Dependencies:"
-  if check_available rpmspec; then
-    rpmspec --parse "$spec" 2>/dev/null | grep -E '^BuildRequires:' || true
-  else
-    grep -E '^BuildRequires:' "$spec" || true
-  fi | awk '{print $2}' | sed -e '/^$/d' | sort -u
+  extract_rpm_deps "$spec" --buildrequires "BuildRequires"
 
   echo ""
   echo "# Runtime Dependencies:"
-  if check_available rpmspec; then
-    rpmspec --parse "$spec" 2>/dev/null | grep -E '^Requires:' || true
-  else
-    grep -E '^Requires:' "$spec" || true
-  fi | awk '{print $2}' | sed -e '/^$/d' | grep -v '^cvmfs' | sort -u
+  extract_rpm_deps "$spec" --requires "Requires" | grep -v '^cvmfs'
 }
 
 ########################

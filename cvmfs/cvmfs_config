@@ -7,6 +7,15 @@ INSTALL_BASE=$(echo "$SCRIPT_LOCATION" | sed -e 's/^\(.*\)\/bin$/\1/')
 INSTALL_BASE=$(echo "$INSTALL_BASE" | sed -e 's/^\(.*\)\/sbin$/\1/')
 SBIN_BASE="$( [ x"$INSTALL_BASE" = x"/usr" ] && echo "/sbin" || echo "${INSTALL_BASE}/sbin" )"
 
+# manpage generation with help2man might run when /etc/cvmfs/config.sh isn't available yet
+# Since config.sh isn't necessary for the help text, skip the check when only doing --help
+case "$1" in
+  --help|-h|--version|"") CVMFS_CONFIG_SKIP_ENV_PROBE=1 ;;
+  *)                      CVMFS_CONFIG_SKIP_ENV_PROBE=0 ;;
+esac
+
+if [ $CVMFS_CONFIG_SKIP_ENV_PROBE -eq 0 ]; then
+
 if [ -f /etc/cvmfs/config.sh ]; then
   . /etc/cvmfs/config.sh
 elif [ -f ${INSTALL_BASE}/etc/cvmfs/config.sh ]; then
@@ -70,6 +79,8 @@ case $sys_arch in
     echo "Architecture $sys_arch is not supported"
     exit 1 ;;
 esac
+
+fi  # CVMFS_CONFIG_SKIP_ENV_PROBE
 
 # This list of known parameters will be merged with all CVMFS_... environment
 # variable for cvmfs_config showconfig.  It is useful to keep this list to show
@@ -266,7 +277,8 @@ cvmfs_config_usage() {
   fi
   echo "  chksetup"
   echo ""
-  echo "  showconfig [-s(hort output, only parameters set in the configuration)] [-j|--json] [<repository>]"
+  echo "  showconfig [-s(hort output, only parameters set in the" \
+       "configuration)] [-j|--json] [<repository>|<mountpoint>]"
   echo ""
   echo "  validate [<repository>]"
   echo ""
@@ -988,7 +1000,6 @@ json_string() {
 cvmfs_showconfig() {
   local fqrn
   local org
-  local retval
   local short_output=0
   local json_output=0
   local short_opt=
@@ -1035,13 +1046,19 @@ cvmfs_showconfig() {
     return 0
   fi
 
-  fqrn=`cvmfs_mkfqrn $org`
-  org=`cvmfs_getorg $fqrn`
-  cvmfs_readconfig $fqrn || die "Failed to read CernVM-FS configuration"
-  retval=$?
-  if [ $retval -ne 0 ]; then
-    return $retval
+  local given_path="$org"
+  local mount_prefix="${CVMFS_MOUNT_DIR%/}/"
+  if [[ "$org" == "$mount_prefix"* ]]; then
+    org=${org#"$mount_prefix"}
   fi
+  org=${org%/}
+  if [[ -z "$org" || "$org" == */* ]]; then
+    die "Invalid repository path: $given_path"
+  fi
+
+  fqrn=$(cvmfs_mkfqrn "$org")
+  org=$(cvmfs_getorg "$fqrn")
+  cvmfs_readconfig "$fqrn" || die "Failed to read CernVM-FS configuration"
 
   local name=
   local all_vars=
@@ -1093,16 +1110,19 @@ cvmfs_showconfig() {
     line=$(echo "$CVMFS_PARMS" | grep "^${var}=")
     if [ "x$line" != "x" ]; then
       if [ "x$org" != "x" ]; then
-        line=`echo "$line" | sed s/@org@/$org/g`
+        line=${line//@org@/$org}
       fi
       if [ "x$fqrn" != "x" ]; then
-        line=`echo "$line" | sed s/@fqrn@/$fqrn/g`
+        line=${line//@fqrn@/$fqrn}
       fi
       echo "$line"
     else
       [ $short_output -eq 0 ] && echo "${var}="
     fi
   done <<< "$all_vars"
+  # In short mode the loop's last command may be the failed condition above;
+  # don't let that become the function's exit status.
+  return 0
 }
 
 
@@ -2038,7 +2058,7 @@ cvmfs_bugreport() {
 
 
 die() {
-  echo -e $1 >&2
+  echo -e "$1" >&2
   exit 1
 }
 
@@ -2982,7 +3002,11 @@ case "$1" in
      ;;
 
    --version)
-     echo $(cvmfs2 --version)
+     if command -v cvmfs2 >/dev/null 2>&1; then
+       echo $(cvmfs2 --version)
+     else
+       echo "cvmfs_config (CernVM-FS)"
+     fi
      RETVAL=0
      ;;
    --help)
