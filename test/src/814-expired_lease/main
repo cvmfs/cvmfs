@@ -30,7 +30,7 @@ cvmfs_run_test() {
     cp "$CVMFS_TEST_814_USER_JSON" "$CVMFS_TEST_814_BACKUP" || return 13
     jq '.max_lease_time = 1' "$CVMFS_TEST_814_USER_JSON" > user.json.new || return 14
     sudo mv user.json.new "$CVMFS_TEST_814_USER_JSON"
-    restart_repository_gateway
+    restart_repository_gateway || return 15
 
     echo "*** Transaction should fail but recover through abort -f"
     cvmfs_server transaction test.repo.org || return 20

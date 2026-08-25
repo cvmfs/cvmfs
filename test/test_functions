@@ -2723,6 +2723,13 @@ restart_repository_gateway() {
     while ! $gateway_script status; do
       sleep 1
     done
+
+    # status only confirms systemd sees the process as active, not that the
+    # HTTP listener on :4929 is accepting connections yet 
+    if ! curl -v -f --retry 30 --retry-max-time 30 --retry-connrefused -o /dev/null -m 2 http://localhost:4929/api/v1/repos; then
+      echo "Gateway failed to become ready within 30 seconds" >&2
+      return 1
+    fi
 }
 
 grep_receiver_debuglog() {

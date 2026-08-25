@@ -55,12 +55,14 @@ RUN set -eux; \
 # in /build and the install tree lands in /rootfs. Two cache mounts persist
 # across rebuilds: ccache for compiler output, and the externals install
 # prefix so prebuilt third-party libraries (openssl, curl, ...) are reused.
+ARG CVMFS_VERSION_OVERRIDE
 RUN --mount=type=bind,source=.,target=/src \
     --mount=type=cache,target=/root/.cache/ccache \
     --mount=type=cache,target=/root/.cache/cvmfs_externals_install \
     set -eux; \
     mkdir -p /build /rootfs; \
     cd /build && cmake \
+      -DCVMFS_VERSION_OVERRIDE="$CVMFS_VERSION_OVERRIDE" \
       -DBUILD_SERVER=no -DBUILD_RECEIVER=no -DBUILD_GEOAPI=no \
       -DBUILD_LIBCVMFS=no -DBUILD_LIBCVMFS_CACHE=no \
       -DINSTALL_BASH_COMPLETION=no \

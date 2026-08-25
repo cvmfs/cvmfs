@@ -8,7 +8,7 @@ file(GLOB_RECURSE CVMFS_SNAPSHOTTER_GO_SOURCES LIST_DIRECTORIES false ./*.go)
 
 add_custom_command(
   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/cvmfs_snapshotter
-  COMMAND ${GO_COMPILER} build -o ${CMAKE_CURRENT_BINARY_DIR}/cvmfs_snapshotter -ldflags='-X main.Version=${CernVM-FS_VERSION_STRING}'
+  COMMAND ${GO_COMPILER} build -o ${CMAKE_CURRENT_BINARY_DIR}/cvmfs_snapshotter -ldflags='-X main.Version=${CernVM-FS_BUILD_VERSION}'
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   DEPENDS ${CVMFS_SNAPSHOTTER_GO_SOURCES}
   COMMENT "Build containerd cvmfs_snapshotter using the Go Compiler"

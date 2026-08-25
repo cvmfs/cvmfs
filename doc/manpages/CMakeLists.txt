@@ -42,13 +42,14 @@ else()
     # cvmfs_config
     add_custom_command(
         OUTPUT "${MAN_OUTPUT_DIR}/cvmfs_config.1"
-        COMMAND ${HELP2MAN} 
-            -i ${CMAKE_CURRENT_LIST_DIR}/cvmfs_common.h2m
-            --no-info 
-            --section=1 
-            --output=${MAN_OUTPUT_DIR}/cvmfs_config.1
-            --name "cvmfs_config: tools for common CernVM-FS config tasks" 
-            "${CMAKE_SOURCE_DIR}/cvmfs/cvmfs_config"
+        COMMAND bash -c "PATH=\"$<TARGET_FILE_DIR:cvmfs2>:$PATH\" ${HELP2MAN} \
+            -i ${CMAKE_CURRENT_LIST_DIR}/cvmfs_common.h2m \
+            --no-info \
+            --section=1 \
+            --output=${MAN_OUTPUT_DIR}/cvmfs_config.1 \
+            --name \"cvmfs_config: tools for common CernVM-FS config tasks\" \
+            ${CMAKE_SOURCE_DIR}/cvmfs/cvmfs_config"
+        DEPENDS cvmfs2 # needed for cvmfs2 --version
         COMMENT "Generating man page for cvmfs_config"
         VERBATIM
     )
