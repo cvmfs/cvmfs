@@ -272,6 +272,8 @@ cvmfs_config_usage() {
   echo ""
   echo "  explain <parameter>"
   echo ""
+  echo "  generate (write /etc/cvmfs/default.local for this node)"
+  echo ""
   echo "  stat [-v | <repository>]"
   echo ""
   echo "  status [-v(erbose, force detail output)] [<repository list>]"
@@ -1160,6 +1162,94 @@ cvmfs_validate() {
   fi
   echo "Configuration of $fqrn is valid"
   return 0
+}
+
+
+cvmfs_generate() {
+  local target="/etc/cvmfs/default.local"
+
+  local validator_bin="/usr/libexec/cvmfs/cvmfs_validator"
+  [ -x "$validator_bin" ] || validator_bin="/usr/lib/cvmfs/cvmfs_validator"
+  [ -x "$validator_bin" ] || die "no validation engine available; build \
+CernVM-FS with -DBUILD_CONFIG_VALIDATOR=ON"
+
+  cvmfs_readconfig || die "Failed to read CernVM-FS configuration"
+
+  # server URLs and proxies are per repository, so choose one to test them out first
+  local fqrn=${CVMFS_REPOSITORIES%%,*}
+  [ -n "$fqrn" ] || fqrn=$CVMFS_CONFIG_REPOSITORY
+  [ -z "$fqrn" ] || cvmfs_readconfig "$fqrn" || true
+
+  # climb to an existing directory to measure disk capacity for the cache
+  local dir="${CVMFS_CACHE_BASE:-/var/lib/cvmfs}"
+  while [ ! -d "$dir" ]; do dir=$(dirname "$dir"); done
+
+  # query systemd for autofs's LimitNOFILE
+  local nfiles=$(systemctl show -p LimitNOFILE --value autofs 2>/dev/null)
+  case "$nfiles" in ''|*[!0-9]*) nfiles=132096 ;; esac
+
+  # discover a proxy when none is configured; auto means http://wpad/wpad.dat
+  local proxy="$CVMFS_HTTP_PROXY" wpad=false
+  case "$proxy" in ''|auto)
+    CVMFS_PAC_URLS=auto cvmfs2 __wpad__ auto "$CVMFS_SERVER_URL" \
+      >/dev/null 2>&1 && wpad=true
+    # send to the go validator the default value "DIRECT", will get changed there
+    proxy=DIRECT ;;
+  esac
+
+  # time a whitelist fetch to size the timeouts; zero keeps the defaults
+  local rtt=0
+  if [ -n "$fqrn" ] && [ -n "$CVMFS_SERVER_URL" ]; then
+    # if proxy isn't set to "DIRECT" then via holds the proxy's address
+    local via=; [ "$proxy" = DIRECT ] || via="$proxy"
+    local org; org=`cvmfs_getorg $fqrn`
+    # extracts the first Stratum 1 server URL and expands the org and fqrn placeholders
+    local url; url=`echo "$CVMFS_SERVER_URL" | sed -e 's/[;|].*//' \
+      -e s/@org@/$org/g -e s/@fqrn@/$fqrn/g`
+    # records starting timestamp in nanoseconds 
+    local start; start=$(date +%s%N)
+    # tries to fetch the lightweight file within 10 seconds
+    if env http_proxy="$via" curl -H "Pragma:" -fs -m 10 \
+         -o /dev/null "${url}/.cvmfspublished" 2>/dev/null; then
+      # rtt is current timestamp substracted the starting timestamp
+      rtt=$((($(date +%s%N)-start)/1000000))
+    fi
+  fi
+
+  # json payload for the generator
+  local facts=$(printf '{"cache_avail_mb":%d,"memory_mb":%d,"nfiles_max":%d,"proxy_chain":"%s","wpad_found":%s,"rtt_ms":%d}' \
+    $(($(df -Pk "$dir" | tail -n 1 | awk '{print $4}')/1024)) \
+    $(($(awk '/^MemTotal:/ {print $2}' /proc/meminfo)/1024)) \
+    "$nfiles" "$proxy" "$wpad" "$rtt")
+
+  local generated
+  generated=$(echo "$facts" | "$validator_bin" -generate) || return 1
+
+  # the parameter names we are about to write, as KEY1|KEY2|KEY3
+  local names
+  names=$(echo "$generated" |
+    sed -nE 's/^([A-Za-z_][A-Za-z0-9_]*)=.*/\1/p' | paste -sd'|' -)
+
+  if [ -f "$target" ]; then
+    # remove any old generated block, and parameters that will get a new generated value
+    # while keeping any other parameters
+    sed -E -e '/^# cvmfs_config generate$/,/^# end cvmfs_config generate$/d' \
+           -e "/^($names)=/d" "$target" > "${target}.new" ||
+      die "Failed to read $target"
+  else
+    # if doesn't exist create a new file
+    : > "${target}.new"
+  fi
+
+  # paste the generated block
+  cat >> "${target}.new" <<EOF
+# cvmfs_config generate
+$generated
+# end cvmfs_config generate
+EOF
+
+  mv "${target}.new" "$target" || die "Failed to write $target"
+  echo "Wrote $target"
 }
 
 
@@ -2793,6 +2883,12 @@ case "$1" in
   explain)
     shift 1
     cvmfs_explain $@
+    RETVAL=$?
+    ;;
+
+  generate)
+    shift 1
+    cvmfs_generate $@
     RETVAL=$?
     ;;
 

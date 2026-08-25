@@ -12,19 +12,24 @@ import (
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/ast"
+	"cuelang.org/go/cue/build"
 	"cuelang.org/go/cue/cuecontext"
 	"cuelang.org/go/cue/errors"
+	"cuelang.org/go/cue/parser"
 	"cuelang.org/go/cue/token"
 	"cuelang.org/go/encoding/json"
 )
 
-// Embed the two schema files into the binary
+// Embed the schema files into the binary
 //
 //go:embed cvmfs_client.cue
 var clientSchemaSource string
 
 //go:embed cvmfs_server.cue
 var serverSchemaSource string
+
+//go:embed gen_client.cue
+var genClientSchemaSource string
 
 var schemas = []struct {
 	filename string
@@ -185,15 +190,107 @@ func explain(name, wanted string) int {
 	return 1
 }
 
+// loadSchema builds the embedded schemas as one CUE package, so that
+// gen_client.cue can use the client definitions.
+func loadSchema(ctx *cue.Context) (cue.Value, error) {
+	instance := build.NewContext().NewInstance("cvmfs", nil)
+	for filename, source := range map[string]string{
+		"cvmfs_client.cue": clientSchemaSource,
+		"cvmfs_server.cue": serverSchemaSource,
+		"gen_client.cue":   genClientSchemaSource,
+	} {
+		file, err := parser.ParseFile(filename, source)
+		if err != nil {
+			return cue.Value{}, err
+		}
+		if err := instance.AddSyntax(file); err != nil {
+			return cue.Value{}, err
+		}
+	}
+	value := ctx.BuildInstance(instance)
+	return value, value.Err()
+}
+
+// generate writes a client configuration for the node facts given as JSON.
+func generate(input []byte) int {
+	ctx := cuecontext.New()
+
+	schema, err := loadSchema(ctx)
+	// catches compilation errors in the CUE files
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "schema error: %v\n", err)
+		return 2
+	}
+
+	// take the JSON input byte array and parse into a ast.Expr
+	expr, err := json.Extract("facts", input)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "json error: %v\n", err)
+		return 2
+	}
+
+	// turn the ast into a cue object and place into the "facts" namespace
+	schema = schema.FillPath(cue.ParsePath("facts"), ctx.BuildExpr(expr))
+
+	tuned := schema.LookupPath(cue.ParsePath("tuned"))
+	// verify that every calculation in tuned resolved to a concrete literal / value
+	if err := tuned.Validate(cue.Concrete(true)); err != nil {
+		fmt.Fprint(os.Stderr, errors.Details(err, nil))
+		return 1
+	}
+	// check whether the unification resolved to a conflict
+	if err := schema.LookupPath(cue.ParsePath("tunedConfig")).Validate(); err != nil {
+		fmt.Fprint(os.Stderr, errors.Details(err, nil))
+		return 1
+	}
+
+	// creates an iterator for tuned's fields
+	fields, _ := tuned.Fields()
+	client := schema.LookupPath(cue.ParsePath("#ClientConfig"))
+
+	for fields.Next() {
+		name, val := fields.Selector().Unquoted(), fields.Value()
+
+		// extract and print description above the parameter if it exists
+		attr := client.LookupPath(cue.MakePath(cue.Str(name).Optional())).
+			Attribute("description")
+		if desc, _ := attr.String(0); desc != "" {
+			fmt.Printf("\n# %s\n", desc)
+		}
+
+		// turn value into a string
+		str, err := val.String()
+		if err != nil {
+			// convert CUE ints and bools to strings
+			str = fmt.Sprint(val)
+		}
+		// output the formatted bash line (KEY=VALUE)
+		fmt.Printf("%s=%s\n", name, str)
+	}
+
+	return 0
+}
+
 func main() {
 	definition := flag.String("d", "#ClientConfig",
 		"schema definition to validate against")
 	explainParam := flag.String("explain", "",
 		"print the documentation of a configuration parameter and exit")
+	generateConfig := flag.Bool("generate", false,
+		"write a client configuration for the node facts read from stdin")
 	flag.Parse()
 
 	if *explainParam != "" {
 		os.Exit(explain(*explainParam, *definition))
+	}
+
+	if *generateConfig {
+		facts, err := io.ReadAll(os.Stdin)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error reading node facts: %v\n", err)
+			os.Exit(2)
+		}
+		os.Exit(generate(facts))
 	}
 
 	ctx := cuecontext.New()

@@ -1,0 +1,77 @@
+#!/bin/bash
+
+cvmfs_test_name="cvmfs_config generate writes a valid client configuration"
+cvmfs_test_suites="quick"
+
+CVMFS_TEST117_SAVED=
+
+# Restores the system's state after test finishes
+cleanup() {
+  # Captures the exit status of whatever command triggered the script to exit
+  local exit_code=$?
+  if [ -n "$CVMFS_TEST117_SAVED" ]; then
+    sudo cp "$CVMFS_TEST117_SAVED" /etc/cvmfs/default.local 2>/dev/null || true
+    rm -f "$CVMFS_TEST117_SAVED"
+  fi
+  return $exit_code
+}
+
+cvmfs_run_test() {
+  local logfile=$1
+
+  local output retval before after
+
+  echo "*** looking for a preinstalled cvmfs_validator"
+  if [ ! -x /usr/libexec/cvmfs/cvmfs_validator ] &&
+     [ ! -x /usr/lib/cvmfs/cvmfs_validator ]; then
+    echo "Warning: no preinstalled cvmfs_validator found, skipping test"
+    CVMFS_GENERAL_WARNING_FLAG=1
+    return 0
+  fi
+
+  # Creates a secure temporary file to back up the system's default.local (interruptible)
+  CVMFS_TEST117_SAVED="$(mktemp)"
+  cp /etc/cvmfs/default.local "$CVMFS_TEST117_SAVED" 2>/dev/null || true
+  trap cleanup EXIT HUP INT TERM
+
+  echo "*** generate must write a configuration that validates"
+  sudo sh -c 'echo CVMFS_REPOSITORIES=atlas.cern.ch > /etc/cvmfs/default.local'
+  sudo cvmfs_config generate || return 1
+  cat /etc/cvmfs/default.local
+  output=$(cvmfs_config validate atlas.cern.ch) && retval=0 || retval=$?
+  echo "$output"
+  [ $retval -eq 0 ] || return 2
+  echo "$output" | grep -q "Configuration of atlas.cern.ch is valid" || return 3
+
+  echo "*** generate must delimit its own block"
+  grep -q '^# cvmfs_config generate$' /etc/cvmfs/default.local || return 4
+  grep -q '^# end cvmfs_config generate$' /etc/cvmfs/default.local || return 5
+
+  echo "*** generate must derive the parameters it owns"
+  grep -q '^CVMFS_QUOTA_LIMIT=[0-9]\+$' /etc/cvmfs/default.local || return 6
+  grep -q '^CVMFS_NFILES=[0-9]\+$' /etc/cvmfs/default.local || return 7
+
+  echo "*** generate must keep parameters it does not own"
+  grep -q '^CVMFS_REPOSITORIES=atlas.cern.ch$' /etc/cvmfs/default.local || return 8
+
+  echo "*** generate must override a parameter it generates a value for"
+  sudo sh -c 'printf "CVMFS_REPOSITORIES=atlas.cern.ch\nCVMFS_QUOTA_LIMIT=1\n" \
+    > /etc/cvmfs/default.local'
+  sudo cvmfs_config generate || return 9
+  ! grep -q '^CVMFS_QUOTA_LIMIT=1$' /etc/cvmfs/default.local || return 10
+  grep -q '^CVMFS_REPOSITORIES=atlas.cern.ch$' /etc/cvmfs/default.local || return 11
+
+  echo "*** regenerating must not grow the configuration"
+  before=$(wc -l < /etc/cvmfs/default.local)
+  sudo cvmfs_config generate || return 12
+  after=$(wc -l < /etc/cvmfs/default.local)
+  echo "$before lines before, $after after"
+  [ "$before" -eq "$after" ] || return 13
+
+  echo "*** the regenerated configuration must still validate"
+  output=$(cvmfs_config validate atlas.cern.ch) && retval=0 || retval=$?
+  echo "$output"
+  [ $retval -eq 0 ] || return 14
+
+  return 0
+}
