@@ -449,7 +449,10 @@ int main(int argc, char **argv) {
   }
 
   options_manager_.ParseDefault("");
-  const string fqrn = MkFqrn(device);
+  // A config= option is passed directly to cvmfs2, where it preserves the
+  // device name verbatim.  Do the same here: server repositories may have an
+  // unqualified name and their client.conf need not define a default domain.
+  const string fqrn = config_files_opt.empty() ? MkFqrn(device) : device;
   // Bail in case we could not form a Fqrn
   if (fqrn.empty()) {
     LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
@@ -458,11 +461,12 @@ int main(int argc, char **argv) {
   }
   options_manager_.SwitchTemplateManager(
       new DefaultOptionsTemplateManager(fqrn));
-  options_manager_.ParseDefault(fqrn);
 
-  // Parse additional config files specified via config= mount option
-  // (e.g. server-side client.conf). These override the defaults.
-  if (!config_files_opt.empty()) {
+  if (config_files_opt.empty()) {
+    options_manager_.ParseDefault(fqrn);
+  } else {
+    // Match cvmfs2's config= behavior: these files replace the normal
+    // repository configuration and are parsed after the global defaults.
     vector<string> cf = SplitString(config_files_opt, ':');
     for (unsigned i = 0; i < cf.size(); ++i) {
       options_manager_.ParsePath(cf[i], false);

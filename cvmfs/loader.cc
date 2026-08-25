@@ -1097,7 +1097,8 @@ int FuseMain(int argc, char *argv[]) {
     dounmount = true;
     char opts[128];
     snprintf(
-        opts, sizeof(opts), "fd=%i,rootmode=%o,user_id=0,group_id=0%s%s",
+        opts, sizeof(opts),
+        "fd=%i,rootmode=%o,user_id=0,group_id=0,subtype=cvmfs2%s%s",
         premount_fd, info.st_mode & S_IFMT,
         MatchFuseOption(mount_options, "default_permissions")
             ? ",default_permissions"
@@ -1111,10 +1112,10 @@ int FuseMain(int argc, char *argv[]) {
     if (MatchFuseOption(mount_options, "ro")) {
       flags |= MS_RDONLY;
     }
-    if (mount(repository_name_->c_str(), mount_point_->c_str(),
-              "fuse.cvmfs2", flags, opts) == -1) {
+    if (mount(repository_name_->c_str(), mount_point_->c_str(), "fuse",
+              flags, opts) == -1) {
       LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
-               "Failed to mount -t fuse.cvmfs2 -o %s %s %s (%d)", opts,
+               "Failed to mount -t fuse -o %s %s %s (%d)", opts,
                repository_name_->c_str(), mount_point_->c_str(), errno);
       return kFailPermission;
     }
@@ -1205,7 +1206,7 @@ int FuseMain(int argc, char *argv[]) {
       }
       if (tokens.size() < i + 3)
         continue;
-      if (tokens[i + 2] != "cvmfs2")
+      if (tokens[i + 2] != *repository_name_)
         continue;
       loader_exports_->device_id = tokens[2];
       break;

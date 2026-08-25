@@ -559,9 +559,11 @@ _migrate_144() {
   echo "--> adjusting /etc/fstab (use type cvmfs instead of fuse)"
   # Replace old-style fstab entries:
   #   cvmfs2#name ... fuse allow_other,fsname=name,config=... -> name ... cvmfs allow_other,config=...
-  # Also handle entries already migrated to fuse.cvmfs2 by PR #3903
-  sed -i -e "s|^cvmfs2#\(${name}\) \(.*\) fuse \(.*\)fsname=${name},\(.*# added by CernVM-FS for ${name}\)|\1 \2 cvmfs \3\4|" /etc/fstab
-  sed -i -e "s|^\(${name}\) \(.*\) fuse\.cvmfs2 \(.*\)fsname=${name},\(.*# added by CernVM-FS for ${name}\)|\1 \2 cvmfs \3\4|" /etc/fstab
+  # Also handle entries already migrated to fuse.cvmfs2 by PR #3903.  Dots
+  # are valid in repository names but are BRE wildcards, so escape them.
+  local name_pattern=$(printf '%s' "$name" | sed 's/\./\\./g')
+  sed -i -e "s|^cvmfs2#\(${name_pattern}\) \(.*\) fuse \(.*\)fsname=${name_pattern},\(.*# added by CernVM-FS for ${name_pattern}\)|\1 \2 cvmfs \3\4|" /etc/fstab
+  sed -i -e "s|^\(${name_pattern}\) \(.*\) fuse\.cvmfs2 \(.*\)fsname=${name_pattern},\(.*# added by CernVM-FS for ${name_pattern}\)|\1 \2 cvmfs \3\4|" /etc/fstab
 
   # Make sure the systemd mount unit exists
   if is_systemd; then
