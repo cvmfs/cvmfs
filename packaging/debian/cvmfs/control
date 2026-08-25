@@ -4,7 +4,6 @@ Priority: extra
 Maintainer: Jakob Blomer <jblomer@cern.ch>
 Build-Depends:
  libfuse3-dev (>= 3.3.0),
-#BUILD_LIBFUSE2 libfuse-dev,
  debhelper (>= 9),
  autotools-dev,
  cmake,
@@ -34,7 +33,6 @@ Architecture: amd64 armhf arm64
 Depends:
  cvmfs-config-default | cvmfs-config,
  cvmfs-fuse3 (= ${binary:Version}),
-#BUILD_LIBFUSE2 fuse,
  gawk,
  psmisc,
  lsof,

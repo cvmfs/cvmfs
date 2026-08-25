@@ -9,6 +9,7 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <memory>
 #include <utility>
 #include <vector>
 
@@ -20,7 +21,6 @@
 #include "upload_facility.h"
 #include "util/exception.h"
 #include "util/logging.h"
-#include "util/pointer.h"
 #include "util/posix.h"
 #include "util/string.h"
 
@@ -197,8 +197,8 @@ bool Reactor::HandleGenerateToken(const std::string &req, std::string *reply) {
   if (reply == NULL) {
     PANIC(kLogSyslogErr, "HandleGenerateToken: Invalid reply pointer.");
   }
-  const UniquePtr<JsonDocument> req_json(JsonDocument::Create(req));
-  if (!req_json.IsValid()) {
+  const std::unique_ptr<JsonDocument> req_json(JsonDocument::Create(req));
+  if (req_json.get() == nullptr) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
              "HandleGenerateToken: Invalid JSON request.");
     return false;
@@ -265,8 +265,8 @@ bool Reactor::HandleCheckToken(const std::string &req, std::string *reply) {
     PANIC(kLogSyslogErr, "HandleCheckToken: Invalid reply pointer.");
   }
 
-  const UniquePtr<JsonDocument> req_json(JsonDocument::Create(req));
-  if (!req_json.IsValid()) {
+  const std::unique_ptr<JsonDocument> req_json(JsonDocument::Create(req));
+  if (req_json.get() == nullptr) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
              "HandleCheckToken: Invalid JSON request.");
     return false;
@@ -325,8 +325,8 @@ bool Reactor::HandleSubmitPayload(int fdin, const std::string &req,
 
   // Extract the Path (used for verification), Digest and DigestSize from the
   // request JSON.
-  const UniquePtr<JsonDocument> req_json(JsonDocument::Create(req));
-  if (!req_json.IsValid()) {
+  const std::unique_ptr<JsonDocument> req_json(JsonDocument::Create(req));
+  if (req_json.get() == nullptr) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
              "HandleSubmitPayload: Invalid JSON request.");
     return false;
@@ -347,7 +347,7 @@ bool Reactor::HandleSubmitPayload(int fdin, const std::string &req,
 
   perf::Statistics statistics;
 
-  const UniquePtr<PayloadProcessor> proc(MakePayloadProcessor());
+  const std::unique_ptr<PayloadProcessor> proc(MakePayloadProcessor());
   proc->SetStatistics(&statistics);
   JsonStringGenerator reply_input;
   const PayloadProcessor::Result res = proc->Process(
@@ -404,8 +404,8 @@ bool Reactor::DoCommit(const std::string &req, std::string *reply,
     PANIC(kLogSyslogErr, "HandleCommit: Invalid reply pointer.");
   }
   // Extract the Path from the request JSON.
-  const UniquePtr<JsonDocument> req_json(JsonDocument::Create(req));
-  if (!req_json.IsValid()) {
+  const std::unique_ptr<JsonDocument> req_json(JsonDocument::Create(req));
+  if (req_json.get() == nullptr) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
              "HandleCommit: Invalid JSON request.");
     return false;
@@ -437,8 +437,7 @@ bool Reactor::DoCommit(const std::string &req, std::string *reply,
 
   perf::Statistics statistics;
   std::string start_time;
-  if (!Reactor::ExtractStatsFromReq(req_json.weak_ref(), &statistics,
-                                    &start_time)) {
+  if (!Reactor::ExtractStatsFromReq(req_json.get(), &statistics, &start_time)) {
     LogCvmfs(
         kLogReceiver, kLogSyslogErr,
         "HandleCommit: Could not extract statistics counters from request");
@@ -446,7 +445,7 @@ bool Reactor::DoCommit(const std::string &req, std::string *reply,
   uint64_t final_revision;
 
   // Here we use the path to commit the changes!
-  const UniquePtr<CommitProcessor> proc(MakeCommitProcessor());
+  const std::unique_ptr<CommitProcessor> proc(MakeCommitProcessor());
   proc->SetStatistics(&statistics, start_time);
   const shash::Any old_root_hash = shash::MkFromSuffixedHexPtr(
       shash::HexPtr(old_root_hash_json->get<std::string>()));

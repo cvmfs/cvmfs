@@ -576,7 +576,7 @@ int CmdEnter::Main(const Options &options) {
     LogCvmfs(kLogCvmfs, kLogStdout, "done");
 
     SettingsBuilder builder;
-    UniquePtr<Publisher> publisher;
+    std::unique_ptr<Publisher> publisher;
 
     if (options.Has("transaction")) {
       LogCvmfs(kLogCvmfs, kLogStdout,
@@ -604,7 +604,7 @@ int CmdEnter::Main(const Options &options) {
 
       SettingsPublisher *settings_publisher = builder.CreateSettingsPublisher(
           fqrn_, false);
-      publisher = new Publisher(*settings_publisher);
+      publisher.reset(new Publisher(*settings_publisher));
       publisher->Transaction();
     }
 

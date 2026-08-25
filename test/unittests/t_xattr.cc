@@ -6,10 +6,10 @@
 
 #include <algorithm>
 #include <cerrno>
+#include <memory>
 
 #include "util/file_guard.h"
 #include "util/platform.h"
-#include "util/pointer.h"
 #include "util/posix.h"
 #include "util/string.h"
 #include "xattr.h"
@@ -65,16 +65,16 @@ TEST_F(T_Xattr, CreateFromFile) {
 
   const unsigned int default_attrs = CountAttributesInFile(tmp_path);
 
-  UniquePtr<XattrList> from_file1(XattrList::CreateFromFile(tmp_path));
-  ASSERT_TRUE(from_file1.IsValid());
+  std::unique_ptr<XattrList> from_file1(XattrList::CreateFromFile(tmp_path));
+  ASSERT_TRUE(from_file1.get() != nullptr);
   EXPECT_EQ(default_attrs, from_file1->ListKeys().size());
 
   string value;
   ASSERT_TRUE(platform_setxattr(tmp_path, "user.test", "value"))
       << "failed to set user defined extended attribute (errno: " << errno
       << ")";
-  UniquePtr<XattrList> from_file2(XattrList::CreateFromFile(tmp_path));
-  ASSERT_TRUE(from_file2.IsValid());
+  std::unique_ptr<XattrList> from_file2(XattrList::CreateFromFile(tmp_path));
+  ASSERT_TRUE(from_file2.get() != nullptr);
   EXPECT_EQ(default_attrs + 1, from_file2->ListKeys().size());
   EXPECT_TRUE(from_file2->Get("user.test", &value));
   EXPECT_TRUE(from_file2->Has("user.test"));
@@ -86,8 +86,8 @@ TEST_F(T_Xattr, CreateFromFile) {
   string very_long_string = string(1000, 'y');
   ASSERT_TRUE(platform_setxattr(tmp_path, long_string, long_string));
   ASSERT_TRUE(platform_setxattr(tmp_path, "user.large", very_long_string));
-  UniquePtr<XattrList> from_file3(XattrList::CreateFromFile(tmp_path));
-  ASSERT_TRUE(from_file3.IsValid());
+  std::unique_ptr<XattrList> from_file3(XattrList::CreateFromFile(tmp_path));
+  ASSERT_TRUE(from_file3.get() != nullptr);
   EXPECT_EQ(default_attrs + 4, from_file3->ListKeys().size());
   EXPECT_TRUE(from_file3->Get("user.test", &value));
   EXPECT_TRUE(from_file3->Has("user.test"));
@@ -112,9 +112,9 @@ TEST_F(T_Xattr, Deserialize) {
   EXPECT_GT(size, 0U);
   EXPECT_TRUE(buf != NULL);
 
-  UniquePtr<XattrList> xattr_list(XattrList::Deserialize(buf, size));
+  std::unique_ptr<XattrList> xattr_list(XattrList::Deserialize(buf, size));
   free(buf);
-  ASSERT_TRUE(xattr_list.IsValid());
+  ASSERT_TRUE(xattr_list.get() != nullptr);
   EXPECT_EQ(default_list.ListKeys().size(), xattr_list->ListKeys().size());
   string value;
   EXPECT_TRUE(xattr_list->Get("keya", &value));
@@ -129,8 +129,8 @@ TEST_F(T_Xattr, Deserialize) {
 }
 
 TEST_F(T_Xattr, DeserializeNull) {
-  UniquePtr<XattrList> xattr_list(XattrList::Deserialize(NULL, 0));
-  ASSERT_TRUE(xattr_list.IsValid());
+  std::unique_ptr<XattrList> xattr_list(XattrList::Deserialize(NULL, 0));
+  ASSERT_TRUE(xattr_list.get() != nullptr);
   EXPECT_EQ(0U, xattr_list->ListKeys().size());
 }
 
@@ -141,35 +141,35 @@ TEST_F(T_Xattr, DeserializeInvalid) {
   EXPECT_GT(size, 0U);
   EXPECT_TRUE(buf != NULL);
 
-  UniquePtr<XattrList> xl1(XattrList::Deserialize(buf, 0));
-  EXPECT_FALSE(xl1.IsValid());
+  std::unique_ptr<XattrList> xl1(XattrList::Deserialize(buf, 0));
+  EXPECT_FALSE(xl1.get() != nullptr);
 
   uint8_t version = buf[0];
   buf[0] = 255;
-  UniquePtr<XattrList> xl2(XattrList::Deserialize(buf, size));
-  EXPECT_FALSE(xl2.IsValid());
+  std::unique_ptr<XattrList> xl2(XattrList::Deserialize(buf, size));
+  EXPECT_FALSE(xl2.get() != nullptr);
   buf[0] = version;
 
-  UniquePtr<XattrList> xl3(XattrList::Deserialize(buf, 3));
-  EXPECT_FALSE(xl3.IsValid());
+  std::unique_ptr<XattrList> xl3(XattrList::Deserialize(buf, 3));
+  EXPECT_FALSE(xl3.get() != nullptr);
 
-  UniquePtr<XattrList> xl4(XattrList::Deserialize(buf, 5));
-  EXPECT_FALSE(xl4.IsValid());
+  std::unique_ptr<XattrList> xl4(XattrList::Deserialize(buf, 5));
+  EXPECT_FALSE(xl4.get() != nullptr);
 
   unsigned char save0, save1;
   save0 = buf[2];
   save1 = buf[3];
   buf[2] = 0;
   buf[3] = 0;
-  UniquePtr<XattrList> xl5(XattrList::Deserialize(buf, size));
-  EXPECT_FALSE(xl5.IsValid());
+  std::unique_ptr<XattrList> xl5(XattrList::Deserialize(buf, size));
+  EXPECT_FALSE(xl5.get() != nullptr);
   buf[3] = save1;
-  UniquePtr<XattrList> xl6(XattrList::Deserialize(buf, size));
-  EXPECT_FALSE(xl6.IsValid());
+  std::unique_ptr<XattrList> xl6(XattrList::Deserialize(buf, size));
+  EXPECT_FALSE(xl6.get() != nullptr);
 
   buf[2] = save0;
-  UniquePtr<XattrList> xl7(XattrList::Deserialize(buf, size));
-  EXPECT_TRUE(xl7.IsValid());
+  std::unique_ptr<XattrList> xl7(XattrList::Deserialize(buf, size));
+  EXPECT_TRUE(xl7.get() != nullptr);
 
   free(buf);
 }
@@ -213,10 +213,10 @@ TEST_F(T_Xattr, ListKeysPosix) {
   EXPECT_EQ(string(expect1, sizeof(expect1) - 1),
             empty.ListKeysPosix(existing_list));
   const char expect2[] = "empty_key\0keya\0keyb\0large\0";
-  EXPECT_EQ(string(expect2, sizeof(expect2)-1),
+  EXPECT_EQ(string(expect2, sizeof(expect2) - 1),
             default_list.ListKeysPosix(""));
   const char expect3[] = "user.a\0user.b\0empty_key\0keya\0keyb\0large\0";
-  EXPECT_EQ(string(expect3, sizeof(expect3)-1),
+  EXPECT_EQ(string(expect3, sizeof(expect3) - 1),
             default_list.ListKeysPosix(existing_list));
 }
 
@@ -314,9 +314,9 @@ TEST_F(T_Xattr, SerializeBlacklist) {
   EXPECT_GT(size, 0U);
   EXPECT_TRUE(buf != NULL);
 
-  UniquePtr<XattrList> xattr_list(XattrList::Deserialize(buf, size));
+  std::unique_ptr<XattrList> xattr_list(XattrList::Deserialize(buf, size));
   free(buf);
-  ASSERT_TRUE(xattr_list.IsValid());
+  ASSERT_TRUE(xattr_list.get() != nullptr);
   EXPECT_EQ(default_list.ListKeys().size() - 2, xattr_list->ListKeys().size());
   string value;
   EXPECT_TRUE(xattr_list->Get("keyb", &value));

@@ -58,7 +58,9 @@ TEST_F(T_FuseInvalidator, InvalidateTimeout) {
 
 
 TEST_F(T_FuseInvalidator, InvalidateOps) {
-  invalidator_->fuse_channel_or_session_ = reinterpret_cast<void **>(this);
+  struct fuse_session *fuse_session =
+      reinterpret_cast<struct fuse_session *>(this);
+  invalidator_->fuse_session_ = &fuse_session;
   inode_tracker_.VfsGet(glue::InodeEx(1, glue::InodeEx::kDirectory),
                         PathString(""));
   for (unsigned i = 2; i <= 1024; ++i) {

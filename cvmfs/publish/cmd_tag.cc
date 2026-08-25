@@ -7,6 +7,7 @@
 
 #include <errno.h>
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -32,9 +33,10 @@ int CmdTag::Main(const Options &options) {
                    EPublish::kFailInvocation);
 
   SettingsBuilder builder;
-  UniquePtr<SettingsPublisher> settings;
+  std::unique_ptr<SettingsPublisher> settings;
   try {
-    settings = builder.CreateSettingsPublisher(fqrn, true /* needs_managed */);
+    settings.reset(
+        builder.CreateSettingsPublisher(fqrn, true /* needs_managed */));
   } catch (const EPublish &e) {
     if (e.failure() == EPublish::kFailRepositoryNotFound) {
       LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "CernVM-FS error: %s",
@@ -55,9 +57,9 @@ int CmdTag::Main(const Options &options) {
                    EPublish::kFailPermission);
   }
 
-  UniquePtr<Publisher> publisher;
+  std::unique_ptr<Publisher> publisher;
   try {
-    publisher = new Publisher(*settings);
+    publisher.reset(new Publisher(*settings));
     if (publisher->whitelist()->IsExpired()) {
       throw EPublish("Repository whitelist for " + fqrn + " is expired",
                      EPublish::kFailWhitelistExpired);
@@ -87,8 +89,8 @@ int CmdTag::Main(const Options &options) {
   try {
     publisher->EditTags(add_tags, rm_tags);
   } catch (const EPublish &e) {
-    LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
-             "CernVM-FS tag error: %s", e.msg().c_str());
+    LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "CernVM-FS tag error: %s",
+             e.msg().c_str());
     if (e.failure() == EPublish::kFailLeaseBusy)
       return EBUSY;
     return EIO;

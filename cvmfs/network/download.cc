@@ -1237,7 +1237,8 @@ bool DownloadManager::ValidateProxyIpsUnlocked(const string &url,
     }
   }
   vector<ProxyInfo> new_infos;
-  set<string> const best_addresses = new_host.ViewBestAddresses(opt_ip_preference_);
+  set<string> const best_addresses = new_host.ViewBestAddresses(
+      opt_ip_preference_);
   set<string>::const_iterator iter_ips = best_addresses.begin();
   for (; iter_ips != best_addresses.end(); ++iter_ips) {
     const string url_ip = dns::RewriteUrl(url, *iter_ips);
@@ -1257,11 +1258,11 @@ bool DownloadManager::ValidateProxyIpsUnlocked(const string &url,
  * Adds transfer time and downloaded bytes to the global counters.
  */
 void DownloadManager::UpdateStatistics(CURL *handle) {
-  double val;
+  curl_off_t val;
   int retval;
   int64_t sum = 0;
 
-  retval = curl_easy_getinfo(handle, CURLINFO_SIZE_DOWNLOAD, &val);
+  retval = curl_easy_getinfo(handle, CURLINFO_SIZE_DOWNLOAD_T, &val);
   assert(retval == CURLE_OK);
   sum += static_cast<int64_t>(val);
   /*retval = curl_easy_getinfo(handle, CURLINFO_HEADER_SIZE, &val);
@@ -1431,7 +1432,7 @@ void DownloadManager::ProcessLink(JobInfo *info) {
     info->SetLink("");
     LogCvmfs(kLogDownload, kLogDebug | kLogSyslog,
                  "(manager '%s' - id %" PRId64 ") "
-                 "received %d hosts from metalink server, starting with %s",
+                 "received %zu hosts from metalink server, starting with %s",
                  name_.c_str(), info->id(),
                  host_list.size(),
                  host_list[0].c_str());
@@ -1703,7 +1704,8 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     }
 
     // The hash context is updated on this (MainDownload) thread in
-    // CallbackCurlData(), so it is reset here regardless of the decompress mode.
+    // CallbackCurlData(), so it is reset here regardless of the decompress
+    // mode.
     if (info->expected_hash()) {
       shash::Init(info->hash_context());
     }
@@ -1826,8 +1828,8 @@ DownloadManager::~DownloadManager() {
     pipe_terminate_->Write(kPipeTerminateSignal);
     pthread_join(thread_download_, NULL);
     // All handles are removed from the multi stack
-    pipe_terminate_.Destroy();
-    pipe_jobs_.Destroy();
+    pipe_terminate_.reset();
+    pipe_jobs_.reset();
   }
 
   for (set<CURL *>::iterator i = pool_handles_idle_->begin(),
@@ -1890,9 +1892,9 @@ DownloadManager::DownloadManager(const unsigned max_pool_handles,
     , pool_handles_idle_(new set<CURL *>)
     , pool_handles_inuse_(new set<CURL *>)
     , pool_max_handles_(max_pool_handles)
-    , pipe_terminate_(NULL)
-    , pipe_jobs_(NULL)
-    , watch_fds_(NULL)
+    , pipe_terminate_(nullptr)
+    , pipe_jobs_(nullptr)
+    , watch_fds_(nullptr)
     , watch_fds_size_(0)
     , watch_fds_inuse_(0)
     , watch_fds_max_(4 * max_pool_handles)
@@ -1967,8 +1969,10 @@ DownloadManager::DownloadManager(const unsigned max_pool_handles,
  * No way back except Fini(); Init();
  */
 void DownloadManager::Spawn() {
-  pipe_terminate_ = new Pipe<kPipeThreadTerminator>();
-  pipe_jobs_ = new Pipe<kPipeDownloadJobs>();
+  pipe_terminate_ = std::unique_ptr<Pipe<kPipeThreadTerminator> >(
+      new Pipe<kPipeThreadTerminator>());
+  pipe_jobs_ = std::unique_ptr<Pipe<kPipeDownloadJobs> >(
+      new Pipe<kPipeDownloadJobs>());
 
   const int retval = pthread_create(&thread_download_, NULL, MainDownload,
                                     static_cast<void *>(this));
@@ -2003,10 +2007,15 @@ Failures DownloadManager::Fetch(JobInfo *info) {
     info->GetHashContextPtr()->buffer = alloca(info->hash_context().size);
   }
 
+  // Clear out any saved Links in case this will be a metalink request and
+  // previous non-metalink requests sent Link headers
+  info->SetLink("");
+
   // Prepare cvmfs-info: header, allocate string on the stack
   info->SetInfoHeader(NULL);
   if (enable_info_header_) {
-    const string header_info = info->GetInfoHeaderContents(info_header_template_);
+    const string header_info = info->GetInfoHeaderContents(
+        info_header_template_);
     if (header_info != "") {
       const char * const header_name = "cvmfs-info: ";
       const size_t header_name_len = strlen(header_name);
@@ -2080,12 +2089,12 @@ Failures DownloadManager::Fetch(JobInfo *info) {
       if (decompress_err == kFailOk && ele->size > 0) {
         if (info->compressed()) {
           const zlib::StreamStates retval = zlib::DecompressZStream2Sink(
-              ele->data, static_cast<int64_t>(ele->size),
-              info->GetZstreamPtr(), info->sink());
+              ele->data, static_cast<int64_t>(ele->size), info->GetZstreamPtr(),
+              info->sink());
           if (retval == zlib::kStreamDataError) {
             LogCvmfs(kLogDownload, kLogSyslogErr,
-                     "(id %" PRId64 ") failed to decompress %s",
-                     info->id(), info->url()->c_str());
+                     "(id %" PRId64 ") failed to decompress %s", info->id(),
+                     info->url()->c_str());
             decompress_err = kFailBadData;
           } else if (retval == zlib::kStreamIOError) {
             LogCvmfs(kLogDownload, kLogSyslogErr,
@@ -2095,8 +2104,7 @@ Failures DownloadManager::Fetch(JobInfo *info) {
           }
         } else {
           const int64_t written = info->sink()->Write(ele->data, ele->size);
-          if (written < 0 ||
-              static_cast<uint64_t>(written) != ele->size) {
+          if (written < 0 || static_cast<uint64_t>(written) != ele->size) {
             LogCvmfs(kLogDownload, kLogDebug,
                      "(id %" PRId64 ") sink write failed for %s (%ld of %zu)",
                      info->id(), info->url()->c_str(),

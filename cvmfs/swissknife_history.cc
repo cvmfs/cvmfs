@@ -112,7 +112,7 @@ CommandTag::Environment *CommandTag::InitializeEnvironment(
   // Note: We use this encapsulation because we cannot be sure that the
   // Command object gets deleted properly. With the Environment object at
   // hand we have full control and can make heavy and safe use of RAII
-  UniquePtr<Environment> env(new Environment(repository_url, tmp_path));
+  std::unique_ptr<Environment> env(new Environment(repository_url, tmp_path));
   env->manifest_path.Set(manifest_path);
   env->history_path.Set(CreateTempPath(tmp_path + "/history", 0600));
 
@@ -131,21 +131,21 @@ CommandTag::Environment *CommandTag::InitializeEnvironment(
 
   // open the (yet unsigned) manifest file if it is there, otherwise load the
   // latest manifest from the server
-  env->manifest = (FileExists(env->manifest_path.path()))
-                      ? OpenLocalManifest(env->manifest_path.path())
-                      : FetchRemoteManifest(env->repository_url, repo_name,
-                                            base_hash);
+  env->manifest.reset(
+      (FileExists(env->manifest_path.path()))
+          ? OpenLocalManifest(env->manifest_path.path())
+          : FetchRemoteManifest(env->repository_url, repo_name, base_hash));
 
-  if (!env->manifest.IsValid()) {
+  if (env->manifest.get() == nullptr) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to load manifest file");
     return NULL;
   }
 
   // figure out the hash of the history from the previous revision if needed
   if (read_write && env->manifest->history().IsNull() && !base_hash.IsNull()) {
-    env->previous_manifest = FetchRemoteManifest(env->repository_url, repo_name,
-                                                 base_hash);
-    if (!env->previous_manifest.IsValid()) {
+    env->previous_manifest.reset(
+        FetchRemoteManifest(env->repository_url, repo_name, base_hash));
+    if (env->previous_manifest.get() == nullptr) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to load previous manifest");
       return NULL;
     }
@@ -161,9 +161,9 @@ CommandTag::Environment *CommandTag::InitializeEnvironment(
   }
 
   // download the history database referenced in the manifest
-  env->history = GetHistory(env->manifest.weak_ref(), env->repository_url,
-                            env->history_path.path(), read_write);
-  if (!env->history.IsValid()) {
+  env->history.reset(GetHistory(env->manifest.get(), env->repository_url,
+                                env->history_path.path(), read_write));
+  if (env->history.get() == nullptr) {
     return NULL;
   }
 
@@ -177,25 +177,25 @@ CommandTag::Environment *CommandTag::InitializeEnvironment(
         spl_definition, hash_algo, zlib::kZlibDefault,
         generate_legacy_bulk_chunks, use_file_chunking, 0, 0, 0,
         session_token_file);
-    env->spooler = upload::Spooler::Construct(sd);
-    if (!env->spooler.IsValid()) {
+    env->spooler.reset(upload::Spooler::Construct(sd));
+    if (env->spooler.get() == nullptr) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to initialize upload spooler");
       return NULL;
     }
   }
 
   // return the pointer of the Environment (passing the ownership along)
-  return env.Release();
+  return env.release();
 }
 
 bool CommandTag::CloseAndPublishHistory(Environment *env) {
-  assert(env->spooler.IsValid());
+  assert(env->spooler.get() != nullptr);
 
   // set the previous revision pointer of the history database
   env->history->SetPreviousRevision(env->manifest->history());
 
   // close the history database
-  history::History *weak_history = env->history.Release();
+  history::History *weak_history = env->history.release();
   delete weak_history;
 
   // compress and upload the new history database
@@ -232,17 +232,17 @@ bool CommandTag::CloseAndPublishHistory(Environment *env) {
 
 bool CommandTag::UploadCatalogAndUpdateManifest(
     CommandTag::Environment *env, catalog::WritableCatalog *catalog) {
-  assert(env->spooler.IsValid());
+  assert(env->spooler.get() != nullptr);
 
   // gather information about catalog to be uploaded and update manifest
-  UniquePtr<catalog::WritableCatalog> wr_catalog(catalog);
+  std::unique_ptr<catalog::WritableCatalog> wr_catalog(catalog);
   const std::string catalog_path = wr_catalog->database_path();
   env->manifest->set_ttl(wr_catalog->GetTTL());
   env->manifest->set_revision(wr_catalog->GetRevision());
   env->manifest->set_publish_timestamp(wr_catalog->GetLastModified());
 
   // close the catalog
-  catalog::WritableCatalog *weak_catalog = wr_catalog.Release();
+  catalog::WritableCatalog *weak_catalog = wr_catalog.release();
   delete weak_catalog;
 
   // upload the catalog
@@ -287,7 +287,7 @@ void CommandTag::UploadClosure(const upload::SpoolerResult &result,
 bool CommandTag::UpdateUndoTags(
     Environment *env, const history::History::Tag &current_head_template,
     const bool undo_rollback) {
-  assert(env->history.IsValid());
+  assert(env->history.get() != nullptr);
 
   history::History::Tag current_head;
   history::History::Tag current_old_head;
@@ -442,8 +442,8 @@ ParameterList CommandEditTag::GetParams() const {
   r.push_back(Parameter::Optional('P', "predecessor branch"));
   r.push_back(Parameter::Optional('h', "root hash of the new tag"));
   r.push_back(Parameter::Switch('x', "maintain undo tags"));
-  r.push_back(Parameter::Optional('c',
-    "cleanup auto tags older than this Unix timestamp"));
+  r.push_back(Parameter::Optional(
+      'c', "cleanup auto tags older than this Unix timestamp"));
   return r;
 }
 
@@ -456,16 +456,16 @@ int CommandEditTag::Main(const ArgumentList &args) {
 
   // initialize the Environment (taking ownership)
   const bool history_read_write = true;
-  const UniquePtr<Environment> env(
+  const std::unique_ptr<Environment> env(
       InitializeEnvironment(args, history_read_write));
-  if (!env.IsValid()) {
+  if (env.get() == nullptr) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to init environment");
     return 1;
   }
 
   int retval;
   if (args.find('d') != args.end()) {
-    retval = RemoveTags(args, env.weak_ref());
+    retval = RemoveTags(args, env.get());
     if (retval != 0)
       return retval;
   }
@@ -478,19 +478,19 @@ int CommandEditTag::Main(const ArgumentList &args) {
   // non-gateway publish ordering (cleanup before tagging), so the latest auto
   // tag always survives.
   if (args.find('c') != args.end()) {
-    retval = CleanupOldAutoTags(args, env.weak_ref());
+    retval = CleanupOldAutoTags(args, env.get());
     if (retval != 0)
       return retval;
   }
 
   if ((args.find('a') != args.end()) || (args.find('x') != args.end())) {
-    retval = AddNewTag(args, env.weak_ref());
+    retval = AddNewTag(args, env.get());
     if (retval != 0)
       return retval;
   }
 
   // finalize processing and upload new history database
-  if (!CloseAndPublishHistory(env.weak_ref())) {
+  if (!CloseAndPublishHistory(env.get())) {
     return 1;
   }
   return 0;
@@ -515,8 +515,8 @@ int CommandEditTag::CleanupOldAutoTags(const ArgumentList &args,
   // Filter for auto-generated tags that are older than the threshold
   std::vector<std::string> condemned_tags;
   for (TagList::const_iterator i = tags.begin(); i != tags.end(); ++i) {
-    if (RepositoryTag::IsAutoGeneratedName(i->name) &&
-        i->timestamp < threshold) {
+    if (RepositoryTag::IsAutoGeneratedName(i->name)
+        && i->timestamp < threshold) {
       condemned_tags.push_back(i->name);
     }
   }
@@ -532,7 +532,8 @@ int CommandEditTag::CleanupOldAutoTags(const ArgumentList &args,
   // Delete the old auto tags
   env->history->BeginTransaction();
   for (std::vector<std::string>::const_iterator i = condemned_tags.begin();
-       i != condemned_tags.end(); ++i) {
+       i != condemned_tags.end();
+       ++i) {
     LogCvmfs(kLogCvmfs, kLogStdout, "removing auto tag '%s'", i->c_str());
     if (!env->history->Remove(*i)) {
       LogCvmfs(kLogCvmfs, kLogStderr,
@@ -596,9 +597,9 @@ int CommandEditTag::AddNewTag(const ArgumentList &args, Environment *env) {
   const UnlinkGuard catalog_path(
       CreateTempPath(env->tmp_path + "/catalog", 0600));
   const bool catalog_read_write = false;
-  const UniquePtr<catalog::Catalog> catalog(GetCatalog(
+  const std::unique_ptr<catalog::Catalog> catalog(GetCatalog(
       env->repository_url, root_hash, catalog_path.path(), catalog_read_write));
-  if (!catalog.IsValid()) {
+  if (catalog.get() == nullptr) {
     LogCvmfs(kLogCvmfs, kLogStderr, "catalog with hash '%s' does not exist",
              root_hash.ToString().c_str());
     return 1;
@@ -967,9 +968,9 @@ int CommandListTags::Main(const ArgumentList &args) {
 
   // initialize the Environment (taking ownership)
   const bool history_read_write = false;
-  const UniquePtr<Environment> env(
+  const std::unique_ptr<Environment> env(
       InitializeEnvironment(args, history_read_write));
-  if (!env.IsValid()) {
+  if (env.get() == nullptr) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to init environment");
     return 1;
   }
@@ -1056,9 +1057,9 @@ int CommandInfoTag::Main(const ArgumentList &args) {
 
   // initialize the Environment (taking ownership)
   const bool history_read_write = false;
-  const UniquePtr<Environment> env(
+  const std::unique_ptr<Environment> env(
       InitializeEnvironment(args, history_read_write));
-  if (!env.IsValid()) {
+  if (env.get() == nullptr) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to init environment");
     return 1;
   }
@@ -1097,9 +1098,9 @@ int CommandRollbackTag::Main(const ArgumentList &args) {
 
   // initialize the Environment (taking ownership)
   const bool history_read_write = true;
-  const UniquePtr<Environment> env(
+  const std::unique_ptr<Environment> env(
       InitializeEnvironment(args, history_read_write));
-  if (!env.IsValid()) {
+  if (env.get() == nullptr) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to init environment");
     return 1;
   }
@@ -1147,11 +1148,11 @@ int CommandRollbackTag::Main(const ArgumentList &args) {
   const UnlinkGuard catalog_path(
       CreateTempPath(env->tmp_path + "/catalog", 0600));
   const bool catalog_read_write = true;
-  UniquePtr<catalog::WritableCatalog> catalog(
+  std::unique_ptr<catalog::WritableCatalog> catalog(
       dynamic_cast<catalog::WritableCatalog *>(
           GetCatalog(env->repository_url, target_tag.root_hash,
                      catalog_path.path(), catalog_read_write)));
-  if (!catalog.IsValid()) {
+  if (catalog.get() == nullptr) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to open catalog with hash '%s'",
              target_tag.root_hash.ToString().c_str());
     return 1;
@@ -1176,7 +1177,7 @@ int CommandRollbackTag::Main(const ArgumentList &args) {
   catalog->Commit();
 
   // Upload catalog (handing over ownership of catalog pointer)
-  if (!UploadCatalogAndUpdateManifest(env.weak_ref(), catalog.Release())) {
+  if (!UploadCatalogAndUpdateManifest(env.get(), catalog.release())) {
     LogCvmfs(kLogCvmfs, kLogStderr, "catalog upload failed");
     return 1;
   }
@@ -1196,13 +1197,13 @@ int CommandRollbackTag::Main(const ArgumentList &args) {
   assert(retval);
 
   // set the magic undo tags
-  if (!UpdateUndoTags(env.weak_ref(), updated_target_tag, undo_rollback)) {
+  if (!UpdateUndoTags(env.get(), updated_target_tag, undo_rollback)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to update magic undo tags");
     return 1;
   }
 
   // finalize the history and upload it
-  if (!CloseAndPublishHistory(env.weak_ref())) {
+  if (!CloseAndPublishHistory(env.get())) {
     return 1;
   }
 
@@ -1239,9 +1240,9 @@ ParameterList CommandEmptyRecycleBin::GetParams() const {
 int CommandEmptyRecycleBin::Main(const ArgumentList &args) {
   // initialize the Environment (taking ownership)
   const bool history_read_write = true;
-  const UniquePtr<Environment> env(
+  const std::unique_ptr<Environment> env(
       InitializeEnvironment(args, history_read_write));
-  if (!env.IsValid()) {
+  if (env.get() == nullptr) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to init environment");
     return 1;
   }
@@ -1252,7 +1253,7 @@ int CommandEmptyRecycleBin::Main(const ArgumentList &args) {
   }
 
   // finalize the history and upload it
-  if (!CloseAndPublishHistory(env.weak_ref())) {
+  if (!CloseAndPublishHistory(env.get())) {
     return 1;
   }
 

@@ -5,6 +5,7 @@
 #ifndef CVMFS_SWISSKNIFE_LIST_REFLOG_H_
 #define CVMFS_SWISSKNIFE_LIST_REFLOG_H_
 
+#include <memory>
 #include <set>
 #include <string>
 #include <vector>
@@ -13,7 +14,6 @@
 #include "crypto/hash.h"
 #include "smallhash.h"
 #include "swissknife.h"
-#include "util/pointer.h"
 
 namespace swissknife {
 
@@ -29,7 +29,7 @@ class CommandListReflog : public Command {
   int Main(const ArgumentList &args);
 
  protected:
-  UniquePtr<SmallHashDynamic<shash::Any, bool> > objects_;
+  std::unique_ptr<SmallHashDynamic<shash::Any, bool> > objects_;
 
   template<class ObjectFetcherT>
   bool Run(ObjectFetcherT *object_fetcher, std::string repo_name,

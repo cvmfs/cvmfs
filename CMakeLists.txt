@@ -283,7 +283,7 @@ if (BUILTIN_EXTERNALS)
 
     message (STATUS "running bootstrap.sh ...")
     execute_process (
-      COMMAND           sh ${CMAKE_SOURCE_DIR}/externals/bootstrap.sh
+      COMMAND           ${CMAKE_SOURCE_DIR}/externals/bootstrap.sh
       WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
       RESULT_VARIABLE   BOOTSTRAPPING_RESULT
     )
@@ -443,9 +443,6 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_SERVER OR BUILD_SERVER_DEBUG OR
   # ZLIB_LIBRARIES and ZLIB_INCLUDE_DIRS for the global include list below.
   set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${ZLIB_INCLUDE_DIRS})
 
-  find_package (SHA3 REQUIRED)
-  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${SHA3_INCLUDE_DIRS})
-
   # Libnettle_* is set by externals/libnettle (system or vendored build)
   set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${Libnettle_INCLUDE_DIRS})
 endif ()
@@ -499,25 +496,12 @@ endif ()
 
 # Fuse client only
 if (BUILD_CVMFS)
-  if (MACOSX)
-    set(BUILD_LIBFUSE2 ON)
-    find_package (OSXFuse REQUIRED)
-    set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${MACOS_FUSE_INCLUDE_DIR})
-    set (FUSE_LIBRARIES ${MACOS_FUSE_LIBRARIES}) # just abstract the difference here... they are compatible
-    if (USE_MACFUSE_KEXT)
-      add_definitions(-DUSE_MACFUSE_KEXT)
-    endif()
-  else (MACOSX)
-    if (BUILD_LIBFUSE2)
-      find_package (FUSE REQUIRED)
-      if (FUSE_FOUND)
-        set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${FUSE_INCLUDE_DIR})
-      endif ()
-    endif()
-    find_package (FUSE3 REQUIRED)
-    set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${FUSE3_INCLUDE_DIR})
-    add_definitions(-DHAS_FUSE3)
-  endif (MACOSX)
+  find_package (FUSE3 REQUIRED)
+  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${FUSE3_INCLUDE_DIR})
+  add_definitions(-DHAS_FUSE3)
+  if (MACOSX AND USE_MACFUSE_KEXT)
+    add_definitions(-DUSE_MACFUSE_KEXT)
+  endif()
 endif ()
 
 # libcap is needed by every target that links cvmfs/util/capabilities.cc,
@@ -601,7 +585,11 @@ endif ()
 # First check if we have golang available
 #
 if (BUILD_GATEWAY OR BUILD_DUCC OR BUILD_SNAPSHOTTER)
-  find_program(GO_COMPILER go)
+  if (NOT CVMFS_GO_DIR AND NOT "$ENV{CVMFS_GO_DIR}" STREQUAL "")
+    set (CVMFS_GO_DIR "$ENV{CVMFS_GO_DIR}")
+  endif ()
+  find_program(GO_COMPILER go
+               HINTS ${CVMFS_GO_DIR} "${EXTERNALS_INSTALL_LOCATION}/go/bin")
   if(NOT GO_COMPILER)
     message(FATAL_ERROR "go compiler not found")
   else()

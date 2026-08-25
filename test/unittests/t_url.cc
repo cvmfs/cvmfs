@@ -4,27 +4,28 @@
 
 #include <gtest/gtest.h>
 
+#include <memory>
+
 #include "url.h"
-#include "util/pointer.h"
 
 TEST(T_Url, Empty) {
-  UniquePtr<Url> url(Url::Parse(""));
-  ASSERT_FALSE(url.IsValid());
+  std::unique_ptr<Url> url(Url::Parse(""));
+  ASSERT_FALSE(url.get() != nullptr);
 }
 
 TEST(T_Url, DigitsOnly) {
-  UniquePtr<Url> url(Url::Parse("1234"));
-  ASSERT_FALSE(url.IsValid());
+  std::unique_ptr<Url> url(Url::Parse("1234"));
+  ASSERT_FALSE(url.get() != nullptr);
 }
 
 TEST(T_Url, InvalidPort) {
-  UniquePtr<Url> url(Url::Parse("ws://some.host.name:invalid/the/path"));
-  ASSERT_FALSE(url.IsValid());
+  std::unique_ptr<Url> url(Url::Parse("ws://some.host.name:invalid/the/path"));
+  ASSERT_FALSE(url.get() != nullptr);
 }
 
 TEST(T_Url, HostnameOnly) {
-  UniquePtr<Url> url(Url::Parse("localhost"));
-  ASSERT_TRUE(url.IsValid());
+  std::unique_ptr<Url> url(Url::Parse("localhost"));
+  ASSERT_TRUE(url.get() != nullptr);
 
   EXPECT_EQ(Url::kDefaultProtocol, url->protocol());
   EXPECT_STREQ("localhost", url->host().c_str());
@@ -34,8 +35,8 @@ TEST(T_Url, HostnameOnly) {
 }
 
 TEST(T_Url, IpOnly) {
-  UniquePtr<Url> url(Url::Parse("192.168.0.1"));
-  ASSERT_TRUE(url.IsValid());
+  std::unique_ptr<Url> url(Url::Parse("192.168.0.1"));
+  ASSERT_TRUE(url.get() != nullptr);
 
   EXPECT_EQ(Url::kDefaultProtocol, url->protocol());
   EXPECT_STREQ("192.168.0.1", url->host().c_str());
@@ -46,8 +47,8 @@ TEST(T_Url, IpOnly) {
 }
 
 TEST(T_Url, HostnameWithProtocol) {
-  UniquePtr<Url> url(Url::Parse("https://localhost"));
-  ASSERT_TRUE(url.IsValid());
+  std::unique_ptr<Url> url(Url::Parse("https://localhost"));
+  ASSERT_TRUE(url.get() != nullptr);
 
   EXPECT_STREQ("https", url->protocol().c_str());
   EXPECT_STREQ("localhost", url->host().c_str());
@@ -57,8 +58,8 @@ TEST(T_Url, HostnameWithProtocol) {
 }
 
 TEST(T_Url, HostnameNonDefaultPortAndProtocol) {
-  UniquePtr<Url> url(Url::Parse("host", "portocol", 2345));
-  ASSERT_TRUE(url.IsValid());
+  std::unique_ptr<Url> url(Url::Parse("host", "portocol", 2345));
+  ASSERT_TRUE(url.get() != nullptr);
 
   EXPECT_STREQ("portocol", url->protocol().c_str());
   EXPECT_STREQ("host", url->host().c_str());
@@ -68,8 +69,8 @@ TEST(T_Url, HostnameNonDefaultPortAndProtocol) {
 }
 
 TEST(T_Url, HostnameWithPath) {
-  UniquePtr<Url> url(Url::Parse("host.name.com/some/path"));
-  ASSERT_TRUE(url.IsValid());
+  std::unique_ptr<Url> url(Url::Parse("host.name.com/some/path"));
+  ASSERT_TRUE(url.get() != nullptr);
 
   EXPECT_EQ(Url::kDefaultProtocol, url->protocol());
   EXPECT_STREQ("host.name.com", url->host().c_str());
@@ -80,8 +81,8 @@ TEST(T_Url, HostnameWithPath) {
 }
 
 TEST(T_Url, HostnameWithProtocolAndPort) {
-  UniquePtr<Url> url(Url::Parse("ws://some.host.name:1234"));
-  ASSERT_TRUE(url.IsValid());
+  std::unique_ptr<Url> url(Url::Parse("ws://some.host.name:1234"));
+  ASSERT_TRUE(url.get() != nullptr);
 
   EXPECT_STREQ("ws", url->protocol().c_str());
   EXPECT_STREQ("some.host.name", url->host().c_str());
@@ -91,8 +92,8 @@ TEST(T_Url, HostnameWithProtocolAndPort) {
 }
 
 TEST(T_Url, HostnameWithProtocolAndPath) {
-  UniquePtr<Url> url(Url::Parse("file://some.host.name/the/path"));
-  ASSERT_TRUE(url.IsValid());
+  std::unique_ptr<Url> url(Url::Parse("file://some.host.name/the/path"));
+  ASSERT_TRUE(url.get() != nullptr);
 
   EXPECT_STREQ("file", url->protocol().c_str());
   EXPECT_STREQ("some.host.name", url->host().c_str());
@@ -102,8 +103,8 @@ TEST(T_Url, HostnameWithProtocolAndPath) {
 }
 
 TEST(T_Url, HostnameWithProtocolPortAndPath) {
-  UniquePtr<Url> url(Url::Parse("ws://some.host.name:1234/the/path"));
-  ASSERT_TRUE(url.IsValid());
+  std::unique_ptr<Url> url(Url::Parse("ws://some.host.name:1234/the/path"));
+  ASSERT_TRUE(url.get() != nullptr);
 
   EXPECT_STREQ("ws", url->protocol().c_str());
   EXPECT_STREQ("some.host.name", url->host().c_str());
@@ -114,31 +115,31 @@ TEST(T_Url, HostnameWithProtocolPortAndPath) {
 
 TEST(T_Url, RejectInvalid) {
   {
-    UniquePtr<Url> url(Url::Parse("://"));
-    EXPECT_FALSE(url.IsValid());
+    std::unique_ptr<Url> url(Url::Parse("://"));
+    EXPECT_FALSE(url.get() != nullptr);
   }
   {
-    UniquePtr<Url> url(Url::Parse("dsaas:/dsffsd/asdas"));
-    EXPECT_FALSE(url.IsValid());
+    std::unique_ptr<Url> url(Url::Parse("dsaas:/dsffsd/asdas"));
+    EXPECT_FALSE(url.get() != nullptr);
   }
   {
-    UniquePtr<Url> url(Url::Parse(":/:/:/:/:/"));
-    EXPECT_FALSE(url.IsValid());
+    std::unique_ptr<Url> url(Url::Parse(":/:/:/:/:/"));
+    EXPECT_FALSE(url.get() != nullptr);
   }
   {
-    UniquePtr<Url> url(Url::Parse("/:/"));
-    EXPECT_FALSE(url.IsValid());
+    std::unique_ptr<Url> url(Url::Parse("/:/"));
+    EXPECT_FALSE(url.get() != nullptr);
   }
   {
-    UniquePtr<Url> url(Url::Parse("////::::::////"));
-    EXPECT_FALSE(url.IsValid());
+    std::unique_ptr<Url> url(Url::Parse("////::::::////"));
+    EXPECT_FALSE(url.get() != nullptr);
   }
   {
-    UniquePtr<Url> url(Url::Parse("/"));
-    EXPECT_FALSE(url.IsValid());
+    std::unique_ptr<Url> url(Url::Parse("/"));
+    EXPECT_FALSE(url.get() != nullptr);
   }
   {
-    UniquePtr<Url> url(Url::Parse(":"));
-    EXPECT_FALSE(url.IsValid());
+    std::unique_ptr<Url> url(Url::Parse(":"));
+    EXPECT_FALSE(url.get() != nullptr);
   }
 }

@@ -7,16 +7,20 @@
 %define sle15 1
 %define dist .sle15
 %endif
+%if 0%{?suse_version} == 1600
+%define sle16 1
+%define dist .sle16
+%endif
 %if 0%{?dist:1}
 %else
   %define redhat_major %(cat /etc/issue | head -n1 | tr -cd [0-9] | head -c1)
 %endif
 
-%if 0%{?rhel} >= 6 || 0%{?fedora}
+%if 0%{?rhel} >= 6 || 0%{?fedora} || 0%{?sle16}
 %define selinux_cvmfs 1
 %define selinux_variants mls strict targeted
 %endif
-%if 0%{?rhel} >= 7 || 0%{?fedora}
+%if 0%{?rhel} >= 7 || 0%{?fedora} || 0%{?sle16}
 %define selinux_cvmfs_server 1
 %endif
 
@@ -25,7 +29,7 @@
     %define build_ducc 1
     %define build_snapshotter 1
 %endif
-%if 0%{?sle15}
+%if 0%{?sle15} || 0%{?sle16}
   %define build_gateway 1
   %define build_ducc 1
   %define build_snapshotter 1
@@ -38,17 +42,12 @@
 
 
 # List of platforms that require systemd/autofs fix as described in CVM-1200
-%if 0%{?rhel} >= 7 || 0%{?fedora} || 0%{?sle12} || 0%{?sle15}
+%if 0%{?rhel} >= 7 || 0%{?fedora} || 0%{?sle12} || 0%{?sle15} || 0%{?sle16}
 %define systemd_autofs_patch 1
 %endif
 
-%define build_fuse2 1
-%if 0%{?fedora} >= 42 || 0%{?rhel} >= 10
-%define build_fuse2 0
-%endif
 
-
-%if 0%{?sle15} || 0%{?rhel} >= 8 || 0%{?fedora} >= 31
+%if 0%{?sle15} || 0%{?sle16} || 0%{?rhel} >= 8 || 0%{?fedora} >= 31
 %define cvmfs_python_devel python3-devel
 %define cvmfs_python_setuptools python3-setuptools
 %else
@@ -57,12 +56,12 @@
 %endif
 
 %define cvmfs_go golang
-%if 0%{?sle15}
+%if 0%{?sle15} || 0%{?sle16}
 %define cvmfs_go go
 %endif
 
 %define hardlink /usr/sbin/hardlink
-%if 0%{?fedora} >= 31 || 0%{?rhel} >= 9
+%if 0%{?fedora} >= 31 || 0%{?rhel} >= 9 || 0%{?sle16}
 %define hardlink /usr/bin/hardlink
 %endif
 
@@ -106,9 +105,6 @@ BuildRequires: help2man
 BuildRequires: valgrind-devel
 %endif
 BuildRequires: cmake
-%if 0%{?build_fuse2}
-BuildRequires: fuse-devel
-%endif
 BuildRequires: fuse3-devel >= 3.3.0
 BuildRequires: libattr-devel
 # nettle is optional in the same sense as protobuf below: the build uses a
@@ -128,11 +124,6 @@ BuildRequires: pkgconfig
 BuildRequires: %{cvmfs_python_devel}
 BuildRequires: unzip
 BuildRequires: zlib-devel
-%if 0%{?suse_version}
-BuildRequires: nlohmann_json-devel
-%else
-BuildRequires: json-devel
-%endif
 BuildRequires: libarchive-devel
 # protobuf is optional: the build uses the system package when present and
 # otherwise falls back to the vendored (FetchContent) sources. protoc ships in a
@@ -141,7 +132,7 @@ BuildRequires: protobuf-devel
 %if !0%{?suse_version}
 BuildRequires: protobuf-compiler
 %endif
-%if 0%{?rhel} >= 7 || 0%{?fedora} || 0%{?sle12} || 0%{?sle15}
+%if 0%{?rhel} >= 7 || 0%{?fedora} || 0%{?sle12} || 0%{?sle15} || 0%{?sle16}
 BuildRequires: systemd
 %endif
 
@@ -169,9 +160,6 @@ Requires: libarchive
 # Account for different package names
 %if 0%{?suse_version}
 Requires: aaa_base
-%if 0%{?build_fuse2} 
-Requires: libfuse2
-%endif
 Requires: glibc
   %if 0%{?suse_version} < 1500
 Requires: pwdutils
@@ -219,8 +207,13 @@ Provides: user(cvmfs)
 Requires:      selinux-policy
 %endif
 BuildRequires:  checkpolicy selinux-policy-devel hardlink selinux-policy-targeted
+%if 0%{?sle16}
+Requires(post):         /usr/sbin/semodule /usr/sbin/semanage /usr/sbin/fixfiles
+Requires(preun):        /sbin/service /usr/sbin/semodule /usr/sbin/semanage /usr/sbin/fixfiles
+%else
 Requires(post):         /usr/sbin/semodule /usr/sbin/semanage /sbin/fixfiles
 Requires(preun):        /sbin/service /usr/sbin/semodule /usr/sbin/semanage /sbin/fixfiles
+%endif
 Requires(postun):       /usr/sbin/semodule
 %endif
 
@@ -235,7 +228,7 @@ Summary: CernVM-FS common libraries
 Common utility libraries for CernVM-FS packages
 
 %package fuse3
-Summary: additional libraries to enable libfuse3 support
+Summary: libraries implementing the CernVM-FS fuse module
 Group: Applications/System
 Requires: cvmfs-libs = %{version}-%{release}
 # fuse library package name differs on suse
@@ -261,11 +254,6 @@ BuildRequires: %{cvmfs_python_devel}
 BuildRequires: libcap-devel
 BuildRequires: help2man
 BuildRequires: unzip
-%if 0%{?suse_version}
-BuildRequires: nlohmann_json-devel
-%else
-BuildRequires: json-devel
-%endif
 BuildRequires: libarchive-devel
 BuildRequires: %{cvmfs_python_setuptools}
 %if 0%{?suse_version}
@@ -289,7 +277,7 @@ Requires: gzip
 Requires: attr
 Requires: openssl
 Requires: httpd
-%if 0%{?sle15}
+%if 0%{?sle15} || 0%{?sle16}
 Requires: libcap2
 %else
 Requires: libcap
@@ -404,10 +392,6 @@ BUILD_SNAPSHOTTER=no
 %if 0%{?build_snapshotter}
 BUILD_SNAPSHOTTER=yes
 %endif
-BUILD_LIBFUSE2=no
-%if 0%{?build_fuse2}
-BUILD_LIBFUSE2=yes
-%endif
 BUILD_UNITTESTS=no
 INSTALL_UNITTESTS=no
 %if 0%{?build_testing}
@@ -428,7 +412,6 @@ cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} \
   -DBUILD_DUCC=$BUILD_DUCC \
   -DBUILD_SNAPSHOTTER=$BUILD_SNAPSHOTTER \
   -DINSTALL_UNITTESTS=$INSTALL_UNITTESTS \
-  -DBUILD_LIBFUSE2=$BUILD_LIBFUSE2 \
   -DCMAKE_INSTALL_PREFIX:PATH=/usr .
 
 make %{?_smp_mflags}
@@ -689,14 +672,6 @@ systemctl daemon-reload
 %files
 %defattr(-,root,root)
 %{_bindir}/cvmfs2
-%if 0%{?build_fuse2} 
-%{_libdir}/libcvmfs_fuse_stub.so
-%{_libdir}/libcvmfs_fuse_stub.so.%{base_version}
-%{_libdir}/libcvmfs_fuse.so
-%{_libdir}/libcvmfs_fuse.so.%{base_version}
-%{_libdir}/libcvmfs_fuse_debug.so
-%{_libdir}/libcvmfs_fuse_debug.so.%{base_version}
-%endif
 %{_bindir}/cvmfs_talk
 %{_bindir}/cvmfs_fsck
 %{_bindir}/cvmfs_config
@@ -982,4 +957,3 @@ systemctl daemon-reload
 - Small adjustments to run with continueous integration
 * Thu Jan 12 2012 Brian Bockelman <bbockelm@cse.unl.edu> - 2.0.13
 - Addition of SELinux support.
-

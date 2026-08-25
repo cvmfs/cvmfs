@@ -4,11 +4,11 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <memory>
 #include <vector>
 
 #include "compression/compression.h"
 #include "gtest/gtest.h"
-#include "util/pointer.h"
 #include "util/prng.h"
 #include "util/smalloc.h"
 
@@ -42,7 +42,7 @@ class T_Compressor : public ::testing::Test {
   }
 
   char *test_string, *ptr_test_string;
-  UniquePtr<Compressor> compressor;
+  std::unique_ptr<Compressor> compressor;
   unsigned char *buf;
   size_t buf_size;
   size_t size_input;
@@ -53,7 +53,7 @@ class T_Compressor : public ::testing::Test {
 
 
 TEST_F(T_Compressor, Compression) {
-  compressor = zlib::Compressor::Construct(zlib::kZlibDefault);
+  compressor.reset(zlib::Compressor::Construct(zlib::kZlibDefault));
 
   // Compress the output
   unsigned char *input = reinterpret_cast<unsigned char *>(ptr_test_string);
@@ -78,7 +78,7 @@ TEST_F(T_Compressor, Compression) {
 
 
 TEST_F(T_Compressor, CompressionLong) {
-  compressor = zlib::Compressor::Construct(zlib::kZlibDefault);
+  compressor.reset(zlib::Compressor::Construct(zlib::kZlibDefault));
   unsigned char
       *compress_buf = new unsigned char[compressor->DeflateBound(long_size)];
   unsigned compress_pos = 0;
@@ -116,7 +116,7 @@ TEST_F(T_Compressor, CompressionLong) {
 
 
 TEST_F(T_Compressor, EchoCompression) {
-  compressor = zlib::Compressor::Construct(zlib::kNoCompression);
+  compressor.reset(zlib::Compressor::Construct(zlib::kNoCompression));
 
   unsigned char *input = reinterpret_cast<unsigned char *>(ptr_test_string);
   bool deflate_finished = compressor->Deflate(true, &input, &size_input, &buf,
@@ -133,9 +133,9 @@ TEST_F(T_Compressor, EchoCompression) {
 
 
 TEST_F(T_Compressor, EchoCompressionLong) {
-  compressor = zlib::Compressor::Construct(zlib::kNoCompression);
-  UniquePtr<unsigned char> compress_buf(reinterpret_cast<unsigned char *>(
-      smalloc(compressor->DeflateBound(long_size))));
+  compressor.reset(zlib::Compressor::Construct(zlib::kNoCompression));
+  std::unique_ptr<unsigned char, decltype(&free)> compress_buf(reinterpret_cast<unsigned char *>(
+      smalloc(compressor->DeflateBound(long_size))),free);
   unsigned compress_pos = 0;
   bool deflate_finished = false;
   unsigned char *input = long_string;
@@ -146,7 +146,7 @@ TEST_F(T_Compressor, EchoCompressionLong) {
     // Compress the output in multiple stages
     deflate_finished = compressor->Deflate(true, &input, &remaining, &buf,
                                            &buf_size);
-    memcpy(compress_buf.weak_ref() + compress_pos, buf, buf_size);
+    memcpy(compress_buf.get() + compress_pos, buf, buf_size);
     compress_pos += buf_size;
     rounds++;
   }
@@ -156,7 +156,7 @@ TEST_F(T_Compressor, EchoCompressionLong) {
   ASSERT_EQ(0U, remaining);
 
   EXPECT_EQ(compress_pos, long_size);
-  EXPECT_EQ(0, memcmp(compress_buf.weak_ref(), long_string, long_size));
+  EXPECT_EQ(0, memcmp(compress_buf.get(), long_string, long_size));
 }
 
 
@@ -181,7 +181,7 @@ TEST(T_DeflateFingerprint, MatchesVendoredZlib) {
   for (size_t i = 0; i < kTotal; ++i)
     data[i] = prng.Next(256);
 
-  UniquePtr<Compressor> compressor(Compressor::Construct(kZlibDefault));
+  std::unique_ptr<Compressor> compressor(Compressor::Construct(kZlibDefault));
   std::vector<unsigned char> outbuf(kOutBlock);
   uLong crc = crc32(0L, Z_NULL, 0);
   size_t pos = 0;
