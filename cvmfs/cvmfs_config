@@ -7,6 +7,15 @@ INSTALL_BASE=$(echo "$SCRIPT_LOCATION" | sed -e 's/^\(.*\)\/bin$/\1/')
 INSTALL_BASE=$(echo "$INSTALL_BASE" | sed -e 's/^\(.*\)\/sbin$/\1/')
 SBIN_BASE="$( [ x"$INSTALL_BASE" = x"/usr" ] && echo "/sbin" || echo "${INSTALL_BASE}/sbin" )"
 
+# manpage generation with help2man might run when /etc/cvmfs/config.sh isn't available yet
+# Since config.sh isn't necessary for the help text, skip the check when only doing --help
+case "$1" in
+  --help|-h|--version|"") CVMFS_CONFIG_SKIP_ENV_PROBE=1 ;;
+  *)                      CVMFS_CONFIG_SKIP_ENV_PROBE=0 ;;
+esac
+
+if [ $CVMFS_CONFIG_SKIP_ENV_PROBE -eq 0 ]; then
+
 if [ -f /etc/cvmfs/config.sh ]; then
   . /etc/cvmfs/config.sh
 elif [ -f ${INSTALL_BASE}/etc/cvmfs/config.sh ]; then
@@ -70,6 +79,8 @@ case $sys_arch in
     echo "Architecture $sys_arch is not supported"
     exit 1 ;;
 esac
+
+fi  # CVMFS_CONFIG_SKIP_ENV_PROBE
 
 # This list of known parameters will be merged with all CVMFS_... environment
 # variable for cvmfs_config showconfig.  It is useful to keep this list to show
@@ -2817,7 +2828,11 @@ case "$1" in
      ;;
 
    --version)
-     echo $(cvmfs2 --version)
+     if command -v cvmfs2 >/dev/null 2>&1; then
+       echo $(cvmfs2 --version)
+     else
+       echo "cvmfs_config (CernVM-FS)"
+     fi
      RETVAL=0
      ;;
    --help)
