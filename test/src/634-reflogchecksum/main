@@ -160,6 +160,20 @@ cvmfs_run_test() {
   check_repository $CVMFS_TEST_REPO || return 120
   check_repository $CVMFS_TEST634_REPLICA_NAME || return 120
 
+  echo "*** check that a failed reflog download does not fake a repair"
+  local backend_reflog reflog_mode good_checksum repair_rc
+  backend_reflog="$(get_local_repo_storage $CVMFS_TEST_REPO)/.cvmfsreflog"
+  reflog_mode="$(stat -c %a $backend_reflog)" || return 122
+  good_checksum="$(cat $checksum)" || return 122
+  # the owner can still read the reflog (peek succeeds), apache cannot serve it
+  sudo chmod 600 $backend_reflog || return 122
+  repair_rc=0
+  cvmfs_server check -r $CVMFS_TEST_REPO || repair_rc=$?
+  sudo chmod $reflog_mode $backend_reflog || return 122
+  [ $repair_rc -eq 1 ] || return 123
+  [ "$(cat $checksum)" = "$good_checksum" ] || return 124
+  check_repository $CVMFS_TEST_REPO || return 125
+
   echo "*** check repairing missing reflog with a zombie hash registered in the manifest"
   delete_from_backend $CVMFS_TEST_REPO ".cvmfsreflog" || return 30
   delete_from_backend $CVMFS_TEST634_REPLICA_NAME ".cvmfsreflog" || return 30

@@ -218,9 +218,24 @@ __check_repair_reflog() {
   if $user_shell "$(__swissknife_cmd) peek -d .cvmfsreflog -r $CVMFS_UPSTREAM_STORAGE" >/dev/null; then
     has_reflog=1
     local url="$repository_url/.cvmfsreflog"
-    local rehash_cmd="curl -sS --fail --connect-timeout 10 --max-time 300 $(get_curl_proxy) $url \
-      | cvmfs_publish hash -a ${CVMFS_HASH_ALGORITHM:-sha1}"
-    computed_checksum="$($user_shell "$rehash_cmd")"
+    # Download and hash in two steps: without pipefail, a failed download
+    # would be masked by hashing empty input.
+    local reflog_tmp
+    reflog_tmp="$($user_shell "mktemp ${CVMFS_SPOOL_DIR}/tmp/reflog.XXXXXX")" \
+      || return 1
+    if ! $user_shell "curl -sS --fail --connect-timeout 10 --max-time 300 \
+                      $(get_curl_proxy) $url -o $reflog_tmp"; then
+      $user_shell "rm -f $reflog_tmp"
+      echo "Error: failed to download $url" >&2
+      return 1
+    fi
+    if ! computed_checksum="$($user_shell "cvmfs_publish hash \
+      -a ${CVMFS_HASH_ALGORITHM:-sha1} < $reflog_tmp")"; then
+      $user_shell "rm -f $reflog_tmp"
+      echo "Error: failed to hash $url" >&2
+      return 1
+    fi
+    $user_shell "rm -f $reflog_tmp"
     echo "Info: found $url with content hash $computed_checksum"
   fi
 
