@@ -62,9 +62,6 @@ cmake_build_dir=$(find "${CVMFS_RESULT_LOCATION}/BUILD" -maxdepth 2 \
 
 # Prepend bootstrapped cmake / go to PATH the same way rpm.sh does -----------
 
-cvmfs_version="$(get_cvmfs_version_from_cmake "${CVMFS_SOURCE_LOCATION}")"
-cvmfs_prerelease="$(get_cvmfs_prerelease_from_cmake "${CVMFS_SOURCE_LOCATION}")"
-
 _base="${CVMFS_EXTERNALS_PREFIX:-${CVMFS_SOURCE_LOCATION}}"
 _arch="$(uname -m)"
 _distro=""
