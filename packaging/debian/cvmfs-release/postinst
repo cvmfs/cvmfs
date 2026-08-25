@@ -31,22 +31,35 @@ case "$1" in
 	# the server, e.g. a freshly released distro CVMFS has not built for yet.
 	# This list changes rarely (roughly once per LTS), never per release.
 	case "$id" in
-	    ubuntu) fallbacks="noble jammy focal bionic xenial" ;;
+	    ubuntu) fallbacks="resolute noble jammy focal bionic xenial" ;;
 	    *)      fallbacks="trixie bookworm bullseye buster" ;; # debian & derivatives
 	esac
 
 	# Returns 0 if "<suite>-prod" is published, 1 if not, 2 if we cannot tell
-	# (no probing tool / no network). Never aborts under 'set -e'.
+	# (no probing tool / transport failure). Never aborts under 'set -e'.
 	suite_published() {
 	    _url="$base_url/dists/$1-prod/InRelease"
 	    if command -v curl >/dev/null 2>&1; then
-	        curl -fsI --max-time 10 "$_url" >/dev/null 2>&1
+	        _status=$(curl -sS -o /dev/null -w '%{http_code}' -I --max-time 10 "$_url")
+	        _rc=$?
+	        [ $_rc -eq 0 ] || return 2
+	        [ "$_status" = 200 ] && return 0
+	        [ "$_status" = 404 ] && return 1
+	        return 2
 	    elif command -v wget >/dev/null 2>&1; then
-	        wget -q --timeout=10 --spider "$_url" >/dev/null 2>&1
+	        _response=$(wget -q --timeout=10 --spider --server-response "$_url" 2>&1)
+	        _rc=$?
+	        [ $_rc -eq 0 ] && return 0
+	        _status=$(printf '%s\n' "$_response" |
+	            awk '$1 ~ /^HTTP\// { status=$2 } END { print status }')
+	        [ "$_status" = 404 ] && return 1
+	        return 2
 	    elif [ -x /usr/lib/apt/apt-helper ]; then
 	        _tmp=$(mktemp)
 	        /usr/lib/apt/apt-helper download-file "$_url" "$_tmp" >/dev/null 2>&1
-	        _rc=$?; rm -f "$_tmp"; return $_rc
+	        _rc=$?; rm -f "$_tmp"
+	        [ $_rc -eq 0 ] && return 0
+	        return 2
 	    else
 	        return 2
 	    fi
@@ -66,7 +79,9 @@ case "$1" in
 	fi
 	if [ -z "$suite" ]; then
 	    for cand in $fallbacks; do
-	        if suite_published "$cand"; then suite="$cand"; break; fi
+	        rc=0; suite_published "$cand" || rc=$?
+	        if [ $rc -eq 0 ]; then suite="$cand"; break; fi
+	        [ $rc -eq 2 ] && break
 	    done
 	    if [ -n "$suite" ]; then
 	        echo "Warning: '${codename}-prod' is not available yet; using '${suite}-prod' as fallback." >&2
