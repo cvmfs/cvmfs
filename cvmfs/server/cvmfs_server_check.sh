@@ -202,6 +202,10 @@ __check_repair_reflog() {
   local name="$1"
   load_repo_config $name
   local user_shell="$(get_user_shell $name)"
+  default_scratch_dir="${CVMFS_SPOOL_DIR}/tmp"
+  if [ -z "$scratch_dir" ]; then
+    scratch_dir=$default_scratch_dir
+  fi
 
   local stored_checksum=
   has_reflog_checksum $name && stored_checksum="$(cat $(get_reflog_checksum $name))"
@@ -221,7 +225,7 @@ __check_repair_reflog() {
     # Download and hash in two steps: without pipefail, a failed download
     # would be masked by hashing empty input.
     local reflog_tmp
-    reflog_tmp="$($user_shell "mktemp ${CVMFS_SPOOL_DIR}/tmp/reflog.XXXXXX")" \
+    reflog_tmp="$($user_shell "mktemp ${scratch_dir}/reflog.XXXXXX")" \
       || return 1
     if ! $user_shell "curl -sS --fail --connect-timeout 10 --max-time 300 \
                       $(get_curl_proxy) $url -o $reflog_tmp"; then
@@ -267,11 +271,6 @@ __check_repair_reflog() {
   if [ $has_reflog -eq 0 ]; then
     echo "Warning: reference log is missing, reconstructing it"
     to_syslog_for_repo $name "reference log reconstruction started"
-
-    default_scratch_dir="${CVMFS_SPOOL_DIR}/tmp"
-    if [ -z "$scratch_dir" ]; then
-      scratch_dir=$default_scratch_dir
-    fi
 
     local reflog_reconstruct_command="$(__swissknife_cmd dbg) reconstruct_reflog \
                                                   -r $repository_url             \
