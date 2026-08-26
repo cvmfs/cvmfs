@@ -10,9 +10,8 @@
 #include <sys/prctl.h>
 #endif
 
-#include <cassert>
-
 #include "util/capabilities.h"
+#include "util/exception.h"
 #include "util/logging.h"
 #include "util/platform.h"
 #include "util/posix.h"
@@ -82,33 +81,17 @@ bool ClearPermittedCapabilities(const std::vector<cap_value_t> &reservecaps,
   const int nreservecaps = (int) reservecaps.size();
   const int ninheritcaps = (int) inheritcaps.size();
 
-  {
-    cap_t caps_proc = cap_get_proc();
-    if (caps_proc == NULL) {
-      LogCvmfs(kLogCvmfs, kLogSyslogErr | kLogDebug,
-               "Failed to get process capabilities (errno: %d)", errno);
-      return false;
-    }
-    cap_flag_value_t cap_state;
-    retval = cap_get_flag(caps_proc, CAP_SETPCAP, CAP_PERMITTED, &cap_state);
-    cap_free(caps_proc);
-    if (retval != 0) {
-      LogCvmfs(kLogCvmfs, kLogSyslogErr | kLogDebug,
-               "Failed to inspect setpcap capability (errno: %d)", errno);
-      return false;
-    }
-    if (cap_state != CAP_SET) {
-      if (nreservecaps > 0) {
-        LogCvmfs(kLogCvmfs, kLogDebug,
-                 "Capabilities cannot be reserved because setpcap is not "
-                 "permitted.");
-        return false;
-      }
+  if (!SetpcapCapabilityPermitted()) {
+    if (nreservecaps > 0) {
       LogCvmfs(kLogCvmfs, kLogDebug,
-               "Capabilities are already cleared because setpcap is not "
+               "Capabilities cannot be reserved because setpcap is not "
                "permitted.");
-      return true;
+      return false;
     }
+    LogCvmfs(kLogCvmfs, kLogDebug,
+             "Capabilities are already cleared because setpcap is not "
+             "permitted.");
+    return true;
   }
   
   uid = geteuid();
@@ -398,23 +381,19 @@ bool DropCapability(const cap_value_t cap,
 
 bool CheckCapabilityPermitted(const cap_value_t cap) {
   cap_t caps_proc = cap_get_proc();
-  if (caps_proc == NULL) {
-    LogCvmfs(kLogCvmfs, kLogSyslogErr | kLogDebug,
-             "Cannot get process capabilities (errno: %d)", errno);
-    return false;
-  }
+  if (caps_proc == NULL)
+    PANIC(kLogSyslogErr | kLogDebug,
+          "Cannot get process capabilities (errno: %d)", errno);
   cap_flag_value_t cap_state;
   const int retval = cap_get_flag(caps_proc,
                                   cap,
                                   CAP_PERMITTED,
                                   &cap_state);
   cap_free(caps_proc);
-  if (retval != 0) {
-    LogCvmfs(kLogCvmfs, kLogSyslogErr | kLogDebug,
-             "Cannot inspect permitted capability 0x%x (errno: %d)", cap,
-             errno);
-    return false;
-  }
+  if (retval != 0)
+    PANIC(kLogSyslogErr | kLogDebug,
+          "Cannot inspect permitted capability 0x%x (errno: %d)", cap,
+          errno);
   return (cap_state == CAP_SET);
 }
 
