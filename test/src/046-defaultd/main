@@ -6,6 +6,9 @@ cvmfs_test_suites="quick"
 create_config_files() {
   sudo sh -c "echo CVMFS_KCACHE_TIMEOUT=2 > /etc/cvmfs/default.d/50-testA.conf" || return 1
   sudo sh -c "echo CVMFS_KCACHE_TIMEOUT=3 > /etc/cvmfs/default.d/50-testB.conf" || return 2
+  sudo sh -c \
+    "echo EESSI_HOST_INJECTIONS=/tmp/eessi/host_injections \
+    > /etc/cvmfs/default.d/50-testC.conf" || return 3
 
   return 0
 }
@@ -151,6 +154,45 @@ cvmfs_run_test() {
     "${mount_dir%/}/grid.cern.ch/subdir" || retval=63
   expect_exit_code 1 cvmfs_config showconfig \
     /tmp/grid.cern.ch || retval=64
+
+  # Non-CVMFS parameters are hidden by default and shown only on request.
+  local variant_name=EESSI_HOST_INJECTIONS
+  local variant_value=/tmp/eessi/host_injections
+  local all_plain all_json short_all_plain short_all_json
+  local recursive_all_plain recursive_all_json
+  grep -q "^${variant_name}=" <<< "$plain_by_name" && retval=65
+  jq -e --arg key "$variant_name" 'has($key) | not' \
+    <<< "$json_by_name" >/dev/null || retval=66
+
+  all_plain=$(cvmfs_config showconfig -a grid.cern.ch) || retval=67
+  grep -q "^${variant_name}=${variant_value}$" \
+    <<< "$(printf '%s\n' "$all_plain" | normalize_plain)" || retval=68
+  all_json=$(cvmfs_config showconfig --all -j grid.cern.ch) || retval=69
+  jq -e --arg value "$variant_value" \
+    '.EESSI_HOST_INJECTIONS == $value' \
+    <<< "$all_json" >/dev/null || retval=70
+  diff <(printf '%s\n' "$all_plain" | normalize_plain) \
+       <(printf '%s\n' "$all_json" | normalize_json) || retval=71
+
+  short_all_plain=$(cvmfs_config showconfig -s -a grid.cern.ch) \
+    || retval=72
+  short_all_json=$(cvmfs_config showconfig --all -s -j grid.cern.ch) \
+    || retval=73
+  jq -e --arg value "$variant_value" \
+    '.EESSI_HOST_INJECTIONS == $value' \
+    <<< "$short_all_json" >/dev/null || retval=74
+  diff <(printf '%s\n' "$short_all_plain" | normalize_plain) \
+       <(printf '%s\n' "$short_all_json" | normalize_json) || retval=75
+
+  recursive_all_plain=$(cvmfs_config showconfig -a) || retval=76
+  grep -q "^${variant_name}=${variant_value}$" \
+    <<< "$(printf '%s\n' "$recursive_all_plain" | normalize_plain)" \
+    || retval=77
+  recursive_all_json=$(cvmfs_config showconfig --all -j) || retval=78
+  jq -e --arg value "$variant_value" '
+    .[] | select(.CVMFS_REPOSITORY_NAME == "grid.cern.ch")
+    | .EESSI_HOST_INJECTIONS == $value
+  ' <<< "$recursive_all_json" >/dev/null || retval=79
 
   cvmfs_umount grid.cern.ch || retval=5
 

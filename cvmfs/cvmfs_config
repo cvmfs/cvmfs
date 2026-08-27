@@ -82,9 +82,10 @@ esac
 
 fi  # CVMFS_CONFIG_SKIP_ENV_PROBE
 
-# This list of known parameters will be merged with all CVMFS_... environment
-# variable for cvmfs_config showconfig.  It is useful to keep this list to show
-# in cvmfs_config showconfig which known parameters are _not_ set.
+# This list of known parameters is merged with configured variable names for
+# cvmfs_config showconfig.  By default, only configured CVMFS_ names are added;
+# showconfig --all also adds configured names without that prefix.  The list
+# lets showconfig display known parameters that are _not_ set.
 parm_list="CVMFS_USER CVMFS_NFILES CVMFS_CACHE_BASE CVMFS_CACHE_DIR CVMFS_MOUNT_DIR CVMFS_QUOTA_LIMIT \
           CVMFS_SERVER_URL CVMFS_DEBUGLOG CVMFS_HTTP_PROXY \
           CERNVM_GRID_UI_VERSION CVMFS_SYSLOG_LEVEL CVMFS_SYSLOG_FACILITY CVMFS_TRACEFILE \
@@ -278,7 +279,9 @@ cvmfs_config_usage() {
   echo "  chksetup"
   echo ""
   echo "  showconfig [-s(hort output, only parameters set in the" \
-       "configuration)] [-j|--json] [<repository>|<mountpoint>]"
+       "configuration)]" \
+       "[-a|--all (include configured non-CVMFS parameters)]" \
+       "[-j|--json] [<repository>|<mountpoint>]"
   echo ""
   echo "  stat [-v | <repository>]"
   echo ""
@@ -996,14 +999,21 @@ cvmfs_showconfig() {
   local org
   local short_output=0
   local json_output=0
+  local all_output=0
   local short_opt=
-  # Loop over all arguments: -s for short output, -j for JSON output, and the org name
-  # order of flags (-s and -j) does not matter
+  local all_opt=
+  # Loop over the output flags and the repository name. Flag order does not
+  # matter.
   while [ $# -gt 0 ]; do
     case "$1" in
       -s)
         short_output=1
         short_opt="-s "
+        shift 1
+      ;;
+      -a|--all)
+        all_output=1
+        all_opt="-a "
         shift 1
       ;;
       -j|--json)
@@ -1026,15 +1036,16 @@ cvmfs_showconfig() {
       echo "["
       for entry in $list; do
         [ $first -eq 0 ] && echo "," # comma between JSON objects
-        cvmfs_showconfig -j $short_opt$entry # emit JSON object for this repository
+        # Emit a JSON object for this repository.
+        cvmfs_showconfig -j $short_opt$all_opt$entry
         first=0
       done
       echo "]"
     else
       for entry in $list; do
         echo
-        echo "Running $0 $short_opt$entry:"
-        cvmfs_showconfig $short_opt$entry
+        echo "Running $0 $short_opt$all_opt$entry:"
+        cvmfs_showconfig $short_opt$all_opt$entry
       done
     fi
     return 0
@@ -1057,8 +1068,13 @@ cvmfs_showconfig() {
   local setting=
   local all_vars=
   local set_vars=          # names present in the config file
+  # CVMFS_PARMS contains resolved config assignments and a header.  Collect
+  # valid shell assignment names only.
   while read setting; do
-    [ "x${setting:0:6}" != "xCVMFS_" ] && continue
+    [[ "$setting" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]] || continue
+    if [ $all_output -eq 0 ]; then
+      [ "x${setting:0:6}" != "xCVMFS_" ] && continue
+    fi
     set_vars="$set_vars ${setting%%=*}"
   done <<< "$CVMFS_PARMS"
   all_vars="$(echo $set_vars $var_list | tr ' ' '\n' | sort -u)"
