@@ -465,6 +465,54 @@ cvmfs_server_ingest() {
     $(get_follow_http_redirects_flag)                           \
     -x"
 
+  local sync_command_virtual_dir=
+  local virtual_dir_actions_ingest=
+  if [ "x${CVMFS_VIRTUAL_DIR}" = "xtrue" ]; then
+    virtual_dir_actions_ingest="snapshots"
+  fi
+  if [ "x${CVMFS_PRIVATE_VIRTUAL_DIR}" = "xtrue" ]; then
+    if [ -n "$virtual_dir_actions_ingest" ]; then
+      virtual_dir_actions_ingest="${virtual_dir_actions_ingest},user"
+    else
+      virtual_dir_actions_ingest="user"
+    fi
+  fi
+  if [ -n "$virtual_dir_actions_ingest" ]; then
+    sync_command_virtual_dir="$(__swissknife_cmd dbg) sync  \
+      -u /cvmfs/$name                                       \
+      -s ${spool_dir}/scratch/current                       \
+      -c ${spool_dir}/rdonly                                \
+      -t ${spool_dir}/tmp                                   \
+      -b $base_hash                                         \
+      -r $upstream                                          \
+      -w $stratum0                                          \
+      -o ${manifest}                                        \
+      -e $hash_algorithm                                    \
+      -Z ${CVMFS_COMPRESSION_ALGORITHM-default}             \
+      -N $name                                              \
+      -K $CVMFS_PUBLIC_KEY                                  \
+      $(get_swissknife_proxy)                               \
+      $(get_follow_http_redirects_flag) $log_level          \
+      -S $virtual_dir_actions_ingest"
+  elif [ -d /cvmfs/$name/.cvmfs ]; then
+    sync_command_virtual_dir="$(__swissknife_cmd dbg) sync  \
+      -u /cvmfs/$name                                       \
+      -s ${spool_dir}/scratch/current                       \
+      -c ${spool_dir}/rdonly                                \
+      -t ${spool_dir}/tmp                                   \
+      -b $base_hash                                         \
+      -r $upstream                                          \
+      -w $stratum0                                          \
+      -o ${manifest}                                        \
+      -e $hash_algorithm                                    \
+      -Z ${CVMFS_COMPRESSION_ALGORITHM-default}             \
+      -N $name                                              \
+      -K $CVMFS_PUBLIC_KEY                                  \
+      $(get_swissknife_proxy)                               \
+      $(get_follow_http_redirects_flag) $log_level          \
+      -S remove"
+  fi
+
 
   local ingest_command="$(__swissknife_cmd dbg) \
     ingest                                      \

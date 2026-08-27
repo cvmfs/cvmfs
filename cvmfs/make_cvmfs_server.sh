@@ -73,6 +73,7 @@ COMPONENTS="\
     server/cvmfs_server_overlay.sh
     server/cvmfs_server_print_stats.sh
     server/cvmfs_server_merge_stats.sh
+    server/cvmfs_server_print_history_token.sh
     server/cvmfs_server_coda.sh
     "
 

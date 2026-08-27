@@ -184,6 +184,13 @@ cvmfs_server_publish() {
     local user_shell="$(get_user_shell $name)"
 
     local base_hash=$(get_mounted_root_hash $name)
+    # Update private history restriction (.htaccess) if this is a local upstream
+    if is_local_upstream $upstream; then
+      local storage_dir
+      storage_dir=$(get_upstream_config $upstream)
+      update_private_history_restriction "$name" "$storage_dir"
+    fi
+
     local manifest="${spool_dir}/tmp/manifest"
     local dirtab_command="$(__swissknife_cmd dbg) dirtab \
       -d /cvmfs/${name}/.cvmfsdirtab                     \
@@ -303,12 +310,21 @@ cvmfs_server_publish() {
       sync_command="$sync_command -I"
     fi
     local sync_command_virtual_dir=
+    local virtual_dir_actions=
     if [ "x${CVMFS_VIRTUAL_DIR}" = "xtrue" ]; then
-      sync_command_virtual_dir="$sync_command -S snapshots"
-    else
-      if [ -d /cvmfs/$name/.cvmfs ]; then
-        sync_command_virtual_dir="$sync_command -S remove"
+      virtual_dir_actions="snapshots"
+    fi
+    if [ "x${CVMFS_PRIVATE_VIRTUAL_DIR}" = "xtrue" ]; then
+      if [ -n "$virtual_dir_actions" ]; then
+        virtual_dir_actions="${virtual_dir_actions},user"
+      else
+        virtual_dir_actions="user"
       fi
+    fi
+    if [ -n "$virtual_dir_actions" ]; then
+      sync_command_virtual_dir="$sync_command -S $virtual_dir_actions"
+    elif [ -d /cvmfs/$name/.cvmfs ]; then
+      sync_command_virtual_dir="$sync_command -S remove"
     fi
     if [ "x$CVMFS_PRINT_STATISTICS" = "xtrue" ]; then
       sync_command="$sync_command -+stats"

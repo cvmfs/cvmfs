@@ -1242,7 +1242,7 @@ is_subcommand() {
     skeleton migrate list-catalogs diff checkout update-geodb gc catalog-chown      \
     eliminate-hardlinks eliminate-bulk-hashes fix-stats update-info update-repoinfo \
     mount fix-permissions masterkeycard ingest ingestsql overlay merge-stats print-stats \
-    refresh-lease"
+    refresh-lease print-history-token"
 
   for possible_command in $supported_commands; do
     if [ x"$possible_command" = x"$subcommand" ]; then
@@ -1482,6 +1482,10 @@ Supported Commands:
                   [-x path to repository configuration]
                   <fully qualified repository name> [-- <command> <params>]
                   Open an ephemeral namespace to publish content
+  print-history-token <fully qualified name>
+                  Print the history access token for a repository that has
+                  CVMFS_PRIVATE_HISTORY=true.  Distribute this token to
+                  stratum-1 operators who need to replicate the history database.
 "
 
 

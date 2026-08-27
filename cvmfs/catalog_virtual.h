@@ -27,10 +27,12 @@ namespace catalog {
 
 class VirtualCatalog {
  public:
-  static const char *kVirtualPath;            // = ".cvmfs"
-  static const int kActionNone;               // = 0x00
-  static const int kActionGenerateSnapshots;  // = 0x01
-  static const int kActionRemove;             // 0x02;
+  static const char *kVirtualPath;                   // = ".cvmfs"
+  static const char *kUserDirectory;                 // = "user"
+  static const int kActionNone;                      // = 0x00
+  static const int kActionGenerateSnapshots;         // = 0x01
+  static const int kActionRemove;                    // 0x02
+  static const int kActionGeneratePrivateSnapshots;  // = 0x04
 
   static bool ParseActions(const std::string &action_desc, int *actions);
 
@@ -63,15 +65,21 @@ class VirtualCatalog {
   };
 
   void GenerateSnapshots();
+  void GeneratePrivateSnapshots();
   void EnsurePresence();
+  void EnsureUserDirectoryPresence();
   void CreateCatalog();
   void CreateBaseDirectory();
   void CreateNestedCatalogMarker();
   void CreateSnapshotDirectory();
+  void CreateUserDirectory();
   void GetSortedTagsFromHistory(std::vector<TagId> *tags);
   void GetSortedTagsFromCatalog(std::vector<TagId> *tags);
+  void GetSortedHashesFromCatalog(std::vector<TagId> *hashes);
   void RemoveSnapshot(TagId tag);
   void InsertSnapshot(TagId tag);
+  void InsertPrivateSnapshot(TagId tag);
+  void RemovePrivateSnapshot(TagId tag);
   void Remove();
   void RemoveRecursively(const std::string &directory);
 
