@@ -20,7 +20,7 @@ class TaskRead : public TubeConsumer<FileItem> {
   static const unsigned kThrottleInitMs = 50;
   static const unsigned kThrottleMaxMs = 500;
   static const unsigned kThrottleResetMs = 2000;
-  static const unsigned kBlockSize = kPageSize * 4;
+  static const unsigned kBlockSize = kPageSize * 32;
 
   TaskRead(Tube<FileItem> *tube_in,
            TubeGroup<BlockItem> *tubes_out,
