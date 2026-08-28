@@ -267,7 +267,8 @@ cvmfs_server_overlay() {
     else
       # No FUSE overlay to close; the merge already committed the gateway lease
       # (FinalizeSession(true)).  Only the local session_token file remains.
-      rm -f "${spool_dir}/session_token"
+      rm -f "${spool_dir}/session_token" \
+            "${spool_dir}/session_token.api_version"
     fi
     publish_after_hook $name
     publish_succeeded $name

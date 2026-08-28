@@ -768,8 +768,9 @@ close_transaction() {
   run_suid_helper rw_mount $name
   clear_flag "$tx_flag"
 
-  # Remove session_token file, used for gateway transactions, if it exists
-  rm -f ${CVMFS_SPOOL_DIR}/session_token
+  # Remove gateway session state, if it exists
+  rm -f ${CVMFS_SPOOL_DIR}/session_token \
+        ${CVMFS_SPOOL_DIR}/session_token.api_version
 
   local fallback_msg=""
   [ $use_fd_fallback -eq 0 ] || fallback_msg="(using force)"
@@ -1016,6 +1017,7 @@ CVMFS_AUTO_TAG=$autotagging
 CVMFS_AUTO_TAG_TIMESPAN="$auto_tag_timespan"
 CVMFS_GARBAGE_COLLECTION=$garbage_collectable
 CVMFS_AUTO_REPAIR_MOUNTPOINT=true
+CVMFS_ALLOW_NONEXISTENT_PATH=false
 CVMFS_AUTOCATALOGS=false
 CVMFS_ASYNC_SCRATCH_CLEANUP=true
 CVMFS_PRINT_STATISTICS=false

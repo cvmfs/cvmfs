@@ -452,6 +452,7 @@ void CmdEnter::CleanupSession(bool keep_logs,
   RemoveSingle(session_dir_ + "/" + fqrn_ + "/server.conf");
   RemoveSingle(session_dir_ + "/" + fqrn_);
   RemoveSingle(session_dir_ + "/session_token");
+  RemoveSingle(session_dir_ + "/session_token.api_version");
   RemoveSingle(session_dir_ + "/in_transaction.lock");
   RemoveSingle(session_dir_ + "/shellaction.marker");
   RemoveSingle(session_dir_);

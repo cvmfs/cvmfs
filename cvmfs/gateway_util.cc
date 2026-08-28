@@ -8,8 +8,10 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <climits>
 #include <vector>
 
+#include "crypto/hash.h"
 #include "util/posix.h"
 #include "util/string.h"
 
@@ -23,7 +25,45 @@ bool BothAreSpaces(const char &c1, const char &c2) {
 
 namespace gateway {
 
-int APIVersion() { return 2; }
+// The publisher advertises the highest gateway API protocol version it can
+// speak. It must be at least kApiVersionNonexistentPath for the gateway to
+// echo back a negotiated version that enables --allow-nonexistent-path.
+int APIVersion() { return kApiVersionNonexistentPath; }
+
+std::string SessionTokenApiVersionPath(const std::string &token_path) {
+  return token_path + ".api_version";
+}
+
+std::string MakeSessionTokenApiVersionRecord(const int api_version,
+                                             const std::string &token) {
+  const shash::Md5 fingerprint(token.data(),
+                               static_cast<unsigned>(token.size()));
+  return StringifyInt(api_version) + "\n" + fingerprint.ToString(false);
+}
+
+bool ParseSessionTokenApiVersionRecord(const std::string &record,
+                                       const std::string &token,
+                                       int *api_version) {
+  if (api_version == NULL)
+    return false;
+
+  const size_t separator = record.find('\n');
+  uint64_t version;
+  if (separator == std::string::npos
+      || !String2Uint64Parse(record.substr(0, separator), &version)
+      || version > static_cast<uint64_t>(INT_MAX)) {
+    return false;
+  }
+
+  const shash::Md5 fingerprint(token.data(),
+                               static_cast<unsigned>(token.size()));
+  if (record.substr(separator + 1) != fingerprint.ToString(false)) {
+    return false;
+  }
+
+  *api_version = static_cast<int>(version);
+  return true;
+}
 
 GatewayKey ReadGatewayKey(const std::string &key_file_name) {
   std::string id;

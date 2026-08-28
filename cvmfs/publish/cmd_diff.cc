@@ -189,6 +189,8 @@ class DiffReporter : public publish::DiffListener {
       result_list.push_back(machine_readable_ ? "D" : "direct-io");
     if (diff & catalog::DirectoryEntryBase::Difference::kBundleTriggerFlag)
       result_list.push_back(machine_readable_ ? "A" : "bundle-trigger");
+    if (diff & catalog::DirectoryEntryBase::Difference::kVolatileFlag)
+      result_list.push_back(machine_readable_ ? "V" : "volatile");
     if (diff & catalog::DirectoryEntryBase::Difference::kUid)
       result_list.push_back(machine_readable_ ? "U" : "uid");
     if (diff & catalog::DirectoryEntryBase::Difference::kGid)

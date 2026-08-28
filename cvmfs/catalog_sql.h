@@ -214,6 +214,12 @@ class SqlDirent : public SqlCatalog {
    * list, that should be prefetched upon opening the file.
    */
   static const int kFlagBundleTrigger = 0x20000;  // 2^17
+  /**
+   * For regular files, indicates that the cached object should be evicted
+   * before non-volatile objects (per-file equivalent of the repo-level
+   * 'volatile' property).
+   */
+  static const int kFlagFileVolatile = 0x40000;  // 2^18
 
 
  protected:

@@ -2,6 +2,9 @@
 
 cvmfs_test_name="Browsing with the streaming cache manager"
 cvmfs_test_suites="quick"
+# Possible timeouts from CDN, give a bit more time than the usual 300s
+# TODO(vavolkl): add a longer running, more intensive stress test
+cvmfs_test_timeout=600
 
 cvmfs_run_test() {
   logfile=$1
@@ -12,10 +15,10 @@ cvmfs_run_test() {
   local root_hash=$(get_xattr root_hash /cvmfs/alice.cern.ch/)
   echo "*** root hash is $root_hash"
 
-  local nfiles=100
+  local nfiles=20
   (
     set +o pipefail
-    find /cvmfs/alice.cern.ch/el9-x86_64/Packages/AEGIS -type f -size +100k -size -10M | head -n $nfiles \
+    find /cvmfs/alice.cern.ch/el9-x86_64/Packages/AEGIS -type f -size +100k -size -2M | head -n $nfiles \
       > filelist || return 10
   )
 
