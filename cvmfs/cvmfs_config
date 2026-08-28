@@ -1231,7 +1231,7 @@ CernVM-FS with -DBUILD_CONFIG_VALIDATOR=ON"
     # tries to fetch the lightweight file within 10 seconds
     if env http_proxy="$via" curl -H "Pragma:" -fs -m 10 \
          -o /dev/null "${url}/.cvmfspublished" 2>/dev/null; then
-      # rtt is current timestamp substracted the starting timestamp
+      # rtt is current timestamp subtracted the starting timestamp
       rtt=$((($(date +%s%N)-start)/1000000))
     fi
   fi
