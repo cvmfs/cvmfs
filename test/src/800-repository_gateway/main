@@ -258,6 +258,18 @@ cvmfs_run_test() {
     [ -d /cvmfs/test.repo.org/nonexistent ]      || return 128
     [ -d /cvmfs/test.repo.org/nonexistent/deep ] || return 129
 
+    ## Transaction 15 (Enable nonexistent paths in server.conf)
+    echo "CVMFS_ALLOW_NONEXISTENT_PATH=true" | sudo tee -a \
+        /etc/cvmfs/repositories.d/test.repo.org/server.conf > /dev/null
+    cvmfs_server transaction test.repo.org/config/default/path || return 130
+    mkdir -p /cvmfs/test.repo.org/config/default/path || return 131
+    echo "New file" > /cvmfs/test.repo.org/config/default/path/new_file.txt \
+        || return 132
+    cvmfs_server publish test.repo.org || return 133
+    compare_file_checksum \
+        /cvmfs/test.repo.org/config/default/path/new_file.txt \
+        f1885b1a57c71cacbd923fc5e9aefef3 || return 134
+
     check_repo_integrity test.repo.org || return 110
 
     local reflog_url="$(get_repo_url test.repo.org)/.cvmfsreflog"

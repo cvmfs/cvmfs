@@ -566,6 +566,10 @@ void SettingsBuilder::ApplyOptionsFromServerPath(
     settings_publisher->GetTransaction()->SetAutobalanceMinWeight(
         String2Uint64(arg));
   }
+  if (options_mgr_.GetValue("CVMFS_ALLOW_NONEXISTENT_PATH", &arg)) {
+    settings_publisher->GetTransaction()->SetAllowNonexistentPath(
+        options_mgr_.IsOn(arg));
+  }
   if (options_mgr_.GetValue("CVMFS_AUTO_REPAIR_MOUNTPOINT", &arg)) {
     if (!options_mgr_.IsOn(arg)) {
       settings_publisher->GetTransaction()->GetSpoolArea()->SetRepairMode(
