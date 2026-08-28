@@ -70,16 +70,17 @@ bool SyncUnionTarball::Initialize() {
     return false;
   }
 
+  // Registering the tar/empty formats on a freshly allocated reader can only
+  // fail due to an internal libarchive/allocation error, never because of
+  // anything in the tarball itself, so treat failure as a bug, not a runtime
+  // condition to handle gracefully.
   result = archive_read_support_format_tar(src);
   if (result == ARCHIVE_OK)
     result = archive_read_support_format_empty(src);
   if (result != ARCHIVE_OK) {
-    LogCvmfs(kLogUnionFs, kLogStderr,
-             "Impossible to configure the archive reader: %s",
-             archive_error_string(src));
-    archive_read_free(src);
-    src = NULL;
-    return false;
+    PANIC(kLogStderr | kLogSyslogErr,
+          "Impossible to configure the archive reader: %s",
+          archive_error_string(src));
   }
 
   if (tarball_path_ == "-") {
