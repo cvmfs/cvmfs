@@ -10,6 +10,8 @@
 #include <sys/prctl.h>
 #endif
 
+#include <cstdlib>
+
 #include "util/capabilities.h"
 #include "util/exception.h"
 #include "util/logging.h"
@@ -248,7 +250,7 @@ bool ObtainCapability(const cap_value_t cap,
 #ifdef CAP_IS_SUPPORTED
   if (!CAP_IS_SUPPORTED(cap)) {
     if (avoid_mutexes)
-      return false;
+      abort();
     PANIC(kLogSyslogErr | kLogDebug, "Capability %s is not supported", capname);
   }
 #endif
@@ -256,7 +258,7 @@ bool ObtainCapability(const cap_value_t cap,
   cap_t caps_proc = cap_get_proc();
   if (caps_proc == NULL) {
     if (avoid_mutexes)
-      return false;
+      abort();
     PANIC(kLogSyslogErr | kLogDebug,
           "Cannot get process capabilities (errno: %d)", errno);
   }
@@ -266,7 +268,7 @@ bool ObtainCapability(const cap_value_t cap,
   if (retval != 0) {
     cap_free(caps_proc);
     if (avoid_mutexes)
-      return false;
+      abort();
     PANIC(kLogSyslogErr | kLogDebug, "Cannot inspect %s capability (errno: %d)",
           capname, errno);
   }
@@ -280,7 +282,7 @@ bool ObtainCapability(const cap_value_t cap,
   if (retval != 0) {
     cap_free(caps_proc);
     if (avoid_mutexes)
-      return false;
+      abort();
     PANIC(kLogSyslogErr | kLogDebug, "Cannot inspect %s capability (errno: %d)",
           capname, errno);
   }
@@ -299,7 +301,7 @@ bool ObtainCapability(const cap_value_t cap,
   if (retval != 0) {
     cap_free(caps_proc);
     if (avoid_mutexes)
-      return false;
+      abort();
     PANIC(kLogSyslogErr | kLogDebug, "Cannot enable %s capability (errno: %d)",
           capname, errno);
   }
@@ -325,7 +327,7 @@ bool DropCapability(const cap_value_t cap,
 #ifdef CAP_IS_SUPPORTED
   if (!CAP_IS_SUPPORTED(cap)) {
     if (avoid_mutexes)
-      return false;
+      abort();
     PANIC(kLogSyslogErr | kLogDebug, "Capability %s is not supported", capname);
   }
 #endif
@@ -333,7 +335,7 @@ bool DropCapability(const cap_value_t cap,
   cap_t caps_proc = cap_get_proc();
   if (caps_proc == NULL) {
     if (avoid_mutexes)
-      return false;
+      abort();
     PANIC(kLogSyslogErr | kLogDebug,
           "Cannot get process capabilities (errno: %d)", errno);
   }
@@ -343,7 +345,7 @@ bool DropCapability(const cap_value_t cap,
   if (retval != 0) {
     cap_free(caps_proc);
     if (avoid_mutexes)
-      return false;
+      abort();
     PANIC(kLogSyslogErr | kLogDebug, "Cannot inspect %s capability (errno: %d)",
           capname, errno);
   }
@@ -357,7 +359,7 @@ bool DropCapability(const cap_value_t cap,
   if (retval != 0) {
     cap_free(caps_proc);
     if (avoid_mutexes)
-      return false;
+      abort();
     PANIC(kLogSyslogErr | kLogDebug, "Cannot disable %s capability (errno: %d)",
           capname, errno);
   }
