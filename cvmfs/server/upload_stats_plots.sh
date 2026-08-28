@@ -43,8 +43,23 @@ if [ "x${CVMFS_UPLOAD_STATS_PLOTS}" != "xtrue" ]; then
 fi
 
 if ! command -v root 1>/dev/null ; then
-  echo "Requested statistics plots upload but no ROOT installed. No plots will be uploaded."
-  exit 1
+  echo "Requested statistics plots upload but no ROOT software package is installed."
+  echo "No plots will be uploaded."
+  # Plot generation is optional and must not make a publish or GC fail.
+  exit 0
+fi
+
+# ROOT::RDF::FromSqlite() is only available since ROOT 6.28.
+root_min_version="6.28.00"
+# Older, autotools-generated root-config scripts report the version as
+# read from ROOT_RELEASE in RVersion.h, e.g. "6.28/00" instead of "6.28.00".
+root_version=$(root-config --version 2>/dev/null | tr '/' '.')
+if [ "$(printf '%s\n' "$root_min_version" "$root_version" | sort -V | head -n1)" != "$root_min_version" ]; then
+  echo "Requested statistics plots upload but the installed ROOT version" \
+       "($root_version) is older than the required $root_min_version."
+  echo "No plots will be uploaded."
+  # Plot generation is optional and must not make a publish or GC fail.
+  exit 0
 fi
 
 db_path="/var/spool/cvmfs/${name}/stats.db"
