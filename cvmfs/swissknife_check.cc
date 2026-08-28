@@ -121,6 +121,14 @@ bool CommandCheck::CompareEntries(const catalog::DirectoryEntry &a,
              b.name().c_str());
     retval = false;
   }
+  if (diffs & Difference::kVolatileFlag) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "volatile flag differs: %d / %d "
+             "(%s / %s)",
+             a.IsVolatile(), b.IsVolatile(), a.name().c_str(),
+             b.name().c_str());
+    retval = false;
+  }
   if (diffs & Difference::kHasXattrsFlag) {
     LogCvmfs(kLogCvmfs, kLogStderr,
              "extended attributes differ: %d / %d "

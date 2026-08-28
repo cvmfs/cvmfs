@@ -81,6 +81,7 @@ class SyncItem {
   inline bool IsGraftMarker() const { return IsType(kItemMarker); }
   inline bool IsExternalData() const { return external_data_; }
   inline bool IsDirectIo() const { return direct_io_; }
+  inline bool IsVolatile() const { return volatile_; }
 
   inline bool IsWhiteout() const { return whiteout_; }
   inline bool IsCatalogMarker() const { return filename_ == ".cvmfscatalog"; }
@@ -126,6 +127,7 @@ class SyncItem {
   inline bool HasContentHash() const { return !content_hash_.IsNull(); }
   void SetExternalData(bool val) { external_data_ = val; }
   void SetDirectIo(bool val) { direct_io_ = val; }
+  void SetVolatile(bool val) { volatile_ = val; }
 
   inline zlib::Algorithms GetCompressionAlgorithm() const {
     return compression_algorithm_;
@@ -314,6 +316,7 @@ class SyncItem {
 
   bool external_data_;
   bool direct_io_;
+  bool volatile_;
   std::string relative_parent_path_;
 
   /**
