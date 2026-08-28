@@ -189,7 +189,7 @@ TEST_F(T_CatalogMergeTool, NonExistingLeasePath) {
 
   EXPECT_TRUE(tester.Apply("second", update));
 
-  UniquePtr<ServerTool> server_tool(new ServerTool());
+  std::unique_ptr<ServerTool> server_tool(new ServerTool());
   EXPECT_TRUE(server_tool->InitDownloadManager(true, ""));
 
   const receiver::Params params = MakeMergeToolParams(repo_name);
@@ -212,9 +212,9 @@ TEST_F(T_CatalogMergeTool, NonExistingLeasePath) {
   EXPECT_TRUE(merge_tool.Run(params, &output_manifest_path,
                              &output_manifest_hash, &final_rev));
 
-  UniquePtr<manifest::Manifest> output_manifest(
+  std::unique_ptr<manifest::Manifest> output_manifest(
       manifest::Manifest::LoadFile(output_manifest_path));
-  EXPECT_TRUE(output_manifest.IsValid());
+  EXPECT_TRUE(output_manifest.get() != nullptr);
 
   DirSpec output_spec;
   EXPECT_TRUE(
@@ -249,7 +249,7 @@ TEST_F(T_CatalogMergeTool, NonExistingLeasePathNoop) {
   EXPECT_TRUE(tester.Apply("base", base));
   manifest::Manifest first_manifest = *(tester.manifest());
 
-  UniquePtr<ServerTool> server_tool(new ServerTool());
+  std::unique_ptr<ServerTool> server_tool(new ServerTool());
   EXPECT_TRUE(server_tool->InitDownloadManager(true, ""));
 
   const receiver::Params params = MakeMergeToolParams(repo_name);
@@ -270,9 +270,9 @@ TEST_F(T_CatalogMergeTool, NonExistingLeasePathNoop) {
   EXPECT_TRUE(merge_tool.Run(params, &output_manifest_path,
                              &output_manifest_hash, &final_rev));
 
-  UniquePtr<manifest::Manifest> output_manifest(
+  std::unique_ptr<manifest::Manifest> output_manifest(
       manifest::Manifest::LoadFile(output_manifest_path));
-  ASSERT_TRUE(output_manifest.IsValid());
+  ASSERT_TRUE(output_manifest.get() != nullptr);
   DirSpec output_spec;
   EXPECT_TRUE(
       tester.DirSpecAtRootHash(output_manifest->catalog_hash(), &output_spec));
@@ -304,7 +304,7 @@ TEST_F(T_CatalogMergeTool, RootLeasePathWithSlash) {
 
   EXPECT_TRUE(tester.Apply("second", update));
 
-  UniquePtr<ServerTool> server_tool(new ServerTool());
+  std::unique_ptr<ServerTool> server_tool(new ServerTool());
   EXPECT_TRUE(server_tool->InitDownloadManager(true, ""));
 
   const receiver::Params params = MakeMergeToolParams(repo_name);
@@ -326,9 +326,9 @@ TEST_F(T_CatalogMergeTool, RootLeasePathWithSlash) {
   ASSERT_TRUE(merge_tool.Run(params, &output_manifest_path,
                              &output_manifest_hash, &final_rev));
 
-  UniquePtr<manifest::Manifest> output_manifest(
+  std::unique_ptr<manifest::Manifest> output_manifest(
       manifest::Manifest::LoadFile(output_manifest_path));
-  ASSERT_TRUE(output_manifest.IsValid());
+  ASSERT_TRUE(output_manifest.get() != nullptr);
 
   DirSpec output_spec;
   EXPECT_TRUE(
