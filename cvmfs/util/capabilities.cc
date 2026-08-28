@@ -247,29 +247,28 @@ bool ObtainCapability(const cap_value_t cap,
                       const bool avoid_mutexes = false) {
 #ifdef CAP_IS_SUPPORTED
   if (!CAP_IS_SUPPORTED(cap)) {
-    if (!avoid_mutexes)
-      LogCvmfs(kLogCvmfs, kLogSyslogErr | kLogDebug,
-               "Capability %s is not supported", capname);
-    return false;
+    if (avoid_mutexes)
+      return false;
+    PANIC(kLogSyslogErr | kLogDebug, "Capability %s is not supported", capname);
   }
 #endif
 
   cap_t caps_proc = cap_get_proc();
   if (caps_proc == NULL) {
-    if (!avoid_mutexes)
-      LogCvmfs(kLogCvmfs, kLogSyslogErr | kLogDebug,
-               "Cannot get process capabilities (errno: %d)", errno);
-    return false;
+    if (avoid_mutexes)
+      return false;
+    PANIC(kLogSyslogErr | kLogDebug,
+          "Cannot get process capabilities (errno: %d)", errno);
   }
 
   cap_flag_value_t cap_state;
   int retval = cap_get_flag(caps_proc, cap, CAP_EFFECTIVE, &cap_state);
   if (retval != 0) {
-    if (!avoid_mutexes)
-      LogCvmfs(kLogCvmfs, kLogSyslogErr | kLogDebug,
-               "Cannot inspect %s capability (errno: %d)", capname, errno);
     cap_free(caps_proc);
-    return false;
+    if (avoid_mutexes)
+      return false;
+    PANIC(kLogSyslogErr | kLogDebug, "Cannot inspect %s capability (errno: %d)",
+          capname, errno);
   }
 
   if (cap_state == CAP_SET) {
@@ -279,11 +278,11 @@ bool ObtainCapability(const cap_value_t cap,
 
   retval = cap_get_flag(caps_proc, cap, CAP_PERMITTED, &cap_state);
   if (retval != 0) {
-    if (!avoid_mutexes)
-      LogCvmfs(kLogCvmfs, kLogSyslogErr | kLogDebug,
-               "Cannot inspect %s capability (errno: %d)", capname, errno);
     cap_free(caps_proc);
-    return false;
+    if (avoid_mutexes)
+      return false;
+    PANIC(kLogSyslogErr | kLogDebug, "Cannot inspect %s capability (errno: %d)",
+          capname, errno);
   }
   if (cap_state != CAP_SET) {
     if (!avoid_mutexes) {
@@ -298,11 +297,11 @@ bool ObtainCapability(const cap_value_t cap,
 
   retval = cap_set_flag(caps_proc, CAP_EFFECTIVE, 1, &cap, CAP_SET);
   if (retval != 0) {
-    if (!avoid_mutexes)
-      LogCvmfs(kLogCvmfs, kLogSyslogErr | kLogDebug,
-               "Cannot enable %s capability (errno: %d)", capname, errno);
     cap_free(caps_proc);
-    return false;
+    if (avoid_mutexes)
+      return false;
+    PANIC(kLogSyslogErr | kLogDebug, "Cannot enable %s capability (errno: %d)",
+          capname, errno);
   }
 
   retval = cap_set_proc(caps_proc);
@@ -325,29 +324,28 @@ bool DropCapability(const cap_value_t cap,
                     const bool avoid_mutexes = false) {
 #ifdef CAP_IS_SUPPORTED
   if (!CAP_IS_SUPPORTED(cap)) {
-    if (!avoid_mutexes)
-      LogCvmfs(kLogCvmfs, kLogSyslogErr | kLogDebug,
-               "Capability %s is not supported", capname);
-    return false;
+    if (avoid_mutexes)
+      return false;
+    PANIC(kLogSyslogErr | kLogDebug, "Capability %s is not supported", capname);
   }
 #endif
 
   cap_t caps_proc = cap_get_proc();
   if (caps_proc == NULL) {
-    if (!avoid_mutexes)
-      LogCvmfs(kLogCvmfs, kLogSyslogErr | kLogDebug,
-               "Cannot get process capabilities (errno: %d)", errno);
-    return false;
+    if (avoid_mutexes)
+      return false;
+    PANIC(kLogSyslogErr | kLogDebug,
+          "Cannot get process capabilities (errno: %d)", errno);
   }
 
   cap_flag_value_t cap_state;
   int retval = cap_get_flag(caps_proc, cap, CAP_EFFECTIVE, &cap_state);
   if (retval != 0) {
-    if (!avoid_mutexes)
-      LogCvmfs(kLogCvmfs, kLogSyslogErr | kLogDebug,
-               "Cannot inspect %s capability (errno: %d)", capname, errno);
     cap_free(caps_proc);
-    return false;
+    if (avoid_mutexes)
+      return false;
+    PANIC(kLogSyslogErr | kLogDebug, "Cannot inspect %s capability (errno: %d)",
+          capname, errno);
   }
 
   if (cap_state == CAP_CLEAR) {
@@ -357,11 +355,11 @@ bool DropCapability(const cap_value_t cap,
 
   retval = cap_set_flag(caps_proc, CAP_EFFECTIVE, 1, &cap, CAP_CLEAR);
   if (retval != 0) {
-    if (!avoid_mutexes)
-      LogCvmfs(kLogCvmfs, kLogSyslogErr | kLogDebug,
-               "Cannot disable %s capability (errno: %d)", capname, errno);
     cap_free(caps_proc);
-    return false;
+    if (avoid_mutexes)
+      return false;
+    PANIC(kLogSyslogErr | kLogDebug, "Cannot disable %s capability (errno: %d)",
+          capname, errno);
   }
 
   retval = cap_set_proc(caps_proc);
