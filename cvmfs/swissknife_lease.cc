@@ -83,15 +83,25 @@ int CommandLease::Main(const ArgumentList &args) {
     if (MakeAcquireRequest(key_id, secret, params.lease_path,
                            params.repo_service_url, &buffer)) {
       std::string session_token;
-      const LeaseReply rep = ParseAcquireReply(buffer, &session_token);
+      int max_api_version = 0;
+      const LeaseReply rep = ParseAcquireReply(buffer, &session_token,
+                                               &max_api_version);
       switch (rep) {
         case kLeaseReplySuccess: {
           const std::string token_file_name = "/var/spool/cvmfs/" + lease_fqdn
                                               + "/session_token";
 
-          if (!SafeWriteToFile(session_token, token_file_name, 0600)) {
+          if (!SafeWriteToFile(session_token, token_file_name, 0600)
+              || !SafeWriteToFile(
+                  gateway::MakeSessionTokenApiVersionRecord(max_api_version,
+                                                            session_token),
+                  gateway::SessionTokenApiVersionPath(token_file_name),
+                  0600)) {
+            const int write_errno = errno;
+            unlink(
+                gateway::SessionTokenApiVersionPath(token_file_name).c_str());
             LogCvmfs(kLogCvmfs, kLogStderr, "Error opening file: %s",
-                     std::strerror(errno));
+                     std::strerror(write_errno));
             ret = kLeaseFileOpenError;
           }
         } break;
@@ -125,6 +135,7 @@ int CommandLease::Main(const ArgumentList &args) {
             LogCvmfs(kLogCvmfs, kLogStderr,
                      "Warning - Could not delete session token file.");
           }
+          unlink(gateway::SessionTokenApiVersionPath(token_file_name).c_str());
           return kLeaseSuccess;
         } else {
           LogCvmfs(kLogCvmfs, kLogStderr, "Could not drop active lease");

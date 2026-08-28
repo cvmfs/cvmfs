@@ -161,7 +161,7 @@ const DirSpecItem *DirSpec::Item(const std::string &full_path) const {
   std::string no_slash(full_path);
   RemoveLeadingSlash(&no_slash);
   if (no_slash != full_path) {
-    return Item(full_path);
+    return Item(no_slash);
   }
   return NULL;
 }

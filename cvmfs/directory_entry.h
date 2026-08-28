@@ -8,6 +8,7 @@
 #ifndef CVMFS_DIRECTORY_ENTRY_H_
 #define CVMFS_DIRECTORY_ENTRY_H_
 
+#include <sys/stat.h>
 #include <sys/types.h>
 
 #include <cassert>
@@ -186,6 +187,24 @@ class DirectoryEntryBase {
     has_xattrs_ = has_xattrs;
   }
   inline void set_is_bundle_trigger(bool val) { is_bundle_trigger_ = val; }
+
+  // Use fixed metadata for implicit lease ancestors. Epoch mtime is
+  // reproducible and distinguishes these entries from publisher data.
+  inline void SetImplicitDirectoryMetadata() {
+    mode_ = S_IFDIR | 0755;
+    uid_ = 0;
+    gid_ = 0;
+    size_ = 0;
+    mtime_ = 0;
+    mtime_ns_ = -1;
+    symlink_ = LinkString("");
+    has_xattrs_ = false;
+    checksum_ = shash::Any();
+    compression_algorithm_ = zlib::kZlibDefault;
+    is_external_file_ = false;
+    is_direct_io_ = false;
+    is_bundle_trigger_ = false;
+  }
 
   inline zlib::Algorithms compression_algorithm() const {
     return compression_algorithm_;

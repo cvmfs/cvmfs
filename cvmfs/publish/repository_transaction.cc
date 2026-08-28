@@ -10,6 +10,7 @@
 #include "catalog_mgr_ro.h"
 #include "catalog_mgr_rw.h"
 #include "directory_entry.h"
+#include "gateway_util.h"
 #include "manifest.h"
 #include "publish/except.h"
 #include "publish/repository.h"
@@ -18,6 +19,7 @@
 #include "util/exception.h"
 #include "util/logging.h"
 #include "util/posix.h"
+#include "util/string.h"
 
 namespace publish {
 
@@ -100,9 +102,8 @@ void Publisher::TransactionImpl() {
     }
   }
 
-  // We might have a valid lease for a non-existing path. Nevertheless, we run
-  // run into problems when merging catalogs later, so for the time being we
-  // disallow transactions on non-existing paths.
+  // Missing lease parents require --allow-nonexistent-path and receiver API 4.
+  // The receiver materializes the ancestors during the catalog merge.
   if (!settings_.transaction().lease_path().empty()) {
     const std::string path = GetParentPath(
         "/" + settings_.transaction().lease_path());
@@ -111,10 +112,41 @@ void Publisher::TransactionImpl() {
     const bool retval = catalog_mgr->LookupPath(path, catalog::kLookupDefault,
                                                 &dirent);
     if (!retval) {
-      throw EPublish("cannot open transaction on non-existing path " + path,
-                     EPublish::kFailLeaseNoEntry);
-    }
-    if (!dirent.IsDirectory()) {
+      if (!settings_.transaction().allow_nonexistent_path()) {
+        throw EPublish("cannot open transaction on non-existing path " + path
+                           + " (use --allow-nonexistent-path to permit this)",
+                       EPublish::kFailLeaseNoEntry);
+      }
+      // Refuse before upload when the receiver cannot create the ancestors.
+      // Local publishing builds the complete catalog itself.
+      if (settings_.storage().type() == upload::SpoolerDefinition::Gateway
+          && session_->negotiated_api_version()
+                 < gateway::kApiVersionNonexistentPath) {
+        const int negotiated_version = session_->negotiated_api_version();
+        if (negotiated_version < 0) {
+          throw EPublish(
+              "cannot verify gateway support for opening a transaction on the "
+              "non-existing path "
+                  + path
+                  + ": the existing lease token has no recorded API "
+                    "negotiation; "
+                    "drop the lease and acquire it again",
+              EPublish::kFailInput);
+        }
+        throw EPublish(
+            "the gateway does not support opening a transaction on the "
+            "non-existing path "
+                + path + " (needs API version "
+                + StringifyInt(gateway::kApiVersionNonexistentPath)
+                + ", gateway negotiated " + StringifyInt(negotiated_version)
+                + "); upgrade the gateway or create the parent path first",
+            EPublish::kFailInput);
+      }
+      LogCvmfs(kLogCvmfs, llvl_ | kLogStdout | kLogSyslog,
+               "opening transaction on non-existing path %s; missing parent "
+               "directories will be created at commit time",
+               path.c_str());
+    } else if (!dirent.IsDirectory()) {
       throw EPublish(
           "cannot open transaction on " + path + ", which is not a directory",
           EPublish::kFailLeaseNoDir);

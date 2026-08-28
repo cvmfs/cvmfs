@@ -29,6 +29,7 @@ void TrySessionDrop(publish::Publisher::Session *session,
                " removing session token. Error: %s",
                e.msg().c_str());
       unlink(session->token_path().c_str());
+      unlink(session->api_version_path().c_str());
       return;
     }
     throw e;
