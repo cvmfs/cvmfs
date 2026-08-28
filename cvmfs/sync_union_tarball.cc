@@ -55,7 +55,7 @@ SyncUnionTarball::SyncUnionTarball(AbstractSyncMediator *mediator,
 SyncUnionTarball::~SyncUnionTarball() { delete read_archive_signal_; }
 
 bool SyncUnionTarball::Initialize() {
-  bool result;
+  int result;
 
   // We are just deleting entity from the repo
   if (tarball_path_ == "") {
@@ -64,8 +64,24 @@ bool SyncUnionTarball::Initialize() {
   }
 
   src = archive_read_new();
-  assert(ARCHIVE_OK == archive_read_support_format_tar(src));
-  assert(ARCHIVE_OK == archive_read_support_format_empty(src));
+  if (src == NULL) {
+    LogCvmfs(kLogUnionFs, kLogStderr,
+             "Impossible to create an archive reader");
+    return false;
+  }
+
+  // Registering the tar/empty formats on a freshly allocated reader can only
+  // fail due to an internal libarchive/allocation error, never because of
+  // anything in the tarball itself, so treat failure as a bug, not a runtime
+  // condition to handle gracefully.
+  result = archive_read_support_format_tar(src);
+  if (result == ARCHIVE_OK)
+    result = archive_read_support_format_empty(src);
+  if (result != ARCHIVE_OK) {
+    PANIC(kLogStderr | kLogSyslogErr,
+          "Impossible to configure the archive reader: %s",
+          archive_error_string(src));
+  }
 
   if (tarball_path_ == "-") {
     result = archive_read_open_filename(src, NULL, kBlockSize);
@@ -78,6 +94,8 @@ bool SyncUnionTarball::Initialize() {
   if (result != ARCHIVE_OK) {
     LogCvmfs(kLogUnionFs, kLogStderr, "Impossible to open the archive: %s",
              archive_error_string(src));
+    archive_read_free(src);
+    src = NULL;
     return false;
   }
 

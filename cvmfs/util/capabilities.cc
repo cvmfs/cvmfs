@@ -10,9 +10,10 @@
 #include <sys/prctl.h>
 #endif
 
-#include <cassert>
+#include <cstdlib>
 
 #include "util/capabilities.h"
+#include "util/exception.h"
 #include "util/logging.h"
 #include "util/platform.h"
 #include "util/posix.h"
@@ -85,11 +86,13 @@ bool ClearPermittedCapabilities(const std::vector<cap_value_t> &reservecaps,
   if (!SetpcapCapabilityPermitted()) {
     if (nreservecaps > 0) {
       LogCvmfs(kLogCvmfs, kLogDebug,
-        "Capabilities cannot be reserved because setpcap is not permitted.");
+               "Capabilities cannot be reserved because setpcap is not "
+               "permitted.");
       return false;
     }
     LogCvmfs(kLogCvmfs, kLogDebug,
-      "Capabilities are already cleared because setpcap is not permitted.");
+             "Capabilities are already cleared because setpcap is not "
+             "permitted.");
     return true;
   }
   
@@ -108,11 +111,21 @@ bool ClearPermittedCapabilities(const std::vector<cap_value_t> &reservecaps,
     if (nreservecaps != 0) {
       // keep all capabilities when switching uid, and clear all but the
       // reserved ones below
-      assert(platform_keepcaps(true));
+      if (!platform_keepcaps(true)) {
+        LogCvmfs(kLogCvmfs, kLogSyslogErr | kLogDebug,
+                 "Failed to retain capabilities while switching credentials "
+                 "(errno: %d)", errno);
+        return false;
+      }
     }
     retval = setgid(gid) || setuid(uid);
     if (nreservecaps != 0) {
-      assert(platform_keepcaps(false));
+      if (!platform_keepcaps(false)) {
+        LogCvmfs(kLogCvmfs, kLogSyslogErr | kLogDebug,
+                 "Failed to stop retaining capabilities after switching "
+                 "credentials (errno: %d)", errno);
+        return false;
+      }
     }
     if (retval != 0) {
       LogCvmfs(kLogCvmfs, kLogSyslogErr | kLogDebug,
@@ -126,21 +139,40 @@ bool ClearPermittedCapabilities(const std::vector<cap_value_t> &reservecaps,
     }
   }
 
-  assert(ObtainSetpcapCapability());
+  if (!ObtainSetpcapCapability()) {
+    LogCvmfs(kLogCvmfs, kLogSyslogErr | kLogDebug,
+             "Failed to obtain setpcap capability while clearing capabilities "
+             "(errno: %d)", errno);
+    return false;
+  }
 
   cap_t caps_proc = cap_get_proc();
-  assert(caps_proc != NULL);
+  if (caps_proc == NULL) {
+    LogCvmfs(kLogCvmfs, kLogSyslogErr | kLogDebug,
+             "Failed to get process capabilities (errno: %d)", errno);
+    return false;
+  }
 
   for (int i = 0; i < nreservecaps; i++) {
     const cap_value_t cap = reservecaps[i];
 
 #ifdef CAP_IS_SUPPORTED
-    assert(CAP_IS_SUPPORTED(cap));
+    if (!CAP_IS_SUPPORTED(cap)) {
+      LogCvmfs(kLogCvmfs, kLogSyslogErr | kLogDebug,
+               "Capability 0x%x is not supported", cap);
+      cap_free(caps_proc);
+      return false;
+    }
 #endif
 
     cap_flag_value_t cap_state;
     retval = cap_get_flag(caps_proc, cap, CAP_PERMITTED, &cap_state);
-    assert(retval == 0);
+    if (retval != 0) {
+      LogCvmfs(kLogCvmfs, kLogSyslogErr | kLogDebug,
+               "Failed to inspect capability 0x%x (errno: %d)", cap, errno);
+      cap_free(caps_proc);
+      return false;
+    }
     if (cap_state != CAP_SET) {
       LogCvmfs(kLogCvmfs, kLogDebug,
                "Warning: cap 0x%x cannot be reserved. "
@@ -152,16 +184,32 @@ bool ClearPermittedCapabilities(const std::vector<cap_value_t> &reservecaps,
   // Drop all EFFECTIVE, PERMITTED, and INHERITABLE capabilities other
   // than those requested PERMITTED & INHERITABLE capabilities.
   retval = cap_clear(caps_proc);
-  assert(retval == 0);
+  if (retval != 0) {
+    LogCvmfs(kLogCvmfs, kLogSyslogErr | kLogDebug,
+             "Failed to clear process capabilities (errno: %d)", errno);
+    cap_free(caps_proc);
+    return false;
+  }
 
   if (nreservecaps != 0) {
     retval = cap_set_flag(caps_proc, CAP_PERMITTED,
                           nreservecaps, reservecaps.data(), CAP_SET);
-    assert(retval == 0);
+    if (retval != 0) {
+      LogCvmfs(kLogCvmfs, kLogSyslogErr | kLogDebug,
+               "Failed to reserve process capabilities (errno: %d)", errno);
+      cap_free(caps_proc);
+      return false;
+    }
     if (ninheritcaps != 0) {
       retval = cap_set_flag(caps_proc, CAP_INHERITABLE,
                             ninheritcaps, inheritcaps.data(), CAP_SET);
-      assert(retval == 0);
+      if (retval != 0) {
+        LogCvmfs(kLogCvmfs, kLogSyslogErr | kLogDebug,
+                 "Failed to make process capabilities inheritable (errno: %d)",
+                 errno);
+        cap_free(caps_proc);
+        return false;
+      }
     }
   }
 
@@ -182,7 +230,12 @@ bool ClearPermittedCapabilities(const std::vector<cap_value_t> &reservecaps,
     for (int i = 0; i < ninheritcaps; i++) {
       retval = prctl(PR_CAP_AMBIENT, PR_CAP_AMBIENT_RAISE,
                      inheritcaps[i], 0, 0);
-      assert(retval == 0);
+      if (retval != 0) {
+        LogCvmfs(kLogCvmfs, kLogSyslogErr | kLogDebug,
+                 "Failed to raise ambient capability 0x%x (errno: %d)",
+                 inheritcaps[i], errno);
+        return false;
+      }
     }
   }
 
@@ -195,15 +248,30 @@ bool ObtainCapability(const cap_value_t cap,
                       const char *capname,
                       const bool avoid_mutexes = false) {
 #ifdef CAP_IS_SUPPORTED
-  assert(CAP_IS_SUPPORTED(cap));
+  if (!CAP_IS_SUPPORTED(cap)) {
+    if (avoid_mutexes)
+      abort();
+    PANIC(kLogSyslogErr | kLogDebug, "Capability %s is not supported", capname);
+  }
 #endif
 
   cap_t caps_proc = cap_get_proc();
-  assert(caps_proc != NULL);
+  if (caps_proc == NULL) {
+    if (avoid_mutexes)
+      abort();
+    PANIC(kLogSyslogErr | kLogDebug,
+          "Cannot get process capabilities (errno: %d)", errno);
+  }
 
   cap_flag_value_t cap_state;
   int retval = cap_get_flag(caps_proc, cap, CAP_EFFECTIVE, &cap_state);
-  assert(retval == 0);
+  if (retval != 0) {
+    cap_free(caps_proc);
+    if (avoid_mutexes)
+      abort();
+    PANIC(kLogSyslogErr | kLogDebug, "Cannot inspect %s capability (errno: %d)",
+          capname, errno);
+  }
 
   if (cap_state == CAP_SET) {
     cap_free(caps_proc);
@@ -211,7 +279,13 @@ bool ObtainCapability(const cap_value_t cap,
   }
 
   retval = cap_get_flag(caps_proc, cap, CAP_PERMITTED, &cap_state);
-  assert(retval == 0);
+  if (retval != 0) {
+    cap_free(caps_proc);
+    if (avoid_mutexes)
+      abort();
+    PANIC(kLogSyslogErr | kLogDebug, "Cannot inspect %s capability (errno: %d)",
+          capname, errno);
+  }
   if (cap_state != CAP_SET) {
     if (!avoid_mutexes) {
       LogCvmfs(kLogCvmfs, kLogDebug,
@@ -224,7 +298,13 @@ bool ObtainCapability(const cap_value_t cap,
   }
 
   retval = cap_set_flag(caps_proc, CAP_EFFECTIVE, 1, &cap, CAP_SET);
-  assert(retval == 0);
+  if (retval != 0) {
+    cap_free(caps_proc);
+    if (avoid_mutexes)
+      abort();
+    PANIC(kLogSyslogErr | kLogDebug, "Cannot enable %s capability (errno: %d)",
+          capname, errno);
+  }
 
   retval = cap_set_proc(caps_proc);
   cap_free(caps_proc);
@@ -245,15 +325,30 @@ bool DropCapability(const cap_value_t cap,
                     const char *capname,
                     const bool avoid_mutexes = false) {
 #ifdef CAP_IS_SUPPORTED
-  assert(CAP_IS_SUPPORTED(cap));
+  if (!CAP_IS_SUPPORTED(cap)) {
+    if (avoid_mutexes)
+      abort();
+    PANIC(kLogSyslogErr | kLogDebug, "Capability %s is not supported", capname);
+  }
 #endif
 
   cap_t caps_proc = cap_get_proc();
-  assert(caps_proc != NULL);
+  if (caps_proc == NULL) {
+    if (avoid_mutexes)
+      abort();
+    PANIC(kLogSyslogErr | kLogDebug,
+          "Cannot get process capabilities (errno: %d)", errno);
+  }
 
   cap_flag_value_t cap_state;
   int retval = cap_get_flag(caps_proc, cap, CAP_EFFECTIVE, &cap_state);
-  assert(retval == 0);
+  if (retval != 0) {
+    cap_free(caps_proc);
+    if (avoid_mutexes)
+      abort();
+    PANIC(kLogSyslogErr | kLogDebug, "Cannot inspect %s capability (errno: %d)",
+          capname, errno);
+  }
 
   if (cap_state == CAP_CLEAR) {
     cap_free(caps_proc);
@@ -261,7 +356,13 @@ bool DropCapability(const cap_value_t cap,
   }
 
   retval = cap_set_flag(caps_proc, CAP_EFFECTIVE, 1, &cap, CAP_CLEAR);
-  assert(retval == 0);
+  if (retval != 0) {
+    cap_free(caps_proc);
+    if (avoid_mutexes)
+      abort();
+    PANIC(kLogSyslogErr | kLogDebug, "Cannot disable %s capability (errno: %d)",
+          capname, errno);
+  }
 
   retval = cap_set_proc(caps_proc);
   cap_free(caps_proc);
@@ -280,14 +381,19 @@ bool DropCapability(const cap_value_t cap,
 
 bool CheckCapabilityPermitted(const cap_value_t cap) {
   cap_t caps_proc = cap_get_proc();
-  assert(caps_proc != NULL);
+  if (caps_proc == NULL)
+    PANIC(kLogSyslogErr | kLogDebug,
+          "Cannot get process capabilities (errno: %d)", errno);
   cap_flag_value_t cap_state;
   const int retval = cap_get_flag(caps_proc,
                                   cap,
                                   CAP_PERMITTED,
                                   &cap_state);
-  assert(retval == 0);
   cap_free(caps_proc);
+  if (retval != 0)
+    PANIC(kLogSyslogErr | kLogDebug,
+          "Cannot inspect permitted capability 0x%x (errno: %d)", cap,
+          errno);
   return (cap_state == CAP_SET);
 }
 

@@ -424,16 +424,22 @@ void Watchdog::Fork(bool needs_read_environ) {
                 const std::vector<cap_value_t> reservecaps = {CAP_SYS_ADMIN,
                                                               CAP_SYS_PTRACE};
                 const std::vector<cap_value_t> inheritcaps = {CAP_SYS_PTRACE};
-                assert(ClearPermittedCapabilities(reservecaps, inheritcaps));
+                if (!ClearPermittedCapabilities(reservecaps, inheritcaps))
+                  PANIC(kLogStderr | kLogSyslogErr,
+                        "Failed to reduce watchdog process capabilities");
               } else {
                 const std::vector<cap_value_t> reservecaps = {CAP_SYS_ADMIN};
-                assert(ClearPermittedCapabilities(reservecaps, nocaps));
+                if (!ClearPermittedCapabilities(reservecaps, nocaps))
+                  PANIC(kLogStderr | kLogSyslogErr,
+                        "Failed to reduce watchdog process capabilities");
               }
             } else {
               // Only need to be able to do the stack trace, and the
               // main process needs no extra capabilities, so we can
               // drop all capabilities.
-              assert(ClearPermittedCapabilities(nocaps, nocaps));
+              if (!ClearPermittedCapabilities(nocaps, nocaps))
+                PANIC(kLogStderr | kLogSyslogErr,
+                      "Failed to clear watchdog process capabilities");
             }
           }
           // send the watchdog PID to the supervisee
@@ -610,7 +616,9 @@ void *Watchdog::MainWatchdogListener(void *data) {
   if ((getuid() != 0) && SetuidCapabilityPermitted()) {
     // Drop all capabilities, none are needed in the listener
     const std::vector<cap_value_t> nocaps;
-    assert(ClearPermittedCapabilities(nocaps, nocaps));
+    if (!ClearPermittedCapabilities(nocaps, nocaps))
+      PANIC(kLogStderr | kLogSyslogErr,
+            "Failed to clear watchdog listener capabilities");
   }
 
   struct pollfd watch_fds[2];

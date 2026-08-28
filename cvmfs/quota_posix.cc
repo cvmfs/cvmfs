@@ -1246,11 +1246,17 @@ int PosixQuotaManager::MainCacheManager(int argc, char **argv) {
   if ((geteuid() != 0) && SetuidCapabilityPermitted()) {
     // Permanently drop credentials
     const std::vector<cap_value_t> nocaps;
-    assert(ClearPermittedCapabilities(nocaps, nocaps));
+    if (!ClearPermittedCapabilities(nocaps, nocaps))
+      PANIC(kLogStderr | kLogSyslogErr,
+            "Failed to clear quota manager capabilities");
     // Leave this process ptraceable
-    assert(platform_set_dumpable());
+    if (!platform_set_dumpable())
+      PANIC(kLogStderr | kLogSyslogErr,
+            "Failed to make quota manager process ptraceable");
     // but without core dumps
-    assert(SetLimitCore(0));
+    if (!SetLimitCore(0))
+      PANIC(kLogStderr | kLogSyslogErr,
+            "Failed to disable quota manager core dumps");
   }
 
   const std::unique_ptr<Watchdog> watchdog(
