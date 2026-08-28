@@ -15,6 +15,8 @@
 #include <cassert>
 #include <climits>
 #include <cstring>
+#include <sstream>
+#include <string>
 #include <vector>
 
 #include "duplex_fuse.h"  // IWYU pragma: keep
@@ -70,6 +72,7 @@
 #include "statistics.h"
 #include "telemetry_aggregator.h"
 #include "tracer.h"
+#include "util/fuzzy.h"
 #include "util/logging.h"
 #include "util/posix.h"
 #include "util/string.h"
@@ -1357,6 +1360,26 @@ bool MountPoint::CreateCatalogManager() {
   }
   if (!retval) {
     boot_error_ = "Failed to initialize root file catalog";
+    if (options_mgr_->GetValue("CVMFS_KNOWN_REPOS", &optarg)) {
+      std::istringstream iss(optarg);
+      std::string repo;
+      std::vector<std::string> repos;
+
+      // Assume repos list in a  column separated string
+      while (std::getline(iss, repo, ':')) {
+        repos.push_back(repo);
+      }
+      assert(not repos.empty());
+
+      const fuzzy::FuzzySearch fz(repos);
+      const std::string mountpoint = this->fqrn();
+      const std::string fuzzy_res = fz.Search(mountpoint);
+      boot_error_ += (fuzzy_res.empty())
+                         ? ""
+                         : " for " + mountpoint + ". Did you mean " + fuzzy_res
+                               + "?";
+    }
+
     boot_status_ = loader::kFailCatalog;
     return false;
   }

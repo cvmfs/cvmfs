@@ -12,6 +12,7 @@ set (LIBCVMFS_UTIL_SOURCES
   util/concurrency.cc
   util/exception.cc
   util/file_backed_buffer.cc
+  util/fuzzy.cc
   util/logging.cc
   util/mmap_file.cc
   util/namespace.cc
@@ -21,7 +22,7 @@ set (LIBCVMFS_UTIL_SOURCES
   util/uuid.cc
 )
 
-set (LIBCVMFS_UTIL_CFLAGS "-D_FILE_OFFSET_BITS=64 -DCVMFS_LIBRARY -DCVMFS_RAISE_EXCEPTIONS -fexceptions")
+set (LIBCVMFS_UTIL_CFLAGS "-D_FILE_OFFSET_BITS=64 -DCVMFS_LIBRARY -DCVMFS_RAISE_EXCEPTIONS -DCVMFS_UTIL_EXPORTS -fexceptions")
 set (LIBCVMFS_UTIL_LINK_LIBRARIES "")
 list (APPEND LIBCVMFS_UTIL_LINK_LIBRARIES
       ${UUID_LIBRARIES}
@@ -29,6 +30,8 @@ list (APPEND LIBCVMFS_UTIL_LINK_LIBRARIES
       ${RT_LIBRARY}
       pthread
       dl)
+
+
 
 add_library(cvmfs_util SHARED ${LIBCVMFS_UTIL_SOURCES})
 set_target_properties (cvmfs_util PROPERTIES
@@ -48,6 +51,7 @@ if (BUILD_CVMFS OR BUILD_SERVER_DEBUG OR BUILD_RECEIVER_DEBUG OR
       COMPILE_FLAGS "${LIBCVMFS_UTIL_CFLAGS} -DDEBUGMSG -g -O0 -Wno-cpp")
   target_link_libraries (cvmfs_util_debug ${LIBCVMFS_UTIL_LINK_LIBRARIES})
   install (TARGETS cvmfs_util_debug LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+
 
 endif () # debug binaries
 

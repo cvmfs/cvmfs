@@ -3,6 +3,7 @@
  */
 
 #include <alloca.h>
+#include <memory>
 #include <fcntl.h>
 #include <gtest/gtest.h>
 #include <netinet/in.h>
@@ -28,6 +29,7 @@
 #include "util/posix.h"
 #include "util/smalloc.h"
 #include "util/string.h"
+#include "util/fuzzy.h"
 
 using namespace std;  // NOLINT
 
@@ -126,6 +128,8 @@ class T_Util : public ::testing::Test {
   string fake_path;
   string to_write;
   std::string to_write_large;
+  std::vector<std::string> dictionary = {"banana","apple","kiwi","orange","peach","blueberry","watermelon"};
+  std::unique_ptr<fuzzy::FuzzySearch> fuzzy_searcher = std::make_unique<fuzzy::FuzzySearch>(dictionary);
 };
 
 
@@ -2252,4 +2256,68 @@ TEST(Log2Histogram, Quantiles) {
     unsigned int q = log2hist.GetQuantile(qs[i]);
     EXPECT_NEAR(q, expected, max_difference);
   }
+}
+TEST_F(T_Util, FuzzyExactMatch) {
+    EXPECT_EQ(fuzzy_searcher->Search("apple"), "apple");
+    EXPECT_EQ(fuzzy_searcher->Search("banana"), "banana");
+    EXPECT_EQ(fuzzy_searcher->Search("kiwi"), "kiwi");
+}
+
+TEST_F(T_Util, FuzzySingleCharacterTypos) {
+    EXPECT_EQ(fuzzy_searcher->Search("aple"), "apple");
+    EXPECT_EQ(fuzzy_searcher->Search("bannana"), "banana");
+    EXPECT_EQ(fuzzy_searcher->Search("oragne"), "orange");
+    EXPECT_EQ(fuzzy_searcher->Search("peachh"), "peach");
+}
+
+TEST_F(T_Util, FuzzyTranspositions) {
+    EXPECT_EQ(fuzzy_searcher->Search("aplpe"), "apple");
+    EXPECT_EQ(fuzzy_searcher->Search("banan"), "banana");
+    EXPECT_EQ(fuzzy_searcher->Search("oraneg"), "orange");
+    EXPECT_EQ(fuzzy_searcher->Search("peahc"), "peach");
+}
+
+TEST_F(T_Util, FuzzyMissingCharacters) {
+    EXPECT_EQ(fuzzy_searcher->Search("appl"), "apple");
+    EXPECT_EQ(fuzzy_searcher->Search("bana"), "banana");
+    EXPECT_EQ(fuzzy_searcher->Search("oran"), "orange");
+    EXPECT_EQ(fuzzy_searcher->Search("peac"), "peach");
+}
+
+TEST_F(T_Util, FuzzyExtraCharacters) {
+    EXPECT_EQ(fuzzy_searcher->Search("appple"), "apple");
+    EXPECT_EQ(fuzzy_searcher->Search("banaanana"), "banana");
+    EXPECT_EQ(fuzzy_searcher->Search("oraange"), "orange");
+    EXPECT_EQ(fuzzy_searcher->Search("peeach"), "peach");
+}
+
+TEST_F(T_Util, FuzzyPhoneticMatches) {
+    EXPECT_EQ(fuzzy_searcher->Search("appel"), "apple");
+    EXPECT_EQ(fuzzy_searcher->Search("bannanna"), "banana");
+    EXPECT_EQ(fuzzy_searcher->Search("oranj"), "orange");
+    EXPECT_EQ(fuzzy_searcher->Search("peech"), "peach");
+}
+
+TEST_F(T_Util, FuzzyNoMatch) {
+    EXPECT_TRUE(fuzzy_searcher->Search("xyz").empty());
+    EXPECT_TRUE(fuzzy_searcher->Search("qwerty").empty());
+    EXPECT_TRUE(fuzzy_searcher->Search("12345").empty());
+}
+
+TEST_F(T_Util, FuzzyEmptyInput) {
+    EXPECT_TRUE(fuzzy_searcher->Search("").empty());
+}
+
+TEST_F(T_Util, FuzzyCaseSensitivity) {
+    // Test with case variations if needed
+    EXPECT_EQ(fuzzy_searcher->Search("Kiwi"), "kiwi");
+    EXPECT_EQ(fuzzy_searcher->Search("Appel"), "apple");
+}
+
+TEST_F(T_Util, FuzzyMultipleCloseMatches) {
+    // Test when multiple words are equally close
+    std::unique_ptr<fuzzy::FuzzySearch> aggressive_searcher= std::make_unique<fuzzy::FuzzySearch>(dictionary,5);
+    EXPECT_EQ(aggressive_searcher->Search("berry"), "blueberry");
+    //prefer substring matching over pure replacements "melon"->"apple" is less prefered than "melon"->watermelon
+    EXPECT_EQ(aggressive_searcher->Search("melon"), "watermelon");
 }
