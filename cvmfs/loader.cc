@@ -36,6 +36,7 @@
 #include <string>
 #include <vector>
 
+#include "Dcoredumper.h"
 #include "fence.h"
 #include "fuse_main.h"
 #include "loader_talk.h"
@@ -703,6 +704,11 @@ int FuseMain(int argc, char *argv[]) {
         return 1;
       }
       return 0;
+    }
+
+    if (string(argv[1]) == string("__COREDUMP__")) {
+      // cvmfs2 __COREDUMP__ [--standard|--full] <pid> <output.core>
+      return dcoredumper_main(argc - 1, argv + 1);
     }
 
     debug_mode_ = getenv("__CVMFS_DEBUG_MODE__") != NULL;

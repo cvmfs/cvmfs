@@ -829,7 +829,7 @@ int build_core(int pid, const char *output_path, DumperContext *ctx) {
   return 0;
 }
 
-int main(int argc, char *argv[]) {
+int dcoredumper_main(int argc, char *argv[]) {
   DumperContext ctx;
   ctx.level = kDumpStandard;
   memset(ctx.exe_path, 0, sizeof(ctx.exe_path));
@@ -897,3 +897,10 @@ int main(int argc, char *argv[]) {
 
   return build_core(pid, argv[argi + 1], &ctx);
 }
+
+#ifndef CVMFS_FUSE_MODULE
+int main(int argc, char *argv[]) {
+  return dcoredumper_main(argc, argv);
+}
+#endif
+

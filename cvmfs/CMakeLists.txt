@@ -157,7 +157,8 @@ if (BUILD_CVMFS)
   )
 
   #
-  # /usr/bin/cvmfs_dcoredumper (Linux only, x86_64)
+  # /usr/bin/cvmfs_dcoredumper (Linux only, standalone)
+  # Also folded into cvmfs2 via __COREDUMP__ subcommand.
   #
   if (NOT MACOSX)
     add_executable (cvmfs_dcoredumper Dcoredumper.cc)
@@ -199,6 +200,7 @@ if (BUILD_CVMFS)
   # libcvmfs-fuse.
   #
   set (CVMFS_STUB_SOURCES
+       Dcoredumper.cc
        globals.cc
        loader.cc
        loader_talk.cc
