@@ -13,6 +13,7 @@
 
 #include <cassert>
 #include <cstring>
+#include <ctime>
 #include <string>
 #include <vector>
 
@@ -193,14 +194,16 @@ class DirectoryEntryBase {
   }
   inline void set_is_bundle_trigger(bool val) { is_bundle_trigger_ = val; }
 
-  // Use fixed metadata for implicit lease ancestors. Epoch mtime is
-  // reproducible and distinguishes these entries from publisher data.
+  // Use fixed metadata for implicit lease ancestors: no publisher owns them,
+  // so uid/gid 0 and 0755 mark them as receiver-supplied. Time and size are
+  // those of any other directory cvmfs synthesises (SyncItemDummyDir), so the
+  // entry does not stand out from the ones a publisher created.
   inline void SetImplicitDirectoryMetadata() {
     mode_ = S_IFDIR | 0755;
     uid_ = 0;
     gid_ = 0;
-    size_ = 0;
-    mtime_ = 0;
+    size_ = 4096;
+    mtime_ = time(NULL);
     mtime_ns_ = -1;
     symlink_ = LinkString("");
     has_xattrs_ = false;
