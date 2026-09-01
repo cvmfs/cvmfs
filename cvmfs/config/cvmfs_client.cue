@@ -37,6 +37,9 @@ package cvmfs
 // TCP port, 1-65535.
 #Port: int & >=1 & <=65535
 
+// Regex helper for accepting valid ports as strings ("1" up to "65535")
+_#portRe: "([1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])"
+
 // Single HTTP(S) URL; no whitespace or chain separators allowed.
 #URL: =~"(?i)^https?://[^ \\t;|,]+$"
 
@@ -47,7 +50,7 @@ package cvmfs
 // Proxy chain: ';' separates failover groups, '|' load-balanced members.
 // An entry is DIRECT (no proxy), auto (WPAD/PAC discovery) or a proxy
 // address with optional scheme and port.
-_#proxyEntry: "(DIRECT|auto|(https?://)?[A-Za-z0-9._-]+(:[0-9]{1,5})?)"
+_#proxyEntry: "(DIRECT|auto|(https?://)?[A-Za-z0-9._-]+(:\(_#portRe))?)"
 #ProxyChain:  =~"(?i)^\(_#proxyEntry)([;|]\(_#proxyEntry))*$"
 
 // POSIX user name.

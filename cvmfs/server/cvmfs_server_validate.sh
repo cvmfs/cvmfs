@@ -12,9 +12,22 @@
 
 # Ensure a string is properly escaped for JSON output.
 _validate_json_string() {
-  local s=$1
-  s=$(printf '%s' "$s" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')
-  printf '"%s"' "$s"
+  printf '%s' "$1" | awk '
+    NR > 1 { out = out "\\n" }
+    {
+      for (i = 1; i <= length($0); i++) {
+        c = substr($0, i, 1)
+        if (c == "\\") out = out "\\\\"
+        else if (c == "\"") out = out "\\\""
+        else if (c == "\b") out = out "\\b"
+        else if (c == "\f") out = out "\\f"
+        else if (c == "\r") out = out "\\r"
+        else if (c == "\t") out = out "\\t"
+        else out = out c
+      }
+    }
+    END { printf "\"%s\"", out }
+  '
 }
 
 
@@ -45,7 +58,7 @@ __do_validate() {
   local varname value sep=""
   local json="{"
   for varname in $(grep -o '^[A-Za-z0-9_]*=' "$server_conf" | tr -d '=' \
-                      | grep '^CVMFS_\|^X509_'); do
+                      | sort -u | grep '^CVMFS_\|^X509_'); do
     unset "$varname"
     eval "$(grep "^${varname}=" "$server_conf" | tail -n 1)"
     eval "value=\$$varname"

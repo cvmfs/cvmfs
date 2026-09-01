@@ -1196,9 +1196,10 @@ CernVM-FS with -DBUILD_CONFIG_VALIDATOR=ON"
   cvmfs_readconfig || die "Failed to read CernVM-FS configuration"
 
   # server URLs and proxies are per repository, so choose one to test them out first
-  local fqrn=${CVMFS_REPOSITORIES%%,*}
+  local fqrn=$(cvmfs_mkfqrn "${CVMFS_REPOSITORIES%%,*}")
   [ -n "$fqrn" ] || fqrn=$CVMFS_CONFIG_REPOSITORY
-  [ -z "$fqrn" ] || cvmfs_readconfig "$fqrn" || true
+  [ -z "$fqrn" ] || cvmfs_readconfig "$fqrn" ||
+    echo "Warning: cannot read configuration for $fqrn; using global defaults" >&2
 
   # climb to an existing directory to measure disk capacity for the cache
   local dir="${CVMFS_CACHE_BASE:-/var/lib/cvmfs}"
@@ -1211,10 +1212,17 @@ CernVM-FS with -DBUILD_CONFIG_VALIDATOR=ON"
   # discover a proxy when none is configured; auto means http://wpad/wpad.dat
   local proxy="$CVMFS_HTTP_PROXY" wpad=false
   case "$proxy" in ''|auto)
-    CVMFS_PAC_URLS=auto cvmfs2 __wpad__ auto "$CVMFS_SERVER_URL" \
-      >/dev/null 2>&1 && wpad=true
-    # send to the go validator the default value "DIRECT", will get changed there
-    proxy=DIRECT ;;
+    if [ -n "$CVMFS_SERVER_URL" ]; then
+      # the PAC file is asked about a destination, so it needs the server URL
+      CVMFS_PAC_URLS=auto cvmfs2 __wpad__ auto "$CVMFS_SERVER_URL" \
+        >/dev/null 2>&1 && wpad=true
+      # discovery ran and found nothing, so default to DIRECT
+      proxy=DIRECT
+    else
+      echo "Warning: no server URL for $fqrn, skipping proxy discovery" >&2
+      # don't generate a value
+      proxy=
+    fi ;;
   esac
 
   # time a whitelist fetch to size the timeouts; zero keeps the defaults

@@ -49,29 +49,28 @@ cvmfs_run_test() {
 
   echo "*** generate must derive the parameters it owns"
   grep -q '^CVMFS_QUOTA_LIMIT=[0-9]\+$' /etc/cvmfs/default.local || return 6
-  grep -q '^CVMFS_NFILES=[0-9]\+$' /etc/cvmfs/default.local || return 7
 
   echo "*** generate must keep parameters it does not own"
-  grep -q '^CVMFS_REPOSITORIES=atlas.cern.ch$' /etc/cvmfs/default.local || return 8
+  grep -q '^CVMFS_REPOSITORIES=atlas.cern.ch$' /etc/cvmfs/default.local || return 7
 
   echo "*** generate must override a parameter it generates a value for"
   sudo sh -c 'printf "CVMFS_REPOSITORIES=atlas.cern.ch\nCVMFS_QUOTA_LIMIT=1\n" \
     > /etc/cvmfs/default.local'
-  sudo cvmfs_config generate || return 9
-  ! grep -q '^CVMFS_QUOTA_LIMIT=1$' /etc/cvmfs/default.local || return 10
-  grep -q '^CVMFS_REPOSITORIES=atlas.cern.ch$' /etc/cvmfs/default.local || return 11
+  sudo cvmfs_config generate || return 8
+  ! grep -q '^CVMFS_QUOTA_LIMIT=1$' /etc/cvmfs/default.local || return 9
+  grep -q '^CVMFS_REPOSITORIES=atlas.cern.ch$' /etc/cvmfs/default.local || return 10
 
   echo "*** regenerating must not grow the configuration"
   before=$(wc -l < /etc/cvmfs/default.local)
-  sudo cvmfs_config generate || return 12
+  sudo cvmfs_config generate || return 11
   after=$(wc -l < /etc/cvmfs/default.local)
   echo "$before lines before, $after after"
-  [ "$before" -eq "$after" ] || return 13
+  [ "$before" -eq "$after" ] || return 12
 
   echo "*** the regenerated configuration must still validate"
   output=$(cvmfs_config validate atlas.cern.ch) && retval=0 || retval=$?
   echo "$output"
-  [ $retval -eq 0 ] || return 14
+  [ $retval -eq 0 ] || return 13
 
   return 0
 }

@@ -35,11 +35,14 @@ package cvmfs
 // TCP port, 1-65535.
 #Port: int & >=1 & <=65535
 
+// Regex helper for accepting valid ports as strings ("1" up to "65535")
+_#portRe: "([1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])"
+
 // Single HTTP(S) URL; no whitespace or chain separators allowed.
 #URL: =~"(?i)^https?://[^ \\t;|,]+$"
 
 // DIRECT, auto (WPAD/PAC discovery) or an address with optional scheme/port.
-_#proxyEntry: "(DIRECT|auto|(https?://)?[A-Za-z0-9._-]+(:[0-9]{1,5})?)"
+_#proxyEntry: "(DIRECT|auto|(https?://)?[A-Za-z0-9._-]+(:\(_#portRe))?)"
 
 // Date threshold as understood by `date -d`, e.g. "3 days ago".
 #TimeSpan: =~"^[0-9]+ +(second|minute|hour|day|week|month|year)s? +ago$"
