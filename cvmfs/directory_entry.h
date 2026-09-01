@@ -73,6 +73,8 @@ class DirectoryEntryBase {
   friend class publish::SyncItemDummyCatalog;
   friend class publish::SyncItemDummyFile;
   friend class swissknife::CommandOverlay;
+  // Synthesises the implicit ancestors of a gateway lease path
+  friend class WritableCatalogManager;
   friend class swissknife::IngestSQL;  // TODO(vvolkl): can probably avoided
                                        // with new setters
   // Simplify file system like _touch_ of DirectoryEntry objects
