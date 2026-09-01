@@ -29,19 +29,21 @@
 #include "upload.h"
 #include "util/logging.h"
 
-#define CHECK_SQLITE_ERROR(ret, expected)                         \
-  do {                                                            \
-    if ((ret) != expected) {                                      \
-      LogCvmfs(kLogCvmfs, kLogStderr, "SQLite error: %d", (ret)); \
-      assert(0);                                                  \
-    }                                                             \
+#define CHECK_SQLITE_ERROR(ret, expected)                            \
+  do {                                                               \
+    const int sqlite_result = (ret);                                \
+    if (sqlite_result != (expected)) {                              \
+      LogCvmfs(kLogCvmfs, kLogStderr, "SQLite error: %d",          \
+               sqlite_result);                                      \
+      abort();                                                       \
+    }                                                                \
   } while (0)
 
 #define CUSTOM_ASSERT(check, msg, ...)                     \
   do {                                                     \
     if (!(check)) {                                        \
       LogCvmfs(kLogCvmfs, kLogStderr, msg, ##__VA_ARGS__); \
-      assert(0);                                           \
+      abort();                                             \
     }                                                      \
   } while (0)
 
@@ -439,9 +441,7 @@ static XattrList marshal_xattrs(const char *acl_string) {
   if (ret) {
     LogCvmfs(kLogCvmfs, kLogStderr,
              "failure of acl_from_text_to_xattr_value(%s)", acl_string);
-    assert(
-        0);  // TODO(vavolkl): incorporate error handling other than asserting
-    return aclobj;
+    abort();
   }
   if (!equiv_mode) {
     CUSTOM_ASSERT(
@@ -1069,7 +1069,8 @@ int swissknife::IngestSQL::do_additions(
       bool exists = false;
       exists = catalog_manager.LookupDirEntry(
           MakeCatalogPath(curr_dir), catalog::kLookupDefault, &dir_entry);
-      assert(exists);  // the dir must exist at this point
+      CUSTOM_ASSERT(exists, "Directory %s is missing from the catalog",
+                    curr_dir.c_str());
       if (dir_entry.IsNestedCatalogMountpoint()
           || dir_entry.IsNestedCatalogRoot()) {
         catalog_manager.AddCatalogToQueue(curr_dir);

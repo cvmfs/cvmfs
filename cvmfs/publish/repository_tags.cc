@@ -114,6 +114,7 @@ void Publisher::EditTagsGateway(
   // session token and keep the Session object from trying to drop it again.
   session_->SetKeepAlive(true);
   unlink(session_->token_path().c_str());
+  unlink(session_->api_version_path().c_str());
 
   LogCvmfs(kLogCvmfs, kLogStdout, "Tags updated");
 }

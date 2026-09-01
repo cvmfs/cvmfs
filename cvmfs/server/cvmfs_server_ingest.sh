@@ -579,7 +579,8 @@ cvmfs_server_ingest() {
         # but the session_token file created by the lease acquire must still
         # be removed — the gateway committed and deleted it server-side via
         # FinalizeSession(true), so only the local file remains.
-        rm -f "${spool_dir}/session_token"
+        rm -f "${spool_dir}/session_token" \
+              "${spool_dir}/session_token.api_version"
       fi
       # For mountless gateway ingest the gateway lease was already committed
       # (and deleted server-side) by cvmfs_swissknife ingest via

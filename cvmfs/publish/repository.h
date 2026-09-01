@@ -244,7 +244,8 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
      * For non-gateway nodes, we have an implicit lease for the entire
      * repository
      */
-    Session() : keep_alive_(false), has_lease_(true) { }
+    Session()
+        : keep_alive_(false), has_lease_(true), negotiated_api_version_(-1) { }
     explicit Session(const Settings &settings_session);
     explicit Session(const SettingsPublisher &settings_publisher, int llvl = 0);
     /**
@@ -258,6 +259,16 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
 
     bool has_lease() const { return has_lease_; }
     std::string token_path() const { return settings_.token_path; }
+    std::string api_version_path() const {
+      return gateway::SessionTokenApiVersionPath(settings_.token_path);
+    }
+    /**
+     * The gateway API protocol version negotiated on lease acquisition
+     * (min of the publisher's and the gateway's supported versions). A
+     * pre-existing gateway token restores this value from its sidecar file;
+     * -1 means that an old token has no recorded negotiation.
+     */
+    int negotiated_api_version() const { return negotiated_api_version_; }
 
    private:
     Settings settings_;
@@ -269,6 +280,7 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
      */
     bool keep_alive_;
     bool has_lease_;
+    int negotiated_api_version_;
   };  // class Session
 
   /**

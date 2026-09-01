@@ -121,6 +121,10 @@ void SettingsTransaction::SetPrintChangeset(bool value) {
 
 void SettingsTransaction::SetDryRun(bool value) { dry_run_ = value; }
 
+void SettingsTransaction::SetAllowNonexistentPath(bool value) {
+  allow_nonexistent_path_ = value;
+}
+
 void SettingsTransaction::SetUnionFsType(const std::string &union_fs) {
   if (union_fs == "aufs") {
     union_fs_ = kUnionFsAufs;
@@ -561,6 +565,10 @@ void SettingsBuilder::ApplyOptionsFromServerPath(
   if (options_mgr_.GetValue("CVMFS_AUTOCATALOGS_MIN_WEIGHT", &arg)) {
     settings_publisher->GetTransaction()->SetAutobalanceMinWeight(
         String2Uint64(arg));
+  }
+  if (options_mgr_.GetValue("CVMFS_ALLOW_NONEXISTENT_PATH", &arg)) {
+    settings_publisher->GetTransaction()->SetAllowNonexistentPath(
+        options_mgr_.IsOn(arg));
   }
   if (options_mgr_.GetValue("CVMFS_AUTO_REPAIR_MOUNTPOINT", &arg)) {
     if (!options_mgr_.IsOn(arg)) {

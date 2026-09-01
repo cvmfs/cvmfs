@@ -48,6 +48,41 @@ func TestLeaseHandlerNewLease(t *testing.T) {
 	}
 }
 
+func TestLeaseHandlerNewLeaseNegotiatesV4(t *testing.T) {
+	// A publisher advertising API version 4 (non-existing lease path support)
+	// against a gateway that also supports v4 must negotiate v4.
+	backend := mockBackend{}
+	msg, _ := json.Marshal(map[string]interface{}{
+		"path":        "test2.repo.org/some/path",
+		"api_version": "4",
+		"hostname":    "client host name",
+	})
+
+	req := httptest.NewRequest("POST", "/api/v1/leases", bytes.NewReader(msg))
+	HMAC := ComputeHMAC(msg, backend.GetKey(context.TODO(), "keyid2").Secret)
+	req.Header["Authorization"] = []string{"keyid2 " + base64.StdEncoding.EncodeToString(HMAC)}
+
+	w := httptest.NewRecorder()
+	handler := MakeLeasesHandler(&backend)
+
+	handler(w, req, httprouter.Params{})
+
+	expected, _ := json.Marshal(map[string]interface{}{
+		"status":          "ok",
+		"session_token":   "lease_token_string",
+		"max_api_version": 4,
+	})
+
+	resp := w.Result()
+	if resp.StatusCode != 200 {
+		t.Errorf("Invalid HTTP response status code: %v", resp.StatusCode)
+	}
+	respBody, _ := ioutil.ReadAll(resp.Body)
+	if !bytes.Equal(respBody, expected) {
+		t.Errorf("Invalid response body: %v", string(respBody))
+	}
+}
+
 func TestLeaseHandlerNewLeaseWithoutHostname(t *testing.T) {
 	backend := mockBackend{}
 	msg, _ := json.Marshal(map[string]interface{}{

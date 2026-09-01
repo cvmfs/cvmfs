@@ -2,6 +2,22 @@
  * This file is part of the CernVM File System.
  */
 
+#include <RVersion.h>
+
+#if ROOT_VERSION_CODE < ROOT_VERSION(6, 28, 0)
+
+#include <iostream>
+#include <string>
+
+void generate_stats_plots(std::string /*stats_db_path*/,
+                           std::string /*out_path*/) {
+  std::cerr << "generate_stats_plots.C requires ROOT >= 6.28.00 "
+               "(found " << ROOT_RELEASE << "). No plots will be generated."
+            << std::endl;
+}
+
+#else  // ROOT_VERSION_CODE >= ROOT_VERSION(6, 28, 0)
+
 #include <ROOT/RDataFrame.hxx>
 #include <ROOT/RSqliteDS.hxx>
 #include <TCanvas.h>
@@ -557,3 +573,5 @@ void generate_stats_plots(std::string stats_db_path, std::string out_path) {
     }
   }
 }
+
+#endif  // ROOT_VERSION_CODE < ROOT_VERSION(6, 28, 0)

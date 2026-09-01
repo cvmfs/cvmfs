@@ -1410,6 +1410,8 @@ Supported Commands:
                   Checks the repository's server.conf against the config schema
   transaction     [-t (timeout in seconds for waiting if the repository is busy, 0=infinite)]
                   [-T /template-from=/template-to]
+                  [-P allow a lease on a path whose parent does not exist yet
+                      (gateway publishing; requires a supporting gateway)]
                   <fully qualified name>
                   Start to edit a repository
   snapshot        [-t fail if other snapshot is in progress]
