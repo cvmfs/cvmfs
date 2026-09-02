@@ -3,9 +3,11 @@
  */
 
 #include <gtest/gtest.h>
+#include <pthread.h>
 #include <unistd.h>
 
 #include <cassert>
+#include <cstdio>
 #include <memory>
 #include <string>
 
@@ -13,6 +15,7 @@
 #include "mock/m_sync_mediator.h"
 #include "sync_item.h"
 #include "sync_union_tarball.h"
+#include "util/atomic.h"
 #include "util/posix.h"
 #include "util/string.h"
 
@@ -41,6 +44,18 @@ class T_SyncUnionTarball : public ::testing::Test {
   std::unique_ptr<publish::MockSyncMediator> m_sync_mediator_;
   std::string tmp_tar_filename_;
 };
+
+struct TraverseCtx {
+  publish::SyncUnionTarball *sync_union;
+  atomic_int32 done;
+};
+
+static void *TraverseWorker(void *arg) {
+  TraverseCtx *ctx = static_cast<TraverseCtx *>(arg);
+  ctx->sync_union->Traverse();
+  atomic_inc32(&ctx->done);
+  return NULL;
+}
 
 TEST_F(T_SyncUnionTarball, Simple) {
   std::string tar_filename = CreateTarFile("tar.tar", simple_tar);
@@ -79,6 +94,56 @@ TEST_F(T_SyncUnionTarball, Complex) {
   sync_union.Traverse();
   EXPECT_EQ(3, m_sync_mediator_->n_reg);
   EXPECT_EQ(1, m_sync_mediator_->n_lnk);
+  EXPECT_EQ(3, m_sync_mediator_->n_dir);
+}
+
+// A tar header block with a bad checksum makes libarchive return
+// ARCHIVE_RETRY from archive_read_next_header2().  Traverse() must re-arm the
+// read signal before retrying, otherwise it waits forever (see #4127).
+// The garbage block is spliced in after the first entry so that libarchive
+// still recognizes the archive format; libarchive skips the block on retry
+// and the remaining entries are ingested as in the Simple test.  Traverse()
+// runs in a worker thread so that a regression shows up as a test failure
+// instead of a hang.
+TEST_F(T_SyncUnionTarball, DamagedHeaderBlockDoesNotDeadlock) {
+  std::string data_binary;
+  ASSERT_TRUE(Debase64(simple_tar, &data_binary));
+  ASSERT_EQ(4096U, data_binary.size());
+  data_binary.insert(512, std::string(512, 'x'));
+
+  const std::string tar_filename = CreateTarFile("tar.tar",
+                                                 Base64(data_binary));
+  publish::SyncUnionTarball sync_union(m_sync_mediator_.get(), "", tar_filename,
+                                       "tmpsync", -1u, -1u, "", false);
+
+  EXPECT_TRUE(sync_union.Initialize());
+  EXPECT_EQ(1, m_sync_mediator_->n_register);
+
+  const unsigned kTimeoutMs = 10000;
+  TraverseCtx ctx;
+  ctx.sync_union = &sync_union;
+  atomic_init32(&ctx.done);
+
+  pthread_t worker;
+  ASSERT_EQ(0, pthread_create(&worker, NULL, TraverseWorker, &ctx));
+
+  unsigned elapsed_ms = 0;
+  while (!atomic_read32(&ctx.done) && elapsed_ms < kTimeoutMs) {
+    SafeSleepMs(50);
+    elapsed_ms += 50;
+  }
+
+  if (!atomic_read32(&ctx.done)) {
+    // The worker is stuck in Signal::Wait() and the union engine cannot be
+    // destroyed underneath it, so report the failure and abort the process
+    // rather than hang at tear-down.
+    ADD_FAILURE() << "Traverse() deadlocked on a damaged tar header block";
+    fflush(stdout);
+    fflush(stderr);
+    _exit(1);
+  }
+  ASSERT_EQ(0, pthread_join(worker, NULL));
+  EXPECT_EQ(2, m_sync_mediator_->n_reg);
   EXPECT_EQ(3, m_sync_mediator_->n_dir);
 }
 
