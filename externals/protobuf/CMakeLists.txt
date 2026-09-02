@@ -12,11 +12,10 @@ set(PROTOBUF_HASH "MD5=6b4fd9cee2fa63834f29c7d433679855")
 # only shipped autotools, 3.21.x builds natively with CMake. 3.21.12 is also the
 # last release before the Abseil dependency, so it still builds under C++11.
 #
-# Discovery is done explicitly with the built-in FindProtobuf *module* (capital
-# "Protobuf") rather than FetchContent's FIND_PACKAGE_ARGS integration: the
-# latter would call find_package(protobuf) (lower case, CONFIG mode only), which
-# misses distro packages that ship no protobuf-config.cmake (e.g. EL9/EL10 only
-# provide the module + protobuf.pc).
+# Try the package config first: protobuf >= 22 needs Abseil targets on the
+# protobuf::libprotobuf-lite link interface. Without them, executables can fail
+# to link on recent-protobuf distros such as Gentoo. Fall back to FindProtobuf
+# for packages without protobuf-config.cmake (e.g. EL9/EL10).
 
 # Honour the same three modes as the other externals:
 #   NEVER  (BUILTIN_EXTERNALS_LIST)    -> always build from source
@@ -38,11 +37,18 @@ unset(PROTOBUF_PROTOC_EXECUTABLE CACHE)
 unset(PROTOBUF_INCLUDE_DIRS      CACHE)
 
 if(NOT FETCHCONTENT_TRY_FIND_PACKAGE_MODE STREQUAL "NEVER")
-  if(FETCHCONTENT_TRY_FIND_PACKAGE_MODE STREQUAL "ALWAYS")
-    find_package(Protobuf REQUIRED)
-  else()
-    find_package(Protobuf)
+  # Make imported targets global so sibling directories (e.g. cvmfs/) can link
+  # protobuf and the Abseil targets provided by its package config.
+  set(CMAKE_FIND_PACKAGE_TARGETS_GLOBAL ON)
+  find_package(Protobuf CONFIG QUIET)
+  if(NOT Protobuf_FOUND)
+    if(FETCHCONTENT_TRY_FIND_PACKAGE_MODE STREQUAL "ALWAYS")
+      find_package(Protobuf MODULE REQUIRED)
+    else()
+      find_package(Protobuf MODULE)
+    endif()
   endif()
+  unset(CMAKE_FIND_PACKAGE_TARGETS_GLOBAL)
 endif()
 
 if(Protobuf_FOUND)
@@ -57,15 +63,15 @@ if(Protobuf_FOUND)
                    "using the full libprotobuf.")
     set(_pb_lite_target protobuf::libprotobuf)
   endif()
-  # Imported targets from find_package are directory-scoped; promote the ones we
-  # re-export so sibling directories (e.g. cvmfs/) can link them.
-  set_target_properties(${_pb_lite_target} PROPERTIES IMPORTED_GLOBAL TRUE)
   get_target_property(PROTOBUF_INCLUDE_DIRS ${_pb_lite_target}
                       INTERFACE_INCLUDE_DIRECTORIES)
 
   set(_pb_lite_library     "${_pb_lite_target}")
-  # Use the system protoc binary directly: it is not a build target and matches
-  # the system runtime we link against.
+  # Use the system protoc to match the runtime. Config packages expose it as an
+  # imported target; the module sets Protobuf_PROTOC_EXECUTABLE directly.
+  if(NOT Protobuf_PROTOC_EXECUTABLE AND TARGET protobuf::protoc)
+    get_target_property(Protobuf_PROTOC_EXECUTABLE protobuf::protoc LOCATION)
+  endif()
   set(_pb_protoc_executable "${Protobuf_PROTOC_EXECUTABLE}")
 else()
   message(STATUS "Building protobuf ${PROTOBUF_VERSION} from vendored sources.")
