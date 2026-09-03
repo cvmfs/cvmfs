@@ -288,7 +288,8 @@ cvmfs_config_usage() {
   echo ""
   echo "  bugreport [timeout_in_sec_per_command (default = 90)]"
   echo ""
-  echo "  dcoredump <pid> [output.core]"
+  echo "  dcoredump [--standard|--full] <pid> [output.core]"
+  echo ""
 }
 
 has_selinux() {
@@ -1859,31 +1860,17 @@ cvmfs_bugreport() {
 
 cvmfs_dcoredump() {
   if [ $# -lt 1 ]; then
-    echo "Usage: cvmfs_config dcoredump <pid> [output.core]"
+    echo "Usage: cvmfs_config dcoredump [--standard|--full] <pid> [output.core]"
     return 1
   fi
 
   local arch=$(uname -m)
-  if [ "$arch" != "x86_64" ] && [ "$arch" != "amd64" ]; then
-    echo "Error: cvmfs_dcoredumper is currently only supported on x86_64 architectures."
-    echo "Detected architecture: $arch"
+  if [ "$arch" != "x86_64" ] && [ "$arch" != "amd64" ] && [ "$arch" != "aarch64" ]; then
+    echo "Error: cvmfs_dcoredumper is not supported on $arch (supported: x86_64, aarch64)."
     return 1
   fi
 
-  local dumper_bin="${INSTALL_BASE}/bin/cvmfs_dcoredumper"
-  if [ ! -x "$dumper_bin" ]; then
-    echo "Error: cvmfs_dcoredumper binary not found at $dumper_bin"
-    return 1
-  fi
-
-  local pid=$1
-  local outfile=$2
-  if [ -z "$outfile" ]; then
-    outfile="/tmp/cvmfs_dcoredump_${pid}_$(date +%Y%m%d_%H%M%S).core"
-  fi
-
-  echo "Dumping core for PID $pid to $outfile"
-  $dumper_bin $pid "$outfile"
+  cvmfs2 __COREDUMP__ $@
   return $?
 }
 

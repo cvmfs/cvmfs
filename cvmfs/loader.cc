@@ -707,7 +707,9 @@ int FuseMain(int argc, char *argv[]) {
     }
 
     if (string(argv[1]) == string("__COREDUMP__")) {
-      // cvmfs2 __COREDUMP__ [--standard|--full] <pid> <output.core>
+      if (argc < 3)
+        return 1;
+      // cvmfs2 __COREDUMP__ [--standard|--full] <pid> [output.core]
       return dcoredumper_main(argc - 1, argv + 1);
     }
 

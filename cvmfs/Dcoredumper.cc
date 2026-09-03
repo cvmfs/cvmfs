@@ -873,9 +873,9 @@ int dcoredumper_main(int argc, char *argv[]) {
     argi++;
   }
 
-  if (argc - argi != 2) {
+  if (argc - argi < 1 || argc - argi > 2) {
     fprintf(stderr,
-      "Usage: %s [OPTIONS] <pid> <output.core>\n"
+      "Usage: %s [OPTIONS] <pid> [output.core]\n"
       "Try --help for details.\n", argv[0]);
     return 1;
   }
@@ -895,7 +895,24 @@ int dcoredumper_main(int argc, char *argv[]) {
     return 1;
   }
 
-  return build_core(pid, argv[argi + 1], &ctx);
+  // Generate default output path if not provided
+  char default_path[128];
+  const char *output_path;
+  if (argc - argi == 2) {
+    output_path = argv[argi + 1];
+  } else {
+    time_t now = time(NULL);
+    struct tm tm_buf;
+    localtime_r(&now, &tm_buf);
+    snprintf(default_path, sizeof(default_path),
+             "/tmp/cvmfs_dcoredump_%d_%04d%02d%02d_%02d%02d%02d.core",
+             pid,
+             tm_buf.tm_year + 1900, tm_buf.tm_mon + 1, tm_buf.tm_mday,
+             tm_buf.tm_hour, tm_buf.tm_min, tm_buf.tm_sec);
+    output_path = default_path;
+  }
+
+  return build_core(pid, output_path, &ctx);
 }
 
 #ifndef CVMFS_FUSE_MODULE
