@@ -302,6 +302,9 @@ cvmfs_config_usage() {
   echo "  killall [-r(reset fuse) ] [-s(reset stuck fuse)]"
   echo ""
   echo "  bugreport [timeout_in_sec_per_command (default = 90)]"
+  echo ""
+  echo "  dcoredump [--standard|--full] <pid> [output.core]"
+  echo ""
 }
 
 has_selinux() {
@@ -1921,6 +1924,23 @@ cvmfs_bugreport() {
 }
 
 
+cvmfs_dcoredump() {
+  if [ $# -lt 1 ]; then
+    echo "Usage: cvmfs_config dcoredump [--standard|--full] <pid> [output.core]"
+    return 1
+  fi
+
+  local arch=$(uname -m)
+  if [ "$arch" != "x86_64" ] && [ "$arch" != "amd64" ] && [ "$arch" != "aarch64" ]; then
+    echo "Error: cvmfs_dcoredumper is not supported on $arch (supported: x86_64, aarch64)."
+    return 1
+  fi
+
+  cvmfs2 __COREDUMP__ $@
+  return $?
+}
+
+
 die() {
   echo -e "$1" >&2
   exit 1
@@ -2838,6 +2858,16 @@ case "$1" in
      fi
      shift 1
      cvmfs_bugreport $@
+     RETVAL=$?
+     ;;
+
+   dcoredump)
+     if [ `id -u` -ne 0 ]; then
+       echo "root privileges required"
+       exit 1
+     fi
+     shift 1
+     cvmfs_dcoredump $@
      RETVAL=$?
      ;;
 
