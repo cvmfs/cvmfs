@@ -115,6 +115,11 @@ class WritableCatalogManager : public SimpleCatalogManager {
   void AddDirectory(const DirectoryEntryBase &entry,
                     const XattrList &xattrs,
                     const std::string &parent_directory);
+  // Is this directory already in the catalogs?  Holds the same lock as the
+  // mutating calls, so it is safe to ask while the ingestion pipeline is
+  // adding files from its own threads.
+  bool HasDirectory(const std::string &name,
+                    const std::string &parent_directory);
   void TouchDirectory(const DirectoryEntryBase &entry,
                       const XattrList &xattrs,
                       const std::string &directory_path);
@@ -139,6 +144,7 @@ class WritableCatalogManager : public SimpleCatalogManager {
                          const uint64_t new_size);
   void GraftNestedCatalog(const string &mountpoint, const shash::Any &new_hash,
                           const uint64_t new_size);
+  bool CreateMissingAncestors(const std::string &mountpoint);
   // Non-panicking variant used by the experimental DirectGraft gateway
   // endpoint.  Returns false for expected request validation failures (wrong
   // catalog root, existing target directory, missing parent, etc.) so malformed

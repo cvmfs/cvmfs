@@ -366,6 +366,17 @@ CommitProcessor::Result CommitProcessor::Process(
       return kError;
     }
 
+    // The lease path's ancestors are not part of the payload, so a lease on a
+    // path that does not exist yet has nothing to graft onto.  Create them
+    // here, as CatalogMergeTool does for the DiffRec path.
+    if (!output_mgr->CreateMissingAncestors(relative_lease_path.ToString())) {
+      LogCvmfs(kLogReceiver, kLogSyslogErr,
+               "CommitProcessor - error: could not create the ancestors of "
+               "lease_path: %s",
+               lease_path.c_str());
+      return kMergeFailure;
+    }
+
     // Graft: inserts the nested catalog reference into the parent catalog
     // and propagates the directory entry + counters upward.
     if (!output_mgr->TryGraftNestedCatalog(
