@@ -12,9 +12,11 @@
 #include <cassert>
 #include <cerrno>
 #include <cstring>
+#include <ctime>
 #include <utility>
 
 #include "crypto/hash.h"
+#include "json_document.h"
 #include "util/exception.h"
 #include "util/platform.h"
 #include "util/posix.h"
@@ -803,13 +805,96 @@ bool S3FanoutManager::MkV4Authz(const JobInfo &info,
   return true;
 }
 
+static size_t RecvCB(void *ptr, size_t size, size_t nmemb, void *userp) {
+  const size_t bytes = size * nmemb;
+  reinterpret_cast<string *>(userp)->append(static_cast<char *>(ptr), bytes);
+  return bytes;
+}
+
 /**
- * The Azure Blob authorization header according to
+ * Fetches (and caches) an OAuth2 bearer token for storage.azure.com from the
+ * Azure Instance Metadata Service.  Tokens are re-minted 5 minutes before the
+ * IMDS-reported expiry so long-running snapshots keep a valid credential.
+ */
+bool S3FanoutManager::RefreshAzureToken() const {
+  const MutexLockGuard guard(&azure_token_lock_);
+
+  if (!azure_token_.empty()
+      && (static_cast<uint64_t>(time(NULL)) + 300 < azure_token_expiry_)) {
+    return true;
+  }
+
+  string url = "http://169.254.169.254/metadata/identity/oauth2/token"
+               "?api-version=2018-02-01"
+               "&resource=https%3A%2F%2Fstorage.azure.com%2F";
+  if (!config_.azure_mi_client_id.empty())
+    url += "&client_id=" + config_.azure_mi_client_id;
+
+  CURL *curl = curl_easy_init();
+  if (curl == NULL)
+    return false;
+  string body;
+  curl_slist *clist = curl_slist_append(NULL, "Metadata: true");
+  curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+  curl_easy_setopt(curl, CURLOPT_HTTPHEADER, clist);
+  curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, RecvCB);
+  curl_easy_setopt(curl, CURLOPT_WRITEDATA, &body);
+  curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L);
+  curl_easy_setopt(curl, CURLOPT_NOPROXY, "169.254.169.254");
+  const CURLcode res = curl_easy_perform(curl);
+  long http_code = 0;  // NOLINT(runtime/int)
+  curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+  curl_slist_free_all(clist);
+  curl_easy_cleanup(curl);
+
+  if ((res != CURLE_OK) || (http_code != 200)) {
+    LogCvmfs(kLogS3Fanout, kLogStderr,
+             "Azure MSI token request failed (curl %d, http %ld)", res,
+             http_code);
+    return false;
+  }
+
+  const UniquePtr<JsonDocument> reply(JsonDocument::Create(body));
+  if (!reply.IsValid())
+    return false;
+  const JSON *token = JsonDocument::SearchInObject(reply->root(),
+                                                   "access_token", JSON_STRING);
+  const JSON *expires = JsonDocument::SearchInObject(reply->root(),
+                                                     "expires_on", JSON_STRING);
+  if ((token == NULL) || (expires == NULL))
+    return false;
+
+  azure_token_ = token->get<string>();
+  azure_token_expiry_ = String2Uint64(expires->get<string>());
+  return true;
+}
+
+/**
+ * The Azure Blob authorization header.  With a Shared Key (access/secret key)
+ * the signature is computed as per
  * https://docs.microsoft.com/en-us/rest/api/storageservices/authorize-with-shared-key
+ * With Managed Identity a bearer token from IMDS is used instead, which
+ * requires x-ms-version >= 2017-11-09.
  */
 bool S3FanoutManager::MkAzureAuthz(const JobInfo &info,
                                    vector<string> *headers) const {
   const string timestamp = RfcTimestamp();
+
+  if (config_.azure_msi) {
+    if (!RefreshAzureToken())
+      return false;
+    string bearer;
+    {
+      const MutexLockGuard guard(&azure_token_lock_);
+      bearer = azure_token_;
+    }
+    headers->push_back("x-ms-date: " + timestamp);
+    headers->push_back("x-ms-version: 2017-11-09");
+    headers->push_back("Authorization: Bearer " + bearer);
+    headers->push_back("x-ms-blob-type: BlockBlob");
+    return true;
+  }
+
   const string canonical_headers = "x-ms-blob-type:BlockBlob\nx-ms-date:"
                                    + timestamp + "\nx-ms-version:2011-08-18";
   const string canonical_resource = "/" + config_.access_key + "/"
@@ -1388,6 +1473,10 @@ S3FanoutManager::S3FanoutManager(const S3Config &config) : config_(config) {
   retval = pthread_mutex_init(curl_handle_lock_, NULL);
   assert(retval == 0);
 
+  azure_token_expiry_ = 0;
+  retval = pthread_mutex_init(&azure_token_lock_, NULL);
+  assert(retval == 0);
+
   active_requests_ = new set<JobInfo *>;
   pool_handles_idle_ = new set<CURL *>;
   pool_handles_inuse_ = new set<CURL *>;
@@ -1447,6 +1536,7 @@ S3FanoutManager::~S3FanoutManager() {
   free(jobs_todo_lock_);
   pthread_mutex_destroy(curl_handle_lock_);
   free(curl_handle_lock_);
+  pthread_mutex_destroy(&azure_token_lock_);
 
   if (atomic_xadd32(&multi_threaded_, 0) == 1) {
     // Shutdown I/O thread
