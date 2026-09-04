@@ -25,8 +25,10 @@ usage() {
   cat <<EOF
 CernVM-FS service container ${VERSION:+version $VERSION}
 
-Mounts CernVM-FS repositories under /cvmfs. The mode is selected by the
-CVMFS_REPOSITORIES environment variable:
+Mounts CernVM-FS repositories under /cvmfs for export to the host.
+
+Will either mount a given list of repositories, or mount repositiories
+on demand, depending on the CVMFS_REPOSITORIES environment variable:
 
   unset  automount mode  repositories are mounted on first access
   set    explicit mode   the listed repositories are pre-mounted at startup
@@ -35,7 +37,7 @@ CVMFS_REPOSITORIES environment variable:
 Environment variables:
   CVMFS_CLIENT_PROFILE  'single' to auto-discover a proxy
   CVMFS_HTTP_PROXY      site proxy URL (required unless CVMFS_CLIENT_PROFILE set)
-  CVMFS_REPOSITORIES    comma-separated repositories -> selects explicit mode
+  CVMFS_REPOSITORIES    comma-separated repositories to mount, leave unset for automount
   CVMFS_QUOTA_LIMIT     cache size in MB (default 4000)
 
 Typical invocation (automount mode; repositories become visible on the host
