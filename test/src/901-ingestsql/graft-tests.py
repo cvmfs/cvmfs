@@ -23,6 +23,7 @@ REPO_NAME = os.getenv("CVMFS_TEST_REPO") or "test.repo"
 
 CVMFS_TEST_HTTP_BASE=os.getenv("CVMFS_TEST_HTTP_BASE") or f"http://127.0.0.1:8000/{REPO_NAME}"
 CVMFS_TEST_S3_CONFIG=os.getenv("CVMFS_TEST_S3_CONFIG")
+CVMFS_TEST_PROXY=os.getenv("CVMFS_TEST_PROXY") or "DIRECT"
 
 def clear_db(connection):
     con = connection[0]
@@ -171,8 +172,8 @@ def _do_graft_test(dbfile, prefix=None, lease=None, priority=None):
             "-c",
             "-W", "10", # wait for revision increment
             "-v",
-            #"-@",
-            #"http://127.0.0.1:8088",
+            "-@",
+            CVMFS_TEST_PROXY,
             "-N",
             REPO_NAME,
             "-D",
