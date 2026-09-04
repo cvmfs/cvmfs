@@ -1702,6 +1702,9 @@ void WritableCatalogManager::SetupSingleCatalogUploadCallback() {
 void WritableCatalogManager::RemoveSingleCatalogUploadCallback() {
   spooler_->WaitForUpload();  // wait for all outstanding jobs to finish before
                               // tearing it down
+  // parents that were waiting on children can be uploaded now
+  ScheduleReadyCatalogs();
+  spooler_->WaitForUpload();
   spooler_->UnregisterListeners();
   pending_catalogs_ =
       {};  // whatever we couldn't process, leave it to the Commit
@@ -1714,6 +1717,10 @@ void WritableCatalogManager::AddCatalogToQueue(const std::string &path) {
   assert(retval);
   assert(catalog);
   catalog->SetDirty();  // ensure it's dirty so its parent will wait for it
+  // the parent must not be finalized before this catalog's upload callback
+  // has written the new nested catalog link into it
+  if (catalog->HasParent())
+    catalog->GetWritableParent()->IncrementDirtyChildren();
   SyncUnlock();
   pending_catalogs_.push_back(catalog);
 }

@@ -140,6 +140,9 @@ class WritableCatalog : public Catalog {
   int DecrementDirtyChildren() {
     return atomic_xadd32(&dirty_children_, -1) - 1;
   }
+  int IncrementDirtyChildren() {
+    return atomic_xadd32(&dirty_children_, 1) + 1;
+  }
 
  private:
   SqlDirentInsert *sql_insert_;
