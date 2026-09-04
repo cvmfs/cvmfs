@@ -264,3 +264,8 @@ can_build_ducc() {
 can_build_gateway() {
   command -v go > /dev/null 2>&1 && command -v go-junit-report > /dev/null 2>&1
 }
+
+# The config schema validator only needs a Go compiler
+can_build_config_validator() {
+  command -v go > /dev/null 2>&1
+}

@@ -21,7 +21,7 @@ _cvmfs_config()
   cur="${COMP_WORDS[COMP_CWORD]}"
   prev="${COMP_WORDS[COMP_CWORD-1]}"
 
-  local -r cmds="setup chksetup showconfig stat status probe reload umount bugreport"
+  local -r cmds="setup chksetup showconfig stat status probe reload umount bugreport validate explain"
 
   case "${prev}" in
     setup)
