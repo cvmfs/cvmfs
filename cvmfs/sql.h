@@ -491,6 +491,8 @@ class Sql {
            || SQLITE_DONE == last_error_code_;
   }
 
+  static bool SetupGlobalLogging();
+
  private:
   bool Init(const char *statement);
   void LazyInit() {
