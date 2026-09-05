@@ -1837,6 +1837,7 @@ void WritableCatalogManager::CatalogDownloadCallback(
   for (auto it = nested_catalogs.begin(); it != nested_catalogs.end(); ++it) {
     // schedule relevant child nested catalogs for download
     if (context.dirs->find(it->mountpoint.ToString()) != context.dirs->end()) {
+      assert(!it->hash.IsNull());
       Catalog *child_catalog = CreateCatalog(it->mountpoint, it->hash,
                                              NULL /* parent */);
       {
