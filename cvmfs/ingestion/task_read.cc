@@ -44,7 +44,7 @@ void TaskRead::Process(FileItem *item) {
         item->chunk_detector()->MightFindChunks(item->size()));
   }
 
-  unsigned char *buffer[kBlockSize];
+  unsigned char buffer[kBlockSize];
   const uint64_t tag = atomic_xadd64(&tag_seq_, 1);
   ssize_t nbytes = -1;
   unsigned cnt = 0;
@@ -66,7 +66,8 @@ void TaskRead::Process(FileItem *item) {
     tubes_out_->Dispatch(block_item);
 
     cnt++;
-    if ((cnt % 32) == 0) {
+    // Keep the throttle polling interval at 512 KiB as the read block grows.
+    if ((cnt % 4) == 0) {
       if ((high_watermark_ > 0)
           && (BlockItem::managed_bytes() > high_watermark_)) {
         throttle.Throttle();
