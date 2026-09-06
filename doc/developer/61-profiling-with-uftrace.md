@@ -27,14 +27,14 @@ uftrace has two modes:
 Use uftrace **v0.20 or newer**. Older releases do not reliably follow the
 forked and daemonized watchdog process that every CernVM-FS binary spawns, and
 `uftrace record` then hangs at exit waiting for it. There is no distribution
-package for EL10, so build from source:
+package for EL10, so build from source if needed:
 
 ```bash
 git clone https://github.com/namhyung/uftrace.git && cd uftrace
 ./configure --prefix=/usr/local && make -j$(nproc) && sudo make install
 ```
 
-Do not try to work around the hang with the `finish` trigger
+It's not possible to work around the hang with the `finish` trigger
 (`-T <func>@finish`): it fires on function *entry*, so the trace ends before any
 work is recorded.
 
@@ -142,7 +142,7 @@ isolation (e.g. `publish::SyncMediator::AddFile` or
 
 ## 5. Generate a flame graph
 
-uftrace exports FlameGraph-compatible folded stacks natively. Feed them straight
+uftrace exports FlameGraph-compatible folded stacks, that can be fed straight
 into Brendan Gregg's [FlameGraph](https://github.com/brendangregg/FlameGraph)
 `flamegraph.pl`:
 
@@ -163,12 +163,7 @@ upload/ingestion worker threads appear side by side.
 
 > **_NOTE_** &nbsp;
 > Width is *self time*, so most of the worker threads' area is
-> `pthread_cond_wait` / `Tube::PopFront` — the idle work-queue waits. The actual
-> publish work lives under `main → swissknife::CommandSync::Main`. Use the
+> `pthread_cond_wait` / `Tube::PopFront` — which are the workers idling in the queue. The actual
+> publish will show up under `main → swissknife::CommandSync::Main`. Use the
 > flame graph's search (Ctrl-F) to jump to a function of interest.
 
-> **_NOTE_** &nbsp;
-> `uftrace dump --flame-graph` (the old spelling) segfaulted in uftrace v0.17,
-> which is why older notes route the trace through `--chrome` and a custom
-> folding script. That crash is fixed from v0.19 on and the native
-> `--format=flame-graph` output is used directly — no Chrome-JSON detour needed.
