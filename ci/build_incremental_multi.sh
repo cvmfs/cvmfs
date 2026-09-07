@@ -45,18 +45,24 @@ if can_build_gateway; then
   build_gateway="ON"
 fi
 
+build_config_validator="OFF"
+if can_build_config_validator; then
+  build_config_validator="ON"
+fi
+
 
 
 echo "configuring using CMake..."
-cmake -DBUILD_SERVER=$build_server          \
-      -DBUILD_SERVER_DEBUG=$build_server    \
-      -DBUILD_UNITTESTS=yes                 \
-      -DBUILD_LIBCVMFS=$build_libcvmfs      \
-      -DBUILD_SHRINKWRAP=$build_shrinkwrap  \
-      -DBUILD_GEOAPI=$build_geoapi          \
-      -DBUILD_PRELOADER=yes                 \
-      -DBUILD_GATEWAY=$build_gateway        \
-      -DBUILD_DUCC=$build_ducc              \
+cmake -DBUILD_SERVER=$build_server                    \
+      -DBUILD_SERVER_DEBUG=$build_server              \
+      -DBUILD_UNITTESTS=yes                           \
+      -DBUILD_LIBCVMFS=$build_libcvmfs                \
+      -DBUILD_SHRINKWRAP=$build_shrinkwrap            \
+      -DBUILD_GEOAPI=$build_geoapi                    \
+      -DBUILD_PRELOADER=yes                           \
+      -DBUILD_GATEWAY=$build_gateway                  \
+      -DBUILD_DUCC=$build_ducc                        \
+      -DBUILD_CONFIG_VALIDATOR=$build_config_validator \
       $CVMFS_SOURCE_LOCATION
 
 echo "building using make ($CVMFS_CONCURRENT_BUILD_JOBS concurrent jobs)..."

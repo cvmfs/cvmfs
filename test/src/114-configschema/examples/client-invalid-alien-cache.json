@@ -1,0 +1,12 @@
+{
+  "CVMFS_REPOSITORY_NAME": "atlas.cern.ch",
+  "CVMFS_USER": "cvmfs",
+  "CVMFS_NFILES": 131072,
+  "CVMFS_MOUNT_DIR": "/cvmfs",
+  "CVMFS_RELOAD_SOCKETS": "/var/run/cvmfs",
+  "CVMFS_SERVER_URL": "http://cvmfs-stratum-one.cern.ch/cvmfs/atlas.cern.ch",
+  "CVMFS_HTTP_PROXY": "DIRECT",
+  "CVMFS_ALIEN_CACHE": "/gpfs/cvmfs-alien",
+  "CVMFS_SHARED_CACHE": "yes",
+  "CVMFS_QUOTA_LIMIT": 4000
+}

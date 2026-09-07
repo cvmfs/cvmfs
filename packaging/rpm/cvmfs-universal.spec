@@ -28,11 +28,13 @@
     %define build_gateway 1
     %define build_ducc 1
     %define build_snapshotter 1
+    %define build_config_validator 1
 %endif
 %if 0%{?sle15} || 0%{?sle16}
   %define build_gateway 1
   %define build_ducc 1
   %define build_snapshotter 1
+  %define build_config_validator 1
 %endif
 
 # flag to control building of unittests.
@@ -399,6 +401,10 @@ BUILD_SNAPSHOTTER=no
 %if 0%{?build_snapshotter}
 BUILD_SNAPSHOTTER=yes
 %endif
+BUILD_CONFIG_VALIDATOR=no
+%if 0%{?build_config_validator}
+BUILD_CONFIG_VALIDATOR=yes
+%endif
 BUILD_UNITTESTS=no
 INSTALL_UNITTESTS=no
 %if 0%{?build_testing}
@@ -418,6 +424,7 @@ cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} \
   -DBUILD_GATEWAY=$BUILD_GATEWAY \
   -DBUILD_DUCC=$BUILD_DUCC \
   -DBUILD_SNAPSHOTTER=$BUILD_SNAPSHOTTER \
+  -DBUILD_CONFIG_VALIDATOR=$BUILD_CONFIG_VALIDATOR \
   -DINSTALL_UNITTESTS=$INSTALL_UNITTESTS \
   -DCMAKE_INSTALL_PREFIX:PATH=/usr .
 
@@ -687,6 +694,9 @@ systemctl daemon-reload
 /usr/libexec/cvmfs/authz/cvmfs_deny_helper
 /usr/libexec/cvmfs/cache/cvmfs_cache_ram
 /usr/libexec/cvmfs/cache/cvmfs_cache_posix
+%if 0%{?build_config_validator}
+/usr/libexec/cvmfs/cvmfs_validator
+%endif
 %{_sysconfdir}/auto.cvmfs
 %{_sysconfdir}/cvmfs/config.sh
 %if 0%{?selinux_cvmfs}
