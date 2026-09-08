@@ -90,11 +90,14 @@ class GatewayUploader : public AbstractUploader {
 
   virtual int64_t DoGetObjectSize(const std::string &file_name);
 
+  // Subclasses that route part of the objects elsewhere (GatewayS3Uploader)
+  // still need the session to release the buckets they do not commit.
+  SessionContext *session_context_;
+
  private:
   void BumpErrors() const;
 
   Config config_;
-  SessionContext *session_context_;
   mutable atomic_int32 num_errors_;
 };
 

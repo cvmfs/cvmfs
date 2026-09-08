@@ -11,6 +11,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <string>
+#include <vector>
 
 #include "catalog_balancer.h"
 #include "catalog_rw.h"
@@ -21,6 +22,7 @@
 #include "util/logging.h"
 #include "util/posix.h"
 #include "util/smalloc.h"
+#include "util/string.h"
 
 using namespace std;  // NOLINT
 
@@ -513,6 +515,31 @@ void WritableCatalogManager::AddDirectory(const DirectoryEntryBase &entry,
     parent_catalog->UpdateEntry(parent_entry, parent_path);
   }
   SyncUnlock();
+}
+
+/**
+ * Reports whether a directory is already present in the catalogs.
+ * Uses SyncLock, the lock the mutating calls take, so it may be asked while
+ * the ingestion pipeline adds files from its own threads.
+ */
+bool WritableCatalogManager::HasDirectory(const std::string &name,
+                                          const std::string &parent_directory) {
+  const string parent_path = MakeRelativePath(parent_directory);
+  const string directory_path = parent_path + "/" + name;
+
+  SyncLock();
+  // Resolve the PARENT, then look the child up inside it. Resolving the child
+  // itself can mount a nested catalog rooted exactly there -- a synchronous
+  // Stratum 0 fetch, under this lock, blocking every pipeline thread.
+  WritableCatalog *catalog;
+  DirectoryEntry dirent;
+  bool exists = false;
+  if (FindCatalog(parent_path, &catalog, NULL)) {
+    exists = catalog->LookupPath(PathString(directory_path), &dirent)
+             && dirent.IsDirectory();
+  }
+  SyncUnlock();
+  return exists;
 }
 
 /**
@@ -1076,6 +1103,56 @@ void WritableCatalogManager::GraftNestedCatalog(const string &mountpoint,
           mountpoint.c_str());
   }
 }
+
+/**
+ * Create the proper ancestors of mountpoint that are still missing.
+ *
+ * The direct-graft counterpart of CatalogMergeTool::CreateMissingAncestorDirs:
+ * the ancestors of a gateway lease path are not part of the changeset, so a
+ * graft into a prefix that does not exist yet has nothing to attach to.  There
+ * is no source catalog to copy them from here, so they get the same fixed
+ * metadata the merge tool gives implicit ancestors.  Returns false, having
+ * changed nothing, if a component exists as a non-directory.
+ */
+bool WritableCatalogManager::CreateMissingAncestors(
+    const std::string &mountpoint) {
+  const std::string parent = GetParentPath(MakeRelativePath(mountpoint));
+  if (parent.empty())
+    return true;
+
+  // One lookup settles the common case, where the parent is already there.
+  DirectoryEntry parent_entry;
+  if (LookupPath(parent, kLookupDefault, &parent_entry))
+    return parent_entry.IsDirectory();
+
+  const std::vector<std::string> parts = SplitString(parent.substr(1), '/');
+  std::string prefix;  // relative, no leading slash, as AddDirectory wants it
+  for (unsigned i = 0; i < parts.size(); ++i) {
+    const std::string grandparent = prefix;
+    prefix = prefix.empty() ? parts[i] : prefix + "/" + parts[i];
+
+    DirectoryEntry existing;
+    if (LookupPath(MakeRelativePath(prefix), kLookupDefault, &existing)) {
+      if (!existing.IsDirectory()) {
+        LogCvmfs(kLogCatalog, kLogStderr,
+                 "cannot create the ancestors of '%s': '%s' exists and is not "
+                 "a directory",
+                 mountpoint.c_str(), prefix.c_str());
+        return false;
+      }
+      continue;
+    }
+
+    DirectoryEntryBase dirent;
+    dirent.name_ = NameString(parts[i]);
+    dirent.SetImplicitDirectoryMetadata();
+    LogCvmfs(kLogCatalog, kLogVerboseMsg,
+             "creating missing lease path ancestor '%s'", prefix.c_str());
+    AddDirectory(dirent, XattrList(), grandparent);
+  }
+  return true;
+}
+
 
 bool WritableCatalogManager::TryGraftNestedCatalog(const string &mountpoint,
                                                    const shash::Any &new_hash,

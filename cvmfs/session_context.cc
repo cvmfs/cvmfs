@@ -244,6 +244,21 @@ bool SessionContextBase::CommitBucket(const ObjectPack::BucketContentType type,
   return true;
 }
 
+void SessionContextBase::DiscardBucket(const ObjectPack::BucketHandle handle) {
+  const MutexLockGuard lock(current_pack_mtx_);
+
+  if (!current_pack_) {
+    return;
+  }
+
+  // Open handles are transferred along whenever a pack fills up, so the bucket
+  // is always owned by the pack that is current at this point.
+  active_handles_.erase(
+      std::remove(active_handles_.begin(), active_handles_.end(), handle),
+      active_handles_.end());
+  current_pack_->DiscardBucket(handle);
+}
+
 void SessionContextBase::Dispatch() {
   const MutexLockGuard lock(current_pack_mtx_);
 

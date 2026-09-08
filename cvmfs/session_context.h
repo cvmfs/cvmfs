@@ -63,6 +63,14 @@ class SessionContextBase {
                     const std::string &name = "",
                     const bool force_dispatch = false);
 
+  /**
+   * Release a bucket that will never be committed, e.g. because its content was
+   * uploaded by other means.  Without this, the handle stays in active_handles_
+   * for the lifetime of the session: it keeps its content allocated and is
+   * carried over into every subsequent ObjectPack.
+   */
+  void DiscardBucket(const ObjectPack::BucketHandle handle);
+
  protected:
   virtual bool InitializeDerived(uint64_t max_queue_size) = 0;
 
