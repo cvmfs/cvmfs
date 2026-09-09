@@ -173,6 +173,11 @@ void SyncUnionTarball::Traverse() {
         LogCvmfs(kLogUnionFs, kLogStdout,
                  "Error in reading the header, retrying.\n%s\n",
                  archive_error_string(src));
+        // The Wait() at the top of the loop consumed the signal and no entry
+        // was handed to the pipeline that could fire it again.  Re-arm it here,
+        // otherwise the next Wait() blocks forever.  libarchive has already
+        // consumed the damaged header block, so retrying makes progress.
+        read_archive_signal_->Wakeup();
         continue;
         break;
       }
