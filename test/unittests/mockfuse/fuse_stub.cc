@@ -151,4 +151,14 @@ int fuse_lowlevel_notify_expire_entry(
     size_t namelen __attribute__((unused))) {
   return -1;
 }
+
+int fuse_passthrough_open(fuse_req_t req __attribute__((unused)),
+                          int fd __attribute__((unused))) {
+  return -1;
+}
+
+int fuse_passthrough_close(fuse_req_t req __attribute__((unused)),
+                           int backing_id __attribute__((unused))) {
+  return -1;
+}
 #endif
