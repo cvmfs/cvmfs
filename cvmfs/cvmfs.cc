@@ -2223,7 +2223,6 @@ static void cvmfs_destroy(void *unused __attribute__((unused))) {
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_destroy");
 #ifdef FUSE_CAP_PASSTHROUGH
   pthread_mutex_lock(&fuse_passthru_tracker_lock);
-  assert(fuse_passthru_tracker);
   delete fuse_passthru_tracker;
   fuse_passthru_tracker = NULL;
   pthread_mutex_unlock(&fuse_passthru_tracker_lock);
