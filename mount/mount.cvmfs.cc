@@ -436,8 +436,23 @@ int main(int argc, char **argv) {
     (void) SwitchCredentials(pw->pw_uid, pw->pw_gid, true);
   }
 
+  // Check mount options for config= parameter (used by server fstab entries)
+  // These config files will be parsed after defaults to override settings
+  string config_files_opt;
+  for (unsigned i = 0; i < mount_options.size(); ++i) {
+    vector<string> tokens = SplitString(mount_options[i], ',');
+    for (unsigned j = 0; j < tokens.size(); ++j) {
+      if (HasPrefix(tokens[j], "config=", false)) {
+        config_files_opt = tokens[j].substr(7);
+      }
+    }
+  }
+
   options_manager_.ParseDefault("");
-  const string fqrn = MkFqrn(device);
+  // A config= option is passed directly to cvmfs2, where it preserves the
+  // device name verbatim.  Do the same here: server repositories may have an
+  // unqualified name and their client.conf need not define a default domain.
+  const string fqrn = config_files_opt.empty() ? MkFqrn(device) : device;
   // Bail in case we could not form a Fqrn
   if (fqrn.empty()) {
     LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
@@ -446,7 +461,17 @@ int main(int argc, char **argv) {
   }
   options_manager_.SwitchTemplateManager(
       new DefaultOptionsTemplateManager(fqrn));
-  options_manager_.ParseDefault(fqrn);
+
+  if (config_files_opt.empty()) {
+    options_manager_.ParseDefault(fqrn);
+  } else {
+    // Match cvmfs2's config= behavior: these files replace the normal
+    // repository configuration and are parsed after the global defaults.
+    vector<string> cf = SplitString(config_files_opt, ':');
+    for (unsigned i = 0; i < cf.size(); ++i) {
+      options_manager_.ParsePath(cf[i], false);
+    }
+  }
 
   if (pw != NULL) {
     (void) SwitchCredentials(0, 0, true);
@@ -637,7 +662,7 @@ int main(int argc, char **argv) {
 #endif
 
   AddMountOption("system_mount", &mount_options);
-  AddMountOption("fsname=cvmfs2", &mount_options);
+  AddMountOption("fsname=" + fqrn, &mount_options);
   AddMountOption("allow_other", &mount_options);
   AddMountOption("grab_mountpoint", &mount_options);
   AddMountOption("uid=" + StringifyInt(uid_cvmfs), &mount_options);
