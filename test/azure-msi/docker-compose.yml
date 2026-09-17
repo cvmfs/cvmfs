@@ -1,0 +1,36 @@
+# Stands up the two services that emulate the Azure MSI + Blob path, so CVMFS's
+# Azure-MSI uploader can be exercised without a real Azure VM.
+#
+#   docker compose up -d            # start azurite + mock IMDS
+#   CVMFS_AZURE_IMDS_ENDPOINT=http://127.0.0.1:8081 \
+#   AZURITE_BLOB_ENDPOINT=https://127.0.0.1:10000 python3 verify_msi_path.py
+#   docker compose down
+#
+# A CVMFS publisher (built with the s3fanout-imds-endpoint.patch) points at:
+#   CVMFS_AZURE_IMDS_ENDPOINT = http://<imds>:8081
+#   CVMFS_S3_HOST             = <azurite>:10000  (path-style, DNS_BUCKETS=false)
+services:
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite
+    # --oauth basic validates the bearer's aud/iss/exp but NOT its signature,
+    # and requires HTTPS -> the mounted self-signed cert.
+    command: >
+      azurite-blob --blobHost 0.0.0.0 --blobPort 10000 --oauth basic
+      --cert /certs/azurite-cert.pem --key /certs/azurite-key.pem
+      --skipApiVersionCheck
+    ports:
+      - "10000:10000"
+    volumes:
+      - ./certs:/certs:ro
+
+  imds:
+    image: python:3.12-slim
+    working_dir: /app
+    command: python3 imds_mock.py
+    environment:
+      IMDS_BIND: "0.0.0.0"
+      IMDS_PORT: "8081"
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./:/app:ro
