@@ -36,6 +36,7 @@ class T_Options : public ::testing::Test {
             "CVMFS_SHARED_CACHE=no\n"
             "CVMFS_HTTP_PROXY=DIRECT\n"
             "export A=B\n"
+            "export X B=C\n"
             "=only equal sign\n"
             " =equal sign with space\n"
             "\n"
@@ -43,6 +44,12 @@ class T_Options : public ::testing::Test {
             "D=E # with a comment\n"
             "F=\"G\"\n"
             "H='I' \n"
+            "if false; then\n"
+            "  VALFALSE=value\n"
+            "fi\n"
+            "if true; then\n"
+            "  VALTRUE=value\n"
+            "fi\n"
             "FOO=abc/@fqrn@/@foo@.@bar@\n"
             "BAR=abc@def.com");
     int result = fclose(temp_file);
@@ -61,11 +68,12 @@ class T_Options : public ::testing::Test {
   struct type { };
 
   unsigned ExpectedValues(const type<BashOptionsManager> type_specifier) {
-    return 14u;
+    return 15u;
   }
 
   unsigned ExpectedValues(const type<SimpleOptionsParser> type_specifier) {
-    return 14u;
+    // the extras here are XYZABC and VALFALSE
+    return 17u;
   }
 
   unsigned ExpectedValues() { return ExpectedValues(type<OptionsT>()); }
@@ -94,7 +102,7 @@ TYPED_TEST(T_Options, ParsePath) {
   options_manager.ParsePath(config_file, false);
   options_manager.SwitchTemplateManager(opt_temp_mgr);
 
-  // printf("DUMP: ***\n%s\n***\n", options_manager.Dump().c_str());
+  SCOPED_TRACE(options_manager.Dump());
   ASSERT_EQ(expected_number_elements, options_manager.GetAllKeys().size());
 
   EXPECT_TRUE(options_manager.GetValue("CVMFS_CACHE_BASE", &container));
