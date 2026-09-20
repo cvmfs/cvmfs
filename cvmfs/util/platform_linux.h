@@ -310,6 +310,15 @@ inline void platform_disable_kcache(int filedes) {
   (void)posix_fadvise(filedes, 0, 0, POSIX_FADV_RANDOM | POSIX_FADV_NOREUSE);
 }
 
+/**
+ * Advises the kernel that the file will be read sequentially from beginning to
+ * end.  The kernel doubles the read-ahead window, keeping read workers fed
+ * without blocking on I/O for large files in the ingestion pipeline.
+ */
+inline void platform_fadvise_sequential(int filedes) {
+  (void)posix_fadvise(filedes, 0, 0, POSIX_FADV_SEQUENTIAL);
+}
+
 inline ssize_t platform_readahead(int filedes) {
   return readahead(filedes, 0, static_cast<size_t>(-1));
 }
