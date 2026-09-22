@@ -1034,8 +1034,33 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
 
     ProxyInfo *proxy = ChooseProxyUnlocked(info->expected_hash());
     if (!proxy || (proxy->url == "DIRECT")) {
-      info->SetProxy("DIRECT");
-      curl_easy_setopt(info->curl_handle(), CURLOPT_PROXY, "");
+      if (opt_proxy_mandatory_) {
+        // Every configured proxy is currently unusable.  Connecting directly
+        // would bypass the site proxy, so fail the request and let the normal
+        // retry/backoff path report the outage.
+        //
+        // The request is failed by pointing the handle at an address that
+        // cannot be connected to, rather than by returning early, so that the
+        // attempt still runs through the ordinary curl result handling and is
+        // counted, retried and reported like any other failure.  0.0.0.0:1
+        // fails immediately and without a DNS lookup.
+        //
+        // The proxy is recorded as "BLOCKED" rather than "DIRECT" because the
+        // classification in VerifyAndFinalize() reads info->proxy(): the
+        // string "DIRECT" would make this look like a *host* problem and send
+        // the client roaming the CVMFS_SERVER_URL list, when in fact only the
+        // proxy is at fault.  Any value other than "DIRECT" gives the right
+        // answer; a distinct one also makes the state visible in the logs.
+        LogCvmfs(kLogDownload, kLogSyslogErr | kLogDebug,
+                 "(manager '%s' - id %" PRId64 ") "
+                 "no usable proxy available, refusing to connect directly",
+                 name_.c_str(), info->id());
+        info->SetProxy("BLOCKED");
+        curl_easy_setopt(info->curl_handle(), CURLOPT_PROXY, "0.0.0.0:1");
+      } else {
+        info->SetProxy("DIRECT");
+        curl_easy_setopt(info->curl_handle(), CURLOPT_PROXY, "");
+      }
     } else {
       // Note: inside ValidateProxyIpsUnlocked() we may change the proxy data
       // structure, so we must not pass proxy->... (== current_proxy())
@@ -1143,12 +1168,18 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
     } else {
       if (opt_proxy_groups_current_ >= opt_proxy_groups_fallback_) {
         // It doesn't make sense to use the fallback proxies in Geo-API requests
-        // since the fallback proxies are supposed to get sorted, too.
-        info->SetProxy("DIRECT");
-        curl_easy_setopt(info->curl_handle(), CURLOPT_PROXY, "");
+        // since the fallback proxies are supposed to get sorted, too.  Only
+        // rewrite the URL, though: forcing CURLOPT_PROXY to "" here sent the
+        // request off unproxied, and the condition above is true precisely
+        // while the local proxies are down and the fallbacks are in use.
+        if (!opt_proxy_mandatory_) {
+          info->SetProxy("DIRECT");
+          curl_easy_setopt(info->curl_handle(), CURLOPT_PROXY, "");
+        }
         replacement = proxy_template_direct_;
       } else {
-        replacement = ChooseProxyUnlocked(info->expected_hash())->host.name();
+        const ProxyInfo *proxy = ChooseProxyUnlocked(info->expected_hash());
+        replacement = proxy ? proxy->host.name() : proxy_template_direct_;
       }
     }
     replacement = (replacement == "") ? proxy_template_direct_ : replacement;
