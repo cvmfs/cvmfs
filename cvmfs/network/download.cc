@@ -1606,8 +1606,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
       // either way.
       if (curl_error == CURLE_COULDNT_CONNECT) {
         long os_errno = 0;  // NOLINT(runtime/int) -- libcurl's getinfo type
-        if (curl_easy_getinfo(info->curl_handle(), CURLINFO_OS_ERRNO,
-                              &os_errno)
+        if (curl_easy_getinfo(info->curl_handle(), CURLINFO_OS_ERRNO, &os_errno)
             == CURLE_OK) {
           info->SetPeerUnresponsive(os_errno != ECONNREFUSED);
         }
@@ -2517,7 +2516,7 @@ void DownloadManager::SwitchProxy(JobInfo *info) {
                                          == kFailProxyResolve);
       const bool would_escalate = IsEscalatedProxyGroup(next_group)
                                   && !IsEscalatedProxyGroup(
-                                         opt_proxy_groups_current_);
+                                      opt_proxy_groups_current_);
       if (would_escalate && !proxy_unreachable) {
         LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
                  "(manager '%s' - id %" PRId64 ") "

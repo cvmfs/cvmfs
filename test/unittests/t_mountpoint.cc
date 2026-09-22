@@ -636,6 +636,46 @@ TEST_F(T_MountPoint, History) {
 }
 
 
+TEST_F(T_MountPoint, ExternalDownloadMgrInheritsProxyChain) {
+  // Without CVMFS_EXTERNAL_HTTP_PROXY the external download manager used to be
+  // handed the literal string "DIRECT", so external data bypassed the proxy
+  // that had been configured for everything else.  It must inherit instead.
+  CreateMiniRepository(&options_mgr_, &repo_path_);
+  // CreateMiniRepository sets DIRECT; override it afterwards.  The repository
+  // is served over file://, which ignores proxies, so the mount still boots.
+  options_mgr_.SetValue("CVMFS_HTTP_PROXY", "http://127.0.0.1:3128");
+  options_mgr_.SetValue("CVMFS_FALLBACK_PROXY", "http://127.0.0.2:3128");
+
+  std::unique_ptr<FileSystem> fs(FileSystem::Create(fs_info_));
+  ASSERT_EQ(loader::kFailOk, fs->boot_status());
+
+  {
+    std::unique_ptr<MountPoint> mp(
+        MountPoint::Create("keys.cern.ch", fs.get()));
+    ASSERT_EQ(loader::kFailOk, mp->boot_status());
+    EXPECT_STRNE("DIRECT", mp->external_download_mgr()->GetProxyList().c_str());
+    EXPECT_EQ(mp->download_mgr()->GetProxyList(),
+              mp->external_download_mgr()->GetProxyList());
+    EXPECT_EQ(mp->download_mgr()->GetFallbackProxyList(),
+              mp->external_download_mgr()->GetFallbackProxyList());
+  }
+
+  // An explicit external proxy still takes precedence, and brings its own
+  // fallback list rather than borrowing the regular one.
+  options_mgr_.SetValue("CVMFS_EXTERNAL_HTTP_PROXY", "http://127.0.0.3:3128");
+  {
+    std::unique_ptr<MountPoint> mp(
+        MountPoint::Create("keys.cern.ch", fs.get()));
+    ASSERT_EQ(loader::kFailOk, mp->boot_status());
+    EXPECT_EQ("http://127.0.0.3:3128",
+              mp->external_download_mgr()->GetProxyList());
+    EXPECT_EQ("", mp->external_download_mgr()->GetFallbackProxyList());
+    // The regular manager is untouched by the external setting.
+    EXPECT_EQ("http://127.0.0.1:3128", mp->download_mgr()->GetProxyList());
+  }
+}
+
+
 TEST_F(T_MountPoint, MaxServers) {
   CreateMiniRepository(&options_mgr_, &repo_path_);
   string server_url;
