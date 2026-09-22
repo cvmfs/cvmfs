@@ -133,24 +133,34 @@ static Failures PrepareDownloadDestination(JobInfo *info) {
 
 
 /**
- * True when the TCP connect for this transfer completed, whatever happened
- * afterwards.  It tells a peer that never answered apart from one that
- * answered and then misbehaved, which is the difference between "look
+ * True when the peer sent at least one byte of this transfer, whatever
+ * happened afterwards.  It tells a peer that never answered apart from one
+ * that answered and then misbehaved, which is the difference between "look
  * elsewhere" and "stay here".
  *
- * CURLINFO_CONNECT_TIME rather than the newer CURLINFO_CONNECT_TIME_T: the
- * build accepts libcurl from 7.55.0 (see externals/libcurl/CMakeLists.txt)
- * while the _T variant only arrived in 7.61.0.  The two carry the same
- * meaning and differ only in resolution, and all that is asked here is
- * whether the value is still zero, so the older one needs no version guard.
+ * CURLINFO_STARTTRANSFER_TIME stays zero until the first byte of the response
+ * arrives, so it covers both ways of never answering.  One is a connect that
+ * never completed.  The other, and the more common shape of a dead proxy, is
+ * a peer whose listening socket still accepts: the connect succeeds, the
+ * request goes out, and nothing ever comes back until the low-speed limit
+ * trips.  Asking only whether the connect completed would call that peer
+ * alive.  It is also the right question for a connection taken from the
+ * keep-alive pool, where this transfer performs no connect of its own.
+ *
+ * CURLINFO_STARTTRANSFER_TIME rather than the newer _T variant: the build
+ * accepts libcurl from 7.55.0 (see externals/libcurl/CMakeLists.txt) while
+ * the _T variants only arrived in 7.61.0.  The two carry the same meaning and
+ * differ only in resolution, and all that is asked here is whether the value
+ * is still zero, so the older one needs no version guard.
  */
-static bool ConnectCompleted(CURL *handle) {
-  double connect_time = 0.0;
-  if (curl_easy_getinfo(handle, CURLINFO_CONNECT_TIME, &connect_time)
+static bool ResponseStarted(CURL *handle) {
+  double start_transfer_time = 0.0;
+  if (curl_easy_getinfo(handle, CURLINFO_STARTTRANSFER_TIME,
+                        &start_transfer_time)
       != CURLE_OK) {
     return false;
   }
-  return connect_time > 0.0;
+  return start_transfer_time > 0.0;
 }
 
 
@@ -1577,14 +1587,16 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
       info->SetErrorCode(kFailHostResolve);
       break;
     case CURLE_OPERATION_TIMEDOUT:
-      // A timeout means one of two opposite things.  If the connection never
-      // came up, nobody answered: the peer is unreachable, which is exactly
-      // the case that justifies looking elsewhere.  If it did come up and the
-      // transfer then crawled, the peer is alive and merely saturated, and
-      // abandoning it would move traffic off-site for no good reason.  The
-      // connect time stays zero while the connect has not completed, so it
-      // separates the two; see ConnectCompleted().
-      info->SetPeerUnresponsive(!ConnectCompleted(info->curl_handle()));
+      // A timeout means one of two opposite things.  If nothing came back at
+      // all, nobody answered: the peer is unreachable, which is exactly the
+      // case that justifies looking elsewhere.  That covers a connect that
+      // never completed and, just as much, a peer that accepted the
+      // connection and then sent nothing -- a dead proxy still has a socket
+      // listening.  If part of the response did arrive and the transfer then
+      // crawled, the peer is alive and merely saturated, and abandoning it
+      // would move traffic off-site for no good reason.  See
+      // ResponseStarted().
+      info->SetPeerUnresponsive(!ResponseStarted(info->curl_handle()));
       info->SetErrorCode((info->proxy() == "DIRECT") ? kFailHostTooSlow
                                                      : kFailProxyTooSlow);
       break;

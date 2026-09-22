@@ -2,10 +2,14 @@
  * This file is part of the CernVM File System.
  */
 
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
 #include <unistd.h>
 
 #include <cassert>
 #include <cstdio>
+#include <cstring>
 
 #include "c_file_sandbox.h"
 #include "c_http_server.h"
@@ -840,6 +844,78 @@ TEST_F(T_Download, SlowProxyDoesNotEscalateToDirect) {
   EXPECT_EQ(0, origin.num_processed_requests());
   EXPECT_NE("DIRECT", info.proxy());
   slow_proxy.Stop();
+}
+
+
+namespace {
+/**
+ * A socket that is bound and listening but never accepted from.  The kernel
+ * completes the TCP handshake for it, so a connect succeeds, and the request
+ * that follows is then never answered.  That is what a dead proxy looks like
+ * from the client: the listening socket outlives whatever was serving it.
+ *
+ * Start() reports failure rather than asserting, so the test still fails
+ * loudly in a build with NDEBUG defined.
+ */
+class SilentListener {
+ public:
+  SilentListener() : fd_(-1) { }
+  ~SilentListener() {
+    if (fd_ >= 0)
+      close(fd_);
+  }
+
+  bool Start(int port) {
+    fd_ = socket(AF_INET, SOCK_STREAM, 0);
+    if (fd_ < 0)
+      return false;
+    const int on = 1;
+    setsockopt(fd_, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port);
+    addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+    // ::bind, not std::bind -- this file has "using namespace std".
+    if (::bind(fd_, reinterpret_cast<struct sockaddr *>(&addr), sizeof(addr))
+        != 0) {
+      return false;
+    }
+    return listen(fd_, 16) == 0;
+  }
+
+ private:
+  int fd_;
+};
+}  // namespace
+
+
+TEST_F(T_Download, SilentProxyCountsAsUnreachable) {
+  // A proxy that accepts the connection and then sends nothing is dead, not
+  // slow, and must still be escalated away from even with the escalation gate
+  // in force.  Keying the verdict on the connect alone got this wrong: the
+  // handshake completes, so the peer looked alive and the client stayed on a
+  // proxy that would never answer.
+  string src_path = GetSmallFile();
+  MockFileServer origin(8119, sandbox_path_);
+  SilentListener silent_proxy;
+  ASSERT_TRUE(silent_proxy.Start(8118));
+
+  download_mgr.SetProxyFailoverOnSlow(false);
+  download_mgr.SetProxyChain("http://127.0.0.1:8118;DIRECT", "",
+                             DownloadManager::kSetProxyBoth);
+  download_mgr.SetRetryParameters(1, 0, 0);
+  download_mgr.SetTimeout(2, 2);
+
+  const string url = "http://127.0.0.1:8119/" + GetFileName(src_path);
+  cvmfs::MemSink sink;
+  JobInfo info(&url, false /* compressed */, false /* probe hosts */, NULL,
+               &sink);
+  download_mgr.Fetch(&info);
+
+  EXPECT_EQ(kFailOk, info.error_code());
+  EXPECT_EQ("DIRECT", info.proxy());
+  EXPECT_EQ(1, origin.num_processed_requests());
 }
 
 
