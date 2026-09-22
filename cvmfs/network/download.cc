@@ -2493,8 +2493,42 @@ void DownloadManager::SwitchProxy(JobInfo *info) {
   if (opt_proxy_groups_current_burned_ == group->size()) {
     opt_proxy_groups_current_burned_ = 0;
     if (opt_proxy_groups_->size() > 1) {
-      opt_proxy_groups_current_ = (opt_proxy_groups_current_ + 1)
+      const unsigned next_group = (opt_proxy_groups_current_ + 1)
                                   % opt_proxy_groups_->size();
+      // Leaving the local proxy set -- for an unproxied connection, or for an
+      // off-site fallback proxy -- needs evidence that the local proxy is
+      // actually unreachable.  A proxy that is merely saturated answers
+      // requests, just too slowly, and reports itself as "too slow" or as a
+      // short transfer; that is a throughput symptom, not a dead peer, and
+      // escalating on it is what silently moved traffic off-site under load.
+      // Stay on the group instead; the burn counter has just been cleared, so
+      // the proxy is usable again and the normal retry and backoff path
+      // decides whether the request ultimately fails.
+      //
+      // Note the test is peer_unresponsive(), not kFailProxyConnection:
+      // libcurl reports a refused connect as CURLE_COULDNT_CONNECT but an
+      // unanswered one as CURLE_OPERATION_TIMEDOUT, so keying on the error
+      // code alone gets both cases exactly backwards.
+      //
+      // info is non-NULL on this path: the loop above only raises the burn
+      // count for a job, and a zero count returns before reaching here.
+      const bool proxy_unreachable = info->peer_unresponsive()
+                                     || (info->error_code()
+                                         == kFailProxyResolve);
+      const bool would_escalate = IsEscalatedProxyGroup(next_group)
+                                  && !IsEscalatedProxyGroup(
+                                         opt_proxy_groups_current_);
+      if (would_escalate && !proxy_unreachable) {
+        LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
+                 "(manager '%s' - id %" PRId64 ") "
+                 "keeping proxy group %u: '%s' does not show the proxy to be "
+                 "unreachable, so not falling back to group %u",
+                 name_.c_str(), info->id(), opt_proxy_groups_current_,
+                 Code2Ascii(info->error_code()), next_group);
+        UpdateProxiesUnlocked("failed proxy, escalation withheld");
+        return;
+      }
+      opt_proxy_groups_current_ = next_group;
       // Remember the timestamp of switching to backup proxies
       if (opt_proxy_groups_reset_after_ > 0) {
         if (opt_proxy_groups_current_ > 0) {
@@ -3214,6 +3248,24 @@ string DownloadManager::GetProxyList() { return opt_proxy_list_; }
 string DownloadManager::GetFallbackProxyList() {
   return opt_proxy_fallback_list_;
 }
+
+/**
+ * True when using this proxy group means the request has left the local proxy
+ * set: either it is a DIRECT tier, so the request goes out unproxied, or it is
+ * one of the fallback groups, which are by construction off-site.
+ *
+ * Moving between the regular groups is ordinary load-balancing failover and is
+ * not escalation.
+ */
+bool DownloadManager::IsEscalatedProxyGroup(unsigned group_idx) const {
+  if (!opt_proxy_groups_ || (group_idx >= opt_proxy_groups_->size()))
+    return false;
+  if (group_idx >= opt_proxy_groups_fallback_)
+    return true;
+  const std::vector<ProxyInfo> &group = (*opt_proxy_groups_)[group_idx];
+  return !group.empty() && (group[0].url == "DIRECT");
+}
+
 
 /**
  * Choose proxy
