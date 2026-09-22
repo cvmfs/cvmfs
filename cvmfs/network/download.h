@@ -126,6 +126,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   FRIEND_TEST(T_Download, ProxyMandatorySurvivesClone);
   FRIEND_TEST(T_Download, NoProxyChainIsNotSelectable);
   FRIEND_TEST(T_Download, EscalatedProxyGroupClassification);
+  FRIEND_TEST(T_Download, ProxyChainDefaultsToPreviousBehaviour);
 
  public:
   // HostInfo is used for both metalink and host
@@ -228,6 +229,8 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   std::string GetProxyList();
   std::string GetFallbackProxyList();
   void ShardProxies();
+  void EnableMandatoryProxy();
+  void SetProxyFailoverOnSlow(bool value);
   void RebalanceProxies();
   void SwitchProxyGroup();
   void SetProxyGroupResetDelay(const unsigned seconds);
@@ -386,15 +389,33 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
    */
   unsigned opt_num_proxies_;
   /**
-   * True when a real (non-DIRECT) proxy is configured and the configuration
-   * offers no DIRECT tier to fall back on.  While this holds, a direct
-   * connection is never an acceptable substitute for the proxy and requests
-   * are failed instead of silently bypassing it.  Writing DIRECT into the
-   * chain, as in "proxy;DIRECT", clears the flag and re-enables an unproxied
-   * last resort -- reached only once the proxy has actually failed, see
-   * DemoteDirect().  Configurations with no proxy at all also leave it false.
+   * CVMFS_PROXY_MANDATORY, off by default.  Opts in to treating the configured
+   * proxy as the only way out of the host: DIRECT is honoured solely where it
+   * was written as a failover tier of its own, and a request is failed rather
+   * than sent unproxied when no proxy can be selected.  While this is off the
+   * client behaves exactly as it did before the option existed.
+   */
+  bool opt_proxy_require_;
+  /**
+   * The effective conclusion drawn from opt_proxy_require_ and the chain that
+   * was actually configured: true when the policy is on, a real (non-DIRECT)
+   * proxy is configured, and the chain offers no DIRECT tier to fall back on.
+   * While this holds, a direct connection is never an acceptable substitute
+   * for the proxy.  Writing DIRECT into the chain, as in "proxy;DIRECT",
+   * clears it and re-enables an unproxied last resort -- reached only once
+   * the proxy has actually failed, see DemoteDirect().  Configurations with
+   * no proxy at all also leave it false.
    */
   bool opt_proxy_mandatory_;
+  /**
+   * CVMFS_PROXY_FAILOVER_ON_SLOW, on by default, which is the behaviour the
+   * client has always had: any proxy failure, including one that only says
+   * the proxy is slow, may carry the request out of the local proxy set and
+   * on to a DIRECT tier or an off-site fallback proxy.  Turning it off makes
+   * that step require evidence that the proxy is actually unreachable; see
+   * SwitchProxy().
+   */
+  bool opt_proxy_failover_on_slow_;
   /**
    * The original proxy list provided to SetProxyChain.
    */

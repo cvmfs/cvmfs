@@ -505,12 +505,47 @@ TEST_F(T_Download, ProxyDemoteDirect) {
 }
 
 
+TEST_F(T_Download, ProxyChainDefaultsToPreviousBehaviour) {
+  // Everything this branch changes about the chain is opt-in.  With
+  // CVMFS_PROXY_MANDATORY unset -- the default -- SetProxyChain() must behave
+  // exactly as it did before the option existed.
+  vector<vector<DownloadManager::ProxyInfo> > chain;
+  unsigned current_group = 42;
+  unsigned fallback_group = 42;
+
+  // Fallback proxies still discard a configured DIRECT outright.
+  download_mgr.SetProxyChain("http://127.0.0.1:3128;DIRECT",
+                             "http://127.0.0.2:3128",
+                             DownloadManager::kSetProxyBoth);
+  download_mgr.GetProxyInfo(&chain, &current_group, &fallback_group);
+  ASSERT_EQ(2U, chain.size());
+  EXPECT_EQ("http://127.0.0.1:3128", chain[0][0].url);
+  EXPECT_EQ("http://127.0.0.2:3128", chain[1][0].url);
+  EXPECT_EQ(1U, fallback_group);
+  EXPECT_FALSE(download_mgr.opt_proxy_mandatory_);
+
+  // DIRECT is still kept as a peer inside a load-balance group.
+  download_mgr.SetProxyChain("http://127.0.0.1:3128|DIRECT", "",
+                             DownloadManager::kSetProxyBoth);
+  download_mgr.GetProxyInfo(&chain, &current_group, &fallback_group);
+  ASSERT_EQ(1U, chain.size());
+  EXPECT_EQ(2U, chain[0].size());
+  EXPECT_FALSE(download_mgr.opt_proxy_mandatory_);
+
+  // And a proxy-only chain never makes the proxy mandatory by itself.
+  download_mgr.SetProxyChain("http://127.0.0.1:3128", "",
+                             DownloadManager::kSetProxyBoth);
+  EXPECT_FALSE(download_mgr.opt_proxy_mandatory_);
+}
+
+
 TEST_F(T_Download, ProxyDirectKeptAsLastResortTier) {
   vector<vector<DownloadManager::ProxyInfo> > chain;
   unsigned current_group = 42;
   unsigned fallback_group = 42;
 
   // "proxy;DIRECT" must keep DIRECT as a separate, later tier.
+  download_mgr.EnableMandatoryProxy();
   download_mgr.SetProxyChain("http://127.0.0.1:3128;DIRECT", "",
                              DownloadManager::kSetProxyBoth);
   download_mgr.GetProxyInfo(&chain, &current_group, &fallback_group);
@@ -546,6 +581,7 @@ TEST_F(T_Download, ProxyDirectNotPeerOfLiveProxy) {
 
   // "proxy|DIRECT" would otherwise load-balance unproxied traffic against a
   // healthy proxy.
+  download_mgr.EnableMandatoryProxy();
   download_mgr.SetProxyChain("http://127.0.0.1:3128|DIRECT", "",
                              DownloadManager::kSetProxyBoth);
   download_mgr.GetProxyInfo(&chain, &current_group, &fallback_group);
@@ -562,6 +598,7 @@ TEST_F(T_Download, ProxyDirectOnlyPreserved) {
   unsigned fallback_group = 42;
 
   // Nothing but DIRECT is a deliberate choice: leave unproxied setups alone.
+  download_mgr.EnableMandatoryProxy();
   download_mgr.SetProxyChain("DIRECT", "", DownloadManager::kSetProxyBoth);
   download_mgr.GetProxyInfo(&chain, &current_group, &fallback_group);
   ASSERT_EQ(1U, chain.size());
@@ -574,6 +611,7 @@ TEST_F(T_Download, ProxyDirectOnlyPreserved) {
 TEST_F(T_Download, ProxyMandatorySurvivesClone) {
   // The external download manager is created as a clone, so a proxy policy
   // that does not propagate would apply to catalogs but not to external data.
+  download_mgr.EnableMandatoryProxy();
   download_mgr.SetProxyChain("http://127.0.0.1:3128", "",
                              DownloadManager::kSetProxyBoth);
   EXPECT_TRUE(download_mgr.opt_proxy_mandatory_);
@@ -617,6 +655,7 @@ TEST_F(T_Download, EscalatedProxyGroupClassification) {
 
   // "proxy;DIRECT" plus a fallback: group 0 is local, group 1 is the DIRECT
   // tier, group 2 is off-site.  Only the first is not an escalation.
+  download_mgr.EnableMandatoryProxy();
   download_mgr.SetProxyChain("http://127.0.0.1:3128;DIRECT",
                              "http://127.0.0.2:3128",
                              DownloadManager::kSetProxyBoth);
@@ -696,6 +735,7 @@ TEST_F(T_Download, RefusedProxyDoesNotEscalateToDirect) {
   string src_path = GetSmallFile();
   MockFileServer file_server(8098, sandbox_path_);
 
+  download_mgr.SetProxyFailoverOnSlow(false);
   download_mgr.SetProxyChain("http://127.0.0.1:8097;DIRECT", "",
                              DownloadManager::kSetProxyBoth);
   download_mgr.SetRetryParameters(1, 0, 0);
@@ -721,6 +761,7 @@ TEST_F(T_Download, ProxyWithoutDirectNeverLeaks) {
   MockFileServer file_server(8100, sandbox_path_);
 
   // Nothing listens on 8099 and no DIRECT tier is offered.
+  download_mgr.EnableMandatoryProxy();
   download_mgr.SetProxyChain("http://127.0.0.1:8099", "",
                              DownloadManager::kSetProxyBoth);
 
@@ -782,6 +823,7 @@ TEST_F(T_Download, SlowProxyDoesNotEscalateToDirect) {
       slow_proxy.SetResponseCallback(TruncatingProxyHandler, &proxy_hits));
   ASSERT_TRUE(slow_proxy.Start());
 
+  download_mgr.SetProxyFailoverOnSlow(false);
   download_mgr.SetProxyChain("http://127.0.0.1:8111;DIRECT", "",
                              DownloadManager::kSetProxyBoth);
   download_mgr.SetRetryParameters(2, 0, 0);
@@ -797,6 +839,36 @@ TEST_F(T_Download, SlowProxyDoesNotEscalateToDirect) {
   // The decisive assertion: the origin was never contacted directly.
   EXPECT_EQ(0, origin.num_processed_requests());
   EXPECT_NE("DIRECT", info.proxy());
+  slow_proxy.Stop();
+}
+
+
+TEST_F(T_Download, SlowProxyEscalatesToDirectByDefault) {
+  // The mirror image of the test above, and the one that shows the gate is
+  // genuinely opt-in: with CVMFS_PROXY_FAILOVER_ON_SLOW left at its default a
+  // saturated proxy still promotes the DIRECT tier and the origin is still
+  // contacted unproxied, exactly as before this branch.
+  string src_path = GetSmallFile();
+  MockFileServer origin(8116, sandbox_path_);
+  int proxy_hits = 0;
+  MockHTTPServer slow_proxy(8117);
+  ASSERT_TRUE(
+      slow_proxy.SetResponseCallback(TruncatingProxyHandler, &proxy_hits));
+  ASSERT_TRUE(slow_proxy.Start());
+
+  download_mgr.SetProxyChain("http://127.0.0.1:8117;DIRECT", "",
+                             DownloadManager::kSetProxyBoth);
+  download_mgr.SetRetryParameters(2, 0, 0);
+
+  const string url = "http://127.0.0.1:8116/" + GetFileName(src_path);
+  cvmfs::MemSink sink;
+  JobInfo info(&url, false /* compressed */, false /* probe hosts */, NULL,
+               &sink);
+  download_mgr.Fetch(&info);
+
+  EXPECT_GT(proxy_hits, 0) << "the proxy was never even tried";
+  EXPECT_EQ("DIRECT", info.proxy());
+  EXPECT_GT(origin.num_processed_requests(), 0);
   slow_proxy.Stop();
 }
 
@@ -817,6 +889,7 @@ TEST_F(T_Download, SlowProxyDoesNotEscalateToFallback) {
       fallback_proxy.SetResponseCallback(CountingProxyHandler, &fallback_hits));
   ASSERT_TRUE(fallback_proxy.Start());
 
+  download_mgr.SetProxyFailoverOnSlow(false);
   download_mgr.SetProxyChain("http://127.0.0.1:8113",
                              "http://127.0.0.1:8114",
                              DownloadManager::kSetProxyBoth);

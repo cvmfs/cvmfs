@@ -637,9 +637,10 @@ TEST_F(T_MountPoint, History) {
 
 
 TEST_F(T_MountPoint, ExternalDownloadMgrInheritsProxyChain) {
-  // Without CVMFS_EXTERNAL_HTTP_PROXY the external download manager used to be
-  // handed the literal string "DIRECT", so external data bypassed the proxy
-  // that had been configured for everything else.  It must inherit instead.
+  // Without CVMFS_EXTERNAL_HTTP_PROXY the external download manager is handed
+  // the literal string "DIRECT", so external data bypasses the proxy that was
+  // configured for everything else.  That stays the default; under
+  // CVMFS_PROXY_MANDATORY it must inherit the regular chain instead.
   CreateMiniRepository(&options_mgr_, &repo_path_);
   // CreateMiniRepository sets DIRECT; override it afterwards.  The repository
   // is served over file://, which ignores proxies, so the mount still boots.
@@ -649,6 +650,16 @@ TEST_F(T_MountPoint, ExternalDownloadMgrInheritsProxyChain) {
   std::unique_ptr<FileSystem> fs(FileSystem::Create(fs_info_));
   ASSERT_EQ(loader::kFailOk, fs->boot_status());
 
+  // Default: unchanged, the external manager connects directly.
+  {
+    std::unique_ptr<MountPoint> mp(
+        MountPoint::Create("keys.cern.ch", fs.get()));
+    ASSERT_EQ(loader::kFailOk, mp->boot_status());
+    EXPECT_EQ("DIRECT", mp->external_download_mgr()->GetProxyList());
+    EXPECT_EQ("", mp->external_download_mgr()->GetFallbackProxyList());
+  }
+
+  options_mgr_.SetValue("CVMFS_PROXY_MANDATORY", "yes");
   {
     std::unique_ptr<MountPoint> mp(
         MountPoint::Create("keys.cern.ch", fs.get()));

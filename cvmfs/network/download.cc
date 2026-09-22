@@ -1999,7 +1999,9 @@ DownloadManager::DownloadManager(const unsigned max_pool_handles,
     , opt_proxy_groups_current_burned_(0)
     , opt_proxy_groups_fallback_(0)
     , opt_num_proxies_(0)
+    , opt_proxy_require_(false)
     , opt_proxy_mandatory_(false)
+    , opt_proxy_failover_on_slow_(true)
     , opt_proxy_shard_(false)
     , failover_indefinitely_(false)
     , name_(name)
@@ -2494,15 +2496,17 @@ void DownloadManager::SwitchProxy(JobInfo *info) {
     if (opt_proxy_groups_->size() > 1) {
       const unsigned next_group = (opt_proxy_groups_current_ + 1)
                                   % opt_proxy_groups_->size();
-      // Leaving the local proxy set -- for an unproxied connection, or for an
-      // off-site fallback proxy -- needs evidence that the local proxy is
-      // actually unreachable.  A proxy that is merely saturated answers
-      // requests, just too slowly, and reports itself as "too slow" or as a
-      // short transfer; that is a throughput symptom, not a dead peer, and
-      // escalating on it is what silently moved traffic off-site under load.
-      // Stay on the group instead; the burn counter has just been cleared, so
-      // the proxy is usable again and the normal retry and backoff path
-      // decides whether the request ultimately fails.
+      // With CVMFS_PROXY_FAILOVER_ON_SLOW turned off, leaving the local
+      // proxy set -- for an unproxied connection, or for an off-site fallback
+      // proxy -- needs evidence that the local proxy is actually unreachable.
+      // A proxy that is merely saturated answers requests, just too slowly,
+      // and reports itself as "too slow" or as a short transfer; that is a
+      // throughput symptom, not a dead peer, and escalating on it is what
+      // silently moves traffic off-site under load.  Stay on the group
+      // instead; the burn counter has just been cleared, so the proxy is
+      // usable again and the normal retry and backoff path decides whether
+      // the request ultimately fails.  The default leaves this step ungated,
+      // as it has always been.
       //
       // Note the test is peer_unresponsive(), not kFailProxyConnection:
       // libcurl reports a refused connect as CURLE_COULDNT_CONNECT but an
@@ -2517,7 +2521,8 @@ void DownloadManager::SwitchProxy(JobInfo *info) {
       const bool would_escalate = IsEscalatedProxyGroup(next_group)
                                   && !IsEscalatedProxyGroup(
                                       opt_proxy_groups_current_);
-      if (would_escalate && !proxy_unreachable) {
+      if (!opt_proxy_failover_on_slow_ && would_escalate
+          && !proxy_unreachable) {
         LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
                  "(manager '%s' - id %" PRId64 ") "
                  "keeping proxy group %u: '%s' does not show the proxy to be "
@@ -3068,31 +3073,51 @@ void DownloadManager::SetProxyChain(const string &proxy_list,
              "(manager '%s') fallback proxies do not support DIRECT, removing",
              name_.c_str());
   }
-  // Keep a DIRECT tier if one was configured, but never let DIRECT compete
-  // with a healthy proxy inside a load-balance group.  Unlike the previous
-  // behaviour, a configured DIRECT is no longer discarded merely because
-  // fallback proxies also exist: "proxy;DIRECT" keeps meaning "use the proxy,
-  // and connect directly only once it has failed".  Under the EGI
-  // configuration repository fallback proxies are always present, so
-  // ";DIRECT" used to be silently inert.
-  bool has_direct_group = false;
-  set_proxy_list = DemoteDirect(opt_proxy_list_, &has_direct_group);
-  if (set_proxy_list != opt_proxy_list_) {
-    LogCvmfs(kLogDownload, kLogSyslog | kLogDebug,
-             "(manager '%s') proxy chain '%s' normalised to '%s': DIRECT is "
-             "only used as a last resort, never alongside a live proxy",
-             name_.c_str(), opt_proxy_list_.c_str(), set_proxy_list.c_str());
-  }
+  if (!opt_proxy_require_) {
+    // Default: the chain is assembled exactly as it always has been.  A
+    // configured DIRECT is discarded outright whenever fallback proxies also
+    // exist, and a DIRECT sharing a load-balance group with a real proxy is
+    // kept as a peer of it.  See the branch below for why CVMFS_PROXY_MANDATORY
+    // changes both.
+    if (set_proxy_fallback_list == "") {
+      set_proxy_list = opt_proxy_list_;
+    } else {
+      const bool contains_direct = StripDirect(opt_proxy_list_,
+                                               &set_proxy_list);
+      if (contains_direct) {
+        LogCvmfs(kLogDownload, kLogSyslog | kLogDebug,
+                 "(manager '%s') skipping DIRECT proxy to use fallback proxy",
+                 name_.c_str());
+      }
+    }
+    opt_proxy_mandatory_ = false;
+  } else {
+    // CVMFS_PROXY_MANDATORY.  Keep a DIRECT tier if one was configured, but
+    // never let DIRECT compete with a healthy proxy inside a load-balance
+    // group.  A configured DIRECT is no longer discarded merely because
+    // fallback proxies also exist: "proxy;DIRECT" keeps meaning "use the
+    // proxy, and connect directly only once it has failed".  Under the EGI
+    // configuration repository fallback proxies are always present, so
+    // ";DIRECT" is otherwise silently inert.
+    bool has_direct_group = false;
+    set_proxy_list = DemoteDirect(opt_proxy_list_, &has_direct_group);
+    if (set_proxy_list != opt_proxy_list_) {
+      LogCvmfs(kLogDownload, kLogSyslog | kLogDebug,
+               "(manager '%s') proxy chain '%s' normalised to '%s': DIRECT is "
+               "only used as a last resort, never alongside a live proxy",
+               name_.c_str(), opt_proxy_list_.c_str(), set_proxy_list.c_str());
+    }
 
-  // A direct connection is an acceptable substitute for the proxy only where
-  // something asked for one.  DemoteDirect() has left any DIRECT tier as a
-  // group of its own, so what StripDirect() removes here is exactly that tier
-  // and what remains is the real proxies.
-  string real_proxies;
-  StripDirect(set_proxy_list, &real_proxies);
-  opt_proxy_mandatory_ = !has_direct_group
-                         && ((real_proxies != "")
-                             || (set_proxy_fallback_list != ""));
+    // A direct connection is an acceptable substitute for the proxy only
+    // where something asked for one.  DemoteDirect() has left any DIRECT tier
+    // as a group of its own, so what StripDirect() removes here is exactly
+    // that tier and what remains is the real proxies.
+    string real_proxies;
+    StripDirect(set_proxy_list, &real_proxies);
+    opt_proxy_mandatory_ = !has_direct_group
+                           && ((real_proxies != "")
+                               || (set_proxy_fallback_list != ""));
+  }
 
   // From this point on, use set_proxy_list and set_fallback_proxy_list as
   // effective proxy lists!
@@ -3366,6 +3391,24 @@ void DownloadManager::UpdateProxiesUnlocked(const string &reason) {
 }
 
 /**
+ * Opts in to CVMFS_PROXY_MANDATORY.  Must be called before the proxy chain is
+ * installed: SetProxyChain() reads the policy while it normalises the chain,
+ * and a chain already in place is not revisited.
+ */
+void DownloadManager::EnableMandatoryProxy() { opt_proxy_require_ = true; }
+
+
+/**
+ * CVMFS_PROXY_FAILOVER_ON_SLOW.  True, the default, is the long-standing
+ * behaviour: any proxy failure may carry the request out of the local proxy
+ * set.  False requires the proxy to look unreachable first, see SwitchProxy().
+ */
+void DownloadManager::SetProxyFailoverOnSlow(bool value) {
+  opt_proxy_failover_on_slow_ = value;
+}
+
+
+/**
  * Enable proxy sharding
  */
 void DownloadManager::ShardProxies() {
@@ -3554,7 +3597,9 @@ void DownloadManager::CloneProxyConfig(DownloadManager *clone) {
   clone->opt_proxy_groups_current_ = opt_proxy_groups_current_;
   clone->opt_proxy_groups_current_burned_ = opt_proxy_groups_current_burned_;
   clone->opt_proxy_groups_fallback_ = opt_proxy_groups_fallback_;
+  clone->opt_proxy_require_ = opt_proxy_require_;
   clone->opt_proxy_mandatory_ = opt_proxy_mandatory_;
+  clone->opt_proxy_failover_on_slow_ = opt_proxy_failover_on_slow_;
   clone->opt_num_proxies_ = opt_num_proxies_;
   clone->opt_proxy_shard_ = opt_proxy_shard_;
   clone->opt_proxy_list_ = opt_proxy_list_;
