@@ -73,6 +73,7 @@ void JobInfo::Init() {
   tracing_header_gid_ = NULL;
   tracing_header_uid_ = NULL;
   nocache_ = false;
+  peer_unresponsive_ = false;
   error_code_ = kFailOther;
   http_code_ = -1;
   link_ = "";

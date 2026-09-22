@@ -133,6 +133,28 @@ static Failures PrepareDownloadDestination(JobInfo *info) {
 
 
 /**
+ * True when the TCP connect for this transfer completed, whatever happened
+ * afterwards.  It tells a peer that never answered apart from one that
+ * answered and then misbehaved, which is the difference between "look
+ * elsewhere" and "stay here".
+ *
+ * CURLINFO_CONNECT_TIME rather than the newer CURLINFO_CONNECT_TIME_T: the
+ * build accepts libcurl from 7.55.0 (see externals/libcurl/CMakeLists.txt)
+ * while the _T variant only arrived in 7.61.0.  The two carry the same
+ * meaning and differ only in resolution, and all that is asked here is
+ * whether the value is still zero, so the older one needs no version guard.
+ */
+static bool ConnectCompleted(CURL *handle) {
+  double connect_time = 0.0;
+  if (curl_easy_getinfo(handle, CURLINFO_CONNECT_TIME, &connect_time)
+      != CURLE_OK) {
+    return false;
+  }
+  return connect_time > 0.0;
+}
+
+
+/**
  * Called by curl for every HTTP header. Not called for file:// transfers.
  */
 static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
@@ -1485,6 +1507,12 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
            info->proxy().c_str(), curl_error);
   UpdateStatistics(info->curl_handle());
 
+  // Classify this attempt on its own evidence.  A retry reuses the same
+  // JobInfo and the same curl handle, so a peer_unresponsive_ left true by an
+  // earlier attempt would otherwise let SwitchProxy() act on evidence that no
+  // longer applies.  The branches below set it from this result.
+  info->SetPeerUnresponsive(false);
+
   bool was_metalink;
   std::string typ;
   if (info->current_metalink_chain_index() >= 0) {
@@ -1549,6 +1577,14 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
       info->SetErrorCode(kFailHostResolve);
       break;
     case CURLE_OPERATION_TIMEDOUT:
+      // A timeout means one of two opposite things.  If the connection never
+      // came up, nobody answered: the peer is unreachable, which is exactly
+      // the case that justifies looking elsewhere.  If it did come up and the
+      // transfer then crawled, the peer is alive and merely saturated, and
+      // abandoning it would move traffic off-site for no good reason.  The
+      // connect time stays zero while the connect has not completed, so it
+      // separates the two; see ConnectCompleted().
+      info->SetPeerUnresponsive(!ConnectCompleted(info->curl_handle()));
       info->SetErrorCode((info->proxy() == "DIRECT") ? kFailHostTooSlow
                                                      : kFailProxyTooSlow);
       break;
@@ -1559,7 +1595,23 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
                                                      : kFailProxyShortTransfer);
       break;
     case CURLE_FILE_COULDNT_READ_FILE:
-    case CURLE_COULDNT_CONNECT:
+    case CURLE_COULDNT_CONNECT: {
+      // A refused connection comes back in about a round trip and proves that
+      // something is listening and actively rejecting -- a proxy out of slots,
+      // not a dead one.  It is the opposite of unresponsive.
+      //
+      // CURLE_COULDNT_CONNECT is not only a refusal, though: it also covers
+      // ENETUNREACH, EHOSTUNREACH and similar, where nothing was reached at
+      // all.  Ask the OS error which of the two happened rather than assuming
+      // either way.
+      if (curl_error == CURLE_COULDNT_CONNECT) {
+        long os_errno = 0;  // NOLINT(runtime/int) -- libcurl's getinfo type
+        if (curl_easy_getinfo(info->curl_handle(), CURLINFO_OS_ERRNO,
+                              &os_errno)
+            == CURLE_OK) {
+          info->SetPeerUnresponsive(os_errno != ECONNREFUSED);
+        }
+      }
       if (info->proxy() != "DIRECT") {
         // This is a guess.  Fail-over can still change to switching host
         info->SetErrorCode(kFailProxyConnection);
@@ -1567,6 +1619,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
         info->SetErrorCode(kFailHostConnection);
       }
       break;
+    }
     case CURLE_TOO_MANY_REDIRECTS:
       info->SetErrorCode(kFailHostConnection);
       break;

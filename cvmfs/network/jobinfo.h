@@ -100,6 +100,7 @@ class JobInfo {
   std::string proxy_;
   std::string link_;
   bool nocache_;
+  bool peer_unresponsive_;
   Failures error_code_;
   int http_code_;
   unsigned char num_used_proxies_;
@@ -201,6 +202,14 @@ class JobInfo {
   std::string proxy() const { return proxy_; }
   std::string link() const { return link_; }
   bool nocache() const { return nocache_; }
+  /**
+   * True when the failure means the peer never answered at all: the connect
+   * ran out of time without completing, or the network reported the peer as
+   * unreachable.  A refused connection does not count -- the peer answered,
+   * with a reset -- and neither does a connection that was established and
+   * then ran slowly.
+   */
+  bool peer_unresponsive() const { return peer_unresponsive_; }
   Failures error_code() const { return error_code_; }
   int http_code() const { return http_code_; }
   unsigned char num_used_proxies() const { return num_used_proxies_; }
@@ -257,6 +266,7 @@ class JobInfo {
   void SetProxy(const std::string &proxy) { proxy_ = proxy; }
   void SetLink(const std::string &link) { link_ = link; }
   void SetNocache(bool nocache) { nocache_ = nocache; }
+  void SetPeerUnresponsive(bool v) { peer_unresponsive_ = v; }
   void SetErrorCode(Failures error_code) { error_code_ = error_code; }
   void SetHttpCode(int http_code) { http_code_ = http_code; }
   void SetNumUsedProxies(unsigned char num_used_proxies) {
