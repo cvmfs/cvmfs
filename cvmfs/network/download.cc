@@ -1916,6 +1916,7 @@ DownloadManager::DownloadManager(const unsigned max_pool_handles,
     , opt_proxy_groups_current_burned_(0)
     , opt_proxy_groups_fallback_(0)
     , opt_num_proxies_(0)
+    , opt_proxy_mandatory_(false)
     , opt_proxy_shard_(false)
     , failover_indefinitely_(false)
     , name_(name)
@@ -2837,6 +2838,55 @@ bool DownloadManager::ValidateGeoReply(const string &reply_order,
 
 
 /**
+ * Keeps DIRECT as a failover tier of its own but never as a peer of a real
+ * proxy.
+ *
+ * "proxy;DIRECT" is the documented way of asking for "use the proxy, and only
+ * if it has failed connect directly".  Load-balance groups, however, are
+ * chosen from at random, so a DIRECT sharing a group with a real proxy
+ * ("proxy|DIRECT") would send a share of the traffic unproxied while the
+ * proxy is perfectly healthy.  DIRECT is therefore dropped from any group that
+ * also holds a real proxy, and kept when it forms a group on its own.  Because
+ * proxy groups are tried in order, the surviving DIRECT group is only reached
+ * after every proxy in the preceding groups has been burned.
+ *
+ * *has_direct_group is set when such a DIRECT-only group survives.
+ */
+string DownloadManager::DemoteDirect(const string &proxy_list,
+                                     bool *has_direct_group) {
+  assert(has_direct_group);
+  *has_direct_group = false;
+  if (proxy_list == "")
+    return "";
+
+  const vector<string> groups = SplitString(proxy_list, ';');
+  vector<string> kept_groups;
+  for (unsigned i = 0; i < groups.size(); ++i) {
+    const vector<string> members = SplitString(groups[i], '|');
+    vector<string> real_members;
+    bool group_has_direct = false;
+    for (unsigned j = 0; j < members.size(); ++j) {
+      if (members[j] == "DIRECT") {
+        group_has_direct = true;
+        continue;
+      }
+      if (members[j] == "")
+        continue;
+      real_members.push_back(members[j]);
+    }
+    if (!real_members.empty()) {
+      kept_groups.push_back(JoinStrings(real_members, "|"));
+    } else if (group_has_direct) {
+      kept_groups.push_back("DIRECT");
+      *has_direct_group = true;
+    }
+  }
+
+  return JoinStrings(kept_groups, ";");
+}
+
+
+/**
  * Removes DIRECT from a list of ';' and '|' separated proxies.
  * \return true if DIRECT was present, false otherwise
  */
@@ -2901,16 +2951,31 @@ void DownloadManager::SetProxyChain(const string &proxy_list,
              "(manager '%s') fallback proxies do not support DIRECT, removing",
              name_.c_str());
   }
-  if (set_proxy_fallback_list == "") {
-    set_proxy_list = opt_proxy_list_;
-  } else {
-    const bool contains_direct = StripDirect(opt_proxy_list_, &set_proxy_list);
-    if (contains_direct) {
-      LogCvmfs(kLogDownload, kLogSyslog | kLogDebug,
-               "(manager '%s') skipping DIRECT proxy to use fallback proxy",
-               name_.c_str());
-    }
+  // Keep a DIRECT tier if one was configured, but never let DIRECT compete
+  // with a healthy proxy inside a load-balance group.  Unlike the previous
+  // behaviour, a configured DIRECT is no longer discarded merely because
+  // fallback proxies also exist: "proxy;DIRECT" keeps meaning "use the proxy,
+  // and connect directly only once it has failed".  Under the EGI
+  // configuration repository fallback proxies are always present, so
+  // ";DIRECT" used to be silently inert.
+  bool has_direct_group = false;
+  set_proxy_list = DemoteDirect(opt_proxy_list_, &has_direct_group);
+  if (set_proxy_list != opt_proxy_list_) {
+    LogCvmfs(kLogDownload, kLogSyslog | kLogDebug,
+             "(manager '%s') proxy chain '%s' normalised to '%s': DIRECT is "
+             "only used as a last resort, never alongside a live proxy",
+             name_.c_str(), opt_proxy_list_.c_str(), set_proxy_list.c_str());
   }
+
+  // A direct connection is an acceptable substitute for the proxy only where
+  // something asked for one.  DemoteDirect() has left any DIRECT tier as a
+  // group of its own, so what StripDirect() removes here is exactly that tier
+  // and what remains is the real proxies.
+  string real_proxies;
+  StripDirect(set_proxy_list, &real_proxies);
+  opt_proxy_mandatory_ = !has_direct_group
+                         && ((real_proxies != "")
+                             || (set_proxy_fallback_list != ""));
 
   // From this point on, use set_proxy_list and set_fallback_proxy_list as
   // effective proxy lists!
@@ -3336,6 +3401,7 @@ void DownloadManager::CloneProxyConfig(DownloadManager *clone) {
   clone->opt_proxy_groups_current_ = opt_proxy_groups_current_;
   clone->opt_proxy_groups_current_burned_ = opt_proxy_groups_current_burned_;
   clone->opt_proxy_groups_fallback_ = opt_proxy_groups_fallback_;
+  clone->opt_proxy_mandatory_ = opt_proxy_mandatory_;
   clone->opt_num_proxies_ = opt_num_proxies_;
   clone->opt_proxy_shard_ = opt_proxy_shard_;
   clone->opt_proxy_list_ = opt_proxy_list_;

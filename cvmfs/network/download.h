@@ -265,6 +265,8 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   static void *MainDownload(void *data);
 
   bool StripDirect(const std::string &proxy_list, std::string *cleaned_list);
+  std::string DemoteDirect(const std::string &proxy_list,
+                           bool *has_direct_group);
   bool ValidateGeoReply(const std::string &reply_order,
                         const unsigned expected_size,
                         std::vector<uint64_t> *reply_vals);
@@ -375,6 +377,16 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
    * Overall number of proxies summed over all the groups.
    */
   unsigned opt_num_proxies_;
+  /**
+   * True when a real (non-DIRECT) proxy is configured and the configuration
+   * offers no DIRECT tier to fall back on.  While this holds, a direct
+   * connection is never an acceptable substitute for the proxy and requests
+   * are failed instead of silently bypassing it.  Writing DIRECT into the
+   * chain, as in "proxy;DIRECT", clears the flag and re-enables an unproxied
+   * last resort -- reached only once the proxy has actually failed, see
+   * DemoteDirect().  Configurations with no proxy at all also leave it false.
+   */
+  bool opt_proxy_mandatory_;
   /**
    * The original proxy list provided to SetProxyChain.
    */
