@@ -2315,7 +2315,16 @@ bool MountPoint::SetupExternalDownloadMgr(bool dogeosort) {
     }
   }
 
-  string proxies = "DIRECT";
+  // Without an explicit setting, inherit the regular download manager's proxy
+  // configuration rather than defaulting to DIRECT.  Defaulting to DIRECT made
+  // external data bypass a proxy that the administrator had configured for
+  // everything else, which is both surprising and, where only proxied traffic
+  // is permitted to leave the host, a silent leak that has nothing to do with
+  // failover.  CVMFS_EXTERNAL_HTTP_PROXY=DIRECT still asks for it explicitly.
+  string proxies = download_mgr_->GetProxyList();
+  string fallback_proxies = download_mgr_->GetFallbackProxyList();
+  if (proxies == "")
+    proxies = "DIRECT";
   if (options_mgr_->GetValue("CVMFS_EXTERNAL_HTTP_PROXY", &optarg)) {
     proxies = download::ResolveProxyDescription(
         optarg,
@@ -2326,8 +2335,11 @@ bool MountPoint::SetupExternalDownloadMgr(bool dogeosort) {
       boot_status_ = loader::kFailWpad;
       return false;
     }
+    // An explicit external chain replaces the inherited one outright; a
+    // fallback list inherited from the regular manager would otherwise be
+    // silently appended to it.
+    fallback_proxies = "";
   }
-  string fallback_proxies;
   if (options_mgr_->GetValue("CVMFS_EXTERNAL_FALLBACK_PROXY", &optarg))
     fallback_proxies = optarg;
   external_download_mgr_->SetProxyChain(
