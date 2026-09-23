@@ -40,15 +40,22 @@ GarbageCollector<CatalogTraversalT, HashFilterT>::GarbageCollector(
     , use_reflog_timestamps_(false)
     , oldest_trunk_catalog_(static_cast<uint64_t>(-1))
     , oldest_trunk_catalog_found_(false)
-    , preserved_catalogs_(0)
-    , unreferenced_trees_(0)
-    , condemned_trees_(0)
-    , condemned_catalogs_(0)
-    , last_reported_status_(0.0)
-    , condemned_objects_(0)
-    , condemned_bytes_(0)
-    , duplicate_delete_requests_(0) {
+    , unreferenced_trees_(0) {
+  atomic_init64(&preserved_catalogs_);
+  atomic_init64(&condemned_trees_);
+  atomic_init64(&condemned_catalogs_);
+  atomic_init32(&last_reported_status_);
+  atomic_init64(&condemned_objects_);
+  atomic_init64(&condemned_bytes_);
+  atomic_init64(&duplicate_delete_requests_);
+  pthread_mutex_init(&log_mutex_, NULL);
   assert(configuration_.uploader != NULL);
+}
+
+
+template<class CatalogTraversalT, class HashFilterT>
+GarbageCollector<CatalogTraversalT, HashFilterT>::~GarbageCollector() {
+  pthread_mutex_destroy(&log_mutex_);
 }
 
 
@@ -82,7 +89,7 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::PreserveDataObjects(
                            HashFilterT>::TraversalCallbackDataTN
         &data  // NOLINT(runtime/references)
 ) {
-  ++preserved_catalogs_;
+  atomic_inc64(&preserved_catalogs_);
 
   if (data.catalog->IsRoot()) {
     const uint64_t mtime = use_reflog_timestamps_
@@ -130,9 +137,9 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::SweepDataObjects(
                            HashFilterT>::TraversalCallbackDataTN
         &data  // NOLINT(runtime/references)
 ) {
-  ++condemned_catalogs_;
+  atomic_inc64(&condemned_catalogs_);
   if (data.catalog->IsRoot())
-    ++condemned_trees_;
+    atomic_inc64(&condemned_trees_);
 
   if (configuration_.verbose) {
     if (data.catalog->IsRoot()) {
@@ -157,15 +164,27 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::SweepDataObjects(
   // the catalog itself is also condemned and needs to be removed
   CheckAndSweep(data.catalog->hash());
 
-  float threshold = static_cast<float>(condemned_trees_)
-                    / static_cast<float>(unreferenced_trees_);
-  if (threshold > last_reported_status_ + 0.1) {
-    LogCvmfs(kLogGc, kLogStdout | kLogDebug,
-             "      - %02.0f%%    %" PRIu64 " / %" PRIu64
-             " unreferenced revisions removed [%s]",
-             100.0 * threshold, condemned_trees_, unreferenced_trees_,
-             RfcTimestamp().c_str());
-    last_reported_status_ = threshold;
+  // Progress reporting.  Use integer percent so the shared counter can be
+  // an atomic_int32 updated via CAS -- this ensures each 10%-bucket logs
+  // at most once even if several threads cross the threshold concurrently.
+  // The CAS is retried so that when two threads race (e.g. one with pct=20
+  // and one with pct=30 against last=10), the loser still publishes its
+  // bucket instead of being silently dropped.
+  const int64_t condemned_trees = atomic_read64(&condemned_trees_);
+  const int32_t pct = static_cast<int32_t>(
+      (100.0 * static_cast<float>(condemned_trees))
+      / static_cast<float>(unreferenced_trees_));
+  for (;;) {
+    const int32_t last_pct = atomic_read32(&last_reported_status_);
+    if (pct < last_pct + 10) break;
+    if (atomic_cas32(&last_reported_status_, last_pct, pct)) {
+      LogCvmfs(kLogGc, kLogStdout | kLogDebug,
+               "      - %d%%    %" PRIu64 " / %" PRIu64
+               " unreferenced revisions removed [%s]",
+               pct, static_cast<uint64_t>(condemned_trees),
+               unreferenced_trees_, RfcTimestamp().c_str());
+      break;
+    }
   }
 }
 
@@ -173,12 +192,13 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::SweepDataObjects(
 template<class CatalogTraversalT, class HashFilterT>
 void GarbageCollector<CatalogTraversalT, HashFilterT>::CheckAndSweep(
     const shash::Any &hash) {
+  // hash_filter_ is read-only during the sweep phase (mark phase has
+  // completed), so Contains() needs no synchronization.
   if (!hash_filter_.Contains(hash)) {
-    if (!hash_map_delete_requests_.Contains(hash)) {
-      hash_map_delete_requests_.Fill(hash);
+    if (!hash_map_delete_requests_.ContainsOrInsert(hash)) {
       Sweep(hash);
     } else {
-      ++duplicate_delete_requests_;
+      atomic_inc64(&duplicate_delete_requests_);
       LogCvmfs(kLogGc, kLogDebug, "Hash %s already marked as to delete",
                hash.ToString().c_str());
     }
@@ -189,12 +209,12 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::CheckAndSweep(
 template<class CatalogTraversalT, class HashFilterT>
 void GarbageCollector<CatalogTraversalT, HashFilterT>::Sweep(
     const shash::Any &hash) {
-  ++condemned_objects_;
+  atomic_inc64(&condemned_objects_);
   if (configuration_.extended_stats) {
     if (!hash.HasSuffix() || hash.suffix == shash::kSuffixPartial) {
       int64_t condemned_bytes = configuration_.uploader->GetObjectSize(hash);
       if (condemned_bytes > 0) {
-        condemned_bytes_ += condemned_bytes;
+        atomic_xadd64(&condemned_bytes_, condemned_bytes);
       }
     }
   }
@@ -288,8 +308,26 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepReflog() {
     }
   }
   unreferenced_trees_ = to_sweep.size();
-  bool success = traversal_.TraverseList(to_sweep,
-                                         CatalogTraversalT::kDepthFirst);
+  // Publish all hash_filter_ writes from the (serial) mark phase before
+  // sweep workers begin reading it.  The matching acquire is provided by
+  // the parallel traversal's task-queue mutex: each worker's lock-acquire
+  // when it dequeues a sweep task synchronizes-with the producer's
+  // lock-release after this fence, so all hash_filter_ writes are visible
+  // before SweepDataObjects runs.  Made explicit for weakly-ordered
+  // architectures (e.g. ARM).
+  __atomic_thread_fence(__ATOMIC_RELEASE);
+  bool success;
+  {
+    struct SerializeCallbacksGuard {
+      CatalogTraversalT &traversal;
+      explicit SerializeCallbacksGuard(CatalogTraversalT &t) : traversal(t) {
+        traversal.SetSerializeCallbacks(false);
+      }
+      ~SerializeCallbacksGuard() { traversal.SetSerializeCallbacks(true); }
+    } guard(traversal_);
+    success = traversal_.TraverseList(to_sweep,
+                                      CatalogTraversalT::kDepthFirst);
+  }
   traversal_.UnregisterListener(callback);
 
   i = to_sweep.begin();
@@ -349,13 +387,14 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::PrintCatalogTreeEntry(
 
 template<class CatalogTraversalT, class HashFilterT>
 void GarbageCollector<CatalogTraversalT, HashFilterT>::LogDeletion(
-    const shash::Any &hash) const {
+    const shash::Any &hash) {
   if (configuration_.verbose) {
     LogCvmfs(kLogGc, kLogStdout | kLogDebug, "Sweep: %s",
              hash.ToStringWithSuffix().c_str());
   }
 
   if (configuration_.has_deletion_log()) {
+    MutexLockGuard guard(&log_mutex_);
     const int written = fprintf(configuration_.deleted_objects_logfile, "%s\n",
                                 hash.ToStringWithSuffix().c_str());
     if (written < 0) {

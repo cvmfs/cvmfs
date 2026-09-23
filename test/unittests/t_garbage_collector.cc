@@ -28,8 +28,20 @@ typedef MockedCatalogTraversal::Parameters TraversalParams;
 
 class GC_MockUploader : public AbstractMockUploader<GC_MockUploader> {
  public:
+  // Fixed byte size returned by DoGetObjectSize when mock_object_size_ is
+  // set.  Tests that exercise extended_stats assert the aggregated
+  // condemned_bytes counter equals condemned_objects_count * kMockObjectSize.
+  static const int64_t kMockObjectSize = 100;
+
   explicit GC_MockUploader(const SpoolerDefinition &spooler_definition)
-      : AbstractMockUploader<GC_MockUploader>(spooler_definition) { }
+      : AbstractMockUploader<GC_MockUploader>(spooler_definition)
+      , mock_object_size_(-EOPNOTSUPP) {
+    pthread_mutex_init(&deleted_hashes_mutex_, NULL);
+  }
+
+  virtual ~GC_MockUploader() {
+    pthread_mutex_destroy(&deleted_hashes_mutex_);
+  }
 
   virtual std::string name() const { return "GCMock"; }
 
@@ -54,21 +66,34 @@ class GC_MockUploader : public AbstractMockUploader<GC_MockUploader> {
   virtual void DoRemoveAsync(const std::string &file_to_delete) {
     shash::Any hash_to_delete(shash::MkFromSuffixedHexPtr(
         shash::HexPtr(file_to_delete.substr(5, 2) + file_to_delete.substr(8))));
-    deleted_hashes.insert(hash_to_delete);
+    {
+      MutexLockGuard guard(&deleted_hashes_mutex_);
+      deleted_hashes.insert(hash_to_delete);
+    }
     Respond(NULL, upload::UploaderResults());
   }
 
   virtual unsigned GetNumberOfErrors() const { return 0; }
   virtual int64_t DoGetObjectSize(const std::string &file_name) {
-    return -EOPNOTSUPP;
+    return mock_object_size_;
   }
 
   bool HasDeleted(const shash::Any &hash) const {
+    MutexLockGuard guard(&deleted_hashes_mutex_);
     return deleted_hashes.find(hash) != deleted_hashes.end();
   }
 
  public:
+  // Direct reads of deleted_hashes are only safe after Collect() has
+  // returned and all worker threads have joined.  Concurrent access during
+  // an in-flight sweep must go through HasDeleted(), which takes
+  // deleted_hashes_mutex_.
   std::set<shash::Any> deleted_hashes;
+  mutable pthread_mutex_t deleted_hashes_mutex_;
+  // Value returned by DoGetObjectSize.  Defaults to -EOPNOTSUPP to match
+  // historical behaviour; tests that need a real size set this to
+  // kMockObjectSize before invoking GC.
+  int64_t mock_object_size_;
 };
 
 typedef std::map<std::pair<unsigned int, std::string>, MockCatalog *>
@@ -1449,4 +1474,184 @@ TYPED_TEST(T_GarbageCollector, FindAndSweepOrphanedNamedSnapshot) {
   EXPECT_EQ(8u, new_gc.preserved_catalog_count());
   EXPECT_EQ(static_cast<unsigned>(t(25, 12, 2004)),
             new_gc.oldest_trunk_catalog());
+}
+
+
+//------------------------------------------------------------------------------
+// Concurrent sweep fixture -- parallel traversal only, because num_threads > 1
+// only makes sense with CatalogTraversalParallel.
+//------------------------------------------------------------------------------
+class T_GarbageCollectorConcurrentSweep
+    : public T_GarbageCollector<MockedCatalogTraversalParallel> { };
+
+
+TEST_F(T_GarbageCollectorConcurrentSweep, ConcurrentSweepWithMultipleThreads) {
+  // Same catalog hierarchy as KeepLastRevision but driven by four worker
+  // threads running sweep callbacks concurrently.  Asserts the same
+  // per-hash / per-catalog outcomes to verify that the thread-safe
+  // bookkeeping (atomic counters, ShardedHashFilter dedup) produces
+  // bit-identical results to the serial sweep.
+  GcConfiguration config = GetStandardGarbageCollectorConfiguration();
+  config.keep_history_depth = 0;
+  config.num_threads = 4;
+
+  MyGarbageCollector gc(config);
+  const bool success = gc.Collect();
+  EXPECT_TRUE(success);
+  EXPECT_EQ(11u, gc.preserved_catalog_count());
+  EXPECT_EQ(5u, gc.condemned_catalog_count());
+  EXPECT_EQ(0u, gc.duplicate_delete_requests());
+  EXPECT_EQ(static_cast<unsigned>(t(26, 12, 2004)), gc.oldest_trunk_catalog());
+
+  GC_MockUploader *upl = static_cast<GC_MockUploader *>(config.uploader);
+  RevisionMap &c = this->catalogs_;
+
+  // Preserved data objects (none of these should be swept).
+  EXPECT_FALSE(upl->HasDeleted(h("b52945d780f8cc16711d4e670d82499dad99032d")));
+  EXPECT_FALSE(upl->HasDeleted(h("d650d325d59ea9ca754f9b37293cd08d0b12584c")));
+  EXPECT_FALSE(upl->HasDeleted(h("4083d30ba1f72e1dfad4cdbfc60ea3c38bfa600d")));
+  EXPECT_FALSE(upl->HasDeleted(h("c308c87d518c86130d9b9d34723b2a7d4e232ce9")));
+  EXPECT_FALSE(upl->HasDeleted(h("8967a86ddf51d89aaad5ad0b7f29bdfc7f7aef2a")));
+  EXPECT_FALSE(upl->HasDeleted(h("372e393bb9f5c33440f842b47b8f6aa3ed4f2943")));
+  EXPECT_FALSE(upl->HasDeleted(h("50c44954ab4348a6a3772ee5bd30ab7a1494c692")));
+  EXPECT_FALSE(upl->HasDeleted(h("2dc2b87b8ac840e4fb1cad25c806395c931f7b31")));
+  EXPECT_FALSE(upl->HasDeleted(h("a727b47d99fba5fe196400a3c7bc1738172dff71")));
+  EXPECT_FALSE(upl->HasDeleted(h("80b59550342b6f5141b42e5b2d58ce453f12d710")));
+  EXPECT_FALSE(
+      upl->HasDeleted(h("defae1853b929bbbdbc7c6d4e75531273f1ae4cb", 'P')));
+  EXPECT_FALSE(
+      upl->HasDeleted(h("24bf4276fcdbe57e648b82af4e8fece5bd3581c7", 'P')));
+  EXPECT_FALSE(
+      upl->HasDeleted(h("acc4c10cf875861ec8d6744a9ab81cb2abe433b4", 'P')));
+  EXPECT_FALSE(
+      upl->HasDeleted(h("654be8b6938b3fb30be3e9476f3ed26db74e0a9e", 'P')));
+  EXPECT_FALSE(
+      upl->HasDeleted(h("1a17be523120c7d3a7be745ada1658cc74e8507b", 'P')));
+  EXPECT_FALSE(upl->HasDeleted(h("18588c597700a7e2d3b4ce91bdf5a947a4ad13fc")));
+  EXPECT_FALSE(upl->HasDeleted(h("fea3b5156ebbeddb89c85bc14c8e9caa185c10c7")));
+  EXPECT_FALSE(upl->HasDeleted(h("0aceb47a362df1522a69217736617493bef07d5a")));
+  EXPECT_FALSE(upl->HasDeleted(h("d2068490d25c1bd4ef2f3d3a0568a76046466860")));
+  EXPECT_FALSE(upl->HasDeleted(h("283144632474a0e553e3b61c1f272257942e7a61")));
+  EXPECT_FALSE(upl->HasDeleted(h("213bec88ed6729219d94fc9281893ba93fca2a02")));
+  EXPECT_FALSE(upl->HasDeleted(h("7d4d0ec225ebe13839d71c0dc0982567cc810402")));
+  EXPECT_FALSE(upl->HasDeleted(h("bb5a7bbe8410f0268a9b12285b6f1fd26e038023")));
+  EXPECT_FALSE(upl->HasDeleted(h("59b63e8478fb7fc02c54a85767c7116573907364")));
+  EXPECT_FALSE(upl->HasDeleted(h("09fd3486d370013d859651eb164ec71a3a09f5cb")));
+  EXPECT_FALSE(upl->HasDeleted(h("e0862f1d936037eb0c2be7ccf289f5dbf469244b")));
+  EXPECT_FALSE(upl->HasDeleted(h("8031b9ad81b52cd772db9b1b12d38994fdd9dbe4")));
+
+  EXPECT_FALSE(upl->HasDeleted(c[this->mp(5, "00")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[this->mp(5, "10")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[this->mp(5, "11")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[this->mp(5, "20")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[this->mp(2, "00")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[this->mp(2, "10")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[this->mp(2, "11")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[this->mp(4, "00")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[this->mp(4, "10")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[this->mp(4, "11")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[this->mp(4, "20")]->hash()));
+
+  // Condemned data objects.
+  EXPECT_TRUE(upl->HasDeleted(h("2e87adef242bc67cb66fcd61238ad808a7b44aab")));
+  EXPECT_TRUE(upl->HasDeleted(h("3bf4854891899670727fc8e9c6e454f7e4058454")));
+  EXPECT_TRUE(upl->HasDeleted(h("12ea064b069d98cb9da09219568ff2f8dd7d0a7e")));
+  EXPECT_TRUE(upl->HasDeleted(h("20c2e6328f943003254693a66434ff01ebba26f0")));
+  EXPECT_TRUE(upl->HasDeleted(h("219d1ca4c958bd615822f8c125701e73ce379428")));
+  EXPECT_TRUE(upl->HasDeleted(c[this->mp(1, "00")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(c[this->mp(1, "10")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(c[this->mp(3, "00")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(c[this->mp(3, "10")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(c[this->mp(3, "11")]->hash()));
+
+  EXPECT_EQ(11u, upl->deleted_hashes.size());
+}
+
+
+TEST_F(T_GarbageCollectorConcurrentSweep, ConcurrentSweepWithExtendedStats) {
+  // Enables extended_stats to exercise the concurrent
+  //   atomic_xadd64(&condemned_bytes_, uploader->GetObjectSize(hash))
+  // code path from multiple sweep threads.  The mock uploader returns a
+  // fixed size per object so the final byte total is deterministic.
+  GcConfiguration config = GetStandardGarbageCollectorConfiguration();
+  config.keep_history_depth = 0;
+  config.num_threads = 4;
+  config.extended_stats = true;
+  static_cast<GC_MockUploader *>(config.uploader)->mock_object_size_ =
+      GC_MockUploader::kMockObjectSize;
+
+  MyGarbageCollector gc(config);
+  const bool success = gc.Collect();
+  EXPECT_TRUE(success);
+  EXPECT_EQ(5u, gc.condemned_catalog_count());
+
+  GC_MockUploader *upl = static_cast<GC_MockUploader *>(config.uploader);
+  EXPECT_EQ(11u, upl->deleted_hashes.size());
+
+  // Sweep() only counts bytes for objects with no suffix or the Partial
+  // suffix.  Sum the expected total from the actual deleted-hash set so
+  // the assertion does not drift if the catalog hierarchy changes.
+  int64_t expected_bytes = 0;
+  for (std::set<shash::Any>::const_iterator i = upl->deleted_hashes.begin(),
+                                            iend = upl->deleted_hashes.end();
+       i != iend; ++i) {
+    if (!i->HasSuffix() || i->suffix == shash::kSuffixPartial) {
+      expected_bytes += GC_MockUploader::kMockObjectSize;
+    }
+  }
+  EXPECT_GT(expected_bytes, 0);
+  EXPECT_EQ(static_cast<uint64_t>(expected_bytes), gc.condemned_bytes_count());
+}
+
+
+TEST_F(T_GarbageCollectorConcurrentSweep, ConcurrentSweepWithDeletionLog) {
+  // Runs GC with four sweep threads against a real FILE* deletion log and
+  // then verifies every line is intact.  This is the most sensitive way a
+  // concurrent sweep could regress silently: interleaved fprintf() output
+  // would corrupt log lines without affecting counter totals.
+  string dest_path;
+  FILE *deletion_log = this->CreateTemporaryFile(&dest_path);
+  ASSERT_TRUE(deletion_log != NULL);
+  UnlinkGuard unlink_guard(dest_path);
+
+  GcConfiguration config = GetStandardGarbageCollectorConfiguration();
+  config.keep_history_depth = 0;
+  config.num_threads = 4;
+  config.deleted_objects_logfile = deletion_log;
+
+  MyGarbageCollector gc(config);
+  const bool success = gc.Collect();
+  EXPECT_TRUE(success);
+  EXPECT_EQ(5u, gc.condemned_catalog_count());
+
+  GC_MockUploader *upl = static_cast<GC_MockUploader *>(config.uploader);
+  ASSERT_EQ(11u, upl->deleted_hashes.size());
+
+  // Build the expected set of textual hashes from the uploader's view of
+  // what was actually swept.  Every line in the log must match one of
+  // these entries exactly (no truncation, no interleaving).
+  std::set<std::string> expected_lines;
+  for (std::set<shash::Any>::const_iterator i = upl->deleted_hashes.begin(),
+                                            iend = upl->deleted_hashes.end();
+       i != iend; ++i) {
+    expected_lines.insert(i->ToStringWithSuffix());
+  }
+  ASSERT_EQ(11u, expected_lines.size());
+
+  // Read the log back from start; every line must be present in the
+  // expected set and every line must be unique.
+  ASSERT_EQ(0, fseek(deletion_log, 0, SEEK_SET));
+  std::set<std::string> seen_lines;
+  std::string log_line;
+  while (GetLineFile(deletion_log, &log_line)) {
+    EXPECT_FALSE(log_line.empty())
+        << "empty line in deletion log indicates a corrupted write";
+    EXPECT_EQ(1u, expected_lines.count(log_line))
+        << "unexpected or corrupted log line: '" << log_line << "'";
+    EXPECT_TRUE(seen_lines.insert(log_line).second)
+        << "duplicate log line: '" << log_line << "'";
+  }
+  fclose(deletion_log);
+
+  EXPECT_EQ(expected_lines.size(), seen_lines.size());
 }

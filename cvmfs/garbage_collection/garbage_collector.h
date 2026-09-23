@@ -33,6 +33,7 @@
 #define CVMFS_GARBAGE_COLLECTION_GARBAGE_COLLECTOR_H_
 
 #include <inttypes.h>
+#include <pthread.h>
 
 #include <vector>
 
@@ -40,6 +41,8 @@
 #include "garbage_collection/hash_filter.h"
 #include "statistics.h"
 #include "upload_facility.h"
+#include "util/atomic.h"
+#include "util/mutex.h"
 
 template<class CatalogTraversalT, class HashFilterT>
 class GarbageCollector {
@@ -89,17 +92,26 @@ class GarbageCollector {
 
  public:
   explicit GarbageCollector(const Configuration &configuration);
+  ~GarbageCollector();
 
   void UseReflogTimestamps();
   bool Collect();
 
-  uint64_t preserved_catalog_count() const { return preserved_catalogs_; }
-  uint64_t condemned_catalog_count() const { return condemned_catalogs_; }
-  uint64_t condemned_objects_count() const { return condemned_objects_; }
-  uint64_t duplicate_delete_requests() const {
-    return duplicate_delete_requests_;
+  uint64_t preserved_catalog_count() const {
+    return atomic_read64(&preserved_catalogs_);
   }
-  uint64_t condemned_bytes_count() const { return condemned_bytes_; }
+  uint64_t condemned_catalog_count() const {
+    return atomic_read64(&condemned_catalogs_);
+  }
+  uint64_t condemned_objects_count() const {
+    return atomic_read64(&condemned_objects_);
+  }
+  uint64_t duplicate_delete_requests() const {
+    return atomic_read64(&duplicate_delete_requests_);
+  }
+  uint64_t condemned_bytes_count() const {
+    return atomic_read64(&condemned_bytes_);
+  }
   uint64_t oldest_trunk_catalog() const { return oldest_trunk_catalog_; }
 
  protected:
@@ -118,7 +130,7 @@ class GarbageCollector {
 
   void PrintCatalogTreeEntry(const unsigned int tree_level,
                              const CatalogTN *catalog) const;
-  void LogDeletion(const shash::Any &hash) const;
+  void LogDeletion(const shash::Any &hash);
 
  private:
   class ReflogBasedInfoShim
@@ -144,8 +156,13 @@ class GarbageCollector {
   ReflogBasedInfoShim catalog_info_shim_;
   CatalogTraversalT traversal_;
   HashFilterT hash_filter_;
-  HashFilterT hash_map_delete_requests_;
-
+  /// Hashes already dispatched for deletion, so each object is deleted at
+  /// most once.  Written concurrently from sweep threads.
+  ShardedHashFilter hash_map_delete_requests_;
+  /**
+   * Protects fprintf() to configuration_.deleted_objects_logfile.
+   */
+  pthread_mutex_t log_mutex_;
 
   bool use_reflog_timestamps_;
   /**
@@ -156,28 +173,31 @@ class GarbageCollector {
    */
   uint64_t oldest_trunk_catalog_;
   bool oldest_trunk_catalog_found_;
-  uint64_t preserved_catalogs_;
+  mutable atomic_int64 preserved_catalogs_;
   /**
    * Number of catalogs in the reflog that are to be deleted (in fact, some of
-   * them might not exist anymore).
+   * them might not exist anymore).  Set once before the sweep traversal starts
+   * and read-only during sweep, so no atomicity required.
    */
   uint64_t unreferenced_trees_;
   /**
    * Number of root catalogs garbage collected, count grows as GC progresses
    */
-  uint64_t condemned_trees_;
+  mutable atomic_int64 condemned_trees_;
   /**
    * Number of catalogs garbage collected, count grows as GC progresses
    */
-  uint64_t condemned_catalogs_;
+  mutable atomic_int64 condemned_catalogs_;
   /**
-   * Keeps track if the last status report issued, between 0 and 1
+   * Keeps track of the last status report issued, as an integer percent
+   * (0-100).  Updated via atomic CAS so each percentile bucket logs at most
+   * once even when multiple sweep threads cross the threshold simultaneously.
    */
-  float last_reported_status_;
+  mutable atomic_int32 last_reported_status_;
 
-  uint64_t condemned_objects_;
-  uint64_t condemned_bytes_;
-  uint64_t duplicate_delete_requests_;
+  mutable atomic_int64 condemned_objects_;
+  mutable atomic_int64 condemned_bytes_;
+  mutable atomic_int64 duplicate_delete_requests_;
 };
 
 #include "garbage_collector_impl.h"
