@@ -1573,6 +1573,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
       }
 
       info->SetErrorCode(kFailOk);
+      RecordProxySuccess();
       break;
     case CURLE_UNSUPPORTED_PROTOCOL:
       info->SetErrorCode(kFailUnsupportedProtocol);
@@ -1607,22 +1608,14 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
                                                      : kFailProxyShortTransfer);
       break;
     case CURLE_FILE_COULDNT_READ_FILE:
-    case CURLE_COULDNT_CONNECT: {
-      // A refused connection comes back in about a round trip and proves that
-      // something is listening and actively rejecting -- a proxy out of slots,
-      // not a dead one.  It is the opposite of unresponsive.
-      //
-      // CURLE_COULDNT_CONNECT is not only a refusal, though: it also covers
-      // ENETUNREACH, EHOSTUNREACH and similar, where nothing was reached at
-      // all.  Ask the OS error which of the two happened rather than assuming
-      // either way.
-      if (curl_error == CURLE_COULDNT_CONNECT) {
-        long os_errno = 0;  // NOLINT(runtime/int) -- libcurl's getinfo type
-        if (curl_easy_getinfo(info->curl_handle(), CURLINFO_OS_ERRNO, &os_errno)
-            == CURLE_OK) {
-          info->SetPeerUnresponsive(os_errno != ECONNREFUSED);
-        }
-      }
+    case CURLE_COULDNT_CONNECT:
+      // The connect failed, so no response was ever started, whatever the
+      // reason.  ECONNREFUSED in particular is the kernel answering with a
+      // reset because nothing is listening on the port -- the signature of a
+      // daemon that has died, not of a busy one.  A proxy that is merely out
+      // of slots does not refuse: with tcp_abort_on_overflow at its default
+      // the kernel drops the SYN and the connect times out instead.
+      info->SetPeerUnresponsive(true);
       if (info->proxy() != "DIRECT") {
         // This is a guess.  Fail-over can still change to switching host
         info->SetErrorCode(kFailProxyConnection);
@@ -1630,7 +1623,6 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
         info->SetErrorCode(kFailHostConnection);
       }
       break;
-    }
     case CURLE_TOO_MANY_REDIRECTS:
       info->SetErrorCode(kFailHostConnection);
       break;
@@ -2014,6 +2006,7 @@ DownloadManager::DownloadManager(const unsigned max_pool_handles,
     , opt_proxy_require_(false)
     , opt_proxy_mandatory_(false)
     , opt_proxy_failover_on_slow_(true)
+    , last_proxy_success_(0)
     , opt_proxy_shard_(false)
     , failover_indefinitely_(false)
     , name_(name)
@@ -2533,8 +2526,21 @@ void DownloadManager::SwitchProxy(JobInfo *info) {
       const bool would_escalate = IsEscalatedProxyGroup(next_group)
                                   && !IsEscalatedProxyGroup(
                                       opt_proxy_groups_current_);
-      if (!opt_proxy_failover_on_slow_ && would_escalate
-          && !proxy_unreachable) {
+      // Withholding the step is only defensible while the local proxy set is
+      // demonstrably still serving.  Without this, a cache that fails in a
+      // way that still delivers bytes -- truncating every body, answering
+      // with garbage -- would never look unreachable, and the client would
+      // stay on it for good rather than use a healthy fallback.  Two timeout
+      // periods with nothing completing anywhere in the group is taken as
+      // having no current evidence.  It makes the gate load-dependent on
+      // purpose: the saturation it exists for only happens under load, and a
+      // near-idle client falls back to the stock behaviour.
+      const time_t evidence_secs = 2 * static_cast<time_t>(opt_timeout_proxy_);
+      const bool proxy_recently_served = (last_proxy_success_ != 0)
+                                         && ((time(NULL) - last_proxy_success_)
+                                             <= evidence_secs);
+      if (!opt_proxy_failover_on_slow_ && would_escalate && !proxy_unreachable
+          && proxy_recently_served) {
         LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
                  "(manager '%s' - id %" PRId64 ") "
                  "keeping proxy group %u: '%s' does not show the proxy to be "
@@ -3069,6 +3075,8 @@ void DownloadManager::SetProxyChain(const string &proxy_list,
 
   opt_timestamp_backup_proxies_ = 0;
   opt_timestamp_failover_proxies_ = 0;
+  // A new chain carries no evidence about the proxies in it.
+  last_proxy_success_ = 0;
   string set_proxy_list = opt_proxy_list_;
   string set_proxy_fallback_list = opt_proxy_fallback_list_;
   bool contains_direct;
@@ -3300,6 +3308,22 @@ bool DownloadManager::IsEscalatedProxyGroup(unsigned group_idx) const {
     return true;
   const std::vector<ProxyInfo> &group = (*opt_proxy_groups_)[group_idx];
   return !group.empty() && (group[0].url == "DIRECT");
+}
+
+
+/**
+ * Notes that a request has just completed through a proxy of a local
+ * (non-escalated) group, which is the evidence the escalation gate in
+ * SwitchProxy() rests on.  A success on a DIRECT tier or a fallback proxy
+ * says nothing about the local proxy set and is deliberately not recorded.
+ */
+void DownloadManager::RecordProxySuccess() {
+  const MutexLockGuard m(lock_options_);
+  if (!opt_proxy_groups_ || opt_proxy_groups_->empty())
+    return;
+  if (IsEscalatedProxyGroup(opt_proxy_groups_current_))
+    return;
+  last_proxy_success_ = time(NULL);
 }
 
 

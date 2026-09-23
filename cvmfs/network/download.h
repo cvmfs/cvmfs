@@ -278,6 +278,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   std::string DemoteDirect(const std::string &proxy_list,
                            bool *has_direct_group);
   bool IsEscalatedProxyGroup(unsigned group_idx) const;
+  void RecordProxySuccess();
   bool ValidateGeoReply(const std::string &reply_order,
                         const unsigned expected_size,
                         std::vector<uint64_t> *reply_vals);
@@ -416,6 +417,15 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
    * SwitchProxy().
    */
   bool opt_proxy_failover_on_slow_;
+  /**
+   * When a request last completed through a proxy of a local (non-escalated)
+   * group, or 0 if none has.  The escalation gate withholds a step off-site
+   * only while this shows the local proxy set to be serving; without it any
+   * persistent failure that still delivers bytes -- a cache truncating every
+   * body, say -- would pin the client to a broken proxy for good.  It is
+   * deliberately not carried into a clone, which starts with no evidence.
+   */
+  time_t last_proxy_success_;
   /**
    * The original proxy list provided to SetProxyChain.
    */
