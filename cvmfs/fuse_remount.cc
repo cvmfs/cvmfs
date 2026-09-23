@@ -33,8 +33,8 @@ FuseRemounter::Status FuseRemounter::ChangeRoot(const shash::Any &root_hash) {
   if (IsInMaintenanceMode())
     return kStatusMaintenance;
 
-  if (int32_t expected_val = 0;
-      drainout_mode_.compare_exchange_strong(expected_val, 1)) {
+  int32_t expected_val = 0;
+  if (drainout_mode_.compare_exchange_strong(expected_val, 1)) {
     // As of this point, fuse callbacks return zero as cache timeout
     LogCvmfs(kLogCvmfs, kLogDebug, "chroot, draining out meta-data caches");
     invalidator_handle_.Reset();
@@ -83,10 +83,10 @@ FuseRemounter::Status FuseRemounter::Check() {
   const catalog::LoadReturn retval = mountpoint_->catalog_mgr()
                                          ->RemountDryrun();
   switch (retval) {
-    case catalog::kLoadNew:
+    case catalog::kLoadNew: {
       SetOfflineMode(false);
-      if (int32_t expected_val = 0;
-          drainout_mode_.compare_exchange_strong(expected_val, 1)) {
+      int32_t expected_val = 0;
+      if (drainout_mode_.compare_exchange_strong(expected_val, 1)) {
         // As of this point, fuse callbacks return zero as cache timeout
         LogCvmfs(kLogCvmfs, kLogDebug,
                  "new catalog revision available, "
@@ -99,6 +99,7 @@ FuseRemounter::Status FuseRemounter::Check() {
         LogCvmfs(kLogCvmfs, kLogDebug, "already in drainout mode, leaving");
       }
       return kStatusDraining;
+    }
     case catalog::kLoadFail:
     case catalog::kLoadNoSpace:
       LogCvmfs(kLogCvmfs, kLogDebug,
