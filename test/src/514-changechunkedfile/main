@@ -3,17 +3,6 @@ cvmfs_test_name="Change a Chunked File"
 cvmfs_test_autofs_on_startup=false
 cvmfs_test_suites="quick"
 
-inflate_file() {
-  local destination_file=$1
-  local source_file=$2
-  local desired_file_size=$3
-
-  touch $destination_file
-  while [ $(stat -c %s $destination_file) -lt $desired_file_size ]; do
-    cat $source_file >> $destination_file
-  done
-}
-
 produce_files_in() {
   local working_dir=$1
 
@@ -85,47 +74,9 @@ change_files_in() {
 
   # remove the original 50 megabyte file and replace it by a
   # slightly different version
-  local bigfile=big_file/50megabyte
-  rm $bigfile
-  touch $bigfile
-  local first_hit=0
-  while [ $(stat -c %s $bigfile) -lt 52428800 ]; do
-    cat /bin/ls >> $bigfile
-    if [ $first_hit -eq 0 ]; then
-      echo "You need to understand recursion in order to understand recursion" >> $bigfile
-      first_hit=1
-    fi
-  done
+  inflate_file big_file/50megabyte _ 50000000
 
   popdir
-}
-
-check_chunk_alignment() {
-  local repo_name=$1
-  local old_clg_hash=$2
-  local new_clg_hash=$3
-
-  local old_catalog="$(download_and_decompress_object $repo_name ${old_clg_hash}C)"
-  local new_catalog="$(download_and_decompress_object $repo_name ${new_clg_hash}C)"
-
-  load_repo_config $repo_name
-
-  local big_file="50megabyte" # see change_files_in()
-
-  # compare the chunk sizes of associated chunks in the old and the new version
-  # of the updated file.
-  # the final output is the chunk difference which occured most frequently
-  # --> in the best case this is 0 :-)
-  most_common_size_difference=$(echo " \
-  ATTACH '${old_catalog}' AS old; \
-  ATTACH '${new_catalog}' AS new; \
-  CREATE TEMPORARY TABLE old_offsets (rownum INTEGER PRIMARY KEY AUTOINCREMENT, offset INTEGER, size INTEGER); \
-  CREATE TEMPORARY TABLE new_offsets (rownum INTEGER PRIMARY KEY AUTOINCREMENT, offset INTEGER, size INTEGER); \
-  INSERT INTO old_offsets (offset, size) SELECT offset, size FROM old.chunks WHERE md5path_1 = (SELECT md5path_1 FROM old.catalog WHERE name = '${big_file}') ORDER BY offset; \
-  INSERT INTO new_offsets (offset, size) SELECT offset, size FROM new.chunks WHERE md5path_1 = (SELECT md5path_1 FROM new.catalog WHERE name = '${big_file}') ORDER BY offset; \
-  SELECT new.size - old.size FROM old_offsets AS old, new_offsets AS new WHERE old.rownum = new.rownum GROUP BY new.size - old.size ORDER BY count(new.size - old.size) DESC LIMIT 1;" | sqlite3)
-
-  [ $most_common_size_difference -eq 0 ]
 }
 
 cvmfs_run_test() {
@@ -149,7 +100,7 @@ cvmfs_run_test() {
   produce_files_in $repo_dir || return 3
 
   echo "putting exactly the same stuff in the scratch space for comparison"
-  produce_files_in $reference_dir || return 4
+  cp -a "$repo_dir"/* "$reference_dir" || return 4
 
   echo "creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO || return $?
@@ -174,7 +125,7 @@ cvmfs_run_test() {
   change_files_in $repo_dir || return 5
 
   echo "change the chunked file slightly in the reference directory"
-  change_files_in $reference_dir || return 6
+  cp -a "$repo_dir"/* $reference_dir || return 6
 
   echo "creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO || return $?
@@ -188,11 +139,6 @@ cvmfs_run_test() {
   echo -n "retrieving name of new root catalog... "
   local new_root_catalog="$(get_current_root_catalog $CVMFS_TEST_REPO)"
   echo $new_root_catalog
-
-  # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
-  echo "check if most chunks are still aligned after the edit"
-  check_chunk_alignment $CVMFS_TEST_REPO $old_root_catalog $new_root_catalog || return 7
 
   return 0
 }

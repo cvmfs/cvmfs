@@ -3,17 +3,6 @@ cvmfs_test_name="Swissknife list_reflog feature"
 cvmfs_test_autofs_on_startup=false
 cvmfs_test_suites="quick"
 
-inflate_file() {
-  local destination_file=$1
-  local source_file=$2
-  local desired_file_size=$3
-
-  touch $destination_file
-  while [ $(stat -c %s $destination_file) -lt $desired_file_size ]; do
-    cat $source_file >> $destination_file
-  done
-}
-
 check_reflog_list() {
   list_objects=$(cvmfs_swissknife list_reflog -r /srv/cvmfs/$CVMFS_TEST_REPO -n $CVMFS_TEST_REPO -R /var/spool/cvmfs/$CVMFS_TEST_REPO/reflog.chksum)
   for f in $list_objects; do

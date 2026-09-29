@@ -3,17 +3,6 @@
 cvmfs_test_name="Garbage Collection Until Specified Timestamp"
 cvmfs_test_autofs_on_startup=false
 
-inflate_file() {
-  local destination_file=$1
-  local source_file=$2
-  local desired_file_size=$3
-
-  touch $destination_file
-  while [ $(stat -c %s $destination_file) -lt $desired_file_size ]; do
-    cat $source_file >> $destination_file
-  done
-}
-
 produce_files_1_in() {
   local working_dir=$1
   pushdir $working_dir
@@ -200,7 +189,7 @@ cvmfs_run_test() {
   produce_files_1_in $repo_dir || return 1
 
   echo "putting exactly the same stuff in the scratch spaces for comparison"
-  produce_files_1_in $reference_dir1 || return 2
+  cp -a "$repo_dir"/* $reference_dir1 || return 2
 
   timestamp1="$(get_timestamp)"
   echo "creating CVMFS snapshot ($(display_timestamp $timestamp1))"
@@ -219,8 +208,7 @@ cvmfs_run_test() {
   produce_files_2_in $repo_dir || return 3
 
   echo "putting exactly the same stuff in the scratch spaces for comparison"
-  produce_files_1_in $reference_dir2 || return 4
-  produce_files_2_in $reference_dir2 || return 4
+  cp -a "$repo_dir"/* $reference_dir2 || return 4
 
   timestamp2="$(get_timestamp)"
   echo "creating CVMFS snapshot ($(display_timestamp $timestamp2))"
@@ -239,9 +227,7 @@ cvmfs_run_test() {
   produce_files_3_in $repo_dir || return 5
 
   echo "putting exactly the same stuff in the scratch spaces for comparison"
-  produce_files_1_in $reference_dir3 || return 6
-  produce_files_2_in $reference_dir3 || return 6
-  produce_files_3_in $reference_dir3 || return 6
+  cp -a "$repo_dir"/* $reference_dir3 || return 6
 
   timestamp3="$(get_timestamp)"
   echo "creating CVMFS snapshot ($(display_timestamp $timestamp3))"
@@ -260,10 +246,7 @@ cvmfs_run_test() {
   produce_files_4_in $repo_dir || return 7
 
   echo "putting exactly the same stuff in the scratch spaces for comparison"
-  produce_files_1_in $reference_dir4 || return 8
-  produce_files_2_in $reference_dir4 || return 8
-  produce_files_3_in $reference_dir4 || return 8
-  produce_files_4_in $reference_dir4 || return 8
+  cp -a "$repo_dir"/* $reference_dir4 || return 8
 
   timestamp4="$(get_timestamp)"
   echo "creating CVMFS snapshot ($(display_timestamp $timestamp4))"
