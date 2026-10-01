@@ -1,0 +1,2 @@
+# A custom debug package keeps .symtab for watchdog backtraces.
+cvmfs-dbg: debug-package-should-be-named-dbgsym
