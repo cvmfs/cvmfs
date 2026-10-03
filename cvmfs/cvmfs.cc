@@ -1363,7 +1363,11 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
       fi->fh = fd;
       FillOpenFlags(open_directives, fi);
 #ifdef FUSE_CAP_PASSTHROUGH
-      if (loader_exports_ && loader_exports_->fuse_passthrough) {
+      // After a reload the tracker is gone with the old library, so passthrough
+      // stays off until the next mount.
+      if (loader_exports_ && loader_exports_->fuse_passthrough
+          && fuse_passthru_tracker)
+      {
         if (!dirent.IsChunkedFile()) {
           /* "Currently there should be only one backing id per node / backing
            * file." So says libfuse documentation on fuse_passthrough_open(). So
