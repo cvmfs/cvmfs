@@ -137,6 +137,9 @@ typedef struct fuse_passthru_ctx {
 static std::unordered_map<fuse_ino_t, fuse_passthru_ctx_t>
     *fuse_passthru_tracker = NULL;
 pthread_mutex_t fuse_passthru_tracker_lock = PTHREAD_MUTEX_INITIALIZER;
+// Set once the kernel refuses a backing file with EPERM; no further ones are
+// requested. Guarded by fuse_passthru_tracker_lock.
+static bool fuse_passthru_refused = false;
 #endif
 
 /**
@@ -1372,16 +1375,37 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
           pthread_mutex_lock(&fuse_passthru_tracker_lock);
           auto iter = fuse_passthru_tracker->find(ino);
           if (iter == fuse_passthru_tracker->end()) {
-            auto pair_with_iterator = fuse_passthru_tracker->emplace(
-                ino, fuse_passthru_ctx_t());
-            assert(pair_with_iterator.second == true);
-            iter = pair_with_iterator.first;
-            fuse_passthru_ctx_t &entry = iter->second;
-
-            backing_id = fuse_passthrough_open(req, fd);
-            assert(backing_id != 0);
-            entry.backing_id = backing_id;
-            entry.refcount++;
+            /* fuse_passthrough_open() returns 0 when the kernel refuses the
+             * backing file. It refuses with EPERM unless the daemon has
+             * CAP_SYS_ADMIN, which a mount owned by an unprivileged user and
+             * a system mount running as the cvmfs user (#3730) do not have.
+             * Such a file is served through the regular read path, and after
+             * an EPERM no further backing files are requested. */
+            backing_id = 0;
+            if (!fuse_passthru_refused) {
+              errno = 0;
+              backing_id = fuse_passthrough_open(req, fd);
+              const int open_errno = errno;
+              if (backing_id <= 0 && open_errno == EPERM) {
+                fuse_passthru_refused = true;
+                LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+                         "FUSE: passthrough refused (EPERM, the kernel needs "
+                         "CAP_SYS_ADMIN), serving files without passthrough");
+              } else if (backing_id <= 0) {
+                LogCvmfs(kLogCvmfs, kLogDebug,
+                         "FUSE: passthrough_open for inode %" PRIu64
+                         " failed (errno %d), serving it without passthrough",
+                         uint64_t(ino), open_errno);
+              }
+            }
+            if (backing_id > 0) {
+              auto pair_with_iterator = fuse_passthru_tracker->emplace(
+                  ino, fuse_passthru_ctx_t());
+              assert(pair_with_iterator.second == true);
+              fuse_passthru_ctx_t &entry = pair_with_iterator.first->second;
+              entry.backing_id = backing_id;
+              entry.refcount++;
+            }
           } else {
             fuse_passthru_ctx_t &entry = iter->second;
             assert(entry.refcount > 0);
@@ -1390,11 +1414,12 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
           }
           pthread_mutex_unlock(&fuse_passthru_tracker_lock);
 
-          fi->backing_id = backing_id;
-
-          /* according to libfuse example/passthrough_hp.cc:
-           * "open in passthrough mode must drop old page cache" */
-          fi->keep_cache = false;
+          if (backing_id > 0) {
+            fi->backing_id = backing_id;
+            /* according to libfuse example/passthrough_hp.cc:
+             * "open in passthrough mode must drop old page cache" */
+            fi->keep_cache = false;
+          }
         }
       }
 #endif
