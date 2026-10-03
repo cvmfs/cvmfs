@@ -1723,27 +1723,28 @@ static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
       perf::Dec(file_system_->no_open_files());
     }
 #ifdef FUSE_CAP_PASSTHROUGH
-    if (loader_exports_ && loader_exports_->fuse_passthrough) {
-      if (fi->backing_id != 0) {
-        int ret;
-        pthread_mutex_lock(&fuse_passthru_tracker_lock);
-        auto iter = fuse_passthru_tracker->find(ino);
-        assert(iter != fuse_passthru_tracker->end());
+    if (loader_exports_ && loader_exports_->fuse_passthrough
+        && fuse_passthru_tracker) {
+      /* libfuse does not carry backing_id into release (fi is rebuilt from
+       * the release request), so the entry is found by inode. Every open of
+       * an inode while it has an entry took a reference on it. */
+      pthread_mutex_lock(&fuse_passthru_tracker_lock);
+      auto iter = fuse_passthru_tracker->find(ino);
+      if (iter != fuse_passthru_tracker->end()) {
         fuse_passthru_ctx_t &entry = iter->second;
         assert(entry.refcount > 0);
-        assert(entry.backing_id == fi->backing_id);
         entry.refcount--;
         if (entry.refcount == 0) {
-          ret = fuse_passthrough_close(req, fi->backing_id);
+          const int ret = fuse_passthrough_close(req, entry.backing_id);
           if (ret < 0) {
-            LogCvmfs(kLogCvmfs, kLogDebug,
-                     "fuse_passthrough_close(fd=%ld) failed: %d", fd, ret);
-            assert(false);
+            LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+                     "fuse_passthrough_close(backing_id=%d) failed: %d",
+                     entry.backing_id, ret);
           }
           fuse_passthru_tracker->erase(iter);
         }
-        pthread_mutex_unlock(&fuse_passthru_tracker_lock);
       }
+      pthread_mutex_unlock(&fuse_passthru_tracker_lock);
     }
 #endif
   }
