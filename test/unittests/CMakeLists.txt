@@ -297,6 +297,7 @@ set(CVMFS_UNITTEST_SOURCES
   t_atomic.cc
   t_authz_fetch.cc
   t_authz_session.cc
+  t_backing_broker.cc
   t_backoff.cc
   t_base64.cc
   t_bigqueue.cc
