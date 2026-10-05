@@ -98,7 +98,10 @@ class T_Reflog : public ::testing::Test {
   }
 
   void CloseReflog(const type<MockReflog> type_specifier, ReflogT *reflog) {
-    // NOOP
+    // Reflogs created through the mock are owned by the mock object storage,
+    // reflogs opened through it are clones owned by the caller
+    if (!MockReflog::IsRegistered(reflog))
+      delete reflog;
   }
 
   void CheckEmpty(const std::string &str) const { ASSERT_FALSE(str.empty()); }
@@ -398,4 +401,6 @@ TYPED_TEST(T_Reflog, GetTimestamp) {
 
   EXPECT_LE(t1, timestamp);
   EXPECT_LE(timestamp, t2);
+
+  TestFixture::CloseReflog(rl);
 }
