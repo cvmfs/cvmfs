@@ -189,13 +189,45 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
     }
     free(threads_process_);
 
-    if (atomic_read32(&num_errors_))
+    if (atomic_read32(&num_errors_)) {
+      DropRemainingJobs();
       return false;
+    }
 
     assert(catalogs_processing_.size() == 0);
     assert(pre_job_queue_.IsEmpty());
     assert(post_job_queue_.IsEmpty());
     return true;
+  }
+
+  /**
+   * After an error, the worker threads stop without finalizing the jobs that
+   * are still pending. Release them together with their open catalogs so that
+   * an aborted traversal does not leak.
+   */
+  void DropRemainingJobs() {
+    MutexLockGuard const m(&catalogs_lock_);
+    // Every live job is registered in catalogs_processing_ (see
+    // PushJobUnlocked). The queues additionally hold the unregistered
+    // termination sentinels (null hash) from NotifyFinished().
+    CatalogJob *job;
+    while ((job = pre_job_queue_.TryPopFront()) != NULL) {
+      if (job->hash.IsNull())
+        delete job;
+    }
+    while ((job = post_job_queue_.TryPopFront()) != NULL) { }
+
+    const uint32_t capacity = catalogs_processing_.capacity();
+    const shash::Any *keys = catalogs_processing_.keys();
+    CatalogJob **values = catalogs_processing_.values();
+    for (uint32_t i = 0; i < capacity; ++i) {
+      if (keys[i].IsNull())
+        continue;
+      job = values[i];
+      this->CloseCatalog(true, job);
+      delete job;
+    }
+    catalogs_processing_.Clear();
   }
 
   static void *MainProcessQueue(void *data) {
