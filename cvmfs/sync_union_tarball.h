@@ -65,6 +65,11 @@ class SyncUnionTarball : public SyncUnion {
 
  private:
   struct archive *src;
+  /**
+   * Reused for every header read from the archive.  The SyncItemTar objects
+   * refer to it, so it lives as long as this object.
+   */
+  struct archive_entry *entry_;
   const std::string tarball_path_;
   const std::string base_directory_;
   const uid_t uid_;
