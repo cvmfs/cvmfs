@@ -226,6 +226,7 @@ class MagicXattrManager : public SingleCopy {
   MagicXattrManager(MountPoint *mountpoint, EVisibility visibility,
                     const std::set<std::string> &protected_xattrs,
                     const std::set<gid_t> &privileged_xattr_gids);
+  ~MagicXattrManager();
   /// The returned BaseMagicXattr* is supposed to be wrapped by a
   /// MagicXattrRAIIWrapper
   BaseMagicXattr *GetLocked(const std::string &name, PathString path,
