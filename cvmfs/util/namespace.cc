@@ -236,12 +236,16 @@ bool CreatePidNamespace(int *fd_parent) {
       SafeWrite(pipe_parent[1], &parent_pid, sizeof(parent_pid));
       SafeWrite(pipe_parent[1], &pid, sizeof(pid));
 
+      // This process only relays the exit status of the namespace's init
+      // process.  Skip the exit handlers: they belong to the application
+      // running in the new namespace, and LeakSanitizer's exit hook would
+      // fail here because it cannot fork once the namespace's init is gone.
       rvi = waitpid(pid, &status, 0);
       if (rvi >= 0) {
         if (WIFEXITED(status))
-          exit(WEXITSTATUS(status));
+          _exit(WEXITSTATUS(status));
       }
-      exit(127);
+      _exit(127);
   }
   close(pipe_parent[1]);
   if (fd_parent != NULL)
