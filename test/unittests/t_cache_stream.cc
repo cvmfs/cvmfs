@@ -11,6 +11,7 @@
 #include <statistics.h>
 #include <util/posix.h>
 
+#include <cstdlib>
 #include <memory>
 
 class T_StreamingCacheManager : public ::testing::Test {
@@ -22,6 +23,7 @@ class T_StreamingCacheManager : public ::testing::Test {
                           static_cast<int64_t>(content.length()), &zipped_buf,
                           &zipped_size);
     std::string zipped_data(reinterpret_cast<char *>(zipped_buf), zipped_size);
+    free(zipped_buf);
     HashString(zipped_data, hash);
     EXPECT_TRUE(SafeWriteToFile(zipped_data, "data/" + hash->MakePath(), 0600));
   }
