@@ -1710,6 +1710,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
       shash::Init(info->hash_context());
     }
     if (info->compressed() && !defer_reset) {
+      zlib::DecompressFini(info->GetZstreamPtr());
       zlib::DecompressInit(info->GetZstreamPtr());
     }
     if (defer_reset) {
