@@ -301,6 +301,7 @@ TEST_F(T_Xattr, SerializeCompat) {
   EXPECT_TRUE(verify->Get("key", &value));
   EXPECT_EQ("value", value);
   delete verify;
+  free(buf);
 }
 
 
