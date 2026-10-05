@@ -157,6 +157,7 @@ SimpleChunkTables::SimpleChunkTables() {
 SimpleChunkTables::~SimpleChunkTables() {
   for (unsigned i = 0; i < fd_table_.size(); ++i) {
     delete fd_table_[i].chunk_reflist.list;
+    delete fd_table_[i].chunk_fd;
   }
   pthread_mutex_destroy(lock_);
   free(lock_);
