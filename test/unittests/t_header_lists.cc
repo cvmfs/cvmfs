@@ -10,6 +10,7 @@ namespace download {
 class T_HeaderLists : public ::testing::Test {
  protected:
   virtual void SetUp() { header_lists = new download::HeaderLists(); }
+  virtual void TearDown() { delete header_lists; }
 
   download::HeaderLists *header_lists;
 };
@@ -22,7 +23,6 @@ TEST_F(T_HeaderLists, Basic) {
   EXPECT_EQ(header_lists->Print(header), "First: Line\nSecond: Line\n");
 
   header_lists->PutList(header);
-  delete header_lists;
 }
 
 TEST_F(T_HeaderLists, Intrinsics) {
@@ -44,7 +44,6 @@ TEST_F(T_HeaderLists, Intrinsics) {
   header_lists->GetList("Some: Header");
   EXPECT_EQ(header_lists->blocks_.size(), 2U);
 
-  delete header_lists;
 }
 
 
