@@ -346,6 +346,7 @@ TEST_F(T_CacheManager, Open2Mem) {
                                    &retrieve_buf, &retrieve_size));
   EXPECT_EQ(1U, retrieve_size);
   EXPECT_EQ('A', retrieve_buf[0]);
+  free(retrieve_buf);
 
   TestCacheManager faulty_cache;
   EXPECT_FALSE(faulty_cache.Open2Mem(CacheManager::LabeledObject(hash_one_),
