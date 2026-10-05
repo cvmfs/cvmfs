@@ -96,6 +96,19 @@ if (ENABLE_ASAN)
   set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address")
 endif (ENABLE_ASAN)
 
+# protobuf >= 36 changes the ABI of the generated message class data
+# (PROTOBUF_MESSAGE_GLOBALS in port_def.inc) whenever a translation unit is
+# compiled with AddressSanitizer. A system libprotobuf that was built without
+# ASan then disagrees with our ASan-instrumented cache.pb.cc and crashes, e.g.
+# in MessageLite::GetTypeName(). Opt out of the layout switch so that the
+# generated code keeps the ABI of a regular protobuf build. Older protobuf
+# versions ignore the macro. This is set before the externals are added so that
+# a vendored protobuf build sees the same definition.
+if (ENABLE_ASAN OR CMAKE_CXX_FLAGS MATCHES "-fsanitize=[^ ]*address")
+  message (STATUS "ASan build: defining PROTOBUF_MESSAGE_GLOBALS_TEMPORARY_OPTOUT")
+  add_definitions (-DPROTOBUF_MESSAGE_GLOBALS_TEMPORARY_OPTOUT)
+endif ()
+
 # Compile with mcount instrumentation so that uftrace (and gprof) can record a
 # full function-level trace without runtime dynamic patching. The base flags
 # already provide -g and -fno-omit-frame-pointer, which uftrace also needs.
