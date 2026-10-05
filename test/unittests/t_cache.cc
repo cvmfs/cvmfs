@@ -346,6 +346,7 @@ TEST_F(T_CacheManager, Open2Mem) {
                                    &retrieve_buf, &retrieve_size));
   EXPECT_EQ(1U, retrieve_size);
   EXPECT_EQ('A', retrieve_buf[0]);
+  free(retrieve_buf);
 
   TestCacheManager faulty_cache;
   EXPECT_FALSE(faulty_cache.Open2Mem(CacheManager::LabeledObject(hash_one_),
@@ -858,9 +859,7 @@ TEST_F(T_CacheManager, TearDown2ReadOnly) {
     waiting += 50;
   } while (waiting < 10000);
   EXPECT_TRUE(cb.finished);
-  if (cb.finished)
-    pthread_join(thread_teardown, NULL);
-  else
+  if (!cb.finished)
     pthread_cancel(thread_teardown);
   pthread_join(thread_teardown, NULL);
 }

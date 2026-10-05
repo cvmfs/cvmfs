@@ -156,6 +156,8 @@ TEST(T_Callbacks, CallbackableCallback) {
   EXPECT_EQ(1337, DummyCallbackable::g_callback_result);
   DummyCallbackable::g_callback_result = -1;
   ASSERT_EQ(-1, DummyCallbackable::g_callback_result);
+
+  delete callback;
 }
 
 TEST(T_Callbacks, CallbackableBoundCallback) {
@@ -167,6 +169,8 @@ TEST(T_Callbacks, CallbackableBoundCallback) {
   (*callback)(1337);
 
   EXPECT_EQ(1337, callbackable.callback_result);
+
+  delete callback;
 }
 
 TEST(T_Callbacks, CallbackableBoundClosure) {
@@ -186,6 +190,8 @@ TEST(T_Callbacks, CallbackableBoundClosure) {
   // didn't change (closure captured copy)
   EXPECT_EQ(closure_data_item, closure_data.data);
   EXPECT_EQ(1337 + closure_data_item, callbackable.callback_result);
+
+  delete callback;
 }
 
 TEST(T_Callbacks, CallbackableVoidCallback) {
@@ -205,6 +211,8 @@ TEST(T_Callbacks, CallbackableVoidCallback) {
 
   DummyCallbackableVoid::g_void_callback_calls = 0;
   ASSERT_EQ(0, DummyCallbackableVoid::g_void_callback_calls);
+
+  delete callback;
 }
 
 TEST(T_Callbacks, CallbackableVoidBoundCallback) {
@@ -220,6 +228,8 @@ TEST(T_Callbacks, CallbackableVoidBoundCallback) {
   (*callback)();
   EXPECT_EQ(1, callbackable.callback_result);
   (*callback)();
+
+  delete callback;
 }
 
 TEST(T_Callbacks, CallbackableVoidBoundClosure) {
@@ -242,4 +252,6 @@ TEST(T_Callbacks, CallbackableVoidBoundClosure) {
   // didn't change (closure captured copy)
   EXPECT_EQ(closure_data_item, closure_data.data);
   EXPECT_EQ(closure_data_item, callbackable.callback_result);
+
+  delete callback;
 }

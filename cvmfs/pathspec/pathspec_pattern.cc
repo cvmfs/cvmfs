@@ -31,6 +31,11 @@ PathspecElementPattern &PathspecElementPattern::operator=(
     const PathspecElementPattern &other) {
   if (this != &other) {
     valid_ = other.valid_;
+    SubPatterns::const_iterator j = subpatterns_.begin();
+    const SubPatterns::const_iterator jend = subpatterns_.end();
+    for (; j != jend; ++j) {
+      delete *j;
+    }
     subpatterns_.clear();
     subpatterns_.reserve(other.subpatterns_.size());
     SubPatterns::const_iterator i = other.subpatterns_.begin();

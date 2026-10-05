@@ -485,6 +485,8 @@ MockCatalog *catalog::MockCatalogManager::CreateCatalog(
     MockCatalog *parent_catalog) {
   map<PathString, MockCatalog *>::iterator it = catalog_map_.find(mountpoint);
   if (it != catalog_map_.end()) {
+    // ownership passes to the AbstractCatalogManager
+    unmounted_catalogs_.erase(it->second);
     return it->second;
   }
   bool is_root = parent_catalog == NULL;
@@ -527,6 +529,7 @@ catalog::LoadReturn catalog::MockCatalogManager::LoadCatalogByHash(
         ctlg_context->mountpoint().ToString(), ctlg_context->hash(), 4096, 1, 0,
         true, NULL, NULL);
     catalog_map_[ctlg_context->mountpoint()] = catalog;
+    unmounted_catalogs_.insert(catalog);
   }
   return kLoadNew;
 }

@@ -445,6 +445,7 @@ void vLogCvmfs(const LogSource source, const int mask, const char *format,
 
   if (alt_log_func) {
     (*alt_log_func)(source, mask, msg);
+    free(msg);
     return;
   }
 

@@ -143,6 +143,13 @@ BaseMagicXattr *MagicXattrManager::GetLocked(const std::string &name,
   return result;
 }
 
+MagicXattrManager::~MagicXattrManager() {
+  std::map<std::string, BaseMagicXattr *>::iterator i = xattr_list_.begin();
+  for (; i != xattr_list_.end(); ++i)
+    delete i->second;
+}
+
+
 void MagicXattrManager::Register(const std::string &name,
                                  BaseMagicXattr *magic_xattr) {
   assert(!is_frozen_);

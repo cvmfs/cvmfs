@@ -2983,6 +2983,8 @@ void TraverseDepthFirstParallelStressSlowCallback(
   TraverseDepthFirstParallelStressSlow_visited_catalogs.push_back(
       std::make_pair(data.catalog->GetRevision(),
                      data.catalog->mountpoint().ToString()));
+  // no_close: the listener owns the yielded catalog
+  delete data.catalog;
 }
 
 TYPED_TEST(T_CatalogTraversal, TraverseDepthFirstParallelStressSlow) {
@@ -3011,6 +3013,8 @@ void TraverseBreadthFirstParallelStressSlowCallback(
   TraverseBreadthFirstParallelStressSlow_visited_catalogs.push_back(
       std::make_pair(data.catalog->GetRevision(),
                      data.catalog->mountpoint().ToString()));
+  // no_close: the listener owns the yielded catalog
+  delete data.catalog;
 }
 
 TYPED_TEST(T_CatalogTraversal, TraverseBreadthFirstParallelStressSlow) {

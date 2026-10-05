@@ -41,6 +41,7 @@ SyncUnionTarball::SyncUnionTarball(AbstractSyncMediator *mediator,
                                    const bool tolerate_missing_hardlinks)
     : SyncUnion(mediator, rdonly_path, "", "")
     , src(NULL)
+    , entry_(NULL)
     , tarball_path_(tarball_path)
     , base_directory_(base_directory)
     , uid_(uid)
@@ -52,7 +53,13 @@ SyncUnionTarball::SyncUnionTarball(AbstractSyncMediator *mediator,
     , tolerate_missing_hardlinks_(tolerate_missing_hardlinks)
     , read_archive_signal_(new Signal) { }
 
-SyncUnionTarball::~SyncUnionTarball() { delete read_archive_signal_; }
+SyncUnionTarball::~SyncUnionTarball() {
+  if (entry_ != NULL)
+    archive_entry_free(entry_);
+  if (src != NULL)
+    archive_read_free(src);
+  delete read_archive_signal_;
+}
 
 bool SyncUnionTarball::Initialize() {
   int result;
@@ -155,7 +162,9 @@ void SyncUnionTarball::Traverse() {
   // Prime the signal so the first Wait() in the loop below can proceed.
   read_archive_signal_->Wakeup();
 
-  struct archive_entry *entry = archive_entry_new();
+  if (entry_ == NULL)
+    entry_ = archive_entry_new();
+  struct archive_entry *entry = entry_;
   while (true) {
     // Get the lock, wait if lock is not available yet
     read_archive_signal_->Wait();
