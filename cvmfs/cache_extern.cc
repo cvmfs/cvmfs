@@ -84,6 +84,8 @@ int ExternalCacheManager::AbortTxn(void *txn) {
 
 bool ExternalCacheManager::AcquireQuotaManager(QuotaManager *quota_mgr) {
   assert(quota_mgr != NULL);
+  if (quota_mgr_ != quota_mgr)
+    delete quota_mgr_;
   quota_mgr_ = quota_mgr;
   LogCvmfs(kLogCache, kLogDebug, "set quota manager");
   return true;
