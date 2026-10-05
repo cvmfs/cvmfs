@@ -163,7 +163,23 @@ template<class AbstractProductT, typename ParameterT, typename InfoT>
 class PolymorphicConstructionImpl {
  protected:
   typedef AbstractFactory<AbstractProductT, ParameterT, InfoT> Factory;
-  typedef std::vector<Factory *> RegisteredPlugins;
+
+  /**
+   * The list of registered factories owns its elements. They are released
+   * when the list is cleared (unit tests) or destroyed at program exit.
+   */
+  class RegisteredPlugins : public std::vector<Factory *> {
+   public:
+    ~RegisteredPlugins() { Clear(); }
+
+    void Clear() {
+      typename std::vector<Factory *>::iterator i = this->begin();
+      const typename std::vector<Factory *>::iterator iend = this->end();
+      for (; i != iend; ++i)
+        delete *i;
+      this->clear();
+    }
+  };
 
  public:
   virtual ~PolymorphicConstructionImpl() { }
@@ -250,7 +266,7 @@ class PolymorphicConstructionImpl {
    *       -> Global state is nasty!
    */
   static void UnregisterAllPlugins() {
-    registered_plugins_.clear();
+    registered_plugins_.Clear();
     needs_init_ = 1;
   }
 
