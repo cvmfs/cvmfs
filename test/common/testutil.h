@@ -259,6 +259,24 @@ class MockObjectStorage {
     return (Exists(path)) ? available_paths[path] : NULL;
   }
 
+  /**
+   * Registered objects are owned by the storage; clones handed out by Open()
+   * and the object fetcher are owned by the caller.
+   */
+  static bool IsRegistered(const ObjectT *object) {
+    typename AvailableObjects::const_iterator i = available_objects.begin();
+    for (; i != available_objects.end(); ++i) {
+      if (i->second == object)
+        return true;
+    }
+    typename AvailablePathObjects::const_iterator j = available_paths.begin();
+    for (; j != available_paths.end(); ++j) {
+      if (j->second == object)
+        return true;
+    }
+    return false;
+  }
+
  protected:
   static bool IsDeleted(const shash::Any &hash) {
     return s_deleted_objects != NULL
