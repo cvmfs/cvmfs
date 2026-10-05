@@ -39,7 +39,7 @@ class T_MemoryKvStore : public ::testing::Test {
     buf_.object_flags = 0;
   }
 
-  virtual void TearDown() { }
+  virtual void TearDown() { free(buf_.address); }
 
   perf::Statistics statistics_;
   MemoryKvStore store_;
@@ -58,7 +58,6 @@ TEST_F(T_MemoryKvStore, Commit) {
   EXPECT_EQ((int64_t)malloc_size, store_.GetSize(a1_));
   EXPECT_EQ(0, store_.Commit(buf_));
   EXPECT_EQ(malloc_size, store_.GetUsed());
-  free(buf_.address);
 }
 
 TEST_F(T_MemoryKvStore, Delete) {
@@ -67,7 +66,6 @@ TEST_F(T_MemoryKvStore, Delete) {
   EXPECT_EQ(0, store_.Commit(buf_));
   EXPECT_EQ(malloc_size, store_.GetUsed());
   EXPECT_FALSE(store_.Delete(a2_));
-  buf_.address = malloc(malloc_size);
   buf_.id = a2_;
   EXPECT_EQ(0, store_.Commit(buf_));
   EXPECT_EQ(2 * malloc_size, store_.GetUsed());
@@ -143,7 +141,6 @@ TEST_F(T_MemoryKvStore, ShrinkTo) {
   buf_.refcount = 0;
   for (int i = 0; i < 99; i++) {
     (*(reinterpret_cast<uint32_t *>(buf_.id.digest + 1)))++;
-    buf_.address = malloc(malloc_size);
     store_.Commit(buf_);
   }
   EXPECT_EQ(100 * malloc_size, store_.GetUsed());
