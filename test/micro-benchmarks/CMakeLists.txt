@@ -10,6 +10,7 @@ set(CVMFS_UBENCHMARKS_FILES
   ../common/testutil.cc
   ../common/catalog_test_tools.cc
 
+  b_atomic.cc
   b_catalog_grafting.cc
   b_compression.cc
   b_gluebuffer.cc

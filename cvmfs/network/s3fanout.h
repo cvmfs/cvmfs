@@ -310,7 +310,7 @@ class S3FanoutManager : SingleCopy {
   mutable std::pair<std::string, std::string> last_signing_key_;
 
   pthread_t thread_upload_;
-  atomic_int32 multi_threaded_;
+  std::atomic<int32_t> multi_threaded_;
 
   struct pollfd *watch_fds_;
   uint32_t watch_fds_size_;

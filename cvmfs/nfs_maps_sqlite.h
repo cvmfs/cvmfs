@@ -7,13 +7,13 @@
 
 #include <pthread.h>
 
+#include <atomic>
 #include <string>
 
 #include "crypto/hash.h"
 #include "duplex_sqlite3.h"
 #include "nfs_maps.h"
 #include "shortstring.h"
-#include "util/atomic.h"
 #include "util/prng.h"
 
 namespace perf {

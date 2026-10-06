@@ -10,7 +10,7 @@
 #include "util/concurrency.h"
 #include "util/exception.h"
 
-atomic_int64 ItemAllocator::total_allocated_ = 0;
+std::atomic<int64_t> ItemAllocator::total_allocated_(0);
 
 
 void ItemAllocator::Free(void *ptr) {
@@ -23,7 +23,7 @@ void ItemAllocator::Free(void *ptr) {
     for (unsigned i = 0; i < N; ++i) {
       if (malloc_arenas_[i] == M) {
         delete malloc_arenas_[i];
-        atomic_xadd64(&total_allocated_, -static_cast<int>(kArenaSize));
+        total_allocated_.fetch_add(-static_cast<int>(kArenaSize));
         malloc_arenas_.erase(malloc_arenas_.begin() + i);
         idx_last_arena_ = 0;
         return;
@@ -39,13 +39,13 @@ ItemAllocator::ItemAllocator() : idx_last_arena_(0) {
   assert(retval == 0);
 
   malloc_arenas_.push_back(new MallocArena(kArenaSize));
-  atomic_xadd64(&total_allocated_, kArenaSize);
+  total_allocated_.fetch_add(kArenaSize);
 }
 
 
 ItemAllocator::~ItemAllocator() {
   for (unsigned i = 0; i < malloc_arenas_.size(); ++i) {
-    atomic_xadd64(&total_allocated_, -static_cast<int>(kArenaSize));
+    total_allocated_.fetch_add(-static_cast<int>(kArenaSize));
     delete malloc_arenas_[i];
   }
   pthread_mutex_destroy(&lock_);
@@ -68,9 +68,10 @@ void *ItemAllocator::Malloc(unsigned size) {
   }
   idx_last_arena_ = N;
   MallocArena *M = new MallocArena(kArenaSize);
-  atomic_xadd64(&total_allocated_, kArenaSize);
+  total_allocated_.fetch_add(kArenaSize);
   malloc_arenas_.push_back(M);
   p = M->Malloc(size);
   assert(p != NULL);
   return p;
 }
+ 

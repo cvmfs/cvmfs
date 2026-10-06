@@ -174,11 +174,11 @@ CachePlugin::CachePlugin(uint64_t capabilities)
     , num_workers_(0)
     , max_object_size_(kDefaultMaxObjectSize)
     , num_inlimbo_clients_(0) {
-  atomic_init64(&next_session_id_);
-  atomic_init64(&next_txn_id_);
-  atomic_init64(&next_lst_id_);
+  next_session_id_.store(0);
+  next_txn_id_.store(0);
+  next_lst_id_.store(0);
   // Don't use listing id zero
-  atomic_inc64(&next_lst_id_);
+  next_lst_id_.fetch_add(1);
   txn_ids_.Init(128, UniqueRequest(), HashUniqueRequest);
   memset(&thread_io_, 0, sizeof(thread_io_));
   MakePipe(pipe_ctrl_);
@@ -674,7 +674,7 @@ void CachePlugin::HandleStore(cvmfs::MsgStoreReq *msg_req,
 }
 
 
-bool CachePlugin::IsRunning() { return atomic_read32(&running_) != 0; }
+bool CachePlugin::IsRunning() { return running_.load() != 0; }
 
 
 bool CachePlugin::Listen(const string &locator) {
@@ -877,7 +877,8 @@ void CachePlugin::ProcessRequests(unsigned num_workers) {
                                     this);
   assert(retval == 0);
   NotifySupervisor(CacheTransport::kReadyNotification);
-  atomic_cas32(&running_, 0, 1);
+  int32_t expected_val = 0;
+  running_.compare_exchange_strong(expected_val, 1);
 }
 
 
@@ -900,7 +901,8 @@ void CachePlugin::Terminate() {
     char terminate = kSignalTerminate;
     WritePipe(pipe_ctrl_[1], &terminate, 1);
     pthread_join(thread_io_, NULL);
-    atomic_cas32(&running_, 1, 0);
+    int32_t expected_val = 1;
+    running_.compare_exchange_strong(expected_val, 0);
   }
 }
 

@@ -1373,7 +1373,7 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
 }
 
 S3FanoutManager::S3FanoutManager(const S3Config &config) : config_(config) {
-  atomic_init32(&multi_threaded_);
+  multi_threaded_.store(0);
   MakePipe(pipe_terminate_);
   MakePipe(pipe_jobs_);
   MakePipe(pipe_completed_);
@@ -1448,7 +1448,7 @@ S3FanoutManager::~S3FanoutManager() {
   pthread_mutex_destroy(curl_handle_lock_);
   free(curl_handle_lock_);
 
-  if (atomic_xadd32(&multi_threaded_, 0) == 1) {
+  if (multi_threaded_.load() == 1) {
     // Shutdown I/O thread
     char buf = 'T';
     WritePipe(pipe_terminate_[1], &buf, 1);
@@ -1499,7 +1499,7 @@ void S3FanoutManager::Spawn() {
                                     static_cast<void *>(this));
   assert(retval == 0);
 
-  atomic_inc32(&multi_threaded_);
+  multi_threaded_.fetch_add(1);
 }
 
 const Statistics &S3FanoutManager::GetStatistics() { return *statistics_; }

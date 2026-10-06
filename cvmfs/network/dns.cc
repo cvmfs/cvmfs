@@ -201,7 +201,7 @@ std::string AddDefaultScheme(const std::string &proxy) {
 //------------------------------------------------------------------------------
 
 
-atomic_int64 Host::global_id_ = 0;
+std::atomic<int64_t> Host::global_id_(0);
 
 const set<string> &Host::ViewBestAddresses(IpPreference preference) const {
   if (((preference == kIpPreferSystem) || (preference == kIpPreferV4))
@@ -230,7 +230,7 @@ void Host::CopyFrom(const Host &other) {
  */
 Host Host::ExtendDeadline(const Host &original, unsigned seconds_from_now) {
   Host new_host(original);
-  new_host.id_ = atomic_xadd64(&global_id_, 1);
+  new_host.id_ = global_id_.fetch_add(1);
   new_host.deadline_ = time(NULL) + seconds_from_now;
   return new_host;
 }
@@ -242,7 +242,7 @@ Host Host::ExtendDeadline(const Host &original, unsigned seconds_from_now) {
  */
 Host::Host()
     : deadline_(0)
-    , id_(atomic_xadd64(&global_id_, 1))
+    , id_(global_id_.fetch_add(1))
     , status_(kFailNotYetResolved) { }
 
 
@@ -1333,3 +1333,4 @@ NormalResolver::~NormalResolver() {
 }
 
 }  // namespace dns
+                   

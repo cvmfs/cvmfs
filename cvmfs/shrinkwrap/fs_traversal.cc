@@ -8,6 +8,7 @@
 #include <pthread.h>
 #include <stdio.h>
 
+#include <atomic>
 #include <fstream>
 #include <map>
 #include <vector>
@@ -18,7 +19,6 @@
 #include "shrinkwrap/posix/interface.h"
 #include "shrinkwrap/spec_tree.h"
 #include "statistics.h"
-#include "util/atomic.h"
 #include "util/concurrency.h"
 #include "util/logging.h"
 #include "util/platform.h"
@@ -85,7 +85,7 @@ uint64_t stat_update_period_ = 0;  // Off for testing
 int pipe_chunks[2];
 // required for concurrent reading
 pthread_mutex_t lock_pipe = PTHREAD_MUTEX_INITIALIZER;
-atomic_int64 copy_queue;
+std::atomic<int64_t> copy_queue;
 
 vector<RecDir *> dirs_;
 
@@ -341,7 +341,7 @@ bool handle_file(struct fs_traversal *src,
       FileCopy next_copy(src_ident, dest_data);
 
       WritePipe(pipe_chunks[1], &next_copy, sizeof(next_copy));
-      atomic_inc64(&copy_queue);
+      copy_queue.fetch_add(1);
     } else {
       if (!copyFile(src, src_ident, dest, dest_data, pstats)) {
         LogCvmfs(kLogCvmfs, kLogStderr, "Failed to copy %s->%s : %d : %s",
@@ -619,7 +619,7 @@ static void *MainWorker(void *data) {
     free(next_copy.src);
     free(next_copy.dest);
 
-    atomic_dec64(&copy_queue);
+    copy_queue.fetch_sub(1);
   }
   return NULL;
 }
@@ -663,7 +663,7 @@ int SyncInit(struct fs_traversal *src,
   perf::Statistics *pstats = GetSyncStatTemplate();
 
   // Initialization
-  atomic_init64(&copy_queue);
+  copy_queue.store(0);
 
   pthread_t *workers = NULL;
 
@@ -707,7 +707,7 @@ int SyncInit(struct fs_traversal *src,
   add_dir_for_sync(base, recursive);
   const int result = !SyncFull(src, dest, pstats, last_print_time);
 
-  while (atomic_read64(&copy_queue) != 0) {
+  while (copy_queue.load() != 0) {
     if (platform_monotonic_time() - last_print_time > stat_update_period_) {
       LogCvmfs(kLogCvmfs, kLogStdout, "%s",
                pstats->PrintList(perf::Statistics::kPrintSimple).c_str());

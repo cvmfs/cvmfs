@@ -6,6 +6,8 @@
 #include <gtest/gtest.h>
 #include <pthread.h>
 
+#include <atomic>
+
 #include "backoff.h"
 #include "cache_posix.h"
 #include "crypto/hash.h"
@@ -13,7 +15,6 @@
 #include "network/download.h"
 #include "statistics.h"
 #include "testutil.h"
-#include "util/atomic.h"
 
 using namespace std;  // NOLINT
 
@@ -115,8 +116,8 @@ class BuggyCacheManager : public CacheManager {
       , allow_open(false)
       , stall_in_ctrltxn(false)
       , allow_open_from_txn(false) {
-    atomic_init32(&waiting_in_ctrltxn);
-    atomic_init32(&continue_ctrltxn);
+    waiting_in_ctrltxn.store(0);
+    continue_ctrltxn.store(0);
   }
   virtual CacheManagerIds id() { return kUnknownCacheManager; }
   virtual std::string Describe() { return "test\n"; }
@@ -147,10 +148,10 @@ class BuggyCacheManager : public CacheManager {
   virtual void CtrlTxn(const Label & /* label */, const int /* flags */,
                        void * /* txn */) {
     if (stall_in_ctrltxn) {
-      atomic_inc32(&waiting_in_ctrltxn);
-      while (atomic_read32(&continue_ctrltxn) == 0) {
+      waiting_in_ctrltxn.fetch_add(1);
+      while (continue_ctrltxn.load() == 0) {
       }
-      atomic_dec32(&waiting_in_ctrltxn);
+      waiting_in_ctrltxn.fetch_sub(1);
     }
   }
   virtual int64_t Write(const void *buf, uint64_t sz, void *txn) { return sz; }
@@ -169,8 +170,8 @@ class BuggyCacheManager : public CacheManager {
   bool open_2nd_try;
   bool allow_open;
   bool stall_in_ctrltxn;
-  atomic_int32 waiting_in_ctrltxn;
-  atomic_int32 continue_ctrltxn;
+  std::atomic<int32_t> waiting_in_ctrltxn;
+  std::atomic<int32_t> continue_ctrltxn;
   bool allow_open_from_txn;
 };
 
@@ -372,7 +373,7 @@ void *TestFetchCollapse2(void *data) {
       if (iDownloadQueue->second->size() > 0) {
         // printf("open up %s", iDownloadQueue->first.ToString().c_str());
         bcm->stall_in_ctrltxn = false;
-        atomic_inc32(&bcm->continue_ctrltxn);
+        bcm->continue_ctrltxn.fetch_add(1);
       }
     }
     pthread_mutex_unlock(f->lock_queues_download_);
@@ -413,7 +414,7 @@ TEST_F(T_Fetcher, FetchCollapse) {
   EXPECT_EQ(0, pthread_create(&thread_collapse2, NULL, TestFetchCollapse2, &f));
 
   // Piggy-back onto existing download
-  while (atomic_read32(&bcm.waiting_in_ctrltxn) == 0) {
+  while (bcm.waiting_in_ctrltxn.load() == 0) {
   }
   fd = f.Fetch(CacheManager::LabeledObject(hash_catalog_, lbl));
   EXPECT_EQ(-EROFS, fd);

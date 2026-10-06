@@ -8,11 +8,11 @@
 #include <pthread.h>
 #include <stdint.h>
 
+#include <atomic>
 #include <cassert>
 #include <cstddef>
 #include <vector>
 
-#include "util/atomic.h"
 #include "util/mutex.h"
 #include "util/single_copy.h"
 
@@ -244,7 +244,7 @@ class Tube : SingleCopy {
 template<class ItemT>
 class TubeGroup : SingleCopy {
  public:
-  TubeGroup() : is_active_(false) { atomic_init32(&round_robin_); }
+  TubeGroup() : is_active_(false) { round_robin_.store(0); }
 
   ~TubeGroup() {
     for (unsigned i = 0; i < tubes_.size(); ++i)
@@ -279,14 +279,14 @@ class TubeGroup : SingleCopy {
     assert(is_active_);
     unsigned tube_idx = (tubes_.size() == 1)
                             ? 0
-                            : (atomic_xadd32(&round_robin_, 1) % tubes_.size());
+                            : (round_robin_.fetch_add(1) % tubes_.size());
     return tubes_[tube_idx]->EnqueueBack(item);
   }
 
  private:
   bool is_active_;
   std::vector<Tube<ItemT> *> tubes_;
-  atomic_int32 round_robin_;
+  std::atomic<int32_t> round_robin_;
 };
 
 #endif  // CVMFS_UTIL_TUBE_H_

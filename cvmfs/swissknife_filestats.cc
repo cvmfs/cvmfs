@@ -45,7 +45,7 @@ int CommandFileStats::Main(const ArgumentList &args) {
   }
 
   tmp_db_path_ = tmp_dir + "/cvmfs_filestats/";
-  atomic_init32(&num_downloaded_);
+  num_downloaded_.store(0);
 
   bool success = false;
   if (IsHttpUrl(repo_url)) {
@@ -70,7 +70,7 @@ int CommandFileStats::Main(const ArgumentList &args) {
 
 template<class ObjectFetcherT>
 bool CommandFileStats::Run(ObjectFetcherT *object_fetcher) {
-  atomic_init32(&finished_);
+  finished_.store(0);
 
   const string abs_path = GetAbsolutePath(db_path_);
   unlink(abs_path.c_str());
@@ -88,7 +88,7 @@ bool CommandFileStats::Run(ObjectFetcherT *object_fetcher) {
 
   const bool ret = traversal.Traverse();
 
-  atomic_inc32(&finished_);
+  finished_.fetch_add(1);
   pthread_join(thread_processing_, NULL);
 
   db_->DestroyStatements();
@@ -98,17 +98,17 @@ bool CommandFileStats::Run(ObjectFetcherT *object_fetcher) {
 
 void CommandFileStats::CatalogCallback(
     const CatalogTraversalData<catalog::Catalog> &data) {
-  const int32_t num = atomic_read32(&num_downloaded_);
+  const int32_t num = num_downloaded_.load();
   const string out_path = tmp_db_path_ + StringifyInt(num + 1) + ".db";
   assert(CopyPath2Path(data.catalog->database_path(), out_path));
-  atomic_inc32(&num_downloaded_);
+  num_downloaded_.fetch_add(1);
 }
 
 void *CommandFileStats::MainProcessing(void *data) {
   CommandFileStats *repo_stats = static_cast<CommandFileStats *>(data);
   int processed = 0;
-  int32_t downloaded = atomic_read32(&repo_stats->num_downloaded_);
-  int32_t fin = atomic_read32(&repo_stats->finished_);
+  int32_t downloaded = repo_stats->num_downloaded_.load();
+  int32_t fin = repo_stats->finished_.load();
 
   repo_stats->db_->BeginTransaction();
   while (fin == 0 || processed < downloaded) {
@@ -119,8 +119,8 @@ void *CommandFileStats::MainProcessing(void *data) {
       repo_stats->ProcessCatalog(db_path);
       ++processed;
     }
-    downloaded = atomic_read32(&repo_stats->num_downloaded_);
-    fin = atomic_read32(&repo_stats->finished_);
+    downloaded = repo_stats->num_downloaded_.load();
+    fin = repo_stats->finished_.load();
   }
   repo_stats->db_->CommitTransaction();
 

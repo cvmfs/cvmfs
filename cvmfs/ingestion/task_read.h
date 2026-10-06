@@ -7,9 +7,10 @@
 
 #include <stdint.h>
 
+#include <atomic>
+
 #include "ingestion/item.h"
 #include "ingestion/task.h"
-#include "util/atomic.h"
 #include "util/posix.h"
 #include "util/tube.h"
 
@@ -30,12 +31,12 @@ class TaskRead : public TubeConsumer<FileItem> {
       , allocator_(allocator)
       , low_watermark_(0)
       , high_watermark_(0) {
-    atomic_init64(&n_block_);
+    n_block_.store(0);
   }
 
   void SetWatermarks(uint64_t low, uint64_t high);
 
-  uint64_t n_block() { return atomic_read64(&n_block_); }
+  uint64_t n_block() { return n_block_.load(); }
 
  protected:
   virtual void Process(FileItem *item);
@@ -45,7 +46,7 @@ class TaskRead : public TubeConsumer<FileItem> {
    * Every new file increases the tag sequence counter that is used to annotate
    * BlockItems.
    */
-  static atomic_int64 tag_seq_;
+  static std::atomic<int64_t> tag_seq_;
 
   TubeGroup<BlockItem> *tubes_out_;
   ItemAllocator *allocator_;
@@ -62,7 +63,7 @@ class TaskRead : public TubeConsumer<FileItem> {
   /**
    * Number of times reading was blocked on a high watermark.
    */
-  atomic_int64 n_block_;
+  std::atomic<int64_t> n_block_;
 };
 
 #endif  // CVMFS_INGESTION_TASK_READ_H_

@@ -7,6 +7,7 @@
 
 #include <stdint.h>
 
+#include <atomic>
 #include <cstdio>
 #include <ctime>
 #include <map>
@@ -16,7 +17,6 @@
 
 #include "duplex_cares.h"  // IWYU pragma: keep
 #include "duplex_testing.h"
-#include "util/atomic.h"
 #include "util/prng.h"
 #include "util/single_copy.h"
 
@@ -126,7 +126,7 @@ class Host {
    * distinguish two Host objects with the same host name.  E.g. when the proxy
    * list in Download.cc reads "http://A:3128|http://A:3128".
    */
-  static atomic_int64 global_id_;
+  static std::atomic<int64_t> global_id_;
 
   /**
    * When the name resolution becomes outdated, in UTC seconds since UNIX epoch.

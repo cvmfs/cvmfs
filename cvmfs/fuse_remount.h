@@ -7,13 +7,13 @@
 
 #include <pthread.h>
 
+#include <atomic>
 #include <ctime>
 
 #include "crypto/hash.h"
 #include "duplex_fuse.h"
 #include "fence.h"
 #include "fuse_evict.h"
-#include "util/atomic.h"
 #include "util/single_copy.h"
 
 namespace cvmfs {
@@ -58,11 +58,10 @@ class FuseRemounter : SingleCopy {
   void TryFinish(const shash::Any &root_hash = shash::Any());
   void EnterMaintenanceMode();
   bool IsCaching() {
-    return (atomic_read32(&maintenance_mode_) == 0)
-           && (atomic_read32(&drainout_mode_) == 0);
+    return (maintenance_mode_.load() == 0) && (drainout_mode_.load() == 0);
   }
-  bool IsInDrainoutMode() { return atomic_read32(&drainout_mode_) == 2; }
-  bool IsInMaintenanceMode() { return atomic_read32(&maintenance_mode_) == 1; }
+  bool IsInDrainoutMode() { return drainout_mode_.load() == 2; }
+  bool IsInMaintenanceMode() { return maintenance_mode_.load() == 1; }
 
   Fence *fence() { return fence_; }
   time_t catalogs_valid_until() { return catalogs_valid_until_; }
@@ -77,8 +76,11 @@ class FuseRemounter : SingleCopy {
   bool HasRemountTrigger() { return pipe_remount_trigger_[0] >= 0; }
   void SetAlarm(int timeout);
 
-  bool EnterCriticalSection() { return atomic_cas32(&critical_section_, 0, 1); }
-  void LeaveCriticalSection() { atomic_dec32(&critical_section_); /* 1 -> 0 */ }
+  bool EnterCriticalSection() {
+    int32_t expected_val = 0;
+    return critical_section_.compare_exchange_strong(expected_val, 1);
+  }
+  void LeaveCriticalSection() { critical_section_.fetch_sub(1); /* 1 -> 0 */ }
 
   void SetOfflineMode(bool value);
 
@@ -127,18 +129,19 @@ class FuseRemounter : SingleCopy {
    * the handle of the FuseInvalidator is prepared, from one to two is the
    * actual move into drainout mode.
    */
-  atomic_int32 drainout_mode_;
+  std::atomic<int32_t> drainout_mode_;
   /**
    * in maintenance mode, cache timeout is 0 and catalogs are not reloaded.
    * Maintenance mode is entered when the fuse module gets reloaded.
    */
-  atomic_int32 maintenance_mode_;
+  std::atomic<int32_t> maintenance_mode_;
   /**
    * Only one thread must perform the actual remount (stopping user-level
    * caches, loading new catalog, etc.).  This is used to protect TyrFinish()
    * from concurrent execution.
    */
-  atomic_int32 critical_section_;
+  std::atomic<int32_t> critical_section_;
 };  // class FuseRemounter
 
 #endif  // CVMFS_FUSE_REMOUNT_H_
+
