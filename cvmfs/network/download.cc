@@ -1821,7 +1821,7 @@ DownloadManager::~DownloadManager() {
     health_check_.Reset();
   }
 
-  if (multi_threaded_.fetch_add(0) == 1) {
+  if (multi_threaded_.load() == 1) {
     // Shutdown I/O thread
     pipe_terminate_->Write(kPipeTerminateSignal);
     pthread_join(thread_download_, NULL);
@@ -2041,7 +2041,7 @@ Failures DownloadManager::Fetch(JobInfo *info) {
     memcpy(info->tracing_header_uid(), str_uid.c_str(), str_uid.size() + 1);
   }
 
-  if (multi_threaded_.fetch_add(0) == 1) {
+  if (multi_threaded_.load() == 1) {
     if (!info->IsValidPipeJobResults()) {
       info->CreatePipeJobResults();
     }
