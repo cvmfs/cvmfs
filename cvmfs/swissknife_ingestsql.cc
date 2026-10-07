@@ -1319,6 +1319,12 @@ void swissknife::IngestSQL::load_files(
     size_t const size = sqlite3_column_int64(stmt, 5);
     char *hashes_cstr = (char *)sqlite3_column_text(stmt, 6);
     int const internal = sqlite3_column_int(stmt, 7);
+    // A SQL NULL column comes back as a NULL pointer: constructing a
+    // std::string from it (name) or handing it to strtok_r (hashes) is
+    // undefined behaviour -- fail with a message naming the row instead.
+    CUSTOM_ASSERT(name != NULL, "files row with NULL name (corrupt descriptor)");
+    CUSTOM_ASSERT(hashes_cstr != NULL, "files row [%s] has NULL hashes "
+                  "(corrupt descriptor)", name);
     int const compressed = schema_revision <= 2 ? 0
                                                 : sqlite3_column_int(stmt, 8);
 
@@ -1333,6 +1339,9 @@ void swissknife::IngestSQL::load_files(
     }
     all_files[parent_dir].emplace_back(std::move(names), mtime, size, owner,
                                        grp, mode, internal, compressed);
+    // `names` was moved into the File above, so every diagnostic below must
+    // reference the stored copy, or it names the file as "[]".
+    const string &fname = all_files[parent_dir].back().name;
 
     // tokenize hashes
     char *ref;
@@ -1344,7 +1353,7 @@ void swissknife::IngestSQL::load_files(
     off_t offset = 0;
 
     CUSTOM_ASSERT(size >= 0, "file size cannot be negative [%s]",
-                  names.c_str());
+                  fname.c_str());
     size_t const kChunkSize = internal ? kInternalChunkSize
                                        : kExternalChunkSize;
 
@@ -1352,7 +1361,7 @@ void swissknife::IngestSQL::load_files(
       offsets.push_back(offset);
       // TODO: check the hash format
       CUSTOM_ASSERT(check_hash(tok) == 0,
-                    "provided hash for [%s] is invalid: %s", names.c_str(),
+                    "provided hash for [%s] is invalid: %s", fname.c_str(),
                     tok);
       hashes.push_back(
           shash::MkFromHexPtr(shash::HexPtr(tok), shash::kSuffixNone));
@@ -1366,8 +1375,8 @@ void swissknife::IngestSQL::load_files(
     }
     CUSTOM_ASSERT(
         offsets.size() == expected_num_chunks,
-        "offsets size %ld does not match expected number of chunks %ld",
-        offsets.size(), expected_num_chunks);
+        "file [%s]: offsets size %ld does not match expected number of "
+        "chunks %ld", fname.c_str(), offsets.size(), expected_num_chunks);
     for (size_t i = 0; i < offsets.size() - 1; i++) {
       sizes.push_back(size_t(offsets[i + 1] - offsets[i]));
     }
