@@ -1299,18 +1299,29 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     case CURLE_OPERATION_TIMEDOUT:
     case CURLE_SEND_ERROR:
     case CURLE_RECV_ERROR:
+    // Server or proxy dropped the connection mid-response (e.g. a reaped
+    // keep-alive connection); the request body is rewound before retrying.
+    case CURLE_PARTIAL_FILE:
+    case CURLE_GOT_NOTHING:
       info->error_code = kFailHostConnection;
       break;
     case CURLE_ABORTED_BY_CALLBACK:
     case CURLE_WRITE_ERROR:
       // Error set by callback
       break;
-    default:
+    default: {
+      const string what = (info->request == JobInfo::kReqDeleteMulti)
+                              ? "multi-delete of "
+                                    + StringifyUint(
+                                        info->multi_delete_keys.size())
+                                    + " objects"
+                              : "upload of '" + info->object_key + "'";
       LogCvmfs(kLogS3Fanout, kLogStderr | kLogSyslogErr,
-               "unexpected curl error (%d) while trying to upload %s: %s",
-               curl_error, info->object_key.c_str(), info->errorbuffer);
+               "unexpected curl error (%d) during %s: %s", curl_error,
+               what.c_str(), info->errorbuffer);
       info->error_code = kFailOther;
       break;
+    }
   }
 
   // Transform HEAD to PUT request
