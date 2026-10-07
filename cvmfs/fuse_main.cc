@@ -73,13 +73,13 @@ int main(int argc, char **argv) {
 
   // build the library search path
   const std::vector<std::string> library_paths = {
-    local_lib_path + libname_fuse3,
-    "/usr/lib/" + libname_fuse3,
-    "/usr/lib64/" + libname_fuse3,
+      local_lib_path + libname_fuse3,
+      "/usr/lib/" + libname_fuse3,
+      "/usr/lib64/" + libname_fuse3,
 #ifdef __APPLE__
-    // Since OS X El Capitan (10.11) came with SIP, we needed to relocate our
-    // binaries from /usr/... to /usr/local/...
-    "/usr/local/lib/" + libname_fuse3,
+      // Since OS X El Capitan (10.11) came with SIP, we needed to relocate our
+      // binaries from /usr/... to /usr/local/...
+      "/usr/local/lib/" + libname_fuse3,
 #endif
   };
 
