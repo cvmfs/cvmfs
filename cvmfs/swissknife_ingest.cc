@@ -225,6 +225,9 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
         spooler_definition, s3_config_path, params.repo_name, object_list_path);
     if (!gw_s3->Initialize()) {
       PrintError("Failed to initialize GatewayS3 uploader");
+      // Stop the upload threads Initialize started: deleting the uploader
+      // with them running does not return.
+      gw_s3->TearDown();
       delete gw_s3;
       return 3;
     }

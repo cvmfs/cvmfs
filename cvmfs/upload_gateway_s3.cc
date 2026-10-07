@@ -143,6 +143,17 @@ bool GatewayS3Uploader::InitS3Manager() {
     options_manager.GetValue("CVMFS_S3_PROXY", &s3config.proxy);
   }
 
+  // Where the repository lives in the bucket: its S3 alias, the <alias> of an
+  // S3 stratum 0's "S3,<tmp>,<alias>@<config>" upstream (cvmfs/bits.cern.ch).
+  // It differs from the repository name whenever the alias has a path, and
+  // objects written under the name are then never served.  Defaults to the
+  // name, which is what an alias-less mkfs uses.
+  object_prefix_ = repo_alias_;
+  if (options_manager.GetValue("CVMFS_S3_REPO_ALIAS", &parameter)) {
+    const std::string alias = TrimString(parameter, "/");
+    if (!alias.empty()) object_prefix_ = alias;
+  }
+
   // Opened only when -S was given, and before anything is spawned so that a
   // failure here still returns cleanly.  A FIFO blocks until its reader
   // attaches, which is the intended handshake with the caller.
@@ -166,12 +177,46 @@ bool GatewayS3Uploader::InitS3Manager() {
   s3fanout_mgr_.reset(new s3fanout::S3FanoutManager(s3config));
   s3fanout_mgr_->Spawn();
 
+  // Before the collector exists, so this thread can take the reply itself.
+  if (!CheckRepositoryPrefix())
+    return false;
+
   const int retval = pthread_create(&thread_collect_results_, NULL,
                                     MainCollectResults, this);
   assert(retval == 0);
   collector_running_ = true;
 
   return true;
+}
+
+// The repository's manifest must be under the prefix the objects will be
+// written to: a prefix the stratum 0 does not serve takes every upload without
+// complaint and leaves a published tree whose files cannot be read.  One HEAD
+// before anything is uploaded turns that into a failed start.
+bool GatewayS3Uploader::CheckRepositoryPrefix() {
+  const std::string key = object_prefix_ + "/.cvmfspublished";
+  s3fanout::JobInfo *probe = new s3fanout::JobInfo(
+      key, NULL, FileBackedBuffer::Create(4096));
+  probe->request = s3fanout::JobInfo::kReqHeadOnly;
+  s3fanout_mgr_->PushNewJob(probe);
+  s3fanout::JobInfo *done = s3fanout_mgr_->PopCompletedJob();
+  assert(done == probe);
+  const s3fanout::Failures code = done->error_code;
+  delete done;
+  if (code == s3fanout::kFailOk)
+    return true;
+  if (code == s3fanout::kFailNotFound) {
+    LogCvmfs(kLogUploadS3, kLogStderr,
+             "GatewayS3: no repository manifest at '%s' in the bucket, so "
+             "objects written under '%s/data/' would not be served; set "
+             "CVMFS_S3_REPO_ALIAS in '%s' to the repository's S3 alias",
+             key.c_str(), object_prefix_.c_str(), s3_config_path_.c_str());
+  } else {
+    LogCvmfs(kLogUploadS3, kLogStderr,
+             "GatewayS3: cannot check '%s' in the bucket (error: %d - %s)",
+             key.c_str(), code, s3fanout::Code2Ascii(code));
+  }
+  return false;
 }
 
 bool GatewayS3Uploader::Initialize() {
@@ -184,6 +229,9 @@ bool GatewayS3Uploader::Initialize() {
   if (!InitS3Manager()) {
     LogCvmfs(kLogUploadS3, kLogStderr,
              "GatewayS3Uploader: failed to initialize S3 fanout manager");
+    // The base started the gateway session's worker; stop it, or the
+    // caller's delete waits on it.  Nothing was sent, so nothing is lost.
+    GatewayUploader::FinalizeSession(false, "", "", RepositoryTag());
     return false;
   }
 
@@ -229,8 +277,8 @@ void GatewayS3Uploader::FinalizeStreamedUpload(UploadStreamHandle *handle,
 
   // Extract the data from the gateway bucket.  The bucket has been filled
   // by GatewayUploader::StreamedUpload via ObjectPack::AddToBucket.
-  const std::string object_key = repo_alias_ + "/data/"
-                                 + content_hash.MakePath();
+  const std::string object_key =
+      object_prefix_ + "/data/" + content_hash.MakePath();
 
   // Create an S3 job from the bucket data
   FileBackedBuffer *buf = FileBackedBuffer::Create(500 * 1024);

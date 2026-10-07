@@ -46,11 +46,16 @@ class GatewayS3Uploader : public GatewayUploader {
 
  private:
   bool InitS3Manager();
+  bool CheckRepositoryPrefix();
 
   static void *MainCollectResults(void *data);
 
   std::string s3_config_path_;
+  /// The repository name (fqrn): what @fqrn@ in the S3 config expands to.
   std::string repo_alias_;
+  /// Key prefix of the repository in the bucket: CVMFS_S3_REPO_ALIAS, else
+  /// the repository name.
+  std::string object_prefix_;
   std::string object_list_path_;
   /// NULL unless -S was given.  Opened before the collector thread exists and
   /// touched only by it afterwards, so it needs no lock.
