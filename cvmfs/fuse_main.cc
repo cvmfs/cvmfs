@@ -71,29 +71,29 @@ int main(int argc, char **argv) {
       local_lib_path.push_back('/');
   }
 
-  std::vector<std::string> library_paths;
-  library_paths.push_back(local_lib_path + libname_fuse3);
-  library_paths.push_back("/usr/lib/" + libname_fuse3);
-  library_paths.push_back("/usr/lib64/" + libname_fuse3);
+  // build the library search path
+  const std::vector<std::string> library_paths = {
+      local_lib_path + libname_fuse3,
+      "/usr/lib/" + libname_fuse3,
+      "/usr/lib64/" + libname_fuse3,
 #ifdef __APPLE__
-  // Since OS X El Capitan (10.11) came with SIP, we needed to relocate our
-  // binaries from /usr/... to /usr/local/...
-  library_paths.push_back("/usr/local/lib/" + libname_fuse3);
+      // Since OS X El Capitan (10.11) came with SIP, we needed to relocate our
+      // binaries from /usr/... to /usr/local/...
+      "/usr/local/lib/" + libname_fuse3,
 #endif
+  };
 
-  void *library_handle;
-  std::vector<std::string>::const_iterator i = library_paths.begin();
-  const std::vector<std::string>::const_iterator iend = library_paths.end();
-  for (; i != iend; ++i) {
-    library_handle = dlopen(i->c_str(), RTLD_NOW | RTLD_LOCAL);
-    if (library_handle != NULL) {
+  // dlopen the library at the first good path
+  void *library_handle = nullptr;
+  for (const std::string &path : library_paths) {
+    library_handle = dlopen(path.c_str(), RTLD_NOW | RTLD_LOCAL);
+    if (nullptr != library_handle) {
       if (debug) {
         LogCvmfs(kLogCvmfs, kLogDebug | kLogStdout, "Debug: using library %s",
-                 i->c_str());
+                 path.c_str());
       }
       break;
     }
-
     error_messages += std::string(dlerror()) + "\n";
   }
 
