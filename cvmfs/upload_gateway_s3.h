@@ -14,13 +14,14 @@
 #ifndef CVMFS_UPLOAD_GATEWAY_S3_H_
 #define CVMFS_UPLOAD_GATEWAY_S3_H_
 
+#include <atomic>
+#include <cstdint>
 #include <cstdio>
 #include <memory>
 #include <string>
 
 #include "network/s3fanout.h"
 #include "upload_gateway.h"
-#include "util/atomic.h"
 
 namespace upload {
 
@@ -62,7 +63,7 @@ class GatewayS3Uploader : public GatewayUploader {
   FILE *object_list_;
   std::unique_ptr<s3fanout::S3FanoutManager> s3fanout_mgr_;
   /// Written by the collect-results thread, read by the publisher thread
-  mutable atomic_int32 s3_errors_;
+  mutable std::atomic<int32_t> s3_errors_;
 
   pthread_t thread_collect_results_;
   bool collector_running_;

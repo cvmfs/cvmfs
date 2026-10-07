@@ -36,7 +36,7 @@ GatewayS3Uploader::GatewayS3Uploader(
     , object_list_(NULL)
     , s3fanout_mgr_()
     , collector_running_(false) {
-  atomic_init32(&s3_errors_);
+  s3_errors_.store(0);
 }
 
 GatewayS3Uploader::~GatewayS3Uploader() {
@@ -251,7 +251,7 @@ void GatewayS3Uploader::WaitForUpload() const {
 }
 
 unsigned int GatewayS3Uploader::GetNumberOfErrors() const {
-  return GatewayUploader::GetNumberOfErrors() + atomic_read32(&s3_errors_);
+  return GatewayUploader::GetNumberOfErrors() + s3_errors_.load();
 }
 
 void GatewayS3Uploader::FinalizeStreamedUpload(UploadStreamHandle *handle,
@@ -328,7 +328,7 @@ void *GatewayS3Uploader::MainCollectResults(void *data) {
                info->object_key.c_str(), info->error_code,
                s3fanout::Code2Ascii(info->error_code));
       reply_code = 99;
-      atomic_inc32(&uploader->s3_errors_);
+      ++uploader->s3_errors_;
     }
 
     const bool was_duplicate = info->request == s3fanout::JobInfo::kReqHeadPut
@@ -353,7 +353,7 @@ void *GatewayS3Uploader::MainCollectResults(void *data) {
         LogCvmfs(kLogUploadS3, kLogStderr,
                  "GatewayS3: object list write failed at '%s': %s",
                  info->object_key.c_str(), strerror(errno));
-        atomic_inc32(&uploader->s3_errors_);
+        ++uploader->s3_errors_;
         fclose(uploader->object_list_);
         uploader->object_list_ = NULL;
       }
