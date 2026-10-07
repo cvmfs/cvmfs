@@ -1299,18 +1299,29 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     case CURLE_OPERATION_TIMEDOUT:
     case CURLE_SEND_ERROR:
     case CURLE_RECV_ERROR:
+    // Server or proxy dropped the connection mid-response (e.g. a reaped
+    // keep-alive connection); the request body is rewound before retrying.
+    case CURLE_PARTIAL_FILE:
+    case CURLE_GOT_NOTHING:
       info->error_code = kFailHostConnection;
       break;
     case CURLE_ABORTED_BY_CALLBACK:
     case CURLE_WRITE_ERROR:
       // Error set by callback
       break;
-    default:
+    default: {
+      const string what = (info->request == JobInfo::kReqDeleteMulti)
+                              ? "multi-delete of "
+                                    + StringifyUint(
+                                        info->multi_delete_keys.size())
+                                    + " objects"
+                              : "upload of '" + info->object_key + "'";
       LogCvmfs(kLogS3Fanout, kLogStderr | kLogSyslogErr,
-               "unexpected curl error (%d) while trying to upload %s: %s",
-               curl_error, info->object_key.c_str(), info->errorbuffer);
+               "unexpected curl error (%d) during %s: %s", curl_error,
+               what.c_str(), info->errorbuffer);
       info->error_code = kFailOther;
       break;
+    }
   }
 
   // Transform HEAD to PUT request
@@ -1373,7 +1384,7 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
 }
 
 S3FanoutManager::S3FanoutManager(const S3Config &config) : config_(config) {
-  atomic_init32(&multi_threaded_);
+  multi_threaded_.store(0);
   MakePipe(pipe_terminate_);
   MakePipe(pipe_jobs_);
   MakePipe(pipe_completed_);
@@ -1448,7 +1459,7 @@ S3FanoutManager::~S3FanoutManager() {
   pthread_mutex_destroy(curl_handle_lock_);
   free(curl_handle_lock_);
 
-  if (atomic_xadd32(&multi_threaded_, 0) == 1) {
+  if (multi_threaded_.load() == 1) {
     // Shutdown I/O thread
     char buf = 'T';
     WritePipe(pipe_terminate_[1], &buf, 1);
@@ -1499,7 +1510,7 @@ void S3FanoutManager::Spawn() {
                                     static_cast<void *>(this));
   assert(retval == 0);
 
-  atomic_inc32(&multi_threaded_);
+  multi_threaded_.fetch_add(1);
 }
 
 const Statistics &S3FanoutManager::GetStatistics() { return *statistics_; }

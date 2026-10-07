@@ -61,7 +61,7 @@ S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition)
   assert(spooler_definition.IsValid()
          && spooler_definition.driver_type == SpoolerDefinition::S3);
 
-  atomic_init32(&io_errors_);
+  io_errors_.store(0);
   const int mutex_ret = pthread_mutex_init(&delete_batch_mutex_, NULL);
   assert(mutex_ret == 0);
 
@@ -293,9 +293,7 @@ bool S3Uploader::Create() {
 }
 
 
-unsigned int S3Uploader::GetNumberOfErrors() const {
-  return atomic_read32(&io_errors_);
-}
+unsigned int S3Uploader::GetNumberOfErrors() const { return io_errors_.load(); }
 
 
 /**
@@ -326,7 +324,7 @@ void *S3Uploader::MainCollectResults(void *data) {
                    s3fanout::Code2Ascii(info->error_code));
         }
         reply_code = 99;
-        atomic_inc32(&uploader->io_errors_);
+        uploader->io_errors_.fetch_add(1);
       }
     }
     if (info->request == s3fanout::JobInfo::kReqDeleteMulti) {
@@ -342,7 +340,7 @@ void *S3Uploader::MainCollectResults(void *data) {
                    "S3 multi-delete error for key '%s': %s - %s",
                    error_keys[i].c_str(), error_codes[i].c_str(),
                    error_messages[i].c_str());
-          atomic_inc32(&uploader->io_errors_);
+          uploader->io_errors_.fetch_add(1);
           failed_keys.insert(error_keys[i]);
         }
       }

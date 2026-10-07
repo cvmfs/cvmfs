@@ -21,6 +21,51 @@ cleanup() {
   exit 0
 }
 
+usage() {
+  cat <<EOF
+CernVM-FS service container ${VERSION:+version $VERSION}
+
+Mounts CernVM-FS repositories under /cvmfs for export to the host.
+
+Will either mount a given list of repositories, or mount repositiories
+on demand, depending on the CVMFS_REPOSITORIES environment variable:
+
+  unset  automount mode  repositories are mounted on first access
+  set    explicit mode   the listed repositories are pre-mounted at startup
+                         (comma-separated; cvmfs-config.cern.ch is implied)
+
+Environment variables:
+  CVMFS_CLIENT_PROFILE  'single' to auto-discover a proxy
+  CVMFS_HTTP_PROXY      site proxy URL (required unless CVMFS_CLIENT_PROFILE set)
+  CVMFS_REPOSITORIES    comma-separated repositories to mount, leave unset for automount
+  CVMFS_QUOTA_LIMIT     cache size in MB (default 4000)
+
+Typical invocation (automount mode; repositories become visible on the host
+under /cvmfs through shared mount propagation):
+
+  mount --bind /cvmfs /cvmfs && mount --make-shared /cvmfs
+  docker run -d --name cvmfs \\
+    -e CVMFS_CLIENT_PROFILE=single \\
+    --cap-add SYS_ADMIN --cap-add SYS_RESOURCE \\
+    --device /dev/fuse \\
+    --security-opt apparmor=unconfined \\
+    -v /cvmfs:/cvmfs:rshared \\
+    <image>
+
+On SELinux-enforcing hosts add: --security-opt label=disable
+The host mountpoint must be a shared mount for repositories to appear outside
+the container. On a host with the cvmfs client installed,
+'cvmfs_config docker-run' generates this command for you.
+EOF
+}
+
+case "$1" in
+  help|-h|--help)
+    usage
+    exit 0
+    ;;
+esac
+
 echo "CernVM-FS service container version $VERSION" | tee -a $BOOT_LOG
 date | tee -a $BOOT_LOG
 

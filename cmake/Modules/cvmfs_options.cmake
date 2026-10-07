@@ -63,4 +63,5 @@ set (BUILTIN_EXTERNALS_EXCLUDE ${BUILTIN_EXTERNALS_EXCLUDE_DEFAULT} CACHE STRING
 
 
 option (ENABLE_ASAN             "Enable the Address Sanitizer"                                     OFF)
+option (ENABLE_UFTRACE          "Instrument binaries with -pg for uftrace/gprof function tracing"  OFF)
 option (CHECK_SYSTEM_HEADERS    "Check System for required headers"                                 OFF)

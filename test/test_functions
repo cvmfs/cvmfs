@@ -1,13 +1,4 @@
 #!/bin/bash
-# By default, this script runs in testing mode
-# Although it allows for a server debugging mode, which attaches gdb to
-# the `cvmfs_server publish` process and allows for both online and
-# failure debugging.
-#
-# To allow for online debugging, export CVMFS_TEST_SRVDEBUG like so:
-#
-# `export CVMFS_TEST_SRVDEBUG=fail`    - for crash debugging with gdb
-# `export CVMFS_TEST_SRVDEBUG=startup` - for interactive debugging with gdb
 
 CVMFS_SERVER_APACHE_RELOAD_IS_RESTART=true
 CVMFS_TEST_USE_MACFUSE_KEXT=${CVMFS_TEST_USE_MACFUSE_KEXT:=no}
@@ -28,7 +19,6 @@ CVMFS_TEST_GEO_LICENSE_KEY=${CVMFS_TEST_GEO_LICENSE_KEY:=}
 CVMFS_TEST_GEO_ACCOUNT_ID=${CVMFS_TEST_GEO_ACCOUNT_ID:=}
 
 CVMFS_TEST_UNIONFS=${CVMFS_TEST_UNIONFS:=} # union filesystem type to test
-CVMFS_TEST_SRVDEBUG=${CVMFS_TEST_SRVDEBUG:=}
 CVMFS_TEST_HASHALGO=${CVMFS_TEST_HASHALGO:=sha1}
 CVMFS_TEST_S3_CONFIG=${CVMFS_TEST_S3_CONFIG:=}
 CVMFS_TEST_S3_STORAGE=${CVMFS_TEST_S3_STORAGE:=}
@@ -1363,20 +1353,7 @@ publish_repo() {
   local repo=$1
   shift 1
 
-  # enable the debug mode?
-  # in debug mode we redirect output directly to the interactive shell,
-  # overriding any redirections to logfiles or whatever... We want to hack!
-  case $CVMFS_TEST_SRVDEBUG in
-    fail)
-      cvmfs_server publish -dv "$@" $repo > /dev/tty 2>&1 || return 100
-    ;;
-    startup)
-      cvmfs_server publish -Dv "$@" $repo > /dev/tty 2>&1 || return 100
-    ;;
-    *)
-      cvmfs_server publish -v "$@" $repo || return 100
-    ;;
-  esac
+  cvmfs_server publish -v "$@" $repo || return 100
 
   return 0
 }

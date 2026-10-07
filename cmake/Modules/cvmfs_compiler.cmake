@@ -96,6 +96,15 @@ if (ENABLE_ASAN)
   set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address")
 endif (ENABLE_ASAN)
 
+# Compile with mcount instrumentation so that uftrace (and gprof) can record a
+# full function-level trace without runtime dynamic patching. The base flags
+# already provide -g and -fno-omit-frame-pointer, which uftrace also needs.
+# See doc/developer/61-profiling-with-uftrace.md for usage.
+if (ENABLE_UFTRACE)
+  set (CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} -pg")
+  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pg")
+endif (ENABLE_UFTRACE)
+
 # Check for old Linux version that don't have a complete inotify implementation
 if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
   try_compile(HAS_INOTIFY_INIT1 ${CMAKE_BINARY_DIR} ${PROJECT_SOURCE_DIR}/cmake/check_inotify_init1.c)

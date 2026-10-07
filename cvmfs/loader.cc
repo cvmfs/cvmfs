@@ -484,26 +484,24 @@ static CvmfsExports *LoadLibrary(const bool debug_mode,
   library_name = platform_libname(library_name);
   string error_messages;
 
-  vector<string> library_paths;  // TODO(rmeusel): C++11 initializer
-  if (library_paths.empty()) {
-    library_paths.push_back(local_lib_path + library_name);
-    library_paths.push_back("/usr/lib/" + library_name);
-    library_paths.push_back("/usr/lib64/" + library_name);
+  // build search paths for library
+  const vector<string> library_paths = {
+    local_lib_path + library_name,
+    "/usr/lib/" + library_name,
+    "/usr/lib64/" + library_name,
 #ifdef __APPLE__
     // Since OS X El Capitan (10.11) came with SIP, we needed to relocate our
     // binaries from /usr/... to /usr/local/...
-    library_paths.push_back("/usr/local/lib/" + library_name);
+    "/usr/local/lib/" + library_name,
 #endif
-  }
+  };
 
-  vector<string>::const_iterator i = library_paths.begin();
-  const vector<string>::const_iterator iend = library_paths.end();
-  for (; i != iend; ++i) {  // TODO(rmeusel): C++11 range based for
-    library_handle_ = OpenLibrary(*i);
-    if (library_handle_ != NULL) {
+  // dlopen the library at the first good search path
+  for (const string &path : library_paths) {
+    library_handle_ = OpenLibrary(path);
+    if (nullptr != library_handle_) {
       break;
     }
-
     error_messages += string(dlerror()) + "\n";
   }
 
@@ -722,7 +720,7 @@ int FuseMain(int argc, char *argv[]) {
         new DefaultOptionsTemplateManager(*repository_name_));
   }
   if (config_files_) {
-    vector<string> tokens = SplitString(*config_files_, ':');
+    const vector<string> tokens = SplitString(*config_files_, ':');
     for (unsigned i = 0, s = tokens.size(); i < s; ++i) {
       options_manager->ParsePath(tokens[i], false);
     }
@@ -791,10 +789,10 @@ int FuseMain(int argc, char *argv[]) {
   if (options_manager->GetValue("CVMFS_CPU_AFFINITY", &parameter)) {
 #ifndef __APPLE__
     cpu_set_t mask;
-    vector<string> cpus = SplitString(parameter, ',');
+    const vector<string> cpus = SplitString(parameter, ',');
     CPU_ZERO(&mask);
-    for (vector<string>::iterator i = cpus.begin(); i != cpus.end(); i++) {
-      CPU_SET(String2Uint64(Trim(*i)), &mask);
+    for (const string &cpu : cpus) {
+      CPU_SET(String2Uint64(Trim(cpu)), &mask);
     }
     LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: setting CPU Affinity to %s",
              parameter.c_str());

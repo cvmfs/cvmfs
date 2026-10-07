@@ -41,6 +41,7 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <atomic>
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
@@ -50,7 +51,6 @@
 #include "manifest.h"
 #include "manifest_fetch.h"
 #include "quota.h"
-#include "util/atomic.h"
 #include "util/logging.h"
 #include "util/mutex.h"
 #include "util/platform.h"
@@ -72,28 +72,29 @@ namespace {
 class CallGuard {
  public:
   CallGuard() {
-    const int32_t global_drainout = atomic_read32(&global_drainout_);
+    const int32_t global_drainout = global_drainout_.load();
     drainout_ = (global_drainout != 0);
     if (!drainout_)
-      atomic_inc32(&num_inflight_calls_);
+      num_inflight_calls_.fetch_add(1);
   }
   ~CallGuard() {
     if (!drainout_)
-      atomic_dec32(&num_inflight_calls_);
+      num_inflight_calls_.fetch_sub(1);
   }
   static void Drainout() {
-    atomic_cas32(&global_drainout_, 0, 1);
-    while (atomic_read32(&num_inflight_calls_) != 0)
+    int32_t expected_val = 0;
+    global_drainout_.compare_exchange_strong(expected_val, 1);
+    while (num_inflight_calls_.load() != 0)
       SafeSleepMs(50);
   }
 
  private:
   bool drainout_;
-  static atomic_int32 global_drainout_;
-  static atomic_int32 num_inflight_calls_;
+  static std::atomic<int32_t> global_drainout_;
+  static std::atomic<int32_t> num_inflight_calls_;
 };
-atomic_int32 CallGuard::num_inflight_calls_ = 0;
-atomic_int32 CallGuard::global_drainout_ = 0;
+std::atomic<int32_t> CallGuard::num_inflight_calls_(0);
+std::atomic<int32_t> CallGuard::global_drainout_(0);
 
 }  // anonymous namespace
 
@@ -110,7 +111,7 @@ int PosixCacheManager::AbortTxn(void *txn) {
   close(transaction->fd);
   const int result = unlink(transaction->tmp_path.c_str());
   transaction->~Transaction();
-  atomic_dec32(&no_inflight_txns_);
+  no_inflight_txns_.fetch_sub(1);
   if (result == -1)
     return -errno;
   return 0;
@@ -150,7 +151,7 @@ int PosixCacheManager::CommitTxn(void *txn) {
   if (result < 0) {
     unlink(transaction->tmp_path.c_str());
     transaction->~Transaction();
-    atomic_dec32(&no_inflight_txns_);
+    no_inflight_txns_.fetch_sub(1);
     return result;
   }
 
@@ -168,7 +169,7 @@ int PosixCacheManager::CommitTxn(void *txn) {
                     cache_path_ + "/quarantaine/" + transaction->id.ToString());
       unlink(transaction->tmp_path.c_str());
       transaction->~Transaction();
-      atomic_dec32(&no_inflight_txns_);
+      no_inflight_txns_.fetch_sub(1);
       return -EIO;
     }
   }
@@ -183,7 +184,7 @@ int PosixCacheManager::CommitTxn(void *txn) {
                transaction->id.ToString().c_str());
       unlink(transaction->tmp_path.c_str());
       transaction->~Transaction();
-      atomic_dec32(&no_inflight_txns_);
+      no_inflight_txns_.fetch_sub(1);
       return -ENOSPC;
     }
   }
@@ -214,7 +215,7 @@ int PosixCacheManager::CommitTxn(void *txn) {
     }
   }
   transaction->~Transaction();
-  atomic_dec32(&no_inflight_txns_);
+  no_inflight_txns_.fetch_sub(1);
   return result;
 }
 
@@ -247,11 +248,11 @@ bool PosixCacheManager::InitCacheDirectory(const string &cache_path) {
  * been validated and content is about to be stored (see #4217).
  */
 bool PosixCacheManager::EnsureCacheDirectories() {
-  if (atomic_read32(&cache_dirs_created_))
+  if (cache_dirs_created_.load())
     return true;
 
   const MutexLockGuard guard(lock_cache_dirs_);
-  if (atomic_read32(&cache_dirs_created_))
+  if (cache_dirs_created_.load())
     return true;
 
   const mode_t mode = alien_cache_ ? 0770 : 0700;
@@ -293,7 +294,7 @@ bool PosixCacheManager::EnsureCacheDirectories() {
     }
   }
 
-  atomic_write32(&cache_dirs_created_, 1);
+  cache_dirs_created_.store(1);
   return true;
 }
 
@@ -562,9 +563,9 @@ int PosixCacheManager::StartTxn(const shash::Any &id,
   if (!EnsureCacheDirectories())
     return -EIO;
 
-  atomic_inc32(&no_inflight_txns_);
+  no_inflight_txns_.fetch_add(1);
   if (cache_mode_ == kCacheReadOnly) {
-    atomic_dec32(&no_inflight_txns_);
+    no_inflight_txns_.fetch_sub(1);
     return -EROFS;
   }
 
@@ -574,7 +575,7 @@ int PosixCacheManager::StartTxn(const shash::Any &id,
                "file too big for lru cache (%" PRIu64 " "
                "requested but only %" PRIu64 " bytes free)",
                size, quota_mgr_->GetMaxFileSize());
-      atomic_dec32(&no_inflight_txns_);
+      no_inflight_txns_.fetch_sub(1);
       return -ENOSPC;
     }
 
@@ -611,7 +612,7 @@ int PosixCacheManager::StartTxn(const shash::Any &id,
   transaction->fd = mkstemp(template_path);
   if (transaction->fd == -1) {
     transaction->~Transaction();
-    atomic_dec32(&no_inflight_txns_);
+    no_inflight_txns_.fetch_sub(1);
     return -errno;
   }
 
@@ -642,7 +643,7 @@ bool PosixCacheManager::StoreBreadcrumb(std::string fqrn,
 
 void PosixCacheManager::TearDown2ReadOnly() {
   cache_mode_ = kCacheReadOnly;
-  while (atomic_read32(&no_inflight_txns_) != 0)
+  while (no_inflight_txns_.load() != 0)
     SafeSleepMs(50);
 
   QuotaManager *old_manager = quota_mgr_;
@@ -685,3 +686,4 @@ int64_t PosixCacheManager::Write(const void *buf, uint64_t size, void *txn) {
   transaction->size += written;
   return written;
 }
+ 

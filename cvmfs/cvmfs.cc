@@ -1360,7 +1360,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
       fi->fh = fd;
       FillOpenFlags(open_directives, fi);
 #ifdef FUSE_CAP_PASSTHROUGH
-      if (loader_exports_->fuse_passthrough) {
+      if (loader_exports_ && loader_exports_->fuse_passthrough) {
         if (!dirent.IsChunkedFile()) {
           /* "Currently there should be only one backing id per node / backing
            * file." So says libfuse documentation on fuse_passthrough_open(). So
@@ -1698,7 +1698,7 @@ static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
       perf::Dec(file_system_->no_open_files());
     }
 #ifdef FUSE_CAP_PASSTHROUGH
-    if (loader_exports_->fuse_passthrough) {
+    if (loader_exports_ && loader_exports_->fuse_passthrough) {
       if (fi->backing_id != 0) {
         int ret;
         pthread_mutex_lock(&fuse_passthru_tracker_lock);
@@ -2191,7 +2191,7 @@ static void cvmfs_init(void *userdata, struct fuse_conn_info *conn) {
 
 #ifdef FUSE_CAP_PASSTHROUGH
   if (conn->capable & FUSE_CAP_PASSTHROUGH) {
-    if (loader_exports_->fuse_passthrough) {
+    if (loader_exports_ && loader_exports_->fuse_passthrough) {
       conn->want |= FUSE_CAP_PASSTHROUGH;
       /* "Passthrough and writeback cache are conflicting modes"
        * libfuse example/passthrough_hp.cc says,
