@@ -19,6 +19,7 @@
 #include "sync_mediator.h"
 #include "sync_union.h"
 #include "sync_union_tarball.h"
+#include "upload_gateway_s3.h"
 #include "util/capabilities.h"
 #include "util/logging.h"
 #include "util/posix.h"
@@ -143,9 +144,31 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
 
   const bool upload_statsdb = (args.count('I') > 0);
 
+  // -n runs without the statistics database.  Opening it is not free:
+  // OpenStandardDB creates the file when absent, prunes and vacuums it on
+  // every open, and PANICs when the path is not writable -- so an
+  // unprivileged or containerised ingest that has no
+  // /var/spool/cvmfs/<repo> aborts in a code path unrelated to the content
+  // it was asked to ingest.  The file is also shared by every ingest of the
+  // same repository on a host, and no sqlite busy handler is installed, so
+  // concurrent runs contend at statement preparation; in an assert-enabled
+  // build that is fatal.
+  //
+  // The switch suppresses statistics unconditionally and knows nothing about
+  // what kind of run this is.  Using it on a real publish yields no row and
+  // no upload, which is the caller's responsibility, not this flag's.
+  const bool no_statsdb = (args.count('n') > 0);
+  if (no_statsdb && upload_statsdb) {
+    PrintError("Swissknife Ingest: -n (no statistics database) and -I (upload "
+               "statistics database) are mutually exclusive");
+    return 3;
+  }
+
   perf::StatisticsTemplate publish_statistics("publish", this->statistics());
-  StatisticsDatabase *stats_db = StatisticsDatabase::OpenStandardDB(
-      params.repo_name);
+  StatisticsDatabase *stats_db = NULL;
+  if (!no_statsdb) {
+    stats_db = StatisticsDatabase::OpenStandardDB(params.repo_name);
+  }
 
   upload::SpoolerDefinition spooler_definition(
       params.spooler_definition, hash_algorithm, params.compression_alg,
@@ -164,14 +187,75 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
   const upload::SpoolerDefinition spooler_definition_catalogs(
       spooler_definition.Dup2DefaultCompression());
 
-  params.spooler = upload::Spooler::Construct(spooler_definition,
-                                              &publish_statistics);
+  // Check for direct-to-S3 upload mode (prototype)
+  std::string s3_config_path;
+  if (args.find('3') != args.end()) {
+    s3_config_path = *args.find('3')->second;
+  }
+
+  // Only the data uploader writes the list; the catalog uploader below is
+  // deliberately given none, or every object would be listed twice.
+  std::string object_list_path;
+  if (args.find('S') != args.end()) {
+    object_list_path = *args.find('S')->second;
+  }
+
+  const bool use_s3_direct = !s3_config_path.empty();
+  if (!object_list_path.empty() && !use_s3_direct) {
+    // Only the S3 uploader produces the list, so without -3 nothing would
+    // write it.  cvmfs_server refuses this too; refuse for direct callers.
+    PrintError("Object list (-S) requires direct-to-S3 upload (-3)");
+    return 3;
+  }
+
+  if (use_s3_direct
+      && spooler_definition.driver_type != upload::SpoolerDefinition::Gateway) {
+    // Do not silently fall back to the plain uploader: the caller asked for
+    // direct-to-S3 and would otherwise not notice that it did not happen.
+    PrintError("Direct-to-S3 upload (-3) requires a gateway spooler");
+    return 3;
+  }
+
+  if (use_s3_direct) {
+    // Direct-to-S3 mode: data chunks go to S3, catalogs through gateway
+    LogCvmfs(kLogCvmfs, kLogStdout,
+             "Swissknife Ingest: Using direct-to-S3 upload mode");
+
+    upload::GatewayS3Uploader *gw_s3 = new upload::GatewayS3Uploader(
+        spooler_definition, s3_config_path, params.repo_name, object_list_path);
+    if (!gw_s3->Initialize()) {
+      PrintError("Failed to initialize GatewayS3 uploader");
+      // Stop the upload threads Initialize started: deleting the uploader
+      // with them running does not return.
+      gw_s3->TearDown();
+      delete gw_s3;
+      return 3;
+    }
+    params.spooler = upload::Spooler::Construct(spooler_definition, gw_s3,
+                                                &publish_statistics);
+  } else {
+    params.spooler = upload::Spooler::Construct(spooler_definition,
+                                                &publish_statistics);
+  }
   if (NULL == params.spooler)
     return 3;
-  const std::unique_ptr<upload::Spooler> spooler_catalogs(
-      upload::Spooler::Construct(spooler_definition_catalogs,
-                                 &publish_statistics));
-  if (spooler_catalogs.get() == nullptr)
+  upload::Spooler *spooler_catalogs_ptr = NULL;
+  if (use_s3_direct) {
+    upload::GatewayS3Uploader *gw_s3_cat = new upload::GatewayS3Uploader(
+        spooler_definition_catalogs, s3_config_path, params.repo_name);
+    if (!gw_s3_cat->Initialize()) {
+      PrintError("Failed to initialize GatewayS3 catalog uploader");
+      delete gw_s3_cat;
+      return 3;
+    }
+    spooler_catalogs_ptr = upload::Spooler::Construct(
+        spooler_definition_catalogs, gw_s3_cat, &publish_statistics);
+  } else {
+    spooler_catalogs_ptr = upload::Spooler::Construct(
+        spooler_definition_catalogs, &publish_statistics);
+  }
+  const std::unique_ptr<upload::Spooler> spooler_catalogs(spooler_catalogs_ptr);
+  if (!spooler_catalogs)
     return 3;
 
   const bool follow_redirects = (args.count('L') > 0);
@@ -264,9 +348,11 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
 
   if (!mediator.Commit(manifest.get())) {
     PrintError("Swissknife Ingest: something went wrong during sync");
-    stats_db->StorePublishStatistics(this->statistics(), start_time, false);
-    if (upload_statsdb) {
-      stats_db->UploadStatistics(params.spooler);
+    if (stats_db != NULL) {
+      stats_db->StorePublishStatistics(this->statistics(), start_time, false);
+      if (upload_statsdb) {
+        stats_db->UploadStatistics(params.spooler);
+      }
     }
     return 5;
   }
@@ -294,16 +380,20 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
   if (!spooler_catalogs->FinalizeSession(true, old_root_hash, new_root_hash,
                                          params.repo_tag)) {
     PrintError("Swissknife Ingest: Failed to commit the transaction.");
-    stats_db->StorePublishStatistics(this->statistics(), start_time, false);
-    if (upload_statsdb) {
-      stats_db->UploadStatistics(params.spooler);
+    if (stats_db != NULL) {
+      stats_db->StorePublishStatistics(this->statistics(), start_time, false);
+      if (upload_statsdb) {
+        stats_db->UploadStatistics(params.spooler);
+      }
     }
     return 9;
   }
 
-  stats_db->StorePublishStatistics(this->statistics(), start_time, true);
-  if (upload_statsdb) {
-    stats_db->UploadStatistics(params.spooler);
+  if (stats_db != NULL) {
+    stats_db->StorePublishStatistics(this->statistics(), start_time, true);
+    if (upload_statsdb) {
+      stats_db->UploadStatistics(params.spooler);
+    }
   }
 
   delete params.spooler;
