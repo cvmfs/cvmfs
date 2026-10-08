@@ -1,6 +1,11 @@
 name: packages_riscv
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Package version (X.Y.Z[~suffix]); empty = detect from git'
+        required: false
+        default: ''
 
 jobs:
   # Build-only: the riscv64 runners have no systemd, so we can't install the
@@ -39,11 +44,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2
+          fetch-tags: true
       - name: Mark workspace as safe for git
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - name: Install build dependencies
         run: ./ci/build_install_builddeps.sh --install "$PWD"
       - name: Build packages
+        env:
+          CVMFS_VERSION_OVERRIDE: ${{ inputs.version }}
         run: |
           mkdir -p /tmp/build /tmp/build-config
           ./ci/build_package.sh "$PWD" /tmp/build-config cvmfs-config
