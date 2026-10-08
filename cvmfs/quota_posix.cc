@@ -105,6 +105,8 @@ void PosixQuotaManager::CleanupPipes() {
     const int retval = platform_stat(path.c_str(), &info);
     if (retval != 0)
       continue;
+
+    // CVMFS FIFOs are prefixed with "pipe"
     if (S_ISFIFO(info.st_mode) && (name.substr(0, 4) == "pipe")) {
       if (!found_leftovers) {
         LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,

@@ -29,5 +29,8 @@ cvmfs_run_test() {
   sudo stat ${cache_dir}/fifo000 || return 8
   sudo stat ${cache_dir}/pipe000 && return 6
 
+  # cleanup fifo000 manually - shouldn't been cleanup on remount
+  sudo rm -rf "${cache_dir}/fifo000"
+
   return 0
 }
