@@ -6,9 +6,11 @@
 #include <sys/xattr.h>  // NOLINT
 // clang-format on
 
+#include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -64,7 +66,7 @@ int main(int argc, char **argv) {
   struct stat info;
   ssize_t rv = fstat(fd, &info);
   if (rv < 0) {
-    (void)fprintf(stderr, "cannot fstat %s\n", path);
+    (void)fprintf(stderr, "cannot fstat %s: %s\n", path, strerror(errno));
     return 1;
   }
   void *mapped = mmap(NULL, info.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
@@ -82,19 +84,20 @@ int main(int argc, char **argv) {
       xattr_revision[rv] = '\0';
       revision = atoi(xattr_revision);
     } else {
-      (void)fprintf(stderr, "cannot get revision attribute (%s)\n", path);
+      (void)fprintf(stderr, "cannot get revision attribute (%s): %s\n", path,
+                    strerror(errno));
       return 1;
     }
 
     rv = fstat(fd, &info);
     if (rv < 0) {
-      (void)fprintf(stderr, "cannot fstat %s\n", path);
+      (void)fprintf(stderr, "cannot fstat %s: %s\n", path, strerror(errno));
       return 1;
     }
 
     off_t off = lseek(fd, 0, SEEK_SET);
     if (off != 0) {
-      (void)fprintf(stderr, "cannot rewind %s\n", path);
+      (void)fprintf(stderr, "cannot rewind %s: %s\n", path, strerror(errno));
       return 1;
     }
     char buf[4096];
@@ -103,7 +106,7 @@ int main(int argc, char **argv) {
     do {
       rv = read(fd, buf, 4096);
       if (rv < 0) {
-        (void)fprintf(stderr, "cannot read %s\n", path);
+        (void)fprintf(stderr, "cannot read %s: %s\n", path, strerror(errno));
         return 1;
       }
       cksum_read = UpdateChecksum(buf, rv, cksum_read);
