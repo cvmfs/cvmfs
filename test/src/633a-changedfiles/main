@@ -58,6 +58,62 @@ check_stable_value() {
   [ "x$found" = "x$exp" ]
 }
 
+# Fails instead of spinning until the harness timeout when a topen process died
+# (e.g. because the private mount crashed)
+wait_for_round() {
+  local log=$1
+  local pid=$2
+  local nrounds=$3
+  local deadline=$(( $(date +%s) + 60 ))
+  while [ $(grep -c '^\*\*\*\* ROUND' $log) -lt $nrounds ]; do
+    if ! kill -0 $pid 2>/dev/null; then
+      echo "*** topen $pid ($log) died before round $nrounds"
+      dump_client_state
+      return 1
+    fi
+    if [ $(date +%s) -gt $deadline ]; then
+      echo "*** timeout waiting for round $nrounds in $log"
+      dump_client_state
+      return 1
+    fi
+    sleep 1
+  done
+}
+
+wait_for_next_round() {
+  wait_for_round $1 $2 $(( $(grep -c '^\*\*\*\* ROUND' $1) + 1 ))
+}
+
+wait_for_inode_change() {
+  local path=$1
+  local old_inode=$2
+  local deadline=$(( $(date +%s) + 60 ))
+  while [ $(get_inode $path) -eq $old_inode ]; do
+    if [ $(date +%s) -gt $deadline ]; then
+      echo "*** timeout waiting for inode change of $path" >&2
+      dump_client_state >&2
+      return 1
+    fi
+    sleep 1
+  done
+  get_inode $path
+}
+
+dump_client_state() {
+  local mntpnt=$TEST633_PRIVATE_MOUNT
+  echo "*** private mount state"
+  mount | grep "$mntpnt" || echo "*** $mntpnt not mounted"
+  sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO pid \
+    || echo "*** cvmfs2 not responding"
+  local stacktrace=${mntpnt}c/$CVMFS_TEST_REPO/stacktrace.$CVMFS_TEST_REPO
+  [ -f $stacktrace ] && sudo cat $stacktrace
+  [ -f ${mntpnt}.log ] && tail -n 50 ${mntpnt}.log
+  for f in ${mntpnt}.log.*; do
+    [ -f $f ] && tail -n 200 $f
+  done
+  return 0
+}
+
 cleanup() {
   echo "running cleanup()..."
   if [ "x$TEST633_PIDS" != "x" ]; then
@@ -169,13 +225,9 @@ cvmfs_run_test() {
   TEST633_PIDS="$TEST633_PIDS $pid_large02"
   echo "*** {2} topen process pids: $pid_small02, $pid_large02"
 
-  while ! grep "ROUND 1" topen02_small.stdout; do
-    sleep 1
-  done
+  wait_for_round topen02_small.stdout $pid_small02 2 || return 100
   echo "*** {2} $pid_small02 ready"
-  while ! grep "ROUND 1" topen02_large.stdout; do
-    sleep 1
-  done
+  wait_for_round topen02_large.stdout $pid_large02 2 || return 100
   echo "*** {2} $pid_large02 ready"
 
   echo "*** {2} add contents to files in repository (1st change)"
@@ -193,14 +245,8 @@ cvmfs_run_test() {
   [ $revision03 -gt $revision02 ] || return 23
 
   echo "*** {2} wait for one more round"
-  local linecount=$(cat topen02_small.stdout | grep ROUND | wc -l)
-  while [ $(cat topen02_small.stdout | grep ROUND | wc -l) -eq $linecount ]; do
-    sleep 1
-  done
-  linecount=$(cat topen02_large.stdout | grep ROUND | wc -l)
-  while [ $(cat topen02_large.stdout | grep ROUND | wc -l) -eq $linecount ]; do
-    sleep 1
-  done
+  wait_for_next_round topen02_small.stdout $pid_small02 || return 101
+  wait_for_next_round topen02_large.stdout $pid_large02 || return 101
 
   echo "*** {2} verify checksums"
   check_stable_value 'Cksum-read' topen02_small.stdout $chksum_small02 || return 40
@@ -216,16 +262,10 @@ cvmfs_run_test() {
 
   ##############################################################################
 
-  local inode_small03=$(get_inode ${mntpnt}/dir/small)
-  while [ $inode_small03 -eq $inode_small02 ]; do
-    inode_small03=$(get_inode ${mntpnt}/dir/small)
-    sleep 1
-  done
-  local inode_large03=$(get_inode ${mntpnt}/dir/large)
-  while [ $inode_large03 -eq $inode_large02 ]; do
-    inode_large03=$(get_inode ${mntpnt}/dir/large)
-    sleep 1
-  done
+  local inode_small03
+  inode_small03=$(wait_for_inode_change ${mntpnt}/dir/small $inode_small02) || return 102
+  local inode_large03
+  inode_large03=$(wait_for_inode_change ${mntpnt}/dir/large $inode_large02) || return 102
   local chksum_small03=$(get_checksum $small_file)
   local chksum_large03=$(get_checksum $large_file)
   local size_small03=$(get_size $small_file)
@@ -245,24 +285,14 @@ cvmfs_run_test() {
   TEST633_PIDS="$TEST633_PIDS $pid_large03"
   echo "*** {3} topen process pids: $pid_small03, $pid_large03"
 
-  while ! grep "ROUND 1" topen03_small.stdout; do
-    sleep 1
-  done
+  wait_for_round topen03_small.stdout $pid_small03 2 || return 100
   echo "*** {3} $pid_small03 ready"
-  while ! grep "ROUND 1" topen03_large.stdout; do
-    sleep 1
-  done
+  wait_for_round topen03_large.stdout $pid_large03 2 || return 100
   echo "*** {3} $pid_large03 ready"
 
   echo "*** {3} wait for one more round in #2 topen"
-  linecount=$(cat topen02_small.stdout | grep ROUND | wc -l)
-  while [ $(cat topen02_small.stdout | grep ROUND | wc -l) -eq $linecount ]; do
-    sleep 1
-  done
-  linecount=$(cat topen02_large.stdout | grep ROUND | wc -l)
-  while [ $(cat topen02_large.stdout | grep ROUND | wc -l) -eq $linecount ]; do
-    sleep 1
-  done
+  wait_for_next_round topen02_small.stdout $pid_small02 || return 101
+  wait_for_next_round topen02_large.stdout $pid_large02 || return 101
 
   echo "*** {3} verify #2 checksums"
   check_stable_value 'Cksum-read' topen02_small.stdout $chksum_small02 || return 50
@@ -304,16 +334,10 @@ cvmfs_run_test() {
   echo "*** {4} revision is now $revision04"
   [ $revision04 -gt $revision03 ] || return 23
 
-  local inode_small04=$(get_inode ${mntpnt}/dir/small)
-  while [ $inode_small04 -eq $inode_small03 ]; do
-    inode_small04=$(get_inode ${mntpnt}/dir/small)
-    sleep 1
-  done
-  local inode_large04=$(get_inode ${mntpnt}/dir/large)
-  while [ $inode_large04 -eq $inode_large03 ]; do
-    inode_large04=$(get_inode ${mntpnt}/dir/large)
-    sleep 1
-  done
+  local inode_small04
+  inode_small04=$(wait_for_inode_change ${mntpnt}/dir/small $inode_small03) || return 102
+  local inode_large04
+  inode_large04=$(wait_for_inode_change ${mntpnt}/dir/large $inode_large03) || return 102
   local chksum_small04=$(get_checksum $small_file)
   local chksum_large04=$(get_checksum $large_file)
   local size_small04=$(get_size $small_file)
@@ -337,32 +361,16 @@ cvmfs_run_test() {
   TEST633_PIDS="$TEST633_PIDS $pid_large04"
   echo "*** {4} topen process pids: $pid_small04, $pid_large04"
 
-  while ! grep "ROUND 1" topen04_small.stdout; do
-    sleep 1
-  done
+  wait_for_round topen04_small.stdout $pid_small04 2 || return 100
   echo "*** {4} $pid_small04 ready"
-  while ! grep "ROUND 1" topen04_large.stdout; do
-    sleep 1
-  done
+  wait_for_round topen04_large.stdout $pid_large04 2 || return 100
   echo "*** {4} $pid_large04 ready"
 
   echo "*** {4} wait for one more round in #2, #3 topen"
-  linecount=$(cat topen02_small.stdout | grep ROUND | wc -l)
-  while [ $(cat topen02_small.stdout | grep ROUND | wc -l) -eq $linecount ]; do
-    sleep 1
-  done
-  linecount=$(cat topen02_large.stdout | grep ROUND | wc -l)
-  while [ $(cat topen02_large.stdout | grep ROUND | wc -l) -eq $linecount ]; do
-    sleep 1
-  done
-  linecount=$(cat topen03_small.stdout | grep ROUND | wc -l)
-  while [ $(cat topen03_small.stdout | grep ROUND | wc -l) -eq $linecount ]; do
-    sleep 1
-  done
-  linecount=$(cat topen03_large.stdout | grep ROUND | wc -l)
-  while [ $(cat topen03_large.stdout | grep ROUND | wc -l) -eq $linecount ]; do
-    sleep 1
-  done
+  wait_for_next_round topen02_small.stdout $pid_small02 || return 101
+  wait_for_next_round topen02_large.stdout $pid_large02 || return 101
+  wait_for_next_round topen03_small.stdout $pid_small03 || return 101
+  wait_for_next_round topen03_large.stdout $pid_large03 || return 101
 
   echo "*** {4} verify #2 checksums"
   check_stable_value 'Cksum-read' topen02_small.stdout $chksum_small02 || return 60
