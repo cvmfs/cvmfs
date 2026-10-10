@@ -40,6 +40,7 @@ USER root
 # upgrade to the build image. Similar to https://github.com/apptainer/apptainer/issues/2756 but not quite clear
 RUN chmod 0400 /etc/shadow
 
+RUN dnf -y install dnf-utils && dnf config-manager --set-enabled crb && dnf install -y epel-release
 
 # cloudtest dependencies
 RUN dnf install -y \
@@ -59,11 +60,16 @@ RUN dnf install -y \
     python \
     python3-mod_wsgi \
     python3-pip \
+    python3-pylibacl \
+    python3-requests \
+    s3cmd \
     sqlite \
     sudo \
     usbutils \
     wget \
     ;
+
+RUN pip3 install xattr
 
 # Create the sftnight user
 RUN useradd -m -s /bin/bash sftnight

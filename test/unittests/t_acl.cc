@@ -25,7 +25,7 @@ static void should_pass_noncompat(const char *textual, unsigned char *acl_binary
   int const ret = acl_from_text_to_xattr_value(string(textual), binary_acl, binary_size, equiv_mode);
   ASSERT_EQ(ret, 0);
   ASSERT_EQ(binary_size, acl_binary_expected_len);
-  if (binary_size == 0) {
+  if (acl_binary_expected_len == 0) {
     ASSERT_TRUE(equiv_mode);
     ASSERT_EQ(binary_acl, nullptr);
   } else {
