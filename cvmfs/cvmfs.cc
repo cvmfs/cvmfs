@@ -133,10 +133,67 @@ InodeGenerationInfo inode_generation_info_;
 typedef struct fuse_passthru_ctx {
   int backing_id;
   int refcount;
+  bool via_broker;  /**< Registered by the watchdog's broker */
 } fuse_passthru_ctx_t;
 static std::unordered_map<fuse_ino_t, fuse_passthru_ctx_t>
     *fuse_passthru_tracker = NULL;
 pthread_mutex_t fuse_passthru_tracker_lock = PTHREAD_MUTEX_INITIALIZER;
+// Set once the kernel refuses a backing file with EPERM; no further ones are
+// requested. Guarded by fuse_passthru_tracker_lock.
+static bool fuse_passthru_refused = false;
+// Set when the client's own backing open got EPERM and the watchdog has a
+// broker; then backing files go through the broker.  The broker holds the
+// /dev/fuse descriptor once fuse_passthru_broker_ready is set.  Both guarded
+// by fuse_passthru_tracker_lock.
+static bool fuse_passthru_use_broker = false;
+static bool fuse_passthru_broker_ready = false;
+
+/**
+ * Registers fd as a passthrough backing file.  The kernel requires
+ * CAP_SYS_ADMIN, which the client drops (#3730); when the watchdog runs a
+ * broker, the watchdog issues the registration instead.  Returns the backing
+ * id, or 0 with errno set.  Called with fuse_passthru_tracker_lock held.
+ */
+static int PassthroughBackingOpen(fuse_req_t req, int fd, bool *via_broker) {
+  *via_broker = false;
+  if (!fuse_passthru_use_broker) {
+    errno = 0;
+    const int backing_id = fuse_passthrough_open(req, fd);
+    if ((backing_id > 0) || (errno != EPERM) || !watchdog_
+        || !watchdog_->HasBroker())
+    {
+      return backing_id;
+    }
+    fuse_passthru_use_broker = true;
+    LogCvmfs(kLogCvmfs, kLogDebug,
+             "FUSE: passthrough backing files go through the watchdog");
+  }
+  int retval = 0;
+  if (!fuse_passthru_broker_ready) {
+    retval = watchdog_->BrokerSetFuseDevice(
+        fuse_session_fd(*loader_exports_->fuse_session));
+    fuse_passthru_broker_ready = (retval == 0);
+  }
+  if (fuse_passthru_broker_ready)
+    retval = watchdog_->BrokerBackingOpen(fd);
+  if (retval > 0) {
+    *via_broker = true;
+    return retval;
+  }
+  errno = -retval;
+  return 0;
+}
+
+static int PassthroughBackingClose(fuse_req_t req,
+                                   const fuse_passthru_ctx_t &entry)
+{
+  // A closed broker took its registrations with it; the kernel drops them at
+  // the unmount.
+  if (entry.via_broker)
+    return watchdog_->HasBroker()
+           ? watchdog_->BrokerBackingClose(entry.backing_id) : 0;
+  return fuse_passthrough_close(req, entry.backing_id);
+}
 #endif
 
 /**
@@ -1360,7 +1417,11 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
       fi->fh = fd;
       FillOpenFlags(open_directives, fi);
 #ifdef FUSE_CAP_PASSTHROUGH
-      if (loader_exports_ && loader_exports_->fuse_passthrough) {
+      // After a reload the tracker is gone with the old library, so passthrough
+      // stays off until the next mount.
+      if (loader_exports_ && loader_exports_->fuse_passthrough
+          && fuse_passthru_tracker)
+      {
         if (!dirent.IsChunkedFile()) {
           /* "Currently there should be only one backing id per node / backing
            * file." So says libfuse documentation on fuse_passthrough_open(). So
@@ -1372,16 +1433,47 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
           pthread_mutex_lock(&fuse_passthru_tracker_lock);
           auto iter = fuse_passthru_tracker->find(ino);
           if (iter == fuse_passthru_tracker->end()) {
-            auto pair_with_iterator = fuse_passthru_tracker->emplace(
-                ino, fuse_passthru_ctx_t());
-            assert(pair_with_iterator.second == true);
-            iter = pair_with_iterator.first;
-            fuse_passthru_ctx_t &entry = iter->second;
-
-            backing_id = fuse_passthrough_open(req, fd);
-            assert(backing_id != 0);
-            entry.backing_id = backing_id;
-            entry.refcount++;
+            /* fuse_passthrough_open() returns 0 when the kernel refuses the
+             * backing file. It refuses with EPERM unless the daemon has
+             * CAP_SYS_ADMIN, which a mount owned by an unprivileged user and
+             * a system mount running as the cvmfs user (#3730) do not have.
+             * Such a file is served through the regular read path, and after
+             * an EPERM no further backing files are requested. */
+            backing_id = 0;
+            bool via_broker = false;
+            if (!fuse_passthru_refused) {
+              backing_id = PassthroughBackingOpen(req, fd, &via_broker);
+              const int open_errno = errno;
+              const bool broker_down = fuse_passthru_use_broker
+                  && ((open_errno == EAGAIN) || (open_errno == EPIPE)
+                      || (open_errno == ECONNRESET) || (open_errno == ENODEV)
+                      || (open_errno == ENOSYS) || (open_errno == EIO));
+              if (backing_id <= 0 && open_errno == EPERM) {
+                fuse_passthru_refused = true;
+                LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+                         "FUSE: passthrough refused (EPERM, the kernel needs "
+                         "CAP_SYS_ADMIN), serving files without passthrough");
+              } else if (backing_id <= 0 && broker_down) {
+                fuse_passthru_refused = true;
+                LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+                         "FUSE: passthrough broker unavailable (errno %d), "
+                         "serving files without passthrough", open_errno);
+              } else if (backing_id <= 0) {
+                LogCvmfs(kLogCvmfs, kLogDebug,
+                         "FUSE: passthrough_open for inode %" PRIu64
+                         " failed (errno %d), serving it without passthrough",
+                         uint64_t(ino), open_errno);
+              }
+            }
+            if (backing_id > 0) {
+              auto pair_with_iterator = fuse_passthru_tracker->emplace(
+                  ino, fuse_passthru_ctx_t());
+              assert(pair_with_iterator.second == true);
+              fuse_passthru_ctx_t &entry = pair_with_iterator.first->second;
+              entry.backing_id = backing_id;
+              entry.via_broker = via_broker;
+              entry.refcount++;
+            }
           } else {
             fuse_passthru_ctx_t &entry = iter->second;
             assert(entry.refcount > 0);
@@ -1390,11 +1482,12 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
           }
           pthread_mutex_unlock(&fuse_passthru_tracker_lock);
 
-          fi->backing_id = backing_id;
-
-          /* according to libfuse example/passthrough_hp.cc:
-           * "open in passthrough mode must drop old page cache" */
-          fi->keep_cache = false;
+          if (backing_id > 0) {
+            fi->backing_id = backing_id;
+            /* according to libfuse example/passthrough_hp.cc:
+             * "open in passthrough mode must drop old page cache" */
+            fi->keep_cache = false;
+          }
         }
       }
 #endif
@@ -1698,27 +1791,28 @@ static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
       perf::Dec(file_system_->no_open_files());
     }
 #ifdef FUSE_CAP_PASSTHROUGH
-    if (loader_exports_ && loader_exports_->fuse_passthrough) {
-      if (fi->backing_id != 0) {
-        int ret;
-        pthread_mutex_lock(&fuse_passthru_tracker_lock);
-        auto iter = fuse_passthru_tracker->find(ino);
-        assert(iter != fuse_passthru_tracker->end());
+    if (loader_exports_ && loader_exports_->fuse_passthrough
+        && fuse_passthru_tracker) {
+      /* libfuse does not carry backing_id into release (fi is rebuilt from
+       * the release request), so the entry is found by inode. Every open of
+       * an inode while it has an entry took a reference on it. */
+      pthread_mutex_lock(&fuse_passthru_tracker_lock);
+      auto iter = fuse_passthru_tracker->find(ino);
+      if (iter != fuse_passthru_tracker->end()) {
         fuse_passthru_ctx_t &entry = iter->second;
         assert(entry.refcount > 0);
-        assert(entry.backing_id == fi->backing_id);
         entry.refcount--;
         if (entry.refcount == 0) {
-          ret = fuse_passthrough_close(req, fi->backing_id);
+          const int ret = PassthroughBackingClose(req, entry);
           if (ret < 0) {
-            LogCvmfs(kLogCvmfs, kLogDebug,
-                     "fuse_passthrough_close(fd=%ld) failed: %d", fd, ret);
-            assert(false);
+            LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+                     "fuse_passthrough_close(backing_id=%d) failed: %d",
+                     entry.backing_id, ret);
           }
           fuse_passthru_tracker->erase(iter);
         }
-        pthread_mutex_unlock(&fuse_passthru_tracker_lock);
       }
+      pthread_mutex_unlock(&fuse_passthru_tracker_lock);
     }
 #endif
   }
@@ -2464,7 +2558,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
   if (cvmfs::ShouldStartWatchdog()) {
     auto_umount::SetMountpoint(loader_exports->mount_point);
     cvmfs::watchdog_ = Watchdog::Create(auto_umount::UmountOnExit,
-                                        NeedsReadEnviron());
+                                        NeedsReadEnviron(), NULL,
+                                        loader_exports->fuse_passthrough);
     if (cvmfs::watchdog_ == NULL) {
       *g_boot_error = "failed to initialize watchdog.";
       return loader::kFailMonitor;
