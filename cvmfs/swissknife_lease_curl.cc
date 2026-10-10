@@ -109,23 +109,23 @@ bool MakeEndRequest(const std::string &method, const std::string &key_id,
                     const std::string &repo_service_url,
                     const std::string &request_payload, CurlBuffer *reply,
                     bool expect_final_revision) {
-  CURLcode ret = static_cast<CURLcode>(0);
-
-  CURL *h_curl = PrepareCurl(method);
-  if (!h_curl) {
-    return false;
-  }
-
+  bool return_succeeded = false;
   shash::Any hmac(shash::kSha1);
   shash::HmacString(secret, session_token, &hmac);
+  CURLcode ret = static_cast<CURLcode>(0);
+  CURL* h_curl;
+  const std::string header_str = std::string("Authorization: ") + key_id + " " +
+                                 Base64(hmac.ToString(false));
+  struct curl_slist* auth_header = NULL;
+  const JSON *reply_status;
+  bool ok;
+  JsonDocument *reply_json;
 
-  SslCertificateStore cs;
-  cs.UseSystemCertificatePath();
-  cs.ApplySslCertificatePath(h_curl);
+  h_curl = PrepareCurl(method);
+  if (!h_curl) {
+    goto ret;
+  }
 
-  const std::string header_str = std::string("Authorization: ") + key_id + " "
-                                 + Base64(hmac.ToString(false));
-  struct curl_slist *auth_header = NULL;
   auth_header = curl_slist_append(auth_header, header_str.c_str());
   curl_easy_setopt(h_curl, CURLOPT_HTTPHEADER, auth_header);
 
@@ -147,36 +147,37 @@ bool MakeEndRequest(const std::string &method, const std::string &key_id,
   if (ret) {
     LogCvmfs(kLogUploadGateway, kLogStderr,
              "Lease end request - curl_easy_perform failed: %d", ret);
+    goto cleanup_curl;
   }
 
-  JsonDocument *doc = JsonDocument::Create(reply->data);
-  bool ok = true;
-  if (!doc) {
-    ok = false;
-  } else {
-    std::unique_ptr<JsonDocument> const reply_json(doc);
-    const JSON *reply_status = JsonDocument::SearchInObject(
-        reply_json->root(), "status", JSON_STRING);
-    ok = (reply_status != NULL
-          && std::string(reply_status->get<std::string>()) == "ok");
-    if (!ok) {
-      LogCvmfs(kLogUploadGateway, kLogStderr,
-               "Lease end request - error reply: %s", reply->data.c_str());
-    }
-    if (expect_final_revision) {
-      const JSON *reply_final_rev = JsonDocument::SearchInObject(
-          reply_json->root(), "final_revision", JSON_INT);
-      ok = (reply_final_rev != NULL);
-      if (ok) {
-        g_final_revision = reply_final_rev->get<int>();
-      } else {
-        g_final_revision = -1;
-      }
+  reply_json = JsonDocument::Create(reply->data);
+  if (!reply_json) {
+    goto cleanup_curl;
+  }
+  reply_status =
+    JsonDocument::SearchInObject(reply_json->root(), "status", JSON_STRING);
+  ok = (reply_status != NULL &&
+                 std::string(reply_status->get<std::string>()) == "ok");
+  if (!ok) {
+    LogCvmfs(kLogUploadGateway, kLogStderr,
+           "Lease end request - error reply: %s",
+           reply->data.c_str());
+    goto cleanup_reply;
+  }
+  if(expect_final_revision) {
+    const JSON *reply_final_rev =
+      JsonDocument::SearchInObject(reply_json->root(), "final_revision", JSON_INT);
+    ok = (reply_final_rev != NULL  );
+    if (ok) {
+     g_final_revision = reply_final_rev->get<int>();
     }
   }
 
+  return_succeeded = true;
+cleanup_reply:
+  delete reply_json;
+cleanup_curl:
   curl_easy_cleanup(h_curl);
-  h_curl = NULL;
-
-  return ok && !ret;
+ret:
+  return return_succeeded;
 }
