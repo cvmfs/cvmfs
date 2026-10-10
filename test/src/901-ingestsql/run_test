@@ -1,0 +1,130 @@
+#!/bin/bash
+set -euo pipefail
+set -x
+
+sudo mkdir -p /var/{spool,run}/cvmfs/
+export CVMFS_TEST_PROXY=DIRECT
+[[ -v TEST_ROOT ]] # expected /home/sftnight/cvmfs/test
+this_script_dir=$TEST_ROOT/src/901-ingestsql
+build_dir=$(dirname "$TEST_ROOT")
+
+GW_USER_JSON_BKP=
+cleanup() {
+    if [[ -f "$GW_USER_JSON_BKP" ]]; then
+        sudo mv "$GW_USER_JSON_BKP" /etc/cvmfs/gateway/user.json
+    fi
+}
+
+: ${CVMFS_TEST_REPO:=test.repo}
+: ${CVMFS_TEST_MOUNTPOINT:=/tmp/ingestsql_test_mount}
+#export DEBUG=1
+CVMFS2=cvmfs2
+if [[ -v DEBUG ]]; then
+    CVMFS2="$this_script_dir"/cvmfs2-wrapper
+    export CVMFS_SERVER_DEBUG=3
+fi
+
+rsyslogd &
+
+[[ -v CVMFS_TEST_S3_CONFIG ]]
+S3_SERVER_PROVIDED=1
+source "$CVMFS_TEST_S3_CONFIG"
+S3_HOST=${CVMFS_S3_HOST%:*}
+S3_PORT=${CVMFS_S3_HOST#*:}
+S3_WEB_HOST=cvmfs.web.garage.internal
+S3_WEB_PORT=3902
+sudo tee ~/.s3cfg <<-EOF
+host_base = $CVMFS_S3_HOST
+host_bucket = $S3_HOST:$S3_PORT
+use_https = False
+access_key = $CVMFS_S3_ACCESS_KEY
+secret_key = $CVMFS_S3_SECRET_KEY
+EOF
+
+if ! grep '^user_allow_other' /etc/fuse.conf; then
+    echo user_allow_other | sudo tee -a /etc/fuse.conf
+fi
+
+# speed up lease expiry as some cases currently cause ingestsql to terminate uncleanly with panic
+LEASE_DURATION=60
+if [[ -v DEBUG ]]; then
+    LEASE_DURATION=600 # it's slower with rr
+fi
+GW_USER_JSON_BKP=$PWD/user.json.orig
+sudo cp -a /etc/cvmfs/gateway/user.json "$GW_USER_JSON_BKP"
+trap cleanup EXIT
+jq ".max_lease_time = $LEASE_DURATION" "$GW_USER_JSON_BKP" | sudo tee /etc/cvmfs/gateway/user.json
+(
+    source "$TEST_ROOT"/test_functions
+    set_up_repository_gateway "$CVMFS_TEST_REPO" -o "$CVMFS_TEST_USER" -w "$CVMFS_TEST_HTTP_BASE" -s "$CVMFS_TEST_S3_CONFIG"
+)
+
+if [[ -v DEBUG ]]; then
+    sudo ngrep -t -e -d any -q -O "$this_script_dir"/ngrep.pcap >/dev/null &
+    NGREP_PID=$!
+fi
+
+sudo -E cvmfs_server transaction "$CVMFS_TEST_REPO"
+KEEP_REFRESHING_FLAG=$(mktemp)
+(
+    while [[ -f "$KEEP_REFRESHING_FLAG" ]]; do
+        cvmfs_server refresh-lease "$CVMFS_TEST_REPO"
+        sleep 2
+    done
+) &
+LEASE_REFRESH_SUBPROC_PID=$!
+pushd /cvmfs/"$CVMFS_TEST_REPO"
+sudo tar -xaf "$this_script_dir"/repo.tar.gz
+popd
+sudo -E cvmfs_server publish "$CVMFS_TEST_REPO"
+rm "$KEEP_REFRESHING_FLAG"
+pkill -P "$LEASE_REFRESH_SUBPROC_PID" || true
+wait "$LEASE_REFRESH_SUBPROC_PID" || true
+
+sudo tee -a /etc/cvmfs/repositories.d/"$CVMFS_TEST_REPO"/client.conf <<EOF
+CVMFS_MAX_TTL_SECS=1
+CVMFS_AUTO_UPDATE=yes
+CVMFS_KCACHE_TIMEOUT=0
+EOF
+# Some test cases will add files stored uncompressed, possibly as "external". Upload into S3 to make this work.
+CONTENTS=$(mktemp)
+echo -en "HELLO\n" > "$CONTENTS"
+CONTENTS_SHA1=$(sha1sum "$CONTENTS" | cut -d ' ' -f 1)
+s3cmd put "$CONTENTS" s3://"$CVMFS_S3_BUCKET"/test.repo/file-external-uncompressed
+s3cmd put "$CONTENTS" s3://"$CVMFS_S3_BUCKET"/test.repo/data/"${CONTENTS_SHA1:0:2}"/"${CONTENTS_SHA1:2:40}"P
+COMPRESSED=$(mktemp)
+cvmfs_swissknife zpipe < "$CONTENTS" > "$COMPRESSED"
+COMPRESSED_SHA1=$(sha1sum "$COMPRESSED" | cut -d ' ' -f 1)
+s3cmd put "$COMPRESSED" s3://"$CVMFS_S3_BUCKET"/test.repo/data/"${COMPRESSED_SHA1:0:2}"/"${COMPRESSED_SHA1:2:40}"P
+sudo umount /cvmfs/"$CVMFS_TEST_REPO"
+sudo umount /var/spool/cvmfs/"$CVMFS_TEST_REPO"/rdonly
+
+sudo mkdir -p "$CVMFS_TEST_MOUNTPOINT"
+
+sudo -E "$CVMFS2" -d -o config=/etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/client.conf,allow_other $CVMFS_TEST_REPO "$CVMFS_TEST_MOUNTPOINT" |& sudo tee -a /var/log/cvmfs2.log
+attr -g revision "$CVMFS_TEST_MOUNTPOINT" # a check of mount success
+ls -l "$CVMFS_TEST_MOUNTPOINT"
+[[ -f "$CVMFS_TEST_MOUNTPOINT"/TEST_DIRECTORY/DIR1/file1 ]]
+
+export PYTHONUNBUFFERED=1
+
+# Fix
+# UnicodeEncodeError: 'ascii' codec can't encode characters...
+# on Almalinux 8
+export PYTHONIOENCODING=UTF-8
+export LANG=C.UTF-8
+
+set +e
+sudo -E "$this_script_dir"/graft-tests.py --no-mount standard file-read quick |& sudo tee /var/log/graft-tests.log
+RC=$?
+if [[ -v DEBUG ]]; then
+    sleep 2
+    kill $NGREP_PID
+    wait
+    sudo mv "$this_script_dir"/ngrep.pcap "$this_script_dir"/ngrep.prev.pcap
+fi
+exit $RC
+
+# Restore default gateway settings
+trap - EXIT
+cleanup

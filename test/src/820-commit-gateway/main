@@ -9,7 +9,7 @@ cleanup() {
 }
 
 cvmfs_run_test() {
-    set_up_repository_gateway || return 1
+    set_up_repository_gateway test.repo.org || return 1
 
     [ -f /etc/cvmfs/config.d/test.repo.org.local ] && return 10
     trap cleanup EXIT HUP INT TERM || return $?

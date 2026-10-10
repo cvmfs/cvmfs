@@ -44,6 +44,7 @@ services:
         container_name: cvmfs-dev
         hostname: cvmfs-dev
         privileged: true
+        pids_limit: -1
         cgroup: host
         build:
             context: ../../../..

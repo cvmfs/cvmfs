@@ -36,7 +36,7 @@ publish_and_notify() {
 }
 
 run_standalone_tests() {
-    set_up_repository_gateway
+    set_up_repository_gateway test.repo.org
 
     create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
 

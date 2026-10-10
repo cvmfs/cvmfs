@@ -8,7 +8,7 @@ cleanup() {
 }
 
 cvmfs_run_test() {
-  set_up_repository_gateway || return 1
+  set_up_repository_gateway test.repo.org || return 1
 
   sudo cp /etc/cvmfs/gateway/user.json /etc/cvmfs/gateway/user.json.orig || return 10
   jq '.receiver_path = "/usr/bin/cvmfs_receiver_debug"' \
