@@ -1,0 +1,515 @@
+#!/bin/bash
+set -euo pipefail
+set -x
+
+sudo mkdir -p /var/{spool,run}/cvmfs/
+mkdir -p /tmp/cvmfs-test/scratch/903-cache-metrics
+
+if ! [[ -v TEST_ROOT ]]; then
+    this_script_dir=$(dirname "$(readlink -f "$0")")
+    TEST_ROOT=$(readlink -f "$this_script_dir/../..")
+fi
+this_script_dir=$TEST_ROOT/src/903-cache-metrics
+build_dir=$(dirname "$TEST_ROOT")
+
+GW_USER_JSON_BKP=
+cleanup() {
+    if [[ -f "$GW_USER_JSON_BKP" ]]; then
+	sudo mv "$GW_USER_JSON_BKP" /etc/cvmfs/gateway/user.json
+    fi
+}
+
+global_setup() {
+    rsyslogd &
+
+    [[ -v CVMFS_TEST_S3_CONFIG ]]
+    S3_SERVER_PROVIDED=1
+    source "$CVMFS_TEST_S3_CONFIG"
+    S3_HOST=${CVMFS_S3_HOST%:*}
+    S3_PORT=${CVMFS_S3_HOST#*:}
+    S3_WEB_HOST=cvmfs.web.garage.internal
+    S3_WEB_PORT=3902
+    sudo tee ~/.s3cfg <<-EOF
+host_base = $CVMFS_S3_HOST
+host_bucket = $S3_HOST:$S3_PORT
+use_https = False
+access_key = $CVMFS_S3_ACCESS_KEY
+secret_key = $CVMFS_S3_SECRET_KEY
+EOF
+
+    if ! grep '^user_allow_other' /etc/fuse.conf; then
+	echo user_allow_other | sudo tee -a /etc/fuse.conf
+    fi
+
+    # speed up lease expiry as some cases currently cause ingestsql to terminate uncleanly with panic
+    LEASE_DURATION=60
+    if [[ -v DEBUG ]]; then
+	LEASE_DURATION=600 # it's slower with rr
+    fi
+    GW_USER_JSON_BKP=$PWD/user.json.orig
+    sudo cp -a /etc/cvmfs/gateway/user.json "$GW_USER_JSON_BKP"
+    trap cleanup EXIT
+    jq ".max_lease_time = $LEASE_DURATION" "$GW_USER_JSON_BKP" | sudo tee /etc/cvmfs/gateway/user.json
+
+    if [[ -d /etc/vinyl-cache ]]; then
+	PROXY_SERVICE=vinyl-cache
+	PROXY_CONFIG_DIR=/etc/vinyl-cache
+    else
+	if ! [[ -d /etc/varnish ]]; then
+	    echo 'Warning: This test requires vinyl-cache or varnish install. Skipping.'
+	    CVMFS_GENERAL_WARNING_FLAG=1
+	    exit 0
+	fi
+	PROXY_SERVICE=varnish
+	PROXY_CONFIG_DIR=/etc/varnish
+    fi
+
+    if [[ -v DEBUG ]]; then
+	ngrep -t -e -d any -W byline -O /var/log/ngrep.pcap port 6081 or port 3900 or port 3902 > /var/log/ngrep.log &
+    fi
+}
+
+PROXY_HOST=127.0.0.1
+CVMFS_MAX_TTL_SECS=1
+
+proxy_setup() {
+    PROXY_SPEC=$1
+    CVMFS_PROXY_CACHE_STATUS_HEADER=$2
+    CVMFS_HTTP_PROXY=$PROXY_SPEC
+    CVMFS_EXTERNAL_HTTP_PROXY=$PROXY_SPEC
+
+    sudo systemctl stop "$PROXY_SERVICE" || true
+    if [[ "$PROXY_SPEC" != DIRECT ]]; then
+	if [[ "$S3_SERVER_PROVIDED" == 1 ]]; then
+	    sudo tee "$PROXY_CONFIG_DIR"/default.vcl <<-EOF
+vcl 4.1;
+backend default {
+    .host = "cvmfs.web.garage.internal";
+    .port = "3902";
+}
+EOF
+	else
+	    sudo tee "$PROXY_CONFIG_DIR"/default.vcl <<-EOF
+vcl 4.1;
+backend default {
+    .host = "$S3_HOST";
+    .port = "$S3_PORT";
+}
+EOF
+	fi
+    fi
+
+    if [[ "$CVMFS_PROXY_CACHE_STATUS_HEADER" != empty ]] && [[ "$CVMFS_PROXY_CACHE_STATUS_HEADER" != unset ]]; then
+	sudo tee -a "$PROXY_CONFIG_DIR"/default.vcl <<EOF
+# https://www.varnish-software.com/developers/tutorials/logging-cache-hits-misses-varnish/
+sub vcl_recv {
+	unset req.http.$CVMFS_PROXY_CACHE_STATUS_HEADER;
+}
+
+sub vcl_hit {
+	set req.http.$CVMFS_PROXY_CACHE_STATUS_HEADER = "hit";
+	if (obj.ttl <= 0s && obj.grace > 0s) {
+		set req.http.$CVMFS_PROXY_CACHE_STATUS_HEADER = "hit graced";
+	}
+}
+
+sub vcl_miss {
+	set req.http.$CVMFS_PROXY_CACHE_STATUS_HEADER = "miss";
+}
+
+sub vcl_pass {
+	set req.http.$CVMFS_PROXY_CACHE_STATUS_HEADER = "pass";
+}
+
+sub vcl_pipe {
+	set req.http.$CVMFS_PROXY_CACHE_STATUS_HEADER = "pipe uncacheable";
+}
+
+sub vcl_synth {
+	set req.http.$CVMFS_PROXY_CACHE_STATUS_HEADER = "synth synth";
+	# uncomment the following line to show the information in the response
+	set resp.http.$CVMFS_PROXY_CACHE_STATUS_HEADER = req.http.$CVMFS_PROXY_CACHE_STATUS_HEADER;
+}
+
+sub vcl_deliver {
+	if (obj.uncacheable) {
+		set req.http.$CVMFS_PROXY_CACHE_STATUS_HEADER = req.http.$CVMFS_PROXY_CACHE_STATUS_HEADER + " uncacheable" ;
+	} else {
+		set req.http.$CVMFS_PROXY_CACHE_STATUS_HEADER = req.http.$CVMFS_PROXY_CACHE_STATUS_HEADER + " cached" ;
+	}
+	# uncomment the following line to show the information in the response
+	set resp.http.$CVMFS_PROXY_CACHE_STATUS_HEADER = req.http.$CVMFS_PROXY_CACHE_STATUS_HEADER;
+}
+EOF
+    fi
+    sudo systemctl restart "$PROXY_SERVICE"
+}
+
+repo_set_layout_ingestsql() {
+    sudo umount /cvmfs/"$CVMFS_TEST_REPO"
+    sudo umount /var/spool/cvmfs/"$CVMFS_TEST_REPO"/rdonly
+    while pgrep cvmfs2 >/dev/null; do sudo pkill cvmfs2 || true; sleep 1; done
+
+    sudo cp /etc/fstab.hack /etc/fstab
+    sudo systemctl daemon-reload
+
+    sudo mount /cvmfs/"$CVMFS_TEST_REPO"
+}
+
+repo_set_layout_mkfs() {
+    # return it to the layout created by mkfs
+    sudo umount /cvmfs/"$CVMFS_TEST_REPO"
+    while pgrep cvmfs2 >/dev/null; do sudo pkill cvmfs2 || true; sleep 1; done
+
+    sudo cp /etc/fstab.non-hacky /etc/fstab
+    sudo systemctl daemon-reload
+
+    sudo mount /cvmfs/"$CVMFS_TEST_REPO"
+    sudo mount /var/spool/cvmfs/"$CVMFS_TEST_REPO"/rdonly
+}
+
+
+create_repo() {
+    # Usage: set $CVMFS_TEST_REPO
+    sudo rm -rf /var/spool/cvmfs/$CVMFS_TEST_REPO # just in case
+    # CentOS 9 container just doesn't have /etc/fstab
+    sudo cp -a /etc/fstab{,.orig} || sudo touch /etc/fstab{,.orig}
+    sudo truncate --size=0 /etc/fstab
+    (
+	source "$TEST_ROOT"/test_functions
+	set_up_repository_gateway "$CVMFS_TEST_REPO" -o "$CVMFS_TEST_USER" -w "$CVMFS_TEST_HTTP_BASE" -s "$CVMFS_TEST_S3_CONFIG"
+    )
+
+    # cvmfs-posix-tools currently expect to see "revision" attribute at the mountpoint, which is not actually visible at /cvmfs/$CVMFS_TEST_REPO, but only at /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly.
+    # /cvmfs/$CVMFS_TEST_REPO as created by mkfs is FUSE overlayfs.
+    # FUSE overlayfs serves extended attributes from the upper dir only.
+    # Hack the mounts to accommodate that for now.
+    # Hopefully we'll make the tools look for the lower dir of the overlay.
+
+    if [[ -v DEBUG ]]; then
+	sudo sed -i /etc/fstab -e 's/,noauto/,debug,simple_options_parsing,disable_watchdog,noauto/'
+    fi
+    sudo cp -a /etc/fstab{,.non-hacky}
+    grep -E '^(cvmfs2#)?'"$CVMFS_TEST_REPO" /etc/fstab | sed -e s:/var/spool/cvmfs/"$CVMFS_TEST_REPO"/rdonly:/cvmfs/"$CVMFS_TEST_REPO": | sudo tee /etc/fstab.hack
+
+    CVMFS_EXTERNAL_URL="$CVMFS_TEST_HTTP_BASE/"$CVMFS_TEST_REPO"/external"
+    client_conf=/etc/cvmfs/repositories.d/"$CVMFS_TEST_REPO"/client.conf
+    sudo touch /var/log/cvmfs-debug.log
+    sudo chmod a+w /var/log/cvmfs-debug.log
+    sudo tee -a "$client_conf" <<EOF
+CVMFS_HTTP_PROXY=$PROXY_SPEC
+CVMFS_EXTERNAL_HTTP_PROXY=$PROXY_SPEC
+CVMFS_EXTERNAL_URL=$CVMFS_EXTERNAL_URL
+CVMFS_KCACHE_TIMEOUT=0
+CVMFS_MAX_TTL_SECS=$CVMFS_MAX_TTL_SECS
+CVMFS_AUTO_UPDATE=yes
+CVMFS_DEBUGLOG=/var/log/cvmfs-debug.log
+EOF
+    if [[ "$hdr_name" == unset ]]; then
+	unset CVMFS_PROXY_CACHE_STATUS_HEADER
+    elif [[ "$hdr_name" == empty ]]; then
+	echo CVMFS_PROXY_CACHE_STATUS_HEADER= | sudo tee -a "$client_conf"
+    else
+	echo CVMFS_PROXY_CACHE_STATUS_HEADER="$hdr_name" | sudo tee -a "$client_conf"
+    fi
+
+    repo_set_layout_ingestsql
+}
+destroy_repo() {
+    sudo umount /cvmfs/"$CVMFS_TEST_REPO"
+    sudo umount /var/spool/cvmfs/"$CVMFS_TEST_REPO"/rdonly || true
+    sudo truncate --size=0 /etc/fstab
+}
+
+revision() {
+    attr -q -g revision /cvmfs/"$CVMFS_TEST_REPO"
+}
+
+await_revision_update() {
+    if [[ "$PROXY_SPEC" != DIRECT ]]; then
+	# Apparently CVMFS Gateway Receiver sets .cvmfspublished cache lifetime
+	# to 61 second by default, see MkDotCvmfsCacheControlHeader(), which Varnish upholds.
+	# Receiver doesn't seem to read CVMFS_MAX_TTL_SECS at the moment.
+	# So here we clear Varnish's cache directly.
+	sudo varnishadm  ban 'req.http.host ~ .*'
+    fi
+
+    LAPS=0
+    TIME_START=$(date +%s)
+    while [[ "$(revision)" == "$LAST_REPO_REVISION" ]]; do
+	LAPS=$(( LAPS + 1 ))
+	if [[ "$LAPS" -gt $(( CVMFS_MAX_TTL_SECS + 61 )) ]]; then
+	    exit 1
+	fi
+	sleep 1
+    done
+    echo Revision incremented after $(( "$(date +%s)" - TIME_START )) seconds
+}
+
+# Writes out only the hex-encoded hash.
+# One or zero file arguments are expected.
+my_sha1sum() {
+    sha1sum "$@" | cut -f1 -d' '
+}
+
+place_files() {
+    MY_TEMPDIR=$(mktemp -d)
+    pushd "$MY_TEMPDIR"
+
+    DB_FILE=cvmfs-ingestsql.db
+    cvmfs_swissknife ingestsql -D '' -N '' -n "$DB_FILE"
+
+    touch empty
+
+    mkdir dir
+    touch dir/empty-in-dir
+
+    echo "nonempty" > nonempty
+    HASH=$(my_sha1sum nonempty)
+    PART1=$(echo "$HASH" | head -c+2)
+    PART2=$(echo "$HASH" | tail -c+3)
+    PART3=P # for uncompressed
+    s3cmd put nonempty s3://"$CVMFS_S3_BUCKET"/"$CVMFS_TEST_REPO"/data/$PART1/$PART2$PART3
+
+
+    echo "external" > external
+    s3cmd put external s3://"$CVMFS_S3_BUCKET"/"$CVMFS_TEST_REPO"/external/external
+
+    # compressed=1 means uncompressed, see swissknife::IngestSQL::add_files()
+    sqlite3 "$DB_FILE" <<EOF
+INSERT INTO dirs (name)
+VALUES
+('dir')
+;
+INSERT INTO files (name, size, hashes, internal, compressed)
+VALUES
+('empty', 0, '$(my_sha1sum empty)', 1, 1),
+('dir/empty-in-dir', 0, '$(my_sha1sum dir/empty-in-dir)', 1, 1),
+('nonempty', 9, '$(my_sha1sum nonempty)', 1, 1),
+('external', 9, '$(my_sha1sum external)', 0, 1)
+;
+EOF
+
+    LAST_REPO_REVISION=$(revision)
+    ingestsql_tmpdir=$(mktemp -d --suffix=.ingestsql.tmp)
+    cvmfs_swissknife_debug ingestsql -c -D "$DB_FILE" -N "$CVMFS_TEST_REPO" -g http://127.0.0.1:4929/api/v1 -w "$CVMFS_TEST_HTTP_BASE"/"$CVMFS_TEST_REPO" -@ "$PROXY_SPEC" -k /etc/cvmfs/keys/"$CVMFS_TEST_REPO".pub -s /etc/cvmfs/keys/"$CVMFS_TEST_REPO".gw -3 "$CVMFS_TEST_S3_CONFIG" -t "$ingestsql_tmpdir"
+    rm -r "$ingestsql_tmpdir"
+
+    await_revision_update
+
+    [[ -f "$CVMFS_TEST_MOUNTPOINT"/nonempty ]]
+    popd # $MY_TEMPDIR
+}
+
+dump_internal_affairs() {
+    local ts=$(date +%s.%N)
+    local outfile="$LOG_DIR"/stats.${ts}.txt
+    cvmfs_talk -p /var/spool/cvmfs/"$CVMFS_TEST_REPO"/cvmfs_io internal affairs > "$outfile"
+    echo "$outfile"
+
+    # assertions:
+    for metrics_group in \
+	fetch-external \
+	fetch \
+    ; do
+	grep -q -F $metrics_group'.' "$outfile"
+    done
+}
+
+# takes DUMP_OLD, DUMP_NEW from exported variables for code brevity
+field_delta() {
+    local FIELD_NAME=${1/./[.]} # dots are used in names, they are not a regex pattern
+    VALUE_OLD=$(grep "^$FIELD_NAME\>" "$DUMP_OLD" | head -n1 | cut -d'|' -f2)
+    VALUE_NEW=$(grep "^$FIELD_NAME\>" "$DUMP_NEW" | head -n1 | cut -d'|' -f2)
+    [[ "$VALUE_OLD" != '' ]]
+    [[ "$VALUE_NEW" != '' ]]
+    DELTA=$(( VALUE_NEW - VALUE_OLD ))
+    echo "$DELTA"
+}
+
+ALL_COUNTERS=()
+for domain in \
+    download \
+    download-external \
+    ; do
+    for counter in {n,sz}_proxy_cache_{hit,miss,unc}; do
+	ALL_COUNTERS+=("$domain.$counter")
+    done
+done
+
+wipe_cvmfs_caches_and_remount() {
+    sudo umount /cvmfs/"$CVMFS_TEST_REPO"
+    sudo rm -rf /var/spool/cvmfs/"$CVMFS_TEST_REPO"/cache/*
+    sudo mv /var/log/cvmfs-debug.log /var/log/cvmfs-debug.log.$(date +%s.%N) || true
+    sudo mount  /cvmfs/"$CVMFS_TEST_REPO"
+
+    # Wipe old stats dumps.
+    # Not essential but convenient for troubleshooting to be able to just `diff stats*txt`
+    rm -f "$LOG_DIR"/stats.*.txt
+}
+
+expect_increase_only_in() {
+    DOMAIN=$1
+    CLASS=$2
+
+    # Print all differences related to the feature, for troubleshooting:
+    diff -Nrd -U0 "$LOG_DIR"/stats.*.txt | grep proxy_cache || true
+
+    METRICS_INCR=($DOMAIN.n_proxy_cache_$CLASS  download-total.n_proxy_cache_$CLASS)
+    METRICS_GROW=($DOMAIN.sz_proxy_cache_$CLASS download-total.sz_proxy_cache_$CLASS)
+
+    METRICS_STAY=()
+    for domain in \
+	download \
+	download-external \
+	; do
+	if [[ $domain == $DOMAIN ]]; then continue; fi
+	for class in hit miss unc; do
+	    if [[ $class == $CLASS ]]; then continue; fi
+	    for counter in n sz; do
+		metric=$domain.${counter}_proxy_cache_$class
+		METRICS_STAY+=($metric)
+	    done
+	done
+    done
+    for metric in ${METRICS_INCR}; do
+	[[ "$(field_delta $metric)"  == 1 ]]
+    done
+    for metric in ${METRICS_GROW}; do
+	[[ "$(field_delta $metric)"  -gt 1 ]]
+    done
+    for metric in ${METRICS_STAY}; do
+	[[ "$(field_delta $metric)"  == 0 ]]
+    done
+}
+
+expect_counters_dead() {
+    for metric in ${ALL_COUNTERS}; do
+	[[ "$(field_delta $metric)"  == 0 ]]
+    done
+}
+
+run_cache_metrics_tests() {
+    PROXY_SPEC=$1
+    CVMFS_PROXY_CACHE_STATUS_HEADER=$2
+
+    # With CVMFS_AUTO_UPDATE, there is background polling of catalog files.
+    # This would perturb the numbers we check here, so we disable CVMFS_AUTO_UPDATE.
+    sudo sed -i /etc/cvmfs/repositories.d/"$CVMFS_TEST_REPO"/client.conf -e 's/CVMFS_AUTO_UPDATE=yes/CVMFS_AUTO_UPDATE=no/'
+
+    PROXIED_OR_DIRECT=DIRECT
+    if [[ "$PROXY_SPEC" != DIRECT ]]; then
+	PROXIED_OR_DIRECT=PROXIED
+    fi
+    LOG_DIR=/var/log/903-cache-metrics."$CVMFS_PROXY_CACHE_STATUS_HEADER"."$PROXIED_OR_DIRECT".log
+    sudo mkdir "$LOG_DIR"
+    sudo chmod a+w "$LOG_DIR"
+
+    # Access empty file in mountpoint's root directory
+    wipe_cvmfs_caches_and_remount
+    export DUMP_OLD=$(dump_internal_affairs)
+    cat "$CVMFS_TEST_MOUNTPOINT"/empty >/dev/null
+    export DUMP_NEW=$(dump_internal_affairs)
+    # expect all to stay the same, as the file is empty, so no HTTP request is made.
+    expect_counters_dead
+
+    # Test empty file in nested dir
+    wipe_cvmfs_caches_and_remount
+    export DUMP_OLD=$(dump_internal_affairs)
+    cat "$CVMFS_TEST_MOUNTPOINT"/dir/empty-in-dir >/dev/null
+    export DUMP_NEW=$(dump_internal_affairs)
+    # The dir catalog was fetched, which should show up as a download.
+    if [[ "$CVMFS_PROXY_CACHE_STATUS_HEADER" == empty ]] || [[ "$CVMFS_PROXY_CACHE_STATUS_HEADER" == unset ]]; then
+	# Feature is disabled. Expect everything to stay on zeros.
+	expect_counters_dead
+    else # CVMFS is confugred to search for a certain header in responses.
+	if [[ "$PROXY_SPEC" == DIRECT ]]; then
+	    # S3 server does not fill the sought header.
+	    expect_increase_only_in download unc
+	else # requests go through Varnish and it reports hits/misses.
+	    expect_increase_only_in download miss
+	fi
+    fi
+
+    # Access nonempty file for the first time
+    wipe_cvmfs_caches_and_remount
+    export DUMP_OLD=$(dump_internal_affairs)
+    cat "$CVMFS_TEST_MOUNTPOINT"/nonempty >/dev/null
+    export DUMP_NEW=$(dump_internal_affairs)
+    if [[ "$CVMFS_PROXY_CACHE_STATUS_HEADER" == empty ]] || [[ "$CVMFS_PROXY_CACHE_STATUS_HEADER" == unset ]]; then
+	# Feature is disabled. Expect everything to stay on zeros.
+	expect_counters_dead
+    else # CVMFS is confugred to search for a certain header in responses.
+	if [[ "$PROXY_SPEC" == DIRECT ]]; then
+	    # S3 server does not fill the sought header.
+	    expect_increase_only_in download unc
+	else # requests go through Varnish and it reports hits/misses.
+	    expect_increase_only_in download miss
+	fi
+    fi
+
+    # Access nonempty file again
+    wipe_cvmfs_caches_and_remount
+    export DUMP_OLD=$(dump_internal_affairs)
+    cat "$CVMFS_TEST_MOUNTPOINT"/nonempty >/dev/null
+    export DUMP_NEW=$(dump_internal_affairs)
+    if [[ "$CVMFS_PROXY_CACHE_STATUS_HEADER" == empty ]] || [[ "$CVMFS_PROXY_CACHE_STATUS_HEADER" == unset ]]; then
+	# Feature is disabled. Expect everything to stay on zeros.
+	expect_counters_dead
+    else # CVMFS is confugred to search for a certain header in responses.
+	if [[ "$PROXY_SPEC" == DIRECT ]]; then
+	    # S3 server does not fill the sought header.
+	    expect_increase_only_in download unc
+	else # requests go through Varnish and it reports hits/misses:
+	    expect_increase_only_in download hit
+	fi
+    fi
+
+    # Access external file
+    wipe_cvmfs_caches_and_remount
+    export DUMP_OLD=$(dump_internal_affairs)
+    cat "$CVMFS_TEST_MOUNTPOINT"/external >/dev/null
+    export DUMP_NEW=$(dump_internal_affairs)
+    if [[ "$CVMFS_PROXY_CACHE_STATUS_HEADER" == empty ]] || [[ "$CVMFS_PROXY_CACHE_STATUS_HEADER" == unset ]]; then
+	# Feature is disabled. Expect everything to stay on zeros.
+	expect_counters_dead
+    else # CVMFS is confugred to search for a certain header in responses.
+	if [[ "$PROXY_SPEC" == DIRECT ]]; then
+	    # S3 server does not fill the sought header.
+	    expect_increase_only_in download-external unc
+	else # requests go through Varnish and it reports hits/misses.
+	    # This is an external file, there's separate DownloadManager and hence counter for that.
+	    expect_increase_only_in download-external miss
+	fi
+    fi
+}
+
+run_tool_tests_in_disposable_repo() {
+    PROXY_SPEC=$1
+    CVMFS_PROXY_CACHE_STATUS_HEADER=$2
+    CVMFS_TEST_REPO=test.repo.$(date +%F_%H_%M_%S.%N)
+    CVMFS_TEST_MOUNTPOINT=/cvmfs/$CVMFS_TEST_REPO
+    export CVMFS_TEST_REPO CVMFS_TEST_MOUNTPOINT
+    create_repo
+    place_files
+
+    run_cache_metrics_tests  "$PROXY_SPEC" "$hdr_name"
+
+    destroy_repo
+}
+
+
+global_setup
+for PROXY_SPEC in http://"$PROXY_HOST":6081 DIRECT; do
+    # Test different header setting to ensure no hardcode
+    for hdr_name in x-cache empty unset; do
+	proxy_setup "$PROXY_SPEC" "$hdr_name"
+	run_tool_tests_in_disposable_repo "$PROXY_SPEC" "$hdr_name"
+    done
+done
+
+sudo systemctl stop "$PROXY_SERVICE"
+
+# Restore default gateway settings
+trap - EXIT
+cleanup
