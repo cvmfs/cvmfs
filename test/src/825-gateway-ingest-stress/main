@@ -1,0 +1,81 @@
+#!/bin/bash
+cvmfs_test_name="Mountless repository gateway ingest: parallel stress test"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="" # takes 10 minutes to pass or fail
+
+PROXY_EXE=$TEST_ROOT/common/proxy.py
+
+produce_tarball() {
+  local tarball_name
+  tarball_name=$(readlink -f "$1")
+  mkdir empty
+  pushd empty
+  tar -cf "$tarball_name" .
+  popd
+  rm -rf empty
+}
+
+ingest_lots() {
+  local tarfile=$1
+  local base=$2
+  local n=$3
+
+  echo "*** ingest tarball without a publisher mount"
+  local DIRS_CREATED=()
+  for i in $(seq 1 "$n"); do
+    dir=$(printf %05d "$i")
+    DIRS_CREATED+=("$base"."$dir")
+    cvmfs_server ingest --tar_file "$tarfile" --base_dir "$base.$dir" "$CVMFS_TEST_REPO" |& tee ingest."$base"."$dir".log
+  done
+
+  echo "*** mountless ingest should not remount the publisher view"
+  cat /proc/mounts | grep -e " /cvmfs/$CVMFS_TEST_REPO " && return 21
+  cat /proc/mounts | grep -e " ${CVMFS_SPOOL_DIR}/rdonly " && return 22
+  [ ! -f "$CVMFS_SPOOL_DIR"/session_token ] || return 23
+
+  echo "*** verify published artifacts"
+  cvmfs_server check -i "$CVMFS_TEST_REPO"
+  check_repo_integrity "$CVMFS_TEST_REPO"
+
+  sudo mount "$CVMFS_SPOOL_DIR"/rdonly
+  pushd "$CVMFS_SPOOL_DIR"/rdonly
+  local DIRS_PRESENT=( "$base".* )
+  popd # "$CVMFS_SPOOL_DIR"/rdonly
+  for i in $(seq 0 $(( n - 1 )) ); do
+    [[ "${DIRS_CREATED[$i]}" == "${DIRS_PRESENT[$i]}" ]]
+  done
+  sudo umount "$CVMFS_SPOOL_DIR"/rdonly
+}
+
+cvmfs_run_test() {
+  # set_up_repository_gateway() is hardcoded to test.repo.org as of 2026-10-09
+  # Redefine to match that.
+  CVMFS_TEST_REPO=test.repo.org
+
+  export CVMFS_TEST_REPO # for proxyctl
+
+  local tarfile
+  tarfile="$(pwd)/tarball.tar"
+
+  set_up_repository_gateway -P || return 1
+  load_repo_config "$CVMFS_TEST_REPO" || return 2
+
+  echo "*** check bootstrap leaves the repository unmounted"
+  cat /proc/mounts | grep -e " /cvmfs/$CVMFS_TEST_REPO " && return 3
+  cat /proc/mounts | grep -e " ${CVMFS_SPOOL_DIR}/rdonly " && return 4
+
+  produce_tarball "$tarfile" || return 10
+
+  local n=1000
+
+  #ingest_lots "$tarfile" "direct" "$n" # disabled as not challenging, but should work
+
+  # This sets up an HTTP proxy.
+  # It must intermediate requests from cvmfs_receiver (gateway minion) to the S3 backend.
+
+  #"$TEST_ROOT"/common/proxyctl enable_now
+  #ingest_lots "$tarfile" "proxied" "$n" # disabled as not challenging, but should work
+
+  PROXY_TCP_RST=1 "$TEST_ROOT"/common/proxyctl enable_now
+  ingest_lots "$tarfile" "proxied_rst" "$n"
+}
