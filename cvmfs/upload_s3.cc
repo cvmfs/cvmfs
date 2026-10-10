@@ -51,6 +51,7 @@ S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition)
     , num_retries_(kDefaultNumRetries)
     , timeout_sec_(kDefaultTimeoutSec)
     , authz_method_(s3fanout::kAuthzAwsV2)
+    , azure_msi_(false)
     , peek_before_put_(true)
     , use_https_(false)
     , batch_delete_enabled_(true)
@@ -76,6 +77,8 @@ S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition)
   s3fanout::S3FanoutManager::S3Config s3config;
   s3config.access_key = access_key_;
   s3config.secret_key = secret_key_;
+  s3config.azure_msi = azure_msi_;
+  s3config.azure_mi_client_id = azure_mi_client_id_;
   s3config.hostname_port = host_name_port_;
   s3config.authz_method = authz_method_;
   s3config.region = region_;
@@ -151,7 +154,15 @@ bool S3Uploader::ParseSpoolerDefinition(
              config_path.c_str());
     return false;
   }
-  if (!options_manager.GetValue("CVMFS_S3_SECRET_KEY", &secret_key_)) {
+  if (options_manager.GetValue("CVMFS_S3_AZURE_MSI", &parameter)) {
+    azure_msi_ = options_manager.IsOn(parameter);
+    if (azure_msi_)
+      authz_method_ = s3fanout::kAuthzAzure;
+  }
+  options_manager.GetValue("CVMFS_S3_AZURE_MSI_CLIENT_ID",
+                           &azure_mi_client_id_);
+  if (!options_manager.GetValue("CVMFS_S3_SECRET_KEY", &secret_key_)
+      && !azure_msi_) {
     LogCvmfs(kLogUploadS3, kLogStderr,
              "Failed to parse CVMFS_S3_SECRET_KEY from '%s'.",
              config_path.c_str());

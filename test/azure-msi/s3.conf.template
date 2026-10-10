@@ -1,0 +1,15 @@
+# CVMFS S3 config for publishing to an Azure-Blob emulator (Azurite) over MSI.
+# Used by publish-e2e.sh. Path-style addressing (Azurite is host/account/container).
+#
+# CVMFS_S3_HOST is the Azurite endpoint host:port; CVMFS_S3_BUCKET is
+# <account>/<container>; CVMFS_S3_ACCESS_KEY is the account name. With MSI there
+# is deliberately NO CVMFS_S3_SECRET_KEY — the bearer token replaces it.
+CVMFS_S3_HOST=127.0.0.1:10000
+CVMFS_S3_ACCESS_KEY=devstoreaccount1
+CVMFS_S3_BUCKET=devstoreaccount1/cvmfs
+CVMFS_S3_FLAVOR=azure
+CVMFS_S3_DNS_BUCKETS=false
+CVMFS_S3_USE_HTTPS=true
+CVMFS_S3_AZURE_MSI=true
+# Optional: select a specific user-assigned identity
+# CVMFS_S3_AZURE_MSI_CLIENT_ID=<client-id>
