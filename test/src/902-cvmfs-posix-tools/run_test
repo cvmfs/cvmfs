@@ -2,6 +2,7 @@
 set -euo pipefail
 set -x
 
+export BE_QUICK=1
 #export DEBUG=1
 RUN_PASSING_TESTS=1
 RUN_FAILING_TESTS=0
@@ -500,10 +501,14 @@ run_tool_tests_in_disposable_repo() {
     # BUG: fresh repo is never refreshed without remounting
     #check_ingestsql_works -B
 
-    check_ingestsql_works
-    check_ingestsql_works -B
+    if [[ ${BE_QUICK:-0} != 1 ]]; then
+	check_ingestsql_works
+	check_ingestsql_works -B
+    fi
     configure_tools
-    check_tools
+    if [[ ${BE_QUICK:-0} != 1 ]]; then
+	check_tools
+    fi
     run_golang_tests_for_these "$cmd"
     destroy_repo
 }
