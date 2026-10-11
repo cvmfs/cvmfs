@@ -438,8 +438,6 @@ TESTS_KNOWN_TO_PASS=(cvmfs_chgrp cvmfs_chmod cvmfs_chown                        
 
 run_all_golang_tests() {
     export CVMFS_RSYNC_FULLY_CONTAINERIZED=true
-    #pushd /usr/local/src/cvmfs/cvmfs-posix-tools/cmd/cvmfs_rsync
-    #./cvmfs_rsync.test
 
     pushd "$TEST_ROOT"/../cvmfs-posix-tools/cmd
     FAILED=
@@ -449,7 +447,7 @@ run_all_golang_tests() {
 	pushd $cmd
 	set +o pipefail
 	# cmd.test binaries live in build, but .cvmfs_rsync.yaml etc live in source tree
-	sudo -E "$TEST_ROOT"/../build/cvmfs-posix-tools/cmd/$cmd/$cmd.test |& sudo tee /var/log/$cmd.test.log
+	sudo -E $cmd.test |& sudo tee /var/log/$cmd.test.log
 	if [[ ${PIPESTATUS[0]} != 0 ]]; then
 	    echo "$cmd test failed"
 	    FAILED+=" $cmd"
@@ -477,7 +475,7 @@ run_golang_tests_for_these() {
 	pushd $cmd
 	set +o pipefail
 	# cmd.test binaries live in build, but .cvmfs_rsync.yaml etc live in source tree
-	sudo -E "$TEST_ROOT"/../build/cvmfs-posix-tools/cmd/$cmd/$cmd.test |& sudo tee /var/log/$cmd.test.log
+	sudo -E $cmd.test |& sudo tee /var/log/$cmd.test.log
 	if [[ ${PIPESTATUS[0]} != 0 ]]; then
 	    echo "$cmd test failed"
 	    FAILED+=" $cmd"
