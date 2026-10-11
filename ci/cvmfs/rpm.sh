@@ -97,6 +97,7 @@ echo "building ($default_arch)..."
 rpmbuild --define="_topdir $CVMFS_RESULT_LOCATION"        \
          --define="_tmppath ${CVMFS_RESULT_LOCATION}/TMP" \
          --define="cvmfs_version ${cvmfs_version}"        \
+         --define="build_testing 1"                       \
          --target="$default_arch"                         \
          -ba $spec_file
 
