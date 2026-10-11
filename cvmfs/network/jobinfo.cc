@@ -81,6 +81,12 @@ void JobInfo::Init() {
   num_used_hosts_ = 0;
   num_retries_ = 0;
   backoff_ms_ = 0;
+  retry_not_before_ms_ = 0;
+  no_progress_since_ms_ = 0;
+  parallel_ok_ = false;
+  peer_unresponsive_ = false;
+  resume_offset_ = 0;
+  content_length_ = -1;
   current_metalink_chain_index_ = -1;
   current_host_chain_index_ = -1;
 

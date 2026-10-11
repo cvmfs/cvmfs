@@ -152,6 +152,10 @@ int fuse_lowlevel_notify_expire_entry(
   return -1;
 }
 
+// Passthrough is a libfuse 3.17 feature that cvmfs.cc calls under
+// FUSE_CAP_PASSTHROUGH.  The mock build links no libfuse at all, so these
+// stand in for it and always fail, which keeps the tested callbacks on the
+// ordinary read path rather than the kernel passthrough one.
 int fuse_passthrough_open(fuse_req_t req __attribute__((unused)),
                           int fd __attribute__((unused))) {
   return -1;

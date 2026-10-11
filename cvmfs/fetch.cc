@@ -172,6 +172,9 @@ int Fetcher::Fetch(const CacheManager::LabeledObject &object,
                                   == zlib::kZlibDefault);
   tls->download_job.SetRangeOffset(object.label.range_offset);
   tls->download_job.SetRangeSize(static_cast<int64_t>(object.label.size));
+  // Catalogs are large single objects and the metadata critical path; file
+  // chunks already get their parallelism from CVMFS_CHUNK_READAHEAD
+  tls->download_job.SetParallelOk(object.label.IsCatalog());
   download_mgr_->Fetch(&tls->download_job);
 
   // Partial replica failover: a partial Stratum-1 serves a 404 for objects it

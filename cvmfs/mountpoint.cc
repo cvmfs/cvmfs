@@ -496,7 +496,16 @@ FileSystem::~FileSystem() {
   SetLogSyslogPrefix("");
   SetLogMicroSyslog("");
   SetLogDebugFile("");
-  google::protobuf::ShutdownProtobufLibrary();
+  // Deliberately no google::protobuf::ShutdownProtobufLibrary() here.  That
+  // call is process-global and irreversible: once it has run, constructing any
+  // protobuf message again throws std::system_error.  A FileSystem is not
+  // tied to the lifetime of the process -- only one may exist at a time, but
+  // several are created in sequence: InitSystemFs() destroys one and creates
+  // another when it has to wait for the workspace lock, libcvmfs attaches and
+  // detaches repeatedly, and the unit tests build one per test case.  Tearing
+  // protobuf down here left every later external cache manager, which speaks
+  // protobuf over its socket, unable to construct a single message.  Protobuf
+  // releases its static memory through its own exit handlers anyway.
   g_alive = false;
 }
 
@@ -1031,6 +1040,13 @@ void FileSystem::SetupSqlite() {
   retval = sqlite3_config(SQLITE_CONFIG_LOG, FileSystem::LogSqliteError, NULL);
   assert(retval == SQLITE_OK);
   retval = sqlite3_config(SQLITE_CONFIG_MULTITHREAD);
+  assert(retval == SQLITE_OK);
+  // SQLite serialises calls into a custom allocator (SqliteMemoryManager has
+  // no lock of its own) only while memory statistics are enabled.  That is
+  // the compile-time default for the bundled SQLite but not for every system
+  // library (macOS ships SQLITE_DEFAULT_MEMSTATUS=0), where concurrent catalog
+  // lookups then corrupt the allocator's arena.
+  retval = sqlite3_config(SQLITE_CONFIG_MEMSTATUS, 1);
   assert(retval == SQLITE_OK);
   SqliteMemoryManager::GetInstance()->AssignGlobalArenas();
 
@@ -2305,7 +2321,15 @@ bool MountPoint::SetupExternalDownloadMgr(bool dogeosort) {
     }
   }
 
-  string proxies = "DIRECT";
+  // Without an explicit setting, inherit the regular download manager's proxy
+  // configuration rather than defaulting to DIRECT.  Defaulting to DIRECT made
+  // external data bypass a proxy that the administrator had configured for
+  // everything else, which is both surprising and, where only proxied traffic
+  // is permitted to leave the host, a silent leak.
+  string proxies = download_mgr_->GetProxyList();
+  string fallback_proxies = download_mgr_->GetFallbackProxyList();
+  if (proxies == "")
+    proxies = "DIRECT";
   if (options_mgr_->GetValue("CVMFS_EXTERNAL_HTTP_PROXY", &optarg)) {
     proxies = download::ResolveProxyDescription(
         optarg,
@@ -2316,8 +2340,11 @@ bool MountPoint::SetupExternalDownloadMgr(bool dogeosort) {
       boot_status_ = loader::kFailWpad;
       return false;
     }
+    // An explicit external proxy replaces the inherited configuration whole:
+    // keeping the regular chain's fallbacks behind a different primary would
+    // send external data somewhere the administrator never named for it.
+    fallback_proxies = "";
   }
-  string fallback_proxies;
   if (options_mgr_->GetValue("CVMFS_EXTERNAL_FALLBACK_PROXY", &optarg))
     fallback_proxies = optarg;
   external_download_mgr_->SetProxyChain(
@@ -2353,6 +2380,14 @@ void MountPoint::SetupHttpTuning() {
 
   if (options_mgr_->GetValue("CVMFS_LOW_SPEED_LIMIT", &optarg))
     download_mgr_->SetLowSpeedLimit(String2Uint64(optarg));
+  // Idle-connection probe interval; see opt_tcp_keepalive_ for why the client
+  // probes at all.  An explicit 0 disables it, overriding the default.
+  if (options_mgr_->GetValue("CVMFS_TCP_KEEPALIVE", &optarg))
+    download_mgr_->SetTcpKeepalive(String2Uint64(optarg));
+  // Number of concurrent range requests for one large object; see
+  // FetchParallel() for which objects qualify.
+  if (options_mgr_->GetValue("CVMFS_PARALLEL_FETCH", &optarg))
+    download_mgr_->SetParallelFetch(String2Uint64(optarg));
   if (options_mgr_->GetValue("CVMFS_PROXY_RESET_AFTER", &optarg)) {
     download_mgr_->SetProxyGroupResetDelay(String2Uint64(optarg));
     // Use the proxy reset delay as the default for the metalink reset delay
