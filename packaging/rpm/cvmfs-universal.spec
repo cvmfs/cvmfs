@@ -795,6 +795,17 @@ systemctl daemon-reload
 %{_bindir}/cvmfs_test_cache
 %{_bindir}/cvmfs_test_shrinkwrap
 %{_bindir}/cvmfs_test_publish
+%{_bindir}/cvmfs_chgrp.test
+%{_bindir}/cvmfs_chmod.test
+%{_bindir}/cvmfs_chown.test
+%{_bindir}/cvmfs_insert.test
+%{_bindir}/cvmfs_ln.test
+%{_bindir}/cvmfs_mkdir.test
+%{_bindir}/cvmfs_rm.test
+%{_bindir}/cvmfs_rmdir.test
+%{_bindir}/cvmfs_rsync.test
+%{_bindir}/cvmfs_setfacl.test
+%{_bindir}/cvmfs_touch.test
 %doc COPYING CITATION.cff README.md ChangeLog
 %endif
 
