@@ -1257,10 +1257,34 @@ TEST_F(T_Nfs4Server, Delegations) {
   EXPECT_EQ(static_cast<uint32_t>(NFS4_OK), r.status);
 
   // A new generation of the exported tree recalls the delegation
+  backend_.node(file_)->attr.mtime.sec = 1800000000;
   backend_.generation_++;
   for (unsigned i = 0; i < 50 && callback.recalls() == 0; ++i)
     usleep(100 * 1000);
   EXPECT_EQ(1u, callback.recalls());
+
+  // Until the delegation is returned, the file keeps its old attributes:
+  // the client fetches them with the DELEGRETURN and must not mistake the
+  // new ones for its own
+  Compound ga;
+  ga.PutFh(FhOf("dir/file"));
+  ga.GetAttr(0, 1u << (FATTR4_TIME_MODIFY - 32));
+  int64_t mtime = 0;
+  Run(ga, &r);
+  r.NextOp(OP_PUTFH);
+  ASSERT_EQ(static_cast<uint32_t>(NFS4_OK), r.NextOp(OP_GETATTR));
+  {
+    uint32_t len, word;
+    std::string values;
+    r.reader.GetU32(&len);
+    for (uint32_t i = 0; i < len; ++i)
+      r.reader.GetU32(&word);
+    r.reader.GetOpaque(&values);
+    XdrReader v(reinterpret_cast<const unsigned char *>(values.data()),
+                values.size());
+    v.GetI64(&mtime);
+  }
+  EXPECT_EQ(1700000000, mtime);
 
   Compound ret;
   ret.PutFh(FhOf("dir/file"));
@@ -1270,6 +1294,22 @@ TEST_F(T_Nfs4Server, Delegations) {
   Run(ret, &r);
   EXPECT_EQ(static_cast<uint32_t>(NFS4_OK), r.status);
   EXPECT_EQ(0u, server_->NumDelegations());
+
+  Run(ga, &r);
+  r.NextOp(OP_PUTFH);
+  ASSERT_EQ(static_cast<uint32_t>(NFS4_OK), r.NextOp(OP_GETATTR));
+  {
+    uint32_t len, word;
+    std::string values;
+    r.reader.GetU32(&len);
+    for (uint32_t i = 0; i < len; ++i)
+      r.reader.GetU32(&word);
+    r.reader.GetOpaque(&values);
+    XdrReader v(reinterpret_cast<const unsigned char *>(values.data()),
+                values.size());
+    v.GetI64(&mtime);
+  }
+  EXPECT_EQ(1800000000, mtime);
   Run(ret, &r);
   EXPECT_EQ(static_cast<uint32_t>(NFS4ERR_BAD_STATEID), r.status);
 

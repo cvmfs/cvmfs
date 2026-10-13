@@ -14,10 +14,12 @@
 
 #include <stdint.h>
 
+#include <atomic>
 #include <condition_variable>
 #include <deque>
 #include <map>
 #include <memory>
+#include <set>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -120,6 +122,8 @@ class Nfs4Server : public RpcProgram {
     uint32_t seqid;
     /** When the recall was sent, 0 if not recalled */
     time_t recalled;
+    /** Attributes when the delegation was granted, see frozen_attrs_ */
+    Attr attr;
   };
 
   typedef std::pair<uint64_t, std::string> OwnerKey;
@@ -165,7 +169,10 @@ class Nfs4Server : public RpcProgram {
   void StartMonitor();
   uint32_t OpDelegreturn(XdrReader *args);
   /** Called with state_lock_ held; writes the open_delegation4 result */
-  void PutDelegation(uint64_t clientid, const FileHandle &fh, XdrWriter *w);
+  void PutDelegation(uint64_t clientid, const FileHandle &fh, const Attr &attr,
+                     XdrWriter *w);
+  /** Called with state_lock_ held, after delegations_ changed */
+  void UpdateFrozenAttrs();
   void ExecutorLoop();
 
   uint32_t ProcessCompound(const RpcCall &call, XdrReader *args,
@@ -234,6 +241,21 @@ class Nfs4Server : public RpcProgram {
   std::map<OwnerKey, OpenOwner> owners_;
   std::map<std::string, OpenState> open_states_;
   std::map<std::string, Delegation> delegations_;
+  /**
+   * Files whose delegation of a client was recalled.  The client's next open
+   * gets no delegation: a client holding a delegation trusts its cache, so
+   * it has to revalidate (close-to-open) before getting a new one.
+   */
+  std::set<std::pair<uint64_t, uint64_t> > recalled_files_;
+  /**
+   * While a recalled delegation is outstanding, its file reports the
+   * attributes from when the delegation was granted.  A client returns a
+   * delegation with GETATTR + DELEGRETURN; if that GETATTR showed the new
+   * attributes, the client (still holding the delegation) would take them as
+   * its own and never notice the change.
+   */
+  std::map<uint64_t, Attr> frozen_attrs_;
+  std::atomic<size_t> num_frozen_attrs_;
   std::vector<uint64_t> pending_probes_;
   uint64_t last_generation_;
   std::thread monitor_;

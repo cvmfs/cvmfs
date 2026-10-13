@@ -259,6 +259,7 @@ Nfs4Server::Nfs4Server(Backend *backend, const Options &options)
     , boot_(static_cast<uint32_t>(time(NULL)))
     , next_clientid_(1)
     , next_stateid_(1)
+    , num_frozen_attrs_(0)
     , last_generation_(0)
     , monitor_stopping_(false)
     , executors_stopping_(false) { }
@@ -552,6 +553,12 @@ uint32_t Nfs4Server::Resolve(const FileHandle &fh, const Credentials &creds,
   if (retval != 0)
     return ErrnoToStatus(retval);
 
+  if (fh.kind == FileHandle::kObject && num_frozen_attrs_ > 0) {
+    std::lock_guard<std::mutex> lock(state_lock_);
+    std::map<uint64_t, Attr>::const_iterator it = frozen_attrs_.find(fh.ino);
+    if (it != frozen_attrs_.end())
+      obj->attr = it->second;
+  }
   if (fh.kind == FileHandle::kAttrDir) {
     obj->attr.mode = S_IFDIR | 0555;
     obj->attr.nlink = 2;
@@ -1297,6 +1304,19 @@ uint32_t Nfs4Server::CheckReadStateid(const Stateid &stateid,
 
 void Nfs4Server::DropClient(uint64_t clientid) {
   clients_.erase(clientid);
+  struct Refreeze {
+    explicit Refreeze(Nfs4Server *s) : server(s) { }
+    ~Refreeze() { server->UpdateFrozenAttrs(); }
+    Nfs4Server *server;
+  } refreeze(this);
+  for (std::set<std::pair<uint64_t, uint64_t> >::iterator it =
+           recalled_files_.begin();
+       it != recalled_files_.end();) {
+    if (it->first == clientid)
+      recalled_files_.erase(it++);
+    else
+      ++it;
+  }
   for (std::map<std::string, Delegation>::iterator it = delegations_.begin();
        it != delegations_.end();) {
     if (it->second.clientid == clientid)
@@ -1321,8 +1341,21 @@ void Nfs4Server::DropClient(uint64_t clientid) {
 }
 
 
+void Nfs4Server::UpdateFrozenAttrs() {
+  frozen_attrs_.clear();
+  for (std::map<std::string, Delegation>::const_iterator it =
+           delegations_.begin();
+       it != delegations_.end();
+       ++it) {
+    if (it->second.recalled != 0)
+      frozen_attrs_[it->second.fh.ino] = it->second.attr;
+  }
+  num_frozen_attrs_ = frozen_attrs_.size();
+}
+
+
 void Nfs4Server::PutDelegation(uint64_t clientid, const FileHandle &fh,
-                               XdrWriter *w) {
+                               const Attr &attr, XdrWriter *w) {
   std::map<uint64_t, Client>::const_iterator client = clients_.find(clientid);
   bool grant = options_.delegations && fh.kind == FileHandle::kObject
                && client != clients_.end() && client->second.callback_ok;
@@ -1336,6 +1369,8 @@ void Nfs4Server::PutDelegation(uint64_t clientid, const FileHandle &fh,
       grant = false;
     }
   }
+  if (grant && recalled_files_.erase(std::make_pair(clientid, fh.ino)) > 0)
+    grant = false;
   if (!grant || delegations_.size() >= options_.max_stateids) {
     w->PutU32(OPEN_DELEGATE_NONE);
     return;
@@ -1346,6 +1381,7 @@ void Nfs4Server::PutDelegation(uint64_t clientid, const FileHandle &fh,
   Delegation &delegation = delegations_[stateid.other];
   delegation.clientid = clientid;
   delegation.fh = fh;
+  delegation.attr = attr;
   stateid.seqid = delegation.seqid;
 
   w->PutU32(OPEN_DELEGATE_READ);
@@ -1372,6 +1408,8 @@ uint32_t Nfs4Server::OpDelegreturn(XdrReader *args) {
     return NFS4ERR_STALE_STATEID;
   if (delegations_.erase(stateid.other) == 0)
     return NFS4ERR_BAD_STATEID;
+  if (num_frozen_attrs_ > 0)
+    UpdateFrozenAttrs();
   return NFS4_OK;
 }
 
@@ -1442,6 +1480,7 @@ void Nfs4Server::MonitorLoop() {
           continue;
         }
         d.recalled = now;
+        recalled_files_.insert(std::make_pair(d.clientid, d.fh.ino));
         Recall recall;
         recall.other = it->first;
         recall.seqid = d.seqid;
@@ -1451,6 +1490,7 @@ void Nfs4Server::MonitorLoop() {
       }
       ++it;
     }
+    UpdateFrozenAttrs();
     if (recalls.empty())
       continue;
 
@@ -1472,6 +1512,7 @@ void Nfs4Server::MonitorLoop() {
     lock.lock();
     for (unsigned i = 0; i < failed.size(); ++i)
       delegations_.erase(failed[i]);
+    UpdateFrozenAttrs();
   }
 }
 
@@ -1712,7 +1753,7 @@ uint32_t Nfs4Server::OpOpen(XdrReader *args, Compound *c, XdrWriter *body) {
     result.PutU32(OPEN4_RESULT_LOCKTYPE_POSIX);
     result.PutU32(0);  // attrset
     if (claim_type == CLAIM_NULL)
-      PutDelegation(clientid, target.fh, &result);
+      PutDelegation(clientid, target.fh, target.attr, &result);
     else
       result.PutU32(OPEN_DELEGATE_NONE);
     c->fh = target.fh;
