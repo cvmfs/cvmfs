@@ -99,6 +99,8 @@ class RpcServer {
   void Start();
   /** Joins all threads and closes client connections */
   void Stop();
+  /** Number of open client connections */
+  unsigned NumConnections();
 
  private:
   struct Connection {

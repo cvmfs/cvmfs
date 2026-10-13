@@ -284,6 +284,17 @@ void RpcServer::Stop() {
 }
 
 
+unsigned RpcServer::NumConnections() {
+  std::lock_guard<std::mutex> lock(connections_lock_);
+  unsigned n = 0;
+  for (unsigned i = 0; i < connections_.size(); ++i) {
+    if (!connections_[i].expired())
+      n++;
+  }
+  return n;
+}
+
+
 void RpcServer::AcceptLoop() {
   while (!stopping_) {
     struct pollfd pfd;

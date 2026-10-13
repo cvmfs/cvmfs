@@ -19,6 +19,7 @@ namespace nfs4 {
 namespace {
 
 const unsigned kUnmountAttempts = 120;
+const unsigned kIdleSecondsBeforeExit = 5;
 
 /** Fails every COMPOUND at its first operation */
 class ErrorProgram : public RpcProgram {
@@ -84,12 +85,22 @@ int RunGuardian(int listen_fd, int control_fd, const std::string &mountpoint) {
       break;
     sleep(1);
   }
-  rpc.Stop();
   if (IsMounted(mountpoint)) {
+    rpc.Stop();
     Log(kLogLevelError, "failed to unmount %s", mountpoint.c_str());
     return 1;
   }
   Log(kLogLevelInfo, "unmounted %s", mountpoint.c_str());
+
+  // A lazily detached mount (Linux, files still open) keeps its connection
+  // and hard-mount requests would hang without an answer; keep failing them
+  // until the client is gone
+  unsigned idle = 0;
+  while (idle < kIdleSecondsBeforeExit) {
+    idle = (rpc.NumConnections() == 0) ? idle + 1 : 0;
+    sleep(1);
+  }
+  rpc.Stop();
   return 0;
 }
 
