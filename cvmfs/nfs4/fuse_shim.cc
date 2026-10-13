@@ -196,7 +196,7 @@ void SpawnGuardian(struct fuse_session *se) {
   char listen_str[16], control_str[16];
   snprintf(listen_str, sizeof(listen_str), "%d", listen_fd);
   snprintf(control_str, sizeof(control_str), "%d", control[0]);
-  const char *argv[] = {self.c_str(), "__nfs_guardian__", listen_str,
+  const char *const argv[] = {self.c_str(), "__nfs_guardian__", listen_str,
                         control_str, se->mountpoint.c_str(), NULL};
   struct rlimit limit;
   getrlimit(RLIMIT_NOFILE, &limit);
@@ -240,7 +240,7 @@ void RaiseFileDescriptorLimit() {
   struct rlimit limit;
   if (getrlimit(RLIMIT_NOFILE, &limit) != 0)
     return;
-  rlim_t target = kWanted;
+  const rlim_t target = kWanted;
 #ifdef __APPLE__
   int max_per_proc = 0;
   size_t len = sizeof(max_per_proc);
@@ -251,7 +251,7 @@ void RaiseFileDescriptorLimit() {
 #endif
   if (limit.rlim_cur >= target)
     return;
-  nfs4::ScopedRoot root;
+  const nfs4::ScopedRoot root;
   struct rlimit wanted = limit;
   wanted.rlim_cur = target;
   if (wanted.rlim_max < target)

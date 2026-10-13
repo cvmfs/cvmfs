@@ -94,8 +94,8 @@ int PosixBackend::StatPath(const std::string &path, Attr *attr) {
 
 
 bool PosixBackend::PathOf(uint64_t ino, std::string *path) {
-  std::lock_guard<std::mutex> guard(lock_);
-  std::map<uint64_t, std::string>::const_iterator it = paths_.find(ino);
+  std::lock_guard<std::mutex> const guard(lock_);
+  std::map<uint64_t, std::string>::const_iterator const it = paths_.find(ino);
   if (it == paths_.end())
     return false;
   *path = it->second;
@@ -123,7 +123,7 @@ int PosixBackend::Lookup(uint64_t parent, const std::string &name, Attr *attr) {
   if (retval != 0)
     return retval;
   // Hard links map to the last path seen, which is good enough for testing
-  std::lock_guard<std::mutex> guard(lock_);
+  std::lock_guard<std::mutex> const guard(lock_);
   paths_[attr->ino] = path;
   return 0;
 }
@@ -139,7 +139,7 @@ int PosixBackend::LookupParent(uint64_t ino, Attr *attr) {
   const int retval = StatPath(parent, attr);
   if (retval != 0)
     return retval;
-  std::lock_guard<std::mutex> guard(lock_);
+  std::lock_guard<std::mutex> const guard(lock_);
   paths_[attr->ino] = parent;
   return 0;
 }
@@ -183,7 +183,7 @@ int PosixBackend::Read(uint64_t ino, uint64_t offset, uint32_t size,
   if (read_delay_ms_ > 0) {
     bool first;
     {
-      std::lock_guard<std::mutex> guard(lock_);
+      std::lock_guard<std::mutex> const guard(lock_);
       first = fetched_.insert(ino).second;
     }
     if (first)

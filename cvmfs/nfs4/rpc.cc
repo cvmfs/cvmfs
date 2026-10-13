@@ -293,7 +293,7 @@ void RpcServer::Stop() {
   {
     std::unique_lock<std::mutex> lock(connections_lock_);
     for (unsigned i = 0; i < connections_.size(); ++i) {
-      ConnectionPtr c = connections_[i].lock();
+      ConnectionPtr const c = connections_[i].lock();
       if (c)
         shutdown(c->fd, SHUT_RDWR);
     }
@@ -309,7 +309,7 @@ void RpcServer::Stop() {
 
 
 unsigned RpcServer::NumConnections() {
-  std::lock_guard<std::mutex> lock(connections_lock_);
+  std::lock_guard<std::mutex> const lock(connections_lock_);
   unsigned n = 0;
   for (unsigned i = 0; i < connections_.size(); ++i) {
     if (!connections_[i].expired())
@@ -346,8 +346,8 @@ void RpcServer::AcceptLoop() {
     setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &on, sizeof(on));
 #endif
 
-    ConnectionPtr connection(new Connection(fd));
-    std::lock_guard<std::mutex> lock(connections_lock_);
+    ConnectionPtr const connection(new Connection(fd));
+    std::lock_guard<std::mutex> const lock(connections_lock_);
     // Drop entries of closed connections
     std::vector<std::weak_ptr<Connection> > alive;
     for (unsigned i = 0; i < connections_.size(); ++i) {
@@ -393,7 +393,7 @@ void RpcServer::ReadLoop(ConnectionPtr connection) {
     {
       // A retransmission of a call that is still being processed is
       // answered by the original
-      std::lock_guard<std::mutex> lock(connection->inflight_lock);
+      std::lock_guard<std::mutex> const lock(connection->inflight_lock);
       if (!connection->inflight.insert(job.xid).second) {
         Log(kLogLevelDebug, "dropping retransmission of xid %u", job.xid);
         record.clear();
@@ -402,7 +402,7 @@ void RpcServer::ReadLoop(ConnectionPtr connection) {
     }
     job.record.swap(record);
     {
-      std::lock_guard<std::mutex> lock(queue_lock_);
+      std::lock_guard<std::mutex> const lock(queue_lock_);
       queue_.push_back(Job());
       queue_.back().connection.swap(job.connection);
       queue_.back().xid = job.xid;
@@ -412,7 +412,7 @@ void RpcServer::ReadLoop(ConnectionPtr connection) {
   }
 
   shutdown(connection->fd, SHUT_RDWR);
-  std::lock_guard<std::mutex> lock(connections_lock_);
+  std::lock_guard<std::mutex> const lock(connections_lock_);
   active_readers_--;
   readers_cond_.notify_all();
 }
@@ -440,7 +440,7 @@ void RpcServer::WorkerLoop() {
       Log(kLogLevelWarn, "ignoring record that is not a call (xid %u)",
           job.xid);
     }
-    std::lock_guard<std::mutex> lock(job.connection->inflight_lock);
+    std::lock_guard<std::mutex> const lock(job.connection->inflight_lock);
     job.connection->inflight.erase(job.xid);
   }
 }
@@ -450,7 +450,7 @@ void RpcServer::Send(const ConnectionPtr &connection,
                      const std::string &reply) {
   const uint32_t marker = htonl(kLastFragment
                                 | static_cast<uint32_t>(reply.size()));
-  std::lock_guard<std::mutex> lock(connection->write_lock);
+  std::lock_guard<std::mutex> const lock(connection->write_lock);
   if (!WriteRecord(connection->fd, marker, reply)) {
     Log(kLogLevelWarn, "failed to send reply (%d), closing connection", errno);
     shutdown(connection->fd, SHUT_RDWR);

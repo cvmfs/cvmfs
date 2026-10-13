@@ -162,7 +162,7 @@ bool CallbackClient::Connect(unsigned timeout_ms) {
 
 bool CallbackClient::Call(uint32_t procedure, const std::string &args,
                           std::string *result, unsigned timeout_ms) {
-  std::lock_guard<std::mutex> guard(lock_);
+  std::lock_guard<std::mutex> const guard(lock_);
   if (!valid())
     return false;
 

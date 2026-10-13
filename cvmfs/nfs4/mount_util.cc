@@ -88,7 +88,7 @@ bool IsMounted(const std::string &mountpoint) {
 
 
 bool UnmountNfs(const std::string &mountpoint) {
-  ScopedRoot root;
+  ScopedRoot const root;
 #ifdef __APPLE__
   if (unmount(mountpoint.c_str(), MNT_FORCE) == 0)
     return true;
@@ -165,7 +165,7 @@ bool MountNfs(const std::string &mountpoint, uint16_t port) {
             mountpoint.c_str(), options.c_str());
   int retval;
   {
-    ScopedRoot root;
+    ScopedRoot const root;
     retval = RunCommand(args);
   }
   if (retval != 0) {

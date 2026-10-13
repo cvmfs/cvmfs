@@ -267,14 +267,14 @@ Nfs4Server::Nfs4Server(Backend *backend, const Options &options)
 
 Nfs4Server::~Nfs4Server() {
   {
-    std::lock_guard<std::mutex> lock(state_lock_);
+    std::lock_guard<std::mutex> const lock(state_lock_);
     monitor_stopping_ = true;
   }
   monitor_cond_.notify_all();
   if (monitor_.joinable())
     monitor_.join();
   {
-    std::lock_guard<std::mutex> lock(executor_lock_);
+    std::lock_guard<std::mutex> const lock(executor_lock_);
     executors_stopping_ = true;
   }
   executor_cond_.notify_all();
@@ -299,7 +299,7 @@ void Nfs4Server::ExecutorLoop() {
                    task->args.size());
     ProcessCompound(task->call, &args, &task->res);
     {
-      std::lock_guard<std::mutex> lock(executor_lock_);
+      std::lock_guard<std::mutex> const lock(executor_lock_);
       task->done = true;
     }
     task->done_cond.notify_one();
@@ -554,8 +554,8 @@ uint32_t Nfs4Server::Resolve(const FileHandle &fh, const Credentials &creds,
     return ErrnoToStatus(retval);
 
   if (fh.kind == FileHandle::kObject && num_frozen_attrs_ > 0) {
-    std::lock_guard<std::mutex> lock(state_lock_);
-    std::map<uint64_t, Attr>::const_iterator it = frozen_attrs_.find(fh.ino);
+    std::lock_guard<std::mutex> const lock(state_lock_);
+    std::map<uint64_t, Attr>::const_iterator const it = frozen_attrs_.find(fh.ino);
     if (it != frozen_attrs_.end())
       obj->attr = it->second;
   }
@@ -581,7 +581,7 @@ uint32_t Nfs4Server::Resolve(const FileHandle &fh, const Credentials &creds,
 
 uint32_t Nfs4Server::LookupChild(const Object &dir, const std::string &name,
                                  const Credentials &creds, Object *child) {
-  uint32_t status = CheckName(name);
+  uint32_t const status = CheckName(name);
   if (status != NFS4_OK)
     return status;
 
@@ -1014,7 +1014,7 @@ uint32_t Nfs4Server::OpRead(XdrReader *args, Compound *c, XdrWriter *body) {
   if (!S_ISREG(obj.attr.mode))
     return NFS4ERR_INVAL;
   {
-    std::lock_guard<std::mutex> lock(state_lock_);
+    std::lock_guard<std::mutex> const lock(state_lock_);
     status = CheckReadStateid(stateid, c->fh);
   }
   if (status != NFS4_OK)
@@ -1213,7 +1213,7 @@ std::string Nfs4Server::NewStateidOther() {
 uint32_t Nfs4Server::CheckClient(uint64_t clientid) {
   if (static_cast<uint32_t>(clientid >> 32) != boot_)
     return NFS4ERR_STALE_CLIENTID;
-  std::map<uint64_t, Client>::const_iterator it = clients_.find(clientid);
+  std::map<uint64_t, Client>::const_iterator const it = clients_.find(clientid);
   if (it == clients_.end() || !it->second.confirmed)
     return NFS4ERR_STALE_CLIENTID;
   return NFS4_OK;
@@ -1225,7 +1225,7 @@ Nfs4Server::SeqidCheck Nfs4Server::CheckSeqid(const OwnerKey &owner,
                                               bool create_owner,
                                               uint32_t *status,
                                               std::string *body) {
-  std::map<OwnerKey, OpenOwner>::iterator it = owners_.find(owner);
+  std::map<OwnerKey, OpenOwner>::iterator const it = owners_.find(owner);
   if (it == owners_.end()) {
     if (!create_owner) {
       *status = NFS4ERR_BAD_SEQID;
@@ -1289,7 +1289,7 @@ uint32_t Nfs4Server::CheckReadStateid(const Stateid &stateid,
   std::map<std::string, OpenState>::iterator it;
   const uint32_t status = FindOpenState(stateid, false, &it);
   if (status == NFS4ERR_BAD_STATEID) {
-    std::map<std::string, Delegation>::const_iterator d =
+    std::map<std::string, Delegation>::const_iterator const d =
         delegations_.find(stateid.other);
     if (d != delegations_.end() && d->second.fh == fh)
       return NFS4_OK;
@@ -1308,7 +1308,7 @@ void Nfs4Server::DropClient(uint64_t clientid) {
     explicit Refreeze(Nfs4Server *s) : server(s) { }
     ~Refreeze() { server->UpdateFrozenAttrs(); }
     Nfs4Server *server;
-  } refreeze(this);
+  } const refreeze(this);
   for (std::set<std::pair<uint64_t, uint64_t> >::iterator it =
            recalled_files_.begin();
        it != recalled_files_.end();) {
@@ -1356,7 +1356,7 @@ void Nfs4Server::UpdateFrozenAttrs() {
 
 void Nfs4Server::PutDelegation(uint64_t clientid, const FileHandle &fh,
                                const Attr &attr, XdrWriter *w) {
-  std::map<uint64_t, Client>::const_iterator client = clients_.find(clientid);
+  std::map<uint64_t, Client>::const_iterator const client = clients_.find(clientid);
   bool grant = options_.delegations && fh.kind == FileHandle::kObject
                && client != clients_.end() && client->second.callback_ok;
   for (std::map<std::string, Delegation>::const_iterator it =
@@ -1399,7 +1399,7 @@ uint32_t Nfs4Server::OpDelegreturn(XdrReader *args) {
   Stateid stateid;
   if (!GetStateid(args, &stateid))
     return NFS4ERR_BADXDR;
-  std::lock_guard<std::mutex> lock(state_lock_);
+  std::lock_guard<std::mutex> const lock(state_lock_);
   XdrReader r(reinterpret_cast<const unsigned char *>(stateid.other.data()),
               stateid.other.size());
   uint32_t boot;
@@ -1433,7 +1433,7 @@ void Nfs4Server::MonitorLoop() {
     probes.swap(pending_probes_);
     std::vector<std::pair<uint64_t, std::shared_ptr<CallbackClient> > > cbs;
     for (unsigned i = 0; i < probes.size(); ++i) {
-      std::map<uint64_t, Client>::iterator c = clients_.find(probes[i]);
+      std::map<uint64_t, Client>::iterator const c = clients_.find(probes[i]);
       if (c != clients_.end() && c->second.callback)
         cbs.push_back(std::make_pair(probes[i], c->second.callback));
     }
@@ -1444,7 +1444,7 @@ void Nfs4Server::MonitorLoop() {
     const uint64_t generation = backend_->Generation();
     lock.lock();
     for (unsigned i = 0; i < cbs.size(); ++i) {
-      std::map<uint64_t, Client>::iterator c = clients_.find(cbs[i].first);
+      std::map<uint64_t, Client>::iterator const c = clients_.find(cbs[i].first);
       if (c != clients_.end() && c->second.callback == cbs[i].second) {
         c->second.callback_ok = probe_ok[i];
         Log(kLogLevelDebug, "callback path of client %" PRIx64 " %s",
@@ -1474,7 +1474,7 @@ void Nfs4Server::MonitorLoop() {
         continue;
       }
       if (changed && d.recalled == 0) {
-        std::map<uint64_t, Client>::iterator c = clients_.find(d.clientid);
+        std::map<uint64_t, Client>::iterator const c = clients_.find(d.clientid);
         if (c == clients_.end() || !c->second.callback) {
           delegations_.erase(it++);
           continue;
@@ -1518,13 +1518,13 @@ void Nfs4Server::MonitorLoop() {
 
 
 size_t Nfs4Server::NumDelegations() {
-  std::lock_guard<std::mutex> lock(state_lock_);
+  std::lock_guard<std::mutex> const lock(state_lock_);
   return delegations_.size();
 }
 
 
 size_t Nfs4Server::NumOpenStates() {
-  std::lock_guard<std::mutex> lock(state_lock_);
+  std::lock_guard<std::mutex> const lock(state_lock_);
   return open_states_.size();
 }
 
@@ -1543,7 +1543,7 @@ uint32_t Nfs4Server::OpSetclientid(XdrReader *args, XdrWriter *body) {
     return NFS4ERR_BADXDR;
   const std::string verf(reinterpret_cast<char *>(verifier), kNfs4VerifierSize);
 
-  std::lock_guard<std::mutex> lock(state_lock_);
+  std::lock_guard<std::mutex> const lock(state_lock_);
   uint64_t clientid = 0;
   for (std::map<uint64_t, Client>::iterator it = clients_.begin();
        it != clients_.end();
@@ -1591,8 +1591,8 @@ uint32_t Nfs4Server::OpSetclientidConfirm(XdrReader *args) {
       || !args->GetFixedOpaque(confirm, kNfs4VerifierSize)) {
     return NFS4ERR_BADXDR;
   }
-  std::lock_guard<std::mutex> lock(state_lock_);
-  std::map<uint64_t, Client>::iterator it = clients_.find(clientid);
+  std::lock_guard<std::mutex> const lock(state_lock_);
+  std::map<uint64_t, Client>::iterator const it = clients_.find(clientid);
   if (it == clients_.end()
       || it->second.confirm
              != std::string(reinterpret_cast<char *>(confirm),
@@ -1628,7 +1628,7 @@ uint32_t Nfs4Server::OpRenew(XdrReader *args) {
   uint64_t clientid;
   if (!args->GetU64(&clientid))
     return NFS4ERR_BADXDR;
-  std::lock_guard<std::mutex> lock(state_lock_);
+  std::lock_guard<std::mutex> const lock(state_lock_);
   return CheckClient(clientid);
 }
 
@@ -1680,7 +1680,7 @@ uint32_t Nfs4Server::OpOpen(XdrReader *args, Compound *c, XdrWriter *body) {
   std::string replay_body;
   uint32_t status;
   {
-    std::lock_guard<std::mutex> lock(state_lock_);
+    std::lock_guard<std::mutex> const lock(state_lock_);
     status = CheckClient(clientid);
     if (status != NFS4_OK)
       return status;
@@ -1720,7 +1720,7 @@ uint32_t Nfs4Server::OpOpen(XdrReader *args, Compound *c, XdrWriter *body) {
   }
 
   XdrWriter result;
-  std::lock_guard<std::mutex> lock(state_lock_);
+  std::lock_guard<std::mutex> const lock(state_lock_);
   if (status == NFS4_OK) {
     // Repeated opens of a file by the same owner share one stateid
     std::map<std::string, OpenState>::iterator it = open_states_.begin();
@@ -1774,7 +1774,7 @@ uint32_t Nfs4Server::OpOpenConfirm(XdrReader *args, Compound *c,
   if (!c->has_fh)
     return NFS4ERR_NOFILEHANDLE;
 
-  std::lock_guard<std::mutex> lock(state_lock_);
+  std::lock_guard<std::mutex> const lock(state_lock_);
   std::map<std::string, OpenState>::iterator it;
   uint32_t status = FindOpenState(stateid, true, &it);
   if (status != NFS4_OK)
@@ -1813,7 +1813,7 @@ uint32_t Nfs4Server::OpOpenDowngrade(XdrReader *args, Compound *c,
   if (!c->has_fh)
     return NFS4ERR_NOFILEHANDLE;
 
-  std::lock_guard<std::mutex> lock(state_lock_);
+  std::lock_guard<std::mutex> const lock(state_lock_);
   std::map<std::string, OpenState>::iterator it;
   uint32_t status = FindOpenState(stateid, true, &it);
   if (status != NFS4_OK)
@@ -1857,7 +1857,7 @@ uint32_t Nfs4Server::OpClose(XdrReader *args, Compound *c, XdrWriter *body) {
 
   uint64_t forget_ino = 0;
   {
-    std::lock_guard<std::mutex> lock(state_lock_);
+    std::lock_guard<std::mutex> const lock(state_lock_);
     std::map<std::string, OpenState>::iterator it;
     uint32_t status = FindOpenState(stateid, true, &it);
     if (status == NFS4ERR_BAD_STATEID) {

@@ -37,7 +37,7 @@ void Usage(const char *progname) {
 
 }  // anonymous namespace
 
-int main(int argc, char **argv) {
+int main(int argc, char * const*argv) {
   std::string address = "127.0.0.1";
   unsigned port = 0;
   nfs4::RpcServer::Options rpc_options;

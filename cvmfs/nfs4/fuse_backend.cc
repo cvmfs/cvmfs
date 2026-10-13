@@ -91,7 +91,7 @@ FuseBackend::~FuseBackend() { ReleaseAll(); }
 
 uint64_t FuseBackend::Generation() {
   const time_t now = time(NULL);
-  std::lock_guard<std::mutex> guard(generation_lock_);
+  const std::lock_guard<std::mutex> guard(generation_lock_);
   if (now == generation_checked_)
     return generation_;
   generation_checked_ = now;
@@ -206,7 +206,7 @@ void FuseBackend::EvictLocked(
     std::vector<std::pair<uint64_t, struct fuse_file_info> > *to_close) {
   std::list<uint64_t>::iterator it = lru_.begin();
   while (open_files_.size() > max_open_files_ && it != lru_.end()) {
-    std::map<uint64_t, OpenFile>::iterator f = open_files_.find(*it);
+    const std::map<uint64_t, OpenFile>::iterator f = open_files_.find(*it);
     if (f->second.pins > 0) {
       ++it;
       continue;
@@ -232,8 +232,8 @@ int FuseBackend::AcquireFile(uint64_t ino, struct fuse_file_info *fi) {
   const uint64_t generation = Generation();
   std::vector<std::pair<uint64_t, struct fuse_file_info> > to_close;
   {
-    std::lock_guard<std::mutex> guard(lock_);
-    std::map<uint64_t, OpenFile>::iterator f = open_files_.find(ino);
+    const std::lock_guard<std::mutex> guard(lock_);
+    const std::map<uint64_t, OpenFile>::iterator f = open_files_.find(ino);
     if (f != open_files_.end()) {
       if (f->second.generation == generation || f->second.pins > 0) {
         // A file handle keeps serving the revision it was opened in; a
@@ -275,8 +275,8 @@ int FuseBackend::AcquireFile(uint64_t ino, struct fuse_file_info *fi) {
     return err;
 
   {
-    std::lock_guard<std::mutex> guard(lock_);
-    std::map<uint64_t, OpenFile>::iterator f = open_files_.find(ino);
+    const std::lock_guard<std::mutex> guard(lock_);
+    const std::map<uint64_t, OpenFile>::iterator f = open_files_.find(ino);
     if (f != open_files_.end()) {
       // Another thread opened the file concurrently; use its handle
       to_close.push_back(std::make_pair(ino, req.fi));
@@ -299,8 +299,8 @@ int FuseBackend::AcquireFile(uint64_t ino, struct fuse_file_info *fi) {
 
 
 void FuseBackend::ReleaseFile(uint64_t ino) {
-  std::lock_guard<std::mutex> guard(lock_);
-  std::map<uint64_t, OpenFile>::iterator f = open_files_.find(ino);
+  const std::lock_guard<std::mutex> guard(lock_);
+  const std::map<uint64_t, OpenFile>::iterator f = open_files_.find(ino);
   if (f != open_files_.end() && f->second.pins > 0)
     f->second.pins--;
 }
@@ -333,8 +333,8 @@ int FuseBackend::Read(uint64_t ino, uint64_t offset, uint32_t size,
 void FuseBackend::Forget(uint64_t ino) {
   std::vector<std::pair<uint64_t, struct fuse_file_info> > to_close;
   {
-    std::lock_guard<std::mutex> guard(lock_);
-    std::map<uint64_t, OpenFile>::iterator f = open_files_.find(ino);
+    const std::lock_guard<std::mutex> guard(lock_);
+    const std::map<uint64_t, OpenFile>::iterator f = open_files_.find(ino);
     if (f == open_files_.end() || f->second.pins > 0)
       return;
     to_close.push_back(std::make_pair(ino, f->second.fi));
@@ -349,11 +349,11 @@ void FuseBackend::ReleaseIdle(unsigned max_idle) {
   const time_t now = time(NULL);
   std::vector<std::pair<uint64_t, struct fuse_file_info> > to_close;
   {
-    std::lock_guard<std::mutex> guard(lock_);
+    const std::lock_guard<std::mutex> guard(lock_);
     // The LRU list is ordered by last use
     std::list<uint64_t>::iterator it = lru_.begin();
     while (it != lru_.end()) {
-      std::map<uint64_t, OpenFile>::iterator f = open_files_.find(*it);
+      const std::map<uint64_t, OpenFile>::iterator f = open_files_.find(*it);
       if (now - f->second.last_used < static_cast<time_t>(max_idle))
         break;
       if (f->second.pins > 0) {
@@ -372,7 +372,7 @@ void FuseBackend::ReleaseIdle(unsigned max_idle) {
 void FuseBackend::ReleaseAll() {
   std::vector<std::pair<uint64_t, struct fuse_file_info> > to_close;
   {
-    std::lock_guard<std::mutex> guard(lock_);
+    const std::lock_guard<std::mutex> guard(lock_);
     for (std::map<uint64_t, OpenFile>::iterator f = open_files_.begin();
          f != open_files_.end(); ++f) {
       to_close.push_back(std::make_pair(f->first, f->second.fi));
