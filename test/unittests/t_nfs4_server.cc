@@ -10,6 +10,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <atomic>
 #include <cstring>
 #include <map>
 #include <string>
@@ -1127,4 +1128,150 @@ TEST_F(T_Nfs4Server, DelaySlowCompound) {
                res2.size());
   r2.GetU32(&status);
   EXPECT_EQ(static_cast<uint32_t>(NFS4_OK), status);
+}
+
+
+namespace {
+
+/** Client side of the callback program: acknowledges CB_NULL and CB_RECALL */
+class FakeCallback : public RpcProgram {
+ public:
+  explicit FakeCallback(uint32_t program) : program_(program), recalls_(0) { }
+  virtual uint32_t program() const { return program_; }
+  virtual uint32_t min_version() const { return 1; }
+  virtual uint32_t max_version() const { return 1; }
+  virtual AcceptStat Dispatch(const RpcCall &call, XdrReader *args,
+                              XdrWriter *res) {
+    if (call.procedure == 0)
+      return kAcceptSuccess;
+    std::string tag;
+    uint32_t minor, ident, num_ops, op;
+    args->GetString(&tag);
+    args->GetU32(&minor);
+    args->GetU32(&ident);
+    args->GetU32(&num_ops);
+    args->GetU32(&op);
+    if (op == 4)  // CB_RECALL
+      recalls_++;
+    res->PutU32(NFS4_OK);
+    res->PutString(tag);
+    res->PutU32(1);
+    res->PutU32(op);
+    res->PutU32(NFS4_OK);
+    return kAcceptSuccess;
+  }
+  unsigned recalls() const { return recalls_; }
+
+ private:
+  uint32_t program_;
+  std::atomic<unsigned> recalls_;
+};
+
+}  // anonymous namespace
+
+
+TEST_F(T_Nfs4Server, Delegations) {
+  Nfs4Server::Options options;
+  options.delegations = true;
+  delete server_;
+  server_ = new Nfs4Server(&backend_, options);
+
+  const uint32_t kCbProgram = 0x40000001;
+  FakeCallback callback(kCbProgram);
+  RpcServer callback_server(&callback, RpcServer::Options());
+  ASSERT_TRUE(callback_server.Listen("127.0.0.1", 0));
+  callback_server.Start();
+  const uint16_t port = callback_server.port();
+  char uaddr[64];
+  snprintf(uaddr, sizeof(uaddr), "127.0.0.1.%u.%u", port >> 8, port & 0xff);
+
+  Compound c;
+  XdrWriter *w = c.Op(OP_SETCLIENTID);
+  w->PutFixedOpaque("verifier", kNfs4VerifierSize);
+  w->PutOpaque(std::string("client-deleg"));
+  w->PutU32(kCbProgram);
+  w->PutString("tcp");
+  w->PutString(uaddr);
+  w->PutU32(7);
+  Reply r;
+  Run(c, &r);
+  ASSERT_EQ(static_cast<uint32_t>(NFS4_OK), r.NextOp(OP_SETCLIENTID));
+  uint64_t clientid;
+  unsigned char confirm[kNfs4VerifierSize];
+  r.reader.GetU64(&clientid);
+  r.reader.GetFixedOpaque(confirm, kNfs4VerifierSize);
+  Compound c2;
+  w = c2.Op(OP_SETCLIENTID_CONFIRM);
+  w->PutU64(clientid);
+  w->PutFixedOpaque(confirm, kNfs4VerifierSize);
+  Run(c2, &r);
+  ASSERT_EQ(static_cast<uint32_t>(NFS4_OK), r.status);
+
+  // The callback path is probed in the background; until then, opens get no
+  // delegation
+  uint32_t delegation_type = 0;
+  uint32_t deleg_seqid = 0;
+  std::string deleg_other;
+  for (uint32_t seqid = 1; seqid < 30 && delegation_type == 0; ++seqid) {
+    Compound o;
+    o.PutFh(FhOf("dir"));
+    w = o.Op(OP_OPEN);
+    w->PutU32(seqid);
+    w->PutU32(OPEN4_SHARE_ACCESS_READ);
+    w->PutU32(OPEN4_SHARE_DENY_NONE);
+    w->PutU64(clientid);
+    w->PutOpaque(std::string("owner"));
+    w->PutU32(OPEN4_NOCREATE);
+    w->PutU32(CLAIM_NULL);
+    w->PutString("file");
+    Run(o, &r);
+    r.NextOp(OP_PUTFH);
+    ASSERT_EQ(static_cast<uint32_t>(NFS4_OK), r.NextOp(OP_OPEN));
+    uint32_t u32;
+    uint64_t u64;
+    bool b;
+    unsigned char other[kStateidOtherSize];
+    r.reader.GetU32(&u32);  // stateid
+    r.reader.GetFixedOpaque(other, kStateidOtherSize);
+    r.reader.GetBool(&b);  // change_info
+    r.reader.GetU64(&u64);
+    r.reader.GetU64(&u64);
+    r.reader.GetU32(&u32);  // rflags
+    r.reader.GetU32(&u32);  // attrset bitmap length
+    r.reader.GetU32(&delegation_type);
+    if (delegation_type == OPEN_DELEGATE_READ) {
+      r.reader.GetU32(&deleg_seqid);
+      r.reader.GetFixedOpaque(other, kStateidOtherSize);
+      deleg_other.assign(reinterpret_cast<char *>(other), kStateidOtherSize);
+    } else {
+      usleep(200 * 1000);
+    }
+  }
+  ASSERT_EQ(OPEN_DELEGATE_READ, delegation_type);
+  EXPECT_EQ(1u, server_->NumDelegations());
+
+  Compound rd;
+  rd.PutFh(FhOf("dir/file"));
+  rd.Read(deleg_seqid, deleg_other, 0, 5);
+  Run(rd, &r);
+  EXPECT_EQ(static_cast<uint32_t>(NFS4_OK), r.status);
+
+  // A new generation of the exported tree recalls the delegation
+  backend_.generation_++;
+  for (unsigned i = 0; i < 50 && callback.recalls() == 0; ++i)
+    usleep(100 * 1000);
+  EXPECT_EQ(1u, callback.recalls());
+
+  Compound ret;
+  ret.PutFh(FhOf("dir/file"));
+  w = ret.Op(OP_DELEGRETURN);
+  w->PutU32(deleg_seqid);
+  w->PutFixedOpaque(deleg_other.data(), kStateidOtherSize);
+  Run(ret, &r);
+  EXPECT_EQ(static_cast<uint32_t>(NFS4_OK), r.status);
+  EXPECT_EQ(0u, server_->NumDelegations());
+  Run(ret, &r);
+  EXPECT_EQ(static_cast<uint32_t>(NFS4ERR_BAD_STATEID), r.status);
+
+  callback_server.Stop();
 }

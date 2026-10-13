@@ -5,6 +5,7 @@
 #include "nfs4/nfs4_server.h"
 
 #include <errno.h>
+#include <inttypes.h>
 #include <sys/stat.h>
 
 #include <chrono>
@@ -258,10 +259,19 @@ Nfs4Server::Nfs4Server(Backend *backend, const Options &options)
     , boot_(static_cast<uint32_t>(time(NULL)))
     , next_clientid_(1)
     , next_stateid_(1)
+    , last_generation_(0)
+    , monitor_stopping_(false)
     , executors_stopping_(false) { }
 
 
 Nfs4Server::~Nfs4Server() {
+  {
+    std::lock_guard<std::mutex> lock(state_lock_);
+    monitor_stopping_ = true;
+  }
+  monitor_cond_.notify_all();
+  if (monitor_.joinable())
+    monitor_.join();
   {
     std::lock_guard<std::mutex> lock(executor_lock_);
     executors_stopping_ = true;
@@ -493,8 +503,7 @@ uint32_t Nfs4Server::ProcessOp(uint32_t op, XdrReader *args, Compound *c,
     case OP_RELEASE_LOCKOWNER:
       return NFS4_OK;
     case OP_DELEGRETURN:
-      // No delegations are ever granted
-      return NFS4ERR_BAD_STATEID;
+      return OpDelegreturn(args);
     case OP_DELEGPURGE:
     case OP_LOCK:
     case OP_LOCKT:
@@ -1272,6 +1281,12 @@ uint32_t Nfs4Server::CheckReadStateid(const Stateid &stateid,
   }
   std::map<std::string, OpenState>::iterator it;
   const uint32_t status = FindOpenState(stateid, false, &it);
+  if (status == NFS4ERR_BAD_STATEID) {
+    std::map<std::string, Delegation>::const_iterator d =
+        delegations_.find(stateid.other);
+    if (d != delegations_.end() && d->second.fh == fh)
+      return NFS4_OK;
+  }
   if (status != NFS4_OK)
     return status;
   if (!(it->second.fh == fh))
@@ -1282,6 +1297,13 @@ uint32_t Nfs4Server::CheckReadStateid(const Stateid &stateid,
 
 void Nfs4Server::DropClient(uint64_t clientid) {
   clients_.erase(clientid);
+  for (std::map<std::string, Delegation>::iterator it = delegations_.begin();
+       it != delegations_.end();) {
+    if (it->second.clientid == clientid)
+      delegations_.erase(it++);
+    else
+      ++it;
+  }
   for (std::map<std::string, OpenState>::iterator it = open_states_.begin();
        it != open_states_.end();) {
     if (it->second.owner.first == clientid)
@@ -1296,6 +1318,167 @@ void Nfs4Server::DropClient(uint64_t clientid) {
     else
       ++it;
   }
+}
+
+
+void Nfs4Server::PutDelegation(uint64_t clientid, const FileHandle &fh,
+                               XdrWriter *w) {
+  std::map<uint64_t, Client>::const_iterator client = clients_.find(clientid);
+  bool grant = options_.delegations && fh.kind == FileHandle::kObject
+               && client != clients_.end() && client->second.callback_ok;
+  for (std::map<std::string, Delegation>::const_iterator it =
+           delegations_.begin();
+       grant && it != delegations_.end();
+       ++it) {
+    // One delegation per client and file; none while a recall is going on
+    if ((it->second.clientid == clientid && it->second.fh == fh)
+        || it->second.recalled != 0) {
+      grant = false;
+    }
+  }
+  if (!grant || delegations_.size() >= options_.max_stateids) {
+    w->PutU32(OPEN_DELEGATE_NONE);
+    return;
+  }
+
+  Stateid stateid;
+  stateid.other = NewStateidOther();
+  Delegation &delegation = delegations_[stateid.other];
+  delegation.clientid = clientid;
+  delegation.fh = fh;
+  stateid.seqid = delegation.seqid;
+
+  w->PutU32(OPEN_DELEGATE_READ);
+  PutStateid(stateid, w);
+  w->PutBool(false);  // recall
+  // permissions: none granted in advance, the client still asks ACCESS
+  w->PutU32(0);  // ACE4_ACCESS_ALLOWED_ACE_TYPE
+  w->PutU32(0);  // flags
+  w->PutU32(0);  // access mask
+  w->PutString("EVERYONE@");
+}
+
+
+uint32_t Nfs4Server::OpDelegreturn(XdrReader *args) {
+  Stateid stateid;
+  if (!GetStateid(args, &stateid))
+    return NFS4ERR_BADXDR;
+  std::lock_guard<std::mutex> lock(state_lock_);
+  XdrReader r(reinterpret_cast<const unsigned char *>(stateid.other.data()),
+              stateid.other.size());
+  uint32_t boot;
+  r.GetU32(&boot);
+  if (boot != boot_)
+    return NFS4ERR_STALE_STATEID;
+  if (delegations_.erase(stateid.other) == 0)
+    return NFS4ERR_BAD_STATEID;
+  return NFS4_OK;
+}
+
+
+void Nfs4Server::StartMonitor() {
+  if (!monitor_.joinable())
+    monitor_ = std::thread(&Nfs4Server::MonitorLoop, this);
+}
+
+
+void Nfs4Server::MonitorLoop() {
+  const unsigned kCallbackTimeoutMs = 5000;
+  std::unique_lock<std::mutex> lock(state_lock_);
+  while (!monitor_stopping_) {
+    monitor_cond_.wait_for(lock, std::chrono::seconds(1));
+    if (monitor_stopping_)
+      break;
+
+    // Probe new callback paths
+    std::vector<uint64_t> probes;
+    probes.swap(pending_probes_);
+    std::vector<std::pair<uint64_t, std::shared_ptr<CallbackClient> > > cbs;
+    for (unsigned i = 0; i < probes.size(); ++i) {
+      std::map<uint64_t, Client>::iterator c = clients_.find(probes[i]);
+      if (c != clients_.end() && c->second.callback)
+        cbs.push_back(std::make_pair(probes[i], c->second.callback));
+    }
+    lock.unlock();
+    std::vector<bool> probe_ok;
+    for (unsigned i = 0; i < cbs.size(); ++i)
+      probe_ok.push_back(cbs[i].second->Null(kCallbackTimeoutMs));
+    const uint64_t generation = backend_->Generation();
+    lock.lock();
+    for (unsigned i = 0; i < cbs.size(); ++i) {
+      std::map<uint64_t, Client>::iterator c = clients_.find(cbs[i].first);
+      if (c != clients_.end() && c->second.callback == cbs[i].second) {
+        c->second.callback_ok = probe_ok[i];
+        Log(kLogLevelDebug, "callback path of client %" PRIx64 " %s",
+            cbs[i].first, probe_ok[i] ? "works" : "is down");
+      }
+    }
+
+    // Recall everything when the exported tree changed; revoke what was not
+    // returned within a lease period
+    const time_t now = time(NULL);
+    const bool changed = (last_generation_ != 0)
+                         && (generation != last_generation_);
+    last_generation_ = generation;
+    struct Recall {
+      std::string other;
+      uint32_t seqid;
+      std::string fh;
+      std::shared_ptr<CallbackClient> callback;
+    };
+    std::vector<Recall> recalls;
+    for (std::map<std::string, Delegation>::iterator it = delegations_.begin();
+         it != delegations_.end();) {
+      Delegation &d = it->second;
+      if (d.recalled != 0 && now - d.recalled > options_.lease_time) {
+        Log(kLogLevelWarn, "revoking unreturned delegation");
+        delegations_.erase(it++);
+        continue;
+      }
+      if (changed && d.recalled == 0) {
+        std::map<uint64_t, Client>::iterator c = clients_.find(d.clientid);
+        if (c == clients_.end() || !c->second.callback) {
+          delegations_.erase(it++);
+          continue;
+        }
+        d.recalled = now;
+        Recall recall;
+        recall.other = it->first;
+        recall.seqid = d.seqid;
+        recall.fh = d.fh.Encode();
+        recall.callback = c->second.callback;
+        recalls.push_back(recall);
+      }
+      ++it;
+    }
+    if (recalls.empty())
+      continue;
+
+    lock.unlock();
+    Log(kLogLevelInfo, "recalling %zu delegations", recalls.size());
+    std::vector<std::string> failed;
+    const time_t recall_start = time(NULL);
+    for (unsigned i = 0; i < recalls.size(); ++i) {
+      const int result = recalls[i].callback->Recall(
+          recalls[i].seqid, recalls[i].other, recalls[i].fh,
+          kCallbackTimeoutMs);
+      if (result != NFS4_OK) {
+        Log(kLogLevelWarn, "delegation recall failed (%d)", result);
+        failed.push_back(recalls[i].other);
+      }
+    }
+    Log(kLogLevelInfo, "sent %zu recalls in %lds, %zu failed", recalls.size(),
+        static_cast<long>(time(NULL) - recall_start), failed.size());  // NOLINT
+    lock.lock();
+    for (unsigned i = 0; i < failed.size(); ++i)
+      delegations_.erase(failed[i]);
+  }
+}
+
+
+size_t Nfs4Server::NumDelegations() {
+  std::lock_guard<std::mutex> lock(state_lock_);
+  return delegations_.size();
 }
 
 
@@ -1349,6 +1532,11 @@ uint32_t Nfs4Server::OpSetclientid(XdrReader *args, XdrWriter *body) {
   confirm.PutU64((static_cast<uint64_t>(next_clientid_++) << 32)
                  ^ static_cast<uint64_t>(time(NULL)));
   clients_[clientid].confirm = confirm.buffer();
+  if (options_.delegations) {
+    clients_[clientid].callback.reset(
+        new CallbackClient(cb_program, cb_ident, netid, addr));
+    clients_[clientid].callback_ok = false;
+  }
   body->PutU64(clientid);
   body->PutFixedOpaque(confirm.buffer().data(), kNfs4VerifierSize);
   return NFS4_OK;
@@ -1369,6 +1557,12 @@ uint32_t Nfs4Server::OpSetclientidConfirm(XdrReader *args) {
              != std::string(reinterpret_cast<char *>(confirm),
                             kNfs4VerifierSize)) {
     return NFS4ERR_STALE_CLIENTID;
+  }
+  if (options_.delegations && it->second.callback
+      && it->second.callback->valid()) {
+    pending_probes_.push_back(clientid);
+    StartMonitor();
+    monitor_cond_.notify_all();
   }
   if (it->second.confirmed)
     return NFS4_OK;
@@ -1425,8 +1619,15 @@ uint32_t Nfs4Server::OpOpen(XdrReader *args, Compound *c, XdrWriter *body) {
       args->GetU32(&delegation_type);
       break;
     }
+    case CLAIM_DELEGATE_CUR: {
+      // The client converts local opens before returning a delegation
+      Stateid delegation;
+      GetStateid(args, &delegation);
+      args->GetString(&name, kNfs4OpaqueLimit);
+      break;
+    }
     default:
-      // Delegations are never granted, so they can't be claimed either
+      // State of a previous server instance is not kept
       return NFS4ERR_RECLAIM_BAD;
   }
   if (!args->ok())
@@ -1454,7 +1655,7 @@ uint32_t Nfs4Server::OpOpen(XdrReader *args, Compound *c, XdrWriter *body) {
 
   Object target;
   Object dir;
-  if (claim_type == CLAIM_NULL) {
+  if (claim_type == CLAIM_NULL || claim_type == CLAIM_DELEGATE_CUR) {
     status = Resolve(c->fh, c->call->creds, &dir);
     if (status == NFS4_OK)
       status = LookupChild(dir, name, c->call->creds, &target);
@@ -1510,7 +1711,10 @@ uint32_t Nfs4Server::OpOpen(XdrReader *args, Compound *c, XdrWriter *body) {
     // No OPEN4_RESULT_CONFIRM: a confirm round trip buys nothing here
     result.PutU32(OPEN4_RESULT_LOCKTYPE_POSIX);
     result.PutU32(0);  // attrset
-    result.PutU32(OPEN_DELEGATE_NONE);
+    if (claim_type == CLAIM_NULL)
+      PutDelegation(clientid, target.fh, &result);
+    else
+      result.PutU32(OPEN_DELEGATE_NONE);
     c->fh = target.fh;
   }
   RecordSeqid(owner_key, seqid, OP_OPEN, status, result.buffer());

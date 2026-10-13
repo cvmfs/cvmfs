@@ -80,6 +80,7 @@ int main(int argc, char **argv) {
     return 1;
   }
   backend->set_read_delay_ms(read_delay_ms);
+  server_options.delegations = (getenv("CVMFS_NFS_DELEGATIONS") != NULL);
   nfs4::Nfs4Server server(backend, server_options);
   nfs4::RpcServer rpc(&server, rpc_options);
   if (!rpc.Listen(address, static_cast<uint16_t>(port))) {

@@ -251,6 +251,7 @@ const uint32_t OPEN4_RESULT_CONFIRM = 0x02;
 const uint32_t OPEN4_RESULT_LOCKTYPE_POSIX = 0x04;
 
 const uint32_t OPEN_DELEGATE_NONE = 0;
+const uint32_t OPEN_DELEGATE_READ = 1;
 
 }  // namespace nfs4
 

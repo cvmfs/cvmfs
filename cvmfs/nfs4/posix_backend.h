@@ -35,7 +35,8 @@ class PosixBackend : public Backend {
 
   virtual uint64_t RootInode() { return root_ino_; }
   virtual uint64_t FsId() { return fsid_; }
-  virtual uint64_t Generation() { return 1; }
+  /** Modification time of the export root; touching it recalls delegations */
+  virtual uint64_t Generation();
 
   virtual int GetAttr(uint64_t ino, Attr *attr);
   virtual int Lookup(uint64_t parent, const std::string &name, Attr *attr);

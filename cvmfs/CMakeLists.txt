@@ -301,6 +301,7 @@ if (BUILD_CVMFS)
   #
   if (BUILD_NFS_FRONTEND)
     set (CVMFS_NFSFUSE_SOURCES
+         nfs4/callback.cc
          nfs4/filehandle.cc
          nfs4/fuse_backend.cc
          nfs4/fuse_shim.cc
@@ -1193,6 +1194,7 @@ endif (BUILD_RECEIVER)
 
 if (BUILD_NFS4_EXPORT)
   add_executable (cvmfs_nfs4_export
+                  nfs4/callback.cc
                   nfs4/export_main.cc
                   nfs4/filehandle.cc
                   nfs4/logging.cc

@@ -628,6 +628,7 @@ int fuse_session_mount(struct fuse_session *se, const char *mountpoint) {
   // Mounts are hard, so slow requests simply wait; a dead cvmfs2 is covered
   // by the guardian.  Answering NFS4ERR_DELAY instead costs a thread handoff
   // per request and is only useful for soft mounts.
+  server_options.delegations = (getenv("CVMFS_NFS_DELEGATIONS") != NULL);
   const char *delay_ms = getenv("CVMFS_NFS_DELAY_MS");
   if (delay_ms)
     server_options.delay_after_ms = static_cast<uint32_t>(atoi(delay_ms));

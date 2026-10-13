@@ -61,6 +61,14 @@ PosixBackend *PosixBackend::Create(const std::string &root) {
 }
 
 
+uint64_t PosixBackend::Generation() {
+  Attr attr;
+  if (StatPath(root_, &attr) != 0)
+    return 1;
+  return (static_cast<uint64_t>(attr.mtime.sec) << 30) ^ attr.mtime.nsec;
+}
+
+
 int PosixBackend::StatPath(const std::string &path, Attr *attr) {
   struct stat info;
   if (lstat(path.c_str(), &info) != 0)

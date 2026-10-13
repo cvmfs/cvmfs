@@ -33,7 +33,7 @@ trap cleanup EXIT
 start_server() {
   local port=$1
   : > "$WORK/port"
-  CVMFS_NFS4_DEBUG=$WORK/trace.log \
+  CVMFS_NFS4_DEBUG=$WORK/trace.log CVMFS_NFS_DELEGATIONS=1 \
     "$EXPORT_BIN" -p "$port" "$SRC" > "$WORK/port" 2> "$WORK/server.err" &
   SERVER_PID=$!
   for _ in $(seq 50); do
@@ -138,6 +138,17 @@ for mode in read mmap; do
   r2=$(reads)
   echo "cache check ($mode): first pass $((r1 - r0)) READs, second pass $((r2 - r1)) READs"
 done
+
+echo "--- delegations (informational)"
+sleep 2  # the callback path is probed in the background
+cat "$MNT/tree/CMakeLists.txt" > /dev/null
+grep -E "callback path" "$WORK/trace.log" | tail -1
+touch "$SRC"
+for _ in $(seq 10); do
+  grep -q " op 8 -> 0" "$WORK/trace.log" && break
+  sleep 1
+done
+echo "recalls: $(grep -c 'recalling' "$WORK/trace.log"), DELEGRETURN ok: $(grep -c ' op 8 -> 0' "$WORK/trace.log"), revoked: $(grep -c 'revoking' "$WORK/trace.log")"
 
 echo "--- symlink"
 [ "$(readlink "$MNT/link")" = "tree/CMakeLists.txt" ] || fail "readlink"

@@ -25,6 +25,7 @@
 #include <vector>
 
 #include "nfs4/backend.h"
+#include "nfs4/callback.h"
 #include "nfs4/filehandle.h"
 #include "nfs4/nfs4_const.h"
 #include "nfs4/rpc.h"
@@ -41,7 +42,8 @@ class Nfs4Server : public RpcProgram {
         , max_compound_ops(128)
         , max_stateids(65536)
         , delay_after_ms(0)
-        , executor_threads(32) { }
+        , executor_threads(32)
+        , delegations(false) { }
     uint32_t lease_time;
     uint32_t max_read;
     uint32_t max_compound_ops;
@@ -55,6 +57,12 @@ class Nfs4Server : public RpcProgram {
     uint32_t delay_after_ms;
     /** Threads running COMPOUNDs when delay_after_ms is set */
     unsigned executor_threads;
+    /**
+     * Grant read delegations to clients with a working callback path, so
+     * that they can cache without revalidating.  All delegations are
+     * recalled when the backend's generation changes.
+     */
+    bool delegations;
   };
 
   Nfs4Server(Backend *backend, const Options &options);
@@ -68,6 +76,8 @@ class Nfs4Server : public RpcProgram {
 
   /** Number of open stateids, exposed for tests */
   size_t NumOpenStates();
+  /** Number of outstanding delegations, exposed for tests */
+  size_t NumDelegations();
 
  private:
   struct Compound {
@@ -93,11 +103,23 @@ class Nfs4Server : public RpcProgram {
   };
 
   struct Client {
-    Client() : confirmed(false) { }
+    Client() : confirmed(false), callback_ok(false) { }
     std::string name;
     std::string verifier;
     std::string confirm;
     bool confirmed;
+    std::shared_ptr<CallbackClient> callback;
+    /** Set once CB_NULL succeeded; only then delegations are granted */
+    bool callback_ok;
+  };
+
+  struct Delegation {
+    Delegation() : clientid(0), seqid(1), recalled(0) { }
+    uint64_t clientid;
+    FileHandle fh;
+    uint32_t seqid;
+    /** When the recall was sent, 0 if not recalled */
+    time_t recalled;
   };
 
   typedef std::pair<uint64_t, std::string> OwnerKey;
@@ -138,6 +160,12 @@ class Nfs4Server : public RpcProgram {
   typedef std::shared_ptr<Task> TaskPtr;
 
   void RunWithDeadline(const RpcCall &call, XdrReader *args, XdrWriter *res);
+  /** Probes callback paths and recalls delegations, see Options::delegations */
+  void MonitorLoop();
+  void StartMonitor();
+  uint32_t OpDelegreturn(XdrReader *args);
+  /** Called with state_lock_ held; writes the open_delegation4 result */
+  void PutDelegation(uint64_t clientid, const FileHandle &fh, XdrWriter *w);
   void ExecutorLoop();
 
   uint32_t ProcessCompound(const RpcCall &call, XdrReader *args,
@@ -205,6 +233,12 @@ class Nfs4Server : public RpcProgram {
   std::map<uint64_t, Client> clients_;
   std::map<OwnerKey, OpenOwner> owners_;
   std::map<std::string, OpenState> open_states_;
+  std::map<std::string, Delegation> delegations_;
+  std::vector<uint64_t> pending_probes_;
+  uint64_t last_generation_;
+  std::thread monitor_;
+  bool monitor_stopping_;
+  std::condition_variable monitor_cond_;
 
   // Executor threads start lazily, so that a server constructed before the
   // process daemonizes (forks) does not lose them

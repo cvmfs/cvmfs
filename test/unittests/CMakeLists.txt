@@ -478,6 +478,7 @@ set(CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/manifest_fetch.cc
   ${CVMFS_SOURCE_DIR}/monitor.cc
   ${CVMFS_SOURCE_DIR}/mountpoint.cc
+  ${CVMFS_SOURCE_DIR}/nfs4/callback.cc
   ${CVMFS_SOURCE_DIR}/nfs4/filehandle.cc
   ${CVMFS_SOURCE_DIR}/nfs4/logging.cc
   ${CVMFS_SOURCE_DIR}/nfs4/nfs4_server.cc

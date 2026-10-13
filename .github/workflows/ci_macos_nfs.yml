@@ -85,7 +85,7 @@ jobs:
       - name: Mount sft.cern.ch over NFS and run ROOT
         run: |
           sudo launchctl limit maxfiles 65536 65536
-          sudo bash ci/nfs4/macos_lcg_test.sh build/cvmfs ${{ matrix.lcg_platform }}
+          sudo CVMFS_NFS_DELEGATIONS=1 bash ci/nfs4/macos_lcg_test.sh build/cvmfs ${{ matrix.lcg_platform }}
 
       - name: Collect logs
         if: ${{ always() }}

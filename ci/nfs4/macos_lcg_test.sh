@@ -85,6 +85,7 @@ cleanup
 
 echo "::group::mount"
 export CVMFS_LIBRARY_PATH=$BUILD CVMFS_NFS4_DEBUG=$TRACE
+export CVMFS_NFS_DELEGATIONS
 t0=$(date +%s)
 limit 300 "$BUILD/cvmfs2" -o "nfs,config=$CONF" "$REPO" "$MNT" \
   || fail "cvmfs2 -o nfs exited with $?"
@@ -164,5 +165,6 @@ done
 pgrep -f __nfs_guardian__ && fail "guardian still running"
 echo "::endgroup::"
 
+echo "--- delegations: $(grep -c 'callback path.*works' "$TRACE") working callback paths, $(grep -c ' op 18 -> 0' "$TRACE") OPENs"
 echo "--- delayed requests during the run: $(grep -c delayed "$TRACE")"
 echo "PASS"
