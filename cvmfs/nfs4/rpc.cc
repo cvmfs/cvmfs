@@ -10,6 +10,7 @@
 #include <netinet/tcp.h>
 #include <poll.h>
 #include <sys/socket.h>
+#include <sys/uio.h>
 #include <unistd.h>
 
 #include <cstring>
@@ -72,20 +73,40 @@ bool ReadFull(int fd, void *buf, size_t len) {
   return true;
 }
 
-bool WriteFull(int fd, const char *p, size_t len) {
+/** Record marker and record in one system call where possible */
+bool WriteRecord(int fd, uint32_t marker, const std::string &record) {
+  struct iovec iov[2];
+  iov[0].iov_base = &marker;
+  iov[0].iov_len = sizeof(marker);
+  iov[1].iov_base = const_cast<char *>(record.data());
+  iov[1].iov_len = record.size();
   int flags = 0;
 #ifdef MSG_NOSIGNAL
   flags = MSG_NOSIGNAL;
 #endif
-  while (len > 0) {
-    const ssize_t n = send(fd, p, len, flags);
+  int iovcnt = 2;
+  struct iovec *v = iov;
+  while (iovcnt > 0) {
+    struct msghdr msg;
+    memset(&msg, 0, sizeof(msg));
+    msg.msg_iov = v;
+    msg.msg_iovlen = iovcnt;
+    const ssize_t n = sendmsg(fd, &msg, flags);
     if (n < 0) {
       if (errno == EINTR)
         continue;
       return false;
     }
-    p += n;
-    len -= n;
+    size_t done = n;
+    while (iovcnt > 0 && done >= v->iov_len) {
+      done -= v->iov_len;
+      v++;
+      iovcnt--;
+    }
+    if (iovcnt > 0) {
+      v->iov_base = static_cast<char *>(v->iov_base) + done;
+      v->iov_len -= done;
+    }
   }
   return true;
 }
@@ -178,11 +199,14 @@ bool HandleRpcRecord(RpcProgram *program, const std::string &record,
   call.args = r.cursor();
   call.args_size = r.remaining();
   XdrReader args(call.args, call.args_size);
-  XdrWriter results;
-  const AcceptStat stat = program->Dispatch(call, &args, &results);
-  PutAccepted(call.xid, stat, &w);
-  if (stat == kAcceptSuccess)
-    w.PutRaw(results.buffer().data(), results.size());
+  // Results go right behind the header, the accept status is patched in
+  PutAccepted(call.xid, kAcceptSuccess, &w);
+  const size_t stat_offset = w.size() - 4;
+  const AcceptStat stat = program->Dispatch(call, &args, &w);
+  if (stat != kAcceptSuccess) {
+    w.Truncate(stat_offset + 4);
+    w.PatchU32(stat_offset, stat);
+  }
   reply->swap(*w.mutable_buffer());
   return true;
 }
@@ -427,9 +451,7 @@ void RpcServer::Send(const ConnectionPtr &connection,
   const uint32_t marker = htonl(kLastFragment
                                 | static_cast<uint32_t>(reply.size()));
   std::lock_guard<std::mutex> lock(connection->write_lock);
-  if (!WriteFull(connection->fd, reinterpret_cast<const char *>(&marker),
-                 sizeof(marker))
-      || !WriteFull(connection->fd, reply.data(), reply.size())) {
+  if (!WriteRecord(connection->fd, marker, reply)) {
     Log(kLogLevelWarn, "failed to send reply (%d), closing connection", errno);
     shutdown(connection->fd, SHUT_RDWR);
   }

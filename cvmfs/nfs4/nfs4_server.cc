@@ -398,18 +398,21 @@ uint32_t Nfs4Server::ProcessCompound(const RpcCall &call, XdrReader *args,
         status = NFS4ERR_BADXDR;
         break;
       }
-      XdrWriter body;
-      status = ProcessOp(op, args, &c, &body);
+      // The op's result is written in place; on failure it is cut off again
+      const size_t op_offset = res->ReserveU32();
+      const size_t status_offset_op = res->ReserveU32();
+      const size_t body_offset = res->size();
+      status = ProcessOp(op, args, &c, res);
       if (status == NFS4_OK && !args->ok())
         status = NFS4ERR_BADXDR;
       Log(kLogLevelDebug, "xid %u op %u -> %u", call.xid, op, status);
       const bool illegal = (status == NFS4ERR_OP_ILLEGAL);
-      res->PutU32(illegal ? static_cast<uint32_t>(OP_ILLEGAL) : op);
-      res->PutU32(status);
-      if (status == NFS4_OK) {
-        res->PutRaw(body.buffer().data(), body.size());
-      } else if (op == OP_SETATTR) {
-        res->PutU32(0);  // attrsset is returned on failure, too
+      res->PatchU32(op_offset, illegal ? static_cast<uint32_t>(OP_ILLEGAL) : op);
+      res->PatchU32(status_offset_op, status);
+      if (status != NFS4_OK) {
+        res->Truncate(body_offset);
+        if (op == OP_SETATTR)
+          res->PutU32(0);  // attrsset is returned on failure, too
       }
       num_results++;
       if (status != NFS4_OK)
