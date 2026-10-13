@@ -73,7 +73,7 @@ start_server 0
 echo "server listening on port $PORT"
 
 if [ $PLATFORM = macos ]; then
-  MOUNT_OPTS="vers=4,tcp,port=$PORT,rdonly,soft,intr,timeo=100,retrans=2,nobrowse,namedattr"
+  MOUNT_OPTS="vers=4,tcp,port=$PORT,rdonly,intr,deadtimeout=60,timeo=100,retrans=2,nobrowse,namedattr"
   limit 60 sudo mount_nfs -o "$MOUNT_OPTS" 127.0.0.1:/ "$MNT" || {
     cat "$WORK/server.err"; echo "mount failed"; exit 1; }
   nfsstat -m "$MNT" || true
