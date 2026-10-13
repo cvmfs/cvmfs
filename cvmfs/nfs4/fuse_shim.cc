@@ -240,14 +240,15 @@ void RaiseFileDescriptorLimit() {
   struct rlimit limit;
   if (getrlimit(RLIMIT_NOFILE, &limit) != 0)
     return;
-  const rlim_t target = kWanted;
 #ifdef __APPLE__
   int max_per_proc = 0;
   size_t len = sizeof(max_per_proc);
-  if (sysctlbyname("kern.maxfilesperproc", &max_per_proc, &len, NULL, 0) == 0
-      && max_per_proc > 0 && static_cast<rlim_t>(max_per_proc) < target) {
-    target = max_per_proc;
-  }
+  const bool capped =
+      sysctlbyname("kern.maxfilesperproc", &max_per_proc, &len, NULL, 0) == 0
+      && max_per_proc > 0 && static_cast<rlim_t>(max_per_proc) < kWanted;
+  const rlim_t target = capped ? static_cast<rlim_t>(max_per_proc) : kWanted;
+#else
+  const rlim_t target = kWanted;
 #endif
   if (limit.rlim_cur >= target)
     return;
