@@ -291,7 +291,7 @@ void Nfs4Server::ExecutorLoop() {
       std::lock_guard<std::mutex> lock(executor_lock_);
       task->done = true;
     }
-    executor_cond_.notify_all();
+    task->done_cond.notify_one();
   }
 }
 
@@ -311,8 +311,8 @@ void Nfs4Server::RunWithDeadline(const RpcCall &call, XdrReader *args,
       executors_.push_back(std::thread(&Nfs4Server::ExecutorLoop, this));
   }
   tasks_.push_back(task);
-  executor_cond_.notify_all();
-  const bool done = executor_cond_.wait_for(
+  executor_cond_.notify_one();
+  const bool done = task->done_cond.wait_for(
       lock, std::chrono::milliseconds(options_.delay_after_ms),
       [&task] { return task->done; });
   if (done) {

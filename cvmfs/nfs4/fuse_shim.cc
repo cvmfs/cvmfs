@@ -148,7 +148,7 @@ std::string DefaultMountOptions(uint16_t port) {
            port);
 #else
   snprintf(buf, sizeof(buf),
-           "vers=4.0,port=%u,ro,soft,timeo=600,retrans=2,local_lock=all",
+           "vers=4.0,port=%u,ro,hard,timeo=600,retrans=2,local_lock=all",
            port);
 #endif
   return buf;
@@ -625,12 +625,12 @@ int fuse_session_mount(struct fuse_session *se, const char *mountpoint) {
       &se->ops, (static_cast<uint64_t>(nfs4::HashName(se->mountpoint)) << 32)
                     | 1);
   nfs4::Nfs4Server::Options server_options;
-#ifndef __APPLE__
-  // Well below the timeout of the soft mount (timeo=600, i.e. 60s).  macOS
-  // mounts are hard and simply wait; how the macOS client handles
-  // NFS4ERR_DELAY is untested.
-  server_options.delay_after_ms = 10000;
-#endif
+  // Mounts are hard, so slow requests simply wait; a dead cvmfs2 is covered
+  // by the guardian.  Answering NFS4ERR_DELAY instead costs a thread handoff
+  // per request and is only useful for soft mounts.
+  const char *delay_ms = getenv("CVMFS_NFS_DELAY_MS");
+  if (delay_ms)
+    server_options.delay_after_ms = static_cast<uint32_t>(atoi(delay_ms));
   se->server = new nfs4::Nfs4Server(se->backend, server_options);
   nfs4::RpcServer::Options rpc_options;
   rpc_options.workers = se->workers;

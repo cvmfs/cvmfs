@@ -132,6 +132,8 @@ class Nfs4Server : public RpcProgram {
     std::string args;
     XdrWriter res;
     bool done;
+    /** Signals done; guarded by executor_lock_ */
+    std::condition_variable done_cond;
   };
   typedef std::shared_ptr<Task> TaskPtr;
 
@@ -207,6 +209,7 @@ class Nfs4Server : public RpcProgram {
   // Executor threads start lazily, so that a server constructed before the
   // process daemonizes (forks) does not lose them
   std::mutex executor_lock_;
+  /** Wakes executor threads; waiters use Task::done_cond */
   std::condition_variable executor_cond_;
   std::deque<TaskPtr> tasks_;
   std::vector<std::thread> executors_;
