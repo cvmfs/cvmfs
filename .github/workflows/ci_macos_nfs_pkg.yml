@@ -1,0 +1,108 @@
+name: CI_MacOS_NFS_Pkg
+
+# Builds a macOS development package with the NFS frontend and publishes it as
+# the `nfs-dev` prerelease, so other workflows can install it without building:
+#
+#   gh release download nfs-dev --repo vvolkl/cvmfs --pattern 'cvmfs-*.pkg'
+#   sudo installer -pkg cvmfs-*.pkg -target /
+#   sudo mkdir -p /cvmfs/sft.cern.ch
+#   sudo mount -t cvmfs sft.cern.ch /cvmfs/sft.cern.ch
+
+on:
+  push:
+    branches: [ 'macos/nfs-native' ]
+    paths:
+      - 'cvmfs/**'
+      - 'mount/**'
+      - 'ci/nfs4/**'
+      - 'packaging/mac/nfs/**'
+      - '.github/workflows/ci_macos_nfs_pkg.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 60
+    outputs:
+      pkg: ${{ steps.pkg.outputs.pkg }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install fuse3 headers
+        run: |
+          brew install meson ninja pkg-config
+          git clone --depth 1 --branch fuse-t \
+            https://github.com/macos-fuse-t/libfuse3.git /tmp/libfuse3
+          cd /tmp/libfuse3
+          meson setup build --prefix=/usr/local
+          ninja -C build
+          sudo ninja -C build install
+
+      - name: Build package
+        id: pkg
+        run: |
+          ./ci/nfs4/pkg.sh . build "$(date -u +%Y%m%d).$(git rev-parse --short HEAD)"
+          pkg=$(ls build/pkg_result/cvmfs-*.pkg)
+          pkgutil --payload-files "$pkg"
+          echo "pkg=$(basename $pkg)" >> $GITHUB_OUTPUT
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cvmfs-nfs-pkg
+          path: build/pkg_result/cvmfs-*.pkg
+
+  test:
+    needs: build
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: cvmfs-nfs-pkg
+
+      - name: Install
+        run: |
+          sudo installer -pkg cvmfs-*.pkg -target /
+          cat /tmp/cvmfs_postinstall
+          ls -la /cvmfs/
+          printf 'CVMFS_HTTP_PROXY=DIRECT\nCVMFS_USE_CDN=yes\n' \
+            | sudo tee /etc/cvmfs/default.local
+
+      - name: Mount and read
+        run: |
+          sudo launchctl limit maxfiles 65536 65536
+          sudo mkdir -p /cvmfs/sft.cern.ch
+          sudo mount -t cvmfs sft.cern.ch /cvmfs/sft.cern.ch
+          mount | grep /cvmfs/sft.cern.ch
+          ls /cvmfs/sft.cern.ch/lcg/views | head
+          sudo cvmfs_talk -i sft.cern.ch revision
+          sudo umount /cvmfs/sft.cern.ch
+          ! mount | grep /cvmfs/sft.cern.ch
+
+  publish:
+    needs: [ build, test ]
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: cvmfs-nfs-pkg
+
+      - name: Update nfs-dev prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          notes="Development build of the macOS NFS frontend from ${GITHUB_SHA} (${GITHUB_REF_NAME}). Not for production."
+          if gh release view nfs-dev > /dev/null 2>&1; then
+            for asset in $(gh release view nfs-dev --json assets -q '.assets[].name'); do
+              gh release delete-asset nfs-dev "$asset" --yes
+            done
+            gh release edit nfs-dev --notes "$notes" --target "$GITHUB_SHA"
+          else
+            gh release create nfs-dev --prerelease --title "cvmfs macOS NFS dev build" \
+              --notes "$notes" --target "$GITHUB_SHA"
+          fi
+          gh release upload nfs-dev cvmfs-*.pkg

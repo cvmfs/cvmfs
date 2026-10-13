@@ -1,0 +1,23 @@
+#!/bin/bash
+
+# Configures cvmfs and creates /cvmfs.  / is read-only on macOS 11+, so /cvmfs
+# is a synthetic firmlink to /Users/Shared/cvmfs.
+
+set -e
+exec >> /tmp/cvmfs_postinstall 2>&1
+echo "cvmfs NFS postinstall, $(date)"
+
+export PATH="$PATH:/usr/local/bin"
+/usr/local/bin/cvmfs_config setup
+
+if [ ! -e /cvmfs ]; then
+  if ! grep -q '^cvmfs[[:space:]]' /etc/synthetic.conf 2>/dev/null; then
+    printf 'cvmfs\tUsers/Shared/cvmfs\n' >> /etc/synthetic.conf
+    chown root:wheel /etc/synthetic.conf
+    chmod 0644 /etc/synthetic.conf
+  fi
+  mkdir -p /Users/Shared/cvmfs
+  # Returns non-zero also on success
+  /System/Library/Filesystems/apfs.fs/Contents/Resources/apfs.util -t || true
+fi
+[ -d /cvmfs ] || echo "/cvmfs not available before reboot"
