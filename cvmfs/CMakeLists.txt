@@ -304,7 +304,9 @@ if (BUILD_CVMFS)
          nfs4/filehandle.cc
          nfs4/fuse_backend.cc
          nfs4/fuse_shim.cc
+         nfs4/guardian.cc
          nfs4/logging.cc
+         nfs4/mount_util.cc
          nfs4/nfs4_server.cc
          nfs4/rpc.cc
          nfs4/xdr.cc
@@ -1199,6 +1201,8 @@ if (BUILD_NFS4_EXPORT)
                   nfs4/rpc.cc
                   nfs4/xdr.cc
   )
+  # Built without the rest of the cvmfs targets, which set the standard
+  set_target_properties (cvmfs_nfs4_export PROPERTIES CXX_STANDARD 11)
   target_link_libraries (cvmfs_nfs4_export pthread)
   install (TARGETS cvmfs_nfs4_export RUNTIME DESTINATION bin)
 endif (BUILD_NFS4_EXPORT)

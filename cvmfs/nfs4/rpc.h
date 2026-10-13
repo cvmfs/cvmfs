@@ -89,6 +89,8 @@ class RpcServer {
 
   /** Binds and listens; port 0 picks an ephemeral port. */
   bool Listen(const std::string &address, uint16_t port);
+  /** Serves on an already listening socket, e.g. inherited from a parent */
+  bool Adopt(int listen_fd);
   uint16_t port() const { return port_; }
   int listen_fd() const { return listen_fd_; }
   /** Only effective before Start() */

@@ -239,6 +239,19 @@ bool RpcServer::Listen(const std::string &address, uint16_t port) {
 }
 
 
+bool RpcServer::Adopt(int listen_fd) {
+  struct sockaddr_in addr;
+  socklen_t len = sizeof(addr);
+  if (getsockname(listen_fd, reinterpret_cast<struct sockaddr *>(&addr), &len)
+      != 0) {
+    return false;
+  }
+  listen_fd_ = listen_fd;
+  port_ = ntohs(addr.sin_port);
+  return true;
+}
+
+
 void RpcServer::Start() {
   stopping_ = false;
   for (unsigned i = 0; i < options_.workers; ++i)

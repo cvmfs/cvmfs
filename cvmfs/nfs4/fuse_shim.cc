@@ -30,11 +30,14 @@
 
 #include "nfs4/filehandle.h"
 #include "nfs4/fuse_backend.h"
+#include "nfs4/guardian.h"
 #include "nfs4/logging.h"
+#include "nfs4/mount_util.h"
 #include "nfs4/nfs4_server.h"
 #include "nfs4/rpc.h"
 
 #ifdef __APPLE__
+#include <mach-o/dyld.h>
 #include <sys/sysctl.h>
 #include <sys/ucred.h>
 #else
@@ -42,6 +45,10 @@
 #endif
 
 extern char **environ;
+
+using nfs4::IsMounted;
+using nfs4::RunCommand;
+using nfs4::UnmountNfs;
 
 fuse_req::fuse_req() : reply(kNone), err(0), xattr_size(0) {
   memset(&entry, 0, sizeof(entry));
@@ -58,7 +65,7 @@ struct fuse_session {
   fuse_session()
       : userdata(NULL), exited(false), init_called(false),
         destroy_called(false), mounted(false), workers(16), backend(NULL),
-        server(NULL), rpc(NULL) {
+        server(NULL), rpc(NULL), guardian_fd(-1) {
     memset(&ops, 0, sizeof(ops));
   }
 
@@ -73,6 +80,8 @@ struct fuse_session {
   nfs4::FuseBackend *backend;
   nfs4::Nfs4Server *server;
   nfs4::RpcServer *rpc;
+  /** Write end of the pipe whose EOF tells the guardian that we are gone */
+  int guardian_fd;
 };
 
 #if FUSE_USE_VERSION >= FUSE_MAKE_VERSION(3, 12)
@@ -127,12 +136,14 @@ void ExitHandler(int /* signal */) {
 std::string DefaultMountOptions(uint16_t port) {
   char buf[256];
 #ifdef __APPLE__
-  // soft/timeo: a dead cvmfs2 must not hang every process accessing the mount.
-  // macOS rejects rdonly together with soft for NFSv4, and the lock options
-  // (locallocks, nolocks) altogether; the server refuses writes anyway.
+  // Not soft: the macOS client times out soft-mount READs after well under a
+  // second under load, regardless of timeo.  A dead cvmfs2 is covered by the
+  // guardian (see guardian.h), and deadtimeout lets the kernel give up on a
+  // server that stays silent anyway.  rdonly is incompatible with soft but
+  // not with hard mounts; the lock options are rejected for NFSv4.
   snprintf(buf, sizeof(buf),
-           "vers=4,tcp,port=%u,soft,intr,timeo=600,retrans=2,nobrowse,"
-           "namedattr",
+           "vers=4,tcp,port=%u,rdonly,intr,deadtimeout=120,timeo=600,"
+           "retrans=2,nobrowse,namedattr",
            port);
 #else
   snprintf(buf, sizeof(buf),
@@ -140,49 +151,6 @@ std::string DefaultMountOptions(uint16_t port) {
            port);
 #endif
   return buf;
-}
-
-int RunCommand(const std::vector<std::string> &args) {
-  std::vector<char *> argv;
-  for (unsigned i = 0; i < args.size(); ++i)
-    argv.push_back(const_cast<char *>(args[i].c_str()));
-  argv.push_back(NULL);
-  pid_t pid;
-  const int retval = posix_spawn(&pid, argv[0], NULL, NULL, &argv[0], environ);
-  if (retval != 0)
-    return -retval;
-  int status;
-  while (waitpid(pid, &status, 0) < 0) {
-    if (errno != EINTR)
-      return -errno;
-  }
-  return (WIFEXITED(status)) ? WEXITSTATUS(status) : -1;
-}
-
-bool IsMounted(const std::string &mountpoint) {
-#ifdef __APPLE__
-  struct statfs *mounts;
-  const int n = getmntinfo(&mounts, MNT_NOWAIT);
-  for (int i = 0; i < n; ++i) {
-    if (mountpoint == mounts[i].f_mntonname
-        && strcmp(mounts[i].f_fstypename, "nfs") == 0) {
-      return true;
-    }
-  }
-  return false;
-#else
-  FILE *f = setmntent("/proc/self/mounts", "r");
-  if (f == NULL)
-    return false;
-  bool found = false;
-  struct mntent *m;
-  while ((m = getmntent(f)) != NULL) {
-    if (mountpoint == m->mnt_dir && strncmp(m->mnt_type, "nfs", 3) == 0)
-      found = true;
-  }
-  endmntent(f);
-  return found;
-#endif
 }
 
 bool MountNfs(struct fuse_session *se) {
@@ -213,19 +181,71 @@ bool MountNfs(struct fuse_session *se) {
   return true;
 }
 
-bool UnmountNfs(const std::string &mountpoint) {
+bool ExecutablePath(std::string *path) {
+  char buf[PATH_MAX];
 #ifdef __APPLE__
-  if (unmount(mountpoint.c_str(), MNT_FORCE) == 0)
-    return true;
+  uint32_t size = sizeof(buf);
+  if (_NSGetExecutablePath(buf, &size) != 0)
+    return false;
 #else
-  if (umount2(mountpoint.c_str(), MNT_FORCE) == 0)
-    return true;
+  const ssize_t len = readlink("/proc/self/exe", buf, sizeof(buf) - 1);
+  if (len <= 0)
+    return false;
+  buf[len] = '\0';
 #endif
-  std::vector<std::string> args;
-  args.push_back("/sbin/umount");
-  args.push_back("-f");
-  args.push_back(mountpoint);
-  return RunCommand(args) == 0;
+  *path = buf;
+  return true;
+}
+
+/**
+ * Starts `cvmfs2 __nfs_guardian__`, see nfs4::RunGuardian().  It execs right
+ * after fork, because this process may already run threads.
+ */
+void SpawnGuardian(struct fuse_session *se) {
+  std::string self;
+  if (!ExecutablePath(&self)) {
+    nfs4::Log(nfs4::kLogLevelWarn, "cannot start NFS guardian: no exe path");
+    return;
+  }
+  int control[2];
+  if (pipe(control) != 0)
+    return;
+  const int listen_fd = se->rpc->listen_fd();
+  char listen_str[16], control_str[16];
+  snprintf(listen_str, sizeof(listen_str), "%d", listen_fd);
+  snprintf(control_str, sizeof(control_str), "%d", control[0]);
+  const char *argv[] = {self.c_str(), "__nfs_guardian__", listen_str,
+                        control_str, se->mountpoint.c_str(), NULL};
+  struct rlimit limit;
+  getrlimit(RLIMIT_NOFILE, &limit);
+  const int max_fd = (limit.rlim_cur > 65536) ? 65536
+                                               : static_cast<int>(limit.rlim_cur);
+
+  const pid_t pid = fork();
+  if (pid == 0) {
+    // Only async-signal-safe calls until exec
+    const int null_fd = open("/dev/null", O_RDWR);
+    if (null_fd >= 0) {
+      dup2(null_fd, 0);
+      dup2(null_fd, 1);
+      dup2(null_fd, 2);
+    }
+    for (int fd = 3; fd < max_fd; ++fd) {
+      if (fd != listen_fd && fd != control[0])
+        close(fd);
+    }
+    setsid();
+    execv(argv[0], const_cast<char *const *>(argv));
+    _exit(127);
+  }
+  close(control[0]);
+  if (pid < 0) {
+    close(control[1]);
+    return;
+  }
+  // Children forked later (e.g. mount_nfs) must not keep the pipe open
+  fcntl(control[1], F_SETFD, FD_CLOEXEC);
+  se->guardian_fd = control[1];
 }
 
 /**
@@ -323,6 +343,11 @@ int SessionLoop(struct fuse_session *se, unsigned max_threads) {
 
 
 void cvmfs_nfsfuse_set_ready_fd(int fd) { g_ready_fd = fd; }
+
+int cvmfs_nfsfuse_guardian_main(int listen_fd, int control_fd,
+                                const char *mountpoint) {
+  return nfs4::RunGuardian(listen_fd, control_fd, mountpoint);
+}
 
 
 //------------------------------------------------------------------------------
@@ -610,6 +635,8 @@ int fuse_session_mount(struct fuse_session *se, const char *mountpoint) {
                        port ? static_cast<uint16_t>(atoi(port)) : 0)) {
     return -1;
   }
+  if (getenv("CVMFS_NFS_NO_GUARDIAN") == NULL)
+    SpawnGuardian(se);
 
   // The NFS mount happens in the session loop: the loader may daemonize
   // (fork) before, and cvmfs must not serve requests before it is fully

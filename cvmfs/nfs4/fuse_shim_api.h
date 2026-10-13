@@ -15,6 +15,13 @@ extern "C" {
  * place.
  */
 void cvmfs_nfsfuse_set_ready_fd(int fd);
+
+/**
+ * Entry point of the guardian process (cvmfs2 __nfs_guardian__ ...), see
+ * nfs4::RunGuardian().
+ */
+int cvmfs_nfsfuse_guardian_main(int listen_fd, int control_fd,
+                                const char *mountpoint);
 }
 
 #endif  // CVMFS_NFS4_FUSE_SHIM_API_H_
