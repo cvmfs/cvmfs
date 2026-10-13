@@ -140,10 +140,11 @@ std::string DefaultMountOptions(uint16_t port) {
   // second under load, regardless of timeo.  A dead cvmfs2 is covered by the
   // guardian (see guardian.h), and deadtimeout lets the kernel give up on a
   // server that stays silent anyway.  rdonly is incompatible with soft but
-  // not with hard mounts; the lock options are rejected for NFSv4.
+  // not with hard mounts; the lock options are rejected for NFSv4.  Without
+  // rsize, the client reads in 32 KiB requests.
   snprintf(buf, sizeof(buf),
            "vers=4,tcp,port=%u,rdonly,intr,deadtimeout=120,timeo=600,"
-           "retrans=2,nobrowse,namedattr",
+           "retrans=2,rsize=1048576,readahead=32,nobrowse,namedattr",
            port);
 #else
   snprintf(buf, sizeof(buf),

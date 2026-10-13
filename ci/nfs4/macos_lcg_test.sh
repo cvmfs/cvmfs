@@ -68,7 +68,8 @@ rm -rf "$WORK"
 mkdir -p "$CACHE"
 cat > "$CONF" <<EOF
 CVMFS_HTTP_PROXY=${CVMFS_HTTP_PROXY:-DIRECT}
-CVMFS_SERVER_URL='http://cvmfs-stratum-one.cern.ch/cvmfs/@fqrn@;http://cvmfs-s1bnl.opensciencegrid.org/cvmfs/@fqrn@;http://cvmfs-s1fnal.opensciencegrid.org/cvmfs/@fqrn@'
+CVMFS_SERVER_URL='http://s1cern-cvmfs.openhtc.io/cvmfs/@fqrn@;http://s1ral-cvmfs.openhtc.io/cvmfs/@fqrn@;http://s1bnl-cvmfs.openhtc.io/cvmfs/@fqrn@;http://s1fnal-cvmfs.openhtc.io/cvmfs/@fqrn@'
+CVMFS_USE_GEOAPI=yes
 CVMFS_KEYS_DIR=$SRC_ROOT/mount/keys
 CVMFS_CACHE_BASE=$CACHE
 CVMFS_RELOAD_SOCKETS=$CACHE
