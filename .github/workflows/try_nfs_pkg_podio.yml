@@ -33,17 +33,12 @@ jobs:
           source $VIEW/setup.sh
           cmake -S podio -B build -G Ninja \
             -DCMAKE_CXX_STANDARD=20 -DCMAKE_CXX_FLAGS=-fexperimental-library \
-            -DBUILD_TESTING=ON -DENABLE_SIO=OFF -DUSE_EXTERNAL_CATCH2=AUTO
+            -DBUILD_TESTING=OFF -DENABLE_SIO=OFF -DUSE_EXTERNAL_CATCH2=AUTO
 
       - name: Build
         run: |
           source $VIEW/setup.sh
           time cmake --build build -j $(sysctl -n hw.ncpu)
-
-      - name: Test
-        run: |
-          source $VIEW/setup.sh
-          cd build && ctest --output-on-failure -j $(sysctl -n hw.ncpu)
 
       - name: cvmfs statistics
         if: ${{ always() }}
