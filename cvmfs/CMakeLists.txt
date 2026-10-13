@@ -1108,6 +1108,23 @@ endif (BUILD_RECEIVER)
 
 
 
+if (BUILD_NFS4_EXPORT)
+  add_executable (cvmfs_nfs4_export
+                  nfs4/export_main.cc
+                  nfs4/filehandle.cc
+                  nfs4/logging.cc
+                  nfs4/nfs4_server.cc
+                  nfs4/posix_backend.cc
+                  nfs4/rpc.cc
+                  nfs4/xdr.cc
+  )
+  target_link_libraries (cvmfs_nfs4_export pthread)
+  install (TARGETS cvmfs_nfs4_export RUNTIME DESTINATION bin)
+endif (BUILD_NFS4_EXPORT)
+
+
+
+
 if (BUILD_SHRINKWRAP)
   if (NOT BUILD_LIBCVMFS)
     message (FATAL_ERROR
