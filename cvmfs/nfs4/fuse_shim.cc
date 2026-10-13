@@ -625,8 +625,12 @@ int fuse_session_mount(struct fuse_session *se, const char *mountpoint) {
       &se->ops, (static_cast<uint64_t>(nfs4::HashName(se->mountpoint)) << 32)
                     | 1);
   nfs4::Nfs4Server::Options server_options;
-  // Well below the client timeout (timeo=600, i.e. 60s)
+#ifndef __APPLE__
+  // Well below the timeout of the soft mount (timeo=600, i.e. 60s).  The
+  // macOS client returns EIO for NFS4ERR_DELAY on READ; its mounts are hard
+  // and simply wait.
   server_options.delay_after_ms = 10000;
+#endif
   se->server = new nfs4::Nfs4Server(se->backend, server_options);
   nfs4::RpcServer::Options rpc_options;
   rpc_options.workers = se->workers;
