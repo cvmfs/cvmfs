@@ -136,6 +136,18 @@ int main(int argc, char **argv) {
     error_messages += std::string(dlerror()) + "\n";
   }
 
+  // Installations with only the NFS frontend still run helper commands
+  // (e.g. __wpad__ from cvmfs_config) without -o nfs
+  if (!library_handle && !nfs) {
+    const std::vector<std::string> nfs_paths =
+        LibraryPaths(platform_libname("cvmfs_nfs_stub"));
+    for (const std::string &path : nfs_paths) {
+      library_handle = dlopen(path.c_str(), RTLD_NOW | RTLD_LOCAL);
+      if (nullptr != library_handle)
+        break;
+    }
+  }
+
   if (!library_handle) {
     LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
              "Error: failed to load cvmfs library, tried: '%s'\n%s",

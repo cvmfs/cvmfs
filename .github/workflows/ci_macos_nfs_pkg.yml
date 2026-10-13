@@ -3,8 +3,8 @@ name: CI_MacOS_NFS_Pkg
 # Builds a macOS development package with the NFS frontend and publishes it as
 # the `nfs-dev` prerelease, so other workflows can install it without building:
 #
-#   gh release download nfs-dev --repo vvolkl/cvmfs --pattern 'cvmfs-*.pkg'
-#   sudo installer -pkg cvmfs-*.pkg -target /
+#   curl -fLO https://github.com/vvolkl/cvmfs/releases/download/nfs-dev/cvmfs-nfs-dev.pkg
+#   sudo installer -pkg cvmfs-nfs-dev.pkg -target /
 #   sudo mkdir -p /cvmfs/sft.cern.ch
 #   sudo mount -t cvmfs sft.cern.ch /cvmfs/sft.cern.ch
 
@@ -101,9 +101,11 @@ jobs:
             for asset in $(gh release view nfs-dev --json assets -q '.assets[].name'); do
               gh release delete-asset nfs-dev "$asset" --yes
             done
-            gh release edit nfs-dev --notes "$notes" --target "$GITHUB_SHA"
+            gh release edit nfs-dev --notes "$notes"
           else
             gh release create nfs-dev --prerelease --title "cvmfs macOS NFS dev build" \
-              --notes "$notes" --target "$GITHUB_SHA"
+              --notes "$notes"
           fi
+          # Stable name for a fixed download URL
+          cp cvmfs-*.pkg cvmfs-nfs-dev.pkg
           gh release upload nfs-dev cvmfs-*.pkg
