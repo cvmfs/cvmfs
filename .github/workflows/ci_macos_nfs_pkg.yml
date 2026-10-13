@@ -62,7 +62,8 @@ jobs:
 
       - name: Install
         run: |
-          sudo installer -pkg cvmfs-*.pkg -target /
+          sudo installer -pkg cvmfs-*.pkg -target / \
+            || { cat /tmp/cvmfs_postinstall; exit 1; }
           cat /tmp/cvmfs_postinstall
           ls -la /cvmfs/
           printf 'CVMFS_HTTP_PROXY=DIRECT\nCVMFS_USE_CDN=yes\n' \
