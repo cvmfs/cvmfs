@@ -155,6 +155,10 @@ for _ in $(seq 60); do
 done
 mount | grep -q "$REPO" && fail "guardian did not unmount after kill -9"
 echo "unmounted $(( $(date +%s) - t0 ))s after kill -9"
+for _ in $(seq 10); do
+  pgrep -f __nfs_guardian__ > /dev/null || break
+  sleep 1
+done
 pgrep -f __nfs_guardian__ && fail "guardian still running"
 echo "::endgroup::"
 
