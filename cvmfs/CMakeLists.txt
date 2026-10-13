@@ -296,6 +296,87 @@ if (BUILD_CVMFS)
 
 
   #
+  # NFS frontend: the same loader and client, linked against
+  # libcvmfs_nfsfuse instead of libfuse3.  Selected with `cvmfs2 -o nfs`.
+  #
+  if (BUILD_NFS_FRONTEND)
+    set (CVMFS_NFSFUSE_SOURCES
+         nfs4/filehandle.cc
+         nfs4/fuse_backend.cc
+         nfs4/fuse_shim.cc
+         nfs4/logging.cc
+         nfs4/nfs4_server.cc
+         nfs4/rpc.cc
+         nfs4/xdr.cc
+    )
+    set (CVMFS_NFSFUSE_CFLAGS "-D_FILE_OFFSET_BITS=64")
+    # Not linked against macFUSE, so use the plain libfuse ABI
+    set (CVMFS_NFS_FRONTEND_CFLAGS "-DCVMFS_NFS_FRONTEND")
+    if (MACOSX)
+      set (CVMFS_NFS_FRONTEND_CFLAGS
+           "${CVMFS_NFS_FRONTEND_CFLAGS} -DFUSE_DARWIN_ENABLE_EXTENSIONS=0")
+      set (CVMFS_NFSFUSE_CFLAGS
+           "${CVMFS_NFSFUSE_CFLAGS} -DFUSE_DARWIN_ENABLE_EXTENSIONS=0")
+    endif ()
+    if (CVMFS_ENABLE_FUSE3_LOOP_CONFIG)
+      set (CVMFS_NFSFUSE_CFLAGS
+           "${CVMFS_NFSFUSE_CFLAGS} -DCVMFS_ENABLE_FUSE3_LOOP_CONFIG")
+    endif ()
+    add_library (cvmfs_nfsfuse SHARED ${CVMFS_NFSFUSE_SOURCES})
+    # Exports the libfuse API
+    set_property (SOURCE nfs4/fuse_shim.cc
+                  PROPERTY COMPILE_FLAGS -fvisibility=default)
+    set_target_properties (cvmfs_nfsfuse PROPERTIES
+      VERSION ${CernVM-FS_VERSION_STRING}
+      COMPILE_FLAGS "${CVMFS_NFSFUSE_CFLAGS}"
+    )
+    target_include_directories (cvmfs_nfsfuse PRIVATE ${FUSE3_INCLUDE_DIR})
+    target_link_libraries (cvmfs_nfsfuse pthread)
+
+    add_library (cvmfs_nfs_stub SHARED ${CVMFS_STUB_SOURCES})
+    set_target_properties (cvmfs_nfs_stub PROPERTIES
+      VERSION ${CernVM-FS_VERSION_STRING}
+      COMPILE_FLAGS "${CVMFS_STUB3_CFLAGS} ${CVMFS_NFS_FRONTEND_CFLAGS}"
+      LINK_FLAGS "${CVMFS_STUB_LDFLAGS}"
+    )
+    target_link_libraries (cvmfs_nfs_stub
+                           cvmfs_nfsfuse ${CVMFS_STUB_LINK_LIBRARIES}
+    )
+
+    add_library (cvmfs_nfs SHARED ${CVMFS_FUSE_SOURCES})
+    add_library (cvmfs_nfs_debug SHARED ${CVMFS_FUSE_SOURCES})
+    add_dependencies (cvmfs_nfs cache.pb.generated)
+    add_dependencies (cvmfs_nfs_debug cache.pb.generated)
+    set_target_properties (cvmfs_nfs PROPERTIES
+      VERSION ${CernVM-FS_VERSION_STRING}
+      COMPILE_FLAGS "${CVMFS_FUSE_CFLAGS} ${CVMFS_NFS_FRONTEND_CFLAGS}"
+      LINK_FLAGS "${CVMFS_FUSE_LDFLAGS}"
+    )
+    set_target_properties (cvmfs_nfs_debug PROPERTIES
+      VERSION ${CernVM-FS_VERSION_STRING}
+      COMPILE_FLAGS
+        "${CVMFS_FUSE_CFLAGS} ${CVMFS_NFS_FRONTEND_CFLAGS} -O0 -Wno-cpp -DDEBUGMSG"
+      LINK_FLAGS "${CVMFS_FUSE_LDFLAGS}"
+    )
+    target_link_libraries (cvmfs_nfs
+                           cvmfs_crypto
+                           cvmfs_util
+                           cvmfs_nfsfuse ${CVMFS_FUSE_LINK_LIBRARIES}
+    )
+    target_link_libraries (cvmfs_nfs_debug
+                           cvmfs_crypto_debug
+                           cvmfs_util_debug
+                           cvmfs_nfsfuse ${CVMFS_FUSE_LINK_LIBRARIES}
+    )
+    install (
+      TARGETS      cvmfs_nfsfuse cvmfs_nfs_stub cvmfs_nfs cvmfs_nfs_debug
+      LIBRARY
+      DESTINATION  ${CMAKE_INSTALL_LIBDIR}
+    )
+  endif (BUILD_NFS_FRONTEND)
+
+
+  #
   # Installation: BUILD_CVMFS
   #
   install (
