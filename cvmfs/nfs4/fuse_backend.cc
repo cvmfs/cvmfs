@@ -10,6 +10,7 @@
 #include <sys/resource.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <cstdlib>
 #include <cstring>
 
@@ -22,6 +23,10 @@ namespace {
 
 // Directory listings are fetched from cvmfs in slices of this size
 const size_t kReaddirChunk = 256 * 1024;
+
+// FUSE never reads more than this at once, and cvmfs_read relies on it: it
+// allocates the buffer on the stack (512 KiB for macOS threads)
+const uint32_t kMaxFuseRead = 128 * 1024;
 
 Timespec ToTimespec(time_t sec, long nsec) {  // NOLINT(runtime/int)
   Timespec t;
@@ -307,14 +312,21 @@ int FuseBackend::Read(uint64_t ino, uint64_t offset, uint32_t size,
   int err = AcquireFile(ino, &fi);
   if (err != 0)
     return err;
-  fuse_req req;
-  ops_->read(&req, ino, size, offset, &fi);
+  data->clear();
+  while (data->size() < size) {
+    const uint32_t chunk = std::min(size - static_cast<uint32_t>(data->size()),
+                                    kMaxFuseRead);
+    fuse_req req;
+    ops_->read(&req, ino, chunk, offset + data->size(), &fi);
+    err = ReplyError(req, fuse_req::kBuf);
+    if (err != 0)
+      break;
+    data->append(req.buf);
+    if (req.buf.size() < chunk)
+      break;
+  }
   ReleaseFile(ino);
-  err = ReplyError(req, fuse_req::kBuf);
-  if (err != 0)
-    return err;
-  data->swap(req.buf);
-  return 0;
+  return err;
 }
 
 
