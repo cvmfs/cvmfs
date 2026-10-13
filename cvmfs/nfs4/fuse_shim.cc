@@ -144,7 +144,7 @@ std::string DefaultMountOptions(uint16_t port) {
   // rsize, the client reads in 32 KiB requests.
   snprintf(buf, sizeof(buf),
            "vers=4,tcp,port=%u,rdonly,intr,deadtimeout=120,timeo=600,"
-           "retrans=2,rsize=1048576,readahead=32,nobrowse,namedattr",
+           "retrans=2,rsize=1048576,readahead=4,nobrowse,namedattr",
            port);
 #else
   snprintf(buf, sizeof(buf),

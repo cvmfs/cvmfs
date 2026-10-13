@@ -112,8 +112,10 @@ source $VIEW/setup.sh
 which root
 for i in 1 2; do
   t0=\$(date +%s)
+  r0=\$(grep -c " op 25 " $TRACE)
   root -l -b -q $WORK/t.C
-  echo "root run \$i: \$(( \$(date +%s) - t0 ))s"
+  echo "root run \$i: \$(( \$(date +%s) - t0 ))s, \$(( \$(grep -c " op 25 " $TRACE) - r0 )) READs"
+  vm_stat | grep -E "Pages (free|active|inactive|purgeable)|File-backed"
 done
 python3 -c 'import ROOT; print("PyROOT", ROOT.gROOT.GetVersion())'
 EOF
