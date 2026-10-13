@@ -32,7 +32,7 @@ jobs:
         run: |
           source $VIEW/setup.sh
           cmake -S podio -B build -G Ninja \
-            -DCMAKE_CXX_STANDARD=20 \
+            -DCMAKE_CXX_STANDARD=20 -DCMAKE_CXX_FLAGS=-fexperimental-library \
             -DBUILD_TESTING=ON -DENABLE_SIO=OFF -DUSE_EXTERNAL_CATCH2=AUTO
 
       - name: Build
