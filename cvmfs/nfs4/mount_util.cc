@@ -9,17 +9,38 @@
 #include <sys/mount.h>
 #include <sys/param.h>
 #include <sys/wait.h>
+#include <unistd.h>
 
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 
 #ifndef __APPLE__
 #include <mntent.h>
 #endif
 
+#include "nfs4/logging.h"
+
 extern char **environ;
 
 namespace nfs4 {
+
+ScopedRoot::ScopedRoot() : switched_(false), uid_(geteuid()), gid_(getegid()) {
+  if (uid_ == 0 || getuid() != 0)
+    return;
+  if (seteuid(0) != 0)
+    return;
+  setegid(0);
+  switched_ = true;
+}
+
+ScopedRoot::~ScopedRoot() {
+  if (!switched_)
+    return;
+  setegid(gid_);
+  seteuid(uid_);
+}
+
 
 int RunCommand(const std::vector<std::string> &args) {
   std::vector<char *> argv;
@@ -67,6 +88,7 @@ bool IsMounted(const std::string &mountpoint) {
 
 
 bool UnmountNfs(const std::string &mountpoint) {
+  ScopedRoot root;
 #ifdef __APPLE__
   if (unmount(mountpoint.c_str(), MNT_FORCE) == 0)
     return true;
@@ -82,6 +104,75 @@ bool UnmountNfs(const std::string &mountpoint) {
   args.push_back("-f");
   args.push_back(mountpoint);
   return RunCommand(args) == 0;
+}
+
+std::string NfsMountOptions(uint16_t port) {
+  char buf[256];
+#ifdef __APPLE__
+  // Not soft: the macOS client times out soft-mount READs after well under a
+  // second under load, regardless of timeo.  A dead cvmfs2 is covered by the
+  // guardian (see guardian.h), and deadtimeout lets the kernel give up on a
+  // server that stays silent anyway.  rdonly is incompatible with soft but
+  // not with hard mounts; the lock options are rejected for NFSv4.  Without
+  // rsize, the client reads in 32 KiB requests.
+  snprintf(buf, sizeof(buf),
+           "vers=4,tcp,port=%u,rdonly,intr,deadtimeout=120,timeo=600,"
+           "retrans=2,rsize=1048576,readahead=4,nobrowse,namedattr",
+           port);
+#else
+  snprintf(buf, sizeof(buf),
+           "vers=4.0,port=%u,ro,hard,timeo=600,retrans=2,local_lock=all",
+           port);
+#endif
+  return buf;
+}
+
+
+bool MountNfs(const std::string &mountpoint, uint16_t port) {
+  std::string options = NfsMountOptions(port);
+  const char *extra = getenv("CVMFS_NFS_MOUNT_OPTIONS");
+  if (extra && *extra)
+    options += std::string(",") + extra;
+
+#ifndef __APPLE__
+  // cvmfs2 may run as CVMFS_USER with only CAP_SYS_ADMIN left, which
+  // suffices for mount(2), but /bin/mount would treat it as a user mount.
+  // The kernel takes the NFS options as text; it needs the server address.
+  const std::string data = options + ",addr=127.0.0.1,clientaddr=127.0.0.1";
+  if (mount("127.0.0.1:/", mountpoint.c_str(), "nfs4", MS_RDONLY,
+            data.c_str()) == 0) {
+    Log(kLogLevelInfo, "mounted %s with options %s",
+              mountpoint.c_str(), data.c_str());
+    return true;
+  }
+  Log(kLogLevelDebug, "mount(2) failed (%d), trying /bin/mount",
+            errno);
+#endif
+
+  std::vector<std::string> args;
+#ifdef __APPLE__
+  args.push_back("/sbin/mount_nfs");
+#else
+  args.push_back("/bin/mount");
+  args.push_back("-t");
+  args.push_back("nfs4");
+#endif
+  args.push_back("-o");
+  args.push_back(options);
+  args.push_back("127.0.0.1:/");
+  args.push_back(mountpoint);
+  Log(kLogLevelInfo, "mounting %s with options %s",
+            mountpoint.c_str(), options.c_str());
+  int retval;
+  {
+    ScopedRoot root;
+    retval = RunCommand(args);
+  }
+  if (retval != 0) {
+    Log(kLogLevelError, "%s failed (%d)", args[0].c_str(), retval);
+    return false;
+  }
+  return true;
 }
 
 }  // namespace nfs4

@@ -481,9 +481,16 @@ int main(int argc, char **argv) {
   retval = GetCvmfsUser(&cvmfs_user);
   if (!retval)
     return 1;
-  retval = CheckFuse();
-  if (!retval)
-    return 1;
+  // The NFS frontend mounts through the kernel's NFS client, not FUSE
+  string param_nfs;
+  const bool nfs_frontend =
+      options_manager_.GetValue("CVMFS_NFS_FRONTEND", &param_nfs)
+      && options_manager_.IsOn(param_nfs);
+  if (!nfs_frontend) {
+    retval = CheckFuse();
+    if (!retval)
+      return 1;
+  }
   retval = CheckStrictMount(fqrn);
   if (!retval)
     return 1;
@@ -636,6 +643,8 @@ int main(int argc, char **argv) {
   }
 #endif
 
+  if (nfs_frontend)
+    AddMountOption("nfs", &mount_options);
   AddMountOption("system_mount", &mount_options);
   AddMountOption("fsname=cvmfs2", &mount_options);
   AddMountOption("allow_other", &mount_options);

@@ -4,8 +4,11 @@
 
 #include "nfs4/guardian.h"
 
+#include <arpa/inet.h>
 #include <errno.h>
+#include <netinet/in.h>
 #include <signal.h>
+#include <sys/socket.h>
 #include <unistd.h>
 
 #include "nfs4/logging.h"
@@ -56,16 +59,39 @@ class ErrorProgram : public RpcProgram {
 
 
 int RunGuardian(int listen_fd, int control_fd, const std::string &mountpoint) {
+  // Started by cvmfs2 with its effective uid; unmounting needs root
+  if (getuid() == 0 && geteuid() != 0) {
+    if (seteuid(0) == 0)
+      setegid(0);
+  }
   signal(SIGHUP, SIG_IGN);
   signal(SIGINT, SIG_IGN);
   signal(SIGPIPE, SIG_IGN);
 
-  // Nothing is ever written; the pipe only signals the peer's exit
-  char c;
-  ssize_t n;
-  do {
-    n = read(control_fd, &c, 1);
-  } while (n > 0 || (n < 0 && errno == EINTR));
+  // Serve mount and unmount requests until cvmfs2 exits (EOF)
+  struct sockaddr_in addr;
+  socklen_t addr_len = sizeof(addr);
+  uint16_t port = 0;
+  if (getsockname(listen_fd, reinterpret_cast<struct sockaddr *>(&addr),
+                  &addr_len) == 0) {
+    port = ntohs(addr.sin_port);
+  }
+  while (true) {
+    char command;
+    const ssize_t n = read(control_fd, &command, 1);
+    if (n < 0 && errno == EINTR)
+      continue;
+    if (n != 1)
+      break;
+    bool ok = false;
+    if (command == 'M')
+      ok = MountNfs(mountpoint, port);
+    else if (command == 'U')
+      ok = !IsMounted(mountpoint) || UnmountNfs(mountpoint);
+    const char status = ok ? 0 : 1;
+    if (write(control_fd, &status, 1) != 1)
+      break;
+  }
   close(control_fd);
   if (!IsMounted(mountpoint))
     return 0;

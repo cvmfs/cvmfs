@@ -779,6 +779,11 @@ int FuseMain(int argc, char *argv[]) {
 #ifdef CVMFS_NFS_FRONTEND
   // The file system is mounted through the kernel's NFS client
   premount_fuse_ = false;
+  // Settings of libcvmfs_nfsfuse, which only sees the environment
+  if (options_manager->GetValue("CVMFS_NFS_DELEGATIONS", &parameter))
+    setenv("CVMFS_NFS_DELEGATIONS", parameter.c_str(), 1);
+  if (options_manager->GetValue("CVMFS_NFS_MOUNT_OPTIONS", &parameter))
+    setenv("CVMFS_NFS_MOUNT_OPTIONS", parameter.c_str(), 1);
 #endif
 
   if (options_manager->GetValue("CVMFS_REPOSITORIES_NOMOUNT", &parameter)

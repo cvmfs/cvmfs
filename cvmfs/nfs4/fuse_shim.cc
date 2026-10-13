@@ -16,6 +16,7 @@
 #include <sys/mount.h>
 #include <sys/param.h>
 #include <sys/resource.h>
+#include <sys/socket.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -25,6 +26,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <strings.h>
 #include <string>
 #include <vector>
 
@@ -133,55 +135,6 @@ void ExitHandler(int /* signal */) {
   }
 }
 
-std::string DefaultMountOptions(uint16_t port) {
-  char buf[256];
-#ifdef __APPLE__
-  // Not soft: the macOS client times out soft-mount READs after well under a
-  // second under load, regardless of timeo.  A dead cvmfs2 is covered by the
-  // guardian (see guardian.h), and deadtimeout lets the kernel give up on a
-  // server that stays silent anyway.  rdonly is incompatible with soft but
-  // not with hard mounts; the lock options are rejected for NFSv4.  Without
-  // rsize, the client reads in 32 KiB requests.
-  snprintf(buf, sizeof(buf),
-           "vers=4,tcp,port=%u,rdonly,intr,deadtimeout=120,timeo=600,"
-           "retrans=2,rsize=1048576,readahead=4,nobrowse,namedattr",
-           port);
-#else
-  snprintf(buf, sizeof(buf),
-           "vers=4.0,port=%u,ro,hard,timeo=600,retrans=2,local_lock=all",
-           port);
-#endif
-  return buf;
-}
-
-bool MountNfs(struct fuse_session *se) {
-  std::string options = DefaultMountOptions(se->rpc->port());
-  const char *extra = getenv("CVMFS_NFS_MOUNT_OPTIONS");
-  if (extra && *extra)
-    options += std::string(",") + extra;
-
-  std::vector<std::string> args;
-#ifdef __APPLE__
-  args.push_back("/sbin/mount_nfs");
-#else
-  args.push_back("/bin/mount");
-  args.push_back("-t");
-  args.push_back("nfs4");
-#endif
-  args.push_back("-o");
-  args.push_back(options);
-  args.push_back("127.0.0.1:/");
-  args.push_back(se->mountpoint);
-  nfs4::Log(nfs4::kLogLevelInfo, "mounting %s with options %s",
-            se->mountpoint.c_str(), options.c_str());
-  const int retval = RunCommand(args);
-  if (retval != 0) {
-    nfs4::Log(nfs4::kLogLevelError, "%s failed (%d)", args[0].c_str(), retval);
-    return false;
-  }
-  return true;
-}
-
 bool ExecutablePath(std::string *path) {
   char buf[PATH_MAX];
 #ifdef __APPLE__
@@ -202,14 +155,42 @@ bool ExecutablePath(std::string *path) {
  * Starts `cvmfs2 __nfs_guardian__`, see nfs4::RunGuardian().  It execs right
  * after fork, because this process may already run threads.
  */
+/**
+ * Asks the guardian, which runs as root, to mount ('M') or unmount ('U').
+ * cvmfs2 itself may have dropped its privileges to CVMFS_USER by then.
+ */
+bool GuardianRequest(struct fuse_session *se, char command) {
+  if (write(se->guardian_fd, &command, 1) != 1)
+    return false;
+  char status = 1;
+  ssize_t n;
+  do {
+    n = read(se->guardian_fd, &status, 1);
+  } while (n < 0 && errno == EINTR);
+  return n == 1 && status == 0;
+}
+
+bool MountNfs(struct fuse_session *se) {
+  if (se->guardian_fd >= 0)
+    return GuardianRequest(se, 'M');
+  return nfs4::MountNfs(se->mountpoint, se->rpc->port());
+}
+
+bool Unmount(struct fuse_session *se) {
+  if (se->guardian_fd >= 0)
+    return GuardianRequest(se, 'U');
+  return UnmountNfs(se->mountpoint);
+}
+
 void SpawnGuardian(struct fuse_session *se) {
   std::string self;
   if (!ExecutablePath(&self)) {
     nfs4::Log(nfs4::kLogLevelWarn, "cannot start NFS guardian: no exe path");
     return;
   }
+  // control[0] goes to the guardian
   int control[2];
-  if (pipe(control) != 0)
+  if (socketpair(AF_UNIX, SOCK_STREAM, 0, control) != 0)
     return;
   const int listen_fd = se->rpc->listen_fd();
   char listen_str[16], control_str[16];
@@ -270,6 +251,7 @@ void RaiseFileDescriptorLimit() {
 #endif
   if (limit.rlim_cur >= target)
     return;
+  nfs4::ScopedRoot root;
   struct rlimit wanted = limit;
   wanted.rlim_cur = target;
   if (wanted.rlim_max < target)
@@ -327,7 +309,7 @@ int SessionLoop(struct fuse_session *se, unsigned max_threads) {
   // Unmount while cvmfs can still answer requests
   int retval = 0;
   if (se->mounted) {
-    if (UnmountNfs(se->mountpoint)) {
+    if (Unmount(se)) {
       se->mounted = false;
     } else {
       nfs4::Log(nfs4::kLogLevelError, "failed to unmount %s",
@@ -628,7 +610,14 @@ int fuse_session_mount(struct fuse_session *se, const char *mountpoint) {
   // Mounts are hard, so slow requests simply wait; a dead cvmfs2 is covered
   // by the guardian.  Answering NFS4ERR_DELAY instead costs a thread handoff
   // per request and is only useful for soft mounts.
-  server_options.delegations = (getenv("CVMFS_NFS_DELEGATIONS") != NULL);
+  // On by default; CVMFS_NFS_DELEGATIONS is set by the loader from the
+  // client configuration
+  const char *delegations = getenv("CVMFS_NFS_DELEGATIONS");
+  server_options.delegations =
+      (delegations == NULL)
+      || (strcmp(delegations, "0") != 0 && strcasecmp(delegations, "no") != 0
+          && strcasecmp(delegations, "off") != 0
+          && strcasecmp(delegations, "false") != 0);
   const char *delay_ms = getenv("CVMFS_NFS_DELAY_MS");
   if (delay_ms)
     server_options.delay_after_ms = static_cast<uint32_t>(atoi(delay_ms));
@@ -652,7 +641,7 @@ int fuse_session_mount(struct fuse_session *se, const char *mountpoint) {
 
 
 void fuse_session_unmount(struct fuse_session *se) {
-  if (se->mounted && UnmountNfs(se->mountpoint))
+  if (se->mounted && Unmount(se))
     se->mounted = false;
 }
 
