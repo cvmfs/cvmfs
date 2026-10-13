@@ -33,7 +33,6 @@ export CPATH=/usr/local/include
 # The vendored sqlite: cvmfs reconfigures sqlite globally, which crashes
 # frameworks sharing the system libsqlite3
 cmake -S $SOURCE_DIR -B $BUILD_DIR -G Ninja \
-  -DCMAKE_BUILD_TYPE=RelWithDebInfo \
   -DCMAKE_INSTALL_PREFIX=$PREFIX \
   -DBUILTIN_EXTERNALS=ON \
   -DBUILD_CVMFS=ON -DBUILD_LIBCVMFS=OFF -DBUILD_LIBCVMFS_CACHE=OFF \
