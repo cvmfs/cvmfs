@@ -189,7 +189,7 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
     }
     free(threads_process_);
 
-    if (atomic_read32(&num_errors_)) {
+    if (num_errors_.load()) {
       DropRemainingJobs();
       return false;
     }
@@ -215,7 +215,8 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
       if (job->hash.IsNull())
         delete job;
     }
-    while ((job = post_job_queue_.TryPopFront()) != NULL) { }
+    while ((job = post_job_queue_.TryPopFront()) != NULL) {
+    }
 
     const uint32_t capacity = catalogs_processing_.capacity();
     const shash::Any *keys = catalogs_processing_.keys();
@@ -452,3 +453,4 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
 }  // namespace swissknife
 
 #endif  // CVMFS_CATALOG_TRAVERSAL_PARALLEL_H_
+
