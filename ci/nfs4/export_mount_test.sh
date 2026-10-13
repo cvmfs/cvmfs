@@ -33,7 +33,8 @@ trap cleanup EXIT
 start_server() {
   local port=$1
   : > "$WORK/port"
-  "$EXPORT_BIN" -p "$port" "$SRC" > "$WORK/port" 2> "$WORK/server.err" &
+  CVMFS_NFS4_DEBUG=$WORK/trace.log \
+    "$EXPORT_BIN" -p "$port" "$SRC" > "$WORK/port" 2> "$WORK/server.err" &
   SERVER_PID=$!
   for _ in $(seq 50); do
     [ -s "$WORK/port" ] && break
@@ -121,6 +122,22 @@ done
 
 echo "--- read throughput"
 dd if="$MNT/big.bin" of=/dev/null bs=1048576 2>&1 | tail -1
+
+# Whether the client keeps file data cached across processes: a second read
+# of a file that did not change should not send READs (informational)
+reads() { grep -c " op 25 " "$WORK/trace.log"; }
+for mode in read mmap; do
+  f=$MNT/tree/CMakeLists.txt
+  [ $mode = mmap ] && f=$MNT/big.bin
+  r0=$(reads)
+  if [ $mode = read ]; then cat "$f" > /dev/null; else
+    python3 -c "import mmap,sys; f=open(sys.argv[1],'rb'); m=mmap.mmap(f.fileno(),0,prot=mmap.PROT_READ); m[:].count(b'x')" "$f"; fi
+  r1=$(reads)
+  if [ $mode = read ]; then cat "$f" > /dev/null; else
+    python3 -c "import mmap,sys; f=open(sys.argv[1],'rb'); m=mmap.mmap(f.fileno(),0,prot=mmap.PROT_READ); m[:].count(b'x')" "$f"; fi
+  r2=$(reads)
+  echo "cache check ($mode): first pass $((r1 - r0)) READs, second pass $((r2 - r1)) READs"
+done
 
 echo "--- symlink"
 [ "$(readlink "$MNT/link")" = "tree/CMakeLists.txt" ] || fail "readlink"
