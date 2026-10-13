@@ -26,8 +26,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-14
-            lcg_platform: arm64-mac14-clang160-opt
           - os: macos-15
             lcg_platform: arm64-mac15-clang170-opt
     runs-on: ${{ matrix.os }}

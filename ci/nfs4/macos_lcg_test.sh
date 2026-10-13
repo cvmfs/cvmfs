@@ -138,5 +138,24 @@ done
 mount | grep -q "$REPO" && fail "still mounted after SIGTERM"
 echo "::endgroup::"
 
+echo "::group::guardian: kill -9 cvmfs2"
+limit 300 "$BUILD/cvmfs2" -o "nfs,config=$CONF" "$REPO" "$MNT" \
+  || fail "remount failed"
+limit 60 ls "$MNT" > /dev/null || fail "cannot list $MNT after remount"
+PID=$(limit 30 "$BUILD/cvmfs_talk" -p "$TALK" pid 2>/dev/null)
+[ -n "$PID" ] || fail "cvmfs_talk does not answer after remount"
+kill -9 "$PID"
+t0=$(date +%s)
+limit 60 cat "$MNT/README.md" > /dev/null 2>&1 && fail "read succeeded after kill -9"
+echo "read after kill -9 failed after $(( $(date +%s) - t0 ))s"
+for _ in $(seq 60); do
+  mount | grep -q "$REPO" || break
+  sleep 1
+done
+mount | grep -q "$REPO" && fail "guardian did not unmount after kill -9"
+echo "unmounted $(( $(date +%s) - t0 ))s after kill -9"
+pgrep -f __nfs_guardian__ && fail "guardian still running"
+echo "::endgroup::"
+
 echo "--- delayed requests during the run: $(grep -c delayed "$TRACE")"
 echo "PASS"
