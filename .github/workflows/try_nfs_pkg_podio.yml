@@ -1,0 +1,52 @@
+name: Try_NFS_Pkg_Podio
+
+# Throwaway: installs the nfs-dev package and builds podio against an LCG view
+
+on:
+  push:
+    paths:
+      - '.github/workflows/try_nfs_pkg_podio.yml'
+  workflow_dispatch:
+
+jobs:
+  podio:
+    runs-on: macos-15
+    timeout-minutes: 90
+    env:
+      VIEW: /cvmfs/sft.cern.ch/lcg/views/LCG_110a/arm64-mac15-clang170-opt
+    steps:
+      - name: Install cvmfs (NFS frontend)
+        run: |
+          curl -fLO https://github.com/vvolkl/cvmfs/releases/download/nfs-dev/cvmfs-nfs-dev.pkg
+          sudo installer -pkg cvmfs-nfs-dev.pkg -target /
+          printf 'CVMFS_HTTP_PROXY=DIRECT\nCVMFS_USE_CDN=yes\n' \
+            | sudo tee /etc/cvmfs/default.local
+          sudo mkdir -p /cvmfs/sft.cern.ch
+          sudo mount -t cvmfs sft.cern.ch /cvmfs/sft.cern.ch
+          ls $VIEW
+
+      - name: Checkout podio
+        run: git clone --depth 1 https://github.com/AIDASoft/podio.git
+
+      - name: Configure
+        run: |
+          source $VIEW/setup.sh
+          cmake -S podio -B build -G Ninja \
+            -DCMAKE_CXX_STANDARD=20 \
+            -DBUILD_TESTING=ON -DENABLE_SIO=OFF -DUSE_EXTERNAL_CATCH2=AUTO
+
+      - name: Build
+        run: |
+          source $VIEW/setup.sh
+          time cmake --build build -j $(sysctl -n hw.ncpu)
+
+      - name: Test
+        run: |
+          source $VIEW/setup.sh
+          cd build && ctest --output-on-failure -j $(sysctl -n hw.ncpu)
+
+      - name: cvmfs statistics
+        if: ${{ always() }}
+        run: |
+          sudo cvmfs_talk -i sft.cern.ch internal affairs | head -40 || true
+          df -h /cvmfs/sft.cern.ch || true
