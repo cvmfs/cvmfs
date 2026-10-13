@@ -1,0 +1,110 @@
+name: CI_MacOS_NFS
+
+# Mounts sft.cern.ch with `cvmfs2 -o nfs` on hosted macOS runners (kernel NFS
+# client, no macFUSE/FSKit) and runs ROOT from an LCG view
+
+on:
+  push:
+    paths:
+      - 'cvmfs/nfs4/**'
+      - 'cvmfs/loader.cc'
+      - 'cvmfs/fuse_main.cc'
+      - 'ci/nfs4/**'
+      - '.github/workflows/ci_macos_nfs.yml'
+  pull_request:
+    paths:
+      - 'cvmfs/nfs4/**'
+      - 'cvmfs/loader.cc'
+      - 'cvmfs/fuse_main.cc'
+      - 'ci/nfs4/**'
+      - '.github/workflows/ci_macos_nfs.yml'
+  workflow_dispatch:
+
+jobs:
+  lcg_root:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            lcg_platform: arm64-mac14-clang160-opt
+          - os: macos-15
+            lcg_platform: arm64-mac15-clang170-opt
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Runner info
+        run: |
+          sw_vers
+          uname -m
+          df -h /
+
+      - name: Install fuse3 headers
+        run: |
+          # Only the headers (and a library for FindFUSE3) are needed: the NFS
+          # frontend does not link against libfuse.  Same fork as CI_MacOS.
+          brew install meson ninja pkg-config
+          git clone --depth 1 --branch fuse-t \
+            https://github.com/macos-fuse-t/libfuse3.git /tmp/libfuse3
+          cd /tmp/libfuse3
+          meson setup build --prefix=/usr/local
+          ninja -C build
+          sudo ninja -C build install
+
+      - name: Build cvmfs2 with the NFS frontend
+        run: |
+          export CPATH=/usr/local/include
+          cmake -S . -B build -G Ninja \
+            -DBUILTIN_EXTERNALS=ON \
+            -DBUILD_CVMFS=ON -DBUILD_LIBCVMFS=OFF -DBUILD_LIBCVMFS_CACHE=OFF \
+            -DBUILD_SERVER=OFF -DBUILD_RECEIVER=OFF -DBUILD_GEOAPI=OFF \
+            -DBUILD_UNITTESTS=OFF -DBUILD_MANPAGES=OFF \
+            -DBUILD_NFS_FRONTEND=ON \
+            -DBUILTIN_EXTERNALS_EXCLUDE=zlib \
+            -DCMAKE_DISABLE_FIND_PACKAGE_sqlite3=TRUE
+          cmake --build build --target cvmfs2 cvmfs_nfs_stub cvmfs_nfs cvmfs_talk
+          # cvmfs reconfigures sqlite globally (allocator, threading), which
+          # must not happen to the system libsqlite3 that frameworks share
+          ! otool -L build/cvmfs/libcvmfs_nfs.dylib | grep -i sqlite
+          otool -L build/cvmfs/libcvmfs_nfs.dylib
+
+      - name: Create /cvmfs/sft.cern.ch
+        run: |
+          # / is read-only on macOS 11+: synthetic firmlink, as in CI_MacOS
+          sudo zsh -c 'echo -e "cvmfs\tUsers/Shared/cvmfs\n#comment\n" > /etc/synthetic.conf'
+          sudo chown root:wheel /etc/synthetic.conf
+          sudo chmod a+r /etc/synthetic.conf
+          sudo mkdir -p /Users/Shared/cvmfs
+          # apfs.util returns non-zero also on success
+          sudo /System/Library/Filesystems/apfs.fs/Contents/Resources/apfs.util -t || true
+          sudo mkdir -p /cvmfs/sft.cern.ch
+          ls -la /cvmfs/
+
+      - name: Mount sft.cern.ch over NFS and run ROOT
+        run: |
+          sudo launchctl limit maxfiles 65536 65536
+          sudo bash ci/nfs4/macos_lcg_test.sh build/cvmfs ${{ matrix.lcg_platform }}
+
+      - name: Collect logs
+        if: ${{ always() }}
+        run: |
+          mkdir -p /tmp/nfs-logs
+          sudo cp -R /var/tmp/cvmfs-nfs-lcg/nfs4-trace.log \
+            /var/tmp/cvmfs-nfs-lcg/root.log /tmp/nfs-logs/ 2>/dev/null || true
+          sudo sh -c 'cp /var/tmp/cvmfs-nfs-lcg/cache/sft.cern.ch/stacktrace.* /tmp/nfs-logs/' 2>/dev/null || true
+          sudo log show --last 90m --style compact \
+            --predicate 'process == "cvmfs2" OR process == "mount_nfs"' \
+            > /tmp/nfs-logs/system.log 2>/dev/null || true
+          sudo chmod -R a+r /tmp/nfs-logs
+          ls -la /tmp/nfs-logs
+
+      - name: Upload logs
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: nfs-lcg-logs-${{ matrix.os }}
+          path: /tmp/nfs-logs
