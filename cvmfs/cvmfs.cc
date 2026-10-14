@@ -165,8 +165,9 @@ static int PassthroughBackingOpen(fuse_req_t req, int fd, bool *via_broker) {
       return backing_id;
     }
     fuse_passthru_use_broker = true;
-    LogCvmfs(kLogCvmfs, kLogDebug,
-             "FUSE: passthrough backing files go through the watchdog");
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
+             "FUSE: no CAP_SYS_ADMIN for passthrough, backing files go "
+             "through the watchdog");
   }
   int retval = 0;
   if (!fuse_passthru_broker_ready) {
