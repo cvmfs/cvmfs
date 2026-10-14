@@ -37,7 +37,7 @@ jobs:
         run: |
           cd ${GITHUB_WORKSPACE}
           mkdir -p build
-          # macos-26 images ship no Command Line Tools SDK, the cmake fallback
+          # macos-26 lacks the Command Line Tools SDK that cmake falls back to
           export SDKROOT=$(xcrun --show-sdk-path)
           export USE_MACFUSE_KEXT=OFF
           export USE_MACFUSE_FSKIT=ON
