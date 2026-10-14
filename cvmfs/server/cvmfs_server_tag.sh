@@ -173,6 +173,21 @@ cvmfs_server_tag() {
   local log_level=
   [ "x$CVMFS_LOG_LEVEL" != x ] && log_level="-z $CVMFS_LOG_LEVEL"
   local new_manifest="${CVMFS_SPOOL_DIR}/tmp/manifest"
+  local virtual_dir_actions_tag=
+  if [ "x${CVMFS_VIRTUAL_DIR}" = "xtrue" ]; then
+    virtual_dir_actions_tag="snapshots"
+  fi
+  if [ "x${CVMFS_PRIVATE_VIRTUAL_DIR}" = "xtrue" ]; then
+    if [ -n "$virtual_dir_actions_tag" ]; then
+      virtual_dir_actions_tag="${virtual_dir_actions_tag},user"
+    else
+      virtual_dir_actions_tag="user"
+    fi
+  fi
+  # Default to snapshots if neither flag is set but .cvmfs exists (backward compat)
+  if [ -z "$virtual_dir_actions_tag" ]; then
+    virtual_dir_actions_tag="snapshots"
+  fi
   local sync_command_virtual_dir="$(__swissknife_cmd dbg) sync \
       -u /cvmfs/$name                                    \
       -s ${CVMFS_SPOOL_DIR}/scratch/current              \
@@ -187,7 +202,7 @@ cvmfs_server_tag() {
       -N $name                                           \
       -K $CVMFS_PUBLIC_KEY                               \
       $(get_swissknife_proxy)                            \
-      $(get_follow_http_redirects_flag) $log_level -S snapshots"
+      $(get_follow_http_redirects_flag) $log_level -S $virtual_dir_actions_tag"
   local tag_command_undo_tags="$(__swissknife_cmd dbg) tag_edit \
       -r $CVMFS_UPSTREAM_STORAGE                        \
       -w $CVMFS_STRATUM0                                \
@@ -253,7 +268,8 @@ cvmfs_server_tag() {
     sign_manifest $name $new_manifest || die "Failed to sign repo"
   fi
 
-  if [ "x${CVMFS_VIRTUAL_DIR}" = "xtrue" ]; then
+  if [ "x${CVMFS_VIRTUAL_DIR}" = "xtrue" ] || \
+     [ "x${CVMFS_PRIVATE_VIRTUAL_DIR}" = "xtrue" ]; then
     $user_shell "$sync_command_virtual_dir" || die "Failed to create virtual catalog"
     local trunk_hash=$(grep "^C" ${new_manifest}~ | tr -d C)
     tag_command_undo_tags="$tag_command_undo_tags -b $trunk_hash"
