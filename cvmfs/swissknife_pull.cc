@@ -112,6 +112,11 @@ std::atomic<int64_t> chunk_queue;
 bool preload_cache = false;
 string *preload_cachedir = NULL;
 bool inspect_existing_catalogs = false;
+// Set once a revisited history chain reaches a catalog that is already
+// present. Older revisions missing locally were removed by the replica's gc.
+bool reached_existing_history = false;
+// Upstream path of a local backend; empty for other backends
+string local_upstream_path;
 manifest::Reflog *reflog = NULL;
 
 }  // anonymous namespace
@@ -343,13 +348,22 @@ bool CommandPull::Pull(const shash::Any &catalog_hash,
   assert(shash::kSuffixCatalog == catalog_hash.suffix);
   previous_catalog.SetNull();
 
-  // Check if the catalog already exists
-  if (Peek(catalog_hash)) {
-    // Preload: dirtab changed
+  // With a changed inclusion spec, existing catalogs may contain objects
+  // that were previously excluded. Revisit them and fetch missing chunks.
+  const bool catalog_exists = Peek(catalog_hash);
+  const bool revisit = inspect_existing_catalogs && !preload_cache;
+  if (revisit && path.empty()) {
+    if (catalog_exists) {
+      reached_existing_history = true;
+    } else if (is_historic_catalog && reached_existing_history) {
+      LogCvmfs(kLogCvmfs, kLogStdout,
+               "  Not restoring collected historic catalog %s",
+               catalog_hash.ToString().c_str());
+      return true;
+    }
+  }
+  if (catalog_exists && !revisit) {
     if (inspect_existing_catalogs) {
-      if (!preload_cache) {
-        PANIC(kLogStderr, "to be implemented: -t without -c");
-      }
       catalog::Catalog *catalog = catalog::Catalog::AttachFreely(
           path, MakePath(catalog_hash), catalog_hash);
       if (catalog == NULL) {
@@ -399,16 +413,32 @@ bool CommandPull::Pull(const shash::Any &catalog_hash,
     unlink(file_catalog.c_str());
     return false;
   }
-  const string url_catalog = *stratum0_url + "/data/" + catalog_hash.MakePath();
+  // Historic catalogs retained locally may already have been collected on
+  // Stratum 0, so revisited catalogs are read from the replica's backend.
+  // Without direct access (S3), fall back to the replica's own URL.
+  const string &catalog_url = catalog_exists ? *stratum1_url : *stratum0_url;
+  const string url_catalog = catalog_url + "/data/" + catalog_hash.MakePath();
   cvmfs::FileSink filesink(fcatalog_vanilla);
   download::JobInfo download_catalog(&url_catalog, false, false, &catalog_hash,
                                      &filesink);
-  dl_retval = download_manager()->Fetch(&download_catalog);
-  fclose(fcatalog_vanilla);
+  if (catalog_exists && !local_upstream_path.empty()) {
+    fclose(fcatalog_vanilla);
+    if (!CopyPath2Path(local_upstream_path + "/data/" + catalog_hash.MakePath(),
+                       file_catalog_vanilla)) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to read local catalog %s",
+               catalog_hash.ToString().c_str());
+      goto pull_cleanup;
+    }
+    dl_retval = download::kFailOk;
+  } else {
+    dl_retval = download_manager()->Fetch(&download_catalog);
+    fclose(fcatalog_vanilla);
+  }
   if (dl_retval != download::kFailOk) {
     const bool genuinely_missing = (dl_retval == download::kFailHostHttp)
                                    && (download_catalog.http_code() == 404);
-    if (is_historic_catalog && is_garbage_collectable && genuinely_missing) {
+    if (is_historic_catalog && is_garbage_collectable && genuinely_missing
+        && !catalog_exists) {
       LogCvmfs(kLogCvmfs, kLogStdout,
                "skipping missing catalog %s - "
                "probably swept by garbage collection",
@@ -489,7 +519,11 @@ bool CommandPull::Pull(const shash::Any &catalog_hash,
   WaitForStorage();
   if (!retval)
     return false;
-  Store(file_catalog_vanilla, catalog_hash);
+  if (catalog_exists) {
+    unlink(file_catalog_vanilla.c_str());
+  } else {
+    Store(file_catalog_vanilla, catalog_hash);
+  }
   return true;
 
 pull_cleanup:
@@ -706,6 +740,8 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
         spooler_definition_str, ensemble.manifest->GetHashAlgorithm());
     spooler = upload::Spooler::Construct(spooler_definition);
     assert(spooler);
+    if (spooler_definition.driver_type == upload::SpoolerDefinition::Local)
+      local_upstream_path = spooler_definition.spooler_configuration;
     spooler->RegisterListener(&SpoolerOnUpload);
   }
 
@@ -814,6 +850,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   retval = 1;
   {
     bool is_historic = false;
+    reached_existing_history = false;
     do {
       retval = static_cast<int>(
           Pull(current_catalog_hash, "", previous_catalog_hash, is_historic)
@@ -834,7 +871,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
                                  iend = historic_tags.end();
        i != iend;
        ++i) {
-    if (Peek(i->root_hash))
+    if (Peek(i->root_hash) && !inspect_existing_catalogs)
       continue;
     LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from %s repository tag",
              i->name.c_str());
@@ -842,6 +879,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
 
     bool retval2 = true;
     current_catalog_hash = i->root_hash;
+    reached_existing_history = false;
     do {
       retval2 = Pull(current_catalog_hash, "", previous_catalog_hash,
                      true /* is_historic_catalog */)
