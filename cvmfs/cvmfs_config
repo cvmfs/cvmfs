@@ -387,6 +387,9 @@ cvmfs_subcommand_usage() {
     bugreport)
       echo "Usage: $0 bugreport [timeout_in_sec_per_command (default = 90)]"
       ;;
+    docker-run)
+      cvmfs_docker_run --help
+      ;;
     *)
       return 1
       ;;
@@ -2929,7 +2932,7 @@ cvmfs_docker_run() {
 # Intercept subcommand help flags before dispatching and root checks.
 for _cvmfs_arg in "${@:2}"; do
   case "$_cvmfs_arg" in
-    --help|-h) cvmfs_subcommand_usage "$1" && exit 0 ;;
+    --help|-h) cvmfs_subcommand_usage "$1" || cvmfs_config_usage; exit 0 ;;
   esac
 done
 unset _cvmfs_arg
