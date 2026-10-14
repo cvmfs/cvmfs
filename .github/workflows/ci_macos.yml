@@ -44,19 +44,6 @@ jobs:
             pluginkit -a ${MACFUSE_APP}/Contents/Extensions/io.macfuse.app.fsmodule.${m}.appex || true
             pluginkit -e use -p com.apple.fskit.fsmodule -i io.macfuse.app.fsmodule.${m} || true
           done
-          # The CI shell is not in the console user's GUI session, but
-          # fskitd asks the fskit_agent of that session (and its pkd) whether
-          # a module is enabled.  Repeat the registration inside the GUI
-          # session's bootstrap namespace.
-          echo "managername: $(launchctl managername)"; pgrep -l -x loginwindow || echo "no loginwindow"
-          LW=$(pgrep -x -u $(id -u) loginwindow | head -1)
-          if [ -n "$LW" ]; then
-            for m in macfuse macfuse-local; do
-              sudo launchctl bsexec $LW sudo -u $(id -un) pluginkit -a ${MACFUSE_APP}/Contents/Extensions/io.macfuse.app.fsmodule.${m}.appex || true
-              sudo launchctl bsexec $LW sudo -u $(id -un) pluginkit -e use -p com.apple.fskit.fsmodule -i io.macfuse.app.fsmodule.${m} || true
-            done
-            sudo launchctl bsexec $LW sudo -u $(id -un) pluginkit -m -v -p com.apple.fskit.fsmodule || true
-          fi
           # fskit_agent caches the module list per user session
           pkill -x fskit_agent || true
           pluginkit -m -Dvv -p com.apple.fskit.fsmodule || true
@@ -73,10 +60,18 @@ jobs:
           }
           sem.wait()
           EOS
-          swiftc -target arm64-apple-macos15.4 -o /tmp/fskit_modules /tmp/fskit_modules.swift && /tmp/fskit_modules || true
-          if [ -n "$LW" ]; then
-            echo "--- FSKit view from the GUI session"
-            sudo launchctl bsexec $LW sudo -u $(id -un) /tmp/fskit_modules || true
+          swiftc -target arm64-apple-macos15.4 -o /tmp/fskit_modules /tmp/fskit_modules.swift
+          /tmp/fskit_modules | tee /tmp/fskit_modules.txt
+          # Third-party FSKit modules must be enabled in System Settings
+          # (Login Items & Extensions > File System Extensions).  There is
+          # no headless way to do that, so on hosted runners only the build
+          # is verified; a self-hosted runner with the extension enabled
+          # runs the mount tests as well.
+          if grep -q "^io.macfuse.app.fsmodule.macfuse-local enabled=true" /tmp/fskit_modules.txt; then
+            echo "FSKIT_ENABLED=true" >> $GITHUB_ENV
+          else
+            echo "FSKIT_ENABLED=false" >> $GITHUB_ENV
+            echo "::warning::macFUSE FSKit extension is not enabled on this runner; mount tests are skipped"
           fi
           ls -la /usr/local/lib/libfuse* /usr/local/include/fuse3
 
@@ -117,6 +112,7 @@ jobs:
           cat /etc/synthetic.conf
 
       - name: Smoke mount
+        if: ${{ env.FSKIT_ENABLED == 'true' }}
         run: |
           sudo sh -c 'echo "CVMFS_HTTP_PROXY=DIRECT" > /etc/cvmfs/default.local'
           sudo sh -c 'echo "CVMFS_DEBUGLOG=/tmp/cvmfs-smoke-debug.log" >> /etc/cvmfs/default.local'
@@ -154,6 +150,7 @@ jobs:
           sudo rm -f /etc/cvmfs/default.local
 
       - name: Run Tests
+        if: ${{ env.FSKIT_ENABLED == 'true' }}
         run: |
           sudo launchctl limit maxfiles 65536 65536
           export CVMFS_PLATFORM_NAME="macos"
@@ -223,7 +220,7 @@ jobs:
             src/1*
 
       - name: Collect diagnostics
-        if: ${{ always () }}
+        if: ${{ always() && env.FSKIT_ENABLED == 'true' }}
         run: |
           mount > /tmp/cvmfs-mounts.txt || true
           sudo cvmfs_config status >> /tmp/cvmfs-mounts.txt 2>&1 || true
@@ -233,7 +230,7 @@ jobs:
           tail -50 /tmp/cvmfs-unified.log || true
 
       - name: Upload logs as artifact
-        if: ${{ always () }}
+        if: ${{ always() && env.FSKIT_ENABLED == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: CVMFS test logs
