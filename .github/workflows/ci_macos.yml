@@ -37,6 +37,8 @@ jobs:
         run: |
           cd ${GITHUB_WORKSPACE}
           mkdir -p build
+          # macos-26 images ship no Command Line Tools SDK, the cmake fallback
+          export SDKROOT=$(xcrun --show-sdk-path)
           export USE_MACFUSE_KEXT=OFF
           export USE_MACFUSE_FSKIT=ON
           export CVMFS_EXTERNALS_EXCLUDE="zlib"
