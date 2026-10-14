@@ -9,10 +9,17 @@ SBIN_BASE="$( [ x"$INSTALL_BASE" = x"/usr" ] && echo "/sbin" || echo "${INSTALL_
 
 # manpage generation with help2man might run when /etc/cvmfs/config.sh isn't available yet
 # Since config.sh isn't necessary for the help text, skip the check when only doing --help
+CVMFS_CONFIG_SKIP_ENV_PROBE=0
 case "$1" in
-  --help|-h|--version|"") CVMFS_CONFIG_SKIP_ENV_PROBE=1 ;;
-  *)                      CVMFS_CONFIG_SKIP_ENV_PROBE=0 ;;
+  --version|"") CVMFS_CONFIG_SKIP_ENV_PROBE=1 ;;
 esac
+# Help flags in any position also skip config.sh
+for _cvmfs_arg in "$@"; do
+  case "$_cvmfs_arg" in
+    --help|-h) CVMFS_CONFIG_SKIP_ENV_PROBE=1; break ;;
+  esac
+done
+unset _cvmfs_arg
 
 if [ $CVMFS_CONFIG_SKIP_ENV_PROBE -eq 0 ]; then
 
@@ -304,6 +311,87 @@ cvmfs_config_usage() {
   echo "  bugreport [timeout_in_sec_per_command (default = 90)]"
   echo ""
   echo "  docker-run [--run] [--image I] [--proxy URL] [<repository>...]"
+}
+
+# Print usage for a single subcommand, or return 1 if unknown
+cvmfs_subcommand_usage() {
+  local cmd="$1"
+  case "$cmd" in
+    setup)
+      echo "Usage: $0 setup [nouser] [nocfgmod] [nostart] [noautofs]"
+      echo
+      echo "Set up the system for CernVM-FS (requires root)."
+      ;;
+    wsl2_start)
+      echo "Usage: $0 wsl2_start"
+      ;;
+    chksetup)
+      echo "Usage: $0 chksetup"
+      echo
+      echo "Check the CernVM-FS client setup."
+      ;;
+    showconfig)
+      echo "Usage: $0 showconfig [-s] [-a|--all] [-j|--json] [<repository>|<mountpoint>]"
+      echo
+      echo "Options:"
+      echo "  -s         short output, only parameters set in the configuration"
+      echo "  -a, --all  include configured non-CVMFS parameters"
+      echo "  -j, --json output as JSON"
+      ;;
+    stat)
+      echo "Usage: $0 stat [-v] [<repository>]"
+      echo
+      echo "Show runtime statistics of a mounted repository, or of all"
+      echo "mounted repositories if none is given."
+      echo
+      echo "Options:"
+      echo "  -v         verbose, human-readable output"
+      ;;
+    status)
+      echo "Usage: $0 status [-v] [<repository list>]"
+      echo
+      echo "Options:"
+      echo "  -v         verbose, force detail output"
+      ;;
+    probe)
+      echo "Usage: $0 probe [<repository list>]"
+      ;;
+    fsck)
+      echo "Usage: $0 fsck [-q | <cvmfs_fsck options>]"
+      echo
+      echo "Options:"
+      echo "  -q         quick check for zero byte files only"
+      ;;
+    fuser)
+      echo "Usage: $0 fuser <repository>"
+      ;;
+    reload)
+      echo "Usage: $0 reload [-c | <repository>]"
+      echo
+      echo "Options:"
+      echo "  -c         wipe the cache during reload"
+      ;;
+    umount)
+      echo "Usage: $0 umount"
+      ;;
+    wipecache)
+      echo "Usage: $0 wipecache"
+      ;;
+    killall)
+      echo "Usage: $0 killall [-r] [-s]"
+      echo
+      echo "Options:"
+      echo "  -r         reset fuse"
+      echo "  -s         reset stuck fuse"
+      ;;
+    bugreport)
+      echo "Usage: $0 bugreport [timeout_in_sec_per_command (default = 90)]"
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+  return 0
 }
 
 has_selinux() {
@@ -2837,6 +2925,15 @@ cvmfs_docker_run() {
   mount --make-shared "$mountpoint"
   eval "$cmd"
 }
+
+# Intercept subcommand help flags before dispatching and root checks.
+for _cvmfs_arg in "${@:2}"; do
+  case "$_cvmfs_arg" in
+    --help|-h) cvmfs_subcommand_usage "$1" && exit 0 ;;
+  esac
+done
+unset _cvmfs_arg
+
 
 case "$1" in
   setup)
