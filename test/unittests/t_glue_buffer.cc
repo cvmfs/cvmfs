@@ -160,6 +160,7 @@ TEST_F(T_GlueBuffer, DentryMove) {
   EXPECT_EQ(std::string("one"), name.ToString());
   EXPECT_FALSE(dst->NextEntry(&cursor, &parent_inode, &name));
   dst->EndEnumerate(&cursor);
+  delete dst;
 }
 
 

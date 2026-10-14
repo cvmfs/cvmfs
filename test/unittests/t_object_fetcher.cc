@@ -239,6 +239,7 @@ class T_ObjectFetcher : public ::testing::Test {
         reinterpret_cast<const unsigned char *>(hash.ToString().data()),
         hash.GetHexSize(), &sig, &sig_size));
     *signature = std::string(reinterpret_cast<char *>(sig), sig_size);
+    free(sig);
   }
 
   void SignRsa(const shash::Any hash,
@@ -250,6 +251,7 @@ class T_ObjectFetcher : public ::testing::Test {
         reinterpret_cast<const unsigned char *>(hash.ToString().data()),
         hash.GetHexSize(), &sig, &sig_size));
     *signature = std::string(reinterpret_cast<char *>(sig), sig_size);
+    free(sig);
   }
 
   void SignString(std::string *str,

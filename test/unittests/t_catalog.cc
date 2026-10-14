@@ -612,6 +612,7 @@ TEST_F(T_Catalog, AttachSchema10) {
   shash::Any hash_compare = shash::MkFromHexPtr(
       shash::HexPtr("0000000000000000000000000000000000000042"));
   EXPECT_EQ(h, hash_compare);
+  delete catalog;
 }
 
 TEST_F(T_Catalog, MergeIntoParentLegacyColumnOrder) {

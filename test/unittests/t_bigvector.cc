@@ -4,7 +4,10 @@
 
 #include <gtest/gtest.h>
 
+#include <cstdlib>
+
 #include "bigvector.h"
+#include "util/smalloc.h"
 
 class T_BigVector : public ::testing::Test {
  protected:
@@ -12,6 +15,11 @@ class T_BigVector : public ::testing::Test {
     vec_ = new BigVector<unsigned>();
     EXPECT_EQ(vec_->size(), (unsigned)0);
     EXPECT_GE(vec_->capacity(), vec_->size());
+  }
+
+  virtual void TearDown() {
+    delete vec_;
+    vec_ = NULL;
   }
 
   static const unsigned kNumSmall = 1000;
@@ -70,11 +78,18 @@ TEST_F(T_BigVector, ShareBuffer) {
   bool large_alloc;
   vec_->ShareBuffer(&new_buf, &large_alloc);
   delete vec_;
+  vec_ = NULL;
 
   for (unsigned i = 0; i < N; ++i) {
     unsigned value = new_buf[i];
     EXPECT_EQ(value, i);
   }
+
+  // The shared buffer is now owned by the caller
+  if (large_alloc)
+    smunmap(new_buf);
+  else
+    free(new_buf);
 }
 
 TEST_F(T_BigVector, Copy) {

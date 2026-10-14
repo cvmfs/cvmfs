@@ -94,6 +94,12 @@ class T_MallocArena : public ::testing::Test {
       }
     } while (t < N);
 
+    // Release the schedule entries that were never due
+    map<unsigned, vector<void *> *>::iterator i = schedule_free.begin();
+    for (; i != schedule_free.end(); ++i) {
+      delete i->second;
+    }
+
     // printf("Allocated in total: %ukB\n", total_alloc / 1024);
     return total_alloc;
   }
