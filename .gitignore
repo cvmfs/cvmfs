@@ -40,4 +40,5 @@ ducc/ducc
 ducc/cvmfs_ducc
 snapshotter/out
 gateway/gateway
+cvmfs/config/cvmfs_validator
 vendor

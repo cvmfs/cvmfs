@@ -214,7 +214,7 @@ if [[ "${BUILTIN_EXTERNALS_LIST:-}" != "" ]] && ! echo ";${BUILTIN_EXTERNALS_LIS
 else
     missing_libs="libcrypto"
 
-    if [[ "${BUILD_GATEWAY:-}" != '' ]] || [[ "${BUILD_DUCC:-}" != '' ]] || [[ "${BUILD_SNAPSHOTTER:-}" != '' ]]; then
+    if [[ "${BUILD_GATEWAY:-}" != '' ]] || [[ "${BUILD_DUCC:-}" != '' ]] || [[ "${BUILD_SNAPSHOTTER:-}" != '' ]] || [[ "${BUILD_CONFIG_VALIDATOR:-}" != '' ]]; then
         required_go_minor_version="23"
         if [ -n "$(command -v go)" ]; then
           go_minor_version=`go version | { read _ _ v _; echo ${v#go}; } | cut -d '.' -f2`

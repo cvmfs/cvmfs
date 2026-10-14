@@ -283,6 +283,12 @@ cvmfs_config_usage() {
        "[-a|--all (include configured non-CVMFS parameters)]" \
        "[-j|--json] [<repository>|<mountpoint>]"
   echo ""
+  echo "  validate [<repository>]"
+  echo ""
+  echo "  explain <parameter>"
+  echo ""
+  echo "  generate (write /etc/cvmfs/default.local for this node)"
+  echo ""
   echo "  stat [-v | <repository>]"
   echo ""
   echo "  status [-v(erbose, force detail output)] [<repository list>]"
@@ -1071,7 +1077,6 @@ cvmfs_showconfig() {
   org=$(cvmfs_getorg "$fqrn")
   cvmfs_readconfig "$fqrn" || die "Failed to read CernVM-FS configuration"
 
-  local setting=
   local all_vars=
   local set_vars=          # names present in the config file
   # CVMFS_PARMS contains resolved config assignments and a header.  Collect
@@ -1079,7 +1084,7 @@ cvmfs_showconfig() {
   while read setting; do
     [[ "$setting" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]] || continue
     if ! cvmfs_showconfig_all_requested "$@"; then
-      [ "x${setting:0:6}" != "xCVMFS_" ] && continue
+      [[ "$setting" =~ ^(CVMFS_|X509_|CERNVM_) ]] || continue
     fi
     set_vars="$set_vars ${setting%%=*}"
   done <<< "$CVMFS_PARMS"
@@ -1100,9 +1105,10 @@ cvmfs_showconfig() {
         value=${value//@org@/$org}
         value=${value//@fqrn@/$fqrn}
       fi
-      # short mode: hide only never-set parameters
-      if [ $short_output -eq 1 ] && [ -z "$value" ] \
-         && [[ " $set_vars " != *" $jvar "* ]]; then
+      # short mode: hide the parameters the configuration does not set. The
+      # cache directory derived above is not one of them; a parameter set to
+      # an empty value is.
+      if [ $short_output -eq 1 ] && [[ " $set_vars " != *" $jvar "* ]]; then
         continue
       fi
       printf ',\n  "%s": %s' "$jvar" "$(json_string "$value")"
@@ -1115,7 +1121,9 @@ cvmfs_showconfig() {
   local var=
   while read var; do
     if [ "x$var" = "xCVMFS_CACHE_DIR" ]; then
-      if [ ! -z "$CVMFS_CACHE_DIR" -o $short_output -eq 0 ]; then
+      # Derived in cvmfs_readconfig; in short mode it shows up only when the
+      # configuration set it explicitly (as in the JSON output above).
+      if [ $short_output -eq 0 ] || [[ " $set_vars " == *" $var "* ]]; then
         echo "CVMFS_CACHE_DIR=$CVMFS_CACHE_DIR"
       fi
       continue
@@ -1136,6 +1144,161 @@ cvmfs_showconfig() {
   # In short mode the loop's last command may be the failed condition above;
   # don't let that become the function's exit status.
   return 0
+}
+
+
+cvmfs_explain() {
+  local name=$1
+  [ -n "$name" ] || die "Command explain: no parameter given"
+
+  # Find the validation binary (cvmfs_validator). Packaged installs (Debian,
+  # RPM/RedHat-family) put it under libexec/cvmfs; ArchLinux's CMake config
+  # instead uses lib/cvmfs.
+  local validator_bin="/usr/libexec/cvmfs/cvmfs_validator"
+  [ -x "$validator_bin" ] || validator_bin="/usr/lib/cvmfs/cvmfs_validator"
+  [ -x "$validator_bin" ] || die "no validation engine available; build \
+CernVM-FS with -DBUILD_CONFIG_VALIDATOR=ON"
+
+  "$validator_bin" -d '#ClientConfig' -explain "$name"
+}
+
+
+cvmfs_validate() {
+  local org=$1
+
+  # Find the validation binary (cvmfs_validator). Packaged installs (Debian,
+  # RPM/RedHat-family) put it under libexec/cvmfs; ArchLinux's CMake config
+  # instead uses lib/cvmfs.
+  local validator_bin="/usr/libexec/cvmfs/cvmfs_validator"
+  [ -x "$validator_bin" ] || validator_bin="/usr/lib/cvmfs/cvmfs_validator"
+  [ -x "$validator_bin" ] || validator_bin=
+  if [ -z "$validator_bin" ]; then
+    echo "Error: no validation engine available"
+    echo "Build CernVM-FS with -DBUILD_CONFIG_VALIDATOR=ON"
+    return 1
+  fi
+
+  cvmfs_readconfig || die "Failed to read CernVM-FS configuration"
+
+  # Without a repository argument, validate all configured repositories
+  if [ -z "$org" ]; then
+    local entry retval=0
+    for entry in $(list_repos); do
+      cvmfs_validate $entry || retval=1
+    done
+    return $retval
+  fi
+
+  local fqrn; fqrn=$(cvmfs_mkfqrn $org)
+  cvmfs_readconfig $fqrn || die "Failed to read CernVM-FS configuration of $fqrn"
+
+  # Dump the merged configuration onto the schema. showconfig -j -s emits
+  # exactly the parameters the configuration sets, every value as a JSON
+  # string; the validator converts the ones the schema declares as integers
+  # or booleans.
+  cvmfs_showconfig -j -s "$fqrn" | "$validator_bin" -d '#ClientConfig'
+  if [ $? -ne 0 ]; then
+    echo "Configuration of $fqrn is invalid"
+    return 1
+  fi
+  echo "Configuration of $fqrn is valid"
+  return 0
+}
+
+
+cvmfs_generate() {
+  local target="/etc/cvmfs/default.local"
+
+  local validator_bin="/usr/libexec/cvmfs/cvmfs_validator"
+  [ -x "$validator_bin" ] || validator_bin="/usr/lib/cvmfs/cvmfs_validator"
+  [ -x "$validator_bin" ] || die "no validation engine available; build \
+CernVM-FS with -DBUILD_CONFIG_VALIDATOR=ON"
+
+  cvmfs_readconfig || die "Failed to read CernVM-FS configuration"
+
+  # server URLs and proxies are per repository, so choose one to test them out first
+  local fqrn=$(cvmfs_mkfqrn "${CVMFS_REPOSITORIES%%,*}")
+  [ -n "$fqrn" ] || fqrn=$CVMFS_CONFIG_REPOSITORY
+  [ -z "$fqrn" ] || cvmfs_readconfig "$fqrn" ||
+    echo "Warning: cannot read configuration for $fqrn; using global defaults" >&2
+
+  # climb to an existing directory to measure disk capacity for the cache
+  local dir="${CVMFS_CACHE_BASE:-/var/lib/cvmfs}"
+  while [ ! -d "$dir" ]; do dir=$(dirname "$dir"); done
+
+  # query systemd for autofs's LimitNOFILE
+  local nfiles=$(systemctl show -p LimitNOFILE --value autofs 2>/dev/null)
+  case "$nfiles" in ''|*[!0-9]*) nfiles=132096 ;; esac
+
+  # discover a proxy when none is configured; auto means http://wpad/wpad.dat
+  local proxy="$CVMFS_HTTP_PROXY" wpad=false
+  case "$proxy" in ''|auto)
+    if [ -n "$CVMFS_SERVER_URL" ]; then
+      # the PAC file is asked about a destination, so it needs the server URL
+      CVMFS_PAC_URLS=auto cvmfs2 __wpad__ auto "$CVMFS_SERVER_URL" \
+        >/dev/null 2>&1 && wpad=true
+      # discovery ran and found nothing, so default to DIRECT
+      proxy=DIRECT
+    else
+      echo "Warning: no server URL for $fqrn, skipping proxy discovery" >&2
+      # don't generate a value
+      proxy=
+    fi ;;
+  esac
+
+  # time a whitelist fetch to size the timeouts; zero keeps the defaults
+  local rtt=0
+  if [ -n "$fqrn" ] && [ -n "$CVMFS_SERVER_URL" ]; then
+    # if proxy isn't set to "DIRECT" then via holds the proxy's address
+    local via=; [ "$proxy" = DIRECT ] || via="$proxy"
+    local org; org=`cvmfs_getorg $fqrn`
+    # extracts the first Stratum 1 server URL and expands the org and fqrn placeholders
+    local url; url=`echo "$CVMFS_SERVER_URL" | sed -e 's/[;|].*//' \
+      -e s/@org@/$org/g -e s/@fqrn@/$fqrn/g`
+    # records starting timestamp in nanoseconds 
+    local start; start=$(date +%s%N)
+    # tries to fetch the lightweight file within 10 seconds
+    if env http_proxy="$via" curl -H "Pragma:" -fs -m 10 \
+         -o /dev/null "${url}/.cvmfspublished" 2>/dev/null; then
+      # rtt is current timestamp subtracted the starting timestamp
+      rtt=$((($(date +%s%N)-start)/1000000))
+    fi
+  fi
+
+  # json payload for the generator
+  local facts=$(printf '{"cache_avail_mb":%d,"memory_mb":%d,"nfiles_max":%d,"proxy_chain":"%s","wpad_found":%s,"rtt_ms":%d}' \
+    $(($(df -Pk "$dir" | tail -n 1 | awk '{print $4}')/1024)) \
+    $(($(awk '/^MemTotal:/ {print $2}' /proc/meminfo)/1024)) \
+    "$nfiles" "$proxy" "$wpad" "$rtt")
+
+  local generated
+  generated=$(echo "$facts" | "$validator_bin" -generate) || return 1
+
+  # the parameter names we are about to write, as KEY1|KEY2|KEY3
+  local names
+  names=$(echo "$generated" |
+    sed -nE 's/^([A-Za-z_][A-Za-z0-9_]*)=.*/\1/p' | paste -sd'|' -)
+
+  if [ -f "$target" ]; then
+    # remove any old generated block, and parameters that will get a new generated value
+    # while keeping any other parameters
+    sed -E -e '/^# cvmfs_config generate$/,/^# end cvmfs_config generate$/d' \
+           -e "/^($names)=/d" "$target" > "${target}.new" ||
+      die "Failed to read $target"
+  else
+    # if doesn't exist create a new file
+    : > "${target}.new"
+  fi
+
+  # paste the generated block
+  cat >> "${target}.new" <<EOF
+# cvmfs_config generate
+$generated
+# end cvmfs_config generate
+EOF
+
+  mv "${target}.new" "$target" || die "Failed to write $target"
+  echo "Wrote $target"
 }
 
 
@@ -2858,6 +3021,24 @@ case "$1" in
   showconfig)
     shift 1
     cvmfs_showconfig $@
+    RETVAL=$?
+    ;;
+
+  validate)
+    shift 1
+    cvmfs_validate $@
+    RETVAL=$?
+    ;;
+
+  explain)
+    shift 1
+    cvmfs_explain $@
+    RETVAL=$?
+    ;;
+
+  generate)
+    shift 1
+    cvmfs_generate $@
     RETVAL=$?
     ;;
 

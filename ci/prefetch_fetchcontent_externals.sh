@@ -57,7 +57,7 @@ verify_digest() {
   [ "${actual_digest}" = "${expected_digest}" ]
 }
 
-for godir in ducc gateway snapshotter; do
+for godir in ducc gateway snapshotter cvmfs/config; do
   if [ -f "${CVMFS_SOURCE_TREE}/${godir}/go.mod" ]; then
     (cd "${CVMFS_SOURCE_TREE}/${godir}" && go mod vendor)
   fi
