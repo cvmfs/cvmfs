@@ -128,6 +128,21 @@ class T_Util : public ::testing::Test {
   std::string to_write_large;
 };
 
+class IncreaseNoFileSoftTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        // Save the original resource limits
+        ASSERT_EQ(getrlimit(RLIMIT_NOFILE, &original_rpl), 0);
+    }
+
+    void TearDown() override {
+        // Restore the original resource limits
+        ASSERT_EQ(setrlimit(RLIMIT_NOFILE, &original_rpl), 0);
+    }
+
+    struct rlimit original_rpl;
+};
+
 
 TEST_F(T_Util, GetUserName) {
   EXPECT_FALSE(GetUserName().empty());
@@ -2053,6 +2068,36 @@ TEST_F(T_Util, MemoryMappedFile) {
   mf.Unmap();
 }
 
+TEST_F(IncreaseNoFileSoftTest, SoftLimitAlreadyAtHardLimit) {
+    struct rlimit rpl;
+    rpl.rlim_cur = original_rpl.rlim_max;
+    rpl.rlim_max = original_rpl.rlim_max;
+    ASSERT_EQ(setrlimit(RLIMIT_NOFILE, &rpl), 0);
+
+    EXPECT_EQ(IncreaseNoFileSoft(100), -1);
+}
+
+TEST_F(IncreaseNoFileSoftTest, IncreaseSoftLimitWithinMargin) {
+    struct rlimit rpl;
+    ASSERT_NE(original_rpl.rlim_cur,original_rpl.rlim_max);
+    const auto margin = original_rpl.rlim_max-original_rpl.rlim_cur;
+    const size_t step = static_cast<size_t>(0.1*margin);
+    EXPECT_NE(original_rpl.rlim_cur+step,original_rpl.rlim_max);
+
+    EXPECT_EQ(IncreaseNoFileSoft(step), 0);
+
+    ASSERT_EQ(getrlimit(RLIMIT_NOFILE, &rpl), 0);
+    EXPECT_EQ(rpl.rlim_cur, original_rpl.rlim_cur+step);
+}
+
+TEST_F(IncreaseNoFileSoftTest, IncreaseSoftLimitToHardLimit) {
+    EXPECT_EQ(IncreaseNoFileSoft(original_rpl.rlim_max-original_rpl.rlim_cur), 0);
+
+    struct rlimit new_rpl;
+    ASSERT_EQ(getrlimit(RLIMIT_NOFILE, &new_rpl), 0);
+    EXPECT_EQ(new_rpl.rlim_cur, original_rpl.rlim_max);
+    EXPECT_EQ(IncreaseNoFileSoft(1), -1);
+}
 
 TEST_F(T_Util, SetLimitNoFile) {
   EXPECT_EQ(-1, SetLimitNoFile(3000000000U));
