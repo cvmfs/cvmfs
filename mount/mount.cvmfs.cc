@@ -371,6 +371,28 @@ static int AttachMount(const std::string &mountpoint, const std::string &fqrn,
 }
 
 
+/**
+ * Reads available bytes from fd and logs every complete line in buf.  A
+ * partial last line stays in buf until the next call.
+ */
+static bool RelayLines(int fd, int log_dest, string *buf, bool *open) {
+  char chunk[4096];
+  const ssize_t num_bytes = read(fd, chunk, sizeof(chunk));
+  if (num_bytes < 0)
+    return errno == EINTR;
+  if (num_bytes == 0) {
+    *open = false;
+    return true;
+  }
+  buf->append(chunk, num_bytes);
+  size_t pos;
+  while ((pos = buf->find('\n')) != string::npos) {
+    LogCvmfs(kLogCvmfs, log_dest, "%s", buf->substr(0, pos).c_str());
+    buf->erase(0, pos + 1);
+  }
+  return true;
+}
+
 int main(int argc, char **argv) {
   bool dry_run = false;
   bool remount = false;
@@ -706,6 +728,8 @@ int main(int argc, char **argv) {
   bool stderr_open = true;
   int status = 0;
   int ended = false;
+  string buf_stdout;
+  string buf_stderr;
 
   do {
     FD_ZERO(&readfds);
@@ -723,34 +747,18 @@ int main(int argc, char **argv) {
       return 32;
     }
 
-    char buf;
-    ssize_t num_bytes;
+    // Relay whole lines so that concurrent stdout and stderr messages do not
+    // interleave character by character on the terminal
     if (FD_ISSET(fd_stdout, &readfds)) {
-      num_bytes = read(fd_stdout, &buf, 1);
-      switch (num_bytes) {
-        case 0:
-          stdout_open = false;
-          break;
-        case 1:
-          LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "%c", buf);
-          break;
-        default:
-          LogCvmfs(kLogCvmfs, kLogStderr, "Failed reading stdout");
-          return 32;
+      if (!RelayLines(fd_stdout, kLogStdout, &buf_stdout, &stdout_open)) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "Failed reading stdout");
+        return 32;
       }
     }
     if (FD_ISSET(fd_stderr, &readfds)) {
-      num_bytes = read(fd_stderr, &buf, 1);
-      switch (num_bytes) {
-        case 0:
-          stderr_open = false;
-          break;
-        case 1:
-          LogCvmfs(kLogCvmfs, kLogStderr | kLogNoLinebreak, "%c", buf);
-          break;
-        default:
-          LogCvmfs(kLogCvmfs, kLogStderr, "Failed reading stderr");
-          return 32;
+      if (!RelayLines(fd_stderr, kLogStderr, &buf_stderr, &stderr_open)) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "Failed reading stderr");
+        return 32;
       }
     }
 
@@ -765,6 +773,10 @@ int main(int argc, char **argv) {
     waitpid(pid_cvmfs, &status, 0);
   }
 
+  if (!buf_stdout.empty())
+    LogCvmfs(kLogCvmfs, kLogStdout, "%s", buf_stdout.c_str());
+  if (!buf_stderr.empty())
+    LogCvmfs(kLogCvmfs, kLogStderr, "%s", buf_stderr.c_str());
   close(fd_stdout);
   close(fd_stderr);
 
