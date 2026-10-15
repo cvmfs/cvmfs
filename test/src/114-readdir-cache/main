@@ -1,0 +1,75 @@
+#!/bin/bash
+cvmfs_test_name="Mountless repository gateway ingest"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+produce_tarball() {
+  local tarball_name
+  tarball_name=$(readlink -f "$1")
+  mkdir base_dir
+  pushd base_dir
+  tar -cf "$tarball_name" .
+  popd
+  rm -rf base_dir
+}
+
+test_case() {
+        local EXTRA_CONFIG=()
+        EXTRA_CONFIG=( "$@" )
+
+        set_up_repository_gateway "$CVMFS_TEST_REPO" -P
+
+        # Make sure CVMFS_AUTO_UPDATE is not hindered by fixed root hash
+        grep CVMFS_ROOT_HASH /var/spool/cvmfs/"$CVMFS_TEST_REPO"/client.local && exit 1
+
+        sudo tee -a /etc/cvmfs/repositories.d/"$CVMFS_TEST_REPO"/client.conf <<-EOF
+CVMFS_KCACHE_TIMEOUT=0
+CVMFS_MAX_TTL_SECS=1
+CVMFS_MAX_TTL=1
+CVMFS_AUTO_UPDATE=yes
+CVMFS_DEBUGLOG=/var/log/$CVMFS_TEST_REPO.cvmfs-debug.log
+CVMFS_USYSLOG=/var/log/$CVMFS_TEST_REPO.cvmfs-usyslog.log
+EOF
+        for setting in "${EXTRA_CONFIG[@]}"; do
+            echo "$setting" | sudo tee -a /etc/cvmfs/repositories.d/"$CVMFS_TEST_REPO"/client.conf
+        done
+        sudo tee -a /etc/cvmfs/repositories.d/"$CVMFS_TEST_REPO"/server.conf <<-EOF
+CVMFS_USE_FILE_CHUNKING=false
+CVMFS_QUOTA_LIMIT=-1
+EOF
+        if mount | grep /var/spool/cvmfs/"$CVMFS_TEST_REPO"/rdonly; then
+            echo "cvmfs mount unexpected at this moment"
+            exit 1
+        fi
+        #load_repo_config "$CVMFS_TEST_REPO"
+        cvmfs_server ingest --tar_file "$tarfile" --base_dir foo "$CVMFS_TEST_REPO" |& tee "$CVMFS_TEST_REPO".ingest.log
+        sudo mount  /var/spool/cvmfs/"$CVMFS_TEST_REPO"/rdonly
+
+        FRESH=$(cvmfs_talk -p /var/spool/cvmfs/"$CVMFS_TEST_REPO"/cvmfs_io internal affairs | grep 'cvmfs.n_fs_readdir_0_offset\>' | cut -d'|' -f 2)
+        [[ "$FRESH" == 0 ]]
+        ls /var/spool/cvmfs/"$CVMFS_TEST_REPO"/rdonly
+        AFTER_1_PASS=$(cvmfs_talk -p /var/spool/cvmfs/"$CVMFS_TEST_REPO"/cvmfs_io internal affairs | grep 'cvmfs.n_fs_readdir_0_offset\>' | cut -d'|' -f 2)
+        [[ "$AFTER_1_PASS" == 1 ]]
+        ls /var/spool/cvmfs/"$CVMFS_TEST_REPO"/rdonly
+        AFTER_2_PASSES=$(cvmfs_talk -p /var/spool/cvmfs/"$CVMFS_TEST_REPO"/cvmfs_io internal affairs | grep 'cvmfs.n_fs_readdir_0_offset\>' | cut -d'|' -f 2)
+        if [[ "${EXTRA_CONFIG[*]}" =~ 'CVMFS_FUSE_KEEP_DIR_CACHE=1' ]]; then
+                [[ "$AFTER_2_PASSES" == 1 ]]
+        else
+                [[ "$AFTER_2_PASSES" == 2 ]]
+        fi
+        sudo umount /var/spool/cvmfs/"$CVMFS_TEST_REPO"/rdonly
+        sudo cvmfs_server rmfs -f "$CVMFS_TEST_REPO"
+}
+
+
+cvmfs_run_test() {
+  tarfile="$PWD/tarball.tar"
+
+  produce_tarball "$tarfile" || return 10
+
+  export CVMFS_TEST_REPO=test.repo.readdir-normal
+  test_case
+
+  export CVMFS_TEST_REPO=test.repo.readdir-cached
+  test_case CVMFS_FUSE_KEEP_DIR_CACHE=1 CVMFS_FULL_READDIR_CACHING=1
+}
