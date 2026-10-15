@@ -563,7 +563,7 @@ _cvmfs_mount_manually() {
   local repository=$1
   cvmfs_config status | grep -q "/cvmfs/$repository" && return 0
   mkdir -p "/cvmfs/$repository" 2>/dev/null || sudo mkdir -p "/cvmfs/$repository"
-  sudo mount -t cvmfs "$repository" "/cvmfs/$repository" >/dev/null 2>&1
+  sudo mount -t cvmfs "$repository" "/cvmfs/$repository" >/dev/null
   if running_on_osx; then 
     sleep 3
   fi
@@ -606,6 +606,19 @@ cvmfs_umount() {
       timeout=$(($timeout-1))
       sleep 1
     done
+
+    # The macOS NFS frontend notices an external unmount only by polling, so
+    # cvmfs2 can outlive umount; wait so a remount does not race the old one
+    if running_on_osx; then
+      timeout=15
+      while pgrep -f "cvmfs2 .*[ ,]$r( |$)" > /dev/null; do
+        if [ $timeout -eq 0 ]; then
+          return 102
+        fi
+        timeout=$(($timeout-1))
+        sleep 1
+      done
+    fi
 
     times=5
     result=-1
