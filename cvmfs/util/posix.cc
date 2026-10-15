@@ -30,6 +30,7 @@
 
 #include <cctype>
 #include <cstdlib>
+#include "util/logging_internal.h"
 #ifdef __APPLE__
 #include <sys/mount.h>  //  for statfs()
 #else
@@ -492,8 +493,21 @@ int ConnectTcpEndpoint(const std::string &ipv4_address, int portno) {
  * Creating a pipe should always succeed.
  */
 void MakePipe(int pipe_fd[2]) {
-  const int retval = pipe(pipe_fd);
-  assert(retval == 0);
+  int retval = pipe(pipe_fd);
+  if (retval != 0) {
+    if (errno == EMFILE) {
+      // if the NOFILE is the reason, try to increase it
+      auto infr = IncreaseNoFileSoft(NOFILE_STEP);
+      if (infr == 0) {
+        retval = pipe(pipe_fd);
+        if (retval == 0) {
+          return;
+        }
+      }
+    }
+    LogCvmfs(kLogCvmfs,kLogSyslogErr | kLogDebug, "MakePipe failed with errno %d", errno);
+  }
+  assert(retval==0);
 }
 
 
