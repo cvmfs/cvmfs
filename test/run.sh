@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 usage() {
   echo "$0 [logfile] [-o xUnit XML output] [-s suite labels] [-p profile]"
