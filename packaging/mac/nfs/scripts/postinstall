@@ -7,6 +7,14 @@ set -e
 exec >> /tmp/cvmfs_postinstall 2>&1
 echo "cvmfs NFS postinstall, $(date)"
 
+# A leftover FSKit configuration from a macFUSE package selects the FSKit
+# backend and per-user socket/cache paths, which break NFS mounts
+fskit_conf=/etc/cvmfs/default.d/11-osx-fskit.conf
+if [ -f $fskit_conf ]; then
+  mv -f $fskit_conf $fskit_conf.disabled
+  echo "disabled $fskit_conf"
+fi
+
 export PATH="$PATH:/usr/local/bin"
 /usr/local/bin/cvmfs_config setup
 
