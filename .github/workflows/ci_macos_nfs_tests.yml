@@ -32,8 +32,9 @@ jobs:
       - name: Install test dependencies
         run: |
           sw_vers
-          # The test functions use timeout, greadlink and bash >= 4.2 ([[ -v ]])
-          brew install bash coreutils meson ninja pkg-config
+          # The tests use timeout, greadlink, bash >= 4.2 ([[ -v ]]) and gawk
+          brew install bash coreutils gawk meson ninja pkg-config
+          [ -e "$(brew --prefix)/bin/awk" ] || ln -s gawk "$(brew --prefix)/bin/awk"
           sudo ln -sf "$(brew --prefix)/bin/gtimeout" /usr/local/bin/timeout
           sudo ln -sf "$(brew --prefix)/bin/greadlink" /usr/local/bin/greadlink
 

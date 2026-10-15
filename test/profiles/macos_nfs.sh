@@ -8,7 +8,9 @@
 # to be installed; see .github/workflows/ci_macos_nfs_tests.yml.
 #
 # Exclusions: the CI_MacOS (fuse-t) list, plus tests that depend on a FUSE
-# device, the FUSE mount options, or reloading/attaching a FUSE session.
+# device, the FUSE mount options, or reloading/attaching a FUSE session, and
+# Linux-only tests (autofs, /proc).  011 expects a read to crash the client
+# after its cache manager is killed; over NFS the kernel serves it from cache.
 
 PROFILE_CLASS_NAME="MacOSNFSClientTests"
 PROFILE_TESTSUITE="src/0* src/1*"
@@ -19,6 +21,7 @@ PROFILE_EXCLUSIONS="\
   src/006-buildkernel \
   src/007-testjobs \
   src/008-default_domain \
+  src/011-rmemptyfilesrebuild \
   src/015-rebuild_on_crash \
   src/016-dnsunreachable \
   src/017-dnstimeout \
@@ -54,6 +57,7 @@ PROFILE_EXCLUSIONS="\
   src/090-talkchroot \
   src/091-defaultconfigrepo \
   src/091-talksocket \
+  src/093-deviceid \
   src/092-stat \
   src/094-attachmount \
   src/095-fuser \
@@ -68,6 +72,7 @@ PROFILE_EXCLUSIONS="\
   src/108-fuse-passthru \
   src/108-global-config \
   src/109-capabilities \
+  src/111-ignore-mount-attempt \
   src/406-ducc-webhook-notifications"
 
 profile_setup() {
