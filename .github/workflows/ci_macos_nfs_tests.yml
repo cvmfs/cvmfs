@@ -1,0 +1,87 @@
+name: CI_MacOS_NFS_Tests
+
+# Client integration tests (test/profiles/macos_nfs.sh) against the macOS NFS
+# development package, i.e. cvmfs2 mounted through the kernel NFS client
+
+on:
+  push:
+    branches: [ 'macos/nfs-native' ]
+    paths:
+      - 'cvmfs/**'
+      - 'mount/**'
+      - 'ci/nfs4/**'
+      - 'packaging/mac/nfs/**'
+      - 'test/profiles/macos_nfs.sh'
+      - 'test/test_functions'
+      - '.github/workflows/ci_macos_nfs_tests.yml'
+  pull_request:
+    paths:
+      - 'cvmfs/nfs4/**'
+      - 'packaging/mac/nfs/**'
+      - 'test/profiles/macos_nfs.sh'
+      - '.github/workflows/ci_macos_nfs_tests.yml'
+  workflow_dispatch:
+
+jobs:
+  client_tests:
+    runs-on: macos-15
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install test dependencies
+        run: |
+          sw_vers
+          # The test functions use timeout and greadlink
+          brew install coreutils meson ninja pkg-config
+          sudo ln -sf "$(brew --prefix)/bin/gtimeout" /usr/local/bin/timeout
+          sudo ln -sf "$(brew --prefix)/bin/greadlink" /usr/local/bin/greadlink
+
+      - name: Install fuse3 headers
+        run: |
+          # Headers only: the NFS frontend does not link against libfuse
+          git clone --depth 1 --branch fuse-t \
+            https://github.com/macos-fuse-t/libfuse3.git /tmp/libfuse3
+          cd /tmp/libfuse3
+          meson setup build --prefix=/usr/local
+          ninja -C build
+          sudo ninja -C build install
+
+      - name: Build and install package
+        run: |
+          ./ci/nfs4/pkg.sh . build "ci.$(git rev-parse --short HEAD)"
+          sudo installer -pkg build/pkg_result/cvmfs-*.pkg -target / \
+            || { cat /tmp/cvmfs_postinstall; exit 1; }
+          cat /tmp/cvmfs_postinstall
+          ls -la /cvmfs/
+          sudo cvmfs_config chksetup || true
+
+      - name: Run tests
+        run: |
+          sudo launchctl limit maxfiles 65536 65536
+          export CVMFS_PLATFORM_NAME="macos-nfs"
+          export CVMFS_TIMESTAMP=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          export CVMFS_TEST_PROXY=DIRECT
+          export CVMFS_TEST_USE_CDN=yes
+          export CVMFS_TEST_USE_MACFUSE_KEXT=OFF
+          cd test
+          ./run.sh /tmp/cvmfs-client-test.log \
+            -o /tmp/cvmfs-client-test.xunit.xml -s quick -p macos_nfs
+
+      - name: Collect logs
+        if: ${{ always() }}
+        run: |
+          mkdir -p /tmp/nfs-logs
+          cp /tmp/cvmfs-client-test.log /tmp/cvmfs-client-test.xunit.xml \
+            /tmp/nfs-logs/ 2>/dev/null || true
+          sudo log show --last 120m --style compact \
+            --predicate 'process == "cvmfs2" OR process == "mount_nfs"' \
+            > /tmp/nfs-logs/system.log 2>/dev/null || true
+          sudo chmod -R a+r /tmp/nfs-logs
+
+      - name: Upload logs
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-nfs-client-test-logs
+          path: /tmp/nfs-logs
