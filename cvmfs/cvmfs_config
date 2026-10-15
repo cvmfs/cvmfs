@@ -1979,9 +1979,10 @@ waitfor() {
 
 list_mounts() {
   # Matches lines that begin with cvmfs2 or /usr/bin/cvmfs2 (/bin/cvmfs2,
-  # /usr/local/bin/cvmfs2) on Linux or lines that contain fuse-t on macOS
+  # /usr/local/bin/cvmfs2) on Linux.  On macOS, fuse-t and the NFS frontend
+  # (served on 127.0.0.1:/) both appear as nfs mounts.
   if [ x"$sys_arch" = x"Darwin" ] && ! is_macfuse_enabled; then
-    mount -t "nfs" | grep "fuse-t"
+    mount -t "nfs" | grep -e "fuse-t" -e "^127\.0\.0\.1:/ on "
   else
     mount -t $fuse_fs_type | grep "^\(/[^[:space:]]*/\)\?cvmfs2[[:space:]]"
   fi
