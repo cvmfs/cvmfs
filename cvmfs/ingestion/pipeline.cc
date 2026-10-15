@@ -258,3 +258,117 @@ void ScrubbingPipeline::Spawn() {
 
 
 void ScrubbingPipeline::WaitFor() { tube_counter_.Wait(); }
+
+void TaskCompressHashCallback::Process(BlockItem *block_item) {
+  FileItem *file_item = block_item->file_item();
+  ChunkItem *chunk_item = block_item->chunk_item();
+
+  switch (block_item->type()) {
+    case BlockItem::kBlockData:
+      delete block_item;
+      break;
+    case BlockItem::kBlockStop:
+      assert(!chunk_item->hash_ptr()->IsNull());
+      NotifyListeners(CompressHashResult(file_item->path(), *chunk_item->hash_ptr()));
+      delete block_item;
+      delete chunk_item;
+      delete file_item;
+      tube_counter_->PopFront();
+      break;
+    default:
+      PANIC(NULL);
+  }
+}
+
+CompressHashPipeline::CompressHashPipeline()
+  : spawned_(false)
+{
+  // we don't need much parallelism for this pipeline
+  const unsigned int nfork_base = 1;
+
+  for (unsigned i = 0; i < nfork_base * 1; ++i) {
+    Tube<BlockItem> *tube = new Tube<BlockItem>();
+    tubes_compress_hash_callback_.TakeTube(tube);
+    TaskCompressHashCallback *task =
+      new TaskCompressHashCallback(tube, &tube_counter_);
+    task->RegisterListener(&CompressHashPipeline::OnFileProcessed, this);
+    tasks_compress_hash_callback_.TakeConsumer(task);
+  }
+  tubes_compress_hash_callback_.Activate();
+
+  for (unsigned i = 0; i < nfork_base * 2; ++i) {
+    Tube<BlockItem> *t = new Tube<BlockItem>();
+    tubes_hash_.TakeTube(t);
+    tasks_hash_.TakeConsumer(new TaskHash(t, &tubes_compress_hash_callback_));
+  }
+  tubes_hash_.Activate();
+
+  for (unsigned i = 0; i < nfork_base * 2; ++i) {
+    Tube<BlockItem> *t = new Tube<BlockItem>();
+    tubes_compress_.TakeTube(t);
+    tasks_compress_.TakeConsumer(
+      new TaskCompress(t, &tubes_hash_, &item_allocator_));
+  }
+  tubes_compress_.Activate();
+
+  for (unsigned i = 0; i < nfork_base * 1; ++i) {
+    Tube<BlockItem> *t = new Tube<BlockItem>();
+    tubes_chunk_.TakeTube(t);
+    tasks_chunk_.TakeConsumer(
+      new TaskChunk(t, &tubes_compress_, &item_allocator_));
+  }
+  tubes_chunk_.Activate();
+
+  for (unsigned i = 0; i < nfork_base * 1; ++i) {
+    TaskRead *task_read =
+      new TaskRead(&tube_input_, &tubes_chunk_, &item_allocator_);
+    task_read->SetWatermarks(kMemLowWatermark, kMemHighWatermark);
+    tasks_read_.TakeConsumer(task_read);
+  }
+}
+
+CompressHashPipeline::~CompressHashPipeline() {
+  if (spawned_) {
+    tasks_read_.Terminate();
+    tasks_chunk_.Terminate();
+    tasks_compress_.Terminate();
+    tasks_hash_.Terminate();
+    tasks_compress_hash_callback_.Terminate();
+  }
+}
+
+void CompressHashPipeline::OnFileProcessed(
+  const CompressHashResult &compress_hash_result)
+{
+  NotifyListeners(compress_hash_result);
+}
+
+void CompressHashPipeline::Process(
+  IngestionSource *source,
+  shash::Algorithms hash_algorithm,
+  shash::Suffix hash_suffix)
+{
+  FileItem *file_item = new FileItem(
+    source,
+    0, 0, 0,
+    zlib::kZlibDefault,
+    hash_algorithm,
+    hash_suffix,
+    false,  /* may_have_chunks */
+    false  /* hash_legacy_bulk_chunk */);
+  tube_counter_.EnqueueBack(file_item);
+  tube_input_.EnqueueBack(file_item);
+}
+
+void CompressHashPipeline::Spawn() {
+  tasks_compress_hash_callback_.Spawn();
+  tasks_hash_.Spawn();
+  tasks_compress_.Spawn();
+  tasks_chunk_.Spawn();
+  tasks_read_.Spawn();
+  spawned_ = true;
+}
+
+void CompressHashPipeline::WaitFor() {
+  tube_counter_.Wait();
+}

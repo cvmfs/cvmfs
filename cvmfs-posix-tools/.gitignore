@@ -1,0 +1,11 @@
+test_dir*
+connect
+cvmfs_dir*
+large_file*.txt
+.vscode
+res_loc
+demo*
+*test_file*
+.hold*
+.github/workflows/integration_tests/src_files
+.github/workflows/integration_tests/bin

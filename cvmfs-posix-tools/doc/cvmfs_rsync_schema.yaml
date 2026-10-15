@@ -1,0 +1,23 @@
+# Config File for cvmfs_rsync and toolbox tools
+---
+repos:
+  <repo-name>:
+    proxy: string
+    s3_access_key: string
+    s3_secret_key: string
+    dot-scheme: bool
+    content-addressable: bool
+    external-url-prefix: string
+    internal-url-prefix: string
+    groups:
+      <group-name|DEFAULT>:
+        <path-prefix|DEFAULT>:
+          allow-upload: bool
+          allow-purge: bool
+          allow-delete: bool
+          allow-acl: bool
+          user: int
+          group: int
+          file-mode: int
+          directory-mode: int
+          check-permissions: bool

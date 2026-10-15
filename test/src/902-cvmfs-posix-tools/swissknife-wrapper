@@ -1,0 +1,7 @@
+#!/bin/bash
+set -euo pipefail
+EXE=/usr/bin/cvmfs_swissknife_debug
+if ! [[ -f "$EXE" ]]; then
+	EXE=$/usr/bin/cvmfs_swissknife
+fi
+exec rr "$EXE" "$@"
