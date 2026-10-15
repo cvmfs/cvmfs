@@ -128,7 +128,7 @@ class T_Util : public ::testing::Test {
   std::string to_write_large;
 };
 
-class IncreaseNoFileSoftTest : public ::testing::Test {
+class T_IncreaseNoFileSoftTest : public ::testing::Test {
 protected:
     void SetUp() override {
         // Save the original resource limits
@@ -2068,7 +2068,7 @@ TEST_F(T_Util, MemoryMappedFile) {
   mf.Unmap();
 }
 
-TEST_F(IncreaseNoFileSoftTest, SoftLimitAlreadyAtHardLimit) {
+TEST_F(T_IncreaseNoFileSoftTest, SoftLimitAlreadyAtHardLimit) {
     struct rlimit rpl;
     rpl.rlim_cur = original_rpl.rlim_max;
     rpl.rlim_max = original_rpl.rlim_max;
@@ -2077,7 +2077,7 @@ TEST_F(IncreaseNoFileSoftTest, SoftLimitAlreadyAtHardLimit) {
     EXPECT_EQ(IncreaseNoFileSoft(100), -1);
 }
 
-TEST_F(IncreaseNoFileSoftTest, IncreaseSoftLimitWithinMargin) {
+TEST_F(T_IncreaseNoFileSoftTest, IncreaseSoftLimitWithinMargin) {
     struct rlimit rpl;
     ASSERT_NE(original_rpl.rlim_cur,original_rpl.rlim_max);
     const auto margin = original_rpl.rlim_max-original_rpl.rlim_cur;
@@ -2090,7 +2090,7 @@ TEST_F(IncreaseNoFileSoftTest, IncreaseSoftLimitWithinMargin) {
     EXPECT_EQ(rpl.rlim_cur, original_rpl.rlim_cur+step);
 }
 
-TEST_F(IncreaseNoFileSoftTest, IncreaseSoftLimitToHardLimit) {
+TEST_F(T_IncreaseNoFileSoftTest, IncreaseSoftLimitToHardLimit) {
     EXPECT_EQ(IncreaseNoFileSoft(original_rpl.rlim_max-original_rpl.rlim_cur), 0);
 
     struct rlimit new_rpl;
