@@ -11,6 +11,8 @@
 # device, the FUSE mount options, or reloading/attaching a FUSE session, and
 # Linux-only tests (autofs, /proc).  011 expects a read to crash the client
 # after its cache manager is killed; over NFS the kernel serves it from cache.
+# The frontend forces CVMFS_NFS_SOURCE, which requires the workspace to be the
+# cache directory: excludes 032 (CVMFS_WORKSPACE) and 068 (alien cache).
 
 PROFILE_CLASS_NAME="MacOSNFSClientTests"
 PROFILE_TESTSUITE="src/0* src/1*"
@@ -27,6 +29,7 @@ PROFILE_EXCLUSIONS="\
   src/017-dnstimeout \
   src/024-reload-during-asetup \
   src/028-negativecache \
+  src/032-workspace \
   src/039-reloadalarm \
   src/040-aliencache \
   src/041-rocache \
@@ -41,6 +44,7 @@ PROFILE_EXCLUSIONS="\
   src/060-hidexattrs \
   src/061-systemdnokill \
   src/064-fsck \
+  src/068-rocache \
   src/066-killall \
   src/069-systemremount \
   src/072-mountdevicepath \
