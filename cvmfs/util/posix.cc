@@ -1478,22 +1478,28 @@ int IncreaseNoFileSoft(size_t value) {
   struct rlimit rpl;
   memset(&rpl, 0, sizeof(rpl));
   auto gl = getrlimit(RLIMIT_NOFILE, &rpl);
-  if (!gl) {
-    LogCvmfs(kLogCvmfs, kLogSyslog|kLogDebug, "Getting process resource limits failed (%d).", errno);
-    return errno;
+  if (gl == -1) {
+    LogCvmfs(kLogCvmfs, kLogSyslog | kLogDebug,
+             "Getting process resource limits failed (%d).", errno);
+    return -1;
   }
 
-  if (rpl.rlim_cur >= rpl.rlim_max)
+  if (rpl.rlim_cur >= rpl.rlim_max) {
     // If hard limit is already reached, give up
-    LogCvmfs(kLogCvmfs, kLogSyslog|kLogDebug, "Negotiating a higher NOFILE soft limit failed. Already reached hard limit.");
+    LogCvmfs(kLogCvmfs, kLogSyslog | kLogDebug,
+             "Negotiating a higher NOFILE soft limit failed. Already reached "
+             "hard limit.");
     return -1;
+  }
 
   auto margin = rpl.rlim_max - rpl.rlim_cur;
-  rpl.rlim_cur = (value < margin) ? value : margin;
+  rpl.rlim_cur += (value < margin) ? value : margin;
   const int retval = setrlimit(RLIMIT_NOFILE, &rpl);
   if (retval == 0)
-    LogCvmfs(kLogCvmfs, kLogSyslog|kLogDebug, "A new soft limit for NOFILE is set to %lld",static_cast<long long int>(rpl.rlim_cur));
-    return 0;
+    LogCvmfs(kLogCvmfs, kLogSyslog | kLogDebug,
+             "A new soft limit for NOFILE is set to %lld",
+             static_cast<long long int>(rpl.rlim_cur));
+  return 0;
 
 #ifdef HAS_VALGRIND_HEADERS
   return RUNNING_ON_VALGRIND ? -2 : -1;
