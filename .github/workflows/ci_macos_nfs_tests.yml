@@ -32,8 +32,8 @@ jobs:
       - name: Install test dependencies
         run: |
           sw_vers
-          # The test functions use timeout and greadlink
-          brew install coreutils meson ninja pkg-config
+          # The test functions use timeout, greadlink and bash >= 4.2 ([[ -v ]])
+          brew install bash coreutils meson ninja pkg-config
           sudo ln -sf "$(brew --prefix)/bin/gtimeout" /usr/local/bin/timeout
           sudo ln -sf "$(brew --prefix)/bin/greadlink" /usr/local/bin/greadlink
 
@@ -65,7 +65,9 @@ jobs:
           export CVMFS_TEST_USE_CDN=yes
           export CVMFS_TEST_USE_MACFUSE_KEXT=OFF
           cd test
-          ./run.sh /tmp/cvmfs-client-test.log \
+          # /bin/bash is 3.2; inner `bash -c` calls resolve through PATH
+          export PATH="$(brew --prefix)/bin:$PATH"
+          bash ./run.sh /tmp/cvmfs-client-test.log \
             -o /tmp/cvmfs-client-test.xunit.xml -s quick -p macos_nfs
 
       - name: Collect logs
