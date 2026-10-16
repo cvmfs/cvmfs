@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# bash self-test against outdated bash shipped with macos
+: |& cat
+
 CVMFS_SERVER_APACHE_RELOAD_IS_RESTART=true
 # Written as CVMFS_MOUNT_BACKEND to default.local; empty keeps the installed default
 CVMFS_TEST_MOUNT_BACKEND=${CVMFS_TEST_MOUNT_BACKEND:=}
