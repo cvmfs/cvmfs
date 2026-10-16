@@ -14,70 +14,96 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// DeleteImageFromCVMFS deletes the user-facing symlink and manifest directory
-// for the given image from the CVMFS repository, making it eligible for
-// garbage collection on the next run. Returns true if any paths existed and
-// were (or would be) deleted.
-func DeleteImageFromCVMFS(CVMFSRepo string, img *Image, dryRun bool) (bool, error) {
+// imageCVMFSPaths holds the paths in the CVMFS repository that belong to a
+// single image and that exist at the time of the lookup.
+type imageCVMFSPaths struct {
+	symlink               string
+	manifestDir           string
+	multiarchPaths        []string
+	multiarchMetadataDirs []string
+}
+
+func findImageCVMFSPaths(CVMFSRepo string, img *Image) imageCVMFSPaths {
 	symlinkPath := filepath.Join("/", "cvmfs", CVMFSRepo, img.GetPublicSymlinkPath())
 	manifestDir := filepath.Join("/", "cvmfs", CVMFSRepo, ".metadata", img.GetSimpleName())
 	multiarchBase := filepath.Join("/", "cvmfs", CVMFSRepo, ".multiarch")
 	metadataBase := filepath.Join("/", "cvmfs", CVMFSRepo, ".metadata")
 
-	_, symlinkErr := os.Lstat(symlinkPath)
-	_, manifestErr := os.Stat(manifestDir)
+	var p imageCVMFSPaths
+	if _, err := os.Lstat(symlinkPath); err == nil {
+		p.symlink = symlinkPath
+	}
+	if _, err := os.Stat(manifestDir); err == nil {
+		p.manifestDir = manifestDir
+	}
+	p.multiarchPaths = findMultiarchImagePaths(multiarchBase, img)
+	p.multiarchMetadataDirs = findMultiarchMetadataDirs(metadataBase, img)
+	return p
+}
 
-	symlinkExists := symlinkErr == nil
-	manifestExists := manifestErr == nil
-	multiarchPaths := findMultiarchImagePaths(multiarchBase, img)
-	multiarchMetadataDirs := findMultiarchMetadataDirs(metadataBase, img)
+func (p imageCVMFSPaths) empty() bool {
+	return p.symlink == "" && p.manifestDir == "" &&
+		len(p.multiarchPaths) == 0 && len(p.multiarchMetadataDirs) == 0
+}
 
-	if !symlinkExists && !manifestExists && len(multiarchPaths) == 0 && len(multiarchMetadataDirs) == 0 {
+func (p imageCVMFSPaths) printDryRun() {
+	if p.symlink != "" {
+		fmt.Printf("[dry-run] Would delete symlink: %s\n", p.symlink)
+	}
+	if p.manifestDir != "" {
+		fmt.Printf("[dry-run] Would delete manifest dir: %s\n", p.manifestDir)
+	}
+	for _, path := range p.multiarchPaths {
+		fmt.Printf("[dry-run] Would delete .multiarch symlink: %s\n", path)
+	}
+	for _, path := range p.multiarchMetadataDirs {
+		fmt.Printf("[dry-run] Would delete .metadata/.multiarch manifest dir: %s\n", path)
+	}
+}
+
+// remove deletes the paths; it must run inside an open transaction.
+func (p imageCVMFSPaths) remove() error {
+	if p.symlink != "" {
+		if err := os.Remove(p.symlink); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("error removing symlink %s: %w", p.symlink, err)
+		}
+	}
+	if p.manifestDir != "" {
+		if err := os.RemoveAll(p.manifestDir); err != nil {
+			return fmt.Errorf("error removing manifest dir %s: %w", p.manifestDir, err)
+		}
+	}
+	for _, path := range p.multiarchPaths {
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("error removing .multiarch symlink %s: %w", path, err)
+		}
+	}
+	for _, path := range p.multiarchMetadataDirs {
+		if err := os.RemoveAll(path); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("error removing .metadata/.multiarch manifest dir %s: %w", path, err)
+		}
+	}
+	return nil
+}
+
+// DeleteImageFromCVMFS deletes the user-facing symlink and manifest directory
+// for the given image from the CVMFS repository, making it eligible for
+// garbage collection on the next run. Returns true if any paths existed and
+// were (or would be) deleted.
+func DeleteImageFromCVMFS(CVMFSRepo string, img *Image, dryRun bool) (bool, error) {
+	paths := findImageCVMFSPaths(CVMFSRepo, img)
+	if paths.empty() {
 		l.Log().WithFields(log.Fields{"image": img.GetSimpleName()}).
 			Info("Image not found in CVMFS, nothing to delete")
 		return false, nil
 	}
 
 	if dryRun {
-		if symlinkExists {
-			fmt.Printf("[dry-run] Would delete symlink: %s\n", symlinkPath)
-		}
-		if manifestExists {
-			fmt.Printf("[dry-run] Would delete manifest dir: %s\n", manifestDir)
-		}
-		for _, p := range multiarchPaths {
-			fmt.Printf("[dry-run] Would delete .multiarch symlink: %s\n", p)
-		}
-		for _, p := range multiarchMetadataDirs {
-			fmt.Printf("[dry-run] Would delete .metadata/.multiarch manifest dir: %s\n", p)
-		}
+		paths.printDryRun()
 		return true, nil
 	}
 
-	err := cvmfs.WithinTransaction(CVMFSRepo, func() error {
-		if symlinkExists {
-			if err := os.Remove(symlinkPath); err != nil && !os.IsNotExist(err) {
-				return fmt.Errorf("error removing symlink %s: %w", symlinkPath, err)
-			}
-		}
-		if manifestExists {
-			if err := os.RemoveAll(manifestDir); err != nil {
-				return fmt.Errorf("error removing manifest dir %s: %w", manifestDir, err)
-			}
-		}
-		for _, p := range multiarchPaths {
-			if err := os.Remove(p); err != nil && !os.IsNotExist(err) {
-				return fmt.Errorf("error removing .multiarch symlink %s: %w", p, err)
-			}
-		}
-		for _, p := range multiarchMetadataDirs {
-			if err := os.RemoveAll(p); err != nil && !os.IsNotExist(err) {
-				return fmt.Errorf("error removing .metadata/.multiarch manifest dir %s: %w", p, err)
-			}
-		}
-		return nil
-	})
-	if err != nil {
+	if err := cvmfs.WithinTransaction(CVMFSRepo, paths.remove); err != nil {
 		return true, err
 	}
 
@@ -159,6 +185,185 @@ func findMultiarchMetadataDirs(metadataBase string, img *Image) []string {
 		}
 	}
 	return result
+}
+
+// FindAllCVMFSImages scans the .metadata directory and returns every image
+// that has been converted into the CVMFS repository. Images converted from a
+// manifest list only have per-architecture manifests under
+// .metadata/.multiarch/<arch>/, so that tree is scanned as well; each image is
+// returned once regardless of how many architectures it has.
+func FindAllCVMFSImages(CVMFSRepo string) ([]*Image, error) {
+	metadataRoot := filepath.Join("/", "cvmfs", CVMFSRepo, ".metadata")
+	if _, err := os.Stat(metadataRoot); os.IsNotExist(err) {
+		return nil, nil
+	}
+
+	seen := make(map[string]bool)
+	var result []*Image
+	add := func(img *Image) {
+		name := img.GetSimpleName()
+		if seen[name] {
+			return
+		}
+		seen[name] = true
+		result = append(result, img)
+	}
+
+	multiarchRoot := filepath.Join(metadataRoot, ".multiarch")
+	imgs, err := findImagesBelow(metadataRoot, multiarchRoot)
+	if err != nil {
+		return nil, err
+	}
+	for _, img := range imgs {
+		add(img)
+	}
+
+	entries, err := ioutil.ReadDir(multiarchRoot)
+	if err != nil && !os.IsNotExist(err) {
+		return nil, err
+	}
+	for _, entry := range entries {
+		// Alias symlinks (e.g. aarch64 -> arm64) point to other arch dirs.
+		if entry.Mode()&os.ModeSymlink != 0 || !entry.IsDir() {
+			continue
+		}
+		imgs, err := findImagesBelow(filepath.Join(multiarchRoot, entry.Name()), "")
+		if err != nil {
+			return nil, err
+		}
+		for _, img := range imgs {
+			add(img)
+		}
+	}
+	return result, nil
+}
+
+// findImagesBelow returns the images whose manifest directories
+// (<registry>/<repo>:<tag>/manifest.json) are located under root. The
+// directory skip, if non-empty, is not descended into.
+func findImagesBelow(root, skip string) ([]*Image, error) {
+	var result []*Image
+	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() || path == root {
+			return nil
+		}
+		if skip != "" && path == skip {
+			return filepath.SkipDir
+		}
+		if _, err := os.Stat(filepath.Join(path, "manifest.json")); err != nil {
+			return nil
+		}
+		relPath, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		imageURL := fmt.Sprintf("https://%s", filepath.ToSlash(relPath))
+		img, err := ParseImage(imageURL)
+		if err != nil {
+			l.LogE(err).WithFields(log.Fields{"path": path}).
+				Warning("Failed to parse image from CVMFS metadata, skipping")
+			return filepath.SkipDir
+		}
+		result = append(result, &img)
+		// Manifest directories are never nested.
+		return filepath.SkipDir
+	})
+	return result, err
+}
+
+// ImageCoveredByWishlist reports whether the given CVMFS image is covered by at
+// least one wishlist entry. Registry and repository must match exactly; the tag
+// must match exactly for fixed-tag entries, or as a glob pattern for
+// wildcard-tagged entries.
+func ImageCoveredByWishlist(img *Image, wishlist []Image) bool {
+	for i := range wishlist {
+		w := &wishlist[i]
+		if w.Registry != img.Registry || w.Repository != img.Repository {
+			continue
+		}
+		if w.TagWildcard {
+			matched, err := filepath.Match(w.Tag, img.Tag)
+			if err == nil && matched {
+				return true
+			}
+			continue
+		}
+		if w.Tag == img.Tag {
+			return true
+		}
+	}
+	return false
+}
+
+// FindCVMFSImagesNotInWishlist returns all images converted into the CVMFS
+// repository that are not covered by any entry of the given wishlist.
+func FindCVMFSImagesNotInWishlist(CVMFSRepo string, wishlist []Image) ([]*Image, error) {
+	all, err := FindAllCVMFSImages(CVMFSRepo)
+	if err != nil {
+		return nil, err
+	}
+	var result []*Image
+	for _, img := range all {
+		if ImageCoveredByWishlist(img, wishlist) {
+			continue
+		}
+		result = append(result, img)
+	}
+	return result, nil
+}
+
+// DeleteImagesFromCVMFS deletes the given images from the CVMFS repository
+// within a single transaction, so that pruning many images costs one publish.
+// Errors on individual images are logged and do not stop the deletion of the
+// remaining images; a partially removed image keeps some metadata and is
+// picked up again on the next run. Returns the count of images deleted (or flagged in dry-run mode).
+func DeleteImagesFromCVMFS(CVMFSRepo string, images []*Image, dryRun bool) (int, error) {
+	type pending struct {
+		img   *Image
+		paths imageCVMFSPaths
+	}
+	var todo []pending
+	for _, img := range images {
+		paths := findImageCVMFSPaths(CVMFSRepo, img)
+		if paths.empty() {
+			l.Log().WithFields(log.Fields{"image": img.GetSimpleName()}).
+				Info("Image not found in CVMFS, nothing to delete")
+			continue
+		}
+		todo = append(todo, pending{img, paths})
+	}
+
+	if dryRun {
+		for _, p := range todo {
+			p.paths.printDryRun()
+		}
+		return len(todo), nil
+	}
+	if len(todo) == 0 {
+		return 0, nil
+	}
+
+	deleted := 0
+	err := cvmfs.WithinTransaction(CVMFSRepo, func() error {
+		for _, p := range todo {
+			if err := p.paths.remove(); err != nil {
+				l.LogE(err).WithFields(log.Fields{"image": p.img.GetSimpleName()}).
+					Warning("Error deleting image, continuing")
+				continue
+			}
+			l.Log().WithFields(log.Fields{"image": p.img.GetSimpleName()}).
+				Info("Deleted image from CVMFS")
+			deleted++
+		}
+		return nil
+	})
+	if err != nil {
+		return 0, err
+	}
+	return deleted, nil
 }
 
 // FindCVMFSImagesMatchingPattern scans the .metadata directory and returns

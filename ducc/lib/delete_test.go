@@ -3,6 +3,7 @@ package lib
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -360,5 +361,386 @@ func TestFindMultiarchMetadataDirs_EmptyBaseDir(t *testing.T) {
 	dirs := findMultiarchMetadataDirs(filepath.Join(testMockRepo, "nonexistent-metadata"), &img)
 	if dirs != nil {
 		t.Errorf("expected nil for non-existent base dir, got %v", dirs)
+	}
+}
+
+// --------------------------------------------------------------------------
+// FindAllCVMFSImages
+// --------------------------------------------------------------------------
+
+// setupConvertedImageEntry creates a full manifest directory
+// .metadata/<registry>/<repo>:<tag>/manifest.json in the mock repo to
+// simulate a converted image.
+func setupConvertedImageEntry(t *testing.T, registry, repository, tag string) {
+	t.Helper()
+	simpleName := registry + "/" + repository + ":" + tag
+	dir := filepath.Join(testMockRepo, ".metadata", simpleName)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "manifest.json"), []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestFindAllCVMFSImages_FindsConvertedImages(t *testing.T) {
+	CVMFSRepo := mockCVMFSRepo()
+	registry := "findall.example.com"
+
+	setupConvertedImageEntry(t, registry, "library/alpine", "3.18")
+	setupConvertedImageEntry(t, registry, "org/team/app", "stable")
+
+	imgs, err := FindAllCVMFSImages(CVMFSRepo)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// The mock repo is shared between tests; filter to this test's registry.
+	var found []string
+	for _, img := range imgs {
+		if img.Registry == registry {
+			found = append(found, img.GetSimpleName())
+		}
+	}
+	if len(found) != 2 {
+		t.Fatalf("expected 2 images, got %d: %v", len(found), found)
+	}
+}
+
+// setupMultiarchImageEntry creates
+// .metadata/.multiarch/<arch>/<registry>/<repo>:<tag>/manifest.json, which is
+// the only metadata written for images converted from a manifest list.
+func setupMultiarchImageEntry(t *testing.T, arch, registry, repository, tag string) {
+	t.Helper()
+	simpleName := registry + "/" + repository + ":" + tag
+	dir := filepath.Join(testMockRepo, ".metadata", ".multiarch", arch, simpleName)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "manifest.json"), []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func imagesForRegistry(imgs []*Image, registry string) []string {
+	var found []string
+	for _, img := range imgs {
+		if img.Registry == registry {
+			found = append(found, img.GetSimpleName())
+		}
+	}
+	return found
+}
+
+func TestFindAllCVMFSImages_SkipsDirsWithoutManifest(t *testing.T) {
+	CVMFSRepo := mockCVMFSRepo()
+	registry := "findall2.example.com"
+
+	bare := filepath.Join(testMockRepo, ".metadata", registry, "incomplete:1.0")
+	if err := os.MkdirAll(bare, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	imgs, err := FindAllCVMFSImages(CVMFSRepo)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if found := imagesForRegistry(imgs, registry); len(found) != 0 {
+		t.Errorf("unexpected images found: %v", found)
+	}
+}
+
+func TestFindAllCVMFSImages_FindsMultiarchOnlyImages(t *testing.T) {
+	CVMFSRepo := mockCVMFSRepo()
+	registry := "findall3.example.com"
+
+	setupMultiarchImageEntry(t, "amd64", registry, "library/alpine", "3.18")
+	setupMultiarchImageEntry(t, "arm64:v8", registry, "library/alpine", "3.18")
+	setupMultiarchImageEntry(t, "arm64:v8", registry, "org/team/app", "1.0")
+
+	imgs, err := FindAllCVMFSImages(CVMFSRepo)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	found := imagesForRegistry(imgs, registry)
+	if len(found) != 2 {
+		t.Fatalf("expected 2 distinct images, got %d: %v", len(found), found)
+	}
+	for _, img := range imgs {
+		if img.Registry != registry {
+			continue
+		}
+		if strings.Contains(img.GetSimpleName(), "multiarch") || strings.Contains(img.GetSimpleName(), "amd64") {
+			t.Errorf("arch prefix leaked into image name: %s", img.GetSimpleName())
+		}
+	}
+}
+
+func TestFindAllCVMFSImages_DeduplicatesTopLevelAndMultiarch(t *testing.T) {
+	CVMFSRepo := mockCVMFSRepo()
+	registry := "findall4.example.com"
+
+	setupConvertedImageEntry(t, registry, "library/alpine", "3.18")
+	setupMultiarchImageEntry(t, "amd64", registry, "library/alpine", "3.18")
+
+	imgs, err := FindAllCVMFSImages(CVMFSRepo)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if found := imagesForRegistry(imgs, registry); len(found) != 1 {
+		t.Fatalf("expected 1 image, got %d: %v", len(found), found)
+	}
+}
+
+func TestFindAllCVMFSImages_SkipsArchAliasSymlinks(t *testing.T) {
+	CVMFSRepo := mockCVMFSRepo()
+	registry := "findall5.example.com"
+
+	setupMultiarchImageEntry(t, "riscv64", registry, "library/alpine", "3.18")
+	alias := filepath.Join(testMockRepo, ".metadata", ".multiarch", "riscv64alias")
+	if err := os.Symlink("riscv64", alias); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(alias)
+
+	imgs, err := FindAllCVMFSImages(CVMFSRepo)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if found := imagesForRegistry(imgs, registry); len(found) != 1 {
+		t.Fatalf("expected 1 image, got %d: %v", len(found), found)
+	}
+}
+
+// --------------------------------------------------------------------------
+// ImageCoveredByWishlist
+// --------------------------------------------------------------------------
+
+func TestImageCoveredByWishlist(t *testing.T) {
+	img := makeTestImage("registry.example.com", "library/alpine", "3.18")
+
+	cases := []struct {
+		name     string
+		wishlist []Image
+		covered  bool
+	}{
+		{
+			name:     "exact tag match",
+			wishlist: []Image{makeTestImage("registry.example.com", "library/alpine", "3.18")},
+			covered:  true,
+		},
+		{
+			name:     "different tag not covered",
+			wishlist: []Image{makeTestImage("registry.example.com", "library/alpine", "3.19")},
+			covered:  false,
+		},
+		{
+			name:     "different repository not covered",
+			wishlist: []Image{makeTestImage("registry.example.com", "library/ubuntu", "3.18")},
+			covered:  false,
+		},
+		{
+			name:     "different registry not covered",
+			wishlist: []Image{makeTestImage("other.example.com", "library/alpine", "3.18")},
+			covered:  false,
+		},
+		{
+			name: "wildcard tag glob match",
+			wishlist: []Image{{
+				Registry: "registry.example.com", Repository: "library/alpine",
+				Tag: "3.*", TagWildcard: true,
+			}},
+			covered: true,
+		},
+		{
+			name: "wildcard tag glob no match",
+			wishlist: []Image{{
+				Registry: "registry.example.com", Repository: "library/alpine",
+				Tag: "4.*", TagWildcard: true,
+			}},
+			covered: false,
+		},
+		{
+			name: "covered by second entry",
+			wishlist: []Image{
+				makeTestImage("registry.example.com", "library/ubuntu", "22.04"),
+				makeTestImage("registry.example.com", "library/alpine", "3.18"),
+			},
+			covered: true,
+		},
+		{
+			name:     "empty wishlist not covered",
+			wishlist: nil,
+			covered:  false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := ImageCoveredByWishlist(&img, tc.wishlist); got != tc.covered {
+				t.Errorf("expected covered=%v, got %v", tc.covered, got)
+			}
+		})
+	}
+}
+
+// --------------------------------------------------------------------------
+// FindCVMFSImagesNotInWishlist
+// --------------------------------------------------------------------------
+
+func TestFindCVMFSImagesNotInWishlist(t *testing.T) {
+	CVMFSRepo := mockCVMFSRepo()
+	registry := "notinwl.example.com"
+
+	setupConvertedImageEntry(t, registry, "library/redis", "7.0")
+	setupConvertedImageEntry(t, registry, "library/redis", "6.2")
+	setupConvertedImageEntry(t, registry, "library/mysql", "8.0")
+
+	wishlist := []Image{
+		makeTestImage(registry, "library/redis", "7.0"),
+	}
+
+	imgs, err := FindCVMFSImagesNotInWishlist(CVMFSRepo, wishlist)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var found []string
+	for _, img := range imgs {
+		if img.Registry == registry {
+			found = append(found, img.GetSimpleName())
+		}
+	}
+	if len(found) != 2 {
+		t.Fatalf("expected 2 images not in wishlist, got %d: %v", len(found), found)
+	}
+	for _, name := range found {
+		if name == registry+"/library/redis:7.0" {
+			t.Errorf("wishlist-covered image reported as not in wishlist: %s", name)
+		}
+	}
+}
+
+func TestFindCVMFSImagesNotInWishlist_WildcardCoversAllTags(t *testing.T) {
+	CVMFSRepo := mockCVMFSRepo()
+	registry := "notinwl2.example.com"
+
+	setupConvertedImageEntry(t, registry, "library/redis", "7.0")
+	setupConvertedImageEntry(t, registry, "library/redis", "6.2")
+
+	wishlist := []Image{{
+		Registry: registry, Repository: "library/redis",
+		Tag: "*", TagWildcard: true,
+	}}
+
+	imgs, err := FindCVMFSImagesNotInWishlist(CVMFSRepo, wishlist)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, img := range imgs {
+		if img.Registry == registry {
+			t.Errorf("unexpected image not in wishlist: %s", img.GetSimpleName())
+		}
+	}
+}
+
+// --------------------------------------------------------------------------
+// DeleteImagesFromCVMFS
+// --------------------------------------------------------------------------
+
+func TestDeleteImagesFromCVMFS_DeletesAll(t *testing.T) {
+	CVMFSRepo := mockCVMFSRepo()
+	registry := "delall.example.com"
+
+	var images []*Image
+	for _, tag := range []string{"1.0", "2.0"} {
+		img := makeTestImage(registry, "library/app", tag)
+		setupConvertedImageEntry(t, registry, "library/app", tag)
+		symlinkPath := filepath.Join(testMockRepo, img.GetPublicSymlinkPath())
+		if err := os.MkdirAll(filepath.Dir(symlinkPath), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(symlinkPath, []byte("target"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		images = append(images, &img)
+	}
+
+	deleted, err := DeleteImagesFromCVMFS(CVMFSRepo, images, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if deleted != 2 {
+		t.Errorf("expected 2 deleted images, got %d", deleted)
+	}
+
+	for _, img := range images {
+		symlinkPath := filepath.Join(testMockRepo, img.GetPublicSymlinkPath())
+		if _, err := os.Lstat(symlinkPath); !os.IsNotExist(err) {
+			t.Errorf("symlink path was not removed for %s", img.GetSimpleName())
+		}
+		manifestDir := filepath.Join(testMockRepo, ".metadata", img.GetSimpleName())
+		if _, err := os.Stat(manifestDir); !os.IsNotExist(err) {
+			t.Errorf("manifest dir was not removed for %s", img.GetSimpleName())
+		}
+	}
+}
+
+func TestDeleteImagesFromCVMFS_DryRunKeepsEverything(t *testing.T) {
+	CVMFSRepo := mockCVMFSRepo()
+	registry := "delalldry.example.com"
+
+	img := makeTestImage(registry, "library/app", "1.0")
+	setupConvertedImageEntry(t, registry, "library/app", "1.0")
+
+	deleted, err := DeleteImagesFromCVMFS(CVMFSRepo, []*Image{&img}, true /* dryRun */)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if deleted != 1 {
+		t.Errorf("expected 1 image flagged for deletion, got %d", deleted)
+	}
+
+	manifestDir := filepath.Join(testMockRepo, ".metadata", img.GetSimpleName())
+	if _, err := os.Stat(manifestDir); os.IsNotExist(err) {
+		t.Error("manifest dir was removed during dry-run")
+	}
+}
+
+func TestDeleteImagesFromCVMFS_DeletesMultiarchOnlyImage(t *testing.T) {
+	CVMFSRepo := mockCVMFSRepo()
+	registry := "delma.example.com"
+
+	img := makeTestImage(registry, "library/app", "1.0")
+	setupMultiarchImageEntry(t, "amd64", registry, "library/app", "1.0")
+	setupMultiarchImageEntry(t, "arm64:v8", registry, "library/app", "1.0")
+
+	deleted, err := DeleteImagesFromCVMFS(CVMFSRepo, []*Image{&img}, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if deleted != 1 {
+		t.Errorf("expected 1 deleted image, got %d", deleted)
+	}
+	for _, arch := range []string{"amd64", "arm64:v8"} {
+		dir := filepath.Join(testMockRepo, ".metadata", ".multiarch", arch, img.GetSimpleName())
+		if _, err := os.Stat(dir); !os.IsNotExist(err) {
+			t.Errorf("multiarch manifest dir was not removed: %s", dir)
+		}
+	}
+}
+
+func TestDeleteImagesFromCVMFS_SkipsMissingImages(t *testing.T) {
+	CVMFSRepo := mockCVMFSRepo()
+	img := makeTestImage("delmissing.example.com", "library/app", "1.0")
+
+	for _, dryRun := range []bool{true, false} {
+		deleted, err := DeleteImagesFromCVMFS(CVMFSRepo, []*Image{&img}, dryRun)
+		if err != nil {
+			t.Fatalf("dryRun=%v: unexpected error: %v", dryRun, err)
+		}
+		if deleted != 0 {
+			t.Errorf("dryRun=%v: expected 0 deleted images, got %d", dryRun, deleted)
+		}
 	}
 }
