@@ -38,5 +38,7 @@ mkdir -p $CVMFS_TARBALL_RESULT_LOCATION
 echo "creating source tar ball '$tarball'..."
 create_cvmfs_source_tarball ${CVMFS_SOURCE_LOCATION} \
                             ${CVMFS_TARBALL_RESULT_LOCATION}/${tarball}
+# TODO: source.tar.gz duplicates the versioned tarball; drop it once no
+# deployment script or downstream package rebuild depends on the name.
 cp ${CVMFS_TARBALL_RESULT_LOCATION}/${tarball} \
    ${CVMFS_TARBALL_RESULT_LOCATION}/source.tar.gz
