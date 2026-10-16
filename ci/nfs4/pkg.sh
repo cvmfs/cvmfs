@@ -40,7 +40,7 @@ cmake -S $SOURCE_DIR -B $BUILD_DIR -G Ninja \
   -DBUILTIN_EXTERNALS_EXCLUDE=zlib \
   -DCMAKE_DISABLE_FIND_PACKAGE_sqlite3=TRUE
 cmake --build $BUILD_DIR --target \
-  cvmfs2 cvmfs_talk cvmfs_nfsfuse cvmfs_nfs_stub cvmfs_nfs cvmfs_nfs_debug \
+  cvmfs2 cvmfs_fsck cvmfs_talk cvmfs_nfsfuse cvmfs_nfs_stub cvmfs_nfs cvmfs_nfs_debug \
   mount_cvmfs
 if otool -L $BUILD_DIR/cvmfs/libcvmfs_nfs.dylib | grep -qi sqlite; then
   die "libcvmfs_nfs links against a shared libsqlite3"
@@ -48,7 +48,8 @@ fi
 
 # The regular install would also need the macFUSE libraries
 mkdir -p $stage_dir/bin $stage_dir/lib $stage_dir/sbin
-install -m 0755 $BUILD_DIR/cvmfs/cvmfs2 $BUILD_DIR/cvmfs/cvmfs_talk \
+install -m 0755 $BUILD_DIR/cvmfs/cvmfs2 $BUILD_DIR/cvmfs/cvmfs_fsck \
+  $BUILD_DIR/cvmfs/cvmfs_talk \
   $SOURCE_DIR/cvmfs/cvmfs_config $stage_dir/bin/
 install -m 0755 $BUILD_DIR/mount/mount_cvmfs $stage_dir/sbin/
 for lib in cvmfs_nfsfuse cvmfs_nfs_stub cvmfs_nfs cvmfs_nfs_debug; do
@@ -78,7 +79,7 @@ resolve() {
 changed=1
 while [ $changed -eq 1 ]; do
   changed=0
-  for f in $stage_dir/bin/cvmfs2 $stage_dir/bin/cvmfs_talk \
+  for f in $stage_dir/bin/cvmfs2 $stage_dir/bin/cvmfs_fsck $stage_dir/bin/cvmfs_talk \
            $stage_dir/sbin/mount_cvmfs $(find $stage_dir/lib -type f); do
     for dep in $(otool -L $f | awk 'NR > 1 {print $1}' | grep -v '^/usr/lib/\|^/System/'); do
       case "$dep" in $PREFIX/lib/*) [ -e $stage_dir/${dep#$PREFIX/} ] && continue ;; esac
@@ -94,7 +95,7 @@ while [ $changed -eq 1 ]; do
     done
   done
 done
-for f in $stage_dir/bin/cvmfs2 $stage_dir/bin/cvmfs_talk \
+for f in $stage_dir/bin/cvmfs2 $stage_dir/bin/cvmfs_fsck $stage_dir/bin/cvmfs_talk \
          $stage_dir/sbin/mount_cvmfs $(find $stage_dir/lib -type f); do
   case "$f" in
     *.dylib) install_name_tool -id $(target_path $f) $f 2>/dev/null ;;

@@ -479,10 +479,12 @@ cvmfs_chksetup() {
     fi
   done
 
+  local frontend=fuse3
+  [ "$(get_mount_backend)" = "nfs" ] && frontend=nfs
   if [ "$sys_arch" = "Darwin" ]; then
-    cvmfs_libs="libcvmfs_fuse3.dylib libcvmfs_fuse3_debug.dylib"
+    cvmfs_libs="libcvmfs_${frontend}.dylib libcvmfs_${frontend}_debug.dylib"
   else
-    cvmfs_libs="libcvmfs_fuse3.so libcvmfs_fuse3_debug.so"
+    cvmfs_libs="libcvmfs_${frontend}.so libcvmfs_${frontend}_debug.so"
   fi
   for library in $cvmfs_libs
   do
