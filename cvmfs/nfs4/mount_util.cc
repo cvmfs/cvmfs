@@ -60,29 +60,73 @@ int RunCommand(const std::vector<std::string> &args) {
 }
 
 
-bool IsMounted(const std::string &mountpoint) {
+#ifdef __APPLE__
+static uint64_t PackFsid(const fsid_t &fsid) {
+  return (static_cast<uint64_t>(static_cast<uint32_t>(fsid.val[0])) << 32)
+         | static_cast<uint32_t>(fsid.val[1]);
+}
+#else
+static bool HasPortOption(const char *options, uint16_t port) {
+  char needle[16];
+  snprintf(needle, sizeof(needle), "port=%u", port);
+  const size_t len = strlen(needle);
+  for (const char *p = strstr(options, needle); p; p = strstr(p + 1, needle)) {
+    if ((p == options || p[-1] == ',') && (p[len] == ',' || p[len] == '\0'))
+      return true;
+  }
+  // The kernel omits the default port
+  return port == 2049 && strstr(options, "port=") == NULL;
+}
+#endif
+
+
+uint64_t FindMount(const std::string &mountpoint, uint16_t port) {
+#ifdef __APPLE__
+  (void)port;
+  struct statfs *mounts;
+  const int n = getmntinfo(&mounts, MNT_NOWAIT);
+  // The last entry is the topmost mount, i.e. the one just made
+  for (int i = n - 1; i >= 0; --i) {
+    if (mountpoint == mounts[i].f_mntonname
+        && strcmp(mounts[i].f_fstypename, "nfs") == 0) {
+      return PackFsid(mounts[i].f_fsid);
+    }
+  }
+  return 0;
+#else
+  FILE *f = setmntent("/proc/self/mounts", "r");
+  if (f == NULL)
+    return 0;
+  uint64_t id = 0;
+  struct mntent *m;
+  while ((m = getmntent(f)) != NULL) {
+    if (mountpoint == m->mnt_dir && strncmp(m->mnt_type, "nfs", 3) == 0
+        && HasPortOption(m->mnt_opts, port)) {
+      id = port;
+    }
+  }
+  endmntent(f);
+  return id;
+#endif
+}
+
+
+bool IsMounted(const std::string &mountpoint, uint64_t mount_id) {
+  if (mount_id == 0)
+    return false;
 #ifdef __APPLE__
   struct statfs *mounts;
   const int n = getmntinfo(&mounts, MNT_NOWAIT);
   for (int i = 0; i < n; ++i) {
     if (mountpoint == mounts[i].f_mntonname
-        && strcmp(mounts[i].f_fstypename, "nfs") == 0) {
+        && strcmp(mounts[i].f_fstypename, "nfs") == 0
+        && PackFsid(mounts[i].f_fsid) == mount_id) {
       return true;
     }
   }
   return false;
 #else
-  FILE *f = setmntent("/proc/self/mounts", "r");
-  if (f == NULL)
-    return false;
-  bool found = false;
-  struct mntent *m;
-  while ((m = getmntent(f)) != NULL) {
-    if (mountpoint == m->mnt_dir && strncmp(m->mnt_type, "nfs", 3) == 0)
-      found = true;
-  }
-  endmntent(f);
-  return found;
+  return FindMount(mountpoint, static_cast<uint16_t>(mount_id)) != 0;
 #endif
 }
 

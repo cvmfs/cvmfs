@@ -66,7 +66,8 @@ fuse_req::fuse_req() : reply(kNone), err(0), xattr_size(0) {
 struct fuse_session {
   fuse_session()
       : userdata(NULL), exited(false), init_called(false),
-        destroy_called(false), mounted(false), workers(16), backend(NULL),
+        destroy_called(false), mounted(false), mount_id(0), workers(16),
+        backend(NULL),
         server(NULL), rpc(NULL), guardian_fd(-1) {
     memset(&ops, 0, sizeof(ops));
   }
@@ -78,6 +79,8 @@ struct fuse_session {
   bool init_called;
   bool destroy_called;
   bool mounted;
+  /** See nfs4::FindMount() */
+  uint64_t mount_id;
   unsigned workers;
   nfs4::FuseBackend *backend;
   nfs4::Nfs4Server *server;
@@ -171,15 +174,19 @@ bool GuardianRequest(struct fuse_session *se, char command) {
 }
 
 bool MountNfs(struct fuse_session *se) {
-  if (se->guardian_fd >= 0)
-    return GuardianRequest(se, 'M');
-  return nfs4::MountNfs(se->mountpoint, se->rpc->port());
+  const bool mounted = (se->guardian_fd >= 0)
+                           ? GuardianRequest(se, 'M')
+                           : nfs4::MountNfs(se->mountpoint, se->rpc->port());
+  if (mounted)
+    se->mount_id = nfs4::FindMount(se->mountpoint, se->rpc->port());
+  return mounted;
 }
 
 bool Unmount(struct fuse_session *se) {
   if (se->guardian_fd >= 0)
     return GuardianRequest(se, 'U');
-  return UnmountNfs(se->mountpoint);
+  return !IsMounted(se->mountpoint, se->mount_id)
+         || UnmountNfs(se->mountpoint);
 }
 
 void SpawnGuardian(struct fuse_session *se) {
@@ -299,7 +306,7 @@ int SessionLoop(struct fuse_session *se, unsigned max_threads) {
     pfd.revents = 0;
     poll(&pfd, g_wakeup_pipe[0] >= 0 ? 1 : 0, 1000);
     se->backend->ReleaseIdle(kOpenFileIdleTimeout);
-    if (!IsMounted(se->mountpoint)) {
+    if (!IsMounted(se->mountpoint, se->mount_id)) {
       nfs4::Log(nfs4::kLogLevelInfo, "%s was unmounted",
                 se->mountpoint.c_str());
       se->mounted = false;

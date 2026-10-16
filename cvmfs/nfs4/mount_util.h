@@ -41,8 +41,16 @@ std::string NfsMountOptions(uint16_t port);
  * environment is appended to the options.
  */
 bool MountNfs(const std::string &mountpoint, uint16_t port);
-/** Whether an NFS file system is mounted on mountpoint (without NFS I/O) */
-bool IsMounted(const std::string &mountpoint);
+/**
+ * Identifies the NFS mount on mountpoint served on port, 0 if there is none.
+ * A later mount on the same path (e.g. after an external unmount) gets a
+ * different id.  On macOS this is the kernel's fsid, as the
+ * mount table does not show the port; elsewhere it is the port.  Reads the
+ * mount table only, no NFS I/O.
+ */
+uint64_t FindMount(const std::string &mountpoint, uint16_t port);
+/** Whether the mount identified by FindMount() is still in place */
+bool IsMounted(const std::string &mountpoint, uint64_t mount_id);
 /** Force-unmounts mountpoint */
 bool UnmountNfs(const std::string &mountpoint);
 

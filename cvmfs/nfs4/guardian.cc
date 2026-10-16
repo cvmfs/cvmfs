@@ -76,6 +76,7 @@ int RunGuardian(int listen_fd, int control_fd, const std::string &mountpoint) {
                   &addr_len) == 0) {
     port = ntohs(addr.sin_port);
   }
+  uint64_t mount_id = 0;
   while (true) {
     char command;
     const ssize_t n = read(control_fd, &command, 1);
@@ -84,16 +85,20 @@ int RunGuardian(int listen_fd, int control_fd, const std::string &mountpoint) {
     if (n != 1)
       break;
     bool ok = false;
-    if (command == 'M')
+    if (command == 'M') {
       ok = MountNfs(mountpoint, port);
-    else if (command == 'U')
-      ok = !IsMounted(mountpoint) || UnmountNfs(mountpoint);
+      if (ok)
+        mount_id = FindMount(mountpoint, port);
+    } else if (command == 'U') {
+      ok = !IsMounted(mountpoint, mount_id) || UnmountNfs(mountpoint);
+    }
     const char status = ok ? 0 : 1;
     if (write(control_fd, &status, 1) != 1)
       break;
   }
   close(control_fd);
-  if (!IsMounted(mountpoint))
+  // A newer mount on the same path belongs to another cvmfs2
+  if (!IsMounted(mountpoint, mount_id))
     return 0;
 
   Log(kLogLevelError,
@@ -106,12 +111,12 @@ int RunGuardian(int listen_fd, int control_fd, const std::string &mountpoint) {
   if (rpc.Adopt(listen_fd))
     rpc.Start();
 
-  for (unsigned i = 0; i < kUnmountAttempts && IsMounted(mountpoint); ++i) {
+  for (unsigned i = 0; i < kUnmountAttempts && IsMounted(mountpoint, mount_id); ++i) {
     if (UnmountNfs(mountpoint))
       break;
     sleep(1);
   }
-  if (IsMounted(mountpoint)) {
+  if (IsMounted(mountpoint, mount_id)) {
     rpc.Stop();
     Log(kLogLevelError, "failed to unmount %s", mountpoint.c_str());
     return 1;
@@ -129,5 +134,6 @@ int RunGuardian(int listen_fd, int control_fd, const std::string &mountpoint) {
   rpc.Stop();
   return 0;
 }
+
 
 }  // namespace nfs4

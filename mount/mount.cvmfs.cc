@@ -184,6 +184,24 @@ static bool CheckConcurrentMount(const string &fqrn,
   return true;
 }
 
+/**
+ * Waits for the cvmfs2 instance of fqrn to close its cvmfs_io socket.  The
+ * caller holds the mountcheck lock, so no new instance can start meanwhile.
+ */
+static bool WaitForInstanceExit(const string &fqrn, const string &workspace) {
+  const unsigned kTimeoutMs = 60000;
+  const unsigned kIntervalMs = 250;
+  for (unsigned waited = 0; waited < kTimeoutMs; waited += kIntervalMs) {
+    const int socket_fd = ConnectSocket(workspace + "/cvmfs_io." + fqrn);
+    if (socket_fd < 0)
+      return true;
+    close(socket_fd);
+    SafeSleepMs(kIntervalMs);
+  }
+  return false;
+}
+
+
 static int GetExistingFuseFd(const string &fqrn, const string &workspace,
                              uid_t cvmfs_uid) {
   // Try connecting to cvmfs_io socket
@@ -558,9 +576,21 @@ int main(int argc, char **argv) {
       // Actually remounting is too hard, but pretend that it worked
       return 0;
     }
-    // Identify zombie fuse processes that are held open by other mount
-    // namespaces
-    if ((mountpoint == prev_mountpoint) && !IsMountPoint(mountpoint)) {
+    if ((backend == kBackendNfs) && (mountpoint == prev_mountpoint)
+        && !IsMountPoint(mountpoint)) {
+      // Unmounted from outside, e.g. by autofs after the idle timeout, and
+      // remounted right away; the old cvmfs2 notices within a second and
+      // exits.  There is no fuse fd to take over.
+      if (!WaitForInstanceExit(fqrn, workspace)) {
+        LogCvmfs(kLogCvmfs, kLogStderr,
+                 "Previous instance of %s on %s does not terminate",
+                 fqrn.c_str(), mountpoint.c_str());
+        return 1;
+      }
+    } else if ((mountpoint == prev_mountpoint)
+               && !IsMountPoint(mountpoint)) {
+      // Identify zombie fuse processes that are held open by other mount
+      // namespaces
       // Allow for group access to the socket receiving the fuse fd
       umask(007);
       const int fuse_fd = GetExistingFuseFd(fqrn, workspace, uid_cvmfs);
@@ -570,10 +600,12 @@ int main(int argc, char **argv) {
         return 1;
       }
       return AttachMount(mountpoint, fqrn, fuse_fd);
+    } else {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "Repository %s is already mounted on %s", fqrn.c_str(),
+               prev_mountpoint.c_str());
+      return 1;
     }
-    LogCvmfs(kLogCvmfs, kLogStderr, "Repository %s is already mounted on %s",
-             fqrn.c_str(), prev_mountpoint.c_str());
-    return 1;
   } else {
     // No double mount
     if (remount) {
