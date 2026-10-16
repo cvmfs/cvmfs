@@ -4,20 +4,10 @@
  * Some common functions.
  */
 
-#include <cctype>
-#include <stdlib.h>
-#include <cstdlib>
-#include <dirent.h>
-#include <sys/file.h>
-#include <string.h>
-#include <stdio.h>
-#include <sched.h>
-#include <sys/select.h>
-#include <sys/uio.h>
-
 #include "posix.h"
 
 #include <arpa/inet.h>
+#include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <grp.h>
@@ -25,11 +15,22 @@
 #include <netinet/in.h>
 #include <pthread.h>
 #include <pwd.h>
+#include <sched.h>
 #include <signal.h>
 #include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/file.h>
 #include <sys/resource.h>
+#include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/uio.h>
+
+#include <cctype>
+#include <cstdlib>
+#include "util/logging_internal.h"
 #ifdef __APPLE__
 #include <sys/mount.h>  //  for statfs()
 #else
@@ -61,14 +62,10 @@
 #include "util/exception.h"
 #include "util/fs_traversal.h"
 #include "util/logging.h"
+#include "util/mutex.h"
 #include "util/pipe.h"
+#include "util/smalloc.h"
 #include "util/string.h"
-#include "util/smalloc.h"
-#include "util/smalloc.h"
-#include "util/smalloc.h"
-#include "util/mutex.h"
-#include "util/mutex.h"
-#include "util/mutex.h"
 
 // using namespace std;  // NOLINT
 
@@ -303,7 +300,7 @@ void CreateFile(const std::string &path,
  * Symlinks /tmp/cvmfs.XYZ/l --> ParentPath(path) to make it shorter
  */
 static std::string MakeShortSocketLink(const std::string &path) {
-  //NOLINTNEXTLINE(misc-const-correctness)
+  // NOLINTNEXTLINE(misc-const-correctness)
   struct sockaddr_un sock_addr;
   const unsigned max_length = sizeof(sock_addr.sun_path);
 
@@ -496,8 +493,21 @@ int ConnectTcpEndpoint(const std::string &ipv4_address, int portno) {
  * Creating a pipe should always succeed.
  */
 void MakePipe(int pipe_fd[2]) {
-  const int retval = pipe(pipe_fd);
-  assert(retval == 0);
+  int retval = pipe(pipe_fd);
+  if (retval != 0) {
+    if (errno == EMFILE) {
+      // if the NOFILE is the reason, try to increase it
+      auto infr = IncreaseNoFileSoft(NOFILE_STEP);
+      if (infr == 0) {
+        retval = pipe(pipe_fd);
+        if (retval == 0) {
+          return;
+        }
+      }
+    }
+    LogCvmfs(kLogCvmfs,kLogSyslogErr | kLogDebug, "MakePipe failed with errno %d", errno);
+  }
+  assert(retval==0);
 }
 
 
@@ -806,7 +816,7 @@ bool SwitchCredentials(const uid_t uid, const gid_t gid, const bool temporarily,
       retval = ObtainSetuidgidCapabilities(avoid_mutexes);
       if (!retval && !avoid_mutexes) {
         LogCvmfs(kLogCvmfs, kLogDebug,
-          "unable to obtain setuid & setgid capabilities first");
+                 "unable to obtain setuid & setgid capabilities first");
       }
       // The setuid below will drop the capability again unless
       // switching to root or keepcaps has been enabled.
@@ -1472,6 +1482,45 @@ std::string GetArch() {
   return info.machine;
 }
 
+/**
+ * Increases the soft limit of open file descriptors by
+ * min(<value>,rlim_max-rlim_cur). This requires no elevated privileges, since
+ * the increase will always be bellow the hard limit. Returns 0 on success, -1
+ * on failure, -2 if running under valgrind.
+ */
+int IncreaseNoFileSoft(size_t value) {
+  struct rlimit rpl;
+  memset(&rpl, 0, sizeof(rpl));
+  auto gl = getrlimit(RLIMIT_NOFILE, &rpl);
+  if (gl == -1) {
+    LogCvmfs(kLogCvmfs, kLogSyslog | kLogDebug,
+             "Getting process resource limits failed (%d).", errno);
+    return -1;
+  }
+
+  if (rpl.rlim_cur >= rpl.rlim_max) {
+    // If hard limit is already reached, give up
+    LogCvmfs(kLogCvmfs, kLogSyslog | kLogDebug,
+             "Negotiating a higher NOFILE soft limit failed. Already reached "
+             "hard limit.");
+    return -1;
+  }
+
+  auto margin = rpl.rlim_max - rpl.rlim_cur;
+  rpl.rlim_cur += (value < margin) ? value : margin;
+  const int retval = setrlimit(RLIMIT_NOFILE, &rpl);
+  if (retval == 0)
+    LogCvmfs(kLogCvmfs, kLogSyslog | kLogDebug,
+             "A new soft limit for NOFILE is set to %lld",
+             static_cast<long long int>(rpl.rlim_cur));
+  return 0;
+
+#ifdef HAS_VALGRIND_HEADERS
+  return RUNNING_ON_VALGRIND ? -2 : -1;
+#else
+  return -1;
+#endif
+}
 
 /**
  * Sets soft and hard limit for maximum number of open file descriptors.
@@ -1849,7 +1898,7 @@ struct ForkFailures {  // TODO(rmeusel): C++11 (type safe enum)
  */
 static bool CloseAllFildesUntilMaxFD(const std::set<int> &preserve_fildes,
                                      long max_fd) {  // NOLINT(runtime/int)
-  for (long fd = 0; fd < max_fd; fd++) {  // NOLINT(runtime/int)
+  for (long fd = 0; fd < max_fd; fd++) {             // NOLINT(runtime/int)
     if (preserve_fildes.count(static_cast<int>(fd)) == 0) {
       close(static_cast<int>(fd));
     }
@@ -2005,11 +2054,11 @@ bool ManagedExec(const std::vector<std::string> &command_line,
 #ifdef DEBUGMSG
     assert(setenv("__CVMFS_DEBUG_MODE__", "yes", 1) == 0);
 #endif
-    if (drop_credentials && SetuidCapabilityPermitted() &&
-        !SwitchCredentials(geteuid(),
-                           getegid(),
-                           false /* temporarily */,
-                           true /* avoid_mutexes */)) {
+    if (drop_credentials && SetuidCapabilityPermitted()
+        && !SwitchCredentials(geteuid(),
+                              getegid(),
+                              false /* temporarily */,
+                              true /* avoid_mutexes */)) {
       failed = ForkFailures::kFailDropCredentials;
       goto fork_failure;
     }
@@ -2191,3 +2240,4 @@ bool SafeWriteToFile(const std::string &content,
 #ifdef CVMFS_NAMESPACE_GUARD
 }  // namespace CVMFS_NAMESPACE_GUARD
 #endif
+
