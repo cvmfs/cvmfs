@@ -67,35 +67,42 @@ static string MkFqrn(const string &repository) {
   return repository;
 }
 
-#if defined(__APPLE__) && !defined(USE_MACFUSE_KEXT)
-static bool IsFuseTInstalled() {
-  return true;
-  string fuseTComponentsPaths[] = {"/usr/local/bin/go-nfsv4",
-                                   "/usr/local/lib/libfuse-t.dylib",
-                                   "/usr/local/lib/libfuse-t.a"};
-  const int pathsNumber = sizeof(fuseTComponentsPaths)
-                          / sizeof(fuseTComponentsPaths[0]);
-  platform_stat64 info;
-  for (int idx = 0; idx < pathsNumber; ++idx) {
-    bzero(&info, sizeof(platform_stat64));
-    int retval = platform_stat(fuseTComponentsPaths[idx].c_str(), &info);
-    if ((retval != 0) || !S_ISREG(info.st_mode)) {
-      return false;
-    }
+enum MountBackend {
+  kBackendFuse,   // libfuse on Linux, the macFUSE kernel extension on macOS
+  kBackendFskit,  // macFUSE with the FSKit backend (macOS)
+  kBackendNfs,    // cvmfs2 serves NFSv4, mounted by the kernel NFS client
+};
+
+static bool GetMountBackend(MountBackend *backend) {
+  string param;
+  if (!options_manager_.GetValue("CVMFS_MOUNT_BACKEND", &param)
+      || param.empty()) {
+    *backend = kBackendFuse;
+    return true;
+  }
+  if (param == "fuse") {
+    *backend = kBackendFuse;
+  } else if (param == "nfs") {
+    *backend = kBackendNfs;
+  } else if (param == "fskit") {
+#ifdef __APPLE__
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "CVMFS_MOUNT_BACKEND=fskit is not supported by this version");
+#else
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "CVMFS_MOUNT_BACKEND=fskit is only available on macOS");
+#endif
+    return false;
+  } else {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "invalid CVMFS_MOUNT_BACKEND=%s (expected fuse, fskit, or nfs)",
+             param.c_str());
+    return false;
   }
   return true;
 }
-#endif
 
 static bool CheckFuse() {
-#if defined(__APPLE__) && !defined(USE_MACFUSE_KEXT)
-  bool is_fuse_t_installed = IsFuseTInstalled();
-  if (!is_fuse_t_installed) {
-    LogCvmfs(kLogCvmfs, kLogStderr,
-             "FUSE-T installation check failed. FUSE not loaded");
-  }
-  return is_fuse_t_installed;
-#else
   string fuse_device;
   int retval;
 #ifdef __APPLE__
@@ -110,7 +117,6 @@ static bool CheckFuse() {
     return false;
   }
   return true;
-#endif
 }
 
 
@@ -503,12 +509,11 @@ int main(int argc, char **argv) {
   retval = GetCvmfsUser(&cvmfs_user);
   if (!retval)
     return 1;
-  // The NFS frontend mounts through the kernel's NFS client, not FUSE
-  string param_nfs;
-  const bool nfs_frontend =
-      options_manager_.GetValue("CVMFS_NFS_FRONTEND", &param_nfs)
-      && options_manager_.IsOn(param_nfs);
-  if (!nfs_frontend) {
+  MountBackend backend;
+  retval = GetMountBackend(&backend);
+  if (!retval)
+    return 1;
+  if (backend == kBackendFuse) {
     retval = CheckFuse();
     if (!retval)
       return 1;
@@ -665,7 +670,7 @@ int main(int argc, char **argv) {
   }
 #endif
 
-  if (nfs_frontend)
+  if (backend == kBackendNfs)
     AddMountOption("nfs", &mount_options);
   AddMountOption("system_mount", &mount_options);
   AddMountOption("fsname=cvmfs2", &mount_options);

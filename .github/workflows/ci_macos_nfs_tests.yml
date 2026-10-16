@@ -33,20 +33,10 @@ jobs:
         run: |
           sw_vers
           # The tests use timeout, greadlink, bash >= 4.2 ([[ -v ]]) and gawk
-          brew install bash coreutils gawk meson ninja pkg-config
+          brew install bash coreutils gawk ninja
           [ -e "$(brew --prefix)/bin/awk" ] || ln -s gawk "$(brew --prefix)/bin/awk"
           sudo ln -sf "$(brew --prefix)/bin/gtimeout" /usr/local/bin/timeout
           sudo ln -sf "$(brew --prefix)/bin/greadlink" /usr/local/bin/greadlink
-
-      - name: Install fuse3 headers
-        run: |
-          # Headers only: the NFS frontend does not link against libfuse
-          git clone --depth 1 --branch fuse-t \
-            https://github.com/macos-fuse-t/libfuse3.git /tmp/libfuse3
-          cd /tmp/libfuse3
-          meson setup build --prefix=/usr/local
-          ninja -C build
-          sudo ninja -C build install
 
       - name: Build and install package
         run: |
@@ -64,7 +54,6 @@ jobs:
           export CVMFS_TIMESTAMP=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
           export CVMFS_TEST_PROXY=DIRECT
           export CVMFS_TEST_USE_CDN=yes
-          export CVMFS_TEST_USE_MACFUSE_KEXT=OFF
           cd test
           # /bin/bash is 3.2; inner `bash -c` calls resolve through PATH
           export PATH="$(brew --prefix)/bin:$PATH"

@@ -528,13 +528,59 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_LIBCVMFS_CACHE OR
 endif ()
 
 # Fuse client only
+# libcvmfs_nfsfuse implements the libfuse API itself and builds against these
+set (CVMFS_NFS_FUSE3_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/cvmfs/nfs4/libfuse")
 if (BUILD_CVMFS)
-  find_package (FUSE3 REQUIRED)
-  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${FUSE3_INCLUDE_DIR})
+  if (MACOSX)
+    string (TOUPPER "${CVMFS_MACFUSE}" _macfuse_mode)
+    if (_macfuse_mode STREQUAL "OFF")
+      set (BUILD_FUSE3_FRONTEND OFF)
+    else ()
+      if (_macfuse_mode STREQUAL "ON")
+        find_package (MacFUSE REQUIRED)
+      else ()
+        find_package (MacFUSE)
+      endif ()
+      set (BUILD_FUSE3_FRONTEND ${MacFUSE_FOUND})
+    endif ()
+    if (NOT BUILD_FUSE3_FRONTEND AND NOT BUILD_NFS_FRONTEND)
+      message (FATAL_ERROR "No client frontend: install macFUSE or set BUILD_NFS_FRONTEND=ON")
+    endif ()
+
+    # mount_cvmfs does not drive the FSKit backend yet, so fskit is not
+    # offered even if MACFUSE_HAS_FSKIT
+    if (BUILD_FUSE3_FRONTEND)
+      set (MOUNT_BACKENDS_AVAILABLE fuse)
+    endif ()
+    if (BUILD_NFS_FRONTEND)
+      list (APPEND MOUNT_BACKENDS_AVAILABLE nfs)
+    endif ()
+    if (CVMFS_MACOS_DEFAULT_BACKEND STREQUAL "AUTO")
+      foreach (_backend nfs fuse fskit)
+        if (_backend IN_LIST MOUNT_BACKENDS_AVAILABLE)
+          set (MOUNT_BACKEND_DEFAULT ${_backend})
+        endif ()
+      endforeach ()
+    elseif (CVMFS_MACOS_DEFAULT_BACKEND IN_LIST MOUNT_BACKENDS_AVAILABLE)
+      set (MOUNT_BACKEND_DEFAULT ${CVMFS_MACOS_DEFAULT_BACKEND})
+    else ()
+      message (FATAL_ERROR "CVMFS_MACOS_DEFAULT_BACKEND=${CVMFS_MACOS_DEFAULT_BACKEND} "
+                           "is not built (available: ${MOUNT_BACKENDS_AVAILABLE})")
+    endif ()
+    message (STATUS "macOS mount backends: ${MOUNT_BACKENDS_AVAILABLE} "
+                    "(default: ${MOUNT_BACKEND_DEFAULT})")
+  else ()
+    find_package (FUSE3 REQUIRED)
+    set (BUILD_FUSE3_FRONTEND ON)
+  endif ()
+
+  if (BUILD_FUSE3_FRONTEND)
+    set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${FUSE3_INCLUDE_DIR})
+  else ()
+    # The loader (cvmfs2) still needs the libfuse API declarations
+    set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${CVMFS_NFS_FUSE3_INCLUDE_DIR})
+  endif ()
   add_definitions(-DHAS_FUSE3)
-  if (MACOSX AND USE_MACFUSE_KEXT)
-    add_definitions(-DUSE_MACFUSE_KEXT)
-  endif()
 endif ()
 
 # libcap is needed by every target that links cvmfs/util/capabilities.cc,

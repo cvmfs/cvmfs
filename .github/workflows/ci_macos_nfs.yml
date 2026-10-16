@@ -41,27 +41,17 @@ jobs:
           uname -m
           df -h /
 
-      - name: Install fuse3 headers
-        run: |
-          # Only the headers (and a library for FindFUSE3) are needed: the NFS
-          # frontend does not link against libfuse.  Same fork as CI_MacOS.
-          brew install meson ninja pkg-config
-          git clone --depth 1 --branch fuse-t \
-            https://github.com/macos-fuse-t/libfuse3.git /tmp/libfuse3
-          cd /tmp/libfuse3
-          meson setup build --prefix=/usr/local
-          ninja -C build
-          sudo ninja -C build install
+      - name: Install build tools
+        run: brew install ninja
 
       - name: Build cvmfs2 with the NFS frontend
         run: |
-          export CPATH=/usr/local/include
           cmake -S . -B build -G Ninja \
             -DBUILTIN_EXTERNALS=ON \
             -DBUILD_CVMFS=ON -DBUILD_LIBCVMFS=OFF -DBUILD_LIBCVMFS_CACHE=OFF \
             -DBUILD_SERVER=OFF -DBUILD_RECEIVER=OFF -DBUILD_GEOAPI=OFF \
             -DBUILD_UNITTESTS=OFF -DBUILD_MANPAGES=OFF \
-            -DBUILD_NFS_FRONTEND=ON \
+            -DCVMFS_MACFUSE=OFF -DBUILD_NFS_FRONTEND=ON \
             -DBUILTIN_EXTERNALS_EXCLUDE=zlib \
             -DCMAKE_DISABLE_FIND_PACKAGE_sqlite3=TRUE
           cmake --build build --target cvmfs2 cvmfs_nfs_stub cvmfs_nfs cvmfs_talk

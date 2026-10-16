@@ -1,7 +1,8 @@
 #!/bin/bash
 
 CVMFS_SERVER_APACHE_RELOAD_IS_RESTART=true
-CVMFS_TEST_USE_MACFUSE_KEXT=${CVMFS_TEST_USE_MACFUSE_KEXT:=no}
+# Written as CVMFS_MOUNT_BACKEND to default.local; empty keeps the installed default
+CVMFS_TEST_MOUNT_BACKEND=${CVMFS_TEST_MOUNT_BACKEND:=}
 CVMFS_TEST_DEBUGLOG=${CVMFS_TEST_DEBUGLOG:=}
 CVMFS_TEST_PROXY=${CVMFS_TEST_PROXY:=http://ca-proxy.cern.ch:3128}
 CVMFS_TEST_SCRATCH=${CVMFS_TEST_SCRATCH:=/tmp/cvmfs-test}
@@ -412,21 +413,8 @@ is_macos() {
   [ x"$(uname)" = x"Darwin" ]
 }
 
-is_macfuse_enabled() {
-  if [ x"$CVMFS_TEST_USE_MACFUSE_KEXT" = x ]; then
-    return 1
-  fi
-  local value=$(echo "$CVMFS_TEST_USE_MACFUSE_KEXT" | tr '[:upper:]' '[:lower:]')
-  case "$value" in
-    yes|on|1|true)
-      return 0 ;;
-    no|off|0|false)
-      return 1 ;;
-    *)
-      echo "Error: invalid value of CVMFS_USE_MACFUSE_KEXT: $CVMFS_TEST_USE_MACFUSE_KEXT"
-      echo "Valid values are: yes, on, 1, true, no, off, 0, false"
-      return 1 ;;
-  esac
+is_nfs_mount() {
+  mount -t nfs | grep -q "^127\.0\.0\.1:/ on $1 "
 }
 
 
@@ -467,7 +455,7 @@ wait_for_umount() {
 cvmfs_clean() {
   pkill   openwaitprint || true
   pidwait openwaitprint || true
-  sudo env CVMFS_USE_MACFUSE_KEXT="$CVMFS_TEST_USE_MACFUSE_KEXT" cvmfs_config umount > /dev/null  || return 100
+  sudo cvmfs_config umount > /dev/null  || return 100
   sudo sh -c "rm -rf /var/lib/cvmfs/*"                  || return 101
   sudo rm -f /etc/cvmfs/default.local                    || return 102
   sudo sh -c "rm -f /etc/cvmfs/config.d/*.local"         || return 104
@@ -513,7 +501,9 @@ cvmfs_mount() {
   sudo sh -c 'echo "CVMFS_TIMEOUT=20" >> /etc/cvmfs/default.local' || return 100
   sudo sh -c 'echo "CVMFS_TIMEOUT_DIRECT=20" >> /etc/cvmfs/default.local' || return 100
   sudo sh -c "echo CVMFS_SYSLOG_FACILITY=$CVMFS_TEST_SYSLOG_FACILITY >> /etc/cvmfs/default.local" || return 100
-  sudo sh -c "echo CVMFS_USE_MACFUSE_KEXT=$CVMFS_TEST_USE_MACFUSE_KEXT >> /etc/cvmfs/default.local" || return 100
+  if [ -n "$CVMFS_TEST_MOUNT_BACKEND" ]; then
+    sudo sh -c "echo CVMFS_MOUNT_BACKEND=$CVMFS_TEST_MOUNT_BACKEND >> /etc/cvmfs/default.local" || return 100
+  fi
   sudo sh -c "echo CVMFS_REPOSITORY_TAG=TESTING > /etc/cvmfs/config.d/cvmfs-config.cern.ch.local" || return 100
   if running_on_osx ; then
     sudo sh -c 'echo "CVMFS_MAGIC_XATTRS_VISIBILITY=ALWAYS" >> /etc/cvmfs/default.local' || return 100
@@ -580,7 +570,7 @@ cvmfs_umount() {
 
   for r in $(echo $repositories | tr , " "); do
     while (( result != 0 && times > 0  )); do
-      if [ "$sys_arch" = "Darwin" ] && ! is_macfuse_enabled; then
+      if [ "$sys_arch" = "Darwin" ] && is_nfs_mount /cvmfs/$r; then
         sudo umount -f /cvmfs/$r 2>/dev/null
       else
         sudo umount /cvmfs/$r > /dev/null 2>&1

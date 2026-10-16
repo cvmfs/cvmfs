@@ -3,11 +3,11 @@
 # Profile: macos_nfs
 #
 # Runs the client integration test suite on macOS with the NFS frontend
-# (CVMFS_NFS_FRONTEND=yes): cvmfs2 serves NFSv4 and the kernel NFS client
-# mounts it, no macFUSE/FSKit/fuse-t.  Expects the package from ci/nfs4/pkg.sh
-# to be installed; see .github/workflows/ci_macos_nfs_tests.yml.
+# (CVMFS_MOUNT_BACKEND=nfs): cvmfs2 serves NFSv4 and the kernel NFS client
+# mounts it, no macFUSE.  Expects the package from ci/nfs4/pkg.sh to be
+# installed; see .github/workflows/ci_macos_nfs_tests.yml.
 #
-# Exclusions: the CI_MacOS (fuse-t) list, plus tests that depend on a FUSE
+# Exclusions: the former macOS FUSE CI list, plus tests that depend on a FUSE
 # device, the FUSE mount options, or reloading/attaching a FUSE session, and
 # Linux-only tests (autofs, /proc).  011 expects a read to crash the client
 # after its cache manager is killed; over NFS the kernel serves it from cache.
@@ -79,15 +79,4 @@ PROFILE_EXCLUSIONS="\
   src/111-ignore-mount-attempt \
   src/406-ducc-webhook-notifications"
 
-profile_setup() {
-  local conf=/etc/cvmfs/default.d/60-nfs.conf
-  if ! grep -qs '^CVMFS_NFS_FRONTEND=yes' "$conf"; then
-    echo "[profile:macos_nfs] writing CVMFS_NFS_FRONTEND=yes to $conf"
-    echo "CVMFS_NFS_FRONTEND=yes" | sudo tee "$conf" > /dev/null || return 1
-  fi
-  # A leftover FSKit config switches to the FSKit backend
-  if [ -f /etc/cvmfs/default.d/11-osx-fskit.conf ]; then
-    echo "[profile:macos_nfs] 11-osx-fskit.conf present"
-    return 1
-  fi
-}
+export CVMFS_TEST_MOUNT_BACKEND=nfs

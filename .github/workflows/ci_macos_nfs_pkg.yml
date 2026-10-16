@@ -28,15 +28,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install fuse3 headers
-        run: |
-          brew install meson ninja pkg-config
-          git clone --depth 1 --branch fuse-t \
-            https://github.com/macos-fuse-t/libfuse3.git /tmp/libfuse3
-          cd /tmp/libfuse3
-          meson setup build --prefix=/usr/local
-          ninja -C build
-          sudo ninja -C build install
+      - name: Install build tools
+        run: brew install ninja
 
       - name: Build package
         id: pkg

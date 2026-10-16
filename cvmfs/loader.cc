@@ -53,6 +53,11 @@
 
 using namespace std;  // NOLINT
 
+// Client library of this stub's frontend, set by cvmfs_add_frontend()
+#ifndef CVMFS_FRONTEND_LIBRARY
+#define CVMFS_FRONTEND_LIBRARY "cvmfs_fuse3"
+#endif
+
 namespace loader {
 
 // Follow the fuse convention for option parsing
@@ -483,11 +488,8 @@ static CvmfsExports *LoadLibrary(const bool debug_mode,
       local_lib_path.push_back('/');
   }
 
-#ifdef CVMFS_NFS_FRONTEND
-  string library_name = string("cvmfs_nfs") + ((debug_mode) ? "_debug" : "");
-#else
-  string library_name = string("cvmfs_fuse3") + ((debug_mode) ? "_debug" : "");
-#endif
+  string library_name =
+      string(CVMFS_FRONTEND_LIBRARY) + ((debug_mode) ? "_debug" : "");
   library_name = platform_libname(library_name);
   string error_messages;
 
