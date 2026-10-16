@@ -87,6 +87,7 @@ int main(int argc, char **argv) {
 
   bool debug = false;
   bool nfs = false;
+  bool fskit = false;
   int c;
   opterr = 0;
   while ((c = getopt(optc, optv, "do:")) != -1) {
@@ -103,6 +104,9 @@ int main(int argc, char **argv) {
           if (mount_options[i] == "nfs") {
             nfs = true;
           }
+          if (mount_options[i] == "obackend=fskit") {
+            fskit = true;
+          }
         }
         break;
     }
@@ -114,9 +118,11 @@ int main(int argc, char **argv) {
   }
   free(optv);
 
-  // -o nfs selects the frontend that mounts through the kernel's NFS client
-  const std::string libname_fuse3 =
-      platform_libname(nfs ? "cvmfs_nfs_stub" : "cvmfs_fuse3_stub");
+  // -o nfs selects the frontend that mounts through the kernel's NFS client,
+  // -o obackend=fskit the one built for the macFUSE FSKit backend
+  const std::string libname_fuse3 = platform_libname(
+      nfs ? "cvmfs_nfs_stub"
+          : (fskit ? "cvmfs_fskit_stub" : "cvmfs_fuse3_stub"));
 
   std::string error_messages;
 

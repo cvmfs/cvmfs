@@ -6,7 +6,9 @@
  */
 
 #include <errno.h>
+#include <fcntl.h>
 #include <pwd.h>
+#include <signal.h>
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -53,6 +55,21 @@ static void AddMountOption(const string &option,
 }
 
 
+static bool HasMountOption(const string &needle,
+                           const vector<string> &mount_options) {
+  for (vector<string>::const_iterator i = mount_options.begin(),
+       iend = mount_options.end(); i != iend; ++i) {
+    const vector<string> option_tokens = SplitString(*i, ',');
+    for (vector<string>::const_iterator j = option_tokens.begin(),
+         jend = option_tokens.end(); j != jend; ++j) {
+      if (*j == needle)
+        return true;
+    }
+  }
+  return false;
+}
+
+
 static string MkFqrn(const string &repository) {
   const string::size_type idx = repository.find_last_of('.');
   if (idx == string::npos) {
@@ -86,13 +103,12 @@ static bool GetMountBackend(MountBackend *backend) {
     *backend = kBackendNfs;
   } else if (param == "fskit") {
 #ifdef __APPLE__
-    LogCvmfs(kLogCvmfs, kLogStderr,
-             "CVMFS_MOUNT_BACKEND=fskit is not supported by this version");
+    *backend = kBackendFskit;
 #else
     LogCvmfs(kLogCvmfs, kLogStderr,
              "CVMFS_MOUNT_BACKEND=fskit is only available on macOS");
-#endif
     return false;
+#endif
   } else {
     LogCvmfs(kLogCvmfs, kLogStderr,
              "invalid CVMFS_MOUNT_BACKEND=%s (expected fuse, fskit, or nfs)",
@@ -333,6 +349,18 @@ static bool GetCvmfsUser(string *cvmfs_user) {
     return false;
   }
   *cvmfs_user = param;  // No sanitation; due to PAM, username can be anything
+  return true;
+}
+
+
+static bool GetReloadSockets(string *reload_sockets) {
+  string param;
+  const int retval = options_manager_.GetValue("CVMFS_RELOAD_SOCKETS", &param);
+  if (!retval) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "CVMFS_RELOAD_SOCKETS required");
+    return false;
+  }
+  *reload_sockets = MakeCanonicalPath(param);
   return true;
 }
 
@@ -615,6 +643,13 @@ int main(int argc, char **argv) {
     }
   }
 
+  string reload_sockets;
+  retval = GetReloadSockets(&reload_sockets);
+  if (!retval)
+    return 1;
+
+  const bool local_fskit_mount = (backend == kBackendFskit) && (geteuid() != 0);
+
   // Prepare cache directory
   if (dedicated_cachedir) {
     retval = MkdirDeep(cachedir, 0755, false);
@@ -624,31 +659,36 @@ int main(int argc, char **argv) {
       return 1;
     }
   }
-  retval = MkdirDeep("/var/run/cvmfs", 0755);
+  retval = MkdirDeep(reload_sockets, 0755);
   if (!retval) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to create socket directory");
+    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to create socket directory %s",
+             reload_sockets.c_str());
     return 1;
   }
-  sysret = chown(workspace.c_str(), uid_cvmfs, getegid());
-  if (sysret != 0) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to transfer ownership of %s to %s",
-             workspace.c_str(), cvmfs_user.c_str());
-    return 1;
-  }
-  if (dedicated_cachedir) {
-    sysret = chown(cachedir.c_str(), uid_cvmfs, getegid());
+  if (!local_fskit_mount) {
+    sysret = chown(workspace.c_str(), uid_cvmfs, getegid());
     if (sysret != 0) {
       LogCvmfs(kLogCvmfs, kLogStderr,
-               "Failed to transfer ownership of %s to %s", cachedir.c_str(),
-               cvmfs_user.c_str());
+               "Failed to transfer ownership of %s to %s",
+               workspace.c_str(), cvmfs_user.c_str());
       return 1;
     }
-  }
-  sysret = chown("/var/run/cvmfs", uid_cvmfs, getegid());
-  if (sysret != 0) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to transfer ownership of %s to %s",
-             "/var/run/cvmfs", cvmfs_user.c_str());
-    return 1;
+    if (dedicated_cachedir) {
+      sysret = chown(cachedir.c_str(), uid_cvmfs, getegid());
+      if (sysret != 0) {
+        LogCvmfs(kLogCvmfs, kLogStderr,
+                 "Failed to transfer ownership of %s to %s",
+                 cachedir.c_str(), cvmfs_user.c_str());
+        return 1;
+      }
+    }
+    sysret = chown(reload_sockets.c_str(), uid_cvmfs, getegid());
+    if (sysret != 0) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "Failed to transfer ownership of %s to %s",
+               reload_sockets.c_str(), cvmfs_user.c_str());
+      return 1;
+    }
   }
 
   // Set maximum number of files
@@ -675,28 +715,48 @@ int main(int argc, char **argv) {
     mib[1] = KERN_MAXFILESPERPROC;
     retval = sysctl(mib, 2, &sys_nfiles, &len, NULL, 0);
     if ((retval != 0) || (sys_nfiles < 0)) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to get KERN_MAXFILESPERPROC");
-      return 1;
+      if (local_fskit_mount) {
+        LogCvmfs(kLogCvmfs, kLogStdout,
+                 "Skipping KERN_MAXFILESPERPROC check for local FSKit mount");
+      } else {
+        LogCvmfs(kLogCvmfs, kLogStderr, "Failed to get KERN_MAXFILESPERPROC");
+        return 1;
+      }
     }
-    if (sys_nfiles < nfiles) {
+    if ((retval == 0) && (sys_nfiles >= 0) && (sys_nfiles < nfiles)) {
       mib[1] = KERN_MAXFILES;
       retval = sysctl(mib, 2, &sys_nfiles_all, &len, NULL, 0);
       if ((retval != 0) || (sys_nfiles_all < 0)) {
-        LogCvmfs(kLogCvmfs, kLogStderr, "Failed to get KERN_MAXFILES");
-        return 1;
-      }
-      if (sys_nfiles_all < nfiles_all) {
-        retval = sysctl(mib, 2, NULL, NULL, &nfiles_all, sizeof(nfiles_all));
-        if (retval != 0) {
-          LogCvmfs(kLogCvmfs, kLogStderr, "Failed to set KERN_MAXFILES");
+        if (local_fskit_mount) {
+          LogCvmfs(kLogCvmfs, kLogStdout,
+                   "Skipping KERN_MAXFILES check for local FSKit mount");
+        } else {
+          LogCvmfs(kLogCvmfs, kLogStderr, "Failed to get KERN_MAXFILES");
           return 1;
         }
-      }
-      mib[1] = KERN_MAXFILESPERPROC;
-      retval = sysctl(mib, 2, NULL, NULL, &nfiles_all, sizeof(nfiles_all));
-      if (retval != 0) {
-        LogCvmfs(kLogCvmfs, kLogStderr, "Failed to set KERN_MAXFILESPERPROC");
-        return 1;
+      } else {
+        if (sys_nfiles_all < nfiles_all) {
+          retval = sysctl(mib, 2, NULL, NULL, &nfiles_all, sizeof(nfiles_all));
+          if (retval != 0) {
+            if (!local_fskit_mount) {
+              LogCvmfs(kLogCvmfs, kLogStderr, "Failed to set KERN_MAXFILES");
+              return 1;
+            }
+            LogCvmfs(kLogCvmfs, kLogStdout,
+                     "Skipping KERN_MAXFILES update for local FSKit mount");
+          }
+        }
+        mib[1] = KERN_MAXFILESPERPROC;
+        retval = sysctl(mib, 2, NULL, NULL, &nfiles_all, sizeof(nfiles_all));
+        if (retval != 0) {
+          if (!local_fskit_mount) {
+            LogCvmfs(kLogCvmfs, kLogStderr,
+                     "Failed to set KERN_MAXFILESPERPROC");
+            return 1;
+          }
+          LogCvmfs(kLogCvmfs, kLogStdout,
+                   "Skipping KERN_MAXFILESPERPROC update for local FSKit mount");
+        }
       }
     }
   }
@@ -704,10 +764,26 @@ int main(int argc, char **argv) {
 
   if (backend == kBackendNfs)
     AddMountOption("nfs", &mount_options);
-  AddMountOption("system_mount", &mount_options);
+  if (backend == kBackendFskit) {
+    if (!HasMountOption("obackend=fskit", mount_options))
+      AddMountOption("obackend=fskit", &mount_options);
+    if (!HasMountOption("noappledouble", mount_options))
+      AddMountOption("noappledouble", &mount_options);
+    // FSKit requires the cvmfs2 process to stay in the foreground;
+    // daemonizing would break the FSKit connection.
+    if (!HasMountOption("foreground", mount_options))
+      AddMountOption("foreground", &mount_options);
+    if (!HasMountOption("disable_watchdog", mount_options))
+      AddMountOption("disable_watchdog", &mount_options);
+  }
+
+  if (!local_fskit_mount)
+    AddMountOption("system_mount", &mount_options);
   AddMountOption("fsname=cvmfs2", &mount_options);
-  AddMountOption("allow_other", &mount_options);
-  AddMountOption("grab_mountpoint", &mount_options);
+  if (!local_fskit_mount) {
+    AddMountOption("allow_other", &mount_options);
+    AddMountOption("grab_mountpoint", &mount_options);
+  }
   AddMountOption("uid=" + StringifyInt(uid_cvmfs), &mount_options);
   AddMountOption("gid=" + StringifyInt(gid_cvmfs), &mount_options);
   if (options_manager_.IsDefined("CVMFS_DEBUGLOG"))
@@ -739,6 +815,89 @@ int main(int argc, char **argv) {
                " the list of supplementary groups");
       return 1;
     }
+  }
+
+  // FSKit foreground mode: cvmfs2 must stay running as the filesystem process.
+  // We launch it in its own session (fully detached) and poll until the mount
+  // point appears (device ID changes), then return success.
+  if (backend == kBackendFskit) {
+    // Get the device ID of the mountpoint before mounting
+    platform_stat64 info_before;
+    dev_t dev_before = 0;
+    if (platform_stat(mountpoint.c_str(), &info_before) == 0) {
+      dev_before = info_before.st_dev;
+    }
+
+    // Fork cvmfs2 into its own session so it survives our exit
+    pid_t pid = fork();
+    if (pid < 0) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to fork");
+      return 32;
+    }
+    if (pid == 0) {
+      // Child: create new session, redirect stdio to /dev/null, exec cvmfs2
+      setsid();
+      int null_fd = open("/dev/null", O_RDWR);
+      if (null_fd >= 0) {
+        dup2(null_fd, 0);
+        dup2(null_fd, 1);
+        dup2(null_fd, 2);
+        if (null_fd > 2) close(null_fd);
+      }
+
+      string opts = JoinStrings(mount_options, ",");
+      execl(cvmfs_binary.c_str(), cvmfs_binary.c_str(),
+            "-o", opts.c_str(),
+            fqrn.c_str(), mountpoint.c_str(), (char *)NULL);
+      _exit(127);  // exec failed
+    }
+
+    // Parent: poll until the mount appears or timeout
+    const int kMountTimeoutSec = 30;
+    const int kPollIntervalUs = 100000;  // 100ms
+    const int kMaxPolls = kMountTimeoutSec * (1000000 / kPollIntervalUs);
+    bool mount_appeared = false;
+
+    for (int i = 0; i < kMaxPolls; ++i) {
+      usleep(kPollIntervalUs);
+
+      // Check if the process died unexpectedly
+      int status = 0;
+      pid_t ret = waitpid(pid, &status, WNOHANG);
+      if (ret == pid) {
+        LogCvmfs(kLogCvmfs, kLogStderr,
+                 "cvmfs2 process exited prematurely with status %d",
+                 WIFEXITED(status) ? WEXITSTATUS(status) : -1);
+        return 32;
+      }
+
+      // Check if the mount point appeared by comparing device IDs
+      platform_stat64 info_after;
+      if (platform_stat(mountpoint.c_str(), &info_after) == 0) {
+        if (info_after.st_dev != dev_before) {
+          mount_appeared = true;
+          break;
+        }
+      }
+    }
+
+    if (!mount_appeared) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "Timeout waiting for FSKit mount on %s", mountpoint.c_str());
+      // cvmfs2 may ignore SIGTERM while it waits for the FSKit mount, so
+      // never block indefinitely on it
+      kill(pid, SIGTERM);
+      for (int i = 0; i < 50; ++i) {
+        if (waitpid(pid, NULL, WNOHANG) == pid)
+          return 32;
+        usleep(kPollIntervalUs);
+      }
+      kill(pid, SIGKILL);
+      waitpid(pid, NULL, 0);
+      return 32;
+    }
+
+    return 0;
   }
 
   // Exec cvmfs2, from here on errors return 32 (mount error)
