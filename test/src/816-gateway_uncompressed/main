@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # Tests publication of uncompressed files through the gateway.
 # Catalogs should remain zlib compressed.

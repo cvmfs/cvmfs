@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 HERE="${0%/*}"
 if [ "$HERE" = "$0" ]; then

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 cvmfs_test_name="Re-export a repository over NFS (knfsd + leveldb inode maps)"
 cvmfs_test_autofs_on_startup=false
