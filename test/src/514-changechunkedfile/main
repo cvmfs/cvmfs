@@ -72,9 +72,8 @@ change_files_in() {
 
   pushdir $working_dir
 
-  # remove the original 50 megabyte file and replace it by a
-  # slightly different version
-  inflate_file big_file/50megabyte _ 50000000
+  # slightly change the file
+  dd if=/dev/urandom of=big_file/50megabyte bs=512 count=1 conv=notrunc
 
   popdir
 }
