@@ -91,4 +91,4 @@ jobs:
           path: |
             mock-result/**
             rpmbuild/SRPMS/*.src.rpm
-            dist/**/*.tar.gz
+            dist/cvmfs_source_tarball/cvmfs-*.tar.gz
