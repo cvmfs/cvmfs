@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # Regression test for issue #3867: a gateway release manager whose read-only
 # mount is behind HEAD must not drop content another release manager added.

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 cvmfs_test_name="Test concurrent api calls on lease database to ensure proper locking"
 cvmfs_test_autofs_on_startup=false
 cvmfs_test_suites="quick"

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 cvmfs_test_name="Fast-delete a nested catalog directory via ingest"
 cvmfs_test_autofs_on_startup=false

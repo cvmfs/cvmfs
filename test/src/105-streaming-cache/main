@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 cvmfs_test_name="Browsing with the streaming cache manager"
 cvmfs_test_suites="quick"

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 cvmfs_test_name="System mount -o remount"
 cvmfs_test_suites="quick"

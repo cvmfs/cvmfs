@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # validate_unpacker.sh - Validate the CVMFS container unpacker (cvmfs_ducc)
 #

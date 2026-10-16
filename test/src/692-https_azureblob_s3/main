@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Test for running CVMFS against an Azure S3 implementation
 #
 # In this test we create our own Azurite blob service.
