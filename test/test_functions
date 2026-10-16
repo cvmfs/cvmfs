@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 
+# bash self-test against outdated bash shipped with macos
+if ! bash -c ': |& cat'; then
+  sudo kill -9 $$
+fi
+
 CVMFS_SERVER_APACHE_RELOAD_IS_RESTART=true
 CVMFS_TEST_USE_MACFUSE_KEXT=${CVMFS_TEST_USE_MACFUSE_KEXT:=no}
 CVMFS_TEST_DEBUGLOG=${CVMFS_TEST_DEBUGLOG:=}
