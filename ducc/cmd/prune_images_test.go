@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -119,7 +120,7 @@ input:
   - https://registry.hub.docker.com/library/ubuntu:22.04
   - https://registry.hub.docker.com/library/alpine:3.18
 `)
-	imgs, err := parseWishlistInputs(yaml)
+	imgs, err := parseWishlistInputs(yaml, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -141,7 +142,7 @@ input:
   - not-a-valid-image-ref
   - https://registry.hub.docker.com/library/debian:11
 `)
-	imgs, err := parseWishlistInputs(yaml)
+	imgs, err := parseWishlistInputs(yaml, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -151,9 +152,20 @@ input:
 	}
 }
 
+func TestParseWishlistInputs_StrictRejectsUnparsableEntries(t *testing.T) {
+	yaml := []byte(`
+input:
+  - https://registry.hub.docker.com/library/ubuntu:22.04
+  - not-a-valid-image-ref
+`)
+	if _, err := parseWishlistInputs(yaml, true); err == nil {
+		t.Error("expected error for unparsable entry in strict mode")
+	}
+}
+
 func TestParseWishlistInputs_EmptyInput(t *testing.T) {
 	yaml := []byte("input: []\n")
-	imgs, err := parseWishlistInputs(yaml)
+	imgs, err := parseWishlistInputs(yaml, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -164,7 +176,7 @@ func TestParseWishlistInputs_EmptyInput(t *testing.T) {
 
 func TestParseWishlistInputs_InvalidYAML(t *testing.T) {
 	// An unclosed flow-mapping is genuinely malformed YAML that yaml.v2 rejects.
-	_, err := parseWishlistInputs([]byte("{"))
+	_, err := parseWishlistInputs([]byte("{"), false)
 	if err == nil {
 		t.Error("expected error for invalid YAML")
 	}
@@ -175,7 +187,7 @@ func TestParseWishlistInputs_WildcardTagPreserved(t *testing.T) {
 input:
   - https://registry.hub.docker.com/library/redis:*
 `)
-	imgs, err := parseWishlistInputs(yaml)
+	imgs, err := parseWishlistInputs(yaml, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -270,17 +282,17 @@ func TestLoadWishlist_HTTPSPrefix(t *testing.T) {
 }
 
 // --------------------------------------------------------------------------
-// pruneFromWishlist (integration of loadWishlist + parseWishlistInputs)
+// loadWishlistImages (integration of loadWishlist + parseWishlistInputs)
 // --------------------------------------------------------------------------
 
-func TestPruneFromWishlist_MissingSourceReturnsError(t *testing.T) {
-	_, err := pruneFromWishlist("repo.example.ch", "/nonexistent/wishlist.yaml", true)
+func TestLoadWishlistImages_MissingSourceReturnsError(t *testing.T) {
+	_, err := loadWishlistImages("/nonexistent/wishlist.yaml", false)
 	if err == nil {
 		t.Error("expected error when wishlist source does not exist")
 	}
 }
 
-func TestPruneFromWishlist_InvalidYAMLReturnsError(t *testing.T) {
+func TestLoadWishlistImages_InvalidYAMLReturnsError(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "bad.yaml")
 	// An unclosed flow-mapping is genuinely malformed YAML that yaml.v2 rejects.
@@ -288,8 +300,98 @@ func TestPruneFromWishlist_InvalidYAMLReturnsError(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err := pruneFromWishlist("repo.example.ch", path, true)
+	_, err := loadWishlistImages(path, false)
 	if err == nil {
 		t.Error("expected error for invalid wishlist YAML")
+	}
+}
+
+func TestLoadWishlistImages_ValidWishlist(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "wishlist.yaml")
+	content := "input:\n  - https://registry.hub.docker.com/library/ubuntu:22.04\n"
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	images, err := loadWishlistImages(path, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(images) != 1 {
+		t.Fatalf("expected 1 image, got %d", len(images))
+	}
+	if images[0].Repository != "library/ubuntu" || images[0].Tag != "22.04" {
+		t.Errorf("unexpected image: %v", images[0])
+	}
+}
+
+func TestLoadWishlistImages_StrictRejectsUnparsableEntries(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "wishlist.yaml")
+	content := "input:\n  - https://registry.hub.docker.com/library/ubuntu:22.04\n  - not-a-valid-image-ref\n"
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := loadWishlistImages(path, true); err == nil {
+		t.Error("expected error for unparsable entry in strict mode")
+	}
+	images, err := loadWishlistImages(path, false)
+	if err != nil {
+		t.Fatalf("unexpected error in non-strict mode: %v", err)
+	}
+	if len(images) != 1 {
+		t.Errorf("expected 1 image in non-strict mode, got %d", len(images))
+	}
+}
+
+// --------------------------------------------------------------------------
+// confirmation prompt
+// --------------------------------------------------------------------------
+
+func TestReadConfirmation(t *testing.T) {
+	cases := []struct {
+		input     string
+		confirmed bool
+		wantErr   bool
+	}{
+		{"y\n", true, false},
+		{"YES\n", true, false},
+		{"  yes  \n", true, false},
+		{"y", true, false},
+		{"n\n", false, false},
+		{"\n", false, false},
+		{"maybe\n", false, false},
+		{"", false, true},
+	}
+	for _, tc := range cases {
+		confirmed, err := readConfirmation(strings.NewReader(tc.input))
+		if (err != nil) != tc.wantErr {
+			t.Errorf("input %q: expected error=%v, got %v", tc.input, tc.wantErr, err)
+		}
+		if confirmed != tc.confirmed {
+			t.Errorf("input %q: expected confirmed=%v, got %v", tc.input, tc.confirmed, confirmed)
+		}
+	}
+}
+
+func TestConfirmPruneNotInWishlist_NonTerminalStdinIsError(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "stdin")
+	if err := os.WriteFile(path, []byte("y\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+
+	confirmed, err := confirmPruneNotInWishlist(f)
+	if err == nil {
+		t.Error("expected error for non-terminal stdin")
+	}
+	if confirmed {
+		t.Error("non-terminal stdin must not confirm deletion")
 	}
 }
