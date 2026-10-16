@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 cvmfs_test_name="check that the .cvmfscatalog file is a regular file"
 cvmfs_test_autofs_on_startup=false
 cvmfs_test_suites="quick"

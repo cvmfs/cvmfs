@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 CVMFS_SERVER_APACHE_RELOAD_IS_RESTART=true
 # Written as CVMFS_MOUNT_BACKEND to default.local; empty keeps the installed default

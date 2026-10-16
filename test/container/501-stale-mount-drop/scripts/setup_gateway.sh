@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Initialise the Stratum-0 + gateway inside the gw1 container.
 set -e
 

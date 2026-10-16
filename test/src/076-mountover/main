@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 cvmfs_test_name="Mount over a directory in cvmfs and reload"
 cvmfs_test_suites="quick"
