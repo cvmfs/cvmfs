@@ -96,7 +96,9 @@ jobs:
             || { cat /tmp/cvmfs_postinstall; exit 1; }
           cat /tmp/cvmfs_postinstall
           ls -la /cvmfs/
-          lipo -archs /usr/local/bin/cvmfs2 /usr/local/lib/libcvmfs_nfs.dylib
+          for f in /usr/local/bin/cvmfs2 /usr/local/lib/libcvmfs_nfs.dylib; do
+            lipo -archs $f
+          done
           printf 'CVMFS_HTTP_PROXY=DIRECT\nCVMFS_USE_CDN=yes\n' \
             | sudo tee /etc/cvmfs/default.local
           sudo cvmfs_config chksetup || true
