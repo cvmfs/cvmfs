@@ -1,6 +1,7 @@
 name: CI_MacOS_NFS_Pkg
 
-# Builds a macOS development package with the NFS frontend and publishes it as
+# Builds a universal (arm64 + x86_64) macOS development package with the NFS
+# frontend, tests it on both architectures and publishes it as
 # the `nfs-dev` prerelease, so other workflows can install it without building:
 #
 #   curl -fLO https://github.com/vvolkl/cvmfs/releases/download/nfs-dev/cvmfs-nfs-dev.pkg
@@ -20,24 +21,46 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
-    runs-on: macos-15
+  build_x86_64:
+    runs-on: macos-15-intel
     timeout-minutes: 60
-    outputs:
-      pkg: ${{ steps.pkg.outputs.pkg }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Install build tools
         run: brew install ninja
 
-      - name: Build package
-        id: pkg
+      - name: Build x86_64 stage directory
         run: |
-          ./ci/nfs4/pkg.sh . build "$(date -u +%Y%m%d).$(git rev-parse --short HEAD)"
-          pkg=$(ls build/pkg_result/cvmfs-*.pkg)
-          pkgutil --payload-files "$pkg"
-          echo "pkg=$(basename $pkg)" >> $GITHUB_OUTPUT
+          ./ci/nfs4/pkg.sh . build "x86_64.$(git rev-parse --short HEAD)"
+          tar -C build -czf stage-x86_64.tar.gz nfs_pkg_root
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cvmfs-nfs-stage-x86_64
+          path: stage-x86_64.tar.gz
+
+  build:
+    needs: build_x86_64
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: cvmfs-nfs-stage-x86_64
+
+      - name: Install build tools
+        run: brew install ninja
+
+      - name: Build universal package
+        run: |
+          mkdir stage-x86_64
+          tar -C stage-x86_64 -xzf stage-x86_64.tar.gz
+          CVMFS_PKG_MERGE_STAGE=$PWD/stage-x86_64/nfs_pkg_root \
+            ./ci/nfs4/pkg.sh . build "$(date -u +%Y%m%d).$(git rev-parse --short HEAD)"
+          pkgutil --payload-files build/pkg_result/cvmfs-*.pkg
 
       - uses: actions/upload-artifact@v4
         with:
@@ -46,7 +69,11 @@ jobs:
 
   test:
     needs: build
-    runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ macos-15, macos-15-intel ]
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     steps:
       - uses: actions/download-artifact@v4
@@ -55,12 +82,15 @@ jobs:
 
       - name: Install
         run: |
+          uname -m
           sudo installer -pkg cvmfs-*.pkg -target / \
             || { cat /tmp/cvmfs_postinstall; exit 1; }
           cat /tmp/cvmfs_postinstall
           ls -la /cvmfs/
+          lipo -archs /usr/local/bin/cvmfs2 /usr/local/lib/libcvmfs_nfs.dylib
           printf 'CVMFS_HTTP_PROXY=DIRECT\nCVMFS_USE_CDN=yes\n' \
             | sudo tee /etc/cvmfs/default.local
+          sudo cvmfs_config chksetup || true
 
       - name: Mount and read
         run: |
@@ -69,9 +99,19 @@ jobs:
           sudo mount -t cvmfs sft.cern.ch /cvmfs/sft.cern.ch
           mount | grep /cvmfs/sft.cern.ch
           ls /cvmfs/sft.cern.ch/lcg/views | head
+          setup=/cvmfs/sft.cern.ch/lcg/views/LCG_110a/arm64-mac15-clang170-opt/setup.sh
+          head -5 $setup
+          shasum $setup
           sudo cvmfs_talk -i sft.cern.ch revision
           sudo umount /cvmfs/sft.cern.ch
           ! mount | grep /cvmfs/sft.cern.ch
+
+      - name: Collect logs
+        if: ${{ failure() }}
+        run: |
+          cat /tmp/cvmfs_postinstall || true
+          sudo log show --last 30m --style compact \
+            --predicate 'process == "cvmfs2" OR process == "mount_nfs"' | tail -200 || true
 
   publish:
     needs: [ build, test ]

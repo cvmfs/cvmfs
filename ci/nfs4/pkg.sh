@@ -108,6 +108,22 @@ done
 echo "bundled libraries:"
 find $stage_dir/lib -type f | sort
 
+# Universal package: merge with the stage directory of a build for the other
+# architecture.  Homebrew dependencies are single-architecture, hence two
+# native builds rather than CMAKE_OSX_ARCHITECTURES.
+if [ -n "$CVMFS_PKG_MERGE_STAGE" ]; then
+  list_stage() { (cd $1 && find bin lib sbin | sort); }
+  diff <(list_stage $stage_dir) <(list_stage $CVMFS_PKG_MERGE_STAGE) \
+    || die "stage directories differ"
+  for f in $(find $stage_dir/bin $stage_dir/lib $stage_dir/sbin -type f); do
+    file -b $f | grep -q '^Mach-O' || continue
+    lipo -create $f $CVMFS_PKG_MERGE_STAGE/${f#$stage_dir/} -output $f.universal
+    mv $f.universal $f
+    codesign --force --sign - $f
+    echo "$(lipo -archs $f): $f"
+  done
+fi
+
 DESTDIR=$BUILD_DIR/nfs_pkg_destdir cmake --install $BUILD_DIR/mount
 cp -R $BUILD_DIR/nfs_pkg_destdir/$PREFIX/etc $stage_dir/
 grep -q '^CVMFS_MOUNT_BACKEND=nfs$' $stage_dir/etc/cvmfs/default.d/11-osx-backend.conf \
