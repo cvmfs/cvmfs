@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # entrypoint-gateway.sh – start-up script for the cvmfs-gateway container.
 #
 # On first boot it:

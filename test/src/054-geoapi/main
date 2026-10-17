@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 cvmfs_test_name="Query Geo-API for server and fallback proxy order"
 cvmfs_test_suites="quick"

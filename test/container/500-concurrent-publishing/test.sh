@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
 docker exec  cvmfs-pub1 cvmfs_server transaction

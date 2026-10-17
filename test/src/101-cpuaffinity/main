@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 #
 # Test CVMFS_CPU_AFFINITY parameter to pin the cvmfs client to certain cores

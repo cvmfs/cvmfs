@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 cvmfs_test_name="Shared quota manager atomic init commands"
 cvmfs_test_suites="quick"

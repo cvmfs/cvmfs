@@ -1,4 +1,5 @@
 #!/bin/bash
+set -x
 # Common configuration tasks for CernVM-FS
 
 SCRIPT_LOCATION=$(dirname "$(command -v "$0")")
@@ -697,7 +698,7 @@ cvmfs_chksetup() {
   fi
 
   # Check that /dev/fuse is read/writable from cvmfs user
-  if [ x"$sys_arch" = x"Darwin" ] && [ ! is_macfuse_enabled ]; then
+  if [ x"$sys_arch" = x"Darwin" ] && ! is_macfuse_enabled; then
     if ! check_fuse_t_installation; then
       echo "Error: FUSE-T is not installed."
       num_errors=$(($num_errors+1))
