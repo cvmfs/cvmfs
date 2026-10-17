@@ -67,35 +67,42 @@ static string MkFqrn(const string &repository) {
   return repository;
 }
 
-#if defined(__APPLE__) && !defined(USE_MACFUSE_KEXT)
-static bool IsFuseTInstalled() {
-  return true;
-  string fuseTComponentsPaths[] = {"/usr/local/bin/go-nfsv4",
-                                   "/usr/local/lib/libfuse-t.dylib",
-                                   "/usr/local/lib/libfuse-t.a"};
-  const int pathsNumber = sizeof(fuseTComponentsPaths)
-                          / sizeof(fuseTComponentsPaths[0]);
-  platform_stat64 info;
-  for (int idx = 0; idx < pathsNumber; ++idx) {
-    bzero(&info, sizeof(platform_stat64));
-    int retval = platform_stat(fuseTComponentsPaths[idx].c_str(), &info);
-    if ((retval != 0) || !S_ISREG(info.st_mode)) {
-      return false;
-    }
+enum MountBackend {
+  kBackendFuse,   // libfuse on Linux, the macFUSE kernel extension on macOS
+  kBackendFskit,  // macFUSE with the FSKit backend (macOS)
+  kBackendNfs,    // cvmfs2 serves NFSv4, mounted by the kernel NFS client
+};
+
+static bool GetMountBackend(MountBackend *backend) {
+  string param;
+  if (!options_manager_.GetValue("CVMFS_MOUNT_BACKEND", &param)
+      || param.empty()) {
+    *backend = kBackendFuse;
+    return true;
+  }
+  if (param == "fuse") {
+    *backend = kBackendFuse;
+  } else if (param == "nfs") {
+    *backend = kBackendNfs;
+  } else if (param == "fskit") {
+#ifdef __APPLE__
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "CVMFS_MOUNT_BACKEND=fskit is not supported by this version");
+#else
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "CVMFS_MOUNT_BACKEND=fskit is only available on macOS");
+#endif
+    return false;
+  } else {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "invalid CVMFS_MOUNT_BACKEND=%s (expected fuse, fskit, or nfs)",
+             param.c_str());
+    return false;
   }
   return true;
 }
-#endif
 
 static bool CheckFuse() {
-#if defined(__APPLE__) && !defined(USE_MACFUSE_KEXT)
-  bool is_fuse_t_installed = IsFuseTInstalled();
-  if (!is_fuse_t_installed) {
-    LogCvmfs(kLogCvmfs, kLogStderr,
-             "FUSE-T installation check failed. FUSE not loaded");
-  }
-  return is_fuse_t_installed;
-#else
   string fuse_device;
   int retval;
 #ifdef __APPLE__
@@ -110,7 +117,6 @@ static bool CheckFuse() {
     return false;
   }
   return true;
-#endif
 }
 
 
@@ -177,6 +183,24 @@ static bool CheckConcurrentMount(const string &fqrn,
   close(socket_fd);
   return true;
 }
+
+/**
+ * Waits for the cvmfs2 instance of fqrn to close its cvmfs_io socket.  The
+ * caller holds the mountcheck lock, so no new instance can start meanwhile.
+ */
+static bool WaitForInstanceExit(const string &fqrn, const string &workspace) {
+  const unsigned kTimeoutMs = 60000;
+  const unsigned kIntervalMs = 250;
+  for (unsigned waited = 0; waited < kTimeoutMs; waited += kIntervalMs) {
+    const int socket_fd = ConnectSocket(workspace + "/cvmfs_io." + fqrn);
+    if (socket_fd < 0)
+      return true;
+    close(socket_fd);
+    SafeSleepMs(kIntervalMs);
+  }
+  return false;
+}
+
 
 static int GetExistingFuseFd(const string &fqrn, const string &workspace,
                              uid_t cvmfs_uid) {
@@ -503,9 +527,15 @@ int main(int argc, char **argv) {
   retval = GetCvmfsUser(&cvmfs_user);
   if (!retval)
     return 1;
-  retval = CheckFuse();
+  MountBackend backend;
+  retval = GetMountBackend(&backend);
   if (!retval)
     return 1;
+  if (backend == kBackendFuse) {
+    retval = CheckFuse();
+    if (!retval)
+      return 1;
+  }
   retval = CheckStrictMount(fqrn);
   if (!retval)
     return 1;
@@ -546,9 +576,21 @@ int main(int argc, char **argv) {
       // Actually remounting is too hard, but pretend that it worked
       return 0;
     }
-    // Identify zombie fuse processes that are held open by other mount
-    // namespaces
-    if ((mountpoint == prev_mountpoint) && !IsMountPoint(mountpoint)) {
+    if ((backend == kBackendNfs) && (mountpoint == prev_mountpoint)
+        && !IsMountPoint(mountpoint)) {
+      // Unmounted from outside, e.g. by autofs after the idle timeout, and
+      // remounted right away; the old cvmfs2 notices within a second and
+      // exits.  There is no fuse fd to take over.
+      if (!WaitForInstanceExit(fqrn, workspace)) {
+        LogCvmfs(kLogCvmfs, kLogStderr,
+                 "Previous instance of %s on %s does not terminate",
+                 fqrn.c_str(), mountpoint.c_str());
+        return 1;
+      }
+    } else if ((mountpoint == prev_mountpoint)
+               && !IsMountPoint(mountpoint)) {
+      // Identify zombie fuse processes that are held open by other mount
+      // namespaces
       // Allow for group access to the socket receiving the fuse fd
       umask(007);
       const int fuse_fd = GetExistingFuseFd(fqrn, workspace, uid_cvmfs);
@@ -558,10 +600,12 @@ int main(int argc, char **argv) {
         return 1;
       }
       return AttachMount(mountpoint, fqrn, fuse_fd);
+    } else {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "Repository %s is already mounted on %s", fqrn.c_str(),
+               prev_mountpoint.c_str());
+      return 1;
     }
-    LogCvmfs(kLogCvmfs, kLogStderr, "Repository %s is already mounted on %s",
-             fqrn.c_str(), prev_mountpoint.c_str());
-    return 1;
   } else {
     // No double mount
     if (remount) {
@@ -658,6 +702,8 @@ int main(int argc, char **argv) {
   }
 #endif
 
+  if (backend == kBackendNfs)
+    AddMountOption("nfs", &mount_options);
   AddMountOption("system_mount", &mount_options);
   AddMountOption("fsname=cvmfs2", &mount_options);
   AddMountOption("allow_other", &mount_options);

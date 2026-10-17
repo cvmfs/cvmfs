@@ -45,6 +45,14 @@ if (MACOSX)
     PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )
 
+  configure_file (default.d/11-osx-backend.conf.in
+                  ${CMAKE_CURRENT_BINARY_DIR}/11-osx-backend.conf @ONLY)
+  install (
+    FILES         ${CMAKE_CURRENT_BINARY_DIR}/11-osx-backend.conf
+    DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/default.d"
+    PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+  )
+
   install (
     FILES         default.d/50-cern.conf
     DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/default.d"

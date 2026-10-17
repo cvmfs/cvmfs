@@ -25,7 +25,57 @@
 using namespace stub;  // NOLINT
 
 
+namespace {
+
+std::vector<std::string> LibraryPaths(const std::string &libname) {
+  std::string local_lib_path = "./";
+  if (getenv("CVMFS_LIBRARY_PATH") != NULL) {
+    local_lib_path = getenv("CVMFS_LIBRARY_PATH");
+    if (!local_lib_path.empty() && (*local_lib_path.rbegin() != '/'))
+      local_lib_path.push_back('/');
+  }
+
+  return {
+      local_lib_path + libname,
+      "/usr/lib/" + libname,
+      "/usr/lib64/" + libname,
+#ifdef __APPLE__
+      // Since OS X El Capitan (10.11) came with SIP, we needed to relocate our
+      // binaries from /usr/... to /usr/local/...
+      "/usr/local/lib/" + libname,
+#endif
+  };
+}
+
+/**
+ * Keeps an NFS mount answerable if its cvmfs2 process dies, see
+ * nfs4/guardian.h.  Started by libcvmfs_nfsfuse as
+ *   cvmfs2 __nfs_guardian__ <listen fd> <control fd> <mount point>
+ */
+int RunNfsGuardian(char **argv) {
+  const std::vector<std::string> paths =
+      LibraryPaths(platform_libname("cvmfs_nfsfuse"));
+  for (const std::string &path : paths) {
+    void *handle = dlopen(path.c_str(), RTLD_NOW | RTLD_LOCAL);
+    if (handle == NULL)
+      continue;
+    typedef int (*GuardianMain)(int, int, const char *);
+    GuardianMain guardian_main = reinterpret_cast<GuardianMain>(
+        dlsym(handle, "cvmfs_nfsfuse_guardian_main"));
+    if (guardian_main == NULL)
+      return 1;
+    return guardian_main(atoi(argv[2]), atoi(argv[3]), argv[4]);
+  }
+  return 1;
+}
+
+}  // anonymous namespace
+
+
 int main(int argc, char **argv) {
+  if ((argc == 5) && (strcmp(argv[1], "__nfs_guardian__") == 0))
+    return RunNfsGuardian(argv);
+
   // Getopt option parsing modifies globals and the argv vector
   const int opterr_save = opterr;
   const int optc = argc;
@@ -36,6 +86,7 @@ int main(int argc, char **argv) {
   }
 
   bool debug = false;
+  bool nfs = false;
   int c;
   opterr = 0;
   while ((c = getopt(optc, optv, "do:")) != -1) {
@@ -49,6 +100,9 @@ int main(int argc, char **argv) {
           if (mount_options[i] == "debug") {
             debug = true;
           }
+          if (mount_options[i] == "nfs") {
+            nfs = true;
+          }
         }
         break;
     }
@@ -60,28 +114,13 @@ int main(int argc, char **argv) {
   }
   free(optv);
 
-  const std::string libname_fuse3 = platform_libname("cvmfs_fuse3_stub");
+  // -o nfs selects the frontend that mounts through the kernel's NFS client
+  const std::string libname_fuse3 =
+      platform_libname(nfs ? "cvmfs_nfs_stub" : "cvmfs_fuse3_stub");
 
   std::string error_messages;
 
-  std::string local_lib_path = "./";
-  if (getenv("CVMFS_LIBRARY_PATH") != NULL) {
-    local_lib_path = getenv("CVMFS_LIBRARY_PATH");
-    if (!local_lib_path.empty() && (*local_lib_path.rbegin() != '/'))
-      local_lib_path.push_back('/');
-  }
-
-  // build the library search path
-  const std::vector<std::string> library_paths = {
-      local_lib_path + libname_fuse3,
-      "/usr/lib/" + libname_fuse3,
-      "/usr/lib64/" + libname_fuse3,
-#ifdef __APPLE__
-      // Since OS X El Capitan (10.11) came with SIP, we needed to relocate our
-      // binaries from /usr/... to /usr/local/...
-      "/usr/local/lib/" + libname_fuse3,
-#endif
-  };
+  const std::vector<std::string> library_paths = LibraryPaths(libname_fuse3);
 
   // dlopen the library at the first good path
   void *library_handle = nullptr;
@@ -95,6 +134,18 @@ int main(int argc, char **argv) {
       break;
     }
     error_messages += std::string(dlerror()) + "\n";
+  }
+
+  // Installations with only the NFS frontend still run helper commands
+  // (e.g. __wpad__ from cvmfs_config) without -o nfs
+  if (!library_handle && !nfs) {
+    const std::vector<std::string> nfs_paths =
+        LibraryPaths(platform_libname("cvmfs_nfs_stub"));
+    for (const std::string &path : nfs_paths) {
+      library_handle = dlopen(path.c_str(), RTLD_NOW | RTLD_LOCAL);
+      if (nullptr != library_handle)
+        break;
+    }
   }
 
   if (!library_handle) {

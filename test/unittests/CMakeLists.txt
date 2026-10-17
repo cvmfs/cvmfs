@@ -357,6 +357,7 @@ set(CVMFS_UNITTEST_SOURCES
   t_manifest.cc
   t_mountpoint.cc
   t_namespace.cc
+  t_nfs4_server.cc
   t_notify_messages.cc
   t_object_fetcher.cc
   t_options.cc
@@ -477,6 +478,12 @@ set(CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/manifest_fetch.cc
   ${CVMFS_SOURCE_DIR}/monitor.cc
   ${CVMFS_SOURCE_DIR}/mountpoint.cc
+  ${CVMFS_SOURCE_DIR}/nfs4/callback.cc
+  ${CVMFS_SOURCE_DIR}/nfs4/filehandle.cc
+  ${CVMFS_SOURCE_DIR}/nfs4/logging.cc
+  ${CVMFS_SOURCE_DIR}/nfs4/nfs4_server.cc
+  ${CVMFS_SOURCE_DIR}/nfs4/rpc.cc
+  ${CVMFS_SOURCE_DIR}/nfs4/xdr.cc
   ${CVMFS_SOURCE_DIR}/network/dns.cc
   ${CVMFS_SOURCE_DIR}/network/download.cc
   ${CVMFS_SOURCE_DIR}/network/jobinfo.cc

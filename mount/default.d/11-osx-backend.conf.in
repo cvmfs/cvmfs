@@ -1,0 +1,3 @@
+# Mount backend: fuse (macFUSE kernel extension), fskit (macFUSE FSKit), or
+# nfs (kernel NFS client).  Override in /etc/cvmfs/default.local.
+CVMFS_MOUNT_BACKEND=@MOUNT_BACKEND_DEFAULT@

@@ -228,8 +228,10 @@ uint64_t NfsMapsLeveldb::GetInode(const PathString &path) {
   // Issue new inode
   inode = seq_;
   seq_ += inode_residue_class_;
-  PutPath2Inode(md5_path, inode);
+  // Reverse mapping first: the lock-free FindInode() above may hand out the
+  // inode as soon as path2inode has it, and GetPath() must then succeed
   PutInode2Path(inode, path);
+  PutPath2Inode(md5_path, inode);
   perf::Inc(n_db_added_);
   return inode;
 }

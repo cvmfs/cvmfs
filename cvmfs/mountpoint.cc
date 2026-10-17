@@ -898,6 +898,16 @@ bool FileSystem::SetupNfsMaps() {
 
   assert(cache_mgr_->id() == kPosixCacheManager);
   assert(IsNfsSource());
+#ifdef CVMFS_NFS_FRONTEND
+  // The loopback NFS mount is private to this process and starts with fresh
+  // file handles, so a cache used by non-NFS mounts (e.g. FSKit sharing the
+  // same cache) needs no wipe.
+  if (!no_nfs_sentinel.empty() && FileExists(no_nfs_sentinel)) {
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
+             "removing %s left by a non-NFS mount", no_nfs_sentinel.c_str());
+    unlink(no_nfs_sentinel.c_str());
+  }
+#endif
   if (!no_nfs_sentinel.empty() && FileExists(no_nfs_sentinel)) {
     boot_error_ = "Cache was used without NFS maps before. "
                   "It has to be wiped out.";
