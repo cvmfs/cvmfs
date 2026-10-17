@@ -207,9 +207,15 @@ build_lib() {
 
 # Build a list of libs that need to be built
 # Check if BUILTIN_EXTERNALS_LIST is set and override missing_libs
-if [[ "${BUILTIN_EXTERNALS_LIST:-}" != "" ]] && ! echo ";${BUILTIN_EXTERNALS_LIST:-};" | grep -qE ";(libarchive|vjson);"; then
-    # Convert semicolon-separated list to space-separated
-    missing_libs=$(echo "${BUILTIN_EXTERNALS_LIST:-}" | tr ';' ' ')
+# The list also names FetchContent externals (e.g. c-ares), which are not
+# built here
+missing_libs=
+for l in $(echo "${BUILTIN_EXTERNALS_LIST:-}" | tr ';' ' '); do
+  case $l in
+    libcrypto|sha3|golang_rev2) missing_libs="$missing_libs $l" ;;
+  esac
+done
+if [[ "$missing_libs" != "" ]]; then
     echo "Bootstrap - Using custom externals list: $missing_libs"
 else
     missing_libs="libcrypto"
