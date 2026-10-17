@@ -112,7 +112,7 @@ switch_list="CVMFS_IGNORE_SIGNATURE CVMFS_STRICT_MOUNT CVMFS_SHARED_CACHE \
           CVMFS_NFS_SOURCE CVMFS_NFS_SHARED CVMFS_CHECK_PERMISSIONS CVMFS_AUTO_UPDATE \
           CVMFS_MOUNT_RW CVMFS_SEND_INFO_HEADER CVMFS_USE_GEOAPI CVMFS_CLAIM_OWNERSHIP \
           CVMFS_HIDE_MAGIC_XATTRS CVMFS_SYSTEMD_NOKILL CVMFS_SERVER_CACHE_MODE \
-          CVMFS_CONFIG_REPO_REQUIRED"
+          CVMFS_CONFIG_REPO_REQUIRED CVMFS_USE_MACFUSE_FSKIT"
 required_list="CVMFS_USER CVMFS_NFILES CVMFS_MOUNT_DIR CVMFS_STRICT_MOUNT CVMFS_RELOAD_SOCKETS \
                CVMFS_QUOTA_LIMIT CVMFS_CACHE_BASE CVMFS_SERVER_URL CVMFS_HTTP_PROXY \
                CVMFS_TIMEOUT CVMFS_TIMEOUT_DIRECT CVMFS_SHARED_CACHE CVMFS_CHECK_PERMISSIONS"
@@ -697,7 +697,7 @@ cvmfs_chksetup() {
   fi
 
   # Check that /dev/fuse is read/writable from cvmfs user
-  if [ x"$sys_arch" = x"Darwin" ] && [ ! is_macfuse_enabled ]; then
+  if [ x"$sys_arch" = x"Darwin" ] && ! is_macfuse_enabled; then
     if ! check_fuse_t_installation; then
       echo "Error: FUSE-T is not installed."
       num_errors=$(($num_errors+1))
@@ -706,6 +706,10 @@ cvmfs_chksetup() {
     if [ ! -d /Library/Filesystems/macfuse.fs ]; then
       echo "Error: macFUSE is missing."
       num_errors=$(($num_errors+1))
+    elif is_macfuse_fskit; then
+      check_macfuse_fskit
+      exit_code=$?
+      num_errors=$(($num_errors+$exit_code))
     fi
   fi
   check_dev_fuse
@@ -1699,9 +1703,10 @@ cvmfs_probe() {
         cvmfs_readconfig $fqrn || die "Failed to read CernVM-FS configuration"
         echo -n "Probing $CVMFS_MOUNT_DIR/$fqrn... "
         ls "$CVMFS_MOUNT_DIR/$fqrn" > /dev/null 2>&1  # workaround for FC28+
-        if [ "$sys_arch" = "Darwin" ] && ! is_macfuse_enabled; then
+        if [ "$sys_arch" = "Darwin" ] && { ! is_macfuse_enabled || is_macfuse_fskit; }; then
+          # FUSE-T and FSKit mounts do not carry the cvmfs2 fsname
           df -P "$CVMFS_MOUNT_DIR/$fqrn" 2>&1 | grep -q "$fqrn"
-        else 
+        else
           df -P "$CVMFS_MOUNT_DIR/$fqrn" 2>&1 | grep -q ^cvmfs2
         fi
         if [ $? -ne 0 ]; then
@@ -2073,6 +2078,17 @@ list_mounts() {
   # /usr/local/bin/cvmfs2) on Linux or lines that contain fuse-t on macOS
   if [ x"$sys_arch" = x"Darwin" ] && ! is_macfuse_enabled; then
     mount -t "nfs" | grep "fuse-t"
+  elif [ x"$sys_arch" = x"Darwin" ] && is_macfuse_fskit; then
+    # FSKit ignores fsname; mounts show up as
+    # "/dev/diskN on /Volumes/cvmfs/<fqrn> (macfuse, ..., fskit)".
+    # Report them under CVMFS_MOUNT_DIR (a symlink to the real directory),
+    # which is what callers compare mount points against.
+    local mount_dir="${CVMFS_MOUNT_DIR:-/cvmfs}"
+    local mount_root
+    mount_root=$(readlink "$mount_dir" 2>/dev/null)
+    [ -n "$mount_root" ] || mount_root="$mount_dir"
+    mount | grep "(macfuse,.*fskit" | grep " on ${mount_root}/" \
+      | sed "s| on ${mount_root}/| on ${mount_dir}/|"
   else
     mount -t $fuse_fs_type | grep "^\(/[^[:space:]]*/\)\?cvmfs2[[:space:]]"
   fi
@@ -2176,7 +2192,9 @@ add_cvmfs_user() {
         sudo dscl . -create /Users/cvmfs UniqueID $uid
         sudo dscl . -create /Users/cvmfs PrimaryGroupID $gid
         sudo dscl . -create /Users/cvmfs NFSHomeDirectory "/var/lib/cvmfs"
-        sudo dscl . -passwd /Users/cvmfs "*"
+        # Setting the attribute directly bypasses the password policy, which
+        # rejects "*" when it goes through -passwd
+        sudo dscl . -create /Users/cvmfs Password "*"
 
         #Hide user from login screen
         sudo defaults write /Library/Preferences/com.apple.loginwindow HiddenUsersList -array-add cvmfs
@@ -2283,7 +2301,11 @@ check_fuse_t_installation() {
   return 0
 }
 
+# True for both macFUSE backends (kext and FSKit); false means FUSE-T
 is_macfuse_enabled() {
+  if is_macfuse_fskit; then
+    return 0
+  fi
   if [ x"$CVMFS_USE_MACFUSE_KEXT" = x ]; then
     return 1
   fi
@@ -2300,6 +2322,56 @@ is_macfuse_enabled() {
   esac
 }
 
+is_macfuse_fskit() {
+  if [ x"$CVMFS_USE_MACFUSE_FSKIT" = x ]; then
+    return 1
+  fi
+  local value=$(echo "$CVMFS_USE_MACFUSE_FSKIT" | tr '[:upper:]' '[:lower:]')
+  case "$value" in
+    yes|on|1|true)
+      return 0 ;;
+    no|off|0|false)
+      return 1 ;;
+    *)
+      echo "Error: invalid value of CVMFS_USE_MACFUSE_FSKIT: $CVMFS_USE_MACFUSE_FSKIT"
+      echo "Valid values are: yes, on, 1, true, no, off, 0, false"
+      return 1 ;;
+  esac
+}
+
+# The FSKit backend needs macFUSE >= 5.4.0 (earlier releases fail to mount)
+# and its file system extension must have been enabled by the user.
+check_macfuse_fskit() {
+  local macfuse_min_version=5.4.0
+  local macfuse_app=/Library/Filesystems/macfuse.fs/Contents/Resources/macfuse.app
+  local plist=/Library/Filesystems/macfuse.fs/Contents/version.plist
+  local version=$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' $plist 2>/dev/null)
+  if [ x"$version" = x ]; then
+    echo "Error: cannot determine macFUSE version from $plist"
+    return 1
+  fi
+  if ! compare_versions "$version" -ge "$macfuse_min_version"; then
+    echo "Error: macFUSE $version is installed but the FSKit backend requires >= $macfuse_min_version"
+    return 1
+  fi
+  local appex
+  for appex in $macfuse_app/Contents/Extensions/io.macfuse.app.fsmodule.macfuse.appex \
+               $macfuse_app/Contents/Extensions/io.macfuse.app.fsmodule.macfuse-local.appex
+  do
+    if [ ! -d "$appex" ]; then
+      echo "Error: macFUSE FSKit module $appex is missing"
+      return 1
+    fi
+  done
+  # pluginkit only sees extensions of the console user's session, so this
+  # is a warning rather than an error
+  if ! pluginkit -m -i io.macfuse.app.fsmodule.macfuse 2>/dev/null | grep -q '^+'; then
+    echo "Warning: the macFUSE file system extension does not appear to be enabled"
+    echo "         (System Settings > General > Login Items & Extensions > File System Extensions)"
+  fi
+  return 0
+}
+
 check_dev_fuse() {
   local charDevice
   local return_code
@@ -2309,9 +2381,9 @@ check_dev_fuse() {
       charDevice=/dev/fuse ;;
 
     Darwin )
-      if ! is_macfuse_enabled; then
-      # Since we rely on user-space FUSE-T now the check for /dev/<device_name> isn't necessary
-        exit 0
+      # FUSE-T and the FSKit backend do not use a character device
+      if ! is_macfuse_enabled || is_macfuse_fskit; then
+        return 0
       fi
       charDevice=/dev/macfuse ;;
     * )
@@ -2504,13 +2576,48 @@ EOF
      # `/Users/shared/cvmfs` instead of `/cvmfs`
      # In order to keep the standard CVMFS mountpoint, we decide to implement
      # firmlinks from `/cvmfs` to `/Users/shared/cvmfs`
+     # When using the macFUSE FSKit backend (macFUSE >= 5.2.0), the mount
+     # point is `/Volumes/cvmfs` instead, so the firmlink target changes.
      if compare_versions $(sw_vers -productVersion) -ge "10.15"; then
-        mkdir -p /Users/shared/cvmfs
-        chown cvmfs:cvmfs /Users/shared/cvmfs
-        chmod 777 /Users/shared/cvmfs
+        if is_macfuse_fskit; then
+          # FSKit mounts appear under /Volumes and are created by
+          # unprivileged users, who need to create their mount points
+          mkdir -p /Volumes/cvmfs
+          chmod 777 /Volumes/cvmfs
+          local firmlink_target=/Volumes/cvmfs
+          # Compatibility symlink: repos may contain absolute symlinks
+          # pointing to /Users/Shared/cvmfs/...  A previous non-FSKit setup
+          # leaves a real directory behind, which silently shadows the
+          # symlink and makes every such repository symlink dangle.
+          if [ -L /Users/Shared/cvmfs ]; then
+            if [ "$(readlink /Users/Shared/cvmfs)" != /Volumes/cvmfs ]; then
+              rm -f /Users/Shared/cvmfs
+              ln -s /Volumes/cvmfs /Users/Shared/cvmfs
+            fi
+          elif [ -d /Users/Shared/cvmfs ]; then
+            # Only replace it if nothing was left in it, e.g. a stale mount
+            if rmdir /Users/Shared/cvmfs 2>/dev/null; then
+              ln -s /Volumes/cvmfs /Users/Shared/cvmfs
+            else
+              echo "Warning: /Users/Shared/cvmfs is a non-empty directory."
+              echo "Repositories with absolute symlinks into /Users/Shared/cvmfs"
+              echo "will not resolve.  Remove it and re-run 'cvmfs_config setup'."
+            fi
+          elif [ ! -e /Users/Shared/cvmfs ]; then
+            ln -s /Volumes/cvmfs /Users/Shared/cvmfs
+          fi
+        else
+          mkdir -p /Users/shared/cvmfs
+          chown cvmfs:cvmfs /Users/shared/cvmfs
+          chmod 777 /Users/shared/cvmfs
+          local firmlink_target=/Users/Shared/cvmfs
+        fi
         if ! grep -q "^cvmfs\t" /etc/synthetic.conf 2> /dev/null ; then
           echo -e "# The line below was autogenerated by CernVM-FS, do not delete nor edit" >> /etc/synthetic.conf
-          echo -e "cvmfs\t/Users/Shared/cvmfs" >> /etc/synthetic.conf
+          echo -e "cvmfs\t${firmlink_target}" >> /etc/synthetic.conf
+        else
+          # Update existing firmlink target if it changed
+          sed -i '' "s|^cvmfs\t.*|cvmfs\t${firmlink_target}|" /etc/synthetic.conf
         fi
         # reload synthetic.conf - seems to return nonzero status code even on success
         /System/Library/Filesystems/apfs.fs/Contents/Resources/apfs.util -t || true

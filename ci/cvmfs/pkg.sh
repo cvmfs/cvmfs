@@ -62,6 +62,7 @@ cmake -DCMAKE_INSTALL_PREFIX:PATH=$CVMFS_INSTALL_PREFIX          \
       -DBUILD_SERVER_DEBUG=no                           \
       -DBUILD_UNITTESTS=no                              \
       -DUSE_MACFUSE_KEXT=${USE_MACFUSE_KEXT:-ON}        \
+      -DUSE_MACFUSE_FSKIT=${USE_MACFUSE_FSKIT:-OFF}      \
       $OPENSSL_INCLUDE                                  \
       $CVMFS_SOURCE_LOCATION
 make -j $(get_number_of_cpu_cores)

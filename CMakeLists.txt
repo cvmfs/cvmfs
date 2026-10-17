@@ -532,8 +532,35 @@ if (BUILD_CVMFS)
   find_package (FUSE3 REQUIRED)
   set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${FUSE3_INCLUDE_DIR})
   add_definitions(-DHAS_FUSE3)
-  if (MACOSX AND USE_MACFUSE_KEXT)
-    add_definitions(-DUSE_MACFUSE_KEXT)
+  if (MACOSX)
+    # On macOS, CMake may treat /usr/local/include as an implicit system include
+    # directory and omit it from compile commands. With an SDK sysroot in use,
+    # AppleClang then no longer finds macFUSE headers such as
+    # <fuse3/fuse_lowlevel.h>. Force the include path explicitly.
+    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -I${FUSE3_INCLUDE_DIR}")
+    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -I${FUSE3_INCLUDE_DIR}")
+    if (USE_MACFUSE_KEXT)
+      add_definitions(-DUSE_MACFUSE_KEXT)
+    endif()
+    if (USE_MACFUSE_FSKIT)
+      # The fuse3 headers carry no macFUSE version, so read it from the
+      # installed bundle.
+      set (MACFUSE_MIN_VERSION_FSKIT "5.4.0")
+      set (MACFUSE_PLIST "/Library/Filesystems/macfuse.fs/Contents/Info.plist")
+      if (NOT EXISTS ${MACFUSE_PLIST})
+        message (FATAL_ERROR "USE_MACFUSE_FSKIT requires macFUSE >= ${MACFUSE_MIN_VERSION_FSKIT}, "
+                             "but ${MACFUSE_PLIST} was not found")
+      endif ()
+      file (READ ${MACFUSE_PLIST} MACFUSE_PLIST_CONTENT)
+      string (REGEX MATCH "<key>CFBundleShortVersionString</key>[ \t\r\n]*<string>([^<]+)</string>"
+              _ "${MACFUSE_PLIST_CONTENT}")
+      set (MACFUSE_VERSION "${CMAKE_MATCH_1}")
+      if (NOT MACFUSE_VERSION OR MACFUSE_VERSION VERSION_LESS MACFUSE_MIN_VERSION_FSKIT)
+        message (FATAL_ERROR "USE_MACFUSE_FSKIT requires macFUSE >= ${MACFUSE_MIN_VERSION_FSKIT}, "
+                             "found '${MACFUSE_VERSION}'")
+      endif ()
+      message (STATUS "Found macFUSE ${MACFUSE_VERSION} (FSKit backend)")
+    endif()
   endif()
 endif ()
 

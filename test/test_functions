@@ -2,6 +2,7 @@
 
 CVMFS_SERVER_APACHE_RELOAD_IS_RESTART=true
 CVMFS_TEST_USE_MACFUSE_KEXT=${CVMFS_TEST_USE_MACFUSE_KEXT:=no}
+CVMFS_TEST_USE_MACFUSE_FSKIT=${CVMFS_TEST_USE_MACFUSE_FSKIT:=no}
 CVMFS_TEST_DEBUGLOG=${CVMFS_TEST_DEBUGLOG:=}
 CVMFS_TEST_PROXY=${CVMFS_TEST_PROXY:=http://ca-proxy.cern.ch:3128}
 CVMFS_TEST_SCRATCH=${CVMFS_TEST_SCRATCH:=/tmp/cvmfs-test}
@@ -44,7 +45,7 @@ if [ ! -z "$CVMFS_TEST_GEO_ACCOUNT_ID" ]; then
   echo "CVMFS_GEO_ACCOUNT_ID=$CVMFS_TEST_GEO_ACCOUNT_ID" | sudo tee -a /etc/cvmfs/server.local > /dev/null
 fi
 
-if ! [[ -v CVMFS_TEST_DOCKER ]]; then
+if [ -z "${CVMFS_TEST_DOCKER+x}" ]; then
   if [ -f /.dockerinit ]; then
     CVMFS_TEST_DOCKER=yes
   else
@@ -467,8 +468,11 @@ wait_for_umount() {
 cvmfs_clean() {
   pkill   openwaitprint || true
   pidwait openwaitprint || true
-  sudo env CVMFS_USE_MACFUSE_KEXT="$CVMFS_TEST_USE_MACFUSE_KEXT" cvmfs_config umount > /dev/null  || return 100
+  sudo env CVMFS_USE_MACFUSE_KEXT="$CVMFS_TEST_USE_MACFUSE_KEXT" CVMFS_USE_MACFUSE_FSKIT="$CVMFS_TEST_USE_MACFUSE_FSKIT" cvmfs_config umount > /dev/null  || return 100
   sudo sh -c "rm -rf /var/lib/cvmfs/*"                  || return 101
+  if [ x"$CVMFS_TEST_USE_MACFUSE_FSKIT" = x"yes" ]; then
+    rm -rf "$HOME/Library/Caches/cvmfs"                  || return 101
+  fi
   sudo rm -f /etc/cvmfs/default.local                    || return 102
   sudo sh -c "rm -f /etc/cvmfs/config.d/*.local"         || return 104
   sudo sh -c "cat /dev/null > $CVMFS_TEST_SYSLOG_TARGET" || return 105
@@ -514,6 +518,7 @@ cvmfs_mount() {
   sudo sh -c 'echo "CVMFS_TIMEOUT_DIRECT=20" >> /etc/cvmfs/default.local' || return 100
   sudo sh -c "echo CVMFS_SYSLOG_FACILITY=$CVMFS_TEST_SYSLOG_FACILITY >> /etc/cvmfs/default.local" || return 100
   sudo sh -c "echo CVMFS_USE_MACFUSE_KEXT=$CVMFS_TEST_USE_MACFUSE_KEXT >> /etc/cvmfs/default.local" || return 100
+  sudo sh -c "echo CVMFS_USE_MACFUSE_FSKIT=$CVMFS_TEST_USE_MACFUSE_FSKIT >> /etc/cvmfs/default.local" || return 100
   sudo sh -c "echo CVMFS_REPOSITORY_TAG=TESTING > /etc/cvmfs/config.d/cvmfs-config.cern.ch.local" || return 100
   if running_on_osx ; then
     sudo sh -c 'echo "CVMFS_MAGIC_XATTRS_VISIBILITY=ALWAYS" >> /etc/cvmfs/default.local' || return 100
@@ -541,7 +546,7 @@ cvmfs_mount() {
     sudo sh -c "echo 'CVMFS_DEBUGLOG=${CVMFS_TEST_DEBUGLOG}' >> /etc/cvmfs/default.local" || return 100
   fi
 
-  if [[ -v CVMFS_TEST_QUOTED_PARAM_KEY_VAL ]]; then
+  if [ -n "${CVMFS_TEST_QUOTED_PARAM_KEY_VAL+x}" ]; then
     sudo sh -c "echo '${CVMFS_TEST_QUOTED_PARAM_KEY_VAL}' >> /etc/cvmfs/default.local" || return 100
   fi
 
@@ -559,12 +564,22 @@ cvmfs_mount() {
 }
 
 
+# FSKit mounts are unprivileged and have to be created by the test user
+_cvmfs_mount_cmd() {
+  local repository=$1
+  if [ x"$CVMFS_TEST_USE_MACFUSE_FSKIT" = x"yes" ]; then
+    mount_cvmfs "$repository" "/cvmfs/$repository"
+  else
+    sudo mount -t cvmfs "$repository" "/cvmfs/$repository"
+  fi
+}
+
 _cvmfs_mount_manually() {
   local repository=$1
   cvmfs_config status | grep -q "/cvmfs/$repository" && return 0
   mkdir -p "/cvmfs/$repository" 2>/dev/null || sudo mkdir -p "/cvmfs/$repository"
-  sudo mount -t cvmfs "$repository" "/cvmfs/$repository" >/dev/null 2>&1
-  if running_on_osx; then 
+  _cvmfs_mount_cmd "$repository" >/dev/null 2>&1
+  if running_on_osx; then
     sleep 3
   fi
 }
@@ -2512,7 +2527,8 @@ try_automount() {
     if mount | grep "$repo"; then
       retval=0
     else
-      sudo mount -t cvmfs $repo /cvmfs/$repo >/dev/null 2>&1
+      mkdir -p "/cvmfs/$repo" 2>/dev/null || sudo mkdir -p "/cvmfs/$repo"
+      _cvmfs_mount_cmd "$repo" >/dev/null 2>&1
       retval=$?
     fi
     sleep 3

@@ -21,6 +21,11 @@ target_link_libraries (${MOUNT_TARGET_NAME} pthread ${CAP_LIBRARIES})
 set (CVMFS_MOUNT_CFLAGS "${CVMFS_MOUNT_CFLAGS} -I${CMAKE_SOURCE_DIR}/cvmfs")
 set_target_properties (${MOUNT_TARGET_NAME} PROPERTIES COMPILE_FLAGS "${CVMFS_MOUNT_CFLAGS}")
 
+if (MACOSX AND USE_MACFUSE_FSKIT)
+  target_compile_definitions(${MOUNT_TARGET_NAME}
+    PRIVATE USE_MACFUSE_FSKIT=1)
+endif ()
+
 if (MACOSX)
   install (
     FILES         auto_cvmfs
@@ -44,6 +49,14 @@ if (MACOSX)
     DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/default.d"
     PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )
+
+  if (USE_MACFUSE_FSKIT)
+    install (
+      FILES         default.d/11-osx-fskit.conf
+      DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/default.d"
+      PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+    )
+  endif()
 
   install (
     FILES         default.d/50-cern.conf

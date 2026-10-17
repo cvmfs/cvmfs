@@ -65,6 +65,7 @@ struct CvmfsOptions {
   int foreground;
   int fuse_debug;
   int fuse_passthrough;
+  int backend_fskit;
 
   // Ignored options
   int ign_netdev;
@@ -100,6 +101,7 @@ static struct fuse_opt cvmfs_array_opts[] = {
     CVMFS_SWITCH("fuse_debug", fuse_debug),
     CVMFS_SWITCH("fuse_passthrough", fuse_passthrough),
     CVMFS_SWITCH("fuse_passthru", fuse_passthrough),
+    CVMFS_SWITCH("obackend=fskit", backend_fskit),
 
     // Ignore these options
     CVMFS_SWITCH("_netdev", ign_netdev),
@@ -180,6 +182,7 @@ static void Usage(const string &exename) {
     "  -o foreground        Run in foreground\n"
     "  -o fuse_passthrough  Enables FUSE passthrough (read requests bypass userspace, improves performance)\n"
     "  -o fuse_passthru     Alias for fuse_passthrough\n"
+    "  -o obackend=fskit    Use the fskit object backend\n"
     "Fuse mount options:\n"
     "  -o allow_other       allow access to other users\n"
     "  -o allow_root        allow access to root\n"
@@ -409,6 +412,13 @@ static fuse_args *ParseCmdLine(int argc, char *argv[]) {
     fuse_opt_add_arg(mount_options, "-d");
   }
   fuse_passthrough_ = cvmfs_options.fuse_passthrough;
+  if (cvmfs_options.backend_fskit) {
+    fuse_opt_add_arg(mount_options, "-obackend=fskit");
+    // FSKit manages the mount lifecycle; daemonizing would break the
+    // FSKit connection, so we force foreground mode.
+    foreground_ = true;
+    disable_watchdog_ = true;
+  }
 
   return mount_options;
 }
