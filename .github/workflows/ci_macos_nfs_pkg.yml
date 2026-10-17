@@ -95,6 +95,7 @@ jobs:
           sudo installer -pkg cvmfs-*.pkg -target / \
             || { cat /tmp/cvmfs_postinstall; exit 1; }
           cat /tmp/cvmfs_postinstall
+          ! grep -E "Read-only file system|DS Error" /tmp/cvmfs_postinstall
           ls -la /cvmfs/
           for f in /usr/local/bin/cvmfs2 /usr/local/lib/libcvmfs_nfs.dylib; do
             lipo -archs $f

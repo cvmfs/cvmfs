@@ -383,7 +383,8 @@ cvmfs_setup() {
     esac
   done
 
-  mkdir -p /cvmfs
+  # / is read-only on macOS; the package creates /cvmfs as a firmlink
+  [ "$sys_arch" = "Darwin" ] || mkdir -p /cvmfs
   # set permissions for home dir
   mkdir -p /var/lib/cvmfs
 
@@ -2093,7 +2094,8 @@ add_cvmfs_user() {
         sudo dscl . -create /Users/cvmfs UniqueID $uid
         sudo dscl . -create /Users/cvmfs PrimaryGroupID $gid
         sudo dscl . -create /Users/cvmfs NFSHomeDirectory "/var/lib/cvmfs"
-        sudo dscl . -passwd /Users/cvmfs "*"
+        # -passwd fails the password policy; "*" disables password login
+        sudo dscl . -create /Users/cvmfs Password "*"
 
         #Hide user from login screen
         sudo defaults write /Library/Preferences/com.apple.loginwindow HiddenUsersList -array-add cvmfs
