@@ -73,9 +73,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "::add-matcher::.github/scripts/clang_matcher.json" 
-          # Vendored headers fail on their own #error guards when analyzed
-          # standalone
-          git diff -U0  HEAD~ HEAD -- . ':!cvmfs/nfs4/libfuse' | /usr/lib/llvm-${{ env.CLANG_VERSION }}/share/clang/clang-tidy-diff.py \
+          git diff -U0  HEAD~ HEAD | /usr/lib/llvm-${{ env.CLANG_VERSION }}/share/clang/clang-tidy-diff.py \
                -clang-tidy-binary clang-tidy-${{ env.CLANG_VERSION }}  \
                 -path ./build -p1 \
                 -j 4 \

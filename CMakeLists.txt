@@ -528,8 +528,11 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_LIBCVMFS_CACHE OR
 endif ()
 
 # Fuse client only
-# libcvmfs_nfsfuse implements the libfuse API itself and builds against these
-set (CVMFS_NFS_FUSE3_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/cvmfs/nfs4/libfuse")
+# libfuse headers for libcvmfs_nfsfuse, which implements the API itself;
+# fetched regardless of BUILTIN_EXTERNALS
+if (BUILD_CVMFS AND BUILD_NFS_FRONTEND)
+  add_subdirectory (externals/libfuse)
+endif ()
 if (BUILD_CVMFS)
   if (MACOSX)
     string (TOUPPER "${CVMFS_MACFUSE}" _macfuse_mode)
