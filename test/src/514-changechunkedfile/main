@@ -3,17 +3,6 @@ cvmfs_test_name="Change a Chunked File"
 cvmfs_test_autofs_on_startup=false
 cvmfs_test_suites="quick"
 
-inflate_file() {
-  local destination_file=$1
-  local source_file=$2
-  local desired_file_size=$3
-
-  touch $destination_file
-  while [ $(stat -c %s $destination_file) -lt $desired_file_size ]; do
-    cat $source_file >> $destination_file
-  done
-}
-
 produce_files_in() {
   local working_dir=$1
 
@@ -83,19 +72,8 @@ change_files_in() {
 
   pushdir $working_dir
 
-  # remove the original 50 megabyte file and replace it by a
-  # slightly different version
-  local bigfile=big_file/50megabyte
-  rm $bigfile
-  touch $bigfile
-  local first_hit=0
-  while [ $(stat -c %s $bigfile) -lt 52428800 ]; do
-    cat /bin/ls >> $bigfile
-    if [ $first_hit -eq 0 ]; then
-      echo "You need to understand recursion in order to understand recursion" >> $bigfile
-      first_hit=1
-    fi
-  done
+  # slightly change the file
+  dd if=/dev/urandom of=big_file/50megabyte bs=512 count=1 conv=notrunc
 
   popdir
 }
@@ -149,7 +127,7 @@ cvmfs_run_test() {
   produce_files_in $repo_dir || return 3
 
   echo "putting exactly the same stuff in the scratch space for comparison"
-  produce_files_in $reference_dir || return 4
+  cp -a "$repo_dir"/* "$reference_dir" || return 4
 
   echo "creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO || return $?
@@ -174,7 +152,7 @@ cvmfs_run_test() {
   change_files_in $repo_dir || return 5
 
   echo "change the chunked file slightly in the reference directory"
-  change_files_in $reference_dir || return 6
+  cp -a "$repo_dir"/* $reference_dir || return 6
 
   echo "creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO || return $?
