@@ -1,7 +1,11 @@
 name: CI_MacOS_NFS_Tests
 
-# Client integration tests (test/profiles/macos_nfs.sh) against the macOS NFS
-# development package, i.e. cvmfs2 mounted through the kernel NFS client
+# NFS frontend tests on hosted runners (kernel NFS client, no macFUSE/FSKit):
+#  - root:    raw cvmfs2 build mounting sft.cern.ch, runs ROOT from an LCG view
+#  - export:  cvmfs_nfs4_export serving a regular directory
+#  - client:  client integration tests (test/profiles/macos_nfs.sh) against
+#             the macOS NFS development package
+#  - podio:   builds podio against an LCG view mounted from the same package
 
 on:
   push:
@@ -17,31 +21,157 @@ on:
   pull_request:
     paths:
       - 'cvmfs/nfs4/**'
+      - 'cvmfs/loader.cc'
+      - 'cvmfs/fuse_main.cc'
+      - 'ci/nfs4/**'
       - 'packaging/mac/nfs/**'
       - 'test/profiles/macos_nfs.sh'
       - '.github/workflows/ci_macos_nfs_tests.yml'
   workflow_dispatch:
 
 jobs:
-  client_tests:
+  export:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nfs-common uuid-dev attr libcap-dev
+
+      - name: Build cvmfs_nfs4_export
+        run: |
+          cmake -S . -B build \
+            -DBUILD_CVMFS=OFF -DBUILD_LIBCVMFS=OFF -DBUILD_LIBCVMFS_CACHE=OFF \
+            -DBUILD_SERVER=OFF -DBUILD_RECEIVER=OFF -DBUILD_GEOAPI=OFF \
+            -DBUILD_MANPAGES=OFF -DBUILD_NFS4_EXPORT=ON
+          cmake --build build --target cvmfs_nfs4_export -j 4
+
+      - name: Mount and compare
+        run: |
+          sw_vers 2>/dev/null || cat /etc/os-release
+          ./ci/nfs4/export_mount_test.sh build/cvmfs/cvmfs_nfs4_export cvmfs
+
+  root:
+    runs-on: macos-15
+    timeout-minutes: 90
+    env:
+      LCG_PLATFORM: arm64-mac15-clang170-opt
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Runner info
+        run: |
+          sw_vers
+          uname -m
+          df -h /
+
+      - name: Install build tools
+        run: brew install ninja
+
+      - name: Build cvmfs2 with the NFS frontend
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DBUILTIN_EXTERNALS=ON \
+            -DBUILD_CVMFS=ON -DBUILD_LIBCVMFS=OFF -DBUILD_LIBCVMFS_CACHE=OFF \
+            -DBUILD_SERVER=OFF -DBUILD_RECEIVER=OFF -DBUILD_GEOAPI=OFF \
+            -DBUILD_UNITTESTS=OFF -DBUILD_MANPAGES=OFF \
+            -DCVMFS_MACFUSE=OFF -DBUILD_NFS_FRONTEND=ON \
+            -DBUILTIN_EXTERNALS_EXCLUDE=zlib \
+            -DCMAKE_DISABLE_FIND_PACKAGE_sqlite3=TRUE
+          cmake --build build --target cvmfs2 cvmfs_nfs_stub cvmfs_nfs cvmfs_talk
+          # cvmfs reconfigures sqlite globally (allocator, threading), which
+          # must not happen to the system libsqlite3 that frameworks share
+          ! otool -L build/cvmfs/libcvmfs_nfs.dylib | grep -i sqlite
+          otool -L build/cvmfs/libcvmfs_nfs.dylib
+
+      - name: Create /cvmfs/sft.cern.ch
+        run: |
+          # / is read-only on macOS 11+: synthetic firmlink, as in CI_MacOS
+          sudo zsh -c 'echo -e "cvmfs\tUsers/Shared/cvmfs\n#comment\n" > /etc/synthetic.conf'
+          sudo chown root:wheel /etc/synthetic.conf
+          sudo chmod a+r /etc/synthetic.conf
+          sudo mkdir -p /Users/Shared/cvmfs
+          # apfs.util returns non-zero also on success
+          sudo /System/Library/Filesystems/apfs.fs/Contents/Resources/apfs.util -t || true
+          sudo mkdir -p /cvmfs/sft.cern.ch
+          ls -la /cvmfs/
+
+      - name: Mount sft.cern.ch over NFS and run ROOT
+        run: |
+          sudo launchctl limit maxfiles 65536 65536
+          sudo CVMFS_NFS_DELEGATIONS=1 bash ci/nfs4/macos_lcg_test.sh build/cvmfs $LCG_PLATFORM
+
+      - name: Collect logs
+        if: ${{ always() }}
+        run: |
+          mkdir -p /tmp/nfs-logs
+          sudo cp -R /var/tmp/cvmfs-nfs-lcg/nfs4-trace.log \
+            /var/tmp/cvmfs-nfs-lcg/root.log /tmp/nfs-logs/ 2>/dev/null || true
+          sudo sh -c 'cp /var/tmp/cvmfs-nfs-lcg/cache/sft.cern.ch/stacktrace.* /tmp/nfs-logs/' 2>/dev/null || true
+          sudo log show --last 90m --style compact \
+            --predicate 'process == "cvmfs2" OR process == "mount_nfs"' \
+            > /tmp/nfs-logs/system.log 2>/dev/null || true
+          sudo chmod -R a+r /tmp/nfs-logs
+          ls -la /tmp/nfs-logs
+
+      - name: Upload logs
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: nfs-lcg-root-logs
+          path: /tmp/nfs-logs
+
+  pkg:
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: brew install ninja
+
+      - name: Build package
+        run: |
+          ./ci/nfs4/pkg.sh . build "ci.$(git rev-parse --short HEAD)"
+          pkgutil --payload-files build/pkg_result/cvmfs-*.pkg
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cvmfs-nfs-test-pkg
+          path: build/pkg_result/cvmfs-*.pkg
+
+  client:
+    needs: pkg
     runs-on: macos-15
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/download-artifact@v4
+        with:
+          name: cvmfs-nfs-test-pkg
+          path: pkg
+
       - name: Install test dependencies
         run: |
           sw_vers
           # The tests use timeout, greadlink, bash >= 4.2 ([[ -v ]]) and gawk
-          brew install bash coreutils gawk ninja
+          brew install bash coreutils gawk
           [ -e "$(brew --prefix)/bin/awk" ] || ln -s gawk "$(brew --prefix)/bin/awk"
           sudo ln -sf "$(brew --prefix)/bin/gtimeout" /usr/local/bin/timeout
           sudo ln -sf "$(brew --prefix)/bin/greadlink" /usr/local/bin/greadlink
 
-      - name: Build and install package
+      - name: Install package
         run: |
-          ./ci/nfs4/pkg.sh . build "ci.$(git rev-parse --short HEAD)"
-          sudo installer -pkg build/pkg_result/cvmfs-*.pkg -target / \
+          sudo installer -pkg pkg/cvmfs-*.pkg -target / \
             || { cat /tmp/cvmfs_postinstall; exit 1; }
           cat /tmp/cvmfs_postinstall
           ls -la /cvmfs/
@@ -77,3 +207,58 @@ jobs:
         with:
           name: macos-nfs-client-test-logs
           path: /tmp/nfs-logs
+
+  podio:
+    needs: pkg
+    runs-on: macos-15
+    timeout-minutes: 90
+    env:
+      VIEW: /cvmfs/sft.cern.ch/lcg/views/LCG_110a/arm64-mac15-clang170-opt
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: cvmfs-nfs-test-pkg
+          path: pkg
+
+      - name: Install cvmfs and mount sft.cern.ch
+        run: |
+          sudo installer -pkg pkg/cvmfs-*.pkg -target / \
+            || { cat /tmp/cvmfs_postinstall; exit 1; }
+          printf 'CVMFS_HTTP_PROXY=DIRECT\nCVMFS_USE_CDN=yes\nCVMFS_DEBUGLOG=/tmp/cvmfs-debug.log\n' \
+            | sudo tee /etc/cvmfs/default.local
+          sudo launchctl limit maxfiles 65536 65536
+          sudo mkdir -p /cvmfs/sft.cern.ch
+          sudo CVMFS_NFS4_DEBUG=/tmp/nfs4-trace.log mount -t cvmfs sft.cern.ch /cvmfs/sft.cern.ch
+          ls $VIEW
+
+      - name: Checkout podio
+        run: git clone --depth 1 https://github.com/AIDASoft/podio.git
+
+      - name: Configure
+        run: |
+          source $VIEW/setup.sh
+          cmake -S podio -B build -G Ninja \
+            -DCMAKE_CXX_STANDARD=20 -DCMAKE_CXX_FLAGS=-fexperimental-library \
+            -DBUILD_TESTING=OFF -DENABLE_SIO=OFF -DUSE_EXTERNAL_CATCH2=AUTO
+
+      - name: Build
+        run: |
+          source $VIEW/setup.sh
+          time cmake --build build -j $(sysctl -n hw.ncpu)
+
+      - name: cvmfs statistics
+        if: ${{ always() }}
+        run: |
+          sudo cvmfs_talk -i sft.cern.ch internal affairs | head -40 || true
+          df -h /cvmfs/sft.cern.ch || true
+          mkdir -p logs
+          sudo cp /tmp/cvmfs-debug.log /tmp/nfs4-trace.log logs/ || true
+          sudo chmod -R a+r logs
+          grep -c " -> 70$" logs/nfs4-trace.log || true
+          grep -m5 -B3 " -> 70$" logs/nfs4-trace.log || true
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() }}
+        with:
+          name: podio-nfs-logs
+          path: logs
