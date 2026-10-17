@@ -18,7 +18,7 @@ cvmfs_run_test() {
   local repodir=/cvmfs/${reponame}
 
   echo "set up gateway"
-  set_up_repository_gateway || return 1
+  set_up_repository_gateway test.repo.org || return 1
 
   echo "parse configuration"
   load_repo_config ${reponame}

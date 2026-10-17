@@ -53,7 +53,7 @@ stresstest_lease() {
 
 
 cvmfs_run_test() {
-  set_up_repository_gateway || return 1
+  set_up_repository_gateway test.repo.org || return 1
 
   echo "*** Starting initial transaction"
   cvmfs_server transaction test.repo.org || return 10

@@ -1040,7 +1040,10 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
   // This affects only reads on the same open directory handle (e.g. multiple
   // reads with rewinddir() between them).  A new opendir on the same directory
   // will trigger readdir calls independently of this setting.
-  fi->cache_readdir = 1;
+  fi->cache_readdir = mount_point_->fuse_dir_cache();
+
+  // Whether to let the cached data survive fd closing.
+  fi->keep_cache = mount_point_->fuse_keep_dir_cache();
 #endif
   fuse_reply_open(req, fi);
 }
@@ -1090,6 +1093,10 @@ static void ReplyBufferSlice(const fuse_req_t req, const char *buffer,
     fuse_reply_buf(
         req, buffer + offset,
         std::min(static_cast<size_t>(buffer_size - offset), max_size));
+    perf::Inc(file_system_->n_fs_readdir());
+    if (offset == 0) {
+      perf::Inc(file_system_->n_fs_readdir_0_offset());
+    }
   } else {
     fuse_reply_buf(req, NULL, 0);
   }
@@ -1122,6 +1129,7 @@ static void cvmfs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
   }
 
   fuse_reply_err(req, EINVAL);
+  perf::Inc(file_system_->n_fs_readdir_einval());
 }
 
 static void FillOpenFlags(const glue::PageCacheTracker::OpenDirectives od,
