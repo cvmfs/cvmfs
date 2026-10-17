@@ -30,11 +30,8 @@ jobs:
       # Both architectures must bundle the same Homebrew libraries for lipo
       - name: Install build tools
         run: |
-          brew install ninja c-ares openssl@3
+          brew install ninja openssl@3
           echo "OPENSSL_ROOT_DIR=$(brew --prefix openssl@3)" >> $GITHUB_ENV
-          # Intel Homebrew lives in /usr/local/include, which CMake drops as an
-          # implicit include directory although clang does not search it
-          echo "CPATH=$(brew --prefix)/include" >> $GITHUB_ENV
 
       - name: Build x86_64 stage directory
         run: |
@@ -60,7 +57,7 @@ jobs:
       # Both architectures must bundle the same Homebrew libraries for lipo
       - name: Install build tools
         run: |
-          brew install ninja c-ares openssl@3
+          brew install ninja openssl@3
           echo "OPENSSL_ROOT_DIR=$(brew --prefix openssl@3)" >> $GITHUB_ENV
 
       - name: Build universal package

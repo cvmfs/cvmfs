@@ -37,7 +37,7 @@ cmake -S $SOURCE_DIR -B $BUILD_DIR -G Ninja \
   -DBUILD_SERVER=OFF -DBUILD_RECEIVER=OFF -DBUILD_GEOAPI=OFF \
   -DBUILD_UNITTESTS=OFF -DBUILD_MANPAGES=OFF \
   -DCVMFS_MACFUSE=OFF -DBUILD_NFS_FRONTEND=ON \
-  -DBUILTIN_EXTERNALS_EXCLUDE=zlib \
+  -DBUILTIN_EXTERNALS_EXCLUDE=zlib -DBUILTIN_EXTERNALS_LIST="c-ares;nettle" \
   -DCMAKE_DISABLE_FIND_PACKAGE_sqlite3=TRUE
 cmake --build $BUILD_DIR --target \
   cvmfs2 cvmfs_fsck cvmfs_talk cvmfs_nfsfuse cvmfs_nfs_stub cvmfs_nfs cvmfs_nfs_debug \
