@@ -43,6 +43,13 @@ static int __attribute__((used)) fuse_lowlevel_notify_inval_entry(
 }
 #else  // CVMFS_LIBCVMFS
 
+#ifdef __APPLE__
+// macFUSE >= 5.4 defaults to its Darwin ABI (extra position argument for
+// get/setxattr, fuse_darwin_entry_param for fuse_reply_entry). Stick to the
+// vanilla libfuse ABI; libfuse picks the ABI at runtime from this flag.
+#define FUSE_DARWIN_ENABLE_EXTENSIONS 0
+#endif
+
 #ifdef CVMFS_ENABLE_FUSE3_LOOP_CONFIG
 #define FUSE_USE_VERSION 312
 #else

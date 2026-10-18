@@ -47,8 +47,16 @@
 #include "util/logging.h"
 #include "util/posix.h"
 #include "util/string.h"
+#ifdef CVMFS_NFS_FRONTEND
+#include "nfs4/fuse_shim_api.h"
+#endif
 
 using namespace std;  // NOLINT
+
+// Client library of this stub's frontend, set by cvmfs_add_frontend()
+#ifndef CVMFS_FRONTEND_LIBRARY
+#define CVMFS_FRONTEND_LIBRARY "cvmfs_fuse3"
+#endif
 
 namespace loader {
 
@@ -480,7 +488,8 @@ static CvmfsExports *LoadLibrary(const bool debug_mode,
       local_lib_path.push_back('/');
   }
 
-  string library_name = string("cvmfs_fuse3") + ((debug_mode) ? "_debug" : "");
+  string library_name =
+      string(CVMFS_FRONTEND_LIBRARY) + ((debug_mode) ? "_debug" : "");
   library_name = platform_libname(library_name);
   string error_messages;
 
@@ -599,6 +608,36 @@ Failures Reload(const int fd_progress, const bool stop_and_go,
 
 
 using namespace loader;  // NOLINT(build/namespaces)
+
+#ifdef CVMFS_NFS_FRONTEND
+/**
+ * Detaches like Daemonize(), but the calling process exits only once the
+ * daemon reports that the NFS mount is in place, with a matching exit code.
+ * Until then the daemon keeps stdout/stderr, so that startup errors still
+ * reach the terminal; libcvmfs_nfsfuse redirects them once the mount is ready.
+ */
+static void DaemonizeUntilMounted() {
+  int pipe_ready[2];
+  MakePipe(pipe_ready);
+  pid_t pid = fork();
+  assert(pid >= 0);
+  if (pid > 0) {
+    close(pipe_ready[1]);
+    char status = 1;
+    const ssize_t retval = read(pipe_ready[0], &status, 1);
+    _exit((retval == 1 && status == 0) ? kFailOk : kFailMount);
+  }
+  close(pipe_ready[0]);
+  const int retval = setsid();
+  assert(retval != -1);
+  pid = fork();
+  assert(pid >= 0);
+  if (pid > 0)
+    _exit(0);
+  cvmfs_nfsfuse_set_ready_fd(pipe_ready[1]);
+}
+#endif
+
 
 int FuseMain(int argc, char *argv[]) {
   // Set a decent umask for new files (no write access to group/everyone).
@@ -739,6 +778,15 @@ int FuseMain(int argc, char *argv[]) {
       && options_manager->IsOff(parameter)) {
     premount_fuse_ = false;
   }
+#ifdef CVMFS_NFS_FRONTEND
+  // The file system is mounted through the kernel's NFS client
+  premount_fuse_ = false;
+  // Settings of libcvmfs_nfsfuse, which only sees the environment
+  if (options_manager->GetValue("CVMFS_NFS_DELEGATIONS", &parameter))
+    setenv("CVMFS_NFS_DELEGATIONS", parameter.c_str(), 1);
+  if (options_manager->GetValue("CVMFS_NFS_MOUNT_OPTIONS", &parameter))
+    setenv("CVMFS_NFS_MOUNT_OPTIONS", parameter.c_str(), 1);
+#endif
 
   if (options_manager->GetValue("CVMFS_REPOSITORIES_NOMOUNT", &parameter)
       && !parameter.empty()) {
@@ -1011,6 +1059,12 @@ int FuseMain(int argc, char *argv[]) {
   delete options_manager;
   options_manager = NULL;
 
+#ifdef CVMFS_NFS_FRONTEND
+  // Fork before the cvmfs library opens its databases: macOS' libsqlite3
+  // invalidates connections that are used again after fork()
+  if (!foreground_)
+    DaemonizeUntilMounted();
+#endif
   loader_exports_->fuse_session = &session;
 
   // Load and initialize cvmfs library
@@ -1204,8 +1258,10 @@ int FuseMain(int argc, char *argv[]) {
   }
   LogCvmfs(kLogCvmfs, kLogSyslog, "CernVM-FS: linking %s to repository %s",
            mount_point_->c_str(), repository_name_->c_str());
+#ifndef CVMFS_NFS_FRONTEND
   if (!foreground_)
     Daemonize();
+#endif
 
   // Note that this has a side effect of significantly reducing capabilities
   // after it starts things that need more privileges

@@ -474,7 +474,8 @@ cvmfs_setup() {
     esac
   done
 
-  mkdir -p /cvmfs
+  # / is read-only on macOS; the package creates /cvmfs as a firmlink
+  [ "$sys_arch" = "Darwin" ] || mkdir -p /cvmfs
   # set permissions for home dir
   mkdir -p /var/lib/cvmfs
 
@@ -570,10 +571,12 @@ cvmfs_chksetup() {
     fi
   done
 
+  local frontend=fuse3
+  [ "$(get_mount_backend)" = "nfs" ] && frontend=nfs
   if [ "$sys_arch" = "Darwin" ]; then
-    cvmfs_libs="libcvmfs_fuse3.dylib libcvmfs_fuse3_debug.dylib"
+    cvmfs_libs="libcvmfs_${frontend}.dylib libcvmfs_${frontend}_debug.dylib"
   else
-    cvmfs_libs="libcvmfs_fuse3.so libcvmfs_fuse3_debug.so"
+    cvmfs_libs="libcvmfs_${frontend}.so libcvmfs_${frontend}_debug.so"
   fi
   for library in $cvmfs_libs
   do
@@ -696,22 +699,26 @@ cvmfs_chksetup() {
     fi
   fi
 
-  # Check that /dev/fuse is read/writable from cvmfs user
-  if [ x"$sys_arch" = x"Darwin" ] && [ ! is_macfuse_enabled ]; then
-    if ! check_fuse_t_installation; then
-      echo "Error: FUSE-T is not installed."
-      num_errors=$(($num_errors+1))
-    fi
-  elif [ x"$sys_arch" = x"Darwin" ]; then
+  local backend=$(get_mount_backend)
+  case $backend in
+    fuse|fskit|nfs ) ;;
+    * )
+      echo "Error: invalid CVMFS_MOUNT_BACKEND=$backend (expected fuse, fskit, or nfs)"
+      num_errors=$(($num_errors+1)) ;;
+  esac
+  if [ x"$sys_arch" = x"Darwin" ] && [ "$backend" != "nfs" ]; then
     if [ ! -d /Library/Filesystems/macfuse.fs ]; then
-      echo "Error: macFUSE is missing."
+      echo "Error: macFUSE is missing (CVMFS_MOUNT_BACKEND=$backend)."
       num_errors=$(($num_errors+1))
     fi
   fi
-  check_dev_fuse
-  exit_code=$?
-  if [ $exit_code -ne 0 ]; then
-    num_errors=$(($num_errors+$exit_code))
+  # Check that /dev/fuse is read/writable from cvmfs user
+  if [ "$backend" = "fuse" ]; then
+    check_dev_fuse
+    exit_code=$?
+    if [ $exit_code -ne 0 ]; then
+      num_errors=$(($num_errors+$exit_code))
+    fi
   fi
 
   # Check that /etc/nsswitch.conf is readable from cvmfs user
@@ -1699,11 +1706,8 @@ cvmfs_probe() {
         cvmfs_readconfig $fqrn || die "Failed to read CernVM-FS configuration"
         echo -n "Probing $CVMFS_MOUNT_DIR/$fqrn... "
         ls "$CVMFS_MOUNT_DIR/$fqrn" > /dev/null 2>&1  # workaround for FC28+
-        if [ "$sys_arch" = "Darwin" ] && ! is_macfuse_enabled; then
-          df -P "$CVMFS_MOUNT_DIR/$fqrn" 2>&1 | grep -q "$fqrn"
-        else 
-          df -P "$CVMFS_MOUNT_DIR/$fqrn" 2>&1 | grep -q ^cvmfs2
-        fi
+        # NFS frontend mounts show up as 127.0.0.1:/
+        df -P "$CVMFS_MOUNT_DIR/$fqrn" 2>&1 | grep -q -e ^cvmfs2 -e "^127\.0\.0\.1:/"
         if [ $? -ne 0 ]; then
           echo "Failed!"
           RETVAL=1
@@ -1793,7 +1797,7 @@ cvmfs_umount() {
   for m in $mount_list
   do
     [ "x$silent" != "x" ] || echo -n "Unmounting ${m}: "
-    if [ "$sys_arch" = "Darwin" ] && ! is_macfuse_enabled; then
+    if [ "$sys_arch" = "Darwin" ] && is_nfs_mount $m; then
       umount -f $umount_options $m 2>/dev/null
     else
       umount $umount_options $m 2>/dev/null
@@ -2070,12 +2074,17 @@ waitfor() {
 
 list_mounts() {
   # Matches lines that begin with cvmfs2 or /usr/bin/cvmfs2 (/bin/cvmfs2,
-  # /usr/local/bin/cvmfs2) on Linux or lines that contain fuse-t on macOS
-  if [ x"$sys_arch" = x"Darwin" ] && ! is_macfuse_enabled; then
-    mount -t "nfs" | grep "fuse-t"
-  else
-    mount -t $fuse_fs_type | grep "^\(/[^[:space:]]*/\)\?cvmfs2[[:space:]]"
+  # /usr/local/bin/cvmfs2).  On macOS, NFS frontend mounts (served on
+  # 127.0.0.1:/) are listed as well.
+  mount -t $fuse_fs_type | grep "^\(/[^[:space:]]*/\)\?cvmfs2[[:space:]]"
+  if [ x"$sys_arch" = x"Darwin" ]; then
+    mount -t "nfs" | grep "^127\.0\.0\.1:/ on "
   fi
+}
+
+
+is_nfs_mount() {
+  mount -t "nfs" | grep -q "^127\.0\.0\.1:/ on $1 "
 }
 
 
@@ -2176,7 +2185,8 @@ add_cvmfs_user() {
         sudo dscl . -create /Users/cvmfs UniqueID $uid
         sudo dscl . -create /Users/cvmfs PrimaryGroupID $gid
         sudo dscl . -create /Users/cvmfs NFSHomeDirectory "/var/lib/cvmfs"
-        sudo dscl . -passwd /Users/cvmfs "*"
+        # -passwd fails the password policy; "*" disables password login
+        sudo dscl . -create /Users/cvmfs Password "*"
 
         #Hide user from login screen
         sudo defaults write /Library/Preferences/com.apple.loginwindow HiddenUsersList -array-add cvmfs
@@ -2265,39 +2275,9 @@ check_cvmfs_user() {
   esac
 }
 
-# Expected to be ran only on macOS
-check_fuse_t_installation() {
-  local product="fuse-t"
-  local nfsV4ServerLink="/usr/local/bin/go-nfsv4"
-  local dylibPath="/usr/local/lib/lib${product}.dylib"
-  local staticLibPath="/usr/local/lib/lib${product}.a"
-
-  # Check for existence of required files and links
-  local paths=("$nfsV4ServerLink" "$dylibPath" "$staticLibPath")
-  for path in "${paths[@]}"; do
-    if [ ! -e "$path" ]; then
-      echo "Error: Missing required file or directory: $path"
-      return 1
-    fi
-  done
-  return 0
-}
-
-is_macfuse_enabled() {
-  if [ x"$CVMFS_USE_MACFUSE_KEXT" = x ]; then
-    return 1
-  fi
-  local value=$(echo "$CVMFS_USE_MACFUSE_KEXT" | tr '[:upper:]' '[:lower:]')
-  case "$value" in
-    yes|on|1|true)
-      return 0 ;;
-    no|off|0|false)
-      return 1 ;;
-    *)
-      echo "Error: invalid value of CVMFS_USE_MACFUSE_KEXT: $CVMFS_USE_MACFUSE_KEXT"
-      echo "Valid values are: yes, on, 1, true, no, off, 0, false"
-      return 1 ;;
-  esac
+# CVMFS_MOUNT_BACKEND of the global configuration, fuse if unset
+get_mount_backend() {
+  (cvmfs_readconfig > /dev/null 2>&1; echo "${CVMFS_MOUNT_BACKEND:-fuse}")
 }
 
 check_dev_fuse() {
@@ -2309,10 +2289,6 @@ check_dev_fuse() {
       charDevice=/dev/fuse ;;
 
     Darwin )
-      if ! is_macfuse_enabled; then
-      # Since we rely on user-space FUSE-T now the check for /dev/<device_name> isn't necessary
-        exit 0
-      fi
       charDevice=/dev/macfuse ;;
     * )
      echo "Architecture $sys_arch is not supported"

@@ -2413,6 +2413,10 @@ static void InitOptionsMgr(const loader::LoaderExports *loader_exports) {
   } else {
     cvmfs::options_mgr_->ParseDefault(loader_exports->repository_name);
   }
+#ifdef CVMFS_NFS_FRONTEND
+  // NFS has no forget, so inodes must not depend on lookup reference counts
+  cvmfs::options_mgr_->SetValue("CVMFS_NFS_SOURCE", "yes");
+#endif
 }
 
 
