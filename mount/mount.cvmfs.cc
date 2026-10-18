@@ -835,7 +835,7 @@ int main(int argc, char **argv) {
     }
 
     // Fork cvmfs2 into its own session so it survives our exit
-    pid_t pid = fork();
+    const pid_t pid = fork();
     if (pid < 0) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to fork");
       return 32;
@@ -843,7 +843,7 @@ int main(int argc, char **argv) {
     if (pid == 0) {
       // Child: create new session, redirect stdio to /dev/null, exec cvmfs2
       setsid();
-      int null_fd = open("/dev/null", O_RDWR);
+      const int null_fd = open("/dev/null", O_RDWR);
       if (null_fd >= 0) {
         dup2(null_fd, 0);
         dup2(null_fd, 1);
@@ -851,7 +851,7 @@ int main(int argc, char **argv) {
         if (null_fd > 2) close(null_fd);
       }
 
-      string opts = JoinStrings(mount_options, ",");
+      const string opts = JoinStrings(mount_options, ",");
       execl(cvmfs_binary.c_str(), cvmfs_binary.c_str(),
             "-o", opts.c_str(),
             fqrn.c_str(), mountpoint.c_str(), (char *)NULL);
@@ -869,7 +869,7 @@ int main(int argc, char **argv) {
 
       // Check if the process died unexpectedly
       int status = 0;
-      pid_t ret = waitpid(pid, &status, WNOHANG);
+      const pid_t ret = waitpid(pid, &status, WNOHANG);
       if (ret == pid) {
         LogCvmfs(kLogCvmfs, kLogStderr,
                  "cvmfs2 process exited prematurely with status %d",

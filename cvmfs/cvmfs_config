@@ -1713,7 +1713,9 @@ cvmfs_probe() {
         cvmfs_readconfig $fqrn || die "Failed to read CernVM-FS configuration"
         echo -n "Probing $CVMFS_MOUNT_DIR/$fqrn... "
         ls "$CVMFS_MOUNT_DIR/$fqrn" > /dev/null 2>&1  # workaround for FC28+
-        if [ "$sys_arch" = "Darwin" ] && is_macfuse_fskit; then
+        # Not is_macfuse_fskit: re-reading the config without an fqrn would
+        # rerun default.d scripts with an empty CVMFS_FQRN
+        if [ "$sys_arch" = "Darwin" ] && [ "$CVMFS_MOUNT_BACKEND" = "fskit" ]; then
           # FSKit mounts do not carry the cvmfs2 fsname
           df -P "$CVMFS_MOUNT_DIR/$fqrn" 2>&1 | grep -q "$fqrn"
         else
@@ -3033,7 +3035,8 @@ case "$1" in
     ;;
 
   reload)
-    if [ `id -u` -ne 0 ]; then
+    # macOS mounts are unprivileged and owned by the mounting user
+    if [ `id -u` -ne 0 ] && [ "$sys_arch" != "Darwin" ]; then
       echo "root privileges required"
       exit 1
     fi
