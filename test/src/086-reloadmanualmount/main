@@ -21,7 +21,12 @@ cvmfs_run_test() {
   cvmfs_umount cvmfs-config.cern.ch || return 6
   mount | grep cvmfs-config.cern.ch && return 7
 
-  sudo cvmfs_config reload || return 8
+  # macOS mounts belong to the test user; sudo would resolve root's cache
+  if running_on_osx; then
+    cvmfs_config reload || return 8
+  else
+    sudo cvmfs_config reload || return 8
+  fi
 
   return 0
 }

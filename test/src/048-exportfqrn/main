@@ -19,6 +19,10 @@ cvmfs_run_test() {
 
   local retval=0
   create_config_files || return 1
+  # Owned by the test user so an unprivileged (macOS) cvmfs2 can overwrite it
+  # after root-run cvmfs_config calls wrote it without an FQRN
+  sudo rm -f /tmp/cvmfs_fqrn
+  touch /tmp/cvmfs_fqrn || return 1
 
   cvmfs_mount grid.cern.ch || retval=2
   if [ $retval -eq 0 ]; then
