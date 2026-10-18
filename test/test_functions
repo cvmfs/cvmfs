@@ -45,7 +45,7 @@ if [ ! -z "$CVMFS_TEST_GEO_ACCOUNT_ID" ]; then
   echo "CVMFS_GEO_ACCOUNT_ID=$CVMFS_TEST_GEO_ACCOUNT_ID" | sudo tee -a /etc/cvmfs/server.local > /dev/null
 fi
 
-if ! [[ -v CVMFS_TEST_DOCKER ]]; then
+if [ -z "${CVMFS_TEST_DOCKER+x}" ]; then
   if [ -f /.dockerinit ]; then
     CVMFS_TEST_DOCKER=yes
   else
@@ -457,6 +457,9 @@ cvmfs_clean() {
   pidwait openwaitprint || true
   sudo cvmfs_config umount > /dev/null  || return 100
   sudo sh -c "rm -rf /var/lib/cvmfs/*"                  || return 101
+  if running_on_osx; then
+    rm -rf "$HOME/Library/Caches/cvmfs"                  || return 101
+  fi
   sudo rm -f /etc/cvmfs/default.local                    || return 102
   sudo sh -c "rm -f /etc/cvmfs/config.d/*.local"         || return 104
   sudo sh -c "cat /dev/null > $CVMFS_TEST_SYSLOG_TARGET" || return 105
@@ -531,7 +534,7 @@ cvmfs_mount() {
     sudo sh -c "echo 'CVMFS_DEBUGLOG=${CVMFS_TEST_DEBUGLOG}' >> /etc/cvmfs/default.local" || return 100
   fi
 
-  if [[ -v CVMFS_TEST_QUOTED_PARAM_KEY_VAL ]]; then
+  if [ -n "${CVMFS_TEST_QUOTED_PARAM_KEY_VAL+x}" ]; then
     sudo sh -c "echo '${CVMFS_TEST_QUOTED_PARAM_KEY_VAL}' >> /etc/cvmfs/default.local" || return 100
   fi
 
@@ -549,12 +552,26 @@ cvmfs_mount() {
 }
 
 
+# macOS mounts are unprivileged and created by the test user, who owns the
+# per-user cache
+_cvmfs_mount_cmd() {
+  local repository=$1
+  if running_on_osx; then
+    # /usr/local/sbin is often not on PATH
+    local mount_cvmfs
+    mount_cvmfs=$(command -v mount_cvmfs || echo /usr/local/sbin/mount_cvmfs)
+    $mount_cvmfs "$repository" "/cvmfs/$repository"
+  else
+    sudo mount -t cvmfs "$repository" "/cvmfs/$repository"
+  fi
+}
+
 _cvmfs_mount_manually() {
   local repository=$1
   cvmfs_config status | grep -q "/cvmfs/$repository" && return 0
   mkdir -p "/cvmfs/$repository" 2>/dev/null || sudo mkdir -p "/cvmfs/$repository"
-  sudo mount -t cvmfs "$repository" "/cvmfs/$repository" >/dev/null
-  if running_on_osx; then 
+  _cvmfs_mount_cmd "$repository" >/dev/null
+  if running_on_osx; then
     sleep 3
   fi
 }
@@ -2515,7 +2532,8 @@ try_automount() {
     if mount | grep "$repo"; then
       retval=0
     else
-      sudo mount -t cvmfs $repo /cvmfs/$repo >/dev/null 2>&1
+      mkdir -p "/cvmfs/$repo" 2>/dev/null || sudo mkdir -p "/cvmfs/$repo"
+      _cvmfs_mount_cmd "$repo" >/dev/null 2>&1
       retval=$?
     fi
     sleep 3

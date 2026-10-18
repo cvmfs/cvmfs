@@ -15,7 +15,12 @@ cvmfs_run_test() {
 
   echo "*** reloading with tainted environment"
   cvmfs_mount grid.cern.ch || return 1
-  sudo $tainted_env || return 2
+  # macOS mounts belong to the test user; sudo would resolve root's cache
+  if running_on_osx; then
+    $tainted_env || return 2
+  else
+    sudo $tainted_env || return 2
+  fi
   rm -f $tainted_env
 
   return 0

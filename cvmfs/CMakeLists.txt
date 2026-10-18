@@ -189,6 +189,7 @@ if (BUILD_CVMFS)
   # Client frontends, each a stub library loaded by cvmfs2 plus the client
   # library (and its debug build) that the stub loads:
   #   libcvmfs_fuse3: libfuse / the macFUSE kernel extension
+  #   libcvmfs_fskit: the macFUSE FSKit backend, selected with -o obackend=fskit
   #   libcvmfs_nfs:   the NFSv4 frontend, selected with -o nfs
   # Note: the stub must _not_ depend on cvmfs-util. The utility functions are
   # compiled in the loader namespace so that their symbols don't conflict with
@@ -330,6 +331,14 @@ if (BUILD_CVMFS)
       COMPILE_OPTIONS ${CVMFS_FUSE3_COMPILE_OPTIONS}
       FUSE_LIBRARIES  ${FUSE3_LIBRARIES}
     )
+    if (MACOSX AND MACFUSE_HAS_FSKIT)
+      cvmfs_add_frontend (cvmfs_fskit
+        CFLAGS          ${CVMFS_FUSE3_FEATURES}
+        DEFINITIONS     USE_MACFUSE_FSKIT
+        COMPILE_OPTIONS ${CVMFS_FUSE3_COMPILE_OPTIONS}
+        FUSE_LIBRARIES  ${FUSE3_LIBRARIES}
+      )
+    endif ()
   endif (BUILD_FUSE3_FRONTEND)
 
   if (BUILD_NFS_FRONTEND)
