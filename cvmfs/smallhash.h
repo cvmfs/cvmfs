@@ -417,7 +417,7 @@ class MultiHash {
     delete[] hashmaps_;
   }
 
-  bool Lookup(const Key &key, Value *value) {
+  bool Lookup(const Key &key, Value *value) const {
     uint8_t target = SelectHashmap(key);
     Lock(target);
     const bool result = hashmaps_[target].Lookup(key, value);
@@ -430,6 +430,35 @@ class MultiHash {
     Lock(target);
     hashmaps_[target].Insert(key, value);
     Unlock(target);
+  }
+
+  bool Contains(const Key &key) const {
+    uint8_t target = SelectHashmap(key);
+    Lock(target);
+    const bool result = hashmaps_[target].Contains(key);
+    Unlock(target);
+    return result;
+  }
+
+  /**
+   * Atomically checks if the key is present; if not, inserts it.  Returns
+   * true if the key was already present (i.e. this call was a duplicate),
+   * false if the key was freshly inserted.
+   *
+   * Holding a single per-shard lock around the Contains+Insert pair avoids
+   * the TOCTOU race that would occur if callers composed Contains() and
+   * Insert() themselves.
+   */
+  bool ContainsOrInsert(const Key &key, const Value &value) {
+    uint8_t target = SelectHashmap(key);
+    Lock(target);
+    if (hashmaps_[target].Contains(key)) {
+      Unlock(target);
+      return true;
+    }
+    hashmaps_[target].Insert(key, value);
+    Unlock(target);
+    return false;
   }
 
   void Erase(const Key &key) {
@@ -450,7 +479,7 @@ class MultiHash {
 
   uint8_t num_hashmaps() const { return num_hashmaps_; }
 
-  void GetSizes(uint32_t *sizes) {
+  void GetSizes(uint32_t *sizes) const {
     for (uint8_t i = 0; i < num_hashmaps_; ++i) {
       Lock(i);
       sizes[i] = hashmaps_[i].size();
@@ -467,7 +496,7 @@ class MultiHash {
   }
 
  private:
-  inline uint8_t SelectHashmap(const Key &key) {
+  inline uint8_t SelectHashmap(const Key &key) const {
     uint32_t hash = MurmurHash2(&key, sizeof(key), 0x37);
     double bucket = static_cast<double>(hash)
                     * static_cast<double>(num_hashmaps_)
@@ -475,19 +504,19 @@ class MultiHash {
     return static_cast<uint32_t>(bucket) % num_hashmaps_;
   }
 
-  inline void Lock(const uint8_t target) {
+  inline void Lock(const uint8_t target) const {
     int retval = pthread_mutex_lock(&locks_[target]);
     assert(retval == 0);
   }
 
-  inline void Unlock(const uint8_t target) {
+  inline void Unlock(const uint8_t target) const {
     int retval = pthread_mutex_unlock(&locks_[target]);
     assert(retval == 0);
   }
 
   uint8_t num_hashmaps_;
   SmallHashDynamic<Key, Value> *hashmaps_;
-  pthread_mutex_t *locks_;
+  mutable pthread_mutex_t *locks_;
 };
 
 
