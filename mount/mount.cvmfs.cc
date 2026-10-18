@@ -648,7 +648,13 @@ int main(int argc, char **argv) {
   if (!retval)
     return 1;
 
-  const bool local_fskit_mount = (backend == kBackendFskit) && (geteuid() != 0);
+#ifdef __APPLE__
+  // macOS mounts need no root with any backend (setuid mount_macfuse,
+  // user-owned NFS and FSKit mounts); cvmfs2 then runs as the caller
+  const bool unprivileged_mount = (geteuid() != 0);
+#else
+  const bool unprivileged_mount = false;
+#endif
 
   // Prepare cache directory
   if (dedicated_cachedir) {
@@ -665,7 +671,7 @@ int main(int argc, char **argv) {
              reload_sockets.c_str());
     return 1;
   }
-  if (!local_fskit_mount) {
+  if (!unprivileged_mount) {
     sysret = chown(workspace.c_str(), uid_cvmfs, getegid());
     if (sysret != 0) {
       LogCvmfs(kLogCvmfs, kLogStderr,
@@ -715,9 +721,9 @@ int main(int argc, char **argv) {
     mib[1] = KERN_MAXFILESPERPROC;
     retval = sysctl(mib, 2, &sys_nfiles, &len, NULL, 0);
     if ((retval != 0) || (sys_nfiles < 0)) {
-      if (local_fskit_mount) {
+      if (unprivileged_mount) {
         LogCvmfs(kLogCvmfs, kLogStdout,
-                 "Skipping KERN_MAXFILESPERPROC check for local FSKit mount");
+                 "Skipping KERN_MAXFILESPERPROC check for unprivileged mount");
       } else {
         LogCvmfs(kLogCvmfs, kLogStderr, "Failed to get KERN_MAXFILESPERPROC");
         return 1;
@@ -727,9 +733,9 @@ int main(int argc, char **argv) {
       mib[1] = KERN_MAXFILES;
       retval = sysctl(mib, 2, &sys_nfiles_all, &len, NULL, 0);
       if ((retval != 0) || (sys_nfiles_all < 0)) {
-        if (local_fskit_mount) {
+        if (unprivileged_mount) {
           LogCvmfs(kLogCvmfs, kLogStdout,
-                   "Skipping KERN_MAXFILES check for local FSKit mount");
+                   "Skipping KERN_MAXFILES check for unprivileged mount");
         } else {
           LogCvmfs(kLogCvmfs, kLogStderr, "Failed to get KERN_MAXFILES");
           return 1;
@@ -738,24 +744,24 @@ int main(int argc, char **argv) {
         if (sys_nfiles_all < nfiles_all) {
           retval = sysctl(mib, 2, NULL, NULL, &nfiles_all, sizeof(nfiles_all));
           if (retval != 0) {
-            if (!local_fskit_mount) {
+            if (!unprivileged_mount) {
               LogCvmfs(kLogCvmfs, kLogStderr, "Failed to set KERN_MAXFILES");
               return 1;
             }
             LogCvmfs(kLogCvmfs, kLogStdout,
-                     "Skipping KERN_MAXFILES update for local FSKit mount");
+                     "Skipping KERN_MAXFILES update for unprivileged mount");
           }
         }
         mib[1] = KERN_MAXFILESPERPROC;
         retval = sysctl(mib, 2, NULL, NULL, &nfiles_all, sizeof(nfiles_all));
         if (retval != 0) {
-          if (!local_fskit_mount) {
+          if (!unprivileged_mount) {
             LogCvmfs(kLogCvmfs, kLogStderr,
                      "Failed to set KERN_MAXFILESPERPROC");
             return 1;
           }
           LogCvmfs(kLogCvmfs, kLogStdout,
-                   "Skipping KERN_MAXFILESPERPROC update for local FSKit mount");
+                   "Skipping KERN_MAXFILESPERPROC update for unprivileged mount");
         }
       }
     }
@@ -777,10 +783,10 @@ int main(int argc, char **argv) {
       AddMountOption("disable_watchdog", &mount_options);
   }
 
-  if (!local_fskit_mount)
+  if (!unprivileged_mount)
     AddMountOption("system_mount", &mount_options);
   AddMountOption("fsname=cvmfs2", &mount_options);
-  if (!local_fskit_mount) {
+  if (!unprivileged_mount) {
     AddMountOption("allow_other", &mount_options);
     AddMountOption("grab_mountpoint", &mount_options);
   }

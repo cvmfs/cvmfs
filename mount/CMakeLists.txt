@@ -52,14 +52,6 @@ if (MACOSX)
     DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/default.d"
     PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )
-  # Per-user cache and sockets for unprivileged FSKit mounts
-  if (MOUNT_BACKEND_DEFAULT STREQUAL "fskit")
-    install (
-      FILES         default.d/11-osx-fskit.conf
-      DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/default.d"
-      PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
-    )
-  endif ()
 
   install (
     FILES         default.d/50-cern.conf

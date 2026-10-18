@@ -457,7 +457,7 @@ cvmfs_clean() {
   pidwait openwaitprint || true
   sudo cvmfs_config umount > /dev/null  || return 100
   sudo sh -c "rm -rf /var/lib/cvmfs/*"                  || return 101
-  if [ "$CVMFS_TEST_MOUNT_BACKEND" = "fskit" ]; then
+  if running_on_osx; then
     rm -rf "$HOME/Library/Caches/cvmfs"                  || return 101
   fi
   sudo rm -f /etc/cvmfs/default.local                    || return 102
@@ -552,11 +552,15 @@ cvmfs_mount() {
 }
 
 
-# FSKit mounts are unprivileged and have to be created by the test user
+# macOS mounts are unprivileged and created by the test user, who owns the
+# per-user cache
 _cvmfs_mount_cmd() {
   local repository=$1
-  if [ "$CVMFS_TEST_MOUNT_BACKEND" = "fskit" ]; then
-    mount_cvmfs "$repository" "/cvmfs/$repository"
+  if running_on_osx; then
+    # /usr/local/sbin is often not on PATH
+    local mount_cvmfs
+    mount_cvmfs=$(command -v mount_cvmfs || echo /usr/local/sbin/mount_cvmfs)
+    $mount_cvmfs "$repository" "/cvmfs/$repository"
   else
     sudo mount -t cvmfs "$repository" "/cvmfs/$repository"
   fi
