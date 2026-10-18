@@ -3,17 +3,6 @@ cvmfs_test_name="Creating File Chunks"
 cvmfs_test_autofs_on_startup=false
 cvmfs_test_suites="quick"
 
-inflate_file() {
-  local destination_file=$1
-  local source_file=$2
-  local desired_file_size=$3
-
-  touch $destination_file
-  while [ $(stat -c %s $destination_file) -lt $desired_file_size ]; do
-    cat $source_file >> $destination_file
-  done
-}
-
 produce_files_in() {
 	local working_dir=$1
 
@@ -102,7 +91,7 @@ cvmfs_run_test() {
   produce_files_in $repo_dir || return 3
 
   echo "putting exactly the same stuff in the scratch space for comparison"
-  produce_files_in $reference_dir || return 4
+  cp -a "$repo_dir"/* "$reference_dir" || return 4
 
   echo "creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO || return $?

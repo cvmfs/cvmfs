@@ -7,8 +7,8 @@ if (MACOSX)
   # AUTO builds the macFUSE frontend if macFUSE is installed
   set (CVMFS_MACFUSE AUTO CACHE STRING "Build the macFUSE frontend (AUTO, ON, OFF)")
   set_property (CACHE CVMFS_MACFUSE PROPERTY STRINGS AUTO ON OFF)
-  # Installed as CVMFS_MOUNT_BACKEND in default.d; AUTO prefers fskit, then
-  # fuse (macFUSE kext), then nfs, among the frontends that are built
+  # Installed as CVMFS_MOUNT_BACKEND in default.d; AUTO prefers nfs, then
+  # fskit, then fuse (macFUSE kext), among the frontends that are built
   set (CVMFS_MACOS_DEFAULT_BACKEND AUTO CACHE STRING
        "Default mount backend on macOS (AUTO, fuse, fskit, nfs)")
   set_property (CACHE CVMFS_MACOS_DEFAULT_BACKEND PROPERTY STRINGS AUTO fuse fskit nfs)
