@@ -1485,7 +1485,7 @@ std::string GetArch() {
 /**
  * Increases the soft limit of open file descriptors by
  * min(<value>,rlim_max-rlim_cur). This requires no elevated privileges, since
- * the increase will always be bellow the hard limit. Returns 0 on success, -1
+ * the increase will always be below the hard limit. Returns 0 on success, -1
  * on failure, -2 if running under valgrind.
  */
 int IncreaseNoFileSoft(size_t value) {
