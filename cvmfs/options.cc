@@ -64,6 +64,15 @@ string OptionsManager::TrimParameter(const string &parameter) {
   } else if (result.find("export ") == 0) {
     result = result.substr(7);
     result = Trim(result);
+    // This enables a hack to ignore a variable setting in cvmfs versions
+    // prior to 2.14.2 which also stopped setting variables to blank when
+    // they are defined only in false conditionals.  The hack is to use
+    // 'export X VAR=VAL', where VAR will be recognized in 2.14.2 and later
+    // and ignored prior to 2.14.2.
+    const size_t last_space = result.find_last_of(" ");
+    if (last_space != string::npos) {
+      result = result.substr(last_space + 1);
+    }
   } else if (result.find("eval ") == 0) {
     result = result.substr(5);
     result = Trim(result);
@@ -239,10 +248,12 @@ void BashOptionsManager::ParsePath(const string &config_file,
 
     ConfigValue value;
     value.source = config_file;
-    const string sh_echo = "echo $" + parameter + "\n";
+    const string sh_echo = "echo ${" + parameter + "-xNOTxSETx}\n";
     WritePipe(fd_stdin, sh_echo.data(), sh_echo.length());
     GetLineFd(fd_stdout, &value.value);
-    PopulateParameter(parameter, value);
+    if (value.value != "xNOTxSETx") {
+      PopulateParameter(parameter, value);
+    }
   }
 
   close(fd_stderr);
