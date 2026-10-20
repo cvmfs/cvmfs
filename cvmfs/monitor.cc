@@ -414,6 +414,13 @@ void Watchdog::Fork(bool needs_read_environ) {
           Daemonize();
 #ifndef __APPLE__
           if (!oom_score_adj_.empty()) {
+            // After seteuid() the process is non-dumpable and its /proc
+            // entries are owned by root, so temporarily regain root if possible
+            const uid_t euid = geteuid();
+            const gid_t egid = getegid();
+            const bool regain_root = (euid != 0) && (getuid() == 0);
+            if (regain_root)
+              SwitchCredentials(0, egid, true /* temporarily */);
             const int fd_oom = open("/proc/self/oom_score_adj", O_WRONLY);
             // Lowering the score requires CAP_SYS_RESOURCE, so failure is
             // expected for unprivileged mounts
@@ -426,6 +433,10 @@ void Watchdog::Fork(bool needs_read_environ) {
             }
             if (fd_oom >= 0)
               close(fd_oom);
+            if (regain_root && !SwitchCredentials(euid, egid, true)) {
+              PANIC(kLogStderr | kLogSyslogErr,
+                    "Failed to drop watchdog credentials");
+            }
           }
 #endif
           if ((geteuid() != 0) && SetuidCapabilityPermitted()) {
