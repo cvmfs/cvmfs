@@ -13,6 +13,7 @@
 
 #include <errno.h>
 #include <execinfo.h>
+#include <fcntl.h>
 #include <poll.h>
 #include <pthread.h>
 #include <signal.h>
@@ -66,9 +67,10 @@ int Watchdog::g_crash_signals[] = {SIGQUIT, SIGILL, SIGABRT, SIGFPE,
 
 Watchdog *Watchdog::Create(FnOnExit on_exit,
                            bool needs_read_environ,
-                           WatchdogState *saved_state) {
+                           WatchdogState *saved_state,
+                           const std::string &oom_score_adj) {
   assert(instance_ == NULL);
-  instance_ = new Watchdog(on_exit);
+  instance_ = new Watchdog(on_exit, oom_score_adj);
   if (saved_state != NULL)
     instance_->RestoreState(saved_state);
   else
@@ -410,6 +412,33 @@ void Watchdog::Fork(bool needs_read_environ) {
         case 0: {
           pipe_watchdog_->CloseWriteFd();
           Daemonize();
+#ifndef __APPLE__
+          if (!oom_score_adj_.empty()) {
+            // After seteuid() the process is non-dumpable and its /proc
+            // entries are owned by root, so temporarily regain root if possible
+            const uid_t euid = geteuid();
+            const gid_t egid = getegid();
+            const bool regain_root = (euid != 0) && (getuid() == 0);
+            if (regain_root)
+              SwitchCredentials(0, egid, true /* temporarily */);
+            const int fd_oom = open("/proc/self/oom_score_adj", O_WRONLY);
+            // Lowering the score requires CAP_SYS_RESOURCE, so failure is
+            // expected for unprivileged mounts
+            if ((fd_oom < 0)
+                || !SafeWrite(fd_oom, oom_score_adj_.data(),
+                              oom_score_adj_.length())) {
+              LogCvmfs(kLogMonitor, kLogDebug,
+                       "watchdog: failed to set oom_score_adj to %s",
+                       oom_score_adj_.c_str());
+            }
+            if (fd_oom >= 0)
+              close(fd_oom);
+            if (regain_root && !SwitchCredentials(euid, egid, true)) {
+              PANIC(kLogStderr | kLogSyslogErr,
+                    "Failed to drop watchdog credentials");
+            }
+          }
+#endif
           if ((geteuid() != 0) && SetuidCapabilityPermitted()) {
             const std::vector<cap_value_t> nocaps;
             if (on_exit_) {
@@ -718,10 +747,11 @@ void Watchdog::RestoreState(WatchdogState *saved_state) {
 }
 
 
-Watchdog::Watchdog(FnOnExit on_exit)
+Watchdog::Watchdog(FnOnExit on_exit, const std::string &oom_score_adj)
     : spawned_(false)
     , maintenance_mode_(false)
     , exe_path_(string(platform_getexepath()))
+    , oom_score_adj_(oom_score_adj)
     , watchdog_pid_(0)
     , on_exit_(on_exit) {
   const int retval = platform_spinlock_init(&lock_handler_, 0);
