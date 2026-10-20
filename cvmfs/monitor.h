@@ -63,7 +63,8 @@ class Watchdog : SingleCopy {
 
   static Watchdog *Create(FnOnExit on_exit,
                           bool needs_read_environ,
-                          WatchdogState *saved_state = 0);
+                          WatchdogState *saved_state = 0,
+                          const std::string &oom_score_adj = "");
   static pid_t GetPid();
   ~Watchdog();
   void Spawn(const std::string &crash_dump_path);
@@ -119,7 +120,7 @@ class Watchdog : SingleCopy {
                                       void *context);
   static void SendTrace(int sig, siginfo_t *siginfo, void *context);
 
-  explicit Watchdog(FnOnExit on_exit);
+  Watchdog(FnOnExit on_exit, const std::string &oom_score_adj);
   void Fork(bool needs_read_environ);
   void RestoreState(WatchdogState *saved_state);
   bool WaitForSupervisee();
@@ -134,6 +135,7 @@ class Watchdog : SingleCopy {
   bool maintenance_mode_;
   std::string crash_dump_path_;
   std::string exe_path_;
+  std::string oom_score_adj_;
   pid_t watchdog_pid_;
   UniquePtr<Pipe<kPipeWatchdog> > pipe_watchdog_;
   /// The supervisee makes sure its watchdog does not die
