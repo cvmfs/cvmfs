@@ -240,6 +240,12 @@ void FileSystem::CreateStatistics() {
   n_fs_inode_replace_ = statistics_->Register(
       "cvmfs.n_fs_inode_replace",
       "Number of stale inodes that got replaced by an up-to-date version");
+  n_fs_readdir_ = statistics_->Register("cvmfs.n_fs_readdir",
+    "readdir calls which successfully returned non-empty results");
+  n_fs_readdir_0_offset_ = statistics_->Register("cvmfs.n_fs_readdir_0_offset",
+    "readdir calls which successfully returned result for offset=0");
+  n_fs_readdir_einval_ = statistics_->Register("cvmfs.n_fs_readdir_einval",
+    "EINVAL in readdir calls");
   no_open_files_ = statistics_->Register("cvmfs.no_open_files",
                                          "Number of currently opened files");
   no_open_dirs_ = statistics_->Register(
@@ -417,6 +423,9 @@ FileSystem::FileSystem(const FileSystem::FileSystemInfo &fs_info)
     , n_fs_statfs_(NULL)
     , n_fs_statfs_cached_(NULL)
     , n_fs_read_(NULL)
+    , n_fs_readdir_(NULL)
+    , n_fs_readdir_0_offset_(NULL)
+    , n_fs_readdir_einval_(NULL)
     , n_fs_readlink_(NULL)
     , n_fs_forget_(NULL)
     , n_fs_inode_replace_(NULL)
@@ -2011,6 +2020,8 @@ MountPoint::MountPoint(const string &fqrn,
     , resolv_conf_watcher_(NULL)
     , max_ttl_sec_(kDefaultMaxTtlSec)
     , kcache_timeout_sec_(static_cast<double>(kDefaultKCacheTtlSec))
+    , fuse_dir_cache_(true)
+    , fuse_keep_dir_cache_(false)
     , fixed_catalog_(false)
     , enforce_acls_(false)
     , cache_symlinks_(false)
@@ -2109,6 +2120,26 @@ bool MountPoint::SetupBehavior() {
   }
   LogCvmfs(kLogCvmfs, kLogDebug, "kernel caches expire after %d seconds",
            static_cast<int>(kcache_timeout_sec_));
+
+  if (options_mgr_->GetValue("CVMFS_FUSE_DIR_CACHE", &optarg)) {
+    if (options_mgr_->IsOn(optarg) || options_mgr_->IsOff(optarg)) {
+      fuse_dir_cache_ = options_mgr_->IsOn(optarg);
+    } else {
+      LogCvmfs(kLogCvmfs, kLogSyslogWarn | kLogDebug,
+               "CVMFS_FUSE_DIR_CACHE value '%s' not boolean",
+               optarg.c_str());
+    }
+  }
+
+  if (options_mgr_->GetValue("CVMFS_FUSE_KEEP_DIR_CACHE", &optarg)) {
+    if (options_mgr_->IsOn(optarg) || options_mgr_->IsOff(optarg)) {
+      fuse_keep_dir_cache_ = options_mgr_->IsOn(optarg);
+    } else {
+      LogCvmfs(kLogCvmfs, kLogSyslogWarn | kLogDebug,
+               "CVMFS_FUSE_KEEP_DIR_CACHE value '%s' not boolean",
+               optarg.c_str());
+    }
+  }
 
   uint64_t statfs_time_cache_valid = 0;
   if (options_mgr_->GetValue("CVMFS_STATFS_CACHE_TIMEOUT", &optarg)) {
