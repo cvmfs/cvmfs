@@ -252,9 +252,9 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::Collect() {
              "pruning a partial replica requires a valid inclusion spec");
     return false;
   }
-  const bool success = AnalyzePreservedCatalogTree()
-                       && CheckPreservedRevisions() && SweepReflog()
-                       && SweepExcludedCatalogs();
+  if (!AnalyzePreservedCatalogTree() || !CheckPreservedRevisions())
+    return false;
+  const bool success = SweepReflog() && SweepExcludedCatalogs();
 
   // TODO(jblomer): turn current counters into perf::Counters
   if (configuration_.statistics) {
