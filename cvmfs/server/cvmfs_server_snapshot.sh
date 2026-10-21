@@ -151,8 +151,8 @@ __do_snapshot() {
       partial_replication_flag="-E $CVMFS_PARTIAL_REPLICATION_SPEC"
       # An existing catalog does not imply that objects newly included by a
       # changed spec have been replicated. Revisit it even if HEAD is unchanged.
-      if ! cmp -s "$CVMFS_PARTIAL_REPLICATION_SPEC" \
-                  <(read_repo_item "$alias_name" .cvmfs_partial_replication); then
+      if ! read_repo_item "$alias_name" .cvmfs_partial_replication | \
+           cmp -s "$CVMFS_PARTIAL_REPLICATION_SPEC" -; then
         echo "Inclusion spec changed, revisiting existing catalogs"
         partial_replication_flag="$partial_replication_flag -z"
       fi

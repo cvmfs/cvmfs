@@ -390,8 +390,8 @@ __do_gc_cmd()
     fi
 
     if [ "$prune_partial_replica" -ne 0 ] && \
-       ! cmp -s "$CVMFS_PARTIAL_REPLICATION_SPEC" \
-                <(read_repo_item "$name" .cvmfs_partial_replication); then
+       ! read_repo_item "$name" .cvmfs_partial_replication | \
+         cmp -s "$CVMFS_PARTIAL_REPLICATION_SPEC" -; then
       die "Snapshot the replica with the current inclusion spec before pruning"
     fi
 
