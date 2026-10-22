@@ -82,6 +82,14 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::PreserveDataObjects(
                            HashFilterT>::TraversalCallbackDataTN
         &data  // NOLINT(runtime/references)
 ) {
+  // A partial replica cannot serve excluded subtrees, even if their objects
+  // are still on disk from an earlier full snapshot. Do not mark them live.
+  // As in snapshot, exclusion is per nested catalog, not per directory.
+  if (configuration_.prune_partial_replica
+      && configuration_.inclusion_spec->IsExcluded(
+          data.catalog->mountpoint().ToString())) {
+    return;
+  }
   ++preserved_catalogs_;
 
   if (data.catalog->IsRoot()) {
@@ -171,6 +179,24 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::SweepDataObjects(
 
 
 template<class CatalogTraversalT, class HashFilterT>
+void GarbageCollector<CatalogTraversalT, HashFilterT>::SweepExcludedDataObjects(
+    const TraversalCallbackDataTN &data) {
+  if (!configuration_.inclusion_spec->IsExcluded(
+          data.catalog->mountpoint().ToString())) {
+    return;
+  }
+
+  const HashVector &hashes = data.catalog->GetReferencedObjects();
+  for (typename HashVector::const_iterator i = hashes.begin();
+       i != hashes.end();
+       ++i) {
+    CheckAndSweep(*i);
+  }
+  CheckAndSweep(data.catalog->hash());
+}
+
+
+template<class CatalogTraversalT, class HashFilterT>
 void GarbageCollector<CatalogTraversalT, HashFilterT>::CheckAndSweep(
     const shash::Any &hash) {
   if (!hash_filter_.Contains(hash)) {
@@ -219,8 +245,38 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::RemoveCatalogFromReflog(
 
 template<class CatalogTraversalT, class HashFilterT>
 bool GarbageCollector<CatalogTraversalT, HashFilterT>::Collect() {
-  return AnalyzePreservedCatalogTree() && CheckPreservedRevisions()
-         && SweepReflog();
+  if (configuration_.prune_partial_replica
+      && (configuration_.inclusion_spec == NULL
+          || !configuration_.inclusion_spec->IsValid())) {
+    LogCvmfs(kLogGc, kLogStderr,
+             "pruning a partial replica requires a valid inclusion spec");
+    return false;
+  }
+  if (!AnalyzePreservedCatalogTree() || !CheckPreservedRevisions())
+    return false;
+  const bool success = SweepReflog() && SweepExcludedCatalogs();
+
+  // TODO(jblomer): turn current counters into perf::Counters
+  if (configuration_.statistics) {
+    perf::Counter *ctr_preserved_catalogs = configuration_.statistics->Register(
+        "gc.n_preserved_catalogs", "number of live catalogs");
+    perf::Counter *ctr_condemned_catalogs = configuration_.statistics->Register(
+        "gc.n_condemned_catalogs", "number of dead catalogs");
+    perf::Counter *ctr_condemned_objects = configuration_.statistics->Register(
+        "gc.n_condemned_objects", "number of deleted objects");
+    perf::Counter *ctr_condemned_bytes = configuration_.statistics->Register(
+        "gc.sz_condemned_bytes", "number of deleted bytes");
+    perf::Counter
+        *ctr_duplicate_delete_requests = configuration_.statistics->Register(
+            "gc.n_duplicate_delete_requests",
+            "number of duplicated delete requests");
+    ctr_preserved_catalogs->Set(preserved_catalog_count());
+    ctr_condemned_catalogs->Set(condemned_catalog_count());
+    ctr_condemned_objects->Set(condemned_objects_count());
+    ctr_condemned_bytes->Set(condemned_bytes_count());
+    ctr_duplicate_delete_requests->Set(duplicate_delete_requests());
+  }
+  return success;
 }
 
 
@@ -263,6 +319,31 @@ bool GarbageCollector<CatalogTraversalT,
 
 
 template<class CatalogTraversalT, class HashFilterT>
+bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepExcludedCatalogs() {
+  if (!configuration_.prune_partial_replica)
+    return true;
+
+  LogCvmfs(kLogGc, kLogStdout, "  --> pruning excluded subtrees [%s]",
+           RfcTimestamp().c_str());
+  // Excluded catalogs listed in the reflog are already removed by SweepReflog.
+  // This pass covers those missing from the reflog. It needs a fresh traversal
+  // because the marking traversal remembers all visited catalogs.
+  CatalogTraversalT traversal(GetTraversalParams(configuration_));
+  if (use_reflog_timestamps_)
+    traversal.SetCatalogInfoShim(&catalog_info_shim_);
+  typename CatalogTraversalT::CallbackTN *callback = traversal.RegisterListener(
+      &GarbageCollector<CatalogTraversalT,
+                        HashFilterT>::SweepExcludedDataObjects,
+      this);
+  bool success = traversal.Traverse();
+  success = success && traversal.TraverseNamedSnapshots();
+  traversal.UnregisterListener(callback);
+  configuration_.uploader->WaitForUpload();
+  return success && configuration_.uploader->GetNumberOfErrors() == 0;
+}
+
+
+template<class CatalogTraversalT, class HashFilterT>
 bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepReflog() {
   LogCvmfs(kLogGc, kLogStdout, "  --> sweeping unreferenced objects [%s]",
            RfcTimestamp().c_str());
@@ -296,27 +377,6 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepReflog() {
   iend = to_sweep.end();
   for (; i != iend; ++i) {
     success = success && RemoveCatalogFromReflog(*i);
-  }
-
-  // TODO(jblomer): turn current counters into perf::Counters
-  if (configuration_.statistics) {
-    perf::Counter *ctr_preserved_catalogs = configuration_.statistics->Register(
-        "gc.n_preserved_catalogs", "number of live catalogs");
-    perf::Counter *ctr_condemned_catalogs = configuration_.statistics->Register(
-        "gc.n_condemned_catalogs", "number of dead catalogs");
-    perf::Counter *ctr_condemned_objects = configuration_.statistics->Register(
-        "gc.n_condemned_objects", "number of deleted objects");
-    perf::Counter *ctr_condemned_bytes = configuration_.statistics->Register(
-        "gc.sz_condemned_bytes", "number of deleted bytes");
-    perf::Counter
-        *ctr_duplicate_delete_requests = configuration_.statistics->Register(
-            "gc.n_duplicate_delete_requests",
-            "number of duplicated delete requests");
-    ctr_preserved_catalogs->Set(preserved_catalog_count());
-    ctr_condemned_catalogs->Set(condemned_catalog_count());
-    ctr_condemned_objects->Set(condemned_objects_count());
-    ctr_condemned_bytes->Set(condemned_bytes_count());
-    ctr_duplicate_delete_requests->Set(duplicate_delete_requests());
   }
 
   configuration_.uploader->WaitForUpload();
