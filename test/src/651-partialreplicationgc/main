@@ -67,6 +67,9 @@ cvmfs_run_test() {
                   /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub \
     || { desaster_cleanup $replica_name; return 7; }
 
+  echo "*** Snapshot as a full replica before switching to partial replication"
+  sudo cvmfs_server snapshot $replica_name || { desaster_cleanup $replica_name; return 8; }
+
   echo "*** Configure partial replication (include /dir1/sub1 and /dir2, leaving /dir1/sub2 excluded)"
   local spec_file="${scratch_dir}/partial_gc_test.spec"
   cat > $spec_file << EOF
@@ -81,32 +84,79 @@ EOF
   sudo sh -c "echo 'CVMFS_PARTIAL_REPLICATION_SPEC=$spec_file' >> $replica_conf"
   load_repo_config $CVMFS_TEST_REPO
 
-  echo "*** Snapshot both revisions to partial Stratum-1"
+  # A new root revision makes the snapshot process the inclusion spec while
+  # the older full-replica objects remain on disk.
+  start_transaction $CVMFS_TEST_REPO || return $?
+  echo "sub1 content before pruning" > ${repo_dir}/dir1/sub1/file_a.txt
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  # Root catalog of the fully replicated revision; gc -r 0 collects it.
+  local old_root_catalog="$(get_current_root_catalog $replica_name)C"
+
+  # Unchanged since the full snapshot, so only an excluded catalog references it.
+  local excluded_hash="$(get_xattr hash ${repo_dir}/dir1/sub2/file_b.txt)"
+
+  echo "*** Snapshot the new revision to partial Stratum-1"
   sudo cvmfs_server snapshot $replica_name || { desaster_cleanup $replica_name; return 9; }
 
   echo "*** Check partial replica"
   sudo cvmfs_server check -c $replica_name || { desaster_cleanup $replica_name; return 10; }
 
-  echo "*** Run GC on partial replica (keep only latest revision)"
-  sudo cvmfs_server gc -r 0 -f $replica_name \
+  echo "*** Check that the excluded object is still on disk before pruning"
+  peek_backend $replica_name $excluded_hash \
     || { desaster_cleanup $replica_name; return 11; }
 
+  echo "*** Pruning must refuse a spec that differs from the last snapshot"
+  local orig_spec="$(cat $spec_file)"
+  echo "/dir1/sub2" >> $spec_file
+  sudo cvmfs_server gc -p -r 0 -f $replica_name \
+    && { desaster_cleanup $replica_name; return 12; }
+  echo "$orig_spec" > $spec_file
+
+  echo "*** Prune objects left behind by full replication (dry run)"
+  sudo cvmfs_server gc -p -r 0 -d -f $replica_name \
+    || { desaster_cleanup $replica_name; return 13; }
+  peek_backend $replica_name $excluded_hash \
+    || { desaster_cleanup $replica_name; return 14; }
+
+  echo "*** Prune objects left behind by full replication"
+  sudo cvmfs_server gc -p -r 0 -f $replica_name \
+    || { desaster_cleanup $replica_name; return 15; }
+  peek_backend $replica_name $excluded_hash \
+    && { desaster_cleanup $replica_name; return 16; }
+  peek_backend $replica_name $old_root_catalog \
+    && { desaster_cleanup $replica_name; return 17; }
+
   echo "*** Check partial replica after GC"
-  sudo cvmfs_server check -c $replica_name || { desaster_cleanup $replica_name; return 12; }
+  sudo cvmfs_server check -c $replica_name || { desaster_cleanup $replica_name; return 18; }
 
   echo "*** Verify .cvmfs_partial_replication still present after GC"
   peek_backend_raw $replica_name ".cvmfs_partial_replication" \
-    || { desaster_cleanup $replica_name; return 13; }
+    || { desaster_cleanup $replica_name; return 19; }
   echo "  .cvmfs_partial_replication found after GC"
+
+  echo "*** Re-include the pruned subtree without changing the upstream revision"
+  echo "/dir1/sub2" >> $spec_file
+  sudo cvmfs_server snapshot $replica_name || { desaster_cleanup $replica_name; return 20; }
+  peek_backend $replica_name $excluded_hash \
+    || { desaster_cleanup $replica_name; return 21; }
+  sudo cvmfs_server check -c $replica_name || { desaster_cleanup $replica_name; return 22; }
+  echo "*** Revisiting must not restore history collected on the replica"
+  peek_backend $replica_name $old_root_catalog \
+    && { desaster_cleanup $replica_name; return 23; }
+  sudo cvmfs_server gc -p -r 0 -f $replica_name \
+    || { desaster_cleanup $replica_name; return 24; }
+  peek_backend $replica_name $excluded_hash \
+    || { desaster_cleanup $replica_name; return 25; }
 
   echo "*** Publish third revision (stress test: GC again after new snapshot)"
   start_transaction $CVMFS_TEST_REPO || return $?
   echo "sub1 content v3" > ${repo_dir}/dir1/sub1/file_a.txt
   publish_repo $CVMFS_TEST_REPO || return $?
 
-  sudo cvmfs_server snapshot $replica_name || { desaster_cleanup $replica_name; return 14; }
-  sudo cvmfs_server gc -r 0 -f $replica_name || { desaster_cleanup $replica_name; return 15; }
-  sudo cvmfs_server check -c $replica_name || { desaster_cleanup $replica_name; return 16; }
+  sudo cvmfs_server snapshot $replica_name || { desaster_cleanup $replica_name; return 26; }
+  sudo cvmfs_server gc -r 0 -f $replica_name || { desaster_cleanup $replica_name; return 27; }
+  sudo cvmfs_server check -c $replica_name || { desaster_cleanup $replica_name; return 28; }
 
   echo "*** Clean up"
   sudo cvmfs_server rmfs -f $replica_name
