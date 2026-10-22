@@ -56,6 +56,14 @@ MemoryKvStore::MemoryKvStore(unsigned int cache_entries,
 
 
 MemoryKvStore::~MemoryKvStore() {
+  shash::Any key;
+  MemoryBuffer buf;
+  entries_.FilterBegin();
+  while (entries_.FilterNext()) {
+    entries_.FilterGet(&key, &buf);
+    DoFree(&buf);
+  }
+  entries_.FilterEnd();
   delete heap_;
   pthread_rwlock_destroy(&rwlock_);
 }

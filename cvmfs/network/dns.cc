@@ -897,49 +897,49 @@ bool CaresResolver::SetResolvers(const vector<string> &resolvers) {
 
 
 /**
- * Changes the options of the active channel.  This is hacky and deals with
- * c-ares internal data structures because there is no way to do it via public
- * APIs.
+ * Changes the search domains of the active channel.  There is no public c-ares
+ * API to modify a live channel, so the channel is re-created from its saved
+ * options with the new search domains.  The name servers are not part of the
+ * saved options and are re-applied afterwards.
  */
 bool CaresResolver::SetSearchDomains(const vector<string> &domains) {
-  // From ares_private.h
-  struct {
-    int flags;
-    int timeout;
-    int tries;
-    int ndots;
-    int rotate;
-    int udp_port;
-    int tcp_port;
-    int socket_send_buffer_size;
-    int socket_receive_buffer_size;
-    char **domains;
-    int ndomains;
-    // More fields come in the original data structure
-  } ares_channelhead;
+  struct ares_options options;
+  int optmask = 0;
+  memset(&options, 0, sizeof(options));
+  int retval = ares_save_options(*channel_, &options, &optmask);
+  if (retval != ARES_SUCCESS)
+    return false;
 
-  memcpy(&ares_channelhead, *channel_, sizeof(ares_channelhead));
-  if (ares_channelhead.domains) {
-    for (int i = 0; i < ares_channelhead.ndomains; ++i) {
-      free(ares_channelhead.domains[i]);
-    }
-    free(ares_channelhead.domains);
-    ares_channelhead.domains = NULL;
-  }
-
-  ares_channelhead.ndomains = static_cast<int>(domains.size());
-  if (ares_channelhead.ndomains > 0) {
-    ares_channelhead.domains = reinterpret_cast<char **>(
-        smalloc(ares_channelhead.ndomains * sizeof(char *)));
-    for (int i = 0; i < ares_channelhead.ndomains; ++i) {
-      ares_channelhead.domains[i] = strdup(domains[i].c_str());
+  const int ndomains = static_cast<int>(domains.size());
+  char **new_domains = NULL;
+  if (ndomains > 0) {
+    new_domains = reinterpret_cast<char **>(smalloc(ndomains * sizeof(char *)));
+    for (int i = 0; i < ndomains; ++i) {
+      new_domains[i] = strdup(domains[i].c_str());
     }
   }
+  // The saved domains stay owned by `options` and are released with it
+  struct ares_options new_options = options;
+  new_options.domains = new_domains;
+  new_options.ndomains = ndomains;
+  // Also set for an empty list: the channel must not fall back to the system
+  // search domains
+  optmask |= ARES_OPT_DOMAINS;
 
-  memcpy(*channel_, &ares_channelhead, sizeof(ares_channelhead));
+  ares_channel new_channel = NULL;
+  retval = ares_init_options(&new_channel, &new_options, optmask);
+  ares_destroy_options(&options);
+  for (int i = 0; i < ndomains; ++i) {
+    free(new_domains[i]);
+  }
+  free(new_domains);
+  if (retval != ARES_SUCCESS)
+    return false;
 
+  ares_destroy(*channel_);
+  *channel_ = new_channel;
   domains_ = domains;
-  return true;
+  return SetResolvers(resolvers_);
 }
 
 

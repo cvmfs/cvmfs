@@ -2007,6 +2007,7 @@ MountPoint::MountPoint(const string &fqrn,
     , inode_tracker_(NULL)
     , dentry_tracker_(NULL)
     , page_cache_tracker_(NULL)
+    , magic_xattr_mgr_(NULL)
     , statfs_cache_(NULL)
     , resolv_conf_watcher_(NULL)
     , max_ttl_sec_(kDefaultMaxTtlSec)
@@ -2032,6 +2033,7 @@ MountPoint::~MountPoint() {
   // those are destroyed.
   delete bundle_mgr_;
 
+  delete magic_xattr_mgr_;
   delete page_cache_tracker_;
   delete dentry_tracker_;
   delete inode_tracker_;
