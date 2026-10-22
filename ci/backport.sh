@@ -4,6 +4,7 @@
 # Usage:
 #   ci/backport.sh [-r owner/repo] [-R remote] [-p push-remote] [-n] <pr|url> [branch...]
 #   ci/backport.sh [-r owner/repo] [-R remote] [-p push-remote] [-n] --cleanup
+#   ci/backport.sh --continue | --abort
 #
 # -R is the remote of owner/repo (default: upstream); -p is where pick branches
 # are pushed (default: same as -R; set to a fork remote, e.g. origin, if you
@@ -12,6 +13,9 @@
 # patch-release branches like cvmfs-2.13.2-3 must be given explicitly.
 # Branch names are pick-<pr>-<target>; each PR gets the "backport" label if the
 # repo has one.
+# On a cherry-pick conflict the script stops; resolve the conflict (git add),
+# then run --continue to finish the pick, open its PR and do the remaining
+# branches. --abort drops the conflicted pick branch and the remaining ones.
 # Uses gh if available, otherwise git + curl with $GITHUB_TOKEN (or $GH_TOKEN).
 
 set -euo pipefail
@@ -22,6 +26,7 @@ PUSH_REMOTE=
 LABEL=backport
 DRY=
 CLEANUP=
+RESUME=
 
 die() { echo "error: $*" >&2; exit 1; }
 run() { if [ -n "$DRY" ]; then echo "+ $*"; else "$@"; fi; }
@@ -35,11 +40,35 @@ while [ $# -gt 0 ]; do
     -p|--push-remote) PUSH_REMOTE=$2; shift 2 ;;
     -n|--dry-run) DRY=1; shift ;;
     --cleanup) CLEANUP=1; shift ;;
+    --continue) RESUME=continue; shift ;;
+    --abort) RESUME=abort; shift ;;
     -h|--help) usage ;;
     -*) die "unknown option $1" ;;
     *) break ;;
   esac
 done
+
+STATE=$(git rev-parse --git-path backport-state)
+if [ -n "$RESUME" ]; then
+  [ -f "$STATE" ] || die "no backport in progress"
+  # shellcheck source=/dev/null
+  source "$STATE"
+  in_pick() { git rev-parse -q --verify CHERRY_PICK_HEAD >/dev/null ||
+              [ -d "$(git rev-parse --git-path sequencer)" ]; }
+  if [ "$RESUME" = abort ]; then
+    in_pick && git cherry-pick --abort
+    git switch "${start:-$REMOTE/${TARGETS[0]}}" 2>/dev/null || git switch --detach "$REMOTE/${TARGETS[0]}"
+    git branch -D "pick-$PR-${TARGETS[0]}"
+    rm -f "$STATE"
+    exit 0
+  fi
+  [ "$(git branch --show-current)" = "pick-$PR-${TARGETS[0]}" ] ||
+    die "expected to be on pick-$PR-${TARGETS[0]}"
+  if in_pick; then
+    GIT_EDITOR=true git cherry-pick --continue ||
+      die "cherry-pick still has conflicts; resolve and rerun --continue"
+  fi
+fi
 
 PUSH_REMOTE=${PUSH_REMOTE:-$REMOTE}
 # GitHub owner of the push remote, so PRs from a fork use owner:branch as head.
@@ -85,6 +114,7 @@ if [ -n "$CLEANUP" ]; then
   exit 0
 fi
 
+if [ -z "$RESUME" ]; then
 [ $# -ge 1 ] || usage 1
 PR=$1; shift
 if [[ $PR =~ github\.com/([^/]+/[^/]+)/pull/([0-9]+) ]]; then
@@ -137,16 +167,26 @@ else
 fi
 
 start=$(git branch --show-current)
-for tgt in "${TARGETS[@]}"; do
+fi
+
+# On --continue the first target is already picked.
+skip_pick=$RESUME
+while [ ${#TARGETS[@]} -gt 0 ]; do
+  tgt=${TARGETS[0]}
   branch="pick-$PR-$tgt"
-  echo "== #$PR -> $tgt ($branch)"
-  git show-ref -q --verify "refs/remotes/$REMOTE/$tgt" || die "no branch $REMOTE/$tgt"
-  run git switch -c "$branch" "$REMOTE/$tgt"
-  if ! run git cherry-pick -x "${pick[@]}"; then
-    echo "Cherry-pick conflict on $branch. Resolve, 'git cherry-pick --continue'," >&2
-    echo "then rerun with the remaining branches." >&2
-    exit 1
+  if [ -z "$skip_pick" ]; then
+    echo "== #$PR -> $tgt ($branch)"
+    git show-ref -q --verify "refs/remotes/$REMOTE/$tgt" || die "no branch $REMOTE/$tgt"
+    run git switch -c "$branch" "$REMOTE/$tgt"
+    if ! run git cherry-pick -x "${pick[@]}"; then
+      declare -p REPO REMOTE PUSH_REMOTE LABEL PR TITLE pick start TARGETS > "$STATE"
+      echo "Cherry-pick conflict on $branch. Resolve it (git add), then run" >&2
+      echo "'$0 --continue' to open the PR and do the remaining branches," >&2
+      echo "or '$0 --abort' to give up." >&2
+      exit 1
+    fi
   fi
+  skip_pick=
   run git push -u "$PUSH_REMOTE" "$branch"
   title="$TITLE ($tgt)"
   body="Cherry-pick #$PR to $tgt"
@@ -160,6 +200,14 @@ for tgt in "${TARGETS[@]}"; do
       num=$(api POST pulls "$payload" | jq -r .number)
       [ -z "$LABEL" ] || api POST "issues/$num/labels" "{\"labels\":[\"$LABEL\"]}" >/dev/null
       echo "https://github.com/$REPO/pull/$num"
+    fi
+  fi
+  TARGETS=("${TARGETS[@]:1}")
+  if [ -f "$STATE" ]; then
+    if [ ${#TARGETS[@]} -gt 0 ]; then
+      declare -p REPO REMOTE PUSH_REMOTE LABEL PR TITLE pick start TARGETS > "$STATE"
+    else
+      rm -f "$STATE"
     fi
   fi
 done
