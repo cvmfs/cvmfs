@@ -149,6 +149,13 @@ __do_snapshot() {
       fi
       echo "Partial replication enabled (spec: $CVMFS_PARTIAL_REPLICATION_SPEC)"
       partial_replication_flag="-E $CVMFS_PARTIAL_REPLICATION_SPEC"
+      # An existing catalog does not imply that objects newly included by a
+      # changed spec have been replicated. Revisit it even if HEAD is unchanged.
+      if ! read_repo_item "$alias_name" .cvmfs_partial_replication | \
+           cmp -s "$CVMFS_PARTIAL_REPLICATION_SPEC" -; then
+        echo "Inclusion spec changed, revisiting existing catalogs"
+        partial_replication_flag="$partial_replication_flag -z"
+      fi
     fi
     $user_shell "$(__swissknife_cmd dbg) pull -m $name \
         -u $stratum0                                   \
