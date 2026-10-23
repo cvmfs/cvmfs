@@ -28,6 +28,7 @@
 
 #include "../common/testutil.h"
 #include "catalog_mgr.h"
+#include "chunk_readahead.h"
 #include "directory_entry.h"
 #include "file_chunk.h"
 #include "fuse_inode_gen.h"
@@ -89,6 +90,16 @@ NotificationClient *notification_client_ = NULL;
 Watchdog *watchdog_ = NULL;
 FuseRemounter *fuse_remounter_ = NULL;
 InodeGenerationInfo inode_generation_info_;
+
+/**
+ * cvmfs.cc keeps this global inside the __TEST_CVMFS_MOCKFUSE guard together
+ * with the other mocked ones, but uses it unguarded in the read path and in
+ * Spawn()/ShutdownMountpoint().  The type itself now lives in
+ * chunk_readahead.h and is compiled into both builds, so only the pointer has
+ * to be supplied here.  Leaving it NULL is what the production code already
+ * checks for, so the read-ahead simply does not run in these tests.
+ */
+ChunkReadahead *chunk_readahead_ = NULL;
 
 
 /**
