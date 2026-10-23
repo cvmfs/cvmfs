@@ -1,0 +1,189 @@
+#!/bin/bash
+
+cvmfs_test_name="Reload with config repository auto-mounted mid-reload"
+cvmfs_test_suites="quick"
+cvmfs_test_timeout=600
+
+# Reproducer for #4435.
+#
+# cvmfs_config reload touches a per-mountpoint marker in
+# $CVMFS_RELOAD_SOCKETS/cvmfs.pause/ for every repository in the mount list,
+# so that autofs may re-mount them while the reload is in progress
+# (mount.cvmfs blocks in WaitForReload otherwise). The config repository is
+# paused last and _cvmfs_reload_pause reaches it with a plain `cd`, which
+# triggers autofs if the repository is not mounted. If the config repository
+# was not in the mount list, no marker exists, mount.cvmfs blocks forever and
+# so does the `cd` in the reload, with all other repositories left paused.
+#
+# The config repository is absent from the mount list whenever the `cd` at
+# the start of cvmfs_reload fails to mount it (a transient mount.cvmfs
+# failure). This test forces that: the config repository is unmounted and
+# its mount broken via CVMFS_USER in config.d/<cfg>.local, then a background
+# helper repairs the config as soon as the reload has created cvmfs.pause/,
+# i.e. after the mount list was taken and before the config repository is
+# paused. autofs caches the failed mount for negative_timeout (60s by
+# default), so the helper also SIGSTOPs the other client for that long: the
+# reload then stalls on its pause and resumes only once a mount of the
+# config repository is possible again.
+#
+# Only `cd` (LOOKUP_DIRECTORY) triggers autofs; the stat() behind readlink -f
+# and getxattr() in the earlier loop of cvmfs_reload do not, which is why the
+# hang sits in _cvmfs_reload_pause of the config repository.
+
+CVMFS_TEST_114_REPO="sft.cern.ch"
+CVMFS_TEST_114_CFGREPO="cvmfs-config.cern.ch"
+CVMFS_TEST_114_CFGLOCAL="/etc/cvmfs/config.d/${CVMFS_TEST_114_CFGREPO}.local"
+CVMFS_TEST_114_CFGLOCAL_BAK=""
+CVMFS_TEST_114_PAUSEDIR="/var/run/cvmfs/cvmfs.pause"
+CVMFS_TEST_114_FLIPPER_PID=""
+CVMFS_TEST_114_RELOAD_PID=""
+CVMFS_TEST_114_STOPPED_PID=""
+
+cfgrepo_marker() {
+  echo "${CVMFS_TEST_114_PAUSEDIR}/$(echo -n /cvmfs/${CVMFS_TEST_114_CFGREPO} | base64 -w0)"
+}
+
+restore_cfglocal() {
+  if [ -n "$CVMFS_TEST_114_CFGLOCAL_BAK" ] && [ -f "$CVMFS_TEST_114_CFGLOCAL_BAK" ]; then
+    sudo cp "$CVMFS_TEST_114_CFGLOCAL_BAK" "$CVMFS_TEST_114_CFGLOCAL"
+  fi
+}
+
+cleanup() {
+  echo "running cleanup() ..."
+  if [ -n "$CVMFS_TEST_114_FLIPPER_PID" ]; then
+    kill $CVMFS_TEST_114_FLIPPER_PID 2>/dev/null || true
+  fi
+  if [ -n "$CVMFS_TEST_114_STOPPED_PID" ]; then
+    sudo kill -CONT $CVMFS_TEST_114_STOPPED_PID 2>/dev/null || true
+  fi
+  restore_cfglocal || true
+  if [ -n "$CVMFS_TEST_114_RELOAD_PID" ] && kill -0 $CVMFS_TEST_114_RELOAD_PID 2>/dev/null; then
+    # Unblock the stuck mount.cvmfs the same way as in #4435, then give the
+    # reload a chance to finish on its own before killing it
+    echo "unblocking stuck reload"
+    sudo touch "$(cfgrepo_marker)" 2>/dev/null || true
+    local i
+    for i in $(seq 1 60); do
+      kill -0 $CVMFS_TEST_114_RELOAD_PID 2>/dev/null || break
+      sleep 1
+    done
+    if kill -0 $CVMFS_TEST_114_RELOAD_PID 2>/dev/null; then
+      sudo pkill -9 -f "cvmfs_config reload" 2>/dev/null || true
+      sudo pkill -9 -f "cvmfs2 __RELOAD__" 2>/dev/null || true
+      sudo sh -c "rm -f ${CVMFS_TEST_114_PAUSEDIR}/* /var/run/cvmfs/pid.* /var/run/cvmfs/guard_files*" || true
+      sudo rmdir "$CVMFS_TEST_114_PAUSEDIR" 2>/dev/null || true
+    fi
+  fi
+  [ -z "$CVMFS_TEST_114_CFGLOCAL_BAK" ] || rm -f "$CVMFS_TEST_114_CFGLOCAL_BAK"
+}
+
+autofs_negative_timeout() {
+  local t
+  t=$(sed -n 's/^[[:space:]]*negative_timeout[[:space:]]*=[[:space:]]*\([0-9]*\).*/\1/p' \
+      /etc/autofs.conf 2>/dev/null | tail -1)
+  echo ${t:-60}
+}
+
+# Waits for the reload to create the pause directory (right after the mount
+# list was taken), then repairs the config repository's configuration and
+# holds the other client until autofs has forgotten the failed mount
+flipper() {
+  local client_pid="$1"
+  local hold="$2"
+  while ! sudo test -d "$CVMFS_TEST_114_PAUSEDIR"; do
+    sleep 0.1
+  done
+  sudo kill -STOP $client_pid
+  restore_cfglocal
+  echo "*** flipper: pause directory seen, config repository mount repaired," \
+       "holding client $client_pid for ${hold}s"
+  sleep $hold
+  sudo kill -CONT $client_pid
+  echo "*** flipper: client released"
+}
+
+cvmfs_run_test() {
+  logfile=$1
+
+  if running_on_osx; then
+    echo "autofs-specific test, skipping on macOS"
+    return 0
+  fi
+
+  trap cleanup EXIT HUP INT TERM || return $?
+
+  echo "*** mount $CVMFS_TEST_114_REPO with config repository $CVMFS_TEST_114_CFGREPO"
+  cvmfs_mount $CVMFS_TEST_114_REPO || return 1
+  show_mounted | grep -q " /cvmfs/$CVMFS_TEST_114_CFGREPO " || return 2
+
+  echo "*** unmount the config repository (idle, expired by autofs in production)"
+  cvmfs_umount $CVMFS_TEST_114_CFGREPO || return 3
+  show_mounted | grep -q " /cvmfs/$CVMFS_TEST_114_CFGREPO " && return 4
+
+  echo "*** break mounting of the config repository"
+  CVMFS_TEST_114_CFGLOCAL_BAK=$(mktemp) || return 5
+  sudo cat "$CVMFS_TEST_114_CFGLOCAL" > "$CVMFS_TEST_114_CFGLOCAL_BAK" || return 5
+  sudo sh -c "echo CVMFS_USER=cvmfs_test_114_nouser >> $CVMFS_TEST_114_CFGLOCAL" || return 6
+  # Check through a direct mount helper call rather than through /cvmfs, so
+  # autofs does not get to cache a failed lookup
+  local probe_mnt
+  probe_mnt=$(mktemp -d) || return 7
+  if sudo mount -t cvmfs $CVMFS_TEST_114_CFGREPO "$probe_mnt" 2>/dev/null; then
+    sudo umount "$probe_mnt"
+    rmdir "$probe_mnt"
+    echo "config repository still mountable, breakage ineffective"
+    return 8
+  fi
+  rmdir "$probe_mnt"
+
+  local client_pid
+  client_pid=$(attr -qg pid /cvmfs/$CVMFS_TEST_114_REPO) || return 9
+  local hold=$(( $(autofs_negative_timeout) + 5 ))
+
+  echo "*** start the flipper and the reload"
+  CVMFS_TEST_114_STOPPED_PID=$client_pid
+  flipper $client_pid $hold &
+  CVMFS_TEST_114_FLIPPER_PID=$!
+  sudo cvmfs_config reload &
+  CVMFS_TEST_114_RELOAD_PID=$!
+
+  local waited=0
+  local budget=$(( hold + 90 ))
+  while kill -0 $CVMFS_TEST_114_RELOAD_PID 2>/dev/null; do
+    if [ $waited -ge $budget ]; then
+      echo "*** reload did not finish after ${waited}s"
+      ps -ef | grep -e "cvmfs_config reload" -e "mount.cvmfs" -e "__RELOAD__" | grep -v grep
+      sudo ls -la /var/run/cvmfs "$CVMFS_TEST_114_PAUSEDIR"
+      if pgrep -f "mount.cvmfs $CVMFS_TEST_114_CFGREPO" > /dev/null && \
+         ! sudo test -e "$(cfgrepo_marker)"; then
+        echo "mount.cvmfs of the config repository is blocked in WaitForReload (#4435)"
+        return 20
+      fi
+      echo "reload hangs for a different reason"
+      return 21
+    fi
+    sleep 1
+    waited=$((waited + 1))
+  done
+  wait $CVMFS_TEST_114_RELOAD_PID
+  local reload_retval=$?
+  CVMFS_TEST_114_RELOAD_PID=""
+  wait $CVMFS_TEST_114_FLIPPER_PID
+  CVMFS_TEST_114_FLIPPER_PID=""
+  CVMFS_TEST_114_STOPPED_PID=""
+  [ $reload_retval -eq 0 ] || return 30
+
+  echo "*** check that the reload went through the mid-reload automount"
+  # Without this the flipper window was missed and the race was not exercised
+  show_mounted | grep -q " /cvmfs/$CVMFS_TEST_114_CFGREPO " || return 31
+  sudo test -d "$CVMFS_TEST_114_PAUSEDIR" && return 32
+  sudo sh -c "stat /var/run/cvmfs/pid.* /var/run/cvmfs/guard_files" > /dev/null 2>&1 && return 33
+
+  echo "*** check that both repositories were resumed"
+  cvmfs_config probe $CVMFS_TEST_114_REPO || return 40
+  cvmfs_config probe $CVMFS_TEST_114_CFGREPO || return 41
+  get_xattr revision /cvmfs/$CVMFS_TEST_114_REPO > /dev/null || return 42
+
+  return 0
+}
