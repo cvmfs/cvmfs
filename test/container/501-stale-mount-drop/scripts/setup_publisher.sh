@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Attach a connected release manager to the gateway (gw upstream).
 set -e
 
