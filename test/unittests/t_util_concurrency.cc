@@ -123,12 +123,14 @@ TEST(T_UtilConcurrency, ReadLockGuard) {
 }
 
 
+volatile bool g_acquire_write_lock_obtained = false;
 volatile bool g_acquire_write_lock_killer = true;
 
 void *acquire_write_lock(void *lock) {
   pthread_rwlock_t &rwlock = *static_cast<pthread_rwlock_t *>(lock);
 
   WriteLockGuard lck(rwlock);
+  g_acquire_write_lock_obtained = true;
   while (g_acquire_write_lock_killer) {
   }
   return NULL;
@@ -144,7 +146,9 @@ TEST(T_UtilConcurrency, WriteLockGuard) {
       &thread, NULL, &acquire_write_lock, static_cast<void *>(&rwlock));
   ASSERT_EQ(0, res);
 
-  sleep(1);
+  while (!g_acquire_write_lock_obtained) {
+    sched_yield();
+  }
   {
     retcode = pthread_rwlock_tryrdlock(&rwlock);
     EXPECT_EQ(EBUSY, retcode) << "WriteLockGuard didn't lock - rdlock possible";

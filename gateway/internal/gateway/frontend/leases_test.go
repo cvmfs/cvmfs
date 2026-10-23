@@ -48,6 +48,41 @@ func TestLeaseHandlerNewLease(t *testing.T) {
 	}
 }
 
+func TestLeaseHandlerNewLeaseNegotiatesV4(t *testing.T) {
+	// A publisher advertising API version 4 (non-existing lease path support)
+	// against a gateway that also supports v4 must negotiate v4.
+	backend := mockBackend{}
+	msg, _ := json.Marshal(map[string]interface{}{
+		"path":        "test2.repo.org/some/path",
+		"api_version": "4",
+		"hostname":    "client host name",
+	})
+
+	req := httptest.NewRequest("POST", "/api/v1/leases", bytes.NewReader(msg))
+	HMAC := ComputeHMAC(msg, backend.GetKey(context.TODO(), "keyid2").Secret)
+	req.Header["Authorization"] = []string{"keyid2 " + base64.StdEncoding.EncodeToString(HMAC)}
+
+	w := httptest.NewRecorder()
+	handler := MakeLeasesHandler(&backend)
+
+	handler(w, req, httprouter.Params{})
+
+	expected, _ := json.Marshal(map[string]interface{}{
+		"status":          "ok",
+		"session_token":   "lease_token_string",
+		"max_api_version": 4,
+	})
+
+	resp := w.Result()
+	if resp.StatusCode != 200 {
+		t.Errorf("Invalid HTTP response status code: %v", resp.StatusCode)
+	}
+	respBody, _ := ioutil.ReadAll(resp.Body)
+	if !bytes.Equal(respBody, expected) {
+		t.Errorf("Invalid response body: %v", string(respBody))
+	}
+}
+
 func TestLeaseHandlerNewLeaseWithoutHostname(t *testing.T) {
 	backend := mockBackend{}
 	msg, _ := json.Marshal(map[string]interface{}{
@@ -116,6 +151,138 @@ func TestLeaseHandlerCommitLease(t *testing.T) {
 	backend := mockBackend{}
 	token := "lease_token"
 
+	msg, _ := json.Marshal(map[string]interface{}{
+		"old_root_hash":   "abcdef",
+		"new_root_hash":   "defabc",
+		"tag_name":        "tag1",
+		"tag_description": "this is a tag",
+	})
+
+	req := httptest.NewRequest("POST", "/api/v1/leases/"+token, bytes.NewReader(msg))
+	HMAC := ComputeHMAC([]byte(token), backend.GetKey(context.TODO(), "keyid2").Secret)
+	req.Header["Authorization"] = []string{"keyid2 " + base64.StdEncoding.EncodeToString(HMAC)}
+
+	w := httptest.NewRecorder()
+	handler := MakeLeasesHandler(&backend)
+
+	ps := httprouter.Params{httprouter.Param{Key: "token", Value: token}}
+	handler(w, req, ps)
+
+	expected, _ := json.Marshal(map[string]interface{}{
+		"status":         "ok",
+		"final_revision": 1,
+	})
+
+	resp := w.Result()
+
+	if resp.StatusCode != 200 {
+		t.Errorf("Invalid HTTP response status code: %v", resp.StatusCode)
+	}
+
+	respBody, _ := ioutil.ReadAll(resp.Body)
+	if !bytes.Equal(respBody, expected) {
+		t.Errorf("Invalid response body: %v", string(respBody))
+	}
+}
+
+func TestGraftHandler(t *testing.T) {
+	backend := mockBackend{}
+	token := "lease_token"
+
+	msg, _ := json.Marshal(map[string]interface{}{
+		"old_root_hash":   "abcdef",
+		"new_root_hash":   "defabc",
+		"tag_name":        "tag1",
+		"tag_description": "this is a tag",
+	})
+
+	req := httptest.NewRequest("POST", "/api/v1/leases/"+token+"/graft", bytes.NewReader(msg))
+	HMAC := ComputeHMAC([]byte(token), backend.GetKey(context.TODO(), "keyid2").Secret)
+	req.Header["Authorization"] = []string{"keyid2 " + base64.StdEncoding.EncodeToString(HMAC)}
+
+	w := httptest.NewRecorder()
+	handler := MakeGraftHandler(&backend)
+
+	ps := httprouter.Params{httprouter.Param{Key: "token", Value: token}}
+	handler(w, req, ps)
+
+	expected, _ := json.Marshal(map[string]interface{}{
+		"status":         "ok",
+		"final_revision": 1,
+	})
+
+	resp := w.Result()
+
+	if resp.StatusCode != 200 {
+		t.Errorf("Invalid HTTP response status code: %v", resp.StatusCode)
+	}
+
+	respBody, _ := ioutil.ReadAll(resp.Body)
+	if !bytes.Equal(respBody, expected) {
+		t.Errorf("Invalid response body: %v", string(respBody))
+	}
+}
+
+func TestGraftHandlerRejectsNonPOST(t *testing.T) {
+	backend := mockBackend{}
+	token := "lease_token"
+
+	req := httptest.NewRequest("GET", "/api/v1/leases/"+token+"/graft", nil)
+	w := httptest.NewRecorder()
+	handler := MakeGraftHandler(&backend)
+
+	ps := httprouter.Params{httprouter.Param{Key: "token", Value: token}}
+	handler(w, req, ps)
+
+	if resp := w.Result(); resp.StatusCode != 404 {
+		t.Errorf("expected 404 for non-POST graft request, got: %v", resp.StatusCode)
+	}
+}
+
+func TestLeaseHandlerCommitLeaseWithAutoTagThreshold(t *testing.T) {
+	backend := mockBackend{}
+	token := "lease_token"
+
+	msg, _ := json.Marshal(map[string]interface{}{
+		"old_root_hash":      "abcdef",
+		"new_root_hash":      "defabc",
+		"tag_name":           "generic-2024-01-01T00:00:00Z",
+		"tag_description":    "auto tag",
+		"auto_tag_threshold": 1700000000,
+	})
+
+	req := httptest.NewRequest("POST", "/api/v1/leases/"+token, bytes.NewReader(msg))
+	HMAC := ComputeHMAC([]byte(token), backend.GetKey(context.TODO(), "keyid2").Secret)
+	req.Header["Authorization"] = []string{"keyid2 " + base64.StdEncoding.EncodeToString(HMAC)}
+
+	w := httptest.NewRecorder()
+	handler := MakeLeasesHandler(&backend)
+
+	ps := httprouter.Params{httprouter.Param{Key: "token", Value: token}}
+	handler(w, req, ps)
+
+	expected, _ := json.Marshal(map[string]interface{}{
+		"status":         "ok",
+		"final_revision": 1,
+	})
+
+	resp := w.Result()
+
+	if resp.StatusCode != 200 {
+		t.Errorf("Invalid HTTP response status code: %v", resp.StatusCode)
+	}
+
+	respBody, _ := ioutil.ReadAll(resp.Body)
+	if !bytes.Equal(respBody, expected) {
+		t.Errorf("Invalid response body: %v", string(respBody))
+	}
+}
+
+func TestLeaseHandlerCommitLeaseWithoutAutoTagThreshold(t *testing.T) {
+	backend := mockBackend{}
+	token := "lease_token"
+
+	// Simulate an older publisher that doesn't send auto_tag_threshold
 	msg, _ := json.Marshal(map[string]interface{}{
 		"old_root_hash":   "abcdef",
 		"new_root_hash":   "defabc",

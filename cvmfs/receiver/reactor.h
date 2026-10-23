@@ -36,7 +36,15 @@ class Reactor {
     kSubmitPayload,
     kCommit,
     kError,
-    kTestCrash  // use to test the gateway
+    kTestCrash,  // use to test the gateway
+    // kCommitGraft is an experimental dedicated commit variant: instead of
+    // carrying a "direct_graft" flag inside the kCommit request body, the
+    // gateway sends this distinct request type to trigger the DirectGraft fast
+    // path in CommitProcessor (graft a pre-built subtree catalog into the
+    // parent, skipping DiffRec).  Appended at the end so the numbering of the
+    // existing requests -- mirrored by receiverOp in the Go gateway -- is
+    // preserved.
+    kCommitGraft
   };
 
   static Request ReadRequest(int fd, std::string *data);
@@ -63,12 +71,18 @@ class Reactor {
   virtual bool HandleSubmitPayload(int fdin, const std::string &req,
                                    std::string *reply);
   virtual bool HandleCommit(const std::string &req, std::string *reply);
+  virtual bool HandleCommitGraft(const std::string &req, std::string *reply);
 
   virtual PayloadProcessor *MakePayloadProcessor();
   virtual CommitProcessor *MakeCommitProcessor();
 
  private:
   bool HandleRequest(Request req, const std::string &data);
+
+  // Shared implementation behind HandleCommit (direct_graft=false) and
+  // HandleCommitGraft (direct_graft=true).  The two requests carry an
+  // identical body; only the CommitProcessor path differs.
+  bool DoCommit(const std::string &req, std::string *reply, bool direct_graft);
 
   int fdin_;
   int fdout_;

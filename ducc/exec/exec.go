@@ -16,28 +16,34 @@ type execCmd struct {
 	out   io.ReadCloser
 	in    io.WriteCloser
 	stdin *io.ReadCloser
+	log   *log.Entry
 }
 
 func ExecCommand(input ...string) *execCmd {
-	l.Log().WithFields(log.Fields{"action": "executing"}).Info(input)
+	return ExecCommandWithLogger(nil, input...)
+}
+
+func ExecCommandWithLogger(logger *log.Entry, input ...string) *execCmd {
+	logger = l.Ensure(logger)
+	logger.WithFields(log.Fields{"action": "executing", "command": input}).Trace("Running command")
 	cmd := exec.Command(input[0], input[1:]...)
 	stdout, errOUT := cmd.StdoutPipe()
 	if errOUT != nil {
-		l.LogE(errOUT).Warning("Impossible to obtain the STDOUT pipe")
+		logger.WithField("error", errOUT).Warning("Impossible to obtain the STDOUT pipe")
 		return nil
 	}
 	stderr, errERR := cmd.StderrPipe()
 	if errERR != nil {
-		l.LogE(errERR).Warning("Impossible to obtain the STDERR pipe")
+		logger.WithField("error", errERR).Warning("Impossible to obtain the STDERR pipe")
 		return nil
 	}
 	stdin, errERR := cmd.StdinPipe()
 	if errERR != nil {
-		l.LogE(errERR).Warning("Impossible to obtain the STDIN pipe")
+		logger.WithField("error", errERR).Warning("Impossible to obtain the STDIN pipe")
 		return nil
 	}
 
-	return &execCmd{cmd: cmd, err: stderr, out: stdout, in: stdin}
+	return &execCmd{cmd: cmd, err: stderr, out: stdout, in: stdin, log: logger}
 }
 
 func (e *execCmd) StdIn(input io.ReadCloser) *execCmd {
@@ -61,19 +67,20 @@ func (e *execCmd) StdOut() io.ReadCloser {
 }
 
 func (e *execCmd) StartWithOutput() (error, bytes.Buffer, bytes.Buffer) {
-	var outb, errb bytes.Buffer
-	e.cmd.Stdout = &outb
-	e.cmd.Stderr = &errb
-
 	if e == nil {
 		err := fmt.Errorf("Use of nil execCmd")
 		l.LogE(err).Error("Call start with nil cmd, maybe error in the constructor")
-		return err, outb, errb
+		return err, bytes.Buffer{}, bytes.Buffer{}
 	}
+
+	var outb, errb bytes.Buffer
+	e.cmd.Stdout = &outb
+	e.cmd.Stderr = &errb
+	logger := l.Ensure(e.log)
 
 	err := e.cmd.Start()
 	if err != nil {
-		l.LogE(err).Error("Error in starting the command")
+		logger.WithField("error", err).Error("Error in starting the command")
 		return err, outb, errb
 	}
 
@@ -82,18 +89,18 @@ func (e *execCmd) StartWithOutput() (error, bytes.Buffer, bytes.Buffer) {
 			defer (*e.stdin).Close()
 			defer e.in.Close()
 			n, err := io.Copy(e.in, *e.stdin)
-			l.Log().WithFields(log.Fields{"n": n}).Info("Copied n bytes to STDIN")
+			logger.WithFields(log.Fields{"n": n}).Trace("Copied n bytes to STDIN")
 			if err != nil {
-				l.LogE(err).Error("Error in copying the input into STDIN.")
+				logger.WithField("error", err).Error("Error in copying the input into STDIN.")
 				return
 			}
 			for n > 0 {
 				n, err = io.Copy(e.in, *e.stdin)
 				if err != nil {
-					l.LogE(err).Error("Error in copying the input into STDIN")
+					logger.WithField("error", err).Error("Error in copying the input into STDIN")
 					return
 				}
-				l.Log().WithFields(log.Fields{"n": n}).Info("Copied additionally n bytes to STDIN")
+				logger.WithFields(log.Fields{"n": n}).Trace("Copied additionally n bytes to STDIN")
 			}
 		}()
 	}
@@ -103,12 +110,13 @@ func (e *execCmd) StartWithOutput() (error, bytes.Buffer, bytes.Buffer) {
 
 func (e *execCmd) Start() error {
 	err, stdout, stderr := e.StartWithOutput()
+	logger := l.Ensure(e.log)
 	if err == nil {
 		return nil
 	} else {
-		l.LogE(err).Error("Error in executing the command")
-		l.Log().WithFields(log.Fields{"pipe": "STDOUT"}).Info(string(stdout.Bytes()))
-		l.Log().WithFields(log.Fields{"pipe": "STDERR"}).Info(string(stderr.Bytes()))
+		logger.WithField("error", err).Error("Error in executing the command")
+		logger.WithFields(log.Fields{"pipe": "STDOUT"}).Trace(string(stdout.Bytes()))
+		logger.WithFields(log.Fields{"pipe": "STDERR"}).Trace(string(stderr.Bytes()))
 		return err
 	}
 }

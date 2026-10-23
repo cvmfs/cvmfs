@@ -13,6 +13,99 @@
 # TODO Most of this code is replicated and shared between different scripts,
 # it would be a good idea to refactor common patterns into coherent functions.
 
+
+cvmfs_server_ingest_release_gateway_lease() {
+  local name="$1"
+  local gateway_api_url="$2"
+  local gw_key_file="$3"
+  local lease_path="$4"
+  local session_token_file="/var/spool/cvmfs/${name}/session_token"
+
+  cvmfs_sys_file_is_regular "$session_token_file" || return 0
+  cvmfs_swissknife lease -u "$gateway_api_url" -a drop \
+    -k "$gw_key_file" -p "$lease_path"
+}
+
+
+cvmfs_server_ingest_abort_transaction() {
+  local name="$1"
+  local mountless_gateway_ingest="$2"
+  local gateway_api_url="$3"
+  local gw_key_file="$4"
+  local lease_path="$5"
+
+  if [ $mountless_gateway_ingest -eq 1 ]; then
+    cvmfs_server_ingest_release_gateway_lease \
+      "$name" "$gateway_api_url" "$gw_key_file" "$lease_path" \
+      >/dev/null 2>&1 || true
+  else
+    cvmfs_server_abort -f "$name"
+  fi
+}
+
+
+# Failure handler for the mountless gateway ingest path.  Mirrors publish_failed
+# but skips the run_suid_helper open/close calls that require a FUSE overlay.
+cvmfs_server_ingest_publish_failed_mountless() {
+  local name="$1"
+  local gateway_api_url="$2"
+  local gw_key_file="$3"
+  local lease_path="$4"
+  load_repo_config $name
+  local pub_lock="${CVMFS_SPOOL_DIR}/is_publishing"
+  trap - EXIT HUP INT TERM
+  cvmfs_server_ingest_release_gateway_lease \
+    "$name" "$gateway_api_url" "$gw_key_file" "$lease_path" \
+    >/dev/null 2>&1 || true
+  release_lock $pub_lock
+  to_syslog_for_repo $name "failed to publish"
+}
+
+
+# Like publish_starting but for the mountless gateway ingest path.
+# Acquires the publishing lock, sets up an EXIT trap that includes gateway
+# lease cleanup, and deliberately omits the run_suid_helper lock call that
+# would fail because no FUSE overlay is mounted.
+cvmfs_server_ingest_publish_starting_mountless() {
+  local name="$1"
+  local gateway_api_url="$2"
+  local gw_key_file="$3"
+  local lease_path="$4"
+  load_repo_config $name
+  local pub_lock="${CVMFS_SPOOL_DIR}/is_publishing"
+  acquire_lock "$pub_lock" || {
+    cvmfs_server_ingest_release_gateway_lease \
+      "$name" "$gateway_api_url" "$gw_key_file" "$lease_path" \
+      >/dev/null 2>&1 || true
+    die "Failed to acquire publishing lock"
+  }
+  # EXIT trap includes lease cleanup; no run_suid_helper lock because there
+  # is no FUSE overlay to remount read-only for the mountless path.
+  trap "cvmfs_server_ingest_publish_failed_mountless '$name' '$gateway_api_url' '$gw_key_file' '$lease_path'" EXIT HUP INT TERM
+  to_syslog_for_repo $name "started publishing"
+}
+
+
+# Combined failure handler called from explicit error blocks AFTER publish_starting
+# (or cvmfs_server_ingest_publish_starting_mountless) has been called.
+# Clears the EXIT trap, releases the publishing lock, and tears down the
+# underlying transaction (drops gateway lease for mountless, aborts the
+# FUSE-backed transaction otherwise).
+cvmfs_server_ingest_fail() {
+  local name="$1"
+  local mountless_gateway_ingest="$2"
+  local gateway_api_url="$3"
+  local gw_key_file="$4"
+  local lease_path="$5"
+  if [ $mountless_gateway_ingest -eq 1 ]; then
+    cvmfs_server_ingest_publish_failed_mountless \
+      "$name" "$gateway_api_url" "$gw_key_file" "$lease_path"
+  else
+    publish_failed "$name"
+    cvmfs_server_abort -f "$name"
+  fi
+}
+
 cvmfs_server_ingest() {
   local base_dir="" # where to extract the tar file
   local tar_file=""
@@ -24,6 +117,9 @@ cvmfs_server_ingest() {
   local gid=""
   local keep_ownership=false
   local create_catalog=false
+  local fast_delete=false
+  local tolerate_missing_hardlinks=false
+  local gc_db=""
 
   local force_native=0
   local force_external=0
@@ -66,6 +162,23 @@ cvmfs_server_ingest() {
       -k | --keep-ownership )
         keep_ownership=true
       ;;
+      -f | --fast-delete )
+        fast_delete=true
+        if [ "x$to_delete" = "x" ]
+        then
+          to_delete="$(echo $2 | tr -s /)"
+        else
+          to_delete="$to_delete///$(echo $2 | tr -s /)"
+          multiple_delete=1
+        fi
+        ;;
+      --gc-db )
+        gc_db=$2
+        fast_delete=true
+        ;;
+      -m | --tolerate-missing-hardlinks )
+        tolerate_missing_hardlinks=true
+        ;;
     esac
     shift
   done
@@ -105,8 +218,8 @@ cvmfs_server_ingest() {
     die "Please provide a repository name, as positional argument or via an absolute path on /cvmfs given to -b"
   fi
 
-  if [ x"$tar_file" = "x" ] && [ x"$base_dir" = "x" ] && [ x"$to_delete" = "x" ] ; then
-    die "Please provide some parameters, use -t \$TAR_FILE to provide the tar to extract -b \$BASE_DIR to provide where to extract the tar and -d \$TO_DELETE to provide what to delete from the repository"
+  if [ x"$tar_file" = "x" ] && [ x"$base_dir" = "x" ] && [ x"$to_delete" = "x" ] && [ x"$gc_db" = "x" ] ; then
+    die "Please provide some parameters, use -t \$TAR_FILE to provide the tar to extract -b \$BASE_DIR to provide where to extract the tar, -d \$TO_DELETE to provide what to delete from the repository, or --gc-db \$DB_PATH to delete paths from a GC database"
   fi
 
   if [ x"$tar_file" = "x" ] && [ ! x"$base_dir" = "x" ]; then
@@ -168,8 +281,15 @@ cvmfs_server_ingest() {
 
   upstream=$CVMFS_UPSTREAM_STORAGE
   upstream_type=$(get_upstream_type $upstream)
+  local mountless_gateway_ingest=0
+  local gateway_api_url=""
+  local gateway_lease_path=""
+  local gw_key_file=""
 
   if [ x"$upstream_type" = xgw ]; then
+    gateway_api_url=$(get_upstream_config "$upstream")
+    gateway_lease_path="$name/$base_dir$to_delete"
+    gw_key_file=/etc/cvmfs/keys/${name}.gw
 
     if [ $multiple_delete -eq 1 ]; then
       die "Could not delete multiple paths using a gateway in a single transaction."
@@ -180,10 +300,41 @@ cvmfs_server_ingest() {
     fi
     # by the check above we are sure that there is only a tar_file to ingest or a directory to_delete
     # hence we just concatenate them with the name for the transaction
-    cvmfs_server_transaction "$name/$base_dir$to_delete" || die "Impossible to start a transaction"
+    if ! is_mounted "/cvmfs/$name" && ! is_mounted "${CVMFS_SPOOL_DIR}/rdonly"; then
+      mountless_gateway_ingest=1
+      if is_checked_out $name; then
+        die "Mountless gateway ingest requires a mounted publisher for checked-out repositories: unpublished checkout state such as .cvmfsdirtab is not visible through backend reads."
+      fi
+      # Deletion without fast-delete requires filesystem traversal of the
+      # rdonly mount (RemoveDirectoryRecursively walks the rdonly tree).
+      # In mountless mode there is no such mount, so only fast-delete is
+      # supported for removal operations.
+      if [ ! x"$to_delete" = "x" ] && [ "$fast_delete" != true ]; then
+        die "Mountless gateway ingest only supports deletion with --fast-delete (-f). Regular deletion requires the rdonly mount for filesystem traversal."
+      fi
+      cvmfs_swissknife lease -u "$gateway_api_url" -a acquire \
+        -k "$gw_key_file" -p "$gateway_lease_path" || \
+        die "Impossible to start a transaction"
+    else
+      cvmfs_server_transaction "$gateway_lease_path" || \
+        die "Impossible to start a transaction"
+    fi
   else
     cvmfs_server_transaction $name || die "Impossible to start a transaction"
   fi
+
+  # Local abort helper to avoid repeating the same five arguments at every
+  # error site.  Defined once the four gateway variables are known.
+  _abort() {
+    cvmfs_server_ingest_abort_transaction \
+      "$name" "$mountless_gateway_ingest" "$gateway_api_url" \
+      "$gw_key_file" "$gateway_lease_path"
+  }
+  _fail() {
+    cvmfs_server_ingest_fail \
+      "$name" "$mountless_gateway_ingest" "$gateway_api_url" \
+      "$gw_key_file" "$gateway_lease_path"
+  }
 
   spool_dir=$CVMFS_SPOOL_DIR
   scratch_dir="${spool_dir}/scratch/current"
@@ -200,25 +351,30 @@ cvmfs_server_ingest() {
   fi
 
 
-  [ $(count_wr_fds /cvmfs/$name) -eq 0 ] || { cvmfs_server_abort -f $name; die "Open writable file descriptors on $name"; }
-  is_cwd_on_path "/cvmfs/$name" && { cvmfs_server_abort -f $name; die "Current working directory is in /cvmfs/$name.  Please release, e.g. by 'cd \$HOME'."; } || true
-  gc_timespan="$(get_auto_garbage_collection_timespan $name)" || { cvmfs_server_abort -f $name; die; }
+  if [ $mountless_gateway_ingest -ne 1 ]; then
+    [ $(count_wr_fds /cvmfs/$name) -eq 0 ] || { _abort; die "Open writable file descriptors on $name"; }
+    is_cwd_on_path "/cvmfs/$name" && { _abort; die "Current working directory is in /cvmfs/$name.  Please release, e.g. by 'cd \$HOME'."; } || true
+  fi
+  gc_timespan="$(get_auto_garbage_collection_timespan $name)" || { _abort; die; }
   if [ x"$manual_revision" != x"" ]; then
     if [ "x$(echo "$manual_revision" | tr -cd 0-9)" != "x$manual_revision" ]; then
-      cvmfs_server_abort -f $name
-      die "Invalid revision number: $manual_revision"
+      _abort; die "Invalid revision number: $manual_revision"
     fi
-    local revision_number=$(attr -qg revision /var/spool/cvmfs/${name}/rdonly)
+    local revision_number=
+    if [ $mountless_gateway_ingest -eq 1 ]; then
+      # is_checked_out already rejected earlier; no need to re-check here.
+      revision_number=$(get_repo_info -v)
+    else
+      revision_number=$(attr -qg revision /var/spool/cvmfs/${name}/rdonly)
+    fi
     if [ $manual_revision -le $revision_number ]; then
-      cvmfs_server_abort -f $name
-      die "Current revision '$revision_number' is ahead of manual revision number '$manual_revision'."
+      _abort; die "Current revision '$revision_number' is ahead of manual revision number '$manual_revision'."
     fi
   fi
 
   if is_checked_out $name; then
     if [ x"$tag_name" = "x" ]; then
-      cvmfs_server_abort -f $name
-      die "Publishing a checked out revision requires a tag name"
+      _abort; die "Publishing a checked out revision requires a tag name"
     fi
   else
     if [ -z "$tag_name" ] && [ x"$CVMFS_AUTO_TAG" = x"true" ]; then
@@ -233,22 +389,39 @@ cvmfs_server_ingest() {
     fi
 
     local auto_tag_cleanup_list=
-    auto_tag_cleanup_list="$(filter_auto_tags $name)" || { cvmfs_server_abort -f $name; die "failed to determine outdated auto tags on $name"; }
+    auto_tag_cleanup_list="$(filter_auto_tags $name)" || { _abort; die "failed to determine outdated auto tags on $name"; }
   fi
 
 
   local user_shell="$(get_user_shell $name)"
-  local base_hash=$(get_mounted_root_hash $name)
+  local base_hash=
+  if [ $mountless_gateway_ingest -eq 1 ]; then
+    base_hash=$(get_published_root_hash $name) || { _abort; die "Failed to get published root hash for $name"; }
+  else
+    base_hash=$(get_mounted_root_hash $name)
+  fi
   local manifest="${spool_dir}/tmp/manifest"
-  local dirtab_command="$(__swissknife_cmd dbg) dirtab \
-    -d /cvmfs/${name}/.cvmfsdirtab                     \
-    -b $base_hash                                      \
-    -w $stratum0                                       \
-    $(get_swissknife_proxy)                            \
-    -t ${spool_dir}/tmp                                \
-    -u /cvmfs/${name}                                  \
-    -s ${scratch_dir}                                  \
-    $verbosity"
+  local dirtab_command=""
+  if [ $mountless_gateway_ingest -eq 1 ]; then
+    local mountless_dirtab="${spool_dir}/tmp/mountless.cvmfsdirtab"
+    if read_repo_item $name .cvmfsdirtab > "$mountless_dirtab"; then
+      if [ -s "$mountless_dirtab" ]; then
+        rm -f "$mountless_dirtab"
+        _abort; die "Mountless gateway ingest does not yet support a published .cvmfsdirtab; reopen the publisher mount or clear .cvmfsdirtab first."
+      fi
+    fi
+    rm -f "$mountless_dirtab"
+  else
+    dirtab_command="$(__swissknife_cmd dbg) dirtab \
+      -d /cvmfs/${name}/.cvmfsdirtab                     \
+      -b $base_hash                                      \
+      -w $stratum0                                       \
+      $(get_swissknife_proxy)                            \
+      -t ${spool_dir}/tmp                                \
+      -u /cvmfs/${name}                                  \
+      -s ${scratch_dir}                                  \
+      $verbosity"
+  fi
 
 
   local log_level=
@@ -329,6 +502,21 @@ cvmfs_server_ingest() {
     ingest_command="$ingest_command -j"
   fi
 
+  if [ "$fast_delete" = true ]; then
+    ingest_command="$ingest_command -f"
+  fi
+
+  if [ "$tolerate_missing_hardlinks" = true ]; then
+    ingest_command="$ingest_command -m"
+  fi
+
+  if [ ! x"$gc_db" = "x" ]; then
+    ingest_command="$ingest_command -Q $gc_db"
+    # Batch size from the repository's server.conf (loaded via
+    # load_repo_config).  Default 1000; 0 means "read all in one batch".
+    ingest_command="$ingest_command -X ${CVMFS_GC_DB_BATCH_SIZE:-1000}"
+  fi
+
   if [ "x$CVMFS_PRINT_STATISTICS" = "xtrue" ]; then
     ingest_command="$ingest_command -+stats"
   fi
@@ -348,17 +536,26 @@ cvmfs_server_ingest() {
 
   # ---> do it! (from here on we are changing things)
   publish_before_hook $name
-  $user_shell "$dirtab_command" || { cvmfs_server_abort -f $name; die "Failed to apply .cvmfsdirtab"; }
+  if [ $mountless_gateway_ingest -ne 1 ]; then
+    $user_shell "$dirtab_command" || { _abort; die "Failed to apply .cvmfsdirtab"; }
+  fi
 
   # check if we have open file descriptors on /cvmfs/<name>
   local use_fd_fallback=0
-  handle_read_only_file_descriptors_on_mount_point $name $open_fd_dialog || use_fd_fallback=1
+  if [ $mountless_gateway_ingest -ne 1 ]; then
+    handle_read_only_file_descriptors_on_mount_point $name $open_fd_dialog || use_fd_fallback=1
+  fi
 
-  publish_starting $name
+  if [ $mountless_gateway_ingest -eq 1 ]; then
+    cvmfs_server_ingest_publish_starting_mountless \
+      "$name" "$gateway_api_url" "$gw_key_file" "$gateway_lease_path"
+  else
+    publish_starting $name
+  fi
 
-  $user_shell "$ingest_command" || { publish_failed $name; cvmfs_server_abort -f $name; die "Synchronization failed\n\nExecuted Command:\n$ingest_command";   }
+  $user_shell "$ingest_command" || { _fail; die "Synchronization failed\n\nExecuted Command:\n$ingest_command"; }
 
-  cvmfs_sys_file_is_regular $manifest            || { publish_failed $name; cvmfs_server_abort -f $name; die "Manifest creation failed\n\nExecuted Command:\n$sync_command"; }
+  cvmfs_sys_file_is_regular $manifest || { _fail; die "Manifest creation failed\n\nExecuted Command:\n$ingest_command"; }
 
   local branch_hash=
   local trunk_hash=$(grep "^C" $manifest | tr -d C)
@@ -370,12 +567,26 @@ cvmfs_server_ingest() {
     sign_manifest $name $manifest "" true
     # Replace throw-away manifest with upstream copy
     get_raw_manifest $name > $manifest
-    cvmfs_sys_file_is_empty $manifest && { cvmfs_server_abort -f $name; die "failed to reload manifest"; }
+    cvmfs_sys_file_is_empty $manifest && { _fail; die "failed to reload manifest"; }
   fi
 
   if [ x"$upstream_type" = xgw ]; then
       # TODO(jpriessn): implement publication counters upload to gateway
-      close_transaction  $name $use_fd_fallback
+      if [ $mountless_gateway_ingest -ne 1 ]; then
+        close_transaction  $name $use_fd_fallback
+      else
+        # close_transaction is skipped for mountless ingest (no FUSE overlay),
+        # but the session_token file created by the lease acquire must still
+        # be removed — the gateway committed and deleted it server-side via
+        # FinalizeSession(true), so only the local file remains.
+        rm -f "${spool_dir}/session_token" \
+              "${spool_dir}/session_token.api_version"
+      fi
+      # For mountless gateway ingest the gateway lease was already committed
+      # (and deleted server-side) by cvmfs_swissknife ingest via
+      # FinalizeSession(true).  No separate DROP/cancel request is needed here;
+      # publish_succeeded handles the remaining local cleanup (lock, syslog,
+      # EXIT trap).
       publish_after_hook $name
       publish_succeeded $name
       echo "Changes submitted to repository gateway"
@@ -473,4 +684,18 @@ cvmfs_server_ingest() {
   publish_after_hook $name
   publish_succeeded  $name
 
+  # If --gc-db was used and the swissknife only consumed one batch, any
+  # remaining rows need another transaction.  Tail-recurse until the DB is
+  # drained.  CVMFS_GC_DB_BATCH_SIZE=0 reads all rows at once, so there is
+  # nothing left to do.
+  if [ ! x"$gc_db" = "x" ]; then
+    local _remaining
+    _remaining=$(sqlite3 "$gc_db" \
+      "SELECT COUNT(*) FROM gc_paths WHERE deleted = 0;" 2>/dev/null) \
+      || _remaining=0
+    if [ "${_remaining:-0}" -gt 0 ]; then
+      echo "Info: ${_remaining} paths still pending in $gc_db, running next batch"
+      cvmfs_server_ingest --gc-db "$gc_db" "$name" || return $?
+    fi
+  fi
 }

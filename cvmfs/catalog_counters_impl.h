@@ -8,6 +8,7 @@
 #include <map>
 #include <string>
 
+#include "catalog_counters.h"
 #include "catalog_sql.h"
 #include "util/string.h"
 
@@ -41,7 +42,7 @@ std::map<std::string, FieldT> TreeCountersBase<FieldT>::GetValues() const {
   std::map<std::string, FieldT> map_summed;
 
   typename FieldsMap::const_iterator i = map_self.begin();
-  typename FieldsMap::const_iterator iend = map_self.end();
+  typename FieldsMap::const_iterator const iend = map_self.end();
   for (; i != iend; ++i) {
     map_summed[i->first] = *(map_self[i->first]) + *(map_subtree[i->first]);
   }
@@ -55,7 +56,7 @@ std::string TreeCountersBase<FieldT>::GetCsvMap() const {
 
   std::string result;
   typename std::map<std::string, FieldT>::const_iterator j = map_summed.begin();
-  typename std::map<std::string, FieldT>::const_iterator jend = map_summed
+  typename std::map<std::string, FieldT>::const_iterator const jend = map_summed
                                                                     .end();
   for (; j != jend; ++j) {
     result += j->first + "," + StringifyInt(j->second) + "\n";
@@ -73,7 +74,7 @@ bool TreeCountersBase<FieldT>::ReadFromDatabase(const CatalogDatabase &database,
   SqlGetCounter sql_counter(database);
 
   typename FieldsMap::const_iterator i = map.begin();
-  typename FieldsMap::const_iterator iend = map.end();
+  typename FieldsMap::const_iterator const iend = map.end();
   for (; i != iend; ++i) {
     bool current_retval = sql_counter.BindCounter(i->first)
                           && sql_counter.FetchRow();
@@ -131,7 +132,7 @@ bool TreeCountersBase<FieldT>::WriteToDatabase(
   SqlUpdateCounter sql_counter(database);
 
   typename FieldsMap::const_iterator i = map.begin();
-  typename FieldsMap::const_iterator iend = map.end();
+  typename FieldsMap::const_iterator const iend = map.end();
   for (; i != iend; ++i) {
     const bool current_retval = sql_counter.BindCounter(i->first)
                                 && sql_counter.BindDelta(*(i->second))
@@ -154,7 +155,7 @@ bool TreeCountersBase<FieldT>::InsertIntoDatabase(
   SqlCreateCounter sql_counter(database);
 
   typename FieldsMap::const_iterator i = map.begin();
-  typename FieldsMap::const_iterator iend = map.end();
+  typename FieldsMap::const_iterator const iend = map.end();
   for (; i != iend; ++i) {
     const bool current_retval = sql_counter.BindCounter(i->first)
                                 && sql_counter.BindInitialValue(*(i->second))

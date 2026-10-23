@@ -50,8 +50,8 @@ CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub
 CVMFS_REPOSITORY_DATE=$stamp_zero
 EOF
 
-  cvmfs2 -d -o config=$conf $CVMFS_TEST_REPO $mountpoint >> $output 2>&1
-  if [ $? -eq 0 ]; then
+  
+  if cvmfs2 -d -o config=$conf $CVMFS_TEST_REPO $mountpoint >> $output 2>&1; then
     fusermount -u $mountpoint
     return 34
   fi

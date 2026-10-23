@@ -1,0 +1,50 @@
+name: CI libcvmfs
+
+on:
+  push:
+      branches: ['devel', 'cvmfs*']
+  pull_request:
+      branches: ['devel', 'cvmfs*']
+
+jobs:
+  libcvmfs-only:
+    name: "Client library only (BUILD_LIBCVMFS)"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake g++ make patch \
+            libc-ares-dev \
+            libcap-dev \
+            libcurl4-openssl-dev \
+            libleveldb-dev \
+            libprotobuf-dev \
+            libsparsehash-dev \
+            libsqlite3-dev \
+            libssl-dev \
+            nlohmann-json3-dev \
+            protobuf-compiler \
+            uuid-dev \
+            zlib1g-dev
+
+      - name: Configure
+        run: |
+          cmake -S . -B build \
+            -DBUILD_CVMFS=OFF \
+            -DBUILD_SERVER=OFF \
+            -DBUILD_RECEIVER=OFF \
+            -DBUILD_GEOAPI=OFF \
+            -DBUILD_LIBCVMFS=ON \
+            -DBUILD_LIBCVMFS_CACHE=OFF \
+            -DINSTALL_MOUNT_SCRIPTS=OFF \
+            -DINSTALL_PUBLIC_KEYS=OFF \
+            -DINSTALL_BASH_COMPLETION=OFF
+
+      - name: Build
+        run: cmake --build build -j"$(nproc)"

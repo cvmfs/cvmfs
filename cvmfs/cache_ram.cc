@@ -12,7 +12,6 @@
 #include <new>
 
 #include "kvstore.h"
-#include "util/concurrency.h"
 #include "util/logging.h"
 #include "util/posix.h"
 #include "util/string.h"

@@ -2,14 +2,11 @@
  * This file is part of the CernVM File System.
  */
 
-#define __STDC_FORMAT_MACROS
-
 #include "swissknife_scrub.h"
 
 #include "util/fs_traversal.h"
 #include "util/logging.h"
 #include "util/posix.h"
-#include "util/smalloc.h"
 #include "util/string.h"
 
 using namespace std;  // NOLINT

@@ -55,4 +55,4 @@ fi
 
 echo "Running '$CMD0 | $CMD1'"
 $CMD0 | $CMD1 2>&1 | tee ${SCRIPT_OUTPUT}
-! grep -q "warning treated as error" ${SCRIPT_OUTPUT}
+! grep -q "warning[s]* treated as error" ${SCRIPT_OUTPUT}

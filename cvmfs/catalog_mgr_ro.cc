@@ -7,6 +7,7 @@
 
 #include "compression/compression.h"
 #include "network/download.h"
+#include "network/sink_file.h"
 #include "util/exception.h"
 #include "util/posix.h"
 

@@ -8,7 +8,8 @@ CVMFS_TEST_688_REPO_NAMES=
 cleanup() {
   if [ -n "$CVMFS_TEST_688_REPO_NAMES" ]; then
     for repo in $CVMFS_TEST_688_REPO_NAMES; do
-      sudo cvmfs_server rmfs -f $repo
+      # may not exist
+      sudo cvmfs_server rmfs -f $repo || true
     done
   fi
 }
@@ -129,9 +130,25 @@ cvmfs_run_test() {
   echo "*** verifying check now succeeded on replica 4"
   curl -f -s "$(get_repo_url ${replica_name}-4)/.cvmfs_status.json" | grep check_status.*succeeded || return 57
 
+  echo "*** verify that check -a -r ignores the full-check interval"
+  local status_before
+  status_before="$(curl -f -s \
+    "$(get_repo_url $CVMFS_TEST_REPO)/.cvmfs_status.json")" || return 61
+  [ -n "$status_before" ] || return 61
+  sleep 1
+  rm -f /var/log/cvmfs/checks.log
+  cvmfs_server check -a -r || return 58
+  grep -q "Checking reference log of" /var/log/cvmfs/checks.log || return 59
+  grep -q "Verifying integrity" /var/log/cvmfs/checks.log && return 62
+  local status_after
+  status_after="$(curl -f -s \
+    "$(get_repo_url $CVMFS_TEST_REPO)/.cvmfs_status.json")" || return 63
+  [ "$status_before" = "$status_after" ] || return 63
+
   create_fake_gc_lock ${replica_name}-1
   echo "*** verify that fake gc lock prevents gc"
-  cvmfs_server gc -f ${replica_name}-1 2>&1 | grep aborting || return 60
+  ! cvmfs_server gc -f ${replica_name}-1 &> gc.err
+  grep aborting gc.err || return 60
   remove_fake_gc_lock ${replica_name}-1
 
   return 0

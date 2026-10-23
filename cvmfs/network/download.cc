@@ -25,9 +25,6 @@
  */
 
 // TODO(jblomer): MS for time summing
-// NOLINTNEXTLINE
-#define __STDC_FORMAT_MACROS
-
 
 #include "download.h"
 
@@ -42,6 +39,7 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <atomic>
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
@@ -52,13 +50,13 @@
 
 #include "compression/compression.h"
 #include "crypto/hash.h"
-#include "duplex_curl.h"
+#include "duplex_curl.h"  // IWYU pragma: keep
 #include "interrupt.h"
+#include "network/sink_mem.h"
+#include "network/sink_path.h"
 #include "sanitizer.h"
 #include "ssl.h"
 #include "util/algorithm.h"
-#include "util/atomic.h"
-#include "util/concurrency.h"
 #include "util/exception.h"
 #include "util/logging.h"
 #include "util/posix.h"
@@ -251,6 +249,16 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
 
 /**
  * Called by curl for every received data chunk.
+ *
+ * In multi-threaded mode the chunk's hash is updated here (cheap) and the
+ * raw bytes are handed off to the calling Fetch() thread via JobInfo's
+ * data tube; the (relatively expensive) zlib decompression and sink->Write
+ * happen on that caller thread. This lets multiple callers — e.g. main
+ * thread plus N file-bundle prefetch workers — run their decompression in
+ * parallel instead of serializing on this single MainDownload thread.
+ *
+ * In single-threaded mode (no MainDownload thread, e.g. unit tests) the
+ * old inline path is kept.
  */
 static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
                                void *info_link) {
@@ -262,14 +270,24 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
   // come here
   assert(info->sink() != NULL);
 
-  // LogCvmfs(kLogDownload, kLogDebug, "Data callback,  %d bytes", num_bytes);
-
   if (num_bytes == 0)
     return 0;
 
   if (info->expected_hash()) {
     shash::Update(reinterpret_cast<unsigned char *>(ptr), num_bytes,
                   info->hash_context());
+  }
+
+  if (info->IsValidDataTube()) {
+    // Parallel-decompress path: copy bytes onto a buffer the caller will own
+    // and enqueue. The caller thread (DownloadManager::Fetch) pops these
+    // elements and runs DecompressZStream2Sink / sink->Write itself.
+    char *buf = new char[num_bytes];
+    memcpy(buf, ptr, num_bytes);
+    DataTubeElement *ele = new DataTubeElement(buf, num_bytes,
+                                               kActionDecompress);
+    info->GetDataTubePtr()->EnqueueBack(ele);
+    return num_bytes;
   }
 
   if (info->compressed()) {
@@ -394,25 +412,6 @@ const int DownloadManager::kProbeUnprobed = -1;
 const int DownloadManager::kProbeDown = -2;
 const int DownloadManager::kProbeGeo = -3;
 
-bool DownloadManager::EscapeUrlChar(unsigned char input, char output[3]) {
-  if (((input >= '0') && (input <= '9')) || ((input >= 'A') && (input <= 'Z'))
-      || ((input >= 'a') && (input <= 'z')) || (input == '/') || (input == ':')
-      || (input == '.') || (input == '@') || (input == '+') || (input == '-')
-      || (input == '_') || (input == '~') || (input == '[') || (input == ']')
-      || (input == ',')) {
-    output[0] = static_cast<char>(input);
-    return false;
-  }
-
-  output[0] = '%';
-  output[1] = static_cast<char>((input / 16)
-                                + ((input / 16 <= 9) ? '0' : 'A' - 10));
-  output[2] = static_cast<char>((input % 16)
-                                + ((input % 16 <= 9) ? '0' : 'A' - 10));
-  return true;
-}
-
-
 /**
  * Escape special chars from the URL, except for ':' and '/',
  * which should keep their meaning.
@@ -423,7 +422,7 @@ string DownloadManager::EscapeUrl(const int64_t jobinfo_id, const string &url) {
 
   char escaped_char[3];
   for (unsigned i = 0, s = url.length(); i < s; ++i) {
-    if (EscapeUrlChar(url[i], escaped_char)) {
+    if (JobInfo::EscapeUrlChar(url[i], escaped_char)) {
       escaped.append(escaped_char, 3);
     } else {
       escaped.push_back(escaped_char[0]);
@@ -433,38 +432,6 @@ string DownloadManager::EscapeUrl(const int64_t jobinfo_id, const string &url) {
            jobinfo_id, url.c_str(), escaped.c_str());
 
   return escaped;
-}
-
-/**
- * escaped array needs to be sufficiently large.  Its size is calculated by
- * passing NULL to EscapeHeader.
- */
-unsigned DownloadManager::EscapeHeader(const string &header,
-                                       char *escaped_buf,
-                                       size_t buf_size) {
-  unsigned esc_pos = 0;
-  char escaped_char[3];
-  for (unsigned i = 0, s = header.size(); i < s; ++i) {
-    if (EscapeUrlChar(header[i], escaped_char)) {
-      for (unsigned j = 0; j < 3; ++j) {
-        if (escaped_buf) {
-          if (esc_pos >= buf_size)
-            return esc_pos;
-          escaped_buf[esc_pos] = escaped_char[j];
-        }
-        esc_pos++;
-      }
-    } else {
-      if (escaped_buf) {
-        if (esc_pos >= buf_size)
-          return esc_pos;
-        escaped_buf[esc_pos] = escaped_char[0];
-      }
-      esc_pos++;
-    }
-  }
-
-  return esc_pos;
 }
 
 /**
@@ -698,7 +665,7 @@ void *DownloadManager::MainDownload(void *data) {
                                    &still_running);
         } else {
           // Return easy handle into pool and write result back
-          download_mgr->ReleaseCurlHandle(easy_handle);
+          download_mgr->ReleaseCurlHandle(easy_handle, true /* allow_reuse */);
 
           DataTubeElement *ele = new DataTubeElement(kActionStop);
           info->GetDataTubePtr()->EnqueueBack(ele);
@@ -897,11 +864,11 @@ CURL *DownloadManager::AcquireCurlHandle() {
 }
 
 
-void DownloadManager::ReleaseCurlHandle(CURL *handle) {
+void DownloadManager::ReleaseCurlHandle(CURL *handle, bool allow_reuse) {
   const set<CURL *>::iterator elem = pool_handles_inuse_->find(handle);
   assert(elem != pool_handles_inuse_->end());
 
-  if (pool_handles_idle_->size() > pool_max_handles_) {
+  if (!allow_reuse || pool_handles_idle_->size() > pool_max_handles_) {
     curl_easy_cleanup(*elem);
   } else {
     pool_handles_idle_->insert(*elem);
@@ -1270,7 +1237,8 @@ bool DownloadManager::ValidateProxyIpsUnlocked(const string &url,
     }
   }
   vector<ProxyInfo> new_infos;
-  set<string> best_addresses = new_host.ViewBestAddresses(opt_ip_preference_);
+  set<string> const best_addresses = new_host.ViewBestAddresses(
+      opt_ip_preference_);
   set<string>::const_iterator iter_ips = best_addresses.begin();
   for (; iter_ips != best_addresses.end(); ++iter_ips) {
     const string url_ip = dns::RewriteUrl(url, *iter_ips);
@@ -1290,11 +1258,11 @@ bool DownloadManager::ValidateProxyIpsUnlocked(const string &url,
  * Adds transfer time and downloaded bytes to the global counters.
  */
 void DownloadManager::UpdateStatistics(CURL *handle) {
-  double val;
+  curl_off_t val;
   int retval;
   int64_t sum = 0;
 
-  retval = curl_easy_getinfo(handle, CURLINFO_SIZE_DOWNLOAD, &val);
+  retval = curl_easy_getinfo(handle, CURLINFO_SIZE_DOWNLOAD_T, &val);
   assert(retval == CURLE_OK);
   sum += static_cast<int64_t>(val);
   /*retval = curl_easy_getinfo(handle, CURLINFO_HEADER_SIZE, &val);
@@ -1457,6 +1425,17 @@ void DownloadManager::ProcessLink(JobInfo *info) {
   if (host_list.size() > 0) {
     SetHostChain(host_list);
     opt_metalink_timestamp_link_ = time(NULL);
+    // Set the index to the first linked host because the protocol includes
+    // redirecting to the first host
+    info->SetCurrentHostChainIndex(0);
+    // Don't process the same links again if there are retries
+    info->SetLink("");
+    LogCvmfs(kLogDownload, kLogDebug | kLogSyslog,
+                 "(manager '%s' - id %" PRId64 ") "
+                 "received %zu hosts from metalink server, starting with %s",
+                 name_.c_str(), info->id(),
+                 host_list.size(),
+                 host_list[0].c_str());
   }
 }
 
@@ -1478,17 +1457,22 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
   bool was_metalink;
   std::string typ;
   if (info->current_metalink_chain_index() >= 0) {
-    was_metalink = true;
-    typ = "metalink";
     if (info->link() != "") {
       // process Link header whether or not the redirected URL got an error
       ProcessLink(info);
+      // The metalink lookup succeeded, so if there was an error it was
+      // with the redirect
+      was_metalink = false;
+      typ = "host";
+    } else {
+      // no Link headers were received, so the metalink lookup failed
+      was_metalink = true;
+      typ = "metalink";
     }
   } else {
     was_metalink = false;
     typ = "host";
   }
-
 
   // Verification and error classification
   switch (curl_error) {
@@ -1695,25 +1679,39 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
   if (try_again) {
     LogCvmfs(kLogDownload, kLogDebug,
              "(manager '%s' - id %" PRId64 ") "
-             "Trying again on same curl handle, same url: %d, "
-             "error code %d no-cache %d",
-             name_.c_str(), info->id(), same_url_retry, info->error_code(),
-             info->nocache());
-    // Reset internal state and destination
-    if (info->sink() != NULL && info->sink()->Reset() != 0) {
-      info->SetErrorCode(kFailLocalIO);
-      goto verify_and_finalize_stop;
+             "Trying again on same curl handle, %s"
+             "error code %d%s",
+             name_.c_str(), info->id(), same_url_retry ? "same url, " : "",
+             info->error_code(), info->nocache() ? ", no cache" : "");
+    // Reset internal state and destination. In parallel-decompress mode the
+    // sink and zstream are owned by the caller thread (it pops and decompresses
+    // the queued chunks). Resetting them here would race the caller and, worse,
+    // leave the bytes of this failed attempt in the tube to be decompressed
+    // into the output. Defer the reset by enqueuing an ordered marker; the
+    // caller discards this attempt's bytes when it pops it (see below).
+    const bool defer_reset = info->IsValidDataTube();
+    if (!defer_reset) {
+      if (info->sink() != NULL && info->sink()->Reset() != 0) {
+        info->SetErrorCode(kFailLocalIO);
+        goto verify_and_finalize_stop;
+      }
     }
     if (info->interrupt_cue() && info->interrupt_cue()->IsCanceled()) {
       info->SetErrorCode(kFailCanceled);
       goto verify_and_finalize_stop;
     }
 
+    // The hash context is updated on this (MainDownload) thread in
+    // CallbackCurlData(), so it is reset here regardless of the decompress
+    // mode.
     if (info->expected_hash()) {
       shash::Init(info->hash_context());
     }
-    if (info->compressed()) {
+    if (info->compressed() && !defer_reset) {
       zlib::DecompressInit(info->GetZstreamPtr());
+    }
+    if (defer_reset) {
+      info->GetDataTubePtr()->EnqueueBack(new DataTubeElement(kActionReset));
     }
 
     if (sharding_policy_.UseCount() > 0) {  // sharding policy
@@ -1784,14 +1782,22 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
   }
 
 verify_and_finalize_stop:
-  // Finalize, flush destination file
+  // Finalize, flush destination file.
   ReleaseCredential(info);
-  if (info->sink() != NULL && info->sink()->Flush() != 0) {
-    info->SetErrorCode(kFailLocalIO);
-  }
 
-  if (info->compressed())
-    zlib::DecompressFini(info->GetZstreamPtr());
+  // In parallel-decompress mode (data_tube_ valid) the caller has not yet
+  // pushed bytes through the sink / zstream — those operations happen on
+  // the caller thread when it pops the queued chunks. Flushing the sink
+  // and tearing down the zstream here would race the caller's decompress
+  // and corrupt the output. Defer both to the caller.
+  const bool defer_finalize = info->IsValidDataTube();
+  if (!defer_finalize) {
+    if (info->sink() != NULL && info->sink()->Flush() != 0) {
+      info->SetErrorCode(kFailLocalIO);
+    }
+    if (info->compressed())
+      zlib::DecompressFini(info->GetZstreamPtr());
+  }
 
   if (info->headers()) {
     header_lists_->PutList(info->headers());
@@ -1815,13 +1821,13 @@ DownloadManager::~DownloadManager() {
     health_check_.Reset();
   }
 
-  if (atomic_xadd32(&multi_threaded_, 0) == 1) {
+  if (multi_threaded_.load() == 1) {
     // Shutdown I/O thread
     pipe_terminate_->Write(kPipeTerminateSignal);
     pthread_join(thread_download_, NULL);
     // All handles are removed from the multi stack
-    pipe_terminate_.Destroy();
-    pipe_jobs_.Destroy();
+    pipe_terminate_.reset();
+    pipe_jobs_.reset();
   }
 
   for (set<CURL *>::iterator i = pool_handles_idle_->begin(),
@@ -1884,9 +1890,9 @@ DownloadManager::DownloadManager(const unsigned max_pool_handles,
     , pool_handles_idle_(new set<CURL *>)
     , pool_handles_inuse_(new set<CURL *>)
     , pool_max_handles_(max_pool_handles)
-    , pipe_terminate_(NULL)
-    , pipe_jobs_(NULL)
-    , watch_fds_(NULL)
+    , pipe_terminate_(nullptr)
+    , pipe_jobs_(nullptr)
+    , watch_fds_(nullptr)
     , watch_fds_size_(0)
     , watch_fds_inuse_(0)
     , watch_fds_max_(4 * max_pool_handles)
@@ -1919,7 +1925,7 @@ DownloadManager::DownloadManager(const unsigned max_pool_handles,
     , opt_proxy_groups_reset_after_(0)
     , credentials_attachment_(NULL)
     , counters_(new Counters(statistics)) {
-  atomic_init32(&multi_threaded_);
+  multi_threaded_.store(0);
 
   lock_options_ = reinterpret_cast<pthread_mutex_t *>(
       smalloc(sizeof(pthread_mutex_t)));
@@ -1961,14 +1967,16 @@ DownloadManager::DownloadManager(const unsigned max_pool_handles,
  * No way back except Fini(); Init();
  */
 void DownloadManager::Spawn() {
-  pipe_terminate_ = new Pipe<kPipeThreadTerminator>();
-  pipe_jobs_ = new Pipe<kPipeDownloadJobs>();
+  pipe_terminate_ = std::unique_ptr<Pipe<kPipeThreadTerminator> >(
+      new Pipe<kPipeThreadTerminator>());
+  pipe_jobs_ = std::unique_ptr<Pipe<kPipeDownloadJobs> >(
+      new Pipe<kPipeDownloadJobs>());
 
   const int retval = pthread_create(&thread_download_, NULL, MainDownload,
                                     static_cast<void *>(this));
   assert(retval == 0);
 
-  atomic_inc32(&multi_threaded_);
+  multi_threaded_.fetch_add(1);
 
   if (health_check_.UseCount() > 0) {
     LogCvmfs(kLogDownload, kLogDebug,
@@ -1997,21 +2005,25 @@ Failures DownloadManager::Fetch(JobInfo *info) {
     info->GetHashContextPtr()->buffer = alloca(info->hash_context().size);
   }
 
-  // In case JobInfo object is being reused
+  // Clear out any saved Links in case this will be a metalink request and
+  // previous non-metalink requests sent Link headers
   info->SetLink("");
 
   // Prepare cvmfs-info: header, allocate string on the stack
   info->SetInfoHeader(NULL);
-  if (enable_info_header_ && info->extra_info()) {
-    const char *header_name = "cvmfs-info: ";
-    const size_t header_name_len = strlen(header_name);
-    const unsigned header_size = 1 + header_name_len
-                                 + EscapeHeader(*(info->extra_info()), NULL, 0);
-    info->SetInfoHeader(static_cast<char *>(alloca(header_size)));
-    memcpy(info->info_header(), header_name, header_name_len);
-    EscapeHeader(*(info->extra_info()), info->info_header() + header_name_len,
-                 header_size - header_name_len);
-    info->info_header()[header_size - 1] = '\0';
+  if (enable_info_header_) {
+    const string header_info = info->GetInfoHeaderContents(
+        info_header_template_);
+    if (header_info != "") {
+      const char * const header_name = "cvmfs-info: ";
+      const size_t header_name_len = strlen(header_name);
+      const size_t info_len = header_info.length();
+      char *buf = static_cast<char *>(alloca(header_name_len + info_len + 1));
+      memcpy(buf, header_name, header_name_len);
+      memcpy(buf + header_name_len, header_info.c_str(), info_len);
+      buf[header_name_len + info_len] = '\0';
+      info->SetInfoHeader(buf);
+    }
   }
 
   if (enable_http_tracing_) {
@@ -2029,7 +2041,7 @@ Failures DownloadManager::Fetch(JobInfo *info) {
     memcpy(info->tracing_header_uid(), str_uid.c_str(), str_uid.size() + 1);
   }
 
-  if (atomic_xadd32(&multi_threaded_, 0) == 1) {
+  if (multi_threaded_.load() == 1) {
     if (!info->IsValidPipeJobResults()) {
       info->CreatePipeJobResults();
     }
@@ -2041,6 +2053,11 @@ Failures DownloadManager::Fetch(JobInfo *info) {
     //          info->wait_at[0], info->wait_at[1]);
     pipe_jobs_->Write<JobInfo *>(info);
 
+    // Decompress / copy chunks on this caller thread (in parallel across
+    // concurrent Fetch() callers) instead of on the single MainDownload
+    // thread. Track decompression errors locally and apply them at the end
+    // — VerifyAndFinalize already ran by the time kActionStop arrives.
+    Failures decompress_err = kFailOk;
     do {
       DataTubeElement *ele = info->GetDataTubePtr()->PopFront();
 
@@ -2048,10 +2065,74 @@ Failures DownloadManager::Fetch(JobInfo *info) {
         delete ele;
         break;
       }
-      // TODO(heretherebedragons) add compression
+
+      if (ele->action == kActionReset) {
+        // The chunks popped so far belonged to a download attempt that was
+        // superseded by a retry / host fail-over (VerifyAndFinalize enqueued
+        // this marker). Discard their — possibly corrupt — decompressed output
+        // and start fresh so the next attempt's bytes are processed cleanly.
+        if (info->compressed()) {
+          zlib::DecompressFini(info->GetZstreamPtr());
+          zlib::DecompressInit(info->GetZstreamPtr());
+        }
+        if (info->sink() != NULL && info->sink()->Reset() != 0) {
+          decompress_err = kFailLocalIO;
+        } else {
+          decompress_err = kFailOk;
+        }
+        delete ele;
+        continue;
+      }
+
+      if (decompress_err == kFailOk && ele->size > 0) {
+        if (info->compressed()) {
+          const zlib::StreamStates retval = zlib::DecompressZStream2Sink(
+              ele->data, static_cast<int64_t>(ele->size), info->GetZstreamPtr(),
+              info->sink());
+          if (retval == zlib::kStreamDataError) {
+            LogCvmfs(kLogDownload, kLogSyslogErr,
+                     "(id %" PRId64 ") failed to decompress %s", info->id(),
+                     info->url()->c_str());
+            decompress_err = kFailBadData;
+          } else if (retval == zlib::kStreamIOError) {
+            LogCvmfs(kLogDownload, kLogSyslogErr,
+                     "(id %" PRId64 ") decompressing %s, local IO error",
+                     info->id(), info->url()->c_str());
+            decompress_err = kFailLocalIO;
+          }
+        } else {
+          const int64_t written = info->sink()->Write(ele->data, ele->size);
+          if (written < 0 || static_cast<uint64_t>(written) != ele->size) {
+            LogCvmfs(kLogDownload, kLogDebug,
+                     "(id %" PRId64 ") sink write failed for %s (%ld of %zu)",
+                     info->id(), info->url()->c_str(),
+                     static_cast<long>(written), ele->size);
+            decompress_err = kFailLocalIO;
+          }
+        }
+      }
+      delete ele;
     } while (true);
 
     info->GetPipeJobResultPtr()->Read<download::Failures>(&result);
+
+    // Caller-side finalize (deferred from VerifyAndFinalize). Must run after
+    // all kActionDecompress chunks have been popped and decompressed.
+    if (result == kFailOk && decompress_err == kFailOk) {
+      if (info->sink() != NULL && info->sink()->Flush() != 0) {
+        decompress_err = kFailLocalIO;
+      }
+    }
+    if (info->compressed()) {
+      zlib::DecompressFini(info->GetZstreamPtr());
+    }
+    if (result == kFailOk && decompress_err != kFailOk) {
+      result = decompress_err;
+      info->SetErrorCode(decompress_err);
+      if (info->sink() != NULL) {
+        info->sink()->Purge();
+      }
+    }
     // LogCvmfs(kLogDownload, kLogDebug, "got result %d", result);
   } else {
     const MutexLockGuard l(lock_synchronous_mode_);
@@ -2071,7 +2152,12 @@ Failures DownloadManager::Fetch(JobInfo *info) {
       }
     } while (VerifyAndFinalize(retval, info));
     result = info->error_code();
-    ReleaseCurlHandle(info->curl_handle());
+    // Prevent the handle from being added to the idle list, which
+    // avoids that it is mistakenly picked up by the multi handle later
+    // in multi-threaded context. This, in turn, would fail to wait for
+    // for resolver threads that meanwhile vanished due to a fork()
+    // in Daemonize()
+    ReleaseCurlHandle(info->curl_handle(), false /* allow_reuse */);
   }
 
   if (result != kFailOk) {
@@ -2390,10 +2476,10 @@ void DownloadManager::SwitchHostInfo(const std::string &typ,
   }
 
   string reason = "manually triggered";
-  string info_id = "(manager " + name_;
+  string info_id = "(manager '" + name_ + "'";
   if (jobinfo) {
     reason = download::Code2Ascii(jobinfo->error_code());
-    info_id = " - id " + StringifyInt(jobinfo->id());
+    info_id += " - id " + StringifyInt(jobinfo->id());
   }
   info_id += ")";
 
@@ -2737,7 +2823,7 @@ bool DownloadManager::ValidateGeoReply(const string &reply_order,
     return false;
 
   // Check if tmp_vals contains the number 1..n
-  set<uint64_t> coverage(tmp_vals.begin(), tmp_vals.end());
+  set<uint64_t> const coverage(tmp_vals.begin(), tmp_vals.end());
   if (coverage.size() != tmp_vals.size())
     return false;
   if ((*coverage.begin() != 1) || (*coverage.rbegin() != coverage.size()))
@@ -2916,7 +3002,7 @@ void DownloadManager::SetProxyChain(const string &proxy_list,
       }
 
       // IPv4 addresses have precedence
-      set<string> best_addresses = hosts[num_proxy].ViewBestAddresses(
+      set<string> const best_addresses = hosts[num_proxy].ViewBestAddresses(
           opt_ip_preference_);
       set<string>::const_iterator iter_ips = best_addresses.begin();
       for (; iter_ips != best_addresses.end(); ++iter_ips) {

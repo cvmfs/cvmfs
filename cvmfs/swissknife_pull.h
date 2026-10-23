@@ -40,14 +40,15 @@ class CommandPull : public Command {
     r.push_back(Parameter::Optional('t', "timeout (s)"));
     r.push_back(Parameter::Optional('a', "number of retries"));
     r.push_back(Parameter::Optional('d', "directory for path specification"));
+    r.push_back(Parameter::Optional('E',
+        "inclusion spec for partial replication"));
     r.push_back(Parameter::Optional('Z', "pull revisions younger than <Z>"));
     r.push_back(Parameter::Optional('@', "proxy url"));
     r.push_back(Parameter::Switch('p', "pull catalog history, too"));
     r.push_back(Parameter::Switch('i', "mark as an 'initial snapshot'"));
     r.push_back(Parameter::Switch('c', "preload cache instead of stratum 1"));
-    // Required for preloading client cache with a dirtab.  If the dirtab
-    // changes, the existence of a catalog does not anymore indicate if
-    // everything in the corresponding subtree is already fetched, too.
+    // A changed cache dirtab or replica inclusion spec invalidates the
+    // assumption that an existing catalog's objects and children are present.
     r.push_back(Parameter::Switch(
         'z', "look into all catalogs even if already present"));
     return r;
@@ -56,7 +57,8 @@ class CommandPull : public Command {
 
  protected:
   bool PullRecursion(catalog::Catalog *catalog, const std::string &path);
-  bool Pull(const shash::Any &catalog_hash, const std::string &path, shash::Any &previous_catalog);
+  bool Pull(const shash::Any &catalog_hash, const std::string &path,
+            shash::Any &previous_catalog, bool is_historic_catalog = false);
 };
 
 }  // namespace swissknife

@@ -176,7 +176,7 @@ int64_t StreamingCacheManager::Stream(const FdInfo &info,
 
   download::JobInfo download_job(&url, is_zipped, true /* probe_hosts */,
                                  &info.object_id, &sink);
-  download_job.SetExtraInfo(&info.label.path);
+  download_job.SetPathInfo(&info.label.path);
   download_job.SetRangeOffset(info.label.range_offset);
   download_job.SetRangeSize(static_cast<int64_t>(info.label.size));
   ClientCtx *ctx = ClientCtx::GetInstance();
@@ -246,7 +246,7 @@ StreamingCacheManager::StreamingCacheManager(
   delete quota_mgr_;
   quota_mgr_ = cache_mgr_->quota_mgr();
 
-  buffer_ = new RingBuffer(buffer_size);
+  buffer_ = std::unique_ptr<RingBuffer>(new RingBuffer(buffer_size));
   buffered_objects_.Init(16, shash::Any(), hasher_any);
   lock_buffer_ = reinterpret_cast<pthread_mutex_t *>(
       smalloc(sizeof(pthread_mutex_t)));
@@ -437,5 +437,5 @@ bool StreamingCacheManager::DoFreeState(void *data) {
 
 CacheManager *StreamingCacheManager::MoveOutBackingCacheMgr(int *root_fd) {
   *root_fd = fd_table_.GetHandle(0).fd_in_cache_mgr;
-  return cache_mgr_.Release();
+  return cache_mgr_.release();
 }

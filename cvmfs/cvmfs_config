@@ -1,11 +1,27 @@
 #!/bin/bash
 # Common configuration tasks for CernVM-FS
 
-SCRIPT_LOCATION=$(cd "$(dirname "$0")"; pwd)
+SCRIPT_LOCATION=$(dirname "$(command -v "$0")")
 INSTALL_BASE=$(echo "$SCRIPT_LOCATION" | sed -e 's/^\(.*\)\/bin$/\1/')
 # workaround for fedora 42
 INSTALL_BASE=$(echo "$INSTALL_BASE" | sed -e 's/^\(.*\)\/sbin$/\1/')
 SBIN_BASE="$( [ x"$INSTALL_BASE" = x"/usr" ] && echo "/sbin" || echo "${INSTALL_BASE}/sbin" )"
+
+# manpage generation with help2man might run when /etc/cvmfs/config.sh isn't available yet
+# Since config.sh isn't necessary for the help text, skip the check when only doing --help
+CVMFS_CONFIG_SKIP_ENV_PROBE=0
+case "$1" in
+  --version|"") CVMFS_CONFIG_SKIP_ENV_PROBE=1 ;;
+esac
+# Help flags in any position also skip config.sh
+for _cvmfs_arg in "$@"; do
+  case "$_cvmfs_arg" in
+    --help|-h) CVMFS_CONFIG_SKIP_ENV_PROBE=1; break ;;
+  esac
+done
+unset _cvmfs_arg
+
+if [ $CVMFS_CONFIG_SKIP_ENV_PROBE -eq 0 ]; then
 
 if [ -f /etc/cvmfs/config.sh ]; then
   . /etc/cvmfs/config.sh
@@ -71,15 +87,18 @@ case $sys_arch in
     exit 1 ;;
 esac
 
-# This list of known parameters will be merged with all CVMFS_... environment
-# variable for cvmfs_config showconfig.  It is useful to keep this list to show
-# in cvmfs_config showconfig which known parameters are _not_ set.
+fi  # CVMFS_CONFIG_SKIP_ENV_PROBE
+
+# This list of known parameters is merged with configured variable names for
+# cvmfs_config showconfig.  By default, only configured CVMFS_ names are added;
+# showconfig --all also adds configured names without that prefix.  The list
+# lets showconfig display known parameters that are _not_ set.
 parm_list="CVMFS_USER CVMFS_NFILES CVMFS_CACHE_BASE CVMFS_CACHE_DIR CVMFS_MOUNT_DIR CVMFS_QUOTA_LIMIT \
           CVMFS_SERVER_URL CVMFS_DEBUGLOG CVMFS_HTTP_PROXY \
           CERNVM_GRID_UI_VERSION CVMFS_SYSLOG_LEVEL CVMFS_SYSLOG_FACILITY CVMFS_TRACEFILE \
           CVMFS_TIMEOUT CVMFS_TIMEOUT_DIRECT CVMFS_PUBLIC_KEY CVMFS_KEYS_DIR \
           CVMFS_MAX_TTL CVMFS_RELOAD_SOCKETS CVMFS_DEFAULT_DOMAIN CVMFS_OOM_SCORE_ADJ \
-          CVMFS_MEMCACHE_SIZE CVMFS_KCACHE_TIMEOUT CVMFS_ROOT_HASH CVMFS_REPOSITORY_TAG CVMFS_REPOSITORY_DATE CVMFS_REPOSITORIES \
+          CVMFS_OOM_SCORE_WATCHDOG CVMFS_MEMCACHE_SIZE CVMFS_KCACHE_TIMEOUT CVMFS_ROOT_HASH CVMFS_REPOSITORY_TAG CVMFS_REPOSITORY_DATE CVMFS_REPOSITORIES \
           CVMFS_PROXY_RESET_AFTER CVMFS_MAX_RETRIES CVMFS_BACKOFF_INIT CVMFS_BACKOFF_MAX \
           CVMFS_ALIEN_CACHE CVMFS_TRUSTED_CERTS CVMFS_INITIAL_GENERATION \
           CVMFS_CONFIG_REPOSITORY CVMFS_LOW_SPEED_LIMIT CVMFS_FALLBACK_PROXY CVMFS_PROXY_TEMPLATE \
@@ -266,11 +285,14 @@ cvmfs_config_usage() {
   fi
   echo "  chksetup"
   echo ""
-  echo "  showconfig [-s(hort output, only non-empty parameters)] [<repository>]"
+  echo "  showconfig [-s(hort output, only parameters set in the" \
+       "configuration)]" \
+       "[-a|--all (include configured non-CVMFS parameters)]" \
+       "[-j|--json] [<repository>|<mountpoint>]"
   echo ""
   echo "  stat [-v | <repository>]"
   echo ""
-  echo "  status [<repository list>]"
+  echo "  status [-v(erbose, force detail output)] [<repository list>]"
   echo ""
   echo "  probe [<repository list>]"
   echo ""
@@ -287,6 +309,92 @@ cvmfs_config_usage() {
   echo "  killall [-r(reset fuse) ] [-s(reset stuck fuse)]"
   echo ""
   echo "  bugreport [timeout_in_sec_per_command (default = 90)]"
+  echo ""
+  echo "  docker-run [--run] [--image I] [--proxy URL] [<repository>...]"
+}
+
+# Print usage for a single subcommand, or return 1 if unknown
+cvmfs_subcommand_usage() {
+  local cmd="$1"
+  case "$cmd" in
+    setup)
+      echo "Usage: $0 setup [nouser] [nocfgmod] [nostart] [noautofs]"
+      echo
+      echo "Set up the system for CernVM-FS (requires root)."
+      ;;
+    wsl2_start)
+      echo "Usage: $0 wsl2_start"
+      ;;
+    chksetup)
+      echo "Usage: $0 chksetup"
+      echo
+      echo "Check the CernVM-FS client setup."
+      ;;
+    showconfig)
+      echo "Usage: $0 showconfig [-s] [-a|--all] [-j|--json] [<repository>|<mountpoint>]"
+      echo
+      echo "Options:"
+      echo "  -s         short output, only parameters set in the configuration"
+      echo "  -a, --all  include configured non-CVMFS parameters"
+      echo "  -j, --json output as JSON"
+      ;;
+    stat)
+      echo "Usage: $0 stat [-v] [<repository>]"
+      echo
+      echo "Show runtime statistics of a mounted repository, or of all"
+      echo "mounted repositories if none is given."
+      echo
+      echo "Options:"
+      echo "  -v         verbose, human-readable output"
+      ;;
+    status)
+      echo "Usage: $0 status [-v] [<repository list>]"
+      echo
+      echo "Options:"
+      echo "  -v         verbose, force detail output"
+      ;;
+    probe)
+      echo "Usage: $0 probe [<repository list>]"
+      ;;
+    fsck)
+      echo "Usage: $0 fsck [-q | <cvmfs_fsck options>]"
+      echo
+      echo "Options:"
+      echo "  -q         quick check for zero byte files only"
+      ;;
+    fuser)
+      echo "Usage: $0 fuser <repository>"
+      ;;
+    reload)
+      echo "Usage: $0 reload [-c | <repository>]"
+      echo
+      echo "Options:"
+      echo "  -c         wipe the cache during reload"
+      ;;
+    umount)
+      echo "Usage: $0 umount"
+      ;;
+    wipecache)
+      echo "Usage: $0 wipecache"
+      ;;
+    killall)
+      echo "Usage: $0 killall [-r] [-s]"
+      echo
+      echo "Options:"
+      echo "  -r         reset fuse"
+      echo "  -s         reset stuck fuse"
+      ;;
+    bugreport)
+      echo "Usage: $0 bugreport [timeout_in_sec_per_command (default = 90)]"
+      ;;
+    docker-run)
+      cvmfs_docker_run --help
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+  return 0
 }
 
 has_selinux() {
@@ -366,7 +474,8 @@ cvmfs_setup() {
     esac
   done
 
-  mkdir -p /cvmfs
+  # / is read-only on macOS; the package creates /cvmfs as a firmlink
+  [ "$sys_arch" = "Darwin" ] || mkdir -p /cvmfs
   # set permissions for home dir
   mkdir -p /var/lib/cvmfs
 
@@ -462,10 +571,15 @@ cvmfs_chksetup() {
     fi
   done
 
+  local frontend=fuse3
+  case "$(get_mount_backend)" in
+    nfs)   frontend=nfs ;;
+    fskit) frontend=fskit ;;
+  esac
   if [ "$sys_arch" = "Darwin" ]; then
-    cvmfs_libs="libcvmfs_fuse.dylib libcvmfs_fuse_debug.dylib"
+    cvmfs_libs="libcvmfs_${frontend}.dylib libcvmfs_${frontend}_debug.dylib"
   else
-    cvmfs_libs="libcvmfs_fuse3.so libcvmfs_fuse3_debug.so"
+    cvmfs_libs="libcvmfs_${frontend}.so libcvmfs_${frontend}_debug.so"
   fi
   for library in $cvmfs_libs
   do
@@ -588,22 +702,30 @@ cvmfs_chksetup() {
     fi
   fi
 
-  # Check that /dev/fuse is read/writable from cvmfs user
-  if [ x"$sys_arch" = x"Darwin" ] && [ ! is_macfuse_enabled ]; then
-    if ! check_fuse_t_installation; then
-      echo "Error: FUSE-T is not installed."
-      num_errors=$(($num_errors+1))
-    fi
-  elif [ x"$sys_arch" = x"Darwin" ]; then
+  local backend=$(get_mount_backend)
+  case $backend in
+    fuse|fskit|nfs ) ;;
+    * )
+      echo "Error: invalid CVMFS_MOUNT_BACKEND=$backend (expected fuse, fskit, or nfs)"
+      num_errors=$(($num_errors+1)) ;;
+  esac
+  if [ x"$sys_arch" = x"Darwin" ] && [ "$backend" != "nfs" ]; then
     if [ ! -d /Library/Filesystems/macfuse.fs ]; then
-      echo "Error: macFUSE is missing."
+      echo "Error: macFUSE is missing (CVMFS_MOUNT_BACKEND=$backend)."
       num_errors=$(($num_errors+1))
+    elif [ "$backend" = "fskit" ]; then
+      check_macfuse_fskit
+      exit_code=$?
+      num_errors=$(($num_errors+$exit_code))
     fi
   fi
-  check_dev_fuse
-  exit_code=$?
-  if [ $exit_code -ne 0 ]; then
-    num_errors=$(($num_errors+$exit_code))
+  # Check that /dev/fuse is read/writable from cvmfs user
+  if [ "$backend" = "fuse" ]; then
+    check_dev_fuse
+    exit_code=$?
+    if [ $exit_code -ne 0 ]; then
+      num_errors=$(($num_errors+$exit_code))
+    fi
   fi
 
   # Check that /etc/nsswitch.conf is readable from cvmfs user
@@ -965,48 +1087,134 @@ cvmfs_chksetup() {
 }
 
 
+# Ensure that a string is properly escaped for JSON output
+json_string() {
+  local s=$1
+  s=${s//\\/\\\\}     # every \ becomes \\
+  s=${s//\"/\\\"}     # every " becomes \"
+  # Control characters are not allowed literally inside a JSON string
+  s=${s//$'\b'/\\b}
+  s=${s//$'\f'/\\f}
+  s=${s//$'\n'/\\n}
+  s=${s//$'\r'/\\r}
+  s=${s//$'\t'/\\t}
+  printf '"%s"' "$s"
+}
+
+cvmfs_showconfig_all_requested() {
+  local option
+  for option in "$@"; do
+    case "$option" in
+      -a|--all)
+        return 0
+      ;;
+    esac
+  done
+  return 1
+}
+
 cvmfs_showconfig() {
   local fqrn
   local org
-  local retval
   local short_output=0
-  local short_opt=
-  org=$1
-  if [ "x$org" = "x-s" ]; then
-    short_output=1
-    short_opt="-s "
-    shift 1
-    org=$1
-  fi
+  local json_output=0
+  local option
+  # Keep the arguments intact so -a/--all can be checked after configuration
+  # variables have been evaluated in this dynamic scope.
+  for option in "$@"; do
+    case "$option" in
+      -s)
+        short_output=1
+      ;;
+      -a|--all)
+        continue
+      ;;
+      -j|--json)
+        json_output=1
+      ;;
+      *)
+        org=$option
+      ;;
+    esac
+  done
 
   cvmfs_readconfig || die "Failed to read CernVM-FS configuration"
   if [ -z "$org" ]; then
     list="$(list_repos)"
-    for entry in $list
-    do
-      echo
-      echo "Running $0 $short_opt$entry:"
-      cvmfs_showconfig $short_opt$entry
-    done
+    if [ $json_output -eq 1 ]; then
+      # Emit all repositories as a JSON array of config objects - no repository argument was given
+      local first=1 entry
+      echo "["
+      for entry in $list; do
+        [ $first -eq 0 ] && echo "," # comma between JSON objects
+        # Emit a JSON object for this repository.
+        cvmfs_showconfig "$@" "$entry"
+        first=0
+      done
+      echo "]"
+    else
+      for entry in $list; do
+        echo
+        echo "Running $0" "$@" "$entry:"
+        cvmfs_showconfig "$@" "$entry"
+      done
+    fi
     return 0
   fi
 
-  fqrn=`cvmfs_mkfqrn $org`
-  org=`cvmfs_getorg $fqrn`
-  cvmfs_readconfig $fqrn || die "Failed to read CernVM-FS configuration"
-  retval=$?
-  if [ $retval -ne 0 ]; then
-    return $retval
+  local given_path="$org"
+  local mount_prefix="${CVMFS_MOUNT_DIR%/}/"
+  if [[ "$org" == "$mount_prefix"* ]]; then
+    org=${org#"$mount_prefix"}
   fi
+  org=${org%/}
+  if [[ -z "$org" || "$org" == */* ]]; then
+    die "Invalid repository path: $given_path"
+  fi
+
+  fqrn=$(cvmfs_mkfqrn "$org")
+  org=$(cvmfs_getorg "$fqrn")
+  cvmfs_readconfig "$fqrn" || die "Failed to read CernVM-FS configuration"
 
   local setting=
   local all_vars=
+  local set_vars=          # names present in the config file
+  # CVMFS_PARMS contains resolved config assignments and a header.  Collect
+  # valid shell assignment names only.
   while read setting; do
-    [ "x${setting:0:6}" != "xCVMFS_" ] && continue
-    var=$(echo "$setting" | cut -d= -f1)
-    all_vars="$all_vars $var"
+    [[ "$setting" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]] || continue
+    if ! cvmfs_showconfig_all_requested "$@"; then
+      [ "x${setting:0:6}" != "xCVMFS_" ] && continue
+    fi
+    set_vars="$set_vars ${setting%%=*}"
   done <<< "$CVMFS_PARMS"
-  all_vars="$(echo $all_vars $var_list | tr ' ' '\n' | sort -u)"
+  all_vars="$(echo $set_vars $var_list | tr ' ' '\n' | sort -u)"
+
+  if [ $json_output -eq 1 ]; then
+    # Emit this repository's configuration as a single JSON object + the repository name
+    echo "{"
+    printf '  "CVMFS_REPOSITORY_NAME": %s' "$(json_string "$fqrn")"
+    local jvar=
+    while read jvar; do
+      local value=
+      if [ "x$jvar" = "xCVMFS_CACHE_DIR" ]; then
+        # Derived in cvmfs_readconfig (unset beforehand), never from the shell.
+        value=$CVMFS_CACHE_DIR
+      elif [[ " $set_vars " == *" $jvar "* ]]; then
+        value=${!jvar}
+        value=${value//@org@/$org}
+        value=${value//@fqrn@/$fqrn}
+      fi
+      # short mode: hide only never-set parameters
+      if [ $short_output -eq 1 ] && [ -z "$value" ] \
+         && [[ " $set_vars " != *" $jvar "* ]]; then
+        continue
+      fi
+      printf ',\n  "%s": %s' "$jvar" "$(json_string "$value")"
+    done <<< "$all_vars"
+    printf '\n}\n'
+    return 0
+  fi
 
   echo "CVMFS_REPOSITORY_NAME=$fqrn"
   local var=
@@ -1020,16 +1228,19 @@ cvmfs_showconfig() {
     line=$(echo "$CVMFS_PARMS" | grep "^${var}=")
     if [ "x$line" != "x" ]; then
       if [ "x$org" != "x" ]; then
-        line=`echo "$line" | sed s/@org@/$org/g`
+        line=${line//@org@/$org}
       fi
       if [ "x$fqrn" != "x" ]; then
-        line=`echo "$line" | sed s/@fqrn@/$fqrn/g`
+        line=${line//@fqrn@/$fqrn}
       fi
       echo "$line"
     else
       [ $short_output -eq 0 ] && echo "${var}="
     fi
   done <<< "$all_vars"
+  # In short mode the loop's last command may be the failed condition above;
+  # don't let that become the function's exit status.
+  return 0
 }
 
 
@@ -1150,6 +1361,11 @@ cvmfs_stat() {
 
 cvmfs_status() {
   local list
+  local verbose=0
+  if [ "x$1" = "x-v" ]; then
+    verbose=1
+    shift
+  fi
   local repos="$@"
   list=""
 
@@ -1173,6 +1389,7 @@ cvmfs_status() {
   else
     mountpoints="$mounted_repos"
   fi
+  local non_terminal_message=false
   for mountpoint in $mountpoints
   do
     local fqrn=
@@ -1199,14 +1416,26 @@ cvmfs_status() {
       # no more detail is available on macOS
       continue
     fi
-    # provide more detail if specific repo(s) requested
+    if [ $verbose -eq 0 ] && [ ! -t 0 ]; then
+      if ! $non_terminal_message; then
+        echo "skipping detail because not running on a terminal (use -v to force)"
+        non_terminal_message=true
+      fi
+      continue
+    fi
+    # provide more detail if specific repo(s) requested interactively or via -v
     local s1="$(attr -qg host $mountpoint)"
     if [ -z "$s1" ]; then
       echo "- could not read host from $mountpoint"
       RETVAL=1
       continue
     fi
-    local last_snapshot="$(curl -s -m 5 "$s1/.cvmfs_status.json" | sed -n 's/"//g;s/,$//;s/.*last_snapshot[^ ]* //p')"
+    local proxy="$(attr -qg proxy $mountpoint)"
+    local proxy_env=
+    if [ "$proxy" != DIRECT ]; then
+      proxy_env="env http_proxy=$proxy"
+    fi
+    local last_snapshot="$($proxy_env curl -s -m 5 "$s1/.cvmfs_status.json" | sed -n 's/"//g;s/,$//;s/.*last_snapshot[^ ]* //p')"
     if [ -z "$last_snapshot" ]; then
       echo "- could not read last_snapshot from $s1/.cvmfs_status.json"
       RETVAL=1
@@ -1219,13 +1448,13 @@ cvmfs_status() {
     if [ -n "$external_host" ]; then
       echo "- external host $external_host"
     fi
-    echo "- proxy $(attr -qg proxy $mountpoint)"
+    echo "- proxy $proxy"
     echo "- host updated $(($age / 60)) minutes and $(($age % 60)) seconds ago"
     local host_list="$(attr -qg host_list $mountpoint)"
     local max_revision=0
     local max_rev_host=""
     for host in ${host_list//;/ }; do
-      local rev="$(curl -s -m 3 "$host/.cvmfspublished" | cat -v | sed -n 's/^S//p')"
+      local rev="$($proxy_env curl -s -m 3 "$host/.cvmfspublished" | cat -v | sed -n 's/^S//p')"
       # Note that later hosts are queried later so they get more time to
       # catch up. That might give them a little advantage.
       if [ -n "$rev" ] && [ "$rev" -gt $max_revision ]; then
@@ -1252,14 +1481,20 @@ cvmfs_status() {
 
 
 
+_cvmfs_is_libfuse2_pid() {
+  # libfuse2 support has been removed; the fuse3-only cvmfs_fuse3.so cannot
+  # take over a mount that is still running against libcvmfs_fuse.so, so
+  # reload must skip such mounts instead of tearing them down.
+  local pid="$1"
+  [ "x$sys_arch" = "xLinux" ] || return 1
+  [ -n "$pid" ] && [ -r "/proc/$pid/maps" ] || return 1
+  grep -qE 'libcvmfs_fuse(_debug)?\.so' "/proc/$pid/maps" 2>/dev/null
+}
+
 _cvmfs_reload_pause() {
   # Helper function to put a particular repository in sleep mode
   local mountpoint="$1"
   local debug_flag=""
- 
-  if [ "x${CVMFS_DEBUGLOG}" != "x" ]; then
-    debug_flag="--debug"
-  fi
 
   cd "$mountpoint" 2>/dev/null || return
   get_attr fqrn ${mountpoint}; fqrn=$attr_value
@@ -1269,6 +1504,20 @@ _cvmfs_reload_pause() {
     cd /
     return 1
   fi
+
+  if _cvmfs_is_libfuse2_pid "$pid"; then
+    echo "WARNING: ${fqrn} on ${mountpoint} (pid ${pid}) is still running on" \
+         "libfuse2, which is no longer supported.  Skipping reload; unmount" \
+         "and remount this repository to switch it to libfuse3." 1>&2
+    cd /
+    return 1
+  fi
+
+  cvmfs_readconfig $fqrn || die "Failed to read CernVM-FS configuration of $fqrn"
+  if [ "x${CVMFS_DEBUGLOG}" != "x" ]; then
+    debug_flag="--debug"
+  fi
+
   echo "Pausing ${fqrn} on ${mountpoint}"
   cd "$mountpoint" &&
     rm -f ${CVMFS_RELOAD_SOCKETS}/cvmfs.pause/$(echo -n "$mountpoint" | base64_nowrap) && \
@@ -1309,12 +1558,22 @@ cvmfs_reload() {
     shift
     cache_directories=$(list_cache_directories)
   elif [ "x$1" != "x" ]; then
+    org=$1
+    fqrn=$(cvmfs_mkfqrn $org)
+    cvmfs_readconfig $fqrn || die "Failed to read CernVM-FS configuration of $fqrn"
+
     if [ "x${CVMFS_DEBUGLOG}" != "x" ]; then
       debug_flag="--debug"
     fi
 
-    org=$1
-    fqrn=$(cvmfs_mkfqrn $org)
+    get_attr pid "${CVMFS_MOUNT_DIR}/${fqrn}"; pid=$attr_value
+    if _cvmfs_is_libfuse2_pid "$pid"; then
+      echo "WARNING: ${fqrn} (pid ${pid}) is still running on libfuse2," \
+           "which is no longer supported.  Refusing to reload; unmount and" \
+           "remount this repository to switch it to libfuse3." 1>&2
+      return 1
+    fi
+
     cvmfs2 __RELOAD__ ${CVMFS_RELOAD_SOCKETS}/cvmfs.$fqrn ${debug_flag}
     return $?
   fi
@@ -1333,7 +1592,11 @@ cvmfs_reload() {
 
   if [ "x$CVMFS_CONFIG_REPOSITORY" != "x" ]; then
     # Ensure that we capture the config repository as well
-    cd "${CVMFS_MOUNT_DIR}/${CVMFS_CONFIG_REPOSITORY}" 2>/dev/null
+    if ! cd "${CVMFS_MOUNT_DIR}/${CVMFS_CONFIG_REPOSITORY}" 2>/dev/null; then
+      # Not fatal: the config repo is paused separately at the end
+      echo "WARNING: cannot access config repository" \
+           "${CVMFS_MOUNT_DIR}/${CVMFS_CONFIG_REPOSITORY}" 1>&2
+    fi
   fi
   # TODO(jblomer): here is a pretty big race: fuse clients could have passed
   # the check for this directory in their mount helper but are not yet fully
@@ -1384,6 +1647,7 @@ cvmfs_reload() {
 
   if [ "x${CVMFS_CONFIG_REPOSITORY}" != "x" ]; then
     # If we have a config repository, now is the time to pause it at the very end
+    touch ${CVMFS_RELOAD_SOCKETS}/cvmfs.pause/$(echo -n "${CVMFS_MOUNT_DIR}/${CVMFS_CONFIG_REPOSITORY}" | base64_nowrap)
     _cvmfs_reload_pause "${CVMFS_MOUNT_DIR}/${CVMFS_CONFIG_REPOSITORY}" &&
       _cvmfs_reload_waitfor "${CVMFS_RELOAD_SOCKETS}/cvmfs.${CVMFS_CONFIG_REPOSITORY}.paused"
   fi
@@ -1418,6 +1682,9 @@ cvmfs_reload() {
 
   if stat ${CVMFS_RELOAD_SOCKETS}/pid.* >/dev/null 2>&1; then
     if [ "x$CVMFS_CONFIG_REPOSITORY" != "x" ]; then
+      # This is for the unlikely case that the config repo got
+      # unmounted by the autmounter between the time that the
+      # _cvmfs_reload_pause above deleted this file and now.
       touch ${CVMFS_RELOAD_SOCKETS}/cvmfs.pause/$(echo -n "${CVMFS_MOUNT_DIR}/${CVMFS_CONFIG_REPOSITORY}" | base64_nowrap)
     fi
     for pidfile in ${CVMFS_RELOAD_SOCKETS}/pid.*; do
@@ -1454,10 +1721,14 @@ cvmfs_probe() {
         cvmfs_readconfig $fqrn || die "Failed to read CernVM-FS configuration"
         echo -n "Probing $CVMFS_MOUNT_DIR/$fqrn... "
         ls "$CVMFS_MOUNT_DIR/$fqrn" > /dev/null 2>&1  # workaround for FC28+
-        if [ "$sys_arch" = "Darwin" ] && ! is_macfuse_enabled; then
+        # Not is_macfuse_fskit: re-reading the config without an fqrn would
+        # rerun default.d scripts with an empty CVMFS_FQRN
+        if [ "$sys_arch" = "Darwin" ] && [ "$CVMFS_MOUNT_BACKEND" = "fskit" ]; then
+          # FSKit mounts do not carry the cvmfs2 fsname
           df -P "$CVMFS_MOUNT_DIR/$fqrn" 2>&1 | grep -q "$fqrn"
-        else 
-          df -P "$CVMFS_MOUNT_DIR/$fqrn" 2>&1 | grep -q ^cvmfs2
+        else
+          # NFS frontend mounts show up as 127.0.0.1:/
+          df -P "$CVMFS_MOUNT_DIR/$fqrn" 2>&1 | grep -q -e ^cvmfs2 -e "^127\.0\.0\.1:/"
         fi
         if [ $? -ne 0 ]; then
           echo "Failed!"
@@ -1548,7 +1819,7 @@ cvmfs_umount() {
   for m in $mount_list
   do
     [ "x$silent" != "x" ] || echo -n "Unmounting ${m}: "
-    if [ "$sys_arch" = "Darwin" ] && ! is_macfuse_enabled; then
+    if [ "$sys_arch" = "Darwin" ] && is_nfs_mount $m; then
       umount -f $umount_options $m 2>/dev/null
     else
       umount $umount_options $m 2>/dev/null
@@ -1770,7 +2041,7 @@ cvmfs_bugreport() {
 
 
 die() {
-  echo -e $1 >&2
+  echo -e "$1" >&2
   exit 1
 }
 
@@ -1825,12 +2096,28 @@ waitfor() {
 
 list_mounts() {
   # Matches lines that begin with cvmfs2 or /usr/bin/cvmfs2 (/bin/cvmfs2,
-  # /usr/local/bin/cvmfs2) on Linux or lines that contain fuse-t on macOS
-  if [ x"$sys_arch" = x"Darwin" ] && ! is_macfuse_enabled; then
-    mount -t "nfs" | grep "fuse-t"
-  else
-    mount -t $fuse_fs_type | grep "^\(/[^[:space:]]*/\)\?cvmfs2[[:space:]]"
+  # /usr/local/bin/cvmfs2).  On macOS, NFS frontend mounts (served on
+  # 127.0.0.1:/) and FSKit mounts are listed as well.
+  mount -t $fuse_fs_type | grep "^\(/[^[:space:]]*/\)\?cvmfs2[[:space:]]"
+  if [ x"$sys_arch" = x"Darwin" ]; then
+    # FSKit ignores fsname; mounts show up as
+    # "/dev/diskN on /Volumes/cvmfs/<fqrn> (macfuse, ..., fskit)".
+    # Report them, like NFS mounts, under CVMFS_MOUNT_DIR (a link to the
+    # real directory), which is what callers compare mount points against.
+    local mount_dir="${CVMFS_MOUNT_DIR:-/cvmfs}"
+    local mount_root
+    mount_root=$(readlink "$mount_dir" 2>/dev/null)
+    [ -n "$mount_root" ] || mount_root="$mount_dir"
+    mount -t "nfs" | grep "^127\.0\.0\.1:/ on " \
+      | sed "s| on ${mount_root}/| on ${mount_dir}/|"
+    mount | grep "(macfuse,.*fskit" | grep " on ${mount_root}/" \
+      | sed "s| on ${mount_root}/| on ${mount_dir}/|"
   fi
+}
+
+
+is_nfs_mount() {
+  mount -t "nfs" | grep -q "^127\.0\.0\.1:/ on $1 "
 }
 
 
@@ -1931,7 +2218,8 @@ add_cvmfs_user() {
         sudo dscl . -create /Users/cvmfs UniqueID $uid
         sudo dscl . -create /Users/cvmfs PrimaryGroupID $gid
         sudo dscl . -create /Users/cvmfs NFSHomeDirectory "/var/lib/cvmfs"
-        sudo dscl . -passwd /Users/cvmfs "*"
+        # -passwd fails the password policy; "*" disables password login
+        sudo dscl . -create /Users/cvmfs Password "*"
 
         #Hide user from login screen
         sudo defaults write /Library/Preferences/com.apple.loginwindow HiddenUsersList -array-add cvmfs
@@ -2020,39 +2308,46 @@ check_cvmfs_user() {
   esac
 }
 
-# Expected to be ran only on macOS
-check_fuse_t_installation() {
-  local product="fuse-t"
-  local nfsV4ServerLink="/usr/local/bin/go-nfsv4"
-  local dylibPath="/usr/local/lib/lib${product}.dylib"
-  local staticLibPath="/usr/local/lib/lib${product}.a"
+# CVMFS_MOUNT_BACKEND of the global configuration, fuse if unset
+get_mount_backend() {
+  (cvmfs_readconfig > /dev/null 2>&1; echo "${CVMFS_MOUNT_BACKEND:-fuse}")
+}
 
-  # Check for existence of required files and links
-  local paths=("$nfsV4ServerLink" "$dylibPath" "$staticLibPath")
-  for path in "${paths[@]}"; do
-    if [ ! -e "$path" ]; then
-      echo "Error: Missing required file or directory: $path"
+is_macfuse_fskit() {
+  [ "$(get_mount_backend)" = "fskit" ]
+}
+
+# The FSKit backend needs macFUSE >= 5.4.0 (earlier releases fail to mount)
+# and its file system extension must have been enabled by the user.
+check_macfuse_fskit() {
+  local macfuse_min_version=5.4.0
+  local macfuse_app=/Library/Filesystems/macfuse.fs/Contents/Resources/macfuse.app
+  local plist=/Library/Filesystems/macfuse.fs/Contents/version.plist
+  local version=$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' $plist 2>/dev/null)
+  if [ x"$version" = x ]; then
+    echo "Error: cannot determine macFUSE version from $plist"
+    return 1
+  fi
+  if ! compare_versions "$version" -ge "$macfuse_min_version"; then
+    echo "Error: macFUSE $version is installed but the FSKit backend requires >= $macfuse_min_version"
+    return 1
+  fi
+  local appex
+  for appex in $macfuse_app/Contents/Extensions/io.macfuse.app.fsmodule.macfuse.appex \
+               $macfuse_app/Contents/Extensions/io.macfuse.app.fsmodule.macfuse-local.appex
+  do
+    if [ ! -d "$appex" ]; then
+      echo "Error: macFUSE FSKit module $appex is missing"
       return 1
     fi
   done
-  return 0
-}
-
-is_macfuse_enabled() {
-  if [ x"$CVMFS_USE_MACFUSE_KEXT" = x ]; then
-    return 1
+  # pluginkit only sees extensions of the console user's session, so this
+  # is a warning rather than an error
+  if ! pluginkit -m -i io.macfuse.app.fsmodule.macfuse 2>/dev/null | grep -q '^+'; then
+    echo "Warning: the macFUSE file system extension does not appear to be enabled"
+    echo "         (System Settings > General > Login Items & Extensions > File System Extensions)"
   fi
-  local value=$(echo "$CVMFS_USE_MACFUSE_KEXT" | tr '[:upper:]' '[:lower:]')
-  case "$value" in
-    yes|on|1|true)
-      return 0 ;;
-    no|off|0|false)
-      return 1 ;;
-    *)
-      echo "Error: invalid value of CVMFS_USE_MACFUSE_KEXT: $CVMFS_USE_MACFUSE_KEXT"
-      echo "Valid values are: yes, on, 1, true, no, off, 0, false"
-      return 1 ;;
-  esac
+  return 0
 }
 
 check_dev_fuse() {
@@ -2064,10 +2359,6 @@ check_dev_fuse() {
       charDevice=/dev/fuse ;;
 
     Darwin )
-      if ! is_macfuse_enabled; then
-      # Since we rely on user-space FUSE-T now the check for /dev/<device_name> isn't necessary
-        exit 0
-      fi
       charDevice=/dev/macfuse ;;
     * )
      echo "Architecture $sys_arch is not supported"
@@ -2253,19 +2544,42 @@ EOF
     ;;
 
    Darwin )
-     # Since MacOS 10.15 Catalina it is not possible anymore (without disabling
-     # SIP) create directory in root `/`.
-     # We decide to move the standard installation directory on
-     # `/Users/shared/cvmfs` instead of `/cvmfs`
-     # In order to keep the standard CVMFS mountpoint, we decide to implement
-     # firmlinks from `/cvmfs` to `/Users/shared/cvmfs`
+     # Since macOS 10.15 / is read-only, so /cvmfs is a synthetic firmlink.
+     # Its target is /Volumes/cvmfs for every backend: FSKit mounts have to
+     # live under /Volumes, and unprivileged users create their mount points
+     # there.
      if compare_versions $(sw_vers -productVersion) -ge "10.15"; then
-        mkdir -p /Users/shared/cvmfs
-        chown cvmfs:cvmfs /Users/shared/cvmfs
-        chmod 777 /Users/shared/cvmfs
+        mkdir -p /Volumes/cvmfs
+        chmod 777 /Volumes/cvmfs
+        local firmlink_target=/Volumes/cvmfs
+        # Compatibility symlink: repos may contain absolute symlinks
+        # pointing to /Users/Shared/cvmfs/...  An older setup leaves a real
+        # directory behind, which silently shadows the symlink and makes
+        # every such repository symlink dangle.
+        if [ -L /Users/Shared/cvmfs ]; then
+          if [ "$(readlink /Users/Shared/cvmfs)" != /Volumes/cvmfs ]; then
+            rm -f /Users/Shared/cvmfs
+            ln -s /Volumes/cvmfs /Users/Shared/cvmfs
+          fi
+        elif [ -d /Users/Shared/cvmfs ]; then
+          # Only replace it if nothing but empty mount points is left in it
+          rmdir /Users/Shared/cvmfs/* 2>/dev/null
+          if rmdir /Users/Shared/cvmfs 2>/dev/null; then
+            ln -s /Volumes/cvmfs /Users/Shared/cvmfs
+          else
+            echo "Warning: /Users/Shared/cvmfs is a non-empty directory."
+            echo "Repositories with absolute symlinks into /Users/Shared/cvmfs"
+            echo "will not resolve.  Unmount, remove it and re-run 'cvmfs_config setup'."
+          fi
+        elif [ ! -e /Users/Shared/cvmfs ]; then
+          ln -s /Volumes/cvmfs /Users/Shared/cvmfs
+        fi
         if ! grep -q "^cvmfs\t" /etc/synthetic.conf 2> /dev/null ; then
           echo -e "# The line below was autogenerated by CernVM-FS, do not delete nor edit" >> /etc/synthetic.conf
-          echo -e "cvmfs\t/Users/Shared/cvmfs" >> /etc/synthetic.conf
+          echo -e "cvmfs\t${firmlink_target}" >> /etc/synthetic.conf
+        else
+          # Update existing firmlink target if it changed
+          sed -i '' "s|^cvmfs\t.*|cvmfs\t${firmlink_target}|" /etc/synthetic.conf
         fi
         # reload synthetic.conf - seems to return nonzero status code even on success
         /System/Library/Filesystems/apfs.fs/Contents/Resources/apfs.util -t || true
@@ -2356,8 +2670,78 @@ check_is_on() {
 }
 
 
+# Stat the given file in a cross-platform way, returning
+# "<owner> <group> <octal_perms>" (space separated) on stdout.
+_stat_owner_group_perms() {
+  local file="$1"
+  case $sys_arch in
+    Linux )
+      stat -c '%U %G %a' "$file" 2>/dev/null ;;
+    Darwin )
+      stat -f '%Su %Sg %Lp' "$file" 2>/dev/null ;;
+  esac
+}
+
+# Best-effort check that $user has mode bit $bit (4=r, 2=w) on $file
+# based on owner/group/other octal permissions. Does not account for
+# ACLs or parent-directory traversal permissions.
+_check_mode_bit() {
+  local file="$1"
+  local user="$2"
+  local bit="$3"
+  local owner group perms
+  [ -e "$file" ] || return 1
+  read -r owner group perms < <(_stat_owner_group_perms "$file") || return 1
+  [ -n "$perms" ] || return 1
+  while [ ${#perms} -lt 3 ]; do perms="0$perms"; done
+  local len=${#perms}
+  local digit
+  if [ "$user" = "$owner" ]; then
+    digit=${perms:$((len-3)):1}
+  elif id -Gn "$user" 2>/dev/null | tr ' ' '\n' | grep -qxF "$group"; then
+    digit=${perms:$((len-2)):1}
+  else
+    digit=${perms:$((len-1)):1}
+  fi
+  [ $(( digit & bit )) -ne 0 ]
+}
+
+check_readable() { _check_mode_bit "$1" "${2:-$(id -un)}" 4; }
+check_writable() { _check_mode_bit "$1" "${2:-$(id -un)}" 2; }
+
+check_owned_by() {
+  local file="$1"
+  local user="${2:-$(id -un)}"
+  local owner _g _p
+  [ -e "$file" ] || return 1
+  read -r owner _g _p < <(_stat_owner_group_perms "$file") || return 1
+  [ "$user" = "$owner" ]
+}
+
 runascvmfsuser() {
   local cmd=$1
+
+  # Without root we cannot su to CVMFS_USER. In rootless operation the
+  # invoking user is the one who will actually access cvmfs, so dispatch
+  # 'test -X PATH' probes to stat-based helpers targeting the current
+  # user. Anything else just runs as the current user.
+  if [ "$(id -u)" -ne 0 ]; then
+    if [[ "$cmd" =~ ^[[:space:]]*test[[:space:]]+-([rwOde])[[:space:]]+(.+)$ ]]; then
+      local op="${BASH_REMATCH[1]}"
+      local path="${BASH_REMATCH[2]}"
+      path="${path%"${path##*[![:space:]]}"}"
+      case "$op" in
+        r) check_readable "$path" ;;
+        w) check_writable "$path" ;;
+        O) check_owned_by "$path" ;;
+        d) [ -d "$path" ] ;;
+        e) [ -e "$path" ] ;;
+      esac
+      return $?
+    fi
+    sh -c "$cmd"
+    return $?
+  fi
 
   if [ -z "$CVMFS_USER" ]; then
     return 1
@@ -2513,6 +2897,116 @@ _usrlocal_migrate() {
   __usrlocal_migrate_clean_legacy_sudoers
 }
 
+cvmfs_docker_run() {
+  local runtime=""
+  local image=""
+  local name="cvmfs"
+  local mountpoint="/cvmfs"
+  local profile="single"
+  local proxy=""
+  local do_run=0
+
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --run)        do_run=1 ;;
+      --runtime)    runtime="$2"; shift ;;
+      --image)      image="$2"; shift ;;
+      --name)       name="$2"; shift ;;
+      --mountpoint) mountpoint="$2"; shift ;;
+      --profile)    profile="$2"; shift ;;
+      --proxy)      proxy="$2"; shift ;;
+      -h|--help)
+        echo "Usage: $0 docker-run [options] [repository...]"
+        echo
+        echo "Print (or run with --run) the invocation that starts the CernVM-FS"
+        echo "service container. Without a repository the container uses automount"
+        echo "mode; listing repositories pre-mounts them (explicit mode)."
+        echo
+        echo "Options:"
+        echo "  --run                    execute the command instead of printing it"
+        echo "  --image IMAGE            container image (default cvmfs/service:<client version>)"
+        echo "  --name NAME              container name (default cvmfs)"
+        echo "  --mountpoint DIR         host directory shared in as /cvmfs (default /cvmfs)"
+        echo "  --profile PROFILE        CVMFS_CLIENT_PROFILE value (default single)"
+        echo "  --proxy URL              CVMFS_HTTP_PROXY value"
+        echo "  --runtime docker|podman  container CLI (default: autodetect)"
+        return 0
+        ;;
+      -*) echo "docker-run: unknown option: $1" >&2; return 1 ;;
+      *)  break ;;
+    esac
+    shift
+  done
+
+  local repos="$(echo "$*" | tr ' ' ',')"
+
+  if [ -z "$runtime" ]; then
+    if which docker >/dev/null 2>&1; then
+      runtime=docker
+    elif which podman >/dev/null 2>&1; then
+      runtime=podman
+    else
+      echo "docker-run: neither docker nor podman found; use --runtime" >&2
+      return 1
+    fi
+  fi
+
+  if [ -z "$image" ]; then
+    local version="$(cvmfs2 --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)"
+    image="cvmfs/service:${version:-latest}"
+  fi
+
+  # Assemble the invocation line by line so the printed form is copy-pasteable.
+  local nl=$'\n'
+  local cmd="$runtime run -d --name $name \\$nl"
+  cmd="$cmd  -e CVMFS_CLIENT_PROFILE=$profile \\$nl"
+  [ -n "$proxy" ] && cmd="$cmd  -e CVMFS_HTTP_PROXY=$proxy \\$nl"
+  [ -n "$repos" ] && cmd="$cmd  -e CVMFS_REPOSITORIES=$repos \\$nl"
+  cmd="$cmd  --cap-add SYS_ADMIN \\$nl"
+  # SYS_RESOURCE lets cvmfs2 raise RLIMIT_NOFILE for the system_mount option
+  # used by autofs-spawned mounts.
+  cmd="$cmd  --cap-add SYS_RESOURCE \\$nl"
+  cmd="$cmd  --device /dev/fuse \\$nl"
+  cmd="$cmd  --security-opt apparmor=unconfined \\$nl"
+  # SELinux-enforcing hosts deny the container's autofs/fuse mounts (the denial
+  # is dontaudit'd, so it surfaces only as a failed mount) unless it runs
+  # unlabeled.
+  if has_selinux; then
+    cmd="$cmd  --security-opt label=disable \\$nl"
+  fi
+  # A shared bind mount is what lets repositories mounted inside the container
+  # propagate back out to $mountpoint on the host.
+  cmd="$cmd  -v $mountpoint:/cvmfs:rshared \\$nl"
+  cmd="$cmd  $image"
+
+  if [ $do_run -eq 0 ]; then
+    echo "# host preparation (run once, as root): make $mountpoint a shared mount"
+    echo "mount --bind $mountpoint $mountpoint && mount --make-shared $mountpoint"
+    echo
+    echo "# start the service container:"
+    echo "$cmd"
+    return 0
+  fi
+
+  if [ $(id -u) -ne 0 ]; then
+    echo "docker-run --run: root privileges required" >&2
+    return 1
+  fi
+  mkdir -p "$mountpoint"
+  mountpoint -q "$mountpoint" || mount --bind "$mountpoint" "$mountpoint"
+  mount --make-shared "$mountpoint"
+  eval "$cmd"
+}
+
+# Intercept subcommand help flags before dispatching and root checks.
+for _cvmfs_arg in "${@:2}"; do
+  case "$_cvmfs_arg" in
+    --help|-h) cvmfs_subcommand_usage "$1" || cvmfs_config_usage; exit 0 ;;
+  esac
+done
+unset _cvmfs_arg
+
+
 case "$1" in
   setup)
     if [ `id -u` -ne 0 ]; then
@@ -2525,10 +3019,6 @@ case "$1" in
     ;;
 
   chksetup)
-    if [ `id -u` -ne 0 ]; then
-      echo "root privileges required"
-      exit 1
-    fi
     shift 1
     cvmfs_chksetup
     RETVAL=$?
@@ -2553,7 +3043,8 @@ case "$1" in
     ;;
 
   reload)
-    if [ `id -u` -ne 0 ]; then
+    # macOS mounts are unprivileged and owned by the mounting user
+    if [ `id -u` -ne 0 ] && [ "$sys_arch" != "Darwin" ]; then
       echo "root privileges required"
       exit 1
     fi
@@ -2623,6 +3114,12 @@ case "$1" in
      RETVAL=$?
      ;;
 
+  docker-run)
+     shift 1
+     cvmfs_docker_run $@
+     RETVAL=$?
+     ;;
+
    wsl2_start)
      shift 1
      cvmfs_wsl2_start $@
@@ -2630,7 +3127,11 @@ case "$1" in
      ;;
 
    --version)
-     echo $(cvmfs2 --version)
+     if command -v cvmfs2 >/dev/null 2>&1; then
+       echo $(cvmfs2 --version)
+     else
+       echo "cvmfs_config (CernVM-FS)"
+     fi
      RETVAL=0
      ;;
    --help)

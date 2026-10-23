@@ -26,6 +26,17 @@ struct GatewayKey {
 
 int APIVersion();
 
+// API version required for --allow-nonexistent-path. The receiver creates
+// missing lease ancestors during the catalog merge.
+const int kApiVersionNonexistentPath = 4;
+
+std::string SessionTokenApiVersionPath(const std::string &token_path);
+std::string MakeSessionTokenApiVersionRecord(int api_version,
+                                             const std::string &token);
+bool ParseSessionTokenApiVersionRecord(const std::string &record,
+                                       const std::string &token,
+                                       int *api_version);
+
 GatewayKey ReadGatewayKey(const std::string &key_file_name);
 
 bool ReadKeys(const std::string &key_file_name, std::string *key_id,

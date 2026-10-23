@@ -95,7 +95,9 @@ __do_snapshot() {
     fi
 
     if ! acquire_update_lock $alias_name snapshot $abort_on_conflict; then
-      retcode=1
+      if [ $abort_on_conflict -lt 2 ]; then
+        retcode=1
+      fi
       continue
     fi
 
@@ -137,6 +139,24 @@ __do_snapshot() {
       with_reflog="-R $(get_reflog_checksum $alias_name)"
     is_stratum0_garbage_collectable $alias_name &&
       timestamp_threshold="-Z $gc_timespan"
+    local partial_replication_flag=""
+    if [ x"$CVMFS_PARTIAL_REPLICATION" = x"true" ]; then
+      if [ -z "$CVMFS_PARTIAL_REPLICATION_SPEC" ]; then
+        die "CVMFS_PARTIAL_REPLICATION is true but CVMFS_PARTIAL_REPLICATION_SPEC is not set"
+      fi
+      if [ ! -f "$CVMFS_PARTIAL_REPLICATION_SPEC" ]; then
+        die "Partial replication spec file not found: $CVMFS_PARTIAL_REPLICATION_SPEC"
+      fi
+      echo "Partial replication enabled (spec: $CVMFS_PARTIAL_REPLICATION_SPEC)"
+      partial_replication_flag="-E $CVMFS_PARTIAL_REPLICATION_SPEC"
+      # An existing catalog does not imply that objects newly included by a
+      # changed spec have been replicated. Revisit it even if HEAD is unchanged.
+      if ! read_repo_item "$alias_name" .cvmfs_partial_replication | \
+           cmp -s "$CVMFS_PARTIAL_REPLICATION_SPEC" -; then
+        echo "Inclusion spec changed, revisiting existing catalogs"
+        partial_replication_flag="$partial_replication_flag -z"
+      fi
+    fi
     $user_shell "$(__swissknife_cmd dbg) pull -m $name \
         -u $stratum0                                   \
         -w $stratum1                                   \
@@ -146,7 +166,8 @@ __do_snapshot() {
         -n $num_workers                                \
         -t $timeout                                    \
         -a $retries $with_history $with_reflog         \
-           $initial_snapshot_flag $timestamp_threshold $log_level"
+           $initial_snapshot_flag $timestamp_threshold  \
+           $partial_replication_flag $log_level"
 
     update_repo_status $alias_name last_snapshot "`date --utc`"
 
@@ -317,7 +338,7 @@ __do_all_snapshots() {
     # See https://lists.gnu.org/archive/html/bug-bash/2012-12/msg00093.html
     set +e
     (set -e
-    __do_snapshot $repo 1
+    __do_snapshot $repo 2
     )
     if [ $? != 0 ]; then
       echo "ERROR from cvmfs_server snapshot!" >&2

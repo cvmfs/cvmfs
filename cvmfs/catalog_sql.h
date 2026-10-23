@@ -16,10 +16,6 @@
 #ifndef CVMFS_CATALOG_SQL_H_
 #define CVMFS_CATALOG_SQL_H_
 
-#ifndef __STDC_FORMAT_MACROS
-#define __STDC_FORMAT_MACROS
-#endif
-
 #include <inttypes.h>
 
 #include <string>
@@ -34,6 +30,10 @@
 class XattrList;
 
 namespace catalog {
+
+// Set to false via CVMFS_NO_IGNORE_LEGACY_BULKHASHES env var to restore the
+// pre-2.14 behavior of including bulk hashes for chunked files.
+extern bool g_ignore_legacy_bulk_hashes;
 
 class Catalog;
 
@@ -209,6 +209,17 @@ class SqlDirent : public SqlCatalog {
    * For regular files, indicates that the file should be opened with direct I/O
    */
   static const int kFlagDirectIo = 0x10000;  // 2^16
+  /**
+   * For regular files, indicates that this file has an attached file bundle
+   * list, that should be prefetched upon opening the file.
+   */
+  static const int kFlagBundleTrigger = 0x20000;  // 2^17
+  /**
+   * For regular files, indicates that the cached object should be evicted
+   * before non-volatile objects (per-file equivalent of the repo-level
+   * 'volatile' property).
+   */
+  static const int kFlagFileVolatile = 0x40000;  // 2^18
 
 
  protected:

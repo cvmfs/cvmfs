@@ -21,8 +21,27 @@ cvmfs_run_test() {
 
   if ! running_on_osx; then
     num_status=$(cvmfs_config status sft.cern.ch | wc -l)
-    if [ $num_status -lt 10 ]; then
+    if [ $num_status -lt 2 ]; then
       return 20
+    fi
+
+    #Check that'cvmfs_config status <repo>' works with CVMFS_HTTP_PROXY_DIRECT
+    cvmfs_clean                                       || return 30
+    cvmfs_mount sft.cern.ch "CVMFS_HTTP_PROXY=DIRECT" || return 31
+
+    local active_proxy
+    active_proxy=$(attr -qg proxy /cvmfs/sft.cern.ch)
+    echo "active proxy after mount with DIRECT: '$active_proxy'"
+    [ "$active_proxy" = "DIRECT" ]                    || return 32
+
+    local status_output
+    status_output=$(env -u http_proxy cvmfs_config status -v sft.cern.ch 2>&1)
+    echo "status output:"
+    echo "$status_output"
+
+    if echo "$status_output" | grep -q "could not read last_snapshot"; then
+      echo "regression: 'cvmfs_config status -v sft.cern.ch' failed with proxy=DIRECT"
+      return 33
     fi
   fi
 

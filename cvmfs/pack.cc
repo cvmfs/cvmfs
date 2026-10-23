@@ -9,7 +9,6 @@
 #include <cstring>
 #include <map>
 
-#include "util/concurrency.h"
 #include "util/exception.h"
 #include "util/platform.h"
 #include "util/smalloc.h"

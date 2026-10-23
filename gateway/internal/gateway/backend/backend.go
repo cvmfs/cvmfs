@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"time"
 
 	gw "github.com/cvmfs/gateway/internal/gateway"
 	"github.com/cvmfs/gateway/internal/gateway/receiver"
@@ -30,9 +31,11 @@ type ActionController interface {
 	NewLease(ctx context.Context, keyID, leasePath, hostname string, protocolVersion int) (string, error)
 	GetLeases(ctx context.Context) (map[string]LeaseDTO, error)
 	GetLease(ctx context.Context, tokenStr string) (*LeaseDTO, error)
+	RefreshLease(ctx context.Context, tokenStr string, requestedExtension time.Duration) (*LeaseDTO, error)
 	CancelLeases(ctx context.Context, repoPath string) error
 	CancelLease(ctx context.Context, tokenStr string) error
 	CommitLease(ctx context.Context, tokenStr, oldRootHash, newRootHash string, tag gw.RepositoryTag) (uint64, error)
+	GraftLease(ctx context.Context, tokenStr, oldRootHash, newRootHash string, tag gw.RepositoryTag) (uint64, error)
 	SubmitPayload(ctx context.Context, token string, payload io.Reader, digest string, headerSize int) error
 	RunGC(ctx context.Context, options GCOptions) (string, error)
 	PublishManifest(ctx context.Context, repository string, message NotificationMessage)

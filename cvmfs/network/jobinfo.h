@@ -11,19 +11,14 @@
 #include <unistd.h>
 
 #include <cstdio>
-#include <map>
-#include <set>
+#include <memory>
 #include <string>
-#include <vector>
 
 #include "compression/compression.h"
 #include "crypto/hash.h"
-#include "duplex_curl.h"
+#include "duplex_curl.h"  // IWYU pragma: keep
 #include "network/network_errors.h"
 #include "network/sink.h"
-#include "network/sink_file.h"
-#include "network/sink_mem.h"
-#include "network/sink_path.h"
 #include "util/pipe.h"
 #include "util/tube.h"
 
@@ -34,7 +29,12 @@ namespace download {
 enum DataTubeAction {
   kActionStop = 0,
   kActionContinue,
-  kActionDecompress
+  kActionDecompress,
+  // Marks the boundary of a superseded download attempt (retry / host
+  // fail-over). When the caller pops this it must discard the bytes it has
+  // decompressed so far, reset its sink and zstream, and clear any
+  // decompression error before processing the bytes of the next attempt.
+  kActionReset
 };
 
 /**
@@ -54,7 +54,7 @@ struct DataTubeElement : SingleCopy {
   DataTubeElement(char *mov_data, size_t xsize, DataTubeAction xact)
       : data(mov_data), size(xsize), action(xact) { }
 
-  ~DataTubeElement() { delete data; }
+  ~DataTubeElement() { delete[] data; }
 };
 
 /**
@@ -62,13 +62,13 @@ struct DataTubeElement : SingleCopy {
  */
 class JobInfo {
  private:
-  static atomic_int64 next_uuid;
+  static std::atomic<int64_t> next_uuid;
   int64_t id_;
   /// Pipe used for the return value
-  UniquePtr<Pipe<kPipeDownloadJobsResults> > pipe_job_results;
+  std::unique_ptr<Pipe<kPipeDownloadJobsResults> > pipe_job_results;
   /// Tube (bounded thread-safe queue) to transport data from CURL callback
   /// to be decompressed in Fetch() instead of MainDownload()
-  UniquePtr<Tube<DataTubeElement> > data_tube_;
+  std::unique_ptr<Tube<DataTubeElement> > data_tube_;
   const std::string *url_;
   bool compressed_;
   bool probe_hosts_;
@@ -82,7 +82,7 @@ class JobInfo {
   InterruptCue *interrupt_cue_;
   cvmfs::Sink *sink_;
   const shash::Any *expected_hash_;
-  const std::string *extra_info_;
+  const std::string *path_info_;
 
   // Allow byte ranges to be specified.
   off_t range_offset_;
@@ -130,22 +130,26 @@ class JobInfo {
   JobInfo(const std::string *u, const bool ph);
 
   ~JobInfo() {
-    pipe_job_results.Destroy();
-    data_tube_.Destroy();
+    pipe_job_results.reset();
+    data_tube_.reset();
   }
+
+  static bool EscapeUrlChar(unsigned char input, char output[3]);
 
   void CreatePipeJobResults() {
-    pipe_job_results = new Pipe<kPipeDownloadJobsResults>();
+    pipe_job_results = std::unique_ptr<Pipe<kPipeDownloadJobsResults> >(
+        new Pipe<kPipeDownloadJobsResults>());
   }
 
-  bool IsValidPipeJobResults() { return pipe_job_results.IsValid(); }
+  bool IsValidPipeJobResults() { return pipe_job_results.get() != nullptr; }
 
   void CreateDataTube() {
     // TODO(heretherebedragons) change to weighted queue
-    data_tube_ = new Tube<DataTubeElement>(500);
+    data_tube_ = std::unique_ptr<Tube<DataTubeElement> >(
+        new Tube<DataTubeElement>(500));
   }
 
-  bool IsValidDataTube() { return data_tube_.IsValid(); }
+  bool IsValidDataTube() { return data_tube_.get() != nullptr; }
 
   /**
    * Tells whether the error is because of a non-existing file. Should only
@@ -164,9 +168,9 @@ class JobInfo {
   CURL **GetCurlHandle() { return &curl_handle_; }
   shash::ContextPtr *GetHashContextPtr() { return &hash_context_; }
   Pipe<kPipeDownloadJobsResults> *GetPipeJobResultPtr() {
-    return pipe_job_results.weak_ref();
+    return pipe_job_results.get();
   }
-  Tube<DataTubeElement> *GetDataTubePtr() { return data_tube_.weak_ref(); }
+  Tube<DataTubeElement> *GetDataTubePtr() { return data_tube_.get(); }
 
   const std::string *url() const { return url_; }
   bool compressed() const { return compressed_; }
@@ -181,7 +185,7 @@ class JobInfo {
   InterruptCue *interrupt_cue() const { return interrupt_cue_; }
   cvmfs::Sink *sink() const { return sink_; }
   const shash::Any *expected_hash() const { return expected_hash_; }
-  const std::string *extra_info() const { return extra_info_; }
+  const std::string *path_info() const { return path_info_; }
 
   off_t range_offset() const { return range_offset_; }
   off_t range_size() const { return range_size_; }
@@ -212,7 +216,7 @@ class JobInfo {
   bool allow_failure() const { return allow_failure_; }
   int64_t id() const { return id_; }
 
-
+  std::string GetInfoHeaderContents(const std::string &templ);
   void SetUrl(const std::string *url) { url_ = url; }
   void SetCompressed(bool compressed) { compressed_ = compressed; }
   void SetProbeHosts(bool probe_hosts) { probe_hosts_ = probe_hosts; }
@@ -221,9 +225,6 @@ class JobInfo {
     follow_redirects_ = follow_redirects;
   }
   void SetForceNocache(bool force_nocache) { force_nocache_ = force_nocache; }
-  void SetPid(pid_t pid) { pid_ = pid; }
-  void SetUid(uid_t uid) { uid_ = uid; }
-  void SetGid(gid_t gid) { gid_ = gid; }
   void SetCredData(void *cred_data) { cred_data_ = cred_data; }
   void SetInterruptCue(InterruptCue *interrupt_cue) {
     interrupt_cue_ = interrupt_cue;
@@ -232,7 +233,7 @@ class JobInfo {
   void SetExpectedHash(const shash::Any *expected_hash) {
     expected_hash_ = expected_hash;
   }
-  void SetExtraInfo(const std::string *extra_info) { extra_info_ = extra_info; }
+  void SetPathInfo(const std::string *path_info) { path_info_ = path_info; }
 
   void SetRangeOffset(off_t range_offset) { range_offset_ = range_offset; }
   void SetRangeSize(off_t range_size) { range_size_ = range_size; }

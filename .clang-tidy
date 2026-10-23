@@ -3,6 +3,7 @@ HeaderFilterRegex: 'cvmfs\/[a-zA-Z0-9_]*\.h$'
 WarningsAsErrors: '*'
 Checks: -*
    ,misc-const-correctness
+   ,-misc-include-cleaner
 #TODO(vvolkl): re-enable one by one when fixed in code base
 #  ,bugprone-*
 #  ,-bugprone-easily-swappable-parameters
@@ -16,7 +17,6 @@ Checks: -*
 #  ,google-*
 #  ,-google-readability-avoid-underscore-in-googletest-name
 #  ,misc-*
-#  ,-misc-include-cleaner
 #  ,-misc-static-assert
 #  ,-misc-no-recursion
 #  ,-misc-non-private-member-variables-in-classes

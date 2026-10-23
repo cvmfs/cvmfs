@@ -98,8 +98,14 @@ cvmfs_server_resign() {
 
       else
 
+        local wl="$(get_upstream_config $CVMFS_UPSTREAM_STORAGE)/.cvmfswhitelist"
+        local crt=/etc/cvmfs/keys/$name.crt
+        if [ ! -f "$wl" ] || [ -f "$crt" ]; then
+          # create from scratch
+          wl=""
+        fi
         create_whitelist $name $CVMFS_USER \
-            ${CVMFS_UPSTREAM_STORAGE} ${CVMFS_SPOOL_DIR}/tmp "$expire_days"
+            ${CVMFS_UPSTREAM_STORAGE} ${CVMFS_SPOOL_DIR}/tmp "$expire_days" $wl
 
       fi
     else

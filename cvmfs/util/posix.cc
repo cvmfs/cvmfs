@@ -4,11 +4,6 @@
  * Some common functions.
  */
 
-#ifndef __STDC_FORMAT_MACROS
-// NOLINTNEXTLINE
-#define __STDC_FORMAT_MACROS
-#endif
-
 #include <cctype>
 #include <stdlib.h>
 #include <cstdlib>
@@ -62,6 +57,7 @@
 #include <vector>
 
 #include "util/algorithm.h"
+#include "util/capabilities.h"
 #include "util/exception.h"
 #include "util/fs_traversal.h"
 #include "util/logging.h"
@@ -307,6 +303,7 @@ void CreateFile(const std::string &path,
  * Symlinks /tmp/cvmfs.XYZ/l --> ParentPath(path) to make it shorter
  */
 static std::string MakeShortSocketLink(const std::string &path) {
+  //NOLINTNEXTLINE(misc-const-correctness)
   struct sockaddr_un sock_addr;
   const unsigned max_length = sizeof(sock_addr.sun_path);
 
@@ -783,6 +780,7 @@ std::string GetHostname() {
 
 /**
  * set(e){g/u}id wrapper.
+ * If temporarily is true, reserve the ability to switch back.
  *
  * avoid_mutexes: if true, means that we are a forked child and must not use
  * mutexes.
@@ -802,11 +800,16 @@ bool SwitchCredentials(const uid_t uid, const gid_t gid, const bool temporarily,
     if ((retval == 0) && (uid != geteuid()))
       retval = seteuid(uid);
   } else {
-    // If effective uid is not root, we must first gain root access back
-    if ((getuid() == 0) && (getuid() != geteuid())) {
-      retval = SwitchCredentials(0, getgid(), true);
-      if (!retval)
-        return false;
+    // If effective uid is not root, we probably need setuid+setgid
+    // capabilities first
+    if (geteuid() != 0) {
+      retval = ObtainSetuidgidCapabilities(avoid_mutexes);
+      if (!retval && !avoid_mutexes) {
+        LogCvmfs(kLogCvmfs, kLogDebug,
+          "unable to obtain setuid & setgid capabilities first");
+      }
+      // The setuid below will drop the capability again unless
+      // switching to root or keepcaps has been enabled.
     }
     retval = setgid(gid) || setuid(uid);
   }
@@ -1515,6 +1518,18 @@ void GetLimitNoFile(unsigned *soft_limit, unsigned *hard_limit) {
 }
 
 
+/**
+ * Sets soft and hard limit for maximum core size
+ */
+bool SetLimitCore(unsigned limit_core) {
+  struct rlimit rpl;
+  memset(&rpl, 0, sizeof(rpl));
+  rpl.rlim_max = limit_core;
+  rpl.rlim_cur = limit_core;
+  return (setrlimit(RLIMIT_CORE, &rpl) == 0);
+}
+
+
 std::vector<LsofEntry> Lsof(const std::string &path) {
   std::vector<LsofEntry> result;
 
@@ -1833,10 +1848,10 @@ struct ForkFailures {  // TODO(rmeusel): C++11 (type safe enum)
  *  Loop through all possible FDs and close them.
  */
 static bool CloseAllFildesUntilMaxFD(const std::set<int> &preserve_fildes,
-                                     int max_fd) {
-  for (int fd = 0; fd < max_fd; fd++) {
-    if (preserve_fildes.count(fd) == 0) {
-      close(fd);
+                                     long max_fd) {  // NOLINT(runtime/int)
+  for (long fd = 0; fd < max_fd; fd++) {  // NOLINT(runtime/int)
+    if (preserve_fildes.count(static_cast<int>(fd)) == 0) {
+      close(static_cast<int>(fd));
     }
   }
 
@@ -1844,12 +1859,13 @@ static bool CloseAllFildesUntilMaxFD(const std::set<int> &preserve_fildes,
 }
 
 /**
- * Loop through /proc/self/fd and close the listed FDs.
- * Not used on macOS.
+ * Enumerate currently open file descriptors via a procfs-like directory
+ * (/proc/self/fd on Linux, /dev/fd on macOS) and close the ones not in
+ * preserve_fildes.
  */
-#ifndef __APPLE__
-static bool CloseAllFildesInProcSelfFd(const std::set<int> &preserve_fildes) {
-  DIR *dirp = opendir("/proc/self/fd");
+static bool CloseAllFildesInFdDir(const char *fd_dir,
+                                  const std::set<int> &preserve_fildes) {
+  DIR *dirp = opendir(fd_dir);
   if (!dirp)
     return false;
 
@@ -1876,29 +1892,29 @@ static bool CloseAllFildesInProcSelfFd(const std::set<int> &preserve_fildes) {
 
   return true;
 }
-#endif
 
 /**
  * Closes all file descriptors except the ones in preserve_fildes.
  * To be used after fork but before exec.
  */
 bool CloseAllFildes(const std::set<int> &preserve_fildes) {
-  const int max_fd = static_cast<int>(sysconf(_SC_OPEN_MAX));
+  const long max_fd = sysconf(_SC_OPEN_MAX);  // NOLINT(runtime/int)
   if (max_fd < 0) {
     return false;
   }
 
-#ifdef __APPLE__
-  return CloseAllFildesUntilMaxFD(preserve_fildes, max_fd);
-#else   // ifdef __APPLE__
+  // When RLIMIT_NOFILE is unbounded (sysconf returns LONG_MAX) or simply very
+  // large, iterating [0, max_fd) is impractical.  Enumerate the actually open
+  // fds via the kernel's fd directory instead.
   if (max_fd > 100000) {
-    // CloseAllFildesUntilMaxFD is inefficient with very large max_fd.
-    // Looping through /proc/self/fd performs better.
-    return CloseAllFildesInProcSelfFd(preserve_fildes);
+#ifdef __APPLE__
+    return CloseAllFildesInFdDir("/dev/fd", preserve_fildes);
+#else
+    return CloseAllFildesInFdDir("/proc/self/fd", preserve_fildes);
+#endif
   }
 
   return CloseAllFildesUntilMaxFD(preserve_fildes, max_fd);
-#endif  // #ifdef __APPLE__
 }
 
 /**
@@ -1989,7 +2005,11 @@ bool ManagedExec(const std::vector<std::string> &command_line,
 #ifdef DEBUGMSG
     assert(setenv("__CVMFS_DEBUG_MODE__", "yes", 1) == 0);
 #endif
-    if (drop_credentials && !SwitchCredentials(geteuid(), getegid(), false, true)) {
+    if (drop_credentials && SetuidCapabilityPermitted() &&
+        !SwitchCredentials(geteuid(),
+                           getegid(),
+                           false /* temporarily */,
+                           true /* avoid_mutexes */)) {
       failed = ForkFailures::kFailDropCredentials;
       goto fork_failure;
     }

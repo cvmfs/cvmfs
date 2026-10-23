@@ -20,6 +20,7 @@
 
 #include <cassert>
 #include <cstddef>
+#include <memory>
 
 #include "leveldb/cache.h"
 #include "leveldb/db.h"
@@ -28,7 +29,6 @@
 #include "util/concurrency.h"
 #include "util/exception.h"
 #include "util/logging.h"
-#include "util/pointer.h"
 #include "util/posix.h"
 #include "util/smalloc.h"
 
@@ -37,7 +37,7 @@ using namespace std;  // NOLINT
 
 NfsMapsLeveldb::ForkAwareEnv::ForkAwareEnv(NfsMapsLeveldb *maps)
     : leveldb::EnvWrapper(leveldb::Env::Default()), maps_(maps) {
-  atomic_init32(&num_bg_threads_);
+  num_bg_threads_.store(0);
 }
 
 
@@ -63,7 +63,7 @@ void NfsMapsLeveldb::ForkAwareEnv::Schedule(void (*function)(void *),
   funcarg->function = function;
   funcarg->arg = arg;
   funcarg->env = this;
-  atomic_inc32(&num_bg_threads_);
+  num_bg_threads_.fetch_add(1);
   pthread_t bg_thread;
   int retval = pthread_create(&bg_thread, NULL, MainFakeThread, funcarg);
   assert(retval == 0);
@@ -73,7 +73,7 @@ void NfsMapsLeveldb::ForkAwareEnv::Schedule(void (*function)(void *),
 
 
 void NfsMapsLeveldb::ForkAwareEnv::WaitForBGThreads() {
-  while (atomic_read32(&num_bg_threads_) > 0)
+  while (num_bg_threads_.load() > 0)
     SafeSleepMs(100);
 }
 
@@ -89,7 +89,7 @@ void NfsMapsLeveldb::ForkAwareEnv::SleepForMicroseconds(int micros) {
 void *NfsMapsLeveldb::ForkAwareEnv::MainFakeThread(void *data) {
   FuncArg *funcarg = reinterpret_cast<FuncArg *>(data);
   funcarg->function(funcarg->arg);
-  atomic_dec32(&(funcarg->env->num_bg_threads_));
+  (funcarg->env->num_bg_threads_.fetch_sub(1));
   delete funcarg;
   return NULL;
 }
@@ -103,12 +103,12 @@ NfsMapsLeveldb *NfsMapsLeveldb::Create(const string &leveldb_dir,
                                        const bool rebuild,
                                        perf::Statistics *statistics) {
   assert(root_inode > 0);
-  UniquePtr<NfsMapsLeveldb> maps(new NfsMapsLeveldb());
+  std::unique_ptr<NfsMapsLeveldb> maps(new NfsMapsLeveldb());
   maps->n_db_added_ = statistics->Register("nfs.leveldb.n_added",
                                            "total number of issued inode");
 
   maps->root_inode_ = root_inode;
-  maps->fork_aware_env_ = new ForkAwareEnv(maps.weak_ref());
+  maps->fork_aware_env_ = new ForkAwareEnv(maps.get());
   leveldb::Status status;
   leveldb::Options leveldb_options;
   leveldb_options.create_if_missing = true;
@@ -169,7 +169,7 @@ NfsMapsLeveldb *NfsMapsLeveldb::Create(const string &leveldb_dir,
 
   maps->fork_aware_env_->WaitForBGThreads();
 
-  return maps.Release();
+  return maps.release();
 }
 
 void NfsMapsLeveldb::SetInodeResidue(unsigned residue_class,
@@ -228,8 +228,10 @@ uint64_t NfsMapsLeveldb::GetInode(const PathString &path) {
   // Issue new inode
   inode = seq_;
   seq_ += inode_residue_class_;
-  PutPath2Inode(md5_path, inode);
+  // Reverse mapping first: the lock-free FindInode() above may hand out the
+  // inode as soon as path2inode has it, and GetPath() must then succeed
   PutInode2Path(inode, path);
+  PutPath2Inode(md5_path, inode);
   perf::Inc(n_db_added_);
   return inode;
 }

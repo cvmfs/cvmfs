@@ -8,6 +8,7 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdlib>
+#include <memory>
 
 #include "catalog_mgr_ro.h"
 #include "catalog_mgr_rw.h"
@@ -19,6 +20,8 @@
 #include "manifest.h"
 #include "manifest_fetch.h"
 #include "network/download.h"
+#include "network/sink_file.h"
+#include "network/sink_mem.h"
 #include "publish/except.h"
 #include "publish/repository_util.h"
 #include "publish/settings.h"
@@ -31,7 +34,6 @@
 #include "upload.h"
 #include "upload_spooler_definition.h"
 #include "util/logging.h"
-#include "util/pointer.h"
 #include "whitelist.h"
 
 // TODO(jblomer): Remove Me
@@ -153,9 +155,16 @@ void Repository::DownloadRootObjects(const std::string &url,
   delete manifest_;
   manifest_ = new manifest::Manifest(*ensemble.manifest);
 
+  // The read-only catalog manager is cached and bound to the previous root
+  // hash; drop it so it is rebuilt against the refreshed manifest on next use.
+  delete simple_catalog_mgr_;
+  simple_catalog_mgr_ = NULL;
+
   std::string reflog_path;
   FILE *reflog_fd = CreateTempFile(tmp_dir + "/reflog", kPrivateFileMode, "w",
                                    &reflog_path);
+  if (reflog_fd == NULL)
+    throw EPublish("cannot create reflog temp file (disk full?)");
   const std::string reflog_url = url + "/.cvmfsreflog";
   // TODO(jblomer): verify reflog hash
   // shash::Any reflog_hash(manifest_->GetHashAlgorithm());
@@ -181,6 +190,8 @@ void Repository::DownloadRootObjects(const std::string &url,
   std::string tags_path;
   FILE *tags_fd = CreateTempFile(tmp_dir + "/tags", kPrivateFileMode, "w",
                                  &tags_path);
+  if (tags_fd == NULL)
+    throw EPublish("cannot create tags temp file (disk full?)");
   if (!manifest_->history().IsNull()) {
     const std::string tags_url = url + "/data/"
                                  + manifest_->history().MakePath();
@@ -263,14 +274,13 @@ void Publisher::ConstructSpoolers() {
                               .gw_session_token();
   sd.key_file = settings_.keychain().gw_key_path();
 
-  spooler_files_ = upload::Spooler::Construct(sd,
-                                              statistics_publish_.weak_ref());
+  spooler_files_ = upload::Spooler::Construct(sd, statistics_publish_.get());
   if (spooler_files_ == NULL)
     throw EPublish("could not initialize file spooler");
 
   const upload::SpoolerDefinition sd_catalogs(sd.Dup2DefaultCompression());
-  spooler_catalogs_ = upload::Spooler::Construct(
-      sd_catalogs, statistics_publish_.weak_ref());
+  spooler_catalogs_ = upload::Spooler::Construct(sd_catalogs,
+                                                 statistics_publish_.get());
   if (spooler_catalogs_ == NULL) {
     delete spooler_files_;
     throw EPublish("could not initialize catalog spooler");
@@ -466,7 +476,7 @@ void Publisher::PushWhitelist() {
 
 
 Publisher *Publisher::Create(const SettingsPublisher &settings) {
-  UniquePtr<Publisher> publisher(new Publisher(settings, false));
+  std::unique_ptr<Publisher> publisher(new Publisher(settings, false));
 
   LogCvmfs(kLogCvmfs, publisher->llvl_ | kLogStdout | kLogNoLinebreak,
            "Creating Key Chain... ");
@@ -493,11 +503,11 @@ Publisher *Publisher::Create(const SettingsPublisher &settings) {
 
   // Re-create from empty repository in order to properly initialize
   // parent Repository object
-  publisher = new Publisher(settings);
+  publisher = std::unique_ptr<Publisher>(new Publisher(settings));
 
   LogCvmfs(kLogCvmfs, publisher->llvl_ | kLogStdout, "done");
 
-  return publisher.Release();
+  return publisher.release();
 }
 
 void Publisher::ExportKeychain() {
@@ -646,6 +656,13 @@ Publisher::Publisher(const SettingsPublisher &settings, const bool exists)
                    EPublish::kFailLayoutRevision);
   }
 
+  // Session and managed node are needed even when skipping downloads (e.g.
+  // for abort under disk-full conditions), so initialize them before the
+  // early return below.
+  if (settings.is_managed())
+    managed_node_ = std::unique_ptr<ManagedNode>(new ManagedNode(this));
+  session_ = std::unique_ptr<Session>(new Session(settings_, llvl_));
+
   if (!exists)
     return;
 
@@ -685,9 +702,6 @@ Publisher::Publisher(const SettingsPublisher &settings, const bool exists)
       throw EPublish("corrupted keychain");
   }
 
-  if (settings.is_managed())
-    managed_node_ = new ManagedNode(this);
-  session_ = new Session(settings_, llvl_);
   if (in_transaction_.IsSet())
     ConstructSpoolers();
 }

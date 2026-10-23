@@ -5,20 +5,20 @@
 #include <gtest/gtest.h>
 
 #include <cstring>
+#include <memory>
 
 #include "ring_buffer.h"
-#include "util/pointer.h"
 #include "util/prng.h"
 
 class T_RingBuffer : public ::testing::Test {
  protected:
   static const size_t kSize;
 
-  virtual void SetUp() { ring = new RingBuffer(kSize); }
+  virtual void SetUp() { ring.reset(new RingBuffer(kSize)); }
 
-  virtual void TearDown() { ring.Destroy(); }
+  virtual void TearDown() { ring.reset(); }
 
-  UniquePtr<RingBuffer> ring;
+  std::unique_ptr<RingBuffer> ring;
 };
 
 const size_t T_RingBuffer::kSize = 997;

@@ -20,7 +20,6 @@
 #include "quota.h"
 #include "statistics.h"
 #include "util/single_copy.h"
-#include "util/string.h"
 
 namespace perf {
 class Recorder;
@@ -39,6 +38,9 @@ class PosixQuotaManager : public QuotaManager {
   FRIEND_TEST(T_QuotaManager, Contains);
   FRIEND_TEST(T_QuotaManager, InitDatabase);
   FRIEND_TEST(T_QuotaManager, MakeReturnPipe);
+  FRIEND_TEST(T_QuotaManager, ReadPipeStringUsesExactLength);
+  FRIEND_TEST(T_QuotaManager, RegisterMountpointUsesCorrectDescriptionBuffer);
+  FRIEND_TEST(T_QuotaManager, SetCleanupPolicyUsesCorrectDescriptionBuffer);
 
  public:
   static PosixQuotaManager *Create(const std::string &cache_workspace,
@@ -129,7 +131,7 @@ class PosixQuotaManager : public QuotaManager {
     kListVolatile,
     kCleanupRate,
     kSetLimit,
-    // After non open aware LRU cleanup
+    // as of protocol revision 3
     kRegisterMountpoint,
     kGetMountpoints,
     kGetGroupHashes,
@@ -274,6 +276,7 @@ class PosixQuotaManager : public QuotaManager {
   PosixQuotaManager(const uint64_t limit, const uint64_t cleanup_threshold,
                     const std::string &cache_workspace);
   void SkipEviction(const EvictCandidate &candidate);
+  std::string ReadPipeString(int fd, size_t size);
 
   /**
    * Indicates if the cache manager is a shared process or a thread within the
@@ -390,15 +393,15 @@ class PosixQuotaManager : public QuotaManager {
   // TODO(gchr): it would be faster if it was a std::set. Needs a comparison
   // operator for shash::Any
   pthread_mutex_t *lock_open_files_;
-  std::vector<shash::Any> open_files_;
+  std::vector<shash::Short> open_files_;
 
   bool cleanup_unused_first_;
   std::vector<std::string> mountpoints_;
 
-  std::vector<shash::Any> CollectAllOpenHashes();
+  std::vector<shash::Short> CollectAllOpenHashes();
 
   struct CollectorHandler {
-    std::vector<shash::Any> &of;
+    std::vector<shash::Short> &of;
     const std::vector<std::string> &mp;
     pthread_mutex_t *l;
     size_t i;

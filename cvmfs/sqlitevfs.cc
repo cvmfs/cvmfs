@@ -7,11 +7,6 @@
  * the SQlite file once opened.  It works purely on the file descriptor.
  */
 
-#ifndef __STDC_FORMAT_MACROS
-#define __STDC_FORMAT_MACROS
-#endif
-
-
 #include "sqlitevfs.h"
 
 #include <dlfcn.h>
@@ -35,7 +30,6 @@
 #include "duplex_sqlite3.h"
 #include "statistics.h"
 #include "util/logging.h"
-#include "util/platform.h"
 #include "util/smalloc.h"
 #include "util/string.h"
 

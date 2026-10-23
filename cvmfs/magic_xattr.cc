@@ -10,11 +10,11 @@
 
 #include "cache_posix.h"
 #include "catalog_mgr_client.h"
+#include "crypto/hash.h"
 #include "crypto/signature.h"
 #include "fetch.h"
 #include "mountpoint.h"
 #include "quota.h"
-#include "quota_posix.h"
 #include "util/logging.h"
 #include "util/string.h"
 
@@ -49,6 +49,7 @@ MagicXattrManager::MagicXattrManager(
   Register("user.repo_counters", new RepoCountersMagicXattr());
   Register("user.repo_metainfo", new RepoMetainfoMagicXattr());
   Register("user.revision", new RevisionMagicXattr());
+  Register("user.revision_timestamp", new RevisionTimestampMagicXattr());
   Register("user.root_hash", new RootHashMagicXattr());
   Register("user.rx", new RxMagicXattr());
   Register("user.speed", new SpeedMagicXattr());
@@ -67,6 +68,7 @@ MagicXattrManager::MagicXattrManager(
   Register("user.chunks", new ChunksMagicXattr());
   Register("user.compression", new CompressionMagicXattr());
   Register("user.direct_io", new DirectIoMagicXattr());
+  Register("user.bundle_trigger", new BundleTriggerMagicXattr());
   Register("user.external_file", new ExternalFileMagicXattr());
 
   Register("user.rawlink", new RawlinkMagicXattr());
@@ -370,6 +372,14 @@ void DirectIoMagicXattr::FinalizeValue() {
   result_pages_.push_back(dirent_->IsDirectIo() ? "1" : "0");
 }
 
+bool BundleTriggerMagicXattr::PrepareValueFenced() {
+  return dirent_->IsRegular();
+}
+
+void BundleTriggerMagicXattr::FinalizeValue() {
+  result_pages_.push_back(dirent_->IsBundleTrigger() ? "1" : "0");
+}
+
 bool ExternalFileMagicXattr::PrepareValueFenced() {
   return dirent_->IsRegular();
 }
@@ -652,7 +662,7 @@ void RepoCountersMagicXattr::FinalizeValue() {
   result_pages_.push_back(counters_.GetCsvMap());
 }
 
-uint64_t RepoMetainfoMagicXattr::kMaxMetainfoLength = 65536;
+const uint64_t RepoMetainfoMagicXattr::kMaxMetainfoLength = 65536;
 
 bool RepoMetainfoMagicXattr::PrepareValueFenced() {
   if (!xattr_mgr_->mount_point()->catalog_mgr()->manifest()) {
@@ -715,6 +725,15 @@ bool RevisionMagicXattr::PrepareValueFenced() {
 
 void RevisionMagicXattr::FinalizeValue() {
   result_pages_.push_back(StringifyUint(revision_));
+}
+
+bool RevisionTimestampMagicXattr::PrepareValueFenced() {
+  timestamp_ = xattr_mgr_->mount_point()->catalog_mgr()->GetTimestamp();
+  return true;
+}
+
+void RevisionTimestampMagicXattr::FinalizeValue() {
+  result_pages_.push_back(StringifyUint(timestamp_));
 }
 
 bool RootHashMagicXattr::PrepareValueFenced() {
@@ -826,14 +845,15 @@ void ListOpenHashesMagicXattr::FinalizeValue() {
   std::string result;
   if (pcm != nullptr) {
     if (pcm->cleanup_unused_first()) {
-      if (pcm->fd_mgr_.IsValid()) {
+      if (pcm->fd_mgr_.get() != nullptr) {
         const auto &hash_map = pcm->fd_mgr_->map_fd_;
         auto empty = hash_map.empty_key();
         auto *keys = hash_map.keys();
         for (size_t i = 0; i < hash_map.capacity(); ++i) {
           const shash::Any &hash = keys[i];
           if (hash != empty) {
-            result += hash.ToString() + "\n";
+            shash::Short short_hash(hash);
+            result += short_hash.ToString() + "\n";
           }
         }
       }
@@ -841,4 +861,3 @@ void ListOpenHashesMagicXattr::FinalizeValue() {
   }
   result_pages_.push_back(result);
 }
-

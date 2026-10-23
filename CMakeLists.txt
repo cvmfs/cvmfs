@@ -5,7 +5,12 @@
 # See externals/CMake-Register_External_Lib.txt for details on external inclusion
 #
 
-cmake_minimum_required (VERSION 3.12..3.30)
+cmake_minimum_required (VERSION 3.24..3.30)
+
+# Enable creation of compile_commands.json by default. Needed by LSPs, useful for devs
+# Must be set before project() so the generator picks it up
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE INTERNAL "Export compile_commands.json for LSPs")
+
 set (PROJECT_NAME "CernVM-FS")
 project (${PROJECT_NAME})
 
@@ -14,22 +19,52 @@ message ("Running CMake version ${CMAKE_VERSION}")
 #
 # The version numbers
 #
-# DON'T DELETE
-## CVMFS_VERSION 2.13.3
-## CVMFS_PRERELEASE 
-#---------------------
-set (CernVM-FS_VERSION_MAJOR 2)
-set (CernVM-FS_VERSION_MINOR 13)
-set (CernVM-FS_VERSION_PATCH 3)
-set (CernVM-FS_VERSION_STRING "${CernVM-FS_VERSION_MAJOR}.${CernVM-FS_VERSION_MINOR}.${CernVM-FS_VERSION_PATCH}")
+# VERSION contains the next release's numeric version.  get_version.sh adds
+# tag or Git development information and also supports source archives and an
+# explicit CVMFS_VERSION_OVERRIDE.
+set (CVMFS_VERSION_OVERRIDE "" CACHE STRING "Override the detected CernVM-FS version")
+set (CVMFS_VERSION_ORDER "" CACHE STRING "Override the development-version order")
+set (CVMFS_VERSION_SEQUENCE "" CACHE STRING "Set the development-version sequence")
+set (CVMFS_VERSION_TIMESTAMP "" CACHE STRING "Override the development-version timestamp")
+set (_CVMFS_VERSION_ENV "")
+foreach (_CVMFS_VERSION_VARIABLE
+         CVMFS_VERSION_OVERRIDE CVMFS_VERSION_ORDER
+         CVMFS_VERSION_SEQUENCE CVMFS_VERSION_TIMESTAMP)
+  if (NOT "${${_CVMFS_VERSION_VARIABLE}}" STREQUAL "")
+    list (APPEND _CVMFS_VERSION_ENV
+          "${_CVMFS_VERSION_VARIABLE}=${${_CVMFS_VERSION_VARIABLE}}")
+  endif ()
+endforeach ()
+execute_process (
+  COMMAND ${CMAKE_COMMAND} -E env ${_CVMFS_VERSION_ENV}
+          "${CMAKE_SOURCE_DIR}/cmake/get_version.sh" "${CMAKE_SOURCE_DIR}"
+  OUTPUT_VARIABLE CernVM-FS_BUILD_VERSION
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+  RESULT_VARIABLE CVMFS_VERSION_RESULT
+)
+if (NOT CVMFS_VERSION_RESULT EQUAL 0)
+  message (FATAL_ERROR "Failed to determine the CernVM-FS version")
+endif ()
+if (NOT CernVM-FS_BUILD_VERSION MATCHES
+    "^([0-9]+)\\.([0-9]+)\\.([0-9]+)([~+][0-9A-Za-z.+~]+)?$")
+  message (FATAL_ERROR "Invalid CernVM-FS version: ${CernVM-FS_BUILD_VERSION}")
+endif ()
+set (CernVM-FS_VERSION_MAJOR ${CMAKE_MATCH_1})
+set (CernVM-FS_VERSION_MINOR ${CMAKE_MATCH_2})
+set (CernVM-FS_VERSION_PATCH ${CMAKE_MATCH_3})
+# Keep shared-library versions and installation paths numeric and stable.
+set (CernVM-FS_VERSION_STRING
+     "${CernVM-FS_VERSION_MAJOR}.${CernVM-FS_VERSION_MINOR}.${CernVM-FS_VERSION_PATCH}")
+message ("CernVM-FS version ${CernVM-FS_BUILD_VERSION}")
+
 if (CMAKE_VERSION VERSION_LESS "3.12.0")
-  add_definitions(-DCVMFS_VERSION="${CernVM-FS_VERSION_STRING}")
+  add_definitions(-DCVMFS_VERSION="${CernVM-FS_BUILD_VERSION}")
   add_definitions(-DCVMFS_VERSION_MAJOR=${CernVM-FS_VERSION_MAJOR})
   add_definitions(-DCVMFS_VERSION_MINOR=${CernVM-FS_VERSION_MINOR})
   add_definitions(-DCVMFS_VERSION_PATCH=${CernVM-FS_VERSION_PATCH})
   add_definitions(-DCVMFS_PATCH_LEVEL="0")
 else()
-  add_compile_definitions(CVMFS_VERSION="${CernVM-FS_VERSION_STRING}")
+  add_compile_definitions(CVMFS_VERSION="${CernVM-FS_BUILD_VERSION}")
   add_compile_definitions(CVMFS_VERSION_MAJOR=${CernVM-FS_VERSION_MAJOR})
   add_compile_definitions(CVMFS_VERSION_MINOR=${CernVM-FS_VERSION_MINOR})
   add_compile_definitions(CVMFS_VERSION_PATCH=${CernVM-FS_VERSION_PATCH})
@@ -65,14 +100,17 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
         if(line MATCHES "^ID=(.*)$")
             set(DISTRO_ID ${CMAKE_MATCH_1})
             string(REPLACE "\"" "" DISTRO_ID ${DISTRO_ID})
+            string(REPLACE "'" "" DISTRO_ID ${DISTRO_ID})
         endif()
         if(line MATCHES "^VERSION_ID=(.*)$")
             set(DISTRO_VERSION ${CMAKE_MATCH_1})
             string(REPLACE "\"" "" DISTRO_VERSION ${DISTRO_VERSION})
+            string(REPLACE "'" "" DISTRO_VERSION ${DISTRO_VERSION})
         endif()
         if(line MATCHES "^PLATFORM_ID=(.*)$")
             set(PLATFORM_ID ${CMAKE_MATCH_1})
             string(REPLACE "\"" "" PLATFORM_ID ${PLATFORM_ID})
+            string(REPLACE "'" "" PLATFORM_ID ${PLATFORM_ID})
         endif()
     endforeach()
 
@@ -145,7 +183,7 @@ endif ()
 #       (https://wiki.debian.org/Multiarch)
 #
 if (MACOSX)
-  set (CMAKE_INSTALL_LIBDIR "lib")
+  set (CMAKE_INSTALL_LIBDIR "lib" CACHE STRING "library installation directory")
   set (CMAKE_MOUNT_INSTALL_BINDIR "${CMAKE_INSTALL_PREFIX}/sbin")
   set (CVMFS_LIBEXEC_DIR "libexec/cvmfs")
   set (CMAKE_MACOSX_RPATH true)
@@ -159,14 +197,14 @@ else (MACOSX) # --> Linux
       set (CMAKE_MOUNT_INSTALL_BINDIR "/sbin")
       set (CVMFS_LIBEXEC_DIR "libexec/cvmfs")
     endif (ARCHLINUX)
-    set (CMAKE_INSTALL_LIBDIR "lib")
+    set (CMAKE_INSTALL_LIBDIR "lib" CACHE STRING "library installation directory")
   else (DEBIAN OR ARCHLINUX) # --> RedHat, Fedora, CentOS, SuSE
     set (CMAKE_MOUNT_INSTALL_BINDIR "/sbin")
     set (CVMFS_LIBEXEC_DIR "libexec/cvmfs")
     if (IS_64_BIT)
-      set (CMAKE_INSTALL_LIBDIR "lib64")
+      set (CMAKE_INSTALL_LIBDIR "lib64" CACHE STRING "library installation directory")
     else (IS_64_BIT) # --> 32 Bit
-      set (CMAKE_INSTALL_LIBDIR "lib")
+      set (CMAKE_INSTALL_LIBDIR "lib" CACHE STRING "library installation directory")
     endif (IS_64_BIT)
   endif (DEBIAN OR ARCHLINUX)
 endif (MACOSX)
@@ -189,6 +227,16 @@ endif ()
 #
 # include file with user-defined options
 #
+
+# workaround for an issue with the libfuse3 target
+if (MACOSX)
+  set(BUILD_MANPAGES_DEFAULT OFF)
+  set(BUILTIN_EXTERNALS_EXCLUDE_DEFAULT "sqlite3;zlib")
+else()
+  set(BUILD_MANPAGES_DEFAULT ON)
+  set(BUILTIN_EXTERNALS_EXCLUDE_DEFAULT "")
+endif()
+
 include (cvmfs_options)
 
 #
@@ -202,6 +250,13 @@ include (cvmfs_compiler)
 # define where to find the external dependencies
 #
 set (EXTERNALS_LIB_LOCATION       "${CMAKE_SOURCE_DIR}/externals")
+
+# Download cache for FetchContent-based externals. Defaults into the source
+# tree so that a checkout with a populated download cache can be packed into a
+# self-contained source tarball. Override (e.g. in read-only container builds
+# where the source is bind-mounted read-only) to point at a writable location.
+set (EXTERNALS_DOWNLOAD_LOCATION  "${EXTERNALS_LIB_LOCATION}/download"
+     CACHE PATH "Download cache directory for vendored externals")
 
 # For convenience in CI workflows, allow to set EXTERNALS_PREFIX via environment
 if (NOT EXTERNALS_PREFIX)
@@ -237,18 +292,12 @@ if (BUILTIN_EXTERNALS)
     set(ENV{CVMFS_BASE_CXX_FLAGS} ${CVMFS_BASE_CXX_FLAGS})
     set(ENV{IS_64_BIT} ${IS_64_BIT})
 
-    if (BUILD_UBENCHMARKS)
-      set(ENV{BUILD_UBENCHMARKS} "true")
-    endif ()
     if (BUILD_SERVER OR BUILD_SERVER_DEBUG)
       set(ENV{BUILD_SERVER} "true")
     endif ()
     if (BUILD_GEOAPI)
       set(ENV{BUILD_GEOAPI} "true")
     endif ()
-    if (BUILD_QC_TESTS)
-      set(ENV{BUILD_QC_TESTS} "true")
-    endif()
     if (BUILD_GATEWAY)
       set(ENV{BUILD_GATEWAY} "true")
     endif ()
@@ -267,7 +316,7 @@ if (BUILTIN_EXTERNALS)
 
     message (STATUS "running bootstrap.sh ...")
     execute_process (
-      COMMAND           sh ${CMAKE_SOURCE_DIR}/externals/bootstrap.sh
+      COMMAND           ${CMAKE_SOURCE_DIR}/externals/bootstrap.sh
       WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
       RESULT_VARIABLE   BOOTSTRAPPING_RESULT
     )
@@ -282,9 +331,7 @@ if (BUILTIN_EXTERNALS)
     set(ENV{CVMFS_BASE_C_FLAGS} "")
     set(ENV{CVMFS_BASE_CXX_FLAGS} "")
     set(ENV{IS_64_BIT} "")
-    set(ENV{BUILD_UBENCHMARKS} "")
     set(ENV{BUILD_SERVER} "")
-    set(ENV{BUILD_QC_TESTS} "")
     set(ENV{BUILD_GATEWAY} "")
     set(ENV{BUILD_DUCC} "")
     set(ENV{BUILD_SNAPSHOTTER} "")
@@ -299,6 +346,18 @@ if (BUILTIN_EXTERNALS)
   message("Project prefix path: ${CMAKE_PREFIX_PATH}")
   message("System prefix path: ${CMAKE_SYSTEM_PREFIX_PATH}")
 endif(BUILTIN_EXTERNALS)
+
+
+# Migrate bootstrap.sh to cmake
+if(BUILTIN_EXTERNALS)
+  message(STATUS "Entering external dependencies setup")
+  # Some vendored externals (e.g. libarchive) force their preferred
+  # CMAKE_BUILD_TYPE into the cache; save the configured value and restore
+  # it afterwards.
+  set(_cvmfs_build_type "${CMAKE_BUILD_TYPE}")
+  add_subdirectory(externals)
+  set(CMAKE_BUILD_TYPE "${_cvmfs_build_type}" CACHE STRING "Build Type" FORCE)
+endif()
 
 #
 # include some common functionality
@@ -408,22 +467,17 @@ find_package (Libcrypto REQUIRED)
 message("Using libcrypto for libcvmfs_crypto from ${Libcrypto_INCLUDE_DIRS}")
 
 
-
-find_package (VJSON REQUIRED)
-set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${VJSON_INCLUDE_DIRS})
-
-find_package (LibArchive REQUIRED)
-set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${LibArchive_INCLUDE_DIRS})
-
 # Almost all build targets require zlib and sha3
 if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_SERVER OR BUILD_SERVER_DEBUG OR
     BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG OR BUILD_PRELOADER OR
     BUILD_UBENCHMARKS OR BUILD_SHRINKWRAP)
-  find_package (ZLIB REQUIRED)
+  # zlib is provided by the externals/zlib FetchContent module (or the system,
+  # via BUILTIN_EXTERNALS_EXCLUDE) as the ZLIB::ZLIB target; it also sets
+  # ZLIB_LIBRARIES and ZLIB_INCLUDE_DIRS for the global include list below.
   set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${ZLIB_INCLUDE_DIRS})
 
-  find_package (SHA3 REQUIRED)
-  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${SHA3_INCLUDE_DIRS})
+  # Libnettle_* is set by externals/libnettle (system or vendored build)
+  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${Libnettle_INCLUDE_DIRS})
 endif ()
 
 
@@ -431,81 +485,123 @@ endif ()
 if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_SERVER OR BUILD_SERVER_DEBUG OR
     BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG OR BUILD_PRELOADER OR
     BUILD_SHRINKWRAP)
-  find_package (CARES REQUIRED)
-  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${CARES_INCLUDE_DIRS})
+  # c-ares and libcurl are provided as the c-ares::cares and CURL::libcurl
+  # targets by add_subdirectory(externals) above (FetchContent). libcurl is
+  # always built with c-ares as its async DNS resolver, so the former
+  # curl-config AsynchDNS check is no longer needed.
 
-  find_package (CURL REQUIRED)
-  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${CURL_INCLUDE_DIRS})
-
-  if (CURL_INCLUDE_DIRS)
-    find_program(CURL_CONFIG_EXEC NAMES curl-config)
-    if (CURL_CONFIG_EXEC)
-      execute_process(
-        COMMAND ${CURL_CONFIG_EXEC} --features
-        OUTPUT_VARIABLE _libcurl_features
-        ERROR_VARIABLE _libcurl_features_error
-        )
-      if (NOT ${_libcurl_features} MATCHES AsynchDNS)
-        message(FATAL_ERROR "libcurl was not compiled with c-ares")
-      endif ()
-    else (CURL_CONFIG_EXEC)
-      message(SEND_ERROR "Command \"${CURL_CONFIG_EXEC} --features\" failed with output:\n${_libcurl_features_error}")
-    endif ()
-  endif (CURL_INCLUDE_DIRS)
-
-  find_package (SQLite3 REQUIRED)
+  # sqlite3 is provided by the externals/sqlite3 FetchContent module (or the
+  # system, via BUILTIN_EXTERNALS_EXCLUDE) as the SQLite::SQLite3 target; it also
+  # sets SQLITE3_INCLUDE_DIR for the global include list below.
   set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${SQLITE3_INCLUDE_DIR})
 
-  find_package(leveldb)
-  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${LEVELDB_INCLUDE_DIR})
+  # leveldb is provided by the externals/leveldb FetchContent module (or the
+  # system, via BUILTIN_EXTERNALS_EXCLUDE) as the leveldb::leveldb target.
 
   find_package (UUID REQUIRED)
 endif ()
 
 # Client/libcvmfs/preloader only: pacparser, sparsehash
+# pacparser is provided by the externals/pacparser FetchContent module (or the
+# system, via BUILTIN_EXTERNALS_EXCLUDE) as the pacparser::pacparser target.
+# sparsehash is provided the same way (externals/sparsehash), as the header-only
+# sparsehash::sparsehash target. It is header-only, so we also expose its
+# include directory globally here; SPARSEHASH_INCLUDE_DIR is set either by that
+# module or, for BUILTIN_EXTERNALS=OFF builds, by the system find_package below.
 if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_PRELOADER OR
     BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG OR BUILD_SHRINKWRAP)
-  find_package (pacparser REQUIRED)
-  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${PACPARSER_INCLUDE_DIR})
-
-  find_package(Sparsehash)
+  if (NOT SPARSEHASH_INCLUDE_DIR)
+    find_package(Sparsehash REQUIRED)
+  endif ()
   set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${SPARSEHASH_INCLUDE_DIR})
 endif ()
 
 if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_LIBCVMFS_CACHE OR
     BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG OR BUILD_UBENCHMARKS OR
     BUILD_SHRINKWRAP)
-  find_package(Protobuf REQUIRED)
+  # protobuf (protobuf-lite + protoc) is provided by the externals/protobuf
+  # FetchContent module (or the system, via BUILTIN_EXTERNALS_EXCLUDE) as the
+  # protobuf::libprotobuf-lite / protobuf::protoc targets, exposed through the
+  # PROTOBUF_LITE_LIBRARY / PROTOBUF_PROTOC_EXECUTABLE / PROTOBUF_INCLUDE_DIRS
+  # variables.
   set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${PROTOBUF_INCLUDE_DIRS})
 endif ()
 
 # Fuse client only
+# libfuse headers for libcvmfs_nfsfuse, which implements the API itself;
+# fetched regardless of BUILTIN_EXTERNALS
+if (BUILD_CVMFS AND BUILD_NFS_FRONTEND)
+  add_subdirectory (externals/libfuse)
+endif ()
 if (BUILD_CVMFS)
   if (MACOSX)
-    set(BUILD_LIBFUSE2 ON)
-    find_package (OSXFuse REQUIRED)
-    set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${MACOS_FUSE_INCLUDE_DIR})
-    set (FUSE_LIBRARIES ${MACOS_FUSE_LIBRARIES}) # just abstract the difference here... they are compatible
-    if (USE_MACFUSE_KEXT)
-      add_definitions(-DUSE_MACFUSE_KEXT)
-    endif()
-  else (MACOSX)
-    if (BUILD_LIBFUSE2)
-      find_package (FUSE REQUIRED)
-      if (FUSE_FOUND)
-        set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${FUSE_INCLUDE_DIR})
+    string (TOUPPER "${CVMFS_MACFUSE}" _macfuse_mode)
+    if (_macfuse_mode STREQUAL "OFF")
+      set (BUILD_FUSE3_FRONTEND OFF)
+    else ()
+      if (_macfuse_mode STREQUAL "ON")
+        find_package (MacFUSE REQUIRED)
+      else ()
+        find_package (MacFUSE)
       endif ()
-    endif()
+      set (BUILD_FUSE3_FRONTEND ${MacFUSE_FOUND})
+    endif ()
+    if (NOT BUILD_FUSE3_FRONTEND AND NOT BUILD_NFS_FRONTEND)
+      message (FATAL_ERROR "No client frontend: install macFUSE or set BUILD_NFS_FRONTEND=ON")
+    endif ()
+
+    if (BUILD_FUSE3_FRONTEND)
+      set (MOUNT_BACKENDS_AVAILABLE fuse)
+      if (MACFUSE_HAS_FSKIT)
+        list (APPEND MOUNT_BACKENDS_AVAILABLE fskit)
+      endif ()
+    endif ()
+    if (BUILD_NFS_FRONTEND)
+      list (APPEND MOUNT_BACKENDS_AVAILABLE nfs)
+    endif ()
+    if (CVMFS_MACOS_DEFAULT_BACKEND STREQUAL "AUTO")
+      foreach (_backend nfs fskit fuse)
+        if (_backend IN_LIST MOUNT_BACKENDS_AVAILABLE)
+          set (MOUNT_BACKEND_DEFAULT ${_backend})
+          break ()
+        endif ()
+      endforeach ()
+    elseif (CVMFS_MACOS_DEFAULT_BACKEND IN_LIST MOUNT_BACKENDS_AVAILABLE)
+      set (MOUNT_BACKEND_DEFAULT ${CVMFS_MACOS_DEFAULT_BACKEND})
+    else ()
+      message (FATAL_ERROR "CVMFS_MACOS_DEFAULT_BACKEND=${CVMFS_MACOS_DEFAULT_BACKEND} "
+                           "is not built (available: ${MOUNT_BACKENDS_AVAILABLE})")
+    endif ()
+    message (STATUS "macOS mount backends: ${MOUNT_BACKENDS_AVAILABLE} "
+                    "(default: ${MOUNT_BACKEND_DEFAULT})")
+  else ()
     find_package (FUSE3 REQUIRED)
+    set (BUILD_FUSE3_FRONTEND ON)
+  endif ()
+
+  if (BUILD_FUSE3_FRONTEND)
     set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${FUSE3_INCLUDE_DIR})
-    add_definitions(-DHAS_FUSE3)
-  endif (MACOSX)
+  else ()
+    # The loader (cvmfs2) still needs the libfuse API declarations
+    set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${CVMFS_NFS_FUSE3_INCLUDE_DIR})
+  endif ()
+  add_definitions(-DHAS_FUSE3)
 endif ()
 
-# Server only: unzip, libcap
-if (BUILD_SERVER OR BUILD_SERVER_DEBUG)
-  find_package(PythonLibs REQUIRED)
+# libcap is needed by every target that links cvmfs/util/capabilities.cc,
+# i.e. everything that builds libcvmfs-util.
+# macOS has stubbed-out implementations in capabilities.{cc,h} that don't
+# reference libcap symbols, so the lookup is skipped there.
+if (NOT MACOSX AND (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_LIBCVMFS_CACHE OR
+                    BUILD_SERVER OR BUILD_SERVER_DEBUG OR BUILD_RECEIVER OR
+                    BUILD_SHRINKWRAP OR BUILD_PRELOADER OR BUILD_UNITTESTS OR
+                    BUILD_STRESS_TESTS OR INSTALL_MOUNT_SCRIPTS))
   find_package(LibCAP REQUIRED)
+endif ()
+
+# Server only: python, unzip, libacl
+if (BUILD_SERVER OR BUILD_SERVER_DEBUG)
+  find_package(Python COMPONENTS Interpreter REQUIRED)
   if (BUILD_COMPARE_TO_LIBACL)
     add_definitions(-DCOMPARE_TO_LIBACL)
     find_package(LibACL REQUIRED)
@@ -517,11 +613,11 @@ if (BUILD_SERVER OR BUILD_SERVER_DEBUG)
 endif ()
 
 
-# Only micro benchmarks need google bench
-if (BUILD_UBENCHMARKS)
-  find_package(GOOGLEBENCH REQUIRED)
-  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${GOOGLEBENCH_INCLUDE_DIRS})
-endif ()
+# Only micro benchmarks need google bench. It is provided by the
+# externals/googlebench FetchContent module (or the system, via
+# BUILTIN_EXTERNALS_EXCLUDE) as the benchmark::benchmark target, which the
+# micro-benchmark executable links directly (its include dirs propagate
+# transitively, so nothing needs adding to INCLUDE_DIRECTORIES here).
 
 include_directories (${INCLUDE_DIRECTORIES})
 
@@ -535,12 +631,24 @@ if (INSTALL_MOUNT_SCRIPTS)
 endif ()
 
 #
+# GoogleTest is needed by both the unit tests and the micro benchmarks
+#
+if (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG OR BUILD_UBENCHMARKS)
+  include(SetupGoogleTest)
+endif ()
+
+#
 # compile the unit tests, if necessary
 #
 if (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
   add_compile_definitions(_CVMFS_UNITTESTS_ENABLED)
   enable_testing ()
-  add_custom_target (check ${CMAKE_CTEST_COMMAND} -VV)
+  # FuzzTest pulls in Abseil, whose absl/log defines a target named `check`
+  # (absl::check). Skip our `make check` convenience target when the quickcheck
+  # tests are built to avoid a target name collision
+  if (NOT BUILD_QC_TESTS)
+    add_custom_target (check ${CMAKE_CTEST_COMMAND} -VV)
+  endif ()
   add_subdirectory (test/unittests)
 endif ()
 
@@ -549,13 +657,23 @@ if (BUILD_UBENCHMARKS)
 endif ()
 
 if (BUILD_QC_TESTS)
-  find_package(RapidCheck REQUIRED)
-  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${RAPIDCHECK_INCLUDE_DIRS})
   add_subdirectory (test/quickcheck)
 endif ()
 
+if (BUILD_STRESS_TESTS)
+  include(test/stress/CMakeLists.txt)
+endif ()
+
+#
+# Builds of golang components
+# First check if we have golang available
+#
 if (BUILD_GATEWAY OR BUILD_DUCC OR BUILD_SNAPSHOTTER)
-  find_program(GO_COMPILER go)
+  if (NOT CVMFS_GO_DIR AND NOT "$ENV{CVMFS_GO_DIR}" STREQUAL "")
+    set (CVMFS_GO_DIR "$ENV{CVMFS_GO_DIR}")
+  endif ()
+  find_program(GO_COMPILER go
+               HINTS ${CVMFS_GO_DIR} "${EXTERNALS_INSTALL_LOCATION}/go/bin")
   if(NOT GO_COMPILER)
     message(FATAL_ERROR "go compiler not found")
   else()
@@ -575,9 +693,6 @@ if (BUILD_SNAPSHOTTER)
   add_subdirectory (snapshotter)
 endif ()
 
-if (BUILD_STRESS_TESTS)
-  include(test/stress/CMakeLists.txt)
-endif ()
 
 #
 # Documentation
@@ -589,7 +704,9 @@ install (
 )
 
 # Man pages
-add_subdirectory(doc/manpages)
+if (BUILD_MANPAGES)
+  add_subdirectory(doc/manpages)
+endif()
 
 # Doxygen
 if (BUILD_DOCUMENTATION)

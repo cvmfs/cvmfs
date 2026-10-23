@@ -8,7 +8,6 @@
 
 #include <cstdlib>
 
-#include "cache.h"
 #include "cache.pb.h"
 #include "util/single_copy.h"
 

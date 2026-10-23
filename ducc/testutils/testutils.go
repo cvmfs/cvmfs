@@ -36,6 +36,9 @@ func MockCvmfsSetup() {
 		TestRepo = "/../../../../" + mockrepo
 		os.Setenv("CVMFS_TEST_REPO", TestRepo)
 		os.Setenv("CVMFS_DUCC_NO_CHOWN", "nochown")
+		overlaycachedir, _ := os.MkdirTemp("", "ducc_overlaycache")
+		os.Setenv("DUCC_OVERLAY_CACHE_DIR", overlaycachedir)
+
 	}
 
 }

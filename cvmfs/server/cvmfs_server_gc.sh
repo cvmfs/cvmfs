@@ -22,10 +22,11 @@ cvmfs_server_gc() {
   local all_collected=0
   local deletion_log=""
   local reconstruct_reflog="0"
+  local prune_partial_replica=0
 
   # optional parameter handling
   OPTIND=1
-  while getopts "ldr:t:faAL:" option
+  while getopts "ldr:t:faAL:p" option
   do
     case $option in
       l)
@@ -42,6 +43,9 @@ cvmfs_server_gc() {
       ;;
       f)
         force=1
+      ;;
+      p)
+        prune_partial_replica=1
       ;;
       a)
         all_collect=1
@@ -60,6 +64,12 @@ cvmfs_server_gc() {
     esac
   done
   shift $(($OPTIND-1))
+
+  # Pruning needs a per-repository inclusion spec and would fail on every
+  # repository that is not a partial replica.
+  if [ $prune_partial_replica -ne 0 ] && [ $all_collect -ne 0 ]; then
+    usage "Command gc: -p cannot be combined with -a or -A"
+  fi
 
   # get repository names
   if [ $all_collect -ne 0 ] && [ -z "$@" ]; then
@@ -164,6 +174,12 @@ cvmfs_server_gc() {
     if [ $reconstruct_reflog -eq 1 ]; then reflog_reconstruct_msg="yes"; fi
 
     echo "Affected Repositories:         $names"
+    for _gc_name in $names; do
+      load_repo_config $_gc_name
+      if [ x"$CVMFS_GARBAGE_COLLECTION" != x"true" ]; then
+        echo "  WARNING: CVMFS_GARBAGE_COLLECTION is not enabled for $_gc_name"
+      fi
+    done
     echo "Dry Run (no actual deletion):  $dry_run_msg"
     echo "Needs Reflog reconstruction:   $reflog_reconstruct_msg"
     if [ $preserve_revisions -ge 0 ]; then
@@ -174,6 +190,9 @@ cvmfs_server_gc() {
     fi
     if [ $preserve_revisions -le 0 ] && [ $preserve_timestamp -le 0 ]; then
       echo "Only the latest revision will be preserved."
+    fi
+    if [ $prune_partial_replica -ne 0 ]; then
+      echo "Prune excluded objects on partial replica: yes"
     fi
   fi
 
@@ -203,7 +222,8 @@ cvmfs_server_gc() {
                   "$list_deleted_objects"       \
                   "$preserve_revisions"         \
                   "$preserve_timestamp"         \
-                  "$deletion_log"
+                  "$deletion_log"               \
+                  "$prune_partial_replica"
     else
       (
       echo
@@ -218,7 +238,8 @@ cvmfs_server_gc() {
                   "$list_deleted_objects"       \
                   "$preserve_revisions"         \
                   "$preserve_timestamp"         \
-                  "$deletion_log"
+                  "$deletion_log"               \
+                  "$prune_partial_replica"
       )
       if [ $? != 0 ]; then
         echo "ERROR from cvmfs_server gc!" >&2
@@ -300,6 +321,7 @@ __do_gc_cmd()
   local preserve_revisions="$4"
   local preserve_timestamp="$5"
   local deletion_log="$6"
+  local prune_partial_replica="$7"
 
   # leave extra layer of indent for now to better show diff with previous
 
@@ -318,7 +340,19 @@ __do_gc_cmd()
       return 0
     fi
     is_garbage_collectable $name || die "Garbage Collection is not enabled for $name"
+    if is_stratum0 $name; then
+      if [ x"$(get_repo_info_from_url $CVMFS_STRATUM0 -g)" != x"yes" ]; then
+        die "Garbage collection is enabled in server.conf but not yet in the repository manifest. Run 'cvmfs_server transaction $name && cvmfs_server publish $name' to update the manifest, then retry."
+      fi
+    fi
     is_owner_or_root       $name || die "Permission denied: Repository $name is owned by $user"
+    if [ "$prune_partial_replica" -ne 0 ]; then
+      is_stratum1 $name || die "Pruning excluded objects is only supported on replicas"
+      [ x"$CVMFS_PARTIAL_REPLICATION" = x"true" ] && \
+        [ -n "$CVMFS_PARTIAL_REPLICATION_SPEC" ] && \
+        [ -f "$CVMFS_PARTIAL_REPLICATION_SPEC" ] || \
+        die "Pruning requires a configured partial replication inclusion spec"
+    fi
 
     # figure out the URL of the repository
     local repository_url="$CVMFS_STRATUM0"
@@ -333,6 +367,7 @@ __do_gc_cmd()
     [ $dry_run              -ne 0 ] && additional_switches="$additional_switches -d"
     [ $preserve_revisions   -ge 0 ] && additional_switches="$additional_switches -h $preserve_revisions"
     [ $preserve_timestamp   -gt 0 ] && additional_switches="$additional_switches -z $preserve_timestamp"
+    [ "$prune_partial_replica" -ne 0 ] && additional_switches="$additional_switches -p"
 
     local trapcmd
     if [ $dry_run -eq 0 ]; then
@@ -352,6 +387,12 @@ __do_gc_cmd()
         trapcmd="release_update_lock $name; $trapcmd"
         trap "$trapcmd" EXIT HUP INT TERM
       fi
+    fi
+
+    if [ "$prune_partial_replica" -ne 0 ] && \
+       ! read_repo_item "$name" .cvmfs_partial_replication | \
+         cmp -s "$CVMFS_PARTIAL_REPLICATION_SPEC" -; then
+      die "Snapshot the replica with the current inclusion spec before pruning"
     fi
 
     local reconstruct_this_reflog=0
@@ -441,6 +482,13 @@ __run_gc() {
     fi
   fi
 
+  local partial_replication_param=""
+  if [ x"$CVMFS_PARTIAL_REPLICATION" = x"true" ] && \
+     [ -n "$CVMFS_PARTIAL_REPLICATION_SPEC" ] && \
+     [ -f "$CVMFS_PARTIAL_REPLICATION_SPEC" ]; then
+    partial_replication_param="-E $CVMFS_PARTIAL_REPLICATION_SPEC"
+  fi
+
   [ $dry_run -ne 0 ] || to_syslog_for_repo $name "started garbage collection"
   local gc_command="$(__swissknife_cmd dbg) gc                              \
                                             -r $repository_url              \
@@ -450,6 +498,7 @@ __run_gc() {
                                             -k $CVMFS_PUBLIC_KEY            \
                                             -t ${CVMFS_SPOOL_DIR}/tmp/      \
                                             -R $(get_reflog_checksum $name) \
+                                            $partial_replication_param       \
                                             $additional_switches"
 
   if ! $user_shell "$gc_command"; then

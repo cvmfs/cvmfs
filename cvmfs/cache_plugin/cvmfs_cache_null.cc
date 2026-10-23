@@ -5,8 +5,6 @@
  * complete but quite inefficient.
  */
 
-#define __STDC_FORMAT_MACROS
-
 #include <alloca.h>
 #include <fcntl.h>
 #include <inttypes.h>

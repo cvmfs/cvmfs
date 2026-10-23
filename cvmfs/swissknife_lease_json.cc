@@ -4,10 +4,10 @@
 
 #include "swissknife_lease_json.h"
 
-#include "json.h"
+#include <memory>
+
 #include "json_document.h"
 #include "util/logging.h"
-#include "util/pointer.h"
 
 // TODO(@vvolkl): refactor
 LeaseReply ParseAcquireReplyWithRevision(const CurlBuffer &buffer,
@@ -18,15 +18,15 @@ LeaseReply ParseAcquireReplyWithRevision(const CurlBuffer &buffer,
     return kLeaseReplyFailure;
   }
 
-  const UniquePtr<JsonDocument> reply(JsonDocument::Create(buffer.data));
-  if (!reply.IsValid() || !reply->IsValid()) {
+  const std::unique_ptr<JsonDocument> reply(JsonDocument::Create(buffer.data));
+  if (reply.get() == nullptr || !reply->IsValid()) {
     return kLeaseReplyFailure;
   }
 
   const JSON *result = JsonDocument::SearchInObject(reply->root(), "status",
                                                     JSON_STRING);
   if (result != NULL) {
-    const std::string status = result->string_value;
+    const std::string status = result->get<std::string>();
     if (status == "ok") {
       LogCvmfs(kLogCvmfs, kLogStdout, "Gateway reply: ok");
       const JSON *token = JsonDocument::SearchInObject(
@@ -36,16 +36,16 @@ LeaseReply ParseAcquireReplyWithRevision(const CurlBuffer &buffer,
             reply->root(), "revision",
             JSON_INT);  // TODO FIXME: make the json lib uint64 aware
         if (rev != NULL) {
-          *current_revision = (uint64_t)rev->int_value;
+          *current_revision = (uint64_t)rev->get<int>();
         }
         const JSON *hash = JsonDocument::SearchInObject(
             reply->root(), "root_hash", JSON_STRING);
         if (hash != NULL) {
-          current_root_hash = hash->string_value;
+          current_root_hash = hash->get<std::string>();
         }
         LogCvmfs(kLogCvmfs, kLogDebug, "Session token: %s",
-                 token->string_value);
-        *session_token = token->string_value;
+                 token->get<std::string>().c_str());
+        *session_token = token->get<std::string>();
         return kLeaseReplySuccess;
       }
     } else if (status == "path_busy") {
@@ -53,14 +53,15 @@ LeaseReply ParseAcquireReplyWithRevision(const CurlBuffer &buffer,
           reply->root(), "time_remaining", JSON_STRING);
       if (time_remaining != NULL) {
         LogCvmfs(kLogCvmfs, kLogStdout, "Path busy. Time remaining = %s",
-                 time_remaining->string_value);
+                 time_remaining->get<std::string>().c_str());
         return kLeaseReplyBusy;
       }
     } else if (status == "error") {
       const JSON *reason = JsonDocument::SearchInObject(reply->root(), "reason",
                                                         JSON_STRING);
       if (reason != NULL) {
-        LogCvmfs(kLogCvmfs, kLogStdout, "Error: %s", reason->string_value);
+        LogCvmfs(kLogCvmfs, kLogStdout, "Error: %s",
+                 reason->get<std::string>().c_str());
       }
     } else {
       LogCvmfs(kLogCvmfs, kLogStdout, "Unknown reply. Status: %s",
@@ -71,28 +72,34 @@ LeaseReply ParseAcquireReplyWithRevision(const CurlBuffer &buffer,
   return kLeaseReplyFailure;
 }
 LeaseReply ParseAcquireReply(const CurlBuffer &buffer,
-                             std::string *session_token) {
+                             std::string *session_token,
+                             int *max_api_version) {
   if (buffer.data.size() == 0 || session_token == NULL) {
     return kLeaseReplyFailure;
   }
 
-  const UniquePtr<JsonDocument> reply(JsonDocument::Create(buffer.data));
-  if (!reply.IsValid() || !reply->IsValid()) {
+  const std::unique_ptr<JsonDocument> reply(JsonDocument::Create(buffer.data));
+  if (reply.get() == nullptr || !reply->IsValid()) {
     return kLeaseReplyFailure;
   }
 
   const JSON *result = JsonDocument::SearchInObject(reply->root(), "status",
                                                     JSON_STRING);
   if (result != NULL) {
-    const std::string status = result->string_value;
+    const std::string status = result->get<std::string>();
     if (status == "ok") {
       LogCvmfs(kLogCvmfs, kLogStdout, "Gateway reply: ok");
       const JSON *token = JsonDocument::SearchInObject(
           reply->root(), "session_token", JSON_STRING);
       if (token != NULL) {
         LogCvmfs(kLogCvmfs, kLogDebug, "Session token: %s",
-                 token->string_value);
-        *session_token = token->string_value;
+                 token->get<std::string>().c_str());
+        *session_token = token->get<std::string>();
+        const JSON *api_version = JsonDocument::SearchInObject(
+            reply->root(), "max_api_version", JSON_INT);
+        if (api_version != NULL && max_api_version != NULL) {
+          *max_api_version = api_version->get<int>();
+        }
         return kLeaseReplySuccess;
       }
     } else if (status == "path_busy") {
@@ -100,14 +107,15 @@ LeaseReply ParseAcquireReply(const CurlBuffer &buffer,
           reply->root(), "time_remaining", JSON_INT);
       if (time_remaining != NULL) {
         LogCvmfs(kLogCvmfs, kLogStdout, "Path busy. Time remaining = %d s",
-                 time_remaining->int_value);
+                 time_remaining->get<int>());
         return kLeaseReplyBusy;
       }
     } else if (status == "error") {
       const JSON *reason = JsonDocument::SearchInObject(reply->root(), "reason",
                                                         JSON_STRING);
       if (reason != NULL) {
-        LogCvmfs(kLogCvmfs, kLogStdout, "Error: %s", reason->string_value);
+        LogCvmfs(kLogCvmfs, kLogStdout, "Error: %s",
+                 reason->get<std::string>().c_str());
       }
     } else {
       LogCvmfs(kLogCvmfs, kLogStdout, "Unknown reply. Status: %s",
@@ -124,15 +132,16 @@ LeaseReply ParseDropReply(const CurlBuffer &buffer) {
     return kLeaseReplyFailure;
   }
 
-  const UniquePtr<const JsonDocument> reply(JsonDocument::Create(buffer.data));
-  if (!reply.IsValid() || !reply->IsValid()) {
+  const std::unique_ptr<const JsonDocument> reply(
+      JsonDocument::Create(buffer.data));
+  if (reply.get() == nullptr || !reply->IsValid()) {
     return kLeaseReplyFailure;
   }
 
   const JSON *result = JsonDocument::SearchInObject(reply->root(), "status",
                                                     JSON_STRING);
   if (result != NULL) {
-    const std::string status = result->string_value;
+    const std::string status = result->get<std::string>();
     if (status == "ok") {
       LogCvmfs(kLogCvmfs, kLogStdout, "Gateway reply: ok");
       return kLeaseReplySuccess;
@@ -142,7 +151,8 @@ LeaseReply ParseDropReply(const CurlBuffer &buffer) {
       const JSON *reason = JsonDocument::SearchInObject(reply->root(), "reason",
                                                         JSON_STRING);
       if (reason != NULL) {
-        LogCvmfs(kLogCvmfs, kLogStdout, "Error: %s", reason->string_value);
+        LogCvmfs(kLogCvmfs, kLogStdout, "Error: %s",
+                 reason->get<std::string>().c_str());
       }
     } else {
       LogCvmfs(kLogCvmfs, kLogStdout, "Unknown reply. Status: %s",

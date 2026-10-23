@@ -3,17 +3,6 @@
 cvmfs_test_name="Garbage Collection Until Specified Timestamp With Named Snapshots"
 cvmfs_test_autofs_on_startup=false
 
-inflate_file() {
-  local destination_file=$1
-  local source_file=$2
-  local desired_file_size=$3
-
-  touch $destination_file
-  while [ $(stat -c %s $destination_file) -lt $desired_file_size ]; do
-    cat $source_file >> $destination_file
-  done
-}
-
 produce_files_1_in() {
   local working_dir=$1
   pushdir $working_dir
@@ -207,7 +196,7 @@ cvmfs_run_test() {
   produce_files_1_in $repo_dir || return 1
 
   echo "*** {1} putting exactly the same stuff in the scratch spaces for comparison"
-  produce_files_1_in $reference_dir1 || return 2
+  cp -a "$repo_dir"/* $reference_dir1 || return 2
 
   timestamp1="$(get_timestamp)"
   echo "*** {1} creating CVMFS snapshot ($(display_timestamp $timestamp1))"

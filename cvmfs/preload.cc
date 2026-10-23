@@ -10,9 +10,6 @@
 #include <string>
 
 #include "compression/compression.h"
-#include "crypto/signature.h"
-#include "network/download.h"
-#include "statistics.h"
 #include "swissknife.h"
 #include "swissknife_pull.h"
 #include "util/logging.h"

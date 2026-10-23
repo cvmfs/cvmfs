@@ -550,10 +550,12 @@ TEST_F(T_SQLite_Wrapper, DataAccessSlow) {
     sqlite::Sql insert(db1->sqlite_db(), "INSERT INTO foobar (foo, bar) "
                                          "VALUES (:f, :b);");
 
+    // BindText() binds the buffer without copying, it must outlive Execute()
+    const std::string useless_text = "this is a very useless text!!";
     EXPECT_TRUE(db1->BeginTransaction());
     for (int i = 0; i < entry_count; ++i) {
       EXPECT_TRUE(insert.BindTextTransient(1, "foobar!" + StringifyInt(i)));
-      EXPECT_TRUE(insert.BindText(2, "this is a very useless text!!"));
+      EXPECT_TRUE(insert.BindText(2, useless_text));
       EXPECT_TRUE(insert.Execute());
       EXPECT_TRUE(insert.Reset());
     }
@@ -596,7 +598,7 @@ TEST_F(T_SQLite_Wrapper, VacuumDatabaseSlow) {
     EXPECT_TRUE(db1->BeginTransaction());
     for (int i = 0; i < entry_count; ++i) {
       EXPECT_TRUE(insert.BindTextTransient(1, "foobar!" + StringifyInt(i)));
-      EXPECT_TRUE(insert.BindText(2, "this is a very useless text!!"));
+      EXPECT_TRUE(insert.BindTextTransient(2, "this is a very useless text!!"));
       EXPECT_TRUE(insert.Execute());
       EXPECT_TRUE(insert.Reset());
     }
@@ -673,7 +675,7 @@ TEST_F(T_SQLite_Wrapper, FailingCompaction) {
     EXPECT_TRUE(db1->BeginTransaction());
     for (int i = 1; i < entry_count; ++i) {
       EXPECT_TRUE(insert.BindTextTransient(1, "foobar!" + StringifyInt(i)));
-      EXPECT_TRUE(insert.BindText(2, "this is a very useless text!!"));
+      EXPECT_TRUE(insert.BindTextTransient(2, "this is a very useless text!!"));
       EXPECT_TRUE(insert.Execute());
 
       EXPECT_TRUE(insert.Reset());
@@ -925,7 +927,7 @@ TEST_F(T_SQLite_Wrapper, CountModifiedRows) {
     EXPECT_TRUE(db2->BeginTransaction());
     for (unsigned i = 0; i < entries; ++i) {
       EXPECT_TRUE(insert.BindTextTransient(1, "foobar!" + StringifyInt(i)));
-      EXPECT_TRUE(insert.BindText(2, "this is a very useless text!!"));
+      EXPECT_TRUE(insert.BindTextTransient(2, "this is a very useless text!!"));
       EXPECT_TRUE(insert.Execute());
       EXPECT_TRUE(insert.Reset());
     }

@@ -65,7 +65,7 @@ PayloadProcessor::PayloadProcessor()
     , uploader_()
     , temp_dir_()
     , num_errors_(0)
-    , statistics_(NULL) { }
+    , statistics_(nullptr) { }
 
 PayloadProcessor::~PayloadProcessor() { }
 
@@ -190,7 +190,8 @@ void PayloadProcessor::OnUploadJobComplete(
 }
 
 void PayloadProcessor::SetStatistics(perf::Statistics *st) {
-  statistics_ = new perf::StatisticsTemplate("publish", st);
+  statistics_ = std::unique_ptr<perf::StatisticsTemplate>(
+      new perf::StatisticsTemplate("publish", st));
 }
 
 PayloadProcessor::Result PayloadProcessor::Initialize() {
@@ -206,8 +207,8 @@ PayloadProcessor::Result PayloadProcessor::Initialize() {
       params.spooler_configuration);
   assert(!spooler_temp_dir.empty());
   assert(MkdirDeep(spooler_temp_dir + "/receiver", 0770, true));
-  temp_dir_ = RaiiTempDir::Create(spooler_temp_dir
-                                  + "/receiver/payload_processor");
+  temp_dir_ = std::unique_ptr<RaiiTempDir>(
+      RaiiTempDir::Create(spooler_temp_dir + "/receiver/payload_processor"));
 
   const upload::SpoolerDefinition definition(
       params.spooler_configuration, params.hash_alg, params.compression_alg,
@@ -215,19 +216,20 @@ PayloadProcessor::Result PayloadProcessor::Initialize() {
       params.min_chunk_size, params.avg_chunk_size, params.max_chunk_size,
       "dummy_token", "dummy_key");
 
-  uploader_.Destroy();
+  uploader_.reset();
 
   // configure the uploader environment
-  uploader_ = upload::AbstractUploader::Construct(definition);
-  if (!uploader_.IsValid()) {
+  uploader_ = std::unique_ptr<upload::AbstractUploader>(
+      upload::AbstractUploader::Construct(definition));
+  if (uploader_.get() == nullptr) {
     LogCvmfs(kLogSpooler, kLogWarning,
              "Failed to initialize backend upload "
              "facility in PayloadProcessor.");
     return kUploaderError;
   }
 
-  if (statistics_.IsValid()) {
-    uploader_->InitCounters(statistics_.weak_ref());
+  if (statistics_.get() != nullptr) {
+    uploader_->InitCounters(statistics_.get());
   }
 
   return kSuccess;
@@ -235,7 +237,7 @@ PayloadProcessor::Result PayloadProcessor::Initialize() {
 
 PayloadProcessor::Result PayloadProcessor::Finalize() {
   uploader_->WaitForUpload();
-  temp_dir_.Destroy();
+  temp_dir_.reset();
 
   const unsigned num_uploader_errors = uploader_->GetNumberOfErrors();
   uploader_->TearDown();

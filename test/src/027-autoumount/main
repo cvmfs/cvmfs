@@ -22,11 +22,8 @@ cvmfs_run_test() {
   echo "wait for things to settle"
   sleep 20
 
-  echo "try to list /cvmfs/atlas.cern.ch again"
-  ls .
-  if [ $? -eq 0 ]; then
-    return 4
-  fi
+  echo "try to list /cvmfs/atlas.cern.ch again (should fail)"
+  ls . && return 4
 
   echo "change directory out of /cvmfs/atlas.cern.ch to $OLDPWD"
   cd $OLDPWD

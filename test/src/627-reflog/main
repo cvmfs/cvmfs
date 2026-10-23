@@ -101,7 +101,7 @@ cvmfs_run_test() {
   echo "creating a tag in Stratum0"
   cvmfs_server tag -a "foobar"                          \
                    -m "new tag to create a new history" \
-                   -h "$root_hash_1" $CVMFS_TEST_REPO || return 6
+                   -h "$root_hash_1" $CVMFS_TEST_REPO || (sudo journalctl -xe; return 6)
 
   echo "extracting root hashes from Stratum0"
   local root_hash_2=$(get_manifest_field $CVMFS_TEST_REPO 'C')

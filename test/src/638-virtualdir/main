@@ -143,7 +143,7 @@ cvmfs_run_test() {
   [ "x$uid_before" != "x0" -o "x$gid_before" != "x0" ] && return 60
   echo "0 1" > uidmap
   echo "0 1" > gidmap
-  sudo cvmfs_server catalog-chown -u uidmap -g gidmap $CVMFS_TEST_REPO || return 61
+  sudo cvmfs_server catalog-chown -u uidmap -g gidmap $CVMFS_TEST_REPO || (sudo journalctl -xe; return 61)
   local uid_after=$(stat -c %u /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots)
   local gid_after=$(stat -c %g /cvmfs/$CVMFS_TEST_REPO/.cvmfs/snapshots)
   [ "x$uid_after" != "x0" -o "x$gid_after" != "x0" ] && return 62

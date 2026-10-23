@@ -73,10 +73,10 @@ class PayloadProcessor {
   typedef std::map<shash::Any, FileInfo>::iterator FileIterator;
   std::map<shash::Any, FileInfo> pending_files_;
   std::string current_repo_;
-  UniquePtr<upload::AbstractUploader> uploader_;
-  UniquePtr<RaiiTempDir> temp_dir_;
+  std::unique_ptr<upload::AbstractUploader> uploader_;
+  std::unique_ptr<RaiiTempDir> temp_dir_;
   int num_errors_;
-  UniquePtr<perf::StatisticsTemplate> statistics_;
+  std::unique_ptr<perf::StatisticsTemplate> statistics_;
 };
 
 }  // namespace receiver

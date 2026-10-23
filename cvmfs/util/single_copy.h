@@ -14,15 +14,13 @@ namespace CVMFS_NAMESPACE_GUARD {
  * Generic base class to mark an inheriting class as 'non-copyable'
  */
 class SingleCopy {
+ public:
+  SingleCopy(const SingleCopy &other) = delete;
+  SingleCopy &operator=(const SingleCopy &rhs) = delete;
+
  protected:
   // Prevent SingleCopy from being instantiated on its own
-  SingleCopy() { }
-
- private:
-  // Provoke a linker error by not implementing copy constructor and
-  // assignment operator.
-  SingleCopy(const SingleCopy &other);
-  SingleCopy &operator=(const SingleCopy &rhs);
+  SingleCopy() = default;
 };
 
 

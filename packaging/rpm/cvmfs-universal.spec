@@ -7,16 +7,20 @@
 %define sle15 1
 %define dist .sle15
 %endif
+%if 0%{?suse_version} == 1600
+%define sle16 1
+%define dist .sle16
+%endif
 %if 0%{?dist:1}
 %else
   %define redhat_major %(cat /etc/issue | head -n1 | tr -cd [0-9] | head -c1)
 %endif
 
-%if 0%{?rhel} >= 6 || 0%{?fedora}
+%if 0%{?rhel} >= 6 || 0%{?fedora} || 0%{?sle16}
 %define selinux_cvmfs 1
 %define selinux_variants mls strict targeted
 %endif
-%if 0%{?rhel} >= 7 || 0%{?fedora}
+%if 0%{?rhel} >= 7 || 0%{?fedora} || 0%{?sle16}
 %define selinux_cvmfs_server 1
 %endif
 
@@ -25,7 +29,7 @@
     %define build_ducc 1
     %define build_snapshotter 1
 %endif
-%if 0%{?sle15}
+%if 0%{?sle15} || 0%{?sle16}
   %define build_gateway 1
   %define build_ducc 1
   %define build_snapshotter 1
@@ -38,17 +42,12 @@
 
 
 # List of platforms that require systemd/autofs fix as described in CVM-1200
-%if 0%{?rhel} >= 7 || 0%{?fedora} || 0%{?sle12} || 0%{?sle15}
+%if 0%{?rhel} >= 7 || 0%{?fedora} || 0%{?sle12} || 0%{?sle15} || 0%{?sle16}
 %define systemd_autofs_patch 1
 %endif
 
-%define build_fuse2 1
-%if 0%{?fedora} >= 42 || 0%{?rhel} >= 10
-%define build_fuse2 0
-%endif
 
-
-%if 0%{?sle15} || 0%{?rhel} >= 8 || 0%{?fedora} >= 31
+%if 0%{?sle15} || 0%{?sle16} || 0%{?rhel} >= 8 || 0%{?fedora} >= 31
 %define cvmfs_python_devel python3-devel
 %define cvmfs_python_setuptools python3-setuptools
 %else
@@ -57,12 +56,12 @@
 %endif
 
 %define cvmfs_go golang
-%if 0%{?sle15}
+%if 0%{?sle15} || 0%{?sle16}
 %define cvmfs_go go
 %endif
 
 %define hardlink /usr/sbin/hardlink
-%if 0%{?fedora} >= 31 || 0%{?rhel} >= 9
+%if 0%{?fedora} >= 31 || 0%{?rhel} >= 9 || 0%{?sle16}
 %define hardlink /usr/bin/hardlink
 %endif
 
@@ -74,9 +73,16 @@
 
 Summary: CernVM File System
 Name: cvmfs
-Version: 2.13.3
+# Staged early so %{SOURCE3} below resolves to its path (rpm defines that
+# macro as each Source tag is parsed).
+Source3: VERSION
+# Build scripts pass the resolved version via `rpmbuild --define "cvmfs_version ..."`.
+# Without that define, fall back to the plain VERSION file (staged as Source3)
+# so this spec stays parseable on its own, e.g. for `dnf builddep`.
+%{!?cvmfs_version: %define cvmfs_version %(cat %{SOURCE3} 2>/dev/null || echo 0)}
+Version: %{cvmfs_version}
 %global base_version %(echo %{version} | cut -d'~' -f1)
-Release: 2%{?dist}
+Release: 1%{?dist}
 URL: https://cernvm.cern.ch/fs/
 Source0: https://ecsft.cern.ch/dist/cvmfs/%{name}-%{version}/%{name}-%{version}.tar.gz
 %if 0%{?selinux_cvmfs}
@@ -106,18 +112,34 @@ BuildRequires: help2man
 BuildRequires: valgrind-devel
 %endif
 BuildRequires: cmake
-%if 0%{?build_fuse2}
-BuildRequires: fuse-devel
-%endif
 BuildRequires: fuse3-devel >= 3.3.0
 BuildRequires: libattr-devel
+# nettle is optional in the same sense as protobuf below: the build uses a
+# system nettle >= 3.10 when present and otherwise falls back to the vendored
+# (FetchContent) sources.
+%if 0%{?suse_version}
+BuildRequires: libnettle-devel
+%else
+BuildRequires: nettle-devel
+%endif
+# m4 preprocesses the assembler routines of the vendored nettle build; without
+# it, nettle falls back to the portable C implementations
+BuildRequires: m4
 BuildRequires: openssl-devel
 BuildRequires: patch
 BuildRequires: pkgconfig
 BuildRequires: %{cvmfs_python_devel}
 BuildRequires: unzip
 BuildRequires: zlib-devel
-%if 0%{?rhel} >= 7 || 0%{?fedora} || 0%{?sle12} || 0%{?sle15}
+BuildRequires: libarchive-devel
+# protobuf is optional: the build uses the system package when present and
+# otherwise falls back to the vendored (FetchContent) sources. protoc ships in a
+# separate protobuf-compiler package everywhere except SUSE.
+BuildRequires: protobuf-devel
+%if !0%{?suse_version}
+BuildRequires: protobuf-compiler
+%endif
+%if 0%{?rhel} >= 7 || 0%{?fedora} || 0%{?sle12} || 0%{?sle15} || 0%{?sle16}
 BuildRequires: systemd
 %endif
 
@@ -133,13 +155,18 @@ Requires: fuse
 Requires: curl
 Requires: attr
 Requires: zlib
+%if !0%{?suse_version}
+Requires: protobuf
+%endif
 Requires: gdb
+%if 0%{?suse_version}
+Requires: libarchive13
+%else
+Requires: libarchive
+%endif
 # Account for different package names
 %if 0%{?suse_version}
 Requires: aaa_base
-%if 0%{?build_fuse2} 
-Requires: libfuse2
-%endif
 Requires: glibc
   %if 0%{?suse_version} < 1500
 Requires: pwdutils
@@ -176,8 +203,8 @@ Requires: util-linux
 Requires: cvmfs-config
 Requires: cvmfs-libs = %{version}-%{release}
 Requires: cvmfs-fuse3 = %{version}-%{release}
-Provides: group(cvmfs)
-Provides: user(cvmfs)
+Provides: group(cvmfs) = %{version}-%{release}
+Provides: user(cvmfs) = %{version}-%{release}
 
 # SELinux integration
 # These are needed to build the selinux policy module.
@@ -187,8 +214,13 @@ Provides: user(cvmfs)
 Requires:      selinux-policy
 %endif
 BuildRequires:  checkpolicy selinux-policy-devel hardlink selinux-policy-targeted
+%if 0%{?sle16}
+Requires(post):         /usr/sbin/semodule /usr/sbin/semanage /usr/sbin/fixfiles
+Requires(preun):        /sbin/service /usr/sbin/semodule /usr/sbin/semanage /usr/sbin/fixfiles
+%else
 Requires(post):         /usr/sbin/semodule /usr/sbin/semanage /sbin/fixfiles
 Requires(preun):        /sbin/service /usr/sbin/semodule /usr/sbin/semanage /sbin/fixfiles
+%endif
 Requires(postun):       /usr/sbin/semodule
 %endif
 
@@ -203,7 +235,7 @@ Summary: CernVM-FS common libraries
 Common utility libraries for CernVM-FS packages
 
 %package fuse3
-Summary: additional libraries to enable libfuse3 support
+Summary: libraries implementing the CernVM-FS fuse module
 Group: Applications/System
 Requires: cvmfs-libs = %{version}-%{release}
 # fuse library package name differs on suse
@@ -229,6 +261,7 @@ BuildRequires: %{cvmfs_python_devel}
 BuildRequires: libcap-devel
 BuildRequires: help2man
 BuildRequires: unzip
+BuildRequires: libarchive-devel
 BuildRequires: %{cvmfs_python_setuptools}
 %if 0%{?suse_version}
   %if 0%{?suse_version} < 1500
@@ -251,7 +284,7 @@ Requires: gzip
 Requires: attr
 Requires: openssl
 Requires: httpd
-%if 0%{?sle15}
+%if 0%{?sle15} || 0%{?sle16}
 Requires: libcap2
 %else
 Requires: libcap
@@ -261,6 +294,11 @@ Requires: rsync
 Requires: usbutils
 Requires: sqlite
 Requires: tar
+%if 0%{?suse_version}
+Requires: libarchive13
+%else
+Requires: libarchive
+%endif
 %if 0%{?rhel} >= 6 || 0%{?fedora} || 0%{?suse_version} >= 1300
 Requires: jq
 %endif
@@ -361,10 +399,6 @@ BUILD_SNAPSHOTTER=no
 %if 0%{?build_snapshotter}
 BUILD_SNAPSHOTTER=yes
 %endif
-BUILD_LIBFUSE2=no
-%if 0%{?build_fuse2}
-BUILD_LIBFUSE2=yes
-%endif
 BUILD_UNITTESTS=no
 INSTALL_UNITTESTS=no
 %if 0%{?build_testing}
@@ -385,7 +419,6 @@ cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} \
   -DBUILD_DUCC=$BUILD_DUCC \
   -DBUILD_SNAPSHOTTER=$BUILD_SNAPSHOTTER \
   -DINSTALL_UNITTESTS=$INSTALL_UNITTESTS \
-  -DBUILD_LIBFUSE2=$BUILD_LIBFUSE2 \
   -DCMAKE_INSTALL_PREFIX:PATH=/usr .
 
 make %{?_smp_mflags}
@@ -646,14 +679,6 @@ systemctl daemon-reload
 %files
 %defattr(-,root,root)
 %{_bindir}/cvmfs2
-%if 0%{?build_fuse2} 
-%{_libdir}/libcvmfs_fuse_stub.so
-%{_libdir}/libcvmfs_fuse_stub.so.%{base_version}
-%{_libdir}/libcvmfs_fuse.so
-%{_libdir}/libcvmfs_fuse.so.%{base_version}
-%{_libdir}/libcvmfs_fuse_debug.so
-%{_libdir}/libcvmfs_fuse_debug.so.%{base_version}
-%endif
 %{_bindir}/cvmfs_talk
 %{_bindir}/cvmfs_fsck
 %{_bindir}/cvmfs_config
@@ -742,11 +767,6 @@ systemctl daemon-reload
 %doc COPYING CITATION.cff README.md ChangeLog
 %config(noreplace) %{_sysconfdir}/logrotate.d/cvmfs
 %config(noreplace) %{_sysconfdir}/logrotate.d/cvmfs-statsdb
-# sqlite version on rhel8 is too old for the statsdb logrotate script (needs >= 3.27)
-%define sqlite_version %(sqlite3 --version 2>/dev/null | cut -d' ' -f1 || echo "0")
-%if "%(echo '%{sqlite_version}' | awk 'BEGIN{print ("%{sqlite_version}" < "3.27")}')" == "1"
-%exclude %{_sysconfdir}/logrotate.d/cvmfs-statsdb
-%endif
 %doc %{_mandir}/man1/cvmfs_server.1.gz
 %doc %{_mandir}/man1/cvmfs_swissknife.1.gz
 
@@ -793,6 +813,8 @@ systemctl daemon-reload
 
 %changelog
 # - When using fuse3, require at least version 3.3.0 (for premounting).
+* Thu Mar 19 2026 Valentin Volkl <vavolkl@cern.ch> - 2.14.0
+- Add new libarchive and json system dependencies 
 * Wed Aug 27 2025 Valentin Volkl <vavolkl@cern.ch> - 2.13.3
 - Make building of unittests optional 
 - Silence a mkdir warning when /cvmfs already exists
@@ -942,4 +964,3 @@ systemctl daemon-reload
 - Small adjustments to run with continueous integration
 * Thu Jan 12 2012 Brian Bockelman <bbockelm@cse.unl.edu> - 2.0.13
 - Addition of SELinux support.
-

@@ -1,8 +1,12 @@
 #!/bin/bash
 
-cd "/home/sftnight/cvmfs/test"
+HERE="${0%/*}"
+if [ "$HERE" = "$0" ]; then
+    # no slash in $0
+    HERE="$PWD"
+fi
+cd $HERE/../..
 
-TEST_LOG_DIRECTORY=/tmp
 CLIENT_TEST_LOGFILE=/tmp/cvmfs-client-test.log
 SERVER_TEST_LOGFILE=/tmp/cvmfs-server-test.log
 
@@ -72,3 +76,5 @@ CVMFS_TEST_UNIONFS=overlayfs                                                  \
                                  src/7*                                       \
                               || exit 1
 
+# Hotpatch/migration coverage runs via test_migration.sh in the standalone
+# GitHub Actions workflow.

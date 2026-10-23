@@ -10,7 +10,7 @@
 namespace auto_umount {
 
 void SetMountpoint(const std::string &mountpoint);
-void UmountOnCrash();
+void UmountOnExit(const bool crashed);
 
 }  // namespace auto_umount
 

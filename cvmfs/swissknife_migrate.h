@@ -5,7 +5,9 @@
 #ifndef CVMFS_SWISSKNIFE_MIGRATE_H_
 #define CVMFS_SWISSKNIFE_MIGRATE_H_
 
+#include <atomic>
 #include <map>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -18,11 +20,9 @@
 #include "uid_map.h"
 #include "upload.h"
 #include "util/algorithm.h"
-#include "util/atomic.h"
 #include "util/concurrency.h"
 #include "util/future.h"
 #include "util/logging.h"
-#include "util/pointer.h"
 
 namespace catalog {
 class WritableCatalog;
@@ -391,7 +391,7 @@ class CommandMigrate : public Command {
   unsigned int file_descriptor_limit_;
   CatalogStatisticsList catalog_statistics_list_;
   unsigned int catalog_count_;
-  atomic_int32 catalogs_processed_;
+  std::atomic<int32_t> catalogs_processed_;
   bool has_committed_new_revision_;
 
   uid_t uid_;
@@ -401,10 +401,10 @@ class CommandMigrate : public Command {
   std::string nested_catalog_marker_tmp_path_;
   static catalog::DirectoryEntry nested_catalog_marker_;
 
-  UniquePtr<manifest::Manifest> manifest_upstream_;
-  UniquePtr<history::SqliteHistory> history_upstream_;
+  std::unique_ptr<manifest::Manifest> manifest_upstream_;
+  std::unique_ptr<history::SqliteHistory> history_upstream_;
   catalog::Catalog const *root_catalog_;
-  UniquePtr<upload::Spooler> spooler_;
+  std::unique_ptr<upload::Spooler> spooler_;
   PendingCatalogMap pending_catalogs_;
 
   StopWatch catalog_loading_stopwatch_;

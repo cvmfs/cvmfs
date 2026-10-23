@@ -94,13 +94,13 @@ class T_CatalogTraversal : public ::testing::Test {
     dice_.InitLocaltime();
     SetupDummyCatalogs();
     EXPECT_EQ(static_cast<int32_t>(initial_catalog_instances),
-              atomic_read32(&MockCatalog::instances));
+              MockCatalog::instances.load());
   }
 
   void TearDown() {
     MockCatalog::Reset();
     MockHistory::Reset();
-    EXPECT_EQ(0, atomic_read32(&MockCatalog::instances));
+    EXPECT_EQ(0, MockCatalog::instances.load());
   }
 
   TraversalParams GetBasicTraversalParams() {
@@ -560,7 +560,7 @@ TYPED_TEST(T_CatalogTraversal, SimpleTraversalNoClose) {
   EXPECT_TRUE(t1);
 
   EXPECT_EQ(static_cast<int32_t>(21 + this->initial_catalog_instances),
-            atomic_read32(&MockCatalog::instances));
+            MockCatalog::instances.load());
 
   std::vector<MockCatalog *>::const_iterator i, iend;
   for (i = SimpleTraversalNoCloseCallback_visited_catalogs.begin(),
@@ -726,7 +726,7 @@ TYPED_TEST(T_CatalogTraversal, FirstLevelHistoryTraversalNoClose) {
   EXPECT_TRUE(t1);
 
   EXPECT_EQ(static_cast<int32_t>(49 + this->initial_catalog_instances),
-            atomic_read32(&MockCatalog::instances));
+            MockCatalog::instances.load());
 
   std::vector<MockCatalog *>::const_iterator i, iend;
   for (i = FirstLevelHistoryTraversalNoClose_visited_catalogs.begin(),

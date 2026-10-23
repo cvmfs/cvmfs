@@ -27,7 +27,7 @@ cvmfs_run_test() {
 
   echo "*** start unshared background process accessing it, and check that"
   sudo unshare -m sh -c \
-    "cd /cvmfs/grid.cern.ch && cut -d' ' -f4 /proc/self/stat > $PWD/started && /bin/sleep 10000" &
+    "cd /cvmfs/grid.cern.ch && cut -d' ' -f4 /proc/self/stat > $PWD/started.wip && mv $PWD/started{.wip,} && /bin/sleep 10000" &
   sudopid=$!
   trap cleanup EXIT HUP INT TERM || return $?
   while [ ! -f started ]; do
@@ -48,7 +48,7 @@ cvmfs_run_test() {
   echo "*** stopping shared background process"
   pids="`sudo cvmfs_config fuser grid.cern.ch`"
   sudo kill -15 $backpid
-  sudo kill -15 -$sudopid
+  sudo kill -15 -$sudopid || true
   sudo wait $backpid 2>/dev/null || true
   echo "*** pids: $pids, backpid: $backpid"
   [[ " $pids " == *" $backpid "* ]] || return 20

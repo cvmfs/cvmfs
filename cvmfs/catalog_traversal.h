@@ -235,7 +235,7 @@ class CatalogTraversalBase
       const TraversalType type = kBreadthFirst) {
     typedef std::vector<shash::Any> HashList;
 
-    UniquePtr<HistoryTN> tag_db;
+    std::unique_ptr<HistoryTN> tag_db;
     const typename ObjectFetcherT::Failures
         retval = object_fetcher_->FetchHistory(&tag_db);
     switch (retval) {
@@ -255,7 +255,7 @@ class CatalogTraversalBase
     }
 
     HashList root_hashes;
-    bool success = tag_db->GetHashes(&root_hashes);
+    bool const success = tag_db->GetHashes(&root_hashes);
     assert(success);
     return TraverseList(root_hashes, type);
   }
@@ -390,7 +390,7 @@ class CatalogTraversalBase
   shash::Any GetRepositoryRootCatalogHash() {
     // get the manifest of the repository to learn about the entry point or the
     // root catalog of the repository to be traversed
-    UniquePtr<manifest::Manifest> manifest;
+    std::unique_ptr<manifest::Manifest> manifest;
     const typename ObjectFetcherT::Failures
         retval = object_fetcher_->FetchManifest(&manifest);
     if (retval != ObjectFetcherT::kFailOk) {
@@ -401,7 +401,7 @@ class CatalogTraversalBase
       return shash::Any();
     }
 
-    assert(manifest.IsValid());
+    assert(manifest.get() != nullptr);
     return manifest->catalog_hash();
   }
 
@@ -717,7 +717,7 @@ class CatalogTraversal : public CatalogTraversalBase<ObjectFetcherT> {
     typedef typename CatalogTN::NestedCatalogList NestedCatalogList;
     const NestedCatalogList nested = job.catalog->ListOwnNestedCatalogs();
     typename NestedCatalogList::const_iterator i = nested.begin();
-    typename NestedCatalogList::const_iterator iend = nested.end();
+    typename NestedCatalogList::const_iterator const iend = nested.end();
     for (; i != iend; ++i) {
       CatalogTN *parent = (this->no_close_) ? job.catalog : NULL;
       const CatalogJob new_job(i->mountpoint.ToString(),

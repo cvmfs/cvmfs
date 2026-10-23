@@ -14,6 +14,7 @@
 #include <vector>
 
 #include "network/download.h"
+#include "network/sink_mem.h"
 #include "pacparser.h"
 #include "statistics.h"
 #include "util/logging.h"

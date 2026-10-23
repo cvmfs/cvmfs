@@ -18,14 +18,9 @@
 #include <unistd.h>
 
 #include <string>
-#include <vector>
 
-#include "backoff.h"
-#include "catalog_mgr.h"
-#include "file_chunk.h"
 #include "interrupt.h"
 #include "loader.h"
-#include "lru.h"
 #include "mountpoint.h"
 #include "options.h"
 

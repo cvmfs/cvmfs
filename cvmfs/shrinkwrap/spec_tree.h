@@ -14,7 +14,8 @@ enum SPEC_READ_ST {
 
 class SpecTreeNode {
  public:
-  explicit SpecTreeNode(char modeParam) : mode(modeParam) { }
+  explicit SpecTreeNode(char modeParam)
+      : mode(modeParam), exclude_children(false) { }
   ~SpecTreeNode() {
     for (std::map<std::string, SpecTreeNode *>::iterator it = nodes_.begin();
          it != nodes_.end();
@@ -26,6 +27,7 @@ class SpecTreeNode {
   int GetListing(std::string base_path, char ***buf, size_t *len);
 
   void AddNode(const std::string &name, SpecTreeNode *node);
+  void ExcludeChildren();
 
   /**
    * 0: include this file
@@ -38,6 +40,12 @@ class SpecTreeNode {
    * !: Do not include this file
    */
   char mode;
+
+  // True for specifications that exclude all children of a path.
+  //
+  // The node itself remains traversable, but its children are excluded by
+  // default unless they are explicitly mentioned by a later rule.
+  bool exclude_children;
 
  private:
   std::map<std::string, SpecTreeNode *> nodes_;

@@ -7,16 +7,20 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "catalog_virtual.h"
 #include "manifest.h"
 #include "statistics.h"
 #include "statistics_database.h"
-#include "swissknife_capabilities.h"
+#include "swissknife_ingest_gc.h"
 #include "sync_mediator.h"
 #include "sync_union.h"
 #include "sync_union_tarball.h"
+#include "util/capabilities.h"
 #include "util/logging.h"
-#include "util/pointer.h"
 #include "util/posix.h"
 
 /*
@@ -53,11 +57,54 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
     params.to_delete = *args.find('D')->second;
   }
 
+  std::string gc_db_path;
+  std::vector<int64_t> gc_batch_ids;
+  if (args.find('Q') != args.end()) {
+    gc_db_path = *args.find('Q')->second;
+    // Batch size comes from the -X flag (populated by the shell from
+    // CVMFS_GC_DB_BATCH_SIZE in the repository server.conf).  0 / missing /
+    // negative means "no limit": read all pending rows.  Default is 1000.
+    int gc_db_batch_size = 1000;
+    if (args.find('X') != args.end()) {
+      gc_db_batch_size = static_cast<int>(
+          String2Int64(*args.find('X')->second));
+      if (gc_db_batch_size < 0)
+        gc_db_batch_size = 0;
+    }
+    std::vector<std::string> gc_paths;
+    if (!ReadGCDatabase(gc_db_path, &gc_paths, &gc_batch_ids,
+                        gc_db_batch_size)) {
+      PrintError("Swissknife Ingest: failed to read GC database");
+      return 1;
+    }
+    LogCvmfs(kLogCvmfs, kLogStdout,
+             "Swissknife Ingest: Read %lu paths from GC database %s "
+             "(batch size %d)",
+             gc_paths.size(), gc_db_path.c_str(), gc_db_batch_size);
+    // Append GC paths to the existing to_delete string using /// delimiter
+    for (size_t i = 0; i < gc_paths.size(); ++i) {
+      if (!params.to_delete.empty()) {
+        params.to_delete += "///";
+      }
+      params.to_delete += gc_paths[i];
+    }
+    // GC database implies fast delete
+    if (!gc_paths.empty()) {
+      params.fast_delete = true;
+    }
+  }
+
   if (args.find('O') != args.end()) {
     params.generate_legacy_bulk_chunks = true;
   }
   if (args.find('j') != args.end()) {
     params.enable_mtime_ns = true;
+  }
+  if (args.find('f') != args.end()) {
+    params.fast_delete = true;
+  }
+  if (args.find('m') != args.end()) {
+    params.tolerate_missing_hardlinks = true;
   }
   shash::Algorithms hash_algorithm = shash::kSha1;
   if (args.find('e') != args.end()) {
@@ -121,9 +168,10 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
                                               &publish_statistics);
   if (NULL == params.spooler)
     return 3;
-  const UniquePtr<upload::Spooler> spooler_catalogs(upload::Spooler::Construct(
-      spooler_definition_catalogs, &publish_statistics));
-  if (!spooler_catalogs.IsValid())
+  const std::unique_ptr<upload::Spooler> spooler_catalogs(
+      upload::Spooler::Construct(spooler_definition_catalogs,
+                                 &publish_statistics));
+  if (spooler_catalogs.get() == nullptr)
     return 3;
 
   const bool follow_redirects = (args.count('L') > 0);
@@ -142,20 +190,20 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
   // This may fail, in which case a warning is printed and the process continues
   ObtainDacReadSearchCapability();
 
-  UniquePtr<manifest::Manifest> manifest;
+  std::unique_ptr<manifest::Manifest> manifest;
   if (params.branched_catalog) {
     // Throw-away manifest
-    manifest = new manifest::Manifest(shash::Any(), 0, "");
+    manifest.reset(new manifest::Manifest(shash::Any(), 0, ""));
   } else {
     if (with_gateway) {
-      manifest = FetchRemoteManifest(params.stratum0, params.repo_name,
-                                     shash::Any());
+      manifest.reset(
+          FetchRemoteManifest(params.stratum0, params.repo_name, shash::Any()));
     } else {
-      manifest = FetchRemoteManifest(params.stratum0, params.repo_name,
-                                     params.base_hash);
+      manifest.reset(FetchRemoteManifest(params.stratum0, params.repo_name,
+                                         params.base_hash));
     }
   }
-  if (!manifest.IsValid()) {
+  if (manifest.get() == nullptr) {
     return 3;
   }
 
@@ -163,7 +211,7 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
 
   catalog::WritableCatalogManager catalog_manager(
       params.base_hash, params.stratum0, params.dir_temp,
-      spooler_catalogs.weak_ref(), download_manager(), params.enforce_limits,
+      spooler_catalogs.get(), download_manager(), params.enforce_limits,
       params.nested_kcatalog_limit, params.root_kcatalog_limit,
       params.file_mbyte_limit, statistics(), params.is_balanced,
       params.max_weight, params.min_weight);
@@ -174,7 +222,8 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
 
   publish::SyncUnion *sync = new publish::SyncUnionTarball(
       &mediator, params.dir_rdonly, params.tar_file, params.base_directory,
-      params.uid, params.gid, params.to_delete, create_catalog, "///");
+      params.uid, params.gid, params.to_delete, create_catalog,
+      params.fast_delete, "///", params.tolerate_missing_hardlinks);
 
   if (!sync->Initialize()) {
     LogCvmfs(kLogCvmfs, kLogStderr,
@@ -213,7 +262,7 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
     catalog_manager.SetVOMSAuthz(new_authz);
   }
 
-  if (!mediator.Commit(manifest.weak_ref())) {
+  if (!mediator.Commit(manifest.get())) {
     PrintError("Swissknife Ingest: something went wrong during sync");
     stats_db->StorePublishStatistics(this->statistics(), start_time, false);
     if (upload_statsdb) {
@@ -262,6 +311,24 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
   if (!manifest->Export(params.manifest_path)) {
     PrintError("Swissknife Ingest: Failed to create new repository");
     return 6;
+  }
+
+  // Mark GC paths as deleted in the database after successful publication.
+  // Only the rows that were just read (gc_batch_ids) are marked, so rows
+  // added after the read by a concurrent scanner are preserved for the next
+  // invocation.
+  if (!gc_db_path.empty()) {
+    if (MarkGCPathsDeleted(gc_db_path, gc_batch_ids)) {
+      LogCvmfs(kLogCvmfs, kLogStdout,
+               "Swissknife Ingest: Marked %lu GC paths as deleted in %s",
+               gc_batch_ids.size(), gc_db_path.c_str());
+    } else {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "Swissknife Ingest: WARNING - Failed to mark GC paths as "
+               "deleted in %s. Paths were removed from the repository but "
+               "the database was not updated.",
+               gc_db_path.c_str());
+    }
   }
 
   return 0;

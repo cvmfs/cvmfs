@@ -17,10 +17,7 @@ cvmfs_run_test() {
 
   cvmfs_umount grid.cern.ch
   cvmfs_mount grid.cern.ch "CVMFS_CLIENT_PROFILE=custom" || return 2
-  sudo cvmfs_talk -i grid.cern.ch proxy info | tail -n 1 | grep 'fallback group:'
-  if [ $? -eq 0 ]; then
-    return 20
-  fi
+  sudo cvmfs_talk -i grid.cern.ch proxy info | tail -n 1 | grep 'fallback group:' && return 20
 
   # Set only fallback proxy
   cvmfs_umount grid.cern.ch
@@ -29,33 +26,21 @@ cvmfs_run_test() {
   sudo cvmfs_talk -i grid proxy info | tail -n 4 | grep "http://A:3128" || return 30
   sudo cvmfs_talk -i grid proxy info | tail -n 4 | grep "http://B1:3128" | grep "http://B2:3128" || return 31
   sudo cvmfs_talk -i grid proxy info | tail -n 4 | grep "fallback group:" || return 32
-  sudo cvmfs_talk -i grid proxy info | grep "DIRECT"
-  if [ $? -eq 0 ]; then
-    return 33
-  fi
+  sudo cvmfs_talk -i grid proxy info | grep "DIRECT" && return 33
 
   # Set only proxy
   ## replaced http://D:3128 with http://H:3128 as D:3128 is used at CERN
   sudo cvmfs_talk -i grid proxy set "http://C:3128|http://H:3128;DIRECT"
-  sudo cvmfs_talk -i grid proxy info | grep "DIRECT"
-  if [ $? -eq 0 ]; then
-    return 40
-  fi
+  sudo cvmfs_talk -i grid proxy info | grep "DIRECT" && return 40
   sudo cvmfs_talk -i grid proxy info | head -n 2 | grep "http://C:3128" | grep "http://H:3128" #|| return 41
 
   sudo cvmfs_talk -i grid proxy set "DIRECT"
-  sudo cvmfs_talk -i grid proxy info | grep "DIRECT"
-  if [ $? -eq 0 ]; then
-    return 50
-  fi
+  sudo cvmfs_talk -i grid proxy info | grep "DIRECT" && return 50
 
   # Recover direct after removing fallback proxies
   sudo cvmfs_talk -i grid.cern.ch proxy fallback DIRECT # DIRECT is removed
   sudo cvmfs_talk -i grid proxy info | grep "DIRECT" || return 60
-  sudo cvmfs_talk -i grid proxy info | grep "fallback group:"
-  if [ $? -eq 0 ]; then
-    return 61
-  fi
+  sudo cvmfs_talk -i grid proxy info | grep "fallback group:" && return 61
 
   return 0
 }

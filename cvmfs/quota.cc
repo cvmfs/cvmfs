@@ -16,7 +16,7 @@
 
 using namespace std;  // NOLINT
 
-const uint32_t QuotaManager::kProtocolRevision = 2;
+const uint32_t QuotaManager::kProtocolRevision = 3;
 
 void QuotaManager::BroadcastBackchannels(const string &message) {
   assert(message.length() > 0);

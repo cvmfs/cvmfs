@@ -93,7 +93,7 @@ elif find_sbin apache2 > /dev/null 2>&1; then
   APACHE_BIN="$(find_sbin apache2)"
   if find_sbin apachectl > /dev/null 2>&1; then # Debian
     APACHE_CTL="$(find_sbin apachectl)"
-    APACHE_WSGI_MODPKG="libapache2-mod-wsgi"
+    APACHE_WSGI_MODPKG="libapache2-mod-wsgi-py3"
   elif find_sbin apache2ctl > /dev/null 2>&1; then # Gentoo
     APACHE_CTL="$(find_sbin apache2ctl)"
     APACHE_WSGI_MODPKG="www-apache/mod_wsgi"

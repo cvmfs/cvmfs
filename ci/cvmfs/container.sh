@@ -17,55 +17,28 @@ fi
 
 CVMFS_SOURCE_LOCATION="$1"
 CVMFS_RESULT_LOCATION="$2"
-CVMFS_BUSYBOX=/usr/bin/busybox
 CVMFS_NIGHTLY_BUILD_NUMBER="${3-0}"
 
-# For the time being, build with the host's docker until the builder nodes are
-# new enough to support fuse in user namespaces.  That's a precondition to
-# using buildah
-
+# The build itself runs inside the multi-stage Dockerfile, so all the host
+# needs is a working docker with BuildKit support.
 if ! docker version; then
   echo "docker required to build container image"
   exit 1
 fi
 
-# if ! buildah version; then
-#   echo "buildah required to build container image"
-#   exit 1
-# fi
+# Preserve the legacy nightly-number interface.
+set_cvmfs_version_sequence_from_nightly "$CVMFS_NIGHTLY_BUILD_NUMBER"
 
-if ! $CVMFS_BUSYBOX --help | head -5; then
-  echo "functional busybox is required"
-  exit 1
-fi
-
-if [ ! -f /etc/os-release ]; then
-  echo "/etc/os-release required to build container image"
-  exit 1
-fi
-
-# retrieve the upstream version string from CVMFS
-cvmfs_prerelease="$(get_cvmfs_prerelease_from_cmake $CVMFS_SOURCE_LOCATION)"
-cvmfs_version=${cvmfs_version}${cvmfs_prerelease}
+cvmfs_version="$(get_cvmfs_version "$CVMFS_SOURCE_LOCATION")"
+# OCI tags do not allow '~' or '+'.
+cvmfs_tag_version=$(echo "$cvmfs_version" | tr '~+' '--')
 echo "detected upstream version: $cvmfs_version"
 
-git_hash="$(get_cvmfs_git_revision $CVMFS_SOURCE_LOCATION)"
-
-# generate the release tag for either a nightly build or a release
-CVMFS_TAG=
-if [ $CVMFS_NIGHTLY_BUILD_NUMBER -gt 0 ]; then
-  build_tag="git-${git_hash}"
-  nightly_tag="0.${CVMFS_NIGHTLY_BUILD_NUMBER}.${git_hash}git"
-
-  echo "creating nightly build '$nightly_tag'"
-  CVMFS_TAG="${cvmfs_version}-$nightly_tag"
-else
-  echo "creating release: $cvmfs_version"
-  CVMFS_TAG="${cvmfs_version}-1"
-fi
+CVMFS_TAG="${cvmfs_tag_version}-1"
+echo "creating container: $CVMFS_TAG"
 
 ${CVMFS_SOURCE_LOCATION}/packaging/container/build.sh \
-  ${CVMFS_SOURCE_LOCATION} ${CVMFS_RESULT_LOCATION} ${CVMFS_BUSYBOX} ${CVMFS_TAG} \
+  ${CVMFS_SOURCE_LOCATION} ${CVMFS_RESULT_LOCATION} ${CVMFS_TAG} \
   || die "failed building service container"
 
 

@@ -7,7 +7,7 @@ cvmfs_test_suites="quick"
 set_up_work_dir() {
     fs_type=$1
     shift
-    mkfs_args=$@
+    mkfs_args=($@)
 
     root_dir=$(pwd)
     read_only=$root_dir/read_only
@@ -17,10 +17,10 @@ set_up_work_dir() {
 
     test_volume=$(pwd)/test_vol
     sudo dd if=/dev/zero of=$test_volume bs=1 count=0 seek=2GB
-    sudo yes | sudo mkfs.$fs_type $fs_args $test_volume
+    sudo mkfs.$fs_type "${mkfs_args[@]}" $test_volume
 
     # preparation
-    echo "$fs_type $mkfs_args - Creating overlay fs"
+    echo "$fs_type ${mkfs_args[@]} - Creating overlay fs"
     mkdir -p $read_only $read_write $work_dir $union
     sudo mount -o loop $test_volume $read_only
     sudo mkdir $read_only/foo
@@ -46,7 +46,7 @@ delete_file_in_lower_branch() {
     set_up_work_dir $@
 
     echo "$@ - Delete file from read-only layer"
-    rm -f $union/foo/bar
+    sudo rm -f $union/foo/bar
 
     # ls produces obviously bogus output (a non-zero return code here, makes the test case fail)
     ls -lisa $union
@@ -87,7 +87,7 @@ delete_dir_in_lower_branch () {
     set_up_work_dir $@
 
     # reproduction
-    rm -fR $union/foo
+    sudo rm -fR $union/foo
 
     # ls shows that 'foo' is still there
     ls -lisa $union
@@ -139,7 +139,7 @@ run_test_cases() {
     local status4=$?
 
     echo "$@ - Check deleting files in the lower read-only branch of the union fs: Status $status1"
-    echo "$@ - Check open file paths in /proc/$PID/fd: Status $status2"
+    echo "$@ - Check open file paths in /proc/PID/fd: Status $status2"
     echo "$@ - Check deleting directories in the lower read-only branch of the union fs: Status $status3"
     echo "$@ - Check suid or sgid bits during writes on overlayfs: Status $status4"
 
@@ -149,15 +149,16 @@ run_test_cases() {
 cvmfs_run_test() {
     trap clean_work_dir EXIT HUP INT TERM || return $?
 
-    run_test_cases "xfs"
+    run_test_cases "xfs -f"
     local status_xfs1=$?
 
-    run_test_cases "xfs -n ftype=1"
+    run_test_cases "xfs -f -n ftype=1"
     local status_xfs2=$?
 
-    run_test_cases "ext4"
+    run_test_cases "ext4 -FF"
     local status_ext4=$?
 
+    trap - EXIT HUP INT TERM
     return $(check_status $(( $status_xfs1 || $status_xfs2 || $status_ext4 )))
 }
 

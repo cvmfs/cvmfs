@@ -70,6 +70,13 @@ class CVMFS_EXPORT Pipe : public SingleCopy {
   }
 
   /**
+   * Used in unit tests to test pipes using stdin/stdout as read/write
+   * and also when restoring state after reload.
+   */
+  Pipe(const int fd_read, const int fd_write)
+      : fd_read_(fd_read), fd_write_(fd_write) { }
+
+  /**
    * Destructor closes all valid file descriptors of the pipe
    */
   ~Pipe() { Close(); }
@@ -194,12 +201,6 @@ class CVMFS_EXPORT Pipe : public SingleCopy {
  private:
   int fd_read_;
   int fd_write_;
-
-  /**
-   * Only used in the unit tests to test pipes using stdin/stdout as read/write.
-   */
-  Pipe(const int fd_read, const int fd_write)
-      : fd_read_(fd_read), fd_write_(fd_write) { }
 
   /**
    * Creating a pipe should always succeed.

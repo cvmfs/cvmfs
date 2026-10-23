@@ -4,17 +4,42 @@
 
 #include <gtest/gtest.h>
 
+#include <memory>
+
+#include "crypto/hash.h"
 #include "json_document.h"
 #include "json_document_write.h"
 #include "pack.h"
+#include "receiver/commit_processor.h"
 #include "receiver/payload_processor.h"
 #include "receiver/reactor.h"
+#include "repository_tag.h"
 #include "util/concurrency.h"
 #include "util/logging.h"
-#include "util/pointer.h"
 #include "util/string.h"
 
 using namespace receiver;  // NOLINT
+
+// Captures what HandleCommit parsed out of the commit request, so the test can
+// assert the receiver forwards the right RepositoryTag to the CommitProcessor.
+// Written in the reactor thread, read in the test thread after the (pipe-
+// synchronized) reply has been received.
+static std::string g_committed_delete_tags;
+
+class MockedCommitProcessor : public CommitProcessor {
+ public:
+  virtual Result Process(const std::string & /*lease_path*/,
+                         const shash::Any & /*old_root_hash*/,
+                         const shash::Any & /*new_root_hash*/,
+                         const RepositoryTag &tag,
+                         int64_t /*lease_expiration*/,
+                         uint64_t *final_revision,
+                         bool /*direct_graft*/ = false) {
+    g_committed_delete_tags = tag.delete_tags();
+    *final_revision = 1;
+    return kSuccess;
+  }
+};
 
 class MockedPayloadProcessor : public PayloadProcessor {
  public:
@@ -45,6 +70,8 @@ class MockedReactor : public Reactor {
   PayloadProcessor *MakePayloadProcessor() {
     return new MockedPayloadProcessor();
   }
+
+  CommitProcessor *MakeCommitProcessor() { return new MockedCommitProcessor(); }
 };
 
 class T_Reactor : public ::testing::Test {
@@ -110,8 +137,8 @@ TEST_F(T_Reactor, kGenerateToken_kQuit) {
   std::string reply;
   ASSERT_TRUE(Reactor::ReadReply(from_reactor_[0], &reply));
 
-  UniquePtr<JsonDocument> json_reply(JsonDocument::Create(reply));
-  ASSERT_TRUE(json_reply.IsValid());
+  std::unique_ptr<JsonDocument> json_reply(JsonDocument::Create(reply));
+  ASSERT_TRUE(json_reply.get() != nullptr);
 
   // Send kQuit request
   ASSERT_TRUE(Reactor::WriteRequest(to_reactor_[1], Reactor::kQuit, ""));
@@ -136,24 +163,24 @@ TEST_F(T_Reactor, FullCycle) {
 
   std::string token, public_id, secret;
   {
-    UniquePtr<JsonDocument> json_reply(JsonDocument::Create(reply));
-    ASSERT_TRUE(json_reply.IsValid());
+    std::unique_ptr<JsonDocument> json_reply(JsonDocument::Create(reply));
+    ASSERT_TRUE(json_reply.get() != nullptr);
 
     // Extract the token, public_id and secret from the reply
     const JSON *token_json = JsonDocument::SearchInObject(json_reply->root(),
                                                           "token", JSON_STRING);
     ASSERT_TRUE(token_json);
-    token = token_json->string_value;
+    token = token_json->get<std::string>();
 
     const JSON *public_id_json = JsonDocument::SearchInObject(
         json_reply->root(), "id", JSON_STRING);
     ASSERT_TRUE(public_id_json);
-    public_id = public_id_json->string_value;
+    public_id = public_id_json->get<std::string>();
 
     const JSON *secret_json = JsonDocument::SearchInObject(
         json_reply->root(), "secret", JSON_STRING);
     ASSERT_TRUE(secret_json);
-    secret = secret_json->string_value;
+    secret = secret_json->get<std::string>();
   }
 
   // Get the public_id from the token
@@ -163,14 +190,14 @@ TEST_F(T_Reactor, FullCycle) {
   reply.clear();
   ASSERT_TRUE(Reactor::ReadReply(from_reactor_[0], &reply));
   {
-    UniquePtr<JsonDocument> json_reply(JsonDocument::Create(reply));
-    ASSERT_TRUE(json_reply.IsValid());
+    std::unique_ptr<JsonDocument> json_reply(JsonDocument::Create(reply));
+    ASSERT_TRUE(json_reply.get() != nullptr);
 
     // Extract the token, public_id and secret from the reply
     const JSON *id_json = JsonDocument::SearchInObject(json_reply->root(), "id",
                                                        JSON_STRING);
     ASSERT_TRUE(id_json);
-    ASSERT_EQ(public_id, id_json->string_value);
+    ASSERT_EQ(public_id, id_json->get<std::string>());
   }
 
   // Check the token validity
@@ -185,14 +212,14 @@ TEST_F(T_Reactor, FullCycle) {
   reply.clear();
   ASSERT_TRUE(Reactor::ReadReply(from_reactor_[0], &reply));
   {
-    UniquePtr<JsonDocument> json_reply(JsonDocument::Create(reply));
-    ASSERT_TRUE(json_reply.IsValid());
+    std::unique_ptr<JsonDocument> json_reply(JsonDocument::Create(reply));
+    ASSERT_TRUE(json_reply.get() != nullptr);
 
     // Extract the token, public_id and secret from the reply
     const JSON *path_json = JsonDocument::SearchInObject(json_reply->root(),
                                                          "path", JSON_STRING);
     ASSERT_TRUE(path_json);
-    ASSERT_EQ(path, path_json->string_value);
+    ASSERT_EQ(path, path_json->get<std::string>());
   }
 
   // Submit a payload
@@ -234,6 +261,50 @@ TEST_F(T_Reactor, FullCycle) {
     std::string reply;
     ASSERT_TRUE(Reactor::ReadReply(from_reactor_[0], &reply));
   }
+
+  // Send kQuit request
+  ASSERT_TRUE(Reactor::WriteRequest(to_reactor_[1], Reactor::kQuit, ""));
+  reply.clear();
+  ASSERT_TRUE(Reactor::ReadReply(from_reactor_[0], &reply));
+  ASSERT_EQ("ok", reply);
+}
+
+TEST_F(T_Reactor, CommitForwardsDeleteTags) {
+  g_committed_delete_tags.clear();
+
+  const shash::Any root_hash(shash::kSha1);
+  const std::string root_hash_str = root_hash.ToString(true /* with_suffix */);
+
+  // A tag-removal commit carries no tag to add (empty tag_name) and the same
+  // root hash as old and new, since the catalog does not change.
+  JsonStringGenerator request_terms;
+  request_terms.Add("lease_path", "test.repo.org/");
+  request_terms.Add("old_root_hash", root_hash_str);
+  request_terms.Add("new_root_hash", root_hash_str);
+  request_terms.Add("tag_name", "");
+  request_terms.Add("tag_description", "");
+  request_terms.Add("delete_tags", "old_tag1 old_tag2");
+  // HandleCommit now requires a lease_expiration field; use a far-future
+  // deadline (year 2100) so the re-check in Process() does not trip in the
+  // mock.
+  request_terms.Add("lease_expiration", static_cast<int64_t>(4102444800LL));
+  const std::string request = request_terms.GenerateString();
+
+  ASSERT_TRUE(Reactor::WriteRequest(to_reactor_[1], Reactor::kCommit, request));
+
+  std::string reply;
+  ASSERT_TRUE(Reactor::ReadReply(from_reactor_[0], &reply));
+  {
+    std::unique_ptr<JsonDocument> json_reply(JsonDocument::Create(reply));
+    ASSERT_TRUE(json_reply.get() != nullptr);
+    const JSON *status_json = JsonDocument::SearchInObject(
+        json_reply->root(), "status", JSON_STRING);
+    ASSERT_TRUE(status_json);
+    ASSERT_EQ("ok", status_json->get<std::string>());
+  }
+
+  // The reply has been received, so the reactor thread has finished Process().
+  ASSERT_EQ("old_tag1 old_tag2", g_committed_delete_tags);
 
   // Send kQuit request
   ASSERT_TRUE(Reactor::WriteRequest(to_reactor_[1], Reactor::kQuit, ""));

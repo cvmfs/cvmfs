@@ -4,20 +4,19 @@
  * UUID generation and caching.
  */
 
-#define __STDC_FORMAT_MACROS
-
 #include "util/uuid.h"
+
+#include <sys/stat.h>
+#include <unistd.h>
+#include <uuid/uuid.h>
 
 #include <cassert>
 #include <cinttypes>
 #include <cstdio>
 #include <cstring>
+#include <memory>
 #include <string>
-#include <sys/stat.h>
-#include <unistd.h>
-#include <uuid/uuid.h>
 
-#include "util/pointer.h"
 #include "util/posix.h"
 #include "util/string.h"
 
@@ -26,10 +25,10 @@ using namespace std;  // NOLINT
 namespace cvmfs {
 
 Uuid *Uuid::Create(const string &store_path) {
-  UniquePtr<Uuid> uuid(new Uuid());
+  std::unique_ptr<Uuid> uuid(new Uuid());
   if (store_path == "") {
     uuid->MkUuid();
-    return uuid.Release();
+    return uuid.release();
   }
 
   FILE *f = fopen(store_path.c_str(), "r");
@@ -53,7 +52,7 @@ Uuid *Uuid::Create(const string &store_path) {
       unlink(path_tmp.c_str());
       return NULL;
     }
-    return uuid.Release();
+    return uuid.release();
   }
 
   // Read from cached file
@@ -71,7 +70,7 @@ Uuid *Uuid::Create(const string &store_path) {
   if (nitems != 6)
     return NULL;
 
-  return uuid.Release();
+  return uuid.release();
 }
 
 

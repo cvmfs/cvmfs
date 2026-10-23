@@ -42,11 +42,11 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
-#include <functional>
 #include <map>
 #include <string>
 #include <vector>
 
+#include "bundle_mgr.h"
 #include "cache_posix.h"
 #include "catalog.h"
 #include "catalog_mgr_client.h"
@@ -54,24 +54,16 @@
 #include "compression/compression.h"
 #include "crypto/crypto_util.h"
 #include "crypto/hash.h"
-#include "crypto/signature.h"
 #include "directory_entry.h"
-#include "duplex_sqlite3.h"
+#include "duplex_sqlite3.h"  // IWYU pragma: keep
 #include "fetch.h"
-#include "globals.h"
-#include "interrupt.h"
 #include "libcvmfs.h"
 #include "lru_md.h"
 #include "network/download.h"
-#include "quota.h"
 #include "shortstring.h"
-#include "sqlitemem.h"
 #include "sqlitevfs.h"
-#include "util/atomic.h"
 #include "util/logging.h"
-#include "util/murmur.hxx"
 #include "util/posix.h"
-#include "util/smalloc.h"
 #include "util/string.h"
 #include "xattr.h"
 
@@ -160,6 +152,11 @@ LibContext *LibContext::Create(const string &fqrn,
 
   ctx->mount_point_ = MountPoint::Create(
       fqrn, LibGlobals::GetInstance()->file_system(), options_mgr);
+  // The library never daemonizes, so the prefetcher threads can start
+  // right away (the fuse client defers this until after the fork)
+  if (ctx->mount_point_->bundle_mgr() != nullptr) {
+    ctx->mount_point_->bundle_mgr()->Spawn();
+  }
   return ctx;
 }
 
@@ -554,6 +551,14 @@ int LibContext::Open(const char *c_path) {
     return -ENOENT;
   }
 
+  BundleMgr *bundle_mgr = mount_point_->bundle_mgr();
+  if (bundle_mgr != nullptr && dirent.IsBundleTrigger()) {
+    // Hand the trigger over to the long-lived prefetcher; spec loading and
+    // dependency downloads happen on its background threads, so the open()
+    // does not wait for them.
+    bundle_mgr->ScheduleTrigger(path);
+  }
+
   if (dirent.IsChunkedFile()) {
     LogCvmfs(kLogCvmfs, kLogDebug,
              "chunked file %s opened (download delayed to read() call)",
@@ -573,7 +578,8 @@ int LibContext::Open(const char *c_path) {
     }
 
     fd = mount_point_->simple_chunk_tables()->Add(FileChunkReflist(
-        chunks, path, dirent.compression_algorithm(), dirent.IsExternalFile()));
+        chunks, path, dirent.compression_algorithm(), dirent.IsExternalFile(),
+        dirent.IsVolatile()));
     return fd | kFdChunked;
   }
 

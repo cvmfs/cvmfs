@@ -7,21 +7,17 @@
 #include <unistd.h>
 
 #include <cassert>
+#include <memory>
 #include <string>
 
-#include "backoff.h"
-#include "catalog_mgr_ro.h"
 #include "crypto/hash.h"
-#include "directory_entry.h"
-#include "duplex_curl.h"
+#include "duplex_curl.h"  // IWYU pragma: keep
 #include "gateway_util.h"
 #include "json_document.h"
 #include "publish/except.h"
 #include "publish/repository.h"
 #include "ssl.h"
-#include "upload.h"
 #include "util/logging.h"
-#include "util/pointer.h"
 #include "util/posix.h"
 #include "util/string.h"
 
@@ -36,6 +32,36 @@ enum LeaseReply {
   kLeaseReplyBusy,
   kLeaseReplyFailure
 };
+
+const int kUnknownApiVersion = -1;
+
+int ReadApiVersion(const std::string &token_path) {
+  const int version_fd = open(
+      gateway::SessionTokenApiVersionPath(token_path).c_str(), O_RDONLY);
+  const int token_fd = open(token_path.c_str(), O_RDONLY);
+  if (version_fd < 0 || token_fd < 0) {
+    if (version_fd >= 0)
+      close(version_fd);
+    if (token_fd >= 0)
+      close(token_fd);
+    return kUnknownApiVersion;
+  }
+
+  std::string contents;
+  std::string token;
+  const bool success = SafeReadToString(version_fd, &contents)
+                       && SafeReadToString(token_fd, &token);
+  close(version_fd);
+  close(token_fd);
+
+  int version;
+  if (!success
+      || !gateway::ParseSessionTokenApiVersionRecord(contents, token,
+                                                     &version)) {
+    return kUnknownApiVersion;
+  }
+  return version;
+}
 
 static CURL *PrepareCurl(const std::string &method) {
   const char *user_agent_string = "cvmfs/" CVMFS_VERSION;
@@ -152,42 +178,51 @@ static void MakeDropRequest(const gateway::GatewayKey &key,
 
 static LeaseReply ParseAcquireReply(const CurlBuffer &buffer,
                                     std::string *session_token,
+                                    int *max_api_version,
                                     int llvl) {
   if (buffer.data.size() == 0 || session_token == NULL) {
     return kLeaseReplyFailure;
   }
 
-  const UniquePtr<JsonDocument> reply(JsonDocument::Create(buffer.data));
-  if (!reply.IsValid() || !reply->IsValid()) {
+  const std::unique_ptr<JsonDocument> reply(JsonDocument::Create(buffer.data));
+  if (reply.get() == nullptr || !reply->IsValid()) {
     return kLeaseReplyFailure;
   }
 
   const JSON *result = JsonDocument::SearchInObject(reply->root(), "status",
                                                     JSON_STRING);
   if (result != NULL) {
-    const std::string status = result->string_value;
+    const std::string status = result->get<std::string>();
     if (status == "ok") {
       LogCvmfs(kLogCvmfs, llvl | kLogStdout, "Gateway reply: ok");
       const JSON *token = JsonDocument::SearchInObject(
           reply->root(), "session_token", JSON_STRING);
       if (token != NULL) {
         LogCvmfs(kLogCvmfs, kLogDebug, "Session token: %s",
-                 token->string_value);
-        *session_token = token->string_value;
+                 token->get<std::string>().c_str());
+        *session_token = token->get<std::string>();
+        // Older gateways (API < 3) do not return max_api_version; a missing
+        // field leaves the negotiated version at its default of 0.
+        const JSON *api_version = JsonDocument::SearchInObject(
+            reply->root(), "max_api_version", JSON_INT);
+        if (api_version != NULL && max_api_version != NULL) {
+          *max_api_version = api_version->get<int>();
+        }
         return kLeaseReplySuccess;
       }
     } else if (status == "path_busy") {
       const JSON *time_remaining = JsonDocument::SearchInObject(
           reply->root(), "time_remaining", JSON_STRING);
-      LogCvmfs(
-          kLogCvmfs, llvl | kLogStdout, "Path busy. Time remaining = %s",
-          (time_remaining != NULL) ? time_remaining->string_value : "UNKNOWN");
+      LogCvmfs(kLogCvmfs, llvl | kLogStdout, "Path busy. Time remaining = %s",
+               (time_remaining != NULL)
+                   ? time_remaining->get<std::string>().c_str()
+                   : "UNKNOWN");
       return kLeaseReplyBusy;
     } else if (status == "error") {
       const JSON *reason = JsonDocument::SearchInObject(reply->root(), "reason",
                                                         JSON_STRING);
       LogCvmfs(kLogCvmfs, llvl | kLogStdout, "Error: '%s'",
-               (reason != NULL) ? reason->string_value : "");
+               (reason != NULL) ? reason->get<std::string>().c_str() : "");
     } else {
       LogCvmfs(kLogCvmfs, llvl | kLogStdout, "Unknown reply. Status: %s",
                status.c_str());
@@ -203,15 +238,16 @@ static LeaseReply ParseDropReply(const CurlBuffer &buffer, int llvl) {
     return kLeaseReplyFailure;
   }
 
-  const UniquePtr<const JsonDocument> reply(JsonDocument::Create(buffer.data));
-  if (!reply.IsValid() || !reply->IsValid()) {
+  const std::unique_ptr<const JsonDocument> reply(
+      JsonDocument::Create(buffer.data));
+  if (reply.get() == nullptr || !reply->IsValid()) {
     return kLeaseReplyFailure;
   }
 
   const JSON *result = JsonDocument::SearchInObject(reply->root(), "status",
                                                     JSON_STRING);
   if (result != NULL) {
-    const std::string status = result->string_value;
+    const std::string status = result->get<std::string>();
     if (status == "ok") {
       LogCvmfs(kLogCvmfs, llvl | kLogStdout, "Gateway reply: ok");
       return kLeaseReplySuccess;
@@ -221,7 +257,7 @@ static LeaseReply ParseDropReply(const CurlBuffer &buffer, int llvl) {
       const JSON *reason = JsonDocument::SearchInObject(reply->root(), "reason",
                                                         JSON_STRING);
       LogCvmfs(kLogCvmfs, llvl | kLogStdout, "Error from gateway: '%s'",
-               (reason != NULL) ? reason->string_value : "");
+               (reason != NULL) ? reason->get<std::string>().c_str() : "");
     } else {
       LogCvmfs(kLogCvmfs, llvl | kLogStdout, "Unknown reply. Status: %s",
                status.c_str());
@@ -239,12 +275,15 @@ Publisher::Session::Session(const Settings &settings_session)
     : settings_(settings_session)
     , keep_alive_(false)
     // TODO(jblomer): it would be better to actually read & validate the token
-    , has_lease_(FileExists(settings_.token_path)) { }
+    , has_lease_(FileExists(settings_.token_path))
+    , negotiated_api_version_(has_lease_ ? ReadApiVersion(settings_.token_path)
+                                         : kUnknownApiVersion) { }
 
 
 Publisher::Session::Session(const SettingsPublisher &settings_publisher,
                             int llvl) {
   keep_alive_ = false;
+  negotiated_api_version_ = kUnknownApiVersion;
   if (settings_publisher.storage().type()
       != upload::SpoolerDefinition::Gateway) {
     has_lease_ = true;
@@ -262,6 +301,8 @@ Publisher::Session::Session(const SettingsPublisher &settings_publisher,
 
   // TODO(jblomer): it would be better to actually read & validate the token
   has_lease_ = FileExists(settings_.token_path);
+  negotiated_api_version_ = has_lease_ ? ReadApiVersion(settings_.token_path)
+                                       : kUnknownApiVersion;
   // If a lease is already present, we don't want to remove it automatically
   keep_alive_ = has_lease_;
 }
@@ -285,16 +326,26 @@ void Publisher::Session::Acquire() {
                      settings_.llvl, &buffer);
 
   std::string session_token;
-  const LeaseReply rep = ParseAcquireReply(buffer, &session_token,
-                                           settings_.llvl);
+  int negotiated_api_version = 0;
+  const LeaseReply rep = ParseAcquireReply(
+      buffer, &session_token, &negotiated_api_version, settings_.llvl);
   switch (rep) {
     case kLeaseReplySuccess: {
-      has_lease_ = true;
-      const bool rvb = SafeWriteToFile(session_token, settings_.token_path,
-                                       0600);
-      if (!rvb) {
+      if (!SafeWriteToFile(session_token, settings_.token_path, 0600)) {
         throw EPublish("cannot write session token: " + settings_.token_path);
       }
+      // Bind the version record to this token. A stale sidecar is unknown, not
+      // evidence that a newly acquired lease supports this API.
+      has_lease_ = true;
+      const std::string api_version_path = gateway::SessionTokenApiVersionPath(
+          settings_.token_path);
+      if (!SafeWriteToFile(gateway::MakeSessionTokenApiVersionRecord(
+                               negotiated_api_version, session_token),
+                           api_version_path, 0600)) {
+        throw EPublish("cannot write negotiated gateway API version: "
+                       + api_version_path);
+      }
+      negotiated_api_version_ = negotiated_api_version;
     } break;
     case kLeaseReplyBusy:
       throw EPublish("lease path busy", EPublish::kFailLeaseBusy);
@@ -339,6 +390,8 @@ void Publisher::Session::Drop() {
       rvi = unlink(settings_.token_path.c_str());
       if (rvi != 0)
         throw EPublish("cannot delete session token " + settings_.token_path);
+      unlink(gateway::SessionTokenApiVersionPath(settings_.token_path).c_str());
+      negotiated_api_version_ = kUnknownApiVersion;
       break;
     case kLeaseReplyFailure:
     default:

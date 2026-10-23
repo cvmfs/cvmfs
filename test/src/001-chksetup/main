@@ -8,9 +8,11 @@ cvmfs_run_test() {
 
   sudo sh -c 'echo CVMFS_HTTP_PROXY=DIRECT > /etc/cvmfs/default.local' || return 1
   sudo cvmfs_config chksetup || return 2
-  local output=$(sudo cvmfs_config chksetup)
+  cvmfs_config chksetup || return 3
+  local output=$(sudo cvmfs_config chksetup 2>&1)
   if [ "x$output" != "xOK" ]; then
-    echo "Warning: cvmfs_config chksetup reported warnings"
+    echo "Warning: cvmfs_config chksetup reported warnings:"
+    echo "$output"
     CVMFS_GENERAL_WARNING_FLAG=1
   fi
 

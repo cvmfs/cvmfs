@@ -7,12 +7,12 @@
 
 #include <pthread.h>
 
+#include <atomic>
 #include <string>
 
 #include "catalog_traversal.h"
 #include "sql.h"
 #include "swissknife.h"
-#include "util/atomic.h"
 
 using namespace std;  // NOLINT
 
@@ -68,8 +68,8 @@ class CommandFileStats : public Command {
   FileStatsDatabase *db_;
 
   pthread_t thread_processing_;
-  atomic_int32 num_downloaded_;
-  atomic_int32 finished_;
+  std::atomic<int32_t> num_downloaded_;
+  std::atomic<int32_t> finished_;
 
   template<class ObjectFetcherT>
   bool Run(ObjectFetcherT *object_fetcher);

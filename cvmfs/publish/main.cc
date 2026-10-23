@@ -17,6 +17,7 @@
 #include "publish/cmd_info.h"
 #include "publish/cmd_lsof.h"
 #include "publish/cmd_mkfs.h"
+#include "publish/cmd_tag.h"
 #include "publish/cmd_transaction.h"
 #include "publish/cmd_zpipe.h"
 #include "publish/command.h"
@@ -79,6 +80,7 @@ int main(int argc, char **argv) {
   commands.TakeCommand(new publish::CmdZpipe());
   commands.TakeCommand(new publish::CmdHash());
   commands.TakeCommand(new publish::CmdLsof());
+  commands.TakeCommand(new publish::CmdTag());
 
   if (argc < 2) {
     Usage(argv[0], commands);

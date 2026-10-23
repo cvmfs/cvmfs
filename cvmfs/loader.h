@@ -51,6 +51,7 @@ enum Failures {
   kFailWpad,
   kFailLockWorkspace,
   kFailRevisionBlacklisted,
+  kFailIgnoredMount,
 
   kFailNumEntries
 };
@@ -83,7 +84,8 @@ inline const char *Code2Ascii(const Failures error) {
   texts[23] = "proxy auto-discovery failed";
   texts[24] = "workspace already locked";
   texts[25] = "revision blacklisted";
-  texts[26] = "no text";
+  texts[26] = "mount attempt ignored";
+  texts[27] = "no text";
   return texts[error];
 }
 
@@ -104,7 +106,8 @@ enum StateId {
   kStateOpenFiles,         // >= 2.4
   kStateDentryTracker,     // >= 2.7 (renamed from kStateNentryTracker in 2.10)
   kStatePageCacheTracker,  // >= 2.10
-  kStateFuse               // >= 2.11
+  kStateFuse,              // >= 2.11
+  kStateWatchdog,          // >= 2.14
 
   // Note: kStateOpenFilesXXX was renamed to kStateOpenChunksXXX as of 2.4
 };
@@ -153,16 +156,19 @@ typedef std::vector<LoadEvent *> EventList;
  * CernVM-FS 2.4.0 --> Version 4
  * CernVM-FS 2.7.0 --> Version 4, fuse_channel --> fuse_channel_or_session
  * CernVM-FS 2.8.2 --> Version 5, add device_id
+ * CernVM-FS 2.14.0 --> Version 6, no change to fields, but signifies that the
+ *                      main watchdog process does not restart during reload
+ * CernVM-FS 2.15.0 --> Version 7, fuse_channel_or_session --> fuse_session
  */
 struct LoaderExports {
   LoaderExports()
-      : version(5)
+      : version(7)
       , size(sizeof(LoaderExports))
       , boot_time(0)
       , foreground(false)
       , disable_watchdog(false)
       , simple_options_parsing(false)
-      , fuse_channel_or_session(NULL)
+      , fuse_session(NULL)
       , fuse_passthrough(false)
   { }
 
@@ -190,11 +196,10 @@ struct LoaderExports {
   bool simple_options_parsing;
 
   // added with CernVM-FS 2.4.0 (LoaderExports Version: 4)
-  // As of CernVM-FS 2.7, this has been rebranded from
-  // struct fuse_chan **fuse_channel  to
-  // void **fuse_channel_or_session
-  // in order to work with both libfuse2 and libfuse3
-  void **fuse_channel_or_session;
+  // Renamed and retyped with CernVM-FS 2.15.0 (LoaderExports Version: 7).
+  // The pointer indirection lets the FUSE module access the session created by
+  // the loader after the module has been initialized.
+  struct fuse_session **fuse_session;
 
   bool fuse_passthrough;
 
@@ -207,15 +212,23 @@ struct LoaderExports {
 
 /**
  * This contains the public interface of the cvmfs fuse module.
- * Whenever something changes, change the version number.
+ * Whenever something changes, change the version number and add only
+ * to the end of the struct.
  * A global CvmfsExports struct is looked up by the loader via dlsym.
+ * Since the cvmfs fuse module gets replaced each time there's an
+ * upgrade or downgrade, the only way to get a cvmfs module older than
+ * the loader is via a downgrade, which is an unusual situation.  
+ * It is still possible, however, so code that uses newer fields should
+ * check the version before doing so.
  *
  * Note: as of cvmfs version 2.8, we set cvmfs_operations.forget_multi on new
  * enough fuse
+ *
+ * CernVM-FS 2.14.0 --> Version 2, add fnClearExit
  */
 struct CvmfsExports {
   CvmfsExports() {
-    version = 1;
+    version = 2;
     size = sizeof(CvmfsExports);
     fnAltProcessFlavor = NULL;
     fnInit = NULL;
@@ -227,6 +240,7 @@ struct CvmfsExports {
     fnRestoreState = NULL;
     fnFreeSavedState = NULL;
     memset(&cvmfs_operations, 0, sizeof(cvmfs_operations));
+    fnClearExit = NULL;
   }
 
   uint32_t version;
@@ -244,6 +258,9 @@ struct CvmfsExports {
   void (*fnFreeSavedState)(const int fd_progress,
                            const StateList &saved_states);
   struct fuse_lowlevel_ops cvmfs_operations;
+
+  // added with CernVM-FS 2.14.0 (CvmfsExports Version: 2)
+  void (*fnClearExit)(); 
 };
 
 enum ReloadMode {

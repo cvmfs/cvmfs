@@ -37,42 +37,37 @@ pkg_build_dir=${CVMFS_RESULT_LOCATION}/pkg_result
 [ ! -d $pkg_install_dir ]           || die "build directory was used before ($pkg_install_dir exists)"
 [ ! -d $pkg_build_dir ]             || die "build directory was used before ($pkg_build_dir exists)"
 [ ! -d $pkg_resource_dir ]          || die "build directory was used before ($pkg_resource_dir exists)"
-which pkgbuild     > /dev/null 2>&1 || die "didn't find 'pkgbuild' utility"
-which productbuild > /dev/null 2>&1 || die "didn't find 'productbuild' utility"
-which tiffutil     > /dev/null 2>&1 || die "didn't find 'tiffutil' utility"
+command -v pkgbuild     > /dev/null 2>&1 || die "didn't find 'pkgbuild' utility"
+command -v productbuild > /dev/null 2>&1 || die "didn't find 'productbuild' utility"
+command -v tiffutil     > /dev/null 2>&1 || die "didn't find 'tiffutil' utility"
 
 # setup environment
 mkdir -p $pkg_install_dir
 mkdir -p $pkg_build_dir
 mkdir -p $pkg_resource_dir
 
-# retrieve the upstream version string from CVMFS
-cvmfs_version="$(get_cvmfs_version_from_cmake $CVMFS_SOURCE_LOCATION)"
-cvmfs_prerelease="$(get_cvmfs_prerelease_from_cmake $CVMFS_SOURCE_LOCATION)"
-cvmfs_version=${cvmfs_version}${cvmfs_prerelease}
+# Preserve the legacy nightly-number interface.
+set_cvmfs_version_sequence_from_nightly "$CVMFS_NIGHTLY_BUILD_NUMBER"
+
+cvmfs_version="$(get_cvmfs_version "$CVMFS_SOURCE_LOCATION")"
 echo "detected upstream version: $cvmfs_version"
 
 echo "building CernVM-FS $cvmfs_version in '$CVMFS_RESULT_LOCATION' from '$CVMFS_SOURCE_LOCATION'"
 cd $CVMFS_RESULT_LOCATION
-cmake -DCMAKE_INSTALL_PREFIX:PATH=$CVMFS_INSTALL_PREFIX \
+
+cmake -DCMAKE_INSTALL_PREFIX:PATH=$CVMFS_INSTALL_PREFIX          \
+      -DBUILTIN_EXTERNALS_EXCLUDE=${CVMFS_EXTERNALS_EXCLUDE:-""} \
+      -DCMAKE_CXX_STANDARD=11                           \
       -DBUILD_SERVER=no                                 \
       -DBUILD_SERVER_DEBUG=no                           \
       -DBUILD_UNITTESTS=no                              \
-      -DBUILTIN_EXTERNALS_EXCLUDE=${CVMFS_EXTERNALS_EXCLUDE:-""}                             \
-      -DUSE_MACFUSE_KEXT=${USE_MACFUSE_KEXT:-ON}        \
+      -DCVMFS_MACFUSE=${CVMFS_MACFUSE:-ON}              \
       $OPENSSL_INCLUDE                                  \
       $CVMFS_SOURCE_LOCATION
 make -j $(get_number_of_cpu_cores)
 
-# generate the release tag for either a nightly build or a release
 cvmfs_build_tag="cvmfs-${cvmfs_version}"
-if [ $CVMFS_NIGHTLY_BUILD_NUMBER -gt 0 ]; then
-  git_hash="$(get_cvmfs_git_revision $CVMFS_SOURCE_LOCATION)"
-  cvmfs_build_tag="${cvmfs_build_tag}-0.${CVMFS_NIGHTLY_BUILD_NUMBER}-git-${git_hash}"
-  echo "creating nightly build '$cvmfs_build_tag'"
-else
-  echo "creating release: $cvmfs_build_tag"
-fi
+echo "creating package: $cvmfs_build_tag"
 
 echo "Installing cvmfs to $pkg_install_dir ..."
 make install DESTDIR=$pkg_install_dir || die "failed to install"

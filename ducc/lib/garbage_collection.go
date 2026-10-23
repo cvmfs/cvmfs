@@ -3,6 +3,7 @@ package lib
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -15,25 +16,35 @@ import (
 	l "github.com/cvmfs/ducc/log"
 )
 
+// ConstructGCDBDeleteCommand returns a single cvmfs_server ingest command that
+// reads pending paths from the given GC database and deletes them all in one
+// CVMFS transaction.
+func ConstructGCDBDeleteCommand(gcDBPath string, CVMFSRepo string) []string {
+	repoName, _ := cvmfs.GetRepoAndSubdir(CVMFSRepo)
+	return []string{"cvmfs_server", "ingest", "--gc-db", gcDBPath, repoName}
+}
+
 func ConstructDeleteCommands(pathsToDelete []string, pathsPerBatchCommand int, CVMFSRepo string) ([][]string, error) {
 
 	if pathsPerBatchCommand < 1 {
 		return nil, errors.New("Num of paths per batch command must be greater than zero")
 	}
+	repoName, _ := cvmfs.GetRepoAndSubdir(CVMFSRepo)
 
 	// we send pathsPerBatchCommand folders to deletion at a time
 	commandPrefix := []string{"cvmfs_server", "ingest"}
 	commands := make([][]string, 0)
 	command := commandPrefix
 	for i, path := range pathsToDelete {
+		path = cvmfs.PrefixRepoSubdirOnce(CVMFSRepo, path)
 		if i%pathsPerBatchCommand == 0 && i > 0 {
-			command = append(command, CVMFSRepo)
+			command = append(command, repoName)
 			commands = append(commands, command)
 			command = commandPrefix
 		}
-		command = append(command, "--delete", path)
+		command = append(command, "--fast-delete", path)
 	}
-	command = append(command, CVMFSRepo)
+	command = append(command, repoName)
 	commands = append(commands, command)
 
 	return commands, nil
@@ -44,39 +55,47 @@ func FindAllUsedFlatImages(CVMFSRepo string) ([]string, error) {
 	root := filepath.Join("/", "cvmfs", CVMFSRepo)
 	root_components := strings.Split(root, string(os.PathSeparator))
 	result := make([]string, 0)
+
+	// collectSymlinkTargets is a walker that resolves symlinks and appends
+	// their real paths to result.
+	collectSymlinkTargets := func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			l.LogE(err).WithFields(log.Fields{"path": path}).Warning("Error in opening the path, moving on.")
+			return nil
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			realName, evalErr := filepath.EvalSymlinks(path)
+			if evalErr != nil {
+				return nil
+			}
+			result = append(result, realName)
+		}
+		return nil
+	}
+
+	// Walk the repo root, skipping hidden directories except .multiarch
 	walker := func(path string, info os.FileInfo, err error) error {
-		// some kind of error, we don't really care and we just move on.
 		if err != nil {
 			l.LogE(err).WithFields(log.Fields{"path": path}).Warning("Error in opening the path, moving on.")
 			return nil
 		}
 		components := strings.Split(path, string(os.PathSeparator))
-		// first root directory, not sure if this ever happen
 		if len(components) == len(root_components) {
 			return nil
 		}
-		// checking if we are in a hidden directory
-		// if we are, we skip it all
 		first_dir := components[len(root_components)]
 		if strings.HasPrefix(first_dir, ".") {
 			return filepath.SkipDir
 		}
-		// let's check if we have reach a symlink
-		// if we are in a symlink, we should capture
-		// the image digest
-		// we don't need to break the walk since Walk
-		// does not follow symlinks
-		if info.Mode()&os.ModeSymlink != 0 {
-			realName, _ := filepath.EvalSymlinks(path)
-			if err != nil {
-				return nil
-			}
-			result = append(result, realName)
-		}
-		// general case we keep iterating
-		return nil
+		return collectSymlinkTargets(path, info, err)
 	}
 	filepath.Walk(root, walker)
+
+	// Also walk .multiarch/ to pick up architecture-specific symlinks
+	// that reference flat images.
+	multiarchRoot := filepath.Join(root, ".multiarch")
+	filepath.Walk(multiarchRoot, collectSymlinkTargets)
+
 	return result, nil
 }
 
@@ -135,7 +154,6 @@ func FindAllLayers(CVMFSRepo string) ([]string, error) {
 }
 
 func FindAllUsedLayers(CVMFSRepo string) ([]string, error) {
-	root := filepath.Join("/", "cvmfs", CVMFSRepo, ".metadata")
 	result := make([]string, 0)
 	walker := func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -164,65 +182,101 @@ func FindAllUsedLayers(CVMFSRepo string) ([]string, error) {
 		}
 		return nil
 	}
-	filepath.Walk(root, walker)
+
+	// Walk .metadata for all image manifests (including .metadata/.multiarch/)
+	metadataRoot := filepath.Join("/", "cvmfs", CVMFSRepo, ".metadata")
+	filepath.Walk(metadataRoot, walker)
+
 	return result, nil
 }
 
-func FindPodmanPathsToDelete(CVMFSRepo string, layersToDelete []string) ([]string, error) {
+// FindPodmanPathsToDelete finds the podman additional image store entries that
+// correspond to flat images being deleted and returns their on-disk paths for
+// removal.  It also rewrites images.json and layers.json inside a single CVMFS
+// transaction to drop the now-stale entries.
+//
+// imagesToDelete is the same slice that the caller already computed for flat
+// images; each entry is an absolute path whose base name is the imageID stored
+// in the podman store's images.json.
+func FindPodmanPathsToDelete(CVMFSRepo string, imagesToDelete []string) ([]string, error) {
 	podmanPathsToDelete := make([]string, 0)
-	layerInfoPath := filepath.Join("/cvmfs", CVMFSRepo, "podmanStore", "overlay-layers", "layers.json")
 
-	layersToDeleteMap := make(map[string]bool)
-	for _, layerpath := range layersToDelete {
-		components := strings.Split(layerpath, string(os.PathSeparator))
-		layerid := components[len(components)-1]
-		layersToDeleteMap[layerid] = true
+	repoName, subDir := cvmfs.GetRepoAndSubdir(CVMFSRepo)
+	storeRoot := filepath.Join("/cvmfs", repoName, subDir, podmanStoreRoot)
+
+	imagesJSONPath := filepath.Join(storeRoot, "overlay-images", "images.json")
+	layersJSONPath := filepath.Join(storeRoot, "overlay-layers", "layers.json")
+
+	// Build the set of imageIDs being removed. Flat image paths look like
+	// /cvmfs/<repo>[/<subdir>]/.flat/<xx>/<imageID>, so the base name is the ID.
+	imageIDsToDelete := make(map[string]bool)
+	for _, imgPath := range imagesToDelete {
+		imageIDsToDelete[filepath.Base(imgPath)] = true
 	}
 
-	_, err := os.Stat(layerInfoPath)
-	if err == nil {
-		layersdata := []LayerInfo{}
-		file, err := ioutil.ReadFile(layerInfoPath)
+	existingImages := readImageInfos(imagesJSONPath)
+	existingLayers := readLayerInfos(layersJSONPath)
+
+	newImages := make([]ImageInfo, 0)
+	newLayers := make([]LayerInfo, 0)
+	deletedLayerIDs := make(map[string]bool)
+
+	for _, imgInfo := range existingImages {
+		if !imageIDsToDelete[imgInfo.ID] {
+			newImages = append(newImages, imgInfo)
+			continue
+		}
+		// Collect all on-disk paths belonging to this store entry.
+		layerID := imgInfo.Layer
+		deletedLayerIDs[layerID] = true
+
+		// Read the short-link ID so we can remove overlay/l/<linkID> as well.
+		linkFilePath := filepath.Join(storeRoot, "overlay", layerID, "link")
+		linkID := readLinkIDFromFile(linkFilePath)
+
+		podmanPathsToDelete = append(podmanPathsToDelete,
+			filepath.Join(storeRoot, "overlay", layerID))
+		if linkID != "" {
+			podmanPathsToDelete = append(podmanPathsToDelete,
+				filepath.Join(storeRoot, "overlay", "l", linkID))
+		}
+		podmanPathsToDelete = append(podmanPathsToDelete,
+			filepath.Join(storeRoot, "overlay-images", imgInfo.ID))
+	}
+
+	for _, li := range existingLayers {
+		if !deletedLayerIDs[li.ID] {
+			newLayers = append(newLayers, li)
+		}
+	}
+
+	// Rewrite both JSON files in a single transaction.
+	if len(deletedLayerIDs) > 0 {
+		imagesJSON, err := json.MarshalIndent(newImages, "", " ")
 		if err != nil {
-			l.LogE(err).Error("Error in reading layers.json file")
+			l.LogE(err).Error("Error marshaling images.json")
 			return podmanPathsToDelete, err
 		}
-		json.Unmarshal(file, &layersdata)
-
-		newlayersdata := []LayerInfo{}
-		for _, info := range layersdata {
-			layerid := strings.Split(info.CompressedDiffDigest, ":")[1]
-			if layersToDeleteMap[layerid] {
-				podmanLayerPath := filepath.Join("/cvmfs", CVMFSRepo, "podmanStore", "overlay", info.ID)
-
-				linkFilePath := filepath.Join(podmanLayerPath, "link")
-				data, err := ioutil.ReadFile(linkFilePath)
-				if err != nil {
-					l.LogE(err).Error("Error in reading link file")
-					return podmanPathsToDelete, err
-				}
-				id := string(data)
-
-				linkDirPath := filepath.Join("/cvmfs", CVMFSRepo, "overlay", "l", id)
-				podmanPathsToDelete = append(podmanPathsToDelete, podmanLayerPath)
-				podmanPathsToDelete = append(podmanPathsToDelete, linkDirPath)
-				continue
+		layersJSON, err := json.MarshalIndent(newLayers, "", " ")
+		if err != nil {
+			l.LogE(err).Error("Error marshaling layers.json")
+			return podmanPathsToDelete, err
+		}
+		err = cvmfs.WithinTransaction(CVMFSRepo, func() error {
+			if err := os.WriteFile(imagesJSONPath, imagesJSON, 0644); err != nil {
+				return fmt.Errorf("writing images.json: %w", err)
 			}
-			newlayersdata = append(newlayersdata, info)
-		}
-
-		layerInfo, err := json.MarshalIndent(newlayersdata, "", " ")
+			if err := os.WriteFile(layersJSONPath, layersJSON, 0644); err != nil {
+				return fmt.Errorf("writing layers.json: %w", err)
+			}
+			return nil
+		})
 		if err != nil {
-			l.LogE(err).Error("Error in marshaling json data for layers.json")
-			return podmanPathsToDelete, err
-		}
-
-		err = cvmfs.WriteDataToCvmfs(CVMFSRepo, cvmfs.TrimCVMFSRepoPrefix(layerInfoPath), layerInfo)
-		if err != nil {
-			l.LogE(err).Error("Error in writing layers.json")
+			l.LogE(err).Error("Error updating podman store JSON files")
 			return podmanPathsToDelete, err
 		}
 	}
+
 	return podmanPathsToDelete, nil
 }
 

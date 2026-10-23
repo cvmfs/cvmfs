@@ -1,48 +1,39 @@
 # -*- cmake -*-
 
-# - Find pacparser
-# Find the pacparser includes and library
-# This module defines
-#  PACPARSER_INCLUDE_DIR, where to find pacparser.h
-#  PACPARSER_LIBRARIES, the libraries needed to use pacparser
-#  PACPARSER_FOUND, If false, do not try to use pacparser
-# also defined, but not for general use are
-#  PACPARSER_LIBRARY, where to find the pacparser library.
+# - Find pacparser (system installation)
+# Used for the system-fallback path (e.g. BUILTIN_EXTERNALS_EXCLUDE=pacparser or
+# BUILTIN_EXTERNALS=OFF). Defines the uniform imported target
+#
+#   pacparser::pacparser
+#
+# and, for FetchContent's FIND_PACKAGE_ARGS integration, the result variable
+# pacparser_FOUND. Also sets, for backwards compatibility:
+#   PACPARSER_INCLUDE_DIR   where to find pacparser.h
+#   PACPARSER_LIBRARIES     the libraries needed to use pacparser
 
-FIND_PATH(PACPARSER_INCLUDE_DIR pacparser.h
-/usr/local/include
-/usr/include
-)
+find_path(PACPARSER_INCLUDE_DIR pacparser.h)
+find_library(PACPARSER_LIBRARY NAMES pacparser)
 
-SET(PACPARSER_NAMES ${PACPARSER_NAMES} pacparser)
-FIND_LIBRARY(PACPARSER_LIBRARY
-  NAMES ${PACPARSER_NAMES}
-  PATHS /usr/lib /usr/local/lib
-  )
+include(FindPackageHandleStandardArgs)
+find_package_handle_standard_args(pacparser
+  REQUIRED_VARS PACPARSER_LIBRARY PACPARSER_INCLUDE_DIR)
 
-IF (PACPARSER_LIBRARY AND PACPARSER_INCLUDE_DIR)
-    SET(PACPARSER_LIBRARIES ${PACPARSER_LIBRARY})
-    SET(PACPARSER_FOUND "YES")
-ELSE (PACPARSER_LIBRARY AND PACPARSER_INCLUDE_DIR)
-  SET(PACPARSER_FOUND "NO")
-ENDIF (PACPARSER_LIBRARY AND PACPARSER_INCLUDE_DIR)
+if (pacparser_FOUND)
+  set(PACPARSER_LIBRARIES ${PACPARSER_LIBRARY})
+  set(PACPARSER_INCLUDE_DIRS ${PACPARSER_INCLUDE_DIR})
+  if (NOT TARGET pacparser::pacparser)
+    # GLOBAL so the target is usable from sibling directories (e.g. cvmfs/),
+    # since this module may be invoked from the externals/ subdirectory.
+    add_library(pacparser::pacparser UNKNOWN IMPORTED GLOBAL)
+    set_target_properties(pacparser::pacparser PROPERTIES
+      IMPORTED_LOCATION "${PACPARSER_LIBRARY}"
+      INTERFACE_INCLUDE_DIRECTORIES "${PACPARSER_INCLUDE_DIR}")
+    # Match the vendored target: a static system libpacparser bundles QuickJS,
+    # which needs libm, pthreads and (for dlopen) libdl.
+    find_package(Threads)
+    set_property(TARGET pacparser::pacparser PROPERTY
+      INTERFACE_LINK_LIBRARIES m Threads::Threads ${CMAKE_DL_LIBS})
+  endif ()
+endif ()
 
-
-IF (PACPARSER_FOUND)
-   IF (NOT PACPARSER_FIND_QUIETLY)
-      MESSAGE(STATUS "Found pacparser: ${PACPARSER_LIBRARIES}")
-   ENDIF (NOT PACPARSER_FIND_QUIETLY)
-ELSE (PACPARSER_FOUND)
-   IF (PACPARSER_FIND_REQUIRED)
-      MESSAGE(FATAL_ERROR "Could not find pacparser library")
-   ENDIF (PACPARSER_FIND_REQUIRED)
-ENDIF (PACPARSER_FOUND)
-
-# Deprecated declarations.
-SET (NATIVE_PACPARSER_INCLUDE_PATH ${PACPARSER_INCLUDE_DIR} )
-GET_FILENAME_COMPONENT (NATIVE_PACPARSER_LIB_PATH ${PACPARSER_LIBRARY} PATH)
-
-MARK_AS_ADVANCED(
-  PACPARSER_LIBRARY
-  PACPARSER_INCLUDE_DIR
-  )
+mark_as_advanced(PACPARSER_LIBRARY PACPARSER_INCLUDE_DIR)

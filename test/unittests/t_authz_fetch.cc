@@ -153,10 +153,10 @@ TEST_F(T_AuthzFetch, ParseMsg) {
       "{\"cvmfs_authz_v1\": {\"msgid\": 1, \"revision\": 0}}", kAuthzMsgReady,
       &binary_msg));
   EXPECT_TRUE(fetcher_->ParseMsg(
-      "{\"cvmfs_authz_v1\": {\"msgid\": 1, \"revision\": 0, null}}",
+      "{\"cvmfs_authz_v1\": {\"msgid\": 1, \"revision\": 0, \"extra\": null}}",
       kAuthzMsgReady, &binary_msg));
   EXPECT_FALSE(fetcher_->ParseMsg(
-      "{\"cvmfs_authz_v1\": {\"msgid\": 1, \"revision\": 0, null}}",
+      "{\"cvmfs_authz_v1\": {\"msgid\": 1, \"revision\": 0, \"extra\": null}}",
       kAuthzMsgHandshake, &binary_msg));
   EXPECT_FALSE(fetcher_->ParseMsg(
       "{\"cvmfs_authz_v1\": {\"msgid\": 1000, \"revision\": 0}}",

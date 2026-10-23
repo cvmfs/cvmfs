@@ -15,6 +15,7 @@
 #include "manifest.h"
 #include "manifest_fetch.h"
 #include "network/download.h"
+#include "network/sink_file.h"
 #include "reflog.h"
 #include "util/posix.h"
 
@@ -115,9 +116,9 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
   Failures FetchHistory(HistoryTN **history,
                         const shash::Any &history_hash = shash::Any()) {
     // retrieve the current HEAD history hash (if nothing else given)
-    shash::Any effective_history_hash = (!history_hash.IsNull())
-                                            ? history_hash
-                                            : GetHistoryHash();
+    shash::Any const effective_history_hash = (!history_hash.IsNull())
+                                                  ? history_hash
+                                                  : GetHistoryHash();
     if (effective_history_hash.IsNull()) {
       return kFailNotFound;
     }
@@ -183,7 +184,8 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
     std::string tmp_path;
     const bool decompress = false;
     const bool nocache = true;
-    Failures failure = Fetch(kReflogFilename, decompress, nocache, &tmp_path);
+    Failures const failure = Fetch(kReflogFilename, decompress, nocache,
+                                   &tmp_path);
     if (failure != kFailOk) {
       return failure;
     }
@@ -205,42 +207,42 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
     return kFailOk;
   }
 
-  Failures FetchManifest(UniquePtr<manifest::Manifest> *manifest) {
+  Failures FetchManifest(std::unique_ptr<manifest::Manifest> *manifest) {
     manifest::Manifest *raw_manifest_ptr = NULL;
-    Failures failure = FetchManifest(&raw_manifest_ptr);
+    Failures const failure = FetchManifest(&raw_manifest_ptr);
     if (failure == kFailOk)
-      *manifest = raw_manifest_ptr;
+      *manifest = std::unique_ptr<manifest::Manifest>(raw_manifest_ptr);
     return failure;
   }
 
-  Failures FetchHistory(UniquePtr<HistoryTN> *history,
+  Failures FetchHistory(std::unique_ptr<HistoryTN> *history,
                         const shash::Any &history_hash = shash::Any()) {
     HistoryTN *raw_history_ptr = NULL;
-    Failures failure = FetchHistory(&raw_history_ptr, history_hash);
+    Failures const failure = FetchHistory(&raw_history_ptr, history_hash);
     if (failure == kFailOk)
-      *history = raw_history_ptr;
+      *history = std::unique_ptr<HistoryTN>(raw_history_ptr);
     return failure;
   }
 
   Failures FetchCatalog(const shash::Any &catalog_hash,
                         const std::string &catalog_path,
-                        UniquePtr<CatalogTN> *catalog,
+                        std::unique_ptr<CatalogTN> *catalog,
                         const bool is_nested = false,
                         CatalogTN *parent = NULL) {
     CatalogTN *raw_catalog_ptr = NULL;
     Failures failure = FetchCatalog(catalog_hash, catalog_path,
                                     &raw_catalog_ptr, is_nested, parent);
     if (failure == kFailOk)
-      *catalog = raw_catalog_ptr;
+      catalog->reset(raw_catalog_ptr);
     return failure;
   }
 
   Failures FetchReflog(const shash::Any &reflog_hash,
-                       UniquePtr<ReflogTN> *reflog) {
+                       std::unique_ptr<ReflogTN> *reflog) {
     ReflogTN *raw_reflog_ptr = NULL;
     Failures failure = FetchReflog(reflog_hash, &raw_reflog_ptr);
     if (failure == kFailOk)
-      *reflog = raw_reflog_ptr;
+      reflog->reset(raw_reflog_ptr);
     return failure;
   }
 
@@ -289,10 +291,10 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
    * @return  the content hash of the HEAD history db or a null-hash on error
    */
   shash::Any GetHistoryHash() {
-    UniquePtr<manifest::Manifest> manifest;
+    std::unique_ptr<manifest::Manifest> manifest;
     const Failures retval = FetchManifest(&manifest);
 
-    if (retval != kFailOk || !manifest.IsValid()
+    if (retval != kFailOk || manifest.get() == nullptr
         || manifest->history().IsNull()) {
       return shash::Any();
     }
@@ -480,13 +482,13 @@ class HttpObjectFetcher : public AbstractObjectFetcher<
 
     // Download manifest file
     struct manifest::ManifestEnsemble manifest_ensemble;
-    manifest::Failures retval = manifest::Fetch(repo_url_,
-                                                repo_name_,
-                                                0,
-                                                NULL,
-                                                signature_manager_,
-                                                download_manager_,
-                                                &manifest_ensemble);
+    manifest::Failures const retval = manifest::Fetch(repo_url_,
+                                                      repo_name_,
+                                                      0,
+                                                      NULL,
+                                                      signature_manager_,
+                                                      download_manager_,
+                                                      &manifest_ensemble);
 
     // Check if manifest was loaded correctly
     switch (retval) {
@@ -573,7 +575,7 @@ class HttpObjectFetcher : public AbstractObjectFetcher<
     download::JobInfo download_job(&url, decompress, probe_hosts, expected_hash,
                                    &filesink);
     download_job.SetForceNocache(nocache);
-    download::Failures retval = download_manager_->Fetch(&download_job);
+    download::Failures const retval = download_manager_->Fetch(&download_job);
     const bool success = (retval == download::kFailOk);
     fclose(f);
 

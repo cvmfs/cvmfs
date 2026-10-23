@@ -1,0 +1,147 @@
+# docker-compose.yml – CernVM-FS S3 integration test stack
+#
+# Self-contained stack for running the server integration test suite against
+# an S3 backend (Garage).  Replaces the manual network-stitching that the CI
+# workflow previously did between the cvmfs-dev and publish-mountless stacks.
+#
+# Services
+# --------
+#   cvmfs-dev    – build/test container (privileged, systemd)
+#   garage       – Garage S3-compatible object storage (v2)
+#   garage-setup – one-shot init: layout, key, bucket, website access
+#
+# Usage
+# -----
+#   docker compose up --build -d
+#   docker compose exec -u sftnight cvmfs-dev bash -c '...'
+#   docker compose down -v --remove-orphans
+#
+# Credentials
+# -----------
+# No S3 credentials are baked into this repo.  garage-setup generates random
+# values on first run, registers the key with Garage, and writes the matching
+# test_s3.conf to a shared volume that cvmfs-dev mounts read-only.  Override
+# by exporting S3_ACCESS_KEY / S3_SECRET_KEY before `docker compose up`.
+
+name: cvmfs-s3-integration
+
+# ---------------------------------------------------------------------------
+# Shared S3 environment – passed through from the host (empty by default,
+# in which case garage-setup generates random values at runtime).
+# ---------------------------------------------------------------------------
+x-s3-env: &s3-env
+    S3_ACCESS_KEY: ${S3_ACCESS_KEY:-}
+    S3_SECRET_KEY: ${S3_SECRET_KEY:-}
+    S3_BUCKET: cvmfs
+
+services:
+
+    # -----------------------------------------------------------------------
+    # cvmfs-dev – builds CVMFS from source and runs integration tests
+    # -----------------------------------------------------------------------
+    cvmfs-dev:
+        image: ghcr.io/cvmfs/cvmfs-dev:latest
+        container_name: cvmfs-dev
+        hostname: cvmfs-dev
+        privileged: true
+        cgroup: host
+        build:
+            context: ../../../..
+            dockerfile: test/common/container/Dockerfile-dev
+        environment:
+            # Consumed by test/profiles/s3.sh via test/run.sh -p s3.
+            # Materialised by garage-setup into the shared s3-conf volume.
+            CVMFS_TEST_S3_CONFIG: /shared/test_s3.conf
+            CVMFS_TEST_HTTP_BASE: http://cvmfs.web.garage.internal:3902
+            CVMFS_TEST_S3_STORAGE: /tmp/unused-garage-storage
+        volumes:
+            - /sys/fs/cgroup:/sys/fs/cgroup
+            - var_spool_cvmfs:/var/spool/cvmfs
+            - ../../../../:/home/sftnight/cvmfs
+            - s3-conf:/shared:ro
+        depends_on:
+            garage-setup:
+                condition: service_completed_successfully
+
+    # -----------------------------------------------------------------------
+    # Garage – S3-compatible object storage (v2)
+    # -----------------------------------------------------------------------
+    garage:
+        image: docker.io/dxflrs/garage:v2.2.0
+        container_name: cvmfs-garage
+        hostname: cvmfs-garage
+        networks:
+            default:
+                aliases:
+                    - cvmfs.web.garage.internal
+        volumes:
+            - ../publish-mountless/config/garage.toml:/etc/garage.toml:ro
+            - garage-meta:/var/lib/garage/meta
+            - garage-data:/var/lib/garage/data
+        healthcheck:
+            test: ["CMD", "/garage", "node", "id"]
+            interval: 3s
+            timeout: 5s
+            retries: 10
+
+    # -----------------------------------------------------------------------
+    # Garage setup – runs once after Garage is healthy
+    # -----------------------------------------------------------------------
+    garage-setup:
+        image: alpine:3
+        container_name: cvmfs-garage-setup
+        depends_on:
+            garage:
+                condition: service_healthy
+        environment:
+            GARAGE_ADMIN_URL: http://cvmfs-garage:3903
+            GARAGE_ADMIN_TOKEN: garage-admin-token
+            SETUP_GARAGE_DEBUG: "1"
+            <<: *s3-env
+        volumes:
+            - ../publish-mountless/scripts/setup_garage.sh:/setup_garage.sh:ro
+            - s3-conf:/shared
+        entrypoint: ["/bin/sh", "-c"]
+        command:
+            - |
+              set -e
+              echo '[garage-setup] Installing curl, jq, openssl ...'
+              apk add --no-cache curl jq openssl
+              # If a previous run already populated /shared/test_s3.conf,
+              # reuse those credentials so re-running setup_garage.sh against
+              # the existing Garage state stays idempotent.  Otherwise honour
+              # any S3_ACCESS_KEY/S3_SECRET_KEY passed in from the host, and
+              # fall back to procedurally generated random values.
+              if [ -f /shared/test_s3.conf ]; then
+                  echo '[garage-setup] Reusing credentials from /shared/test_s3.conf'
+                  S3_ACCESS_KEY=$$(awk -F= '/^CVMFS_S3_ACCESS_KEY=/{print $$2}' /shared/test_s3.conf)
+                  S3_SECRET_KEY=$$(awk -F= '/^CVMFS_S3_SECRET_KEY=/{print $$2}' /shared/test_s3.conf)
+              elif [ -z "$$S3_ACCESS_KEY" ] || [ -z "$$S3_SECRET_KEY" ]; then
+                  echo '[garage-setup] Generating random S3 credentials'
+                  S3_ACCESS_KEY="GK$$(openssl rand -hex 12)"
+                  S3_SECRET_KEY=$$(openssl rand -hex 32)
+              fi
+              export S3_ACCESS_KEY S3_SECRET_KEY
+              # Materialise the cvmfs S3 config for the cvmfs-dev container
+              {
+                  printf '%s\n' "CVMFS_S3_HOST=cvmfs-garage:3900"
+                  printf '%s\n' "CVMFS_S3_ACCESS_KEY=$$S3_ACCESS_KEY"
+                  printf '%s\n' "CVMFS_S3_SECRET_KEY=$$S3_SECRET_KEY"
+                  printf '%s\n' "CVMFS_S3_BUCKETS_PER_ACCOUNT=1"
+                  printf '%s\n' "CVMFS_S3_DNS_BUCKETS=false"
+                  printf '%s\n' "CVMFS_S3_MAX_NUMBER_OF_PARALLEL_CONNECTIONS=10"
+                  printf '%s\n' "CVMFS_S3_BUCKET=$$S3_BUCKET"
+                  printf '%s\n' "CVMFS_S3_FLAVOR=awsv4"
+                  printf '%s\n' "CVMFS_S3_REGION=garage"
+              } > /shared/test_s3.conf
+              chmod 0444 /shared/test_s3.conf
+              echo '[garage-setup] Running setup_garage.sh ...'
+              sh /setup_garage.sh
+        restart: "no"
+
+volumes:
+    var_spool_cvmfs:
+    garage-meta:
+    garage-data:
+    s3-conf:
+

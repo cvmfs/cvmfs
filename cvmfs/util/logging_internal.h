@@ -2,7 +2,7 @@
  * This file is part of the CernVM File System.
  */
 
-// Internal use, include only logging.h!
+// Internal use, included only by logging.h and logging.cc!
 
 #ifndef CVMFS_UTIL_LOGGING_INTERNAL_H_
 #define CVMFS_UTIL_LOGGING_INTERNAL_H_
@@ -70,6 +70,31 @@ enum LogLevels {
 };
 
 /**
+ * The log facilities, flags, and levels occupy disjoint bit ranges of the
+ * same integer log mask and are meant to be combined with bitwise OR.
+ * C++20 deprecates bitwise operations between different enumeration types,
+ * so spell out the intended integer combination once, centrally.
+ */
+inline int operator|(LogFacilities facility, LogFlags flag) {
+  return static_cast<int>(facility) | static_cast<int>(flag);
+}
+inline int operator|(LogFlags flag, LogFacilities facility) {
+  return static_cast<int>(flag) | static_cast<int>(facility);
+}
+inline int operator|(LogFacilities facility, LogLevels level) {
+  return static_cast<int>(facility) | static_cast<int>(level);
+}
+inline int operator|(LogLevels level, LogFacilities facility) {
+  return static_cast<int>(level) | static_cast<int>(facility);
+}
+inline int operator|(LogFlags flag, LogLevels level) {
+  return static_cast<int>(flag) | static_cast<int>(level);
+}
+inline int operator|(LogLevels level, LogFlags flag) {
+  return static_cast<int>(level) | static_cast<int>(flag);
+}
+
+/**
  * Changes in this enum must be done in logging.cc as well!
  * (see const char *module_names[] = {....})
  */
@@ -108,12 +133,21 @@ enum LogSource {
   kLogReflog,
   kLogKvStore,
   kLogTelemetry,
-  kLogCurl
+  kLogCurl,
+  kLogBundleMgr
 };
 
-const int kLogWarning = kLogStdout | kLogShowSource | kLogNormal;
-const int kLogInfoMsg = kLogStdout | kLogShowSource | kLogInform;
-const int kLogVerboseMsg = kLogStdout | kLogShowSource | kLogVerbose;
+/**
+ * The static_cast selects the built-in operator| for the first pair of
+ * operands, which keeps these three integral constant expressions. Without
+ * it the overloads above make them dynamically initialised globals.
+ */
+const int kLogWarning =
+    static_cast<int>(kLogStdout) | kLogShowSource | kLogNormal;  // NOLINT
+const int kLogInfoMsg =
+    static_cast<int>(kLogStdout) | kLogShowSource | kLogInform;  // NOLINT
+const int kLogVerboseMsg =
+    static_cast<int>(kLogStdout) | kLogShowSource | kLogVerbose;  // NOLINT
 
 struct CVMFS_EXPORT LogBufferEntry {
   LogBufferEntry(LogSource s, int m, const std::string &msg)
@@ -161,3 +195,4 @@ CVMFS_EXPORT void PrintError(const std::string &message);
 #endif
 
 #endif  // CVMFS_UTIL_LOGGING_INTERNAL_H_
+

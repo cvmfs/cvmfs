@@ -1,9 +1,9 @@
 package frontend
 
 const (
-	// APIProtocolVersion is the latest API protocol version understood by the
-	// server
-	APIProtocolVersion = 3
+	// APIProtocolVersion is the latest supported protocol. Version 4 enables
+	// receiver-side creation of missing lease ancestors.
+	APIProtocolVersion = 4
 	// MinAPIProtocolVersion is the oldest API protocol version understood by the
 	// server
 	MinAPIProtocolVersion = 2

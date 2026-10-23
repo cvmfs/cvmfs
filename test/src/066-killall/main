@@ -33,9 +33,8 @@ fs_cleanup(){
   # unfreeze it and unmount it
   if mountpoint -q "${DEST}"; then
     local loopdev=$(findmnt -n -o SOURCE --target "$DEST")
-    sudo fsfreeze -u ${DEST} 2> /dev/null
+    sudo fsfreeze -u ${DEST} || true # may be unfrozen and give EINVAL
     sudo umount ${DEST}
-    sudo losetup -d "$loopdev"
     sudo rm -rf ${DEST}
   fi
   if [ -f ${SRC} ]; then
@@ -147,7 +146,7 @@ test_extra_args(){
 
   unfreeze
 
-  sleep 1
+  wait_for_umount
 
   # At this point the ls process should have terminated
   if [ -d /proc/$d_pid ]; then
@@ -156,7 +155,7 @@ test_extra_args(){
 }
 
 logdebug(){
-  if [[  "${DEBUG_LOGGING_MODE}" == "colored"  ]]; then
+  if [[  "${DEBUG_LOGGING_MODE:-}" == "colored"  ]]; then
     echo -e "\e[35m$1\e[0m"
   else
     echo -e "$1"
@@ -181,11 +180,11 @@ cvmfs_run_test() {
 
   sudo cvmfs_config killall || return 20
   echo "Wait for reload to finish"
-  wait $reload_pid
+  # non-zero exit code is legit but not tested for, got 137 as of 2026-05-30
+  wait $reload_pid || true
 
   echo "Killall once again because we don't know where the reloaded was interrupted"
   sudo cvmfs_config killall || return 30
-  wait $!
 
   if [ "$(uname)" != "Linux" ]; then
     # specific killall options are not meant

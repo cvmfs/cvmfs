@@ -23,6 +23,7 @@
 #include <sys/file.h>
 #include <sys/mount.h>
 #include <sys/prctl.h>
+#include <sys/random.h>
 #include <sys/select.h>
 #include <sys/stat.h>
 #include <sys/utsname.h>
@@ -202,6 +203,38 @@ inline bool platform_allow_ptrace(const pid_t pid) {
 }
 
 /**
+ *  Set current process to be marked dumpable
+ *
+ * @return     true when successful
+ */
+inline bool platform_set_dumpable() {
+#ifdef PR_SET_DUMPABLE
+  const int retval = prctl(PR_SET_DUMPABLE, 1, 0, 0, 0);
+  return (retval == 0);
+#else
+  // On other platforms this is currently a no-op
+  return true;
+#endif
+}
+
+/**
+ *  Set current process to be keep capabilities on uid switch
+ *
+ * @param set  true to set keepcaps, false to reset it
+ *
+ * @return     true when successful
+ */
+inline bool platform_keepcaps(bool set) {
+#ifdef PR_SET_KEEPCAPS
+  const int retval = prctl(PR_SET_KEEPCAPS, set ? 1 : 0, 0, 0, 0);
+  return (retval == 0);
+#else
+  // On other platforms this is currently a no-op
+  return true;
+#endif
+}
+
+/**
  * File system functions, ensure 64bit versions.
  */
 typedef struct dirent64 platform_dirent64;
@@ -362,6 +395,22 @@ inline uint16_t platform_htole16(uint16_t host_16bits) {
 
 inline uint16_t platform_le16toh(uint16_t little_endian_16bits) {
   return le16toh(little_endian_16bits);
+}
+
+inline void platform_getrandom(void *buf, size_t length) {
+  // getrandom() can be interrupted by a signal while blocking on an
+  // uninitialized entropy pool and returns short for requests > 256 bytes
+  size_t nbytes = 0;
+  while (nbytes < length) {
+    const ssize_t retval =
+        getrandom(static_cast<unsigned char *>(buf) + nbytes, length - nbytes,
+                  0);
+    if (retval < 0) {
+      assert(errno == EINTR);
+      continue;
+    }
+    nbytes += retval;
+  }
 }
 
 #ifdef CVMFS_NAMESPACE_GUARD

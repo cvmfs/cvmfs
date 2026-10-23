@@ -23,7 +23,7 @@ LocalUploader::LocalUploader(const SpoolerDefinition &spooler_definition)
   assert(spooler_definition.IsValid()
          && spooler_definition.driver_type == SpoolerDefinition::Local);
 
-  atomic_init32(&copy_errors_);
+  copy_errors_.store(0);
 }
 
 bool LocalUploader::WillHandle(const SpoolerDefinition &spooler_definition) {
@@ -31,7 +31,7 @@ bool LocalUploader::WillHandle(const SpoolerDefinition &spooler_definition) {
 }
 
 unsigned int LocalUploader::GetNumberOfErrors() const {
-  return atomic_read32(&copy_errors_);
+  return copy_errors_.load();
 }
 
 bool LocalUploader::Create() {
@@ -53,7 +53,7 @@ void LocalUploader::DoUpload(const std::string &remote_path,
              "failed to create temp path for "
              "upload of file '%s' (errno: %d)",
              source->GetPath().c_str(), errno);
-    atomic_inc32(&copy_errors_);
+    copy_errors_.fetch_add(1);
     Respond(callback, UploaderResults(1, source->GetPath()));
     return;
   }
@@ -63,7 +63,7 @@ void LocalUploader::DoUpload(const std::string &remote_path,
   if (!rvb) {
     fclose(ftmp);
     unlink(tmp_path.c_str());
-    atomic_inc32(&copy_errors_);
+    copy_errors_.fetch_add(1);
     Respond(callback, UploaderResults(100, source->GetPath()));
     return;
   }
@@ -79,7 +79,7 @@ void LocalUploader::DoUpload(const std::string &remote_path,
       source->Close();
       fclose(ftmp);
       unlink(tmp_path.c_str());
-      atomic_inc32(&copy_errors_);
+      copy_errors_.fetch_add(1);
       Respond(callback, UploaderResults(100, source->GetPath()));
       return;
     }
@@ -96,7 +96,7 @@ void LocalUploader::DoUpload(const std::string &remote_path,
              "'%s'",
              tmp_path.c_str(), remote_path.c_str());
     unlink(tmp_path.c_str());
-    atomic_inc32(&copy_errors_);
+    copy_errors_.fetch_add(1);
     Respond(callback, UploaderResults(rvi, source->GetPath()));
     return;
   }
@@ -109,7 +109,7 @@ UploadStreamHandle *LocalUploader::InitStreamedUpload(
   std::string tmp_path;
   const int tmp_fd = CreateAndOpenTemporaryChunkFile(&tmp_path);
   if (tmp_fd < 0) {
-    atomic_inc32(&copy_errors_);
+    copy_errors_.fetch_add(1);
     return NULL;
   }
 
@@ -129,7 +129,7 @@ void LocalUploader::StreamedUpload(UploadStreamHandle *handle,
              "failed to write %lu bytes to '%s' "
              "(errno: %d)",
              buffer.size, local_handle->temporary_path.c_str(), cpy_errno);
-    atomic_inc32(&copy_errors_);
+    copy_errors_.fetch_add(1);
     Respond(callback,
             UploaderResults(UploaderResults::kBufferUpload, cpy_errno));
     return;
@@ -150,7 +150,7 @@ void LocalUploader::FinalizeStreamedUpload(UploadStreamHandle *handle,
              "failed to close temp file '%s' "
              "(errno: %d)",
              local_handle->temporary_path.c_str(), cpy_errno);
-    atomic_inc32(&copy_errors_);
+    copy_errors_.fetch_add(1);
     Respond(handle->commit_callback,
             UploaderResults(UploaderResults::kChunkCommit, cpy_errno));
     return;
@@ -171,7 +171,7 @@ void LocalUploader::FinalizeStreamedUpload(UploadStreamHandle *handle,
                "final location '%s' (errno: %d)",
                local_handle->temporary_path.c_str(), final_path.c_str(),
                cpy_errno);
-      atomic_inc32(&copy_errors_);
+      copy_errors_.fetch_add(1);
       Respond(handle->commit_callback,
               UploaderResults(UploaderResults::kChunkCommit, cpy_errno));
       return;
@@ -207,7 +207,7 @@ void LocalUploader::FinalizeStreamedUpload(UploadStreamHandle *handle,
 void LocalUploader::DoRemoveAsync(const std::string &file_to_delete) {
   const int retval = unlink((upstream_path_ + "/" + file_to_delete).c_str());
   if ((retval != 0) && (errno != ENOENT))
-    atomic_inc32(&copy_errors_);
+    copy_errors_.fetch_add(1);
   Respond(NULL, UploaderResults());
 }
 

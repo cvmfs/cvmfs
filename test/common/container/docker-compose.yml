@@ -2,7 +2,7 @@
 
 services:
     cvmfs-dev:
-        image: registry.cern.ch/cvmfs-dev:latest
+        image: ghcr.io/cvmfs/cvmfs-dev:latest
         container_name: cvmfs-dev
         hostname: cvmfs-dev
         privileged: true

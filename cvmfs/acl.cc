@@ -13,6 +13,12 @@
 
 #include "util/posix.h"
 
+#ifdef __APPLE__
+#include <libkern/OSByteOrder.h>
+#define htole16(x) OSSwapHostToLittleInt16(x)
+#define htole32(x) OSSwapHostToLittleInt32(x)
+#endif
+
 using namespace std;  // NOLINT
 
 #ifdef COMPARE_TO_LIBACL

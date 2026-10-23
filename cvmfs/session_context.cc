@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <limits>
+#include <memory>
 
 #include "curl/curl.h"
 #include "gateway_util.h"
@@ -13,7 +14,6 @@
 #include "json_document_write.h"
 #include "swissknife_lease_curl.h"
 #include "util/exception.h"
-#include "util/pointer.h"
 #include "util/string.h"
 
 namespace {
@@ -260,7 +260,8 @@ SessionContext::SessionContext()
 
 bool SessionContext::InitializeDerived(uint64_t max_queue_size) {
   // Start worker thread
-  upload_jobs_ = new Tube<UploadJob>(max_queue_size);
+  upload_jobs_ = std::unique_ptr<Tube<UploadJob> >(
+      new Tube<UploadJob>(max_queue_size));
 
   const int retval = pthread_create(&worker_, NULL, UploadLoop,
                                     reinterpret_cast<void *>(this));
@@ -295,6 +296,16 @@ bool SessionContext::Commit(const std::string &old_root_hash,
   //
   request_input.Add("tag_channel", 0);
   request_input.Add("tag_description", tag.description());
+  // Space-separated list of tags the receiver should remove in the same history
+  // transaction as this commit. Only sent for tag-removal commits; omitted
+  // otherwise for backwards compatibility with older gateways.
+  if (!tag.delete_tags().empty()) {
+    request_input.Add("delete_tags", tag.delete_tags());
+  }
+  if (tag.auto_tag_threshold() > 0) {
+    request_input.Add("auto_tag_threshold",
+                      static_cast<int64_t>(tag.auto_tag_threshold()));
+  }
   const std::string request = request_input.GenerateString();
   CurlBuffer buffer;
   return MakeEndRequest("POST", key_id_, secret_, session_token_, api_url_,
@@ -373,11 +384,11 @@ bool SessionContext::DoUpload(const SessionContext::UploadJob *job) {
              "SessionContext::DoUpload - curl_easy_perform failed: %d", ret);
   }
 
-  const UniquePtr<JsonDocument> reply_json(JsonDocument::Create(reply));
+  const std::unique_ptr<JsonDocument> reply_json(JsonDocument::Create(reply));
   const JSON *reply_status = JsonDocument::SearchInObject(
       reply_json->root(), "status", JSON_STRING);
   const bool ok = (reply_status != NULL
-                   && std::string(reply_status->string_value) == "ok");
+                   && std::string(reply_status->get<std::string>()) == "ok");
   if (!ok) {
     LogCvmfs(kLogUploadGateway, kLogStderr,
              "SessionContext::DoUpload - error reply: %s", reply.c_str());

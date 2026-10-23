@@ -11,11 +11,6 @@
 #include <unistd.h>
 
 #include <cassert>
-#include <vector>
-
-#include "manifest.h"
-#include "manifest_fetch.h"
-#include "util/logging.h"
 
 using namespace std;  // NOLINT
 

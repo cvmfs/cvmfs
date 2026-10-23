@@ -1,9 +1,8 @@
 /**
  * This file is part of the CernVM File System.
  *
- * The Fuse module entry point. Dynamically selects either the libfuse3
- * cvmfs fuse module or the libfuse2 one, depending on the availability and on
- * the mount options.
+ * The Fuse module entry point. Loads the cvmfs fuse module (libcvmfs_fuse3),
+ * in debug or normal flavour depending on the mount options.
  *
  */
 
@@ -26,7 +25,57 @@
 using namespace stub;  // NOLINT
 
 
+namespace {
+
+std::vector<std::string> LibraryPaths(const std::string &libname) {
+  std::string local_lib_path = "./";
+  if (getenv("CVMFS_LIBRARY_PATH") != NULL) {
+    local_lib_path = getenv("CVMFS_LIBRARY_PATH");
+    if (!local_lib_path.empty() && (*local_lib_path.rbegin() != '/'))
+      local_lib_path.push_back('/');
+  }
+
+  return {
+      local_lib_path + libname,
+      "/usr/lib/" + libname,
+      "/usr/lib64/" + libname,
+#ifdef __APPLE__
+      // Since OS X El Capitan (10.11) came with SIP, we needed to relocate our
+      // binaries from /usr/... to /usr/local/...
+      "/usr/local/lib/" + libname,
+#endif
+  };
+}
+
+/**
+ * Keeps an NFS mount answerable if its cvmfs2 process dies, see
+ * nfs4/guardian.h.  Started by libcvmfs_nfsfuse as
+ *   cvmfs2 __nfs_guardian__ <listen fd> <control fd> <mount point>
+ */
+int RunNfsGuardian(char **argv) {
+  const std::vector<std::string> paths =
+      LibraryPaths(platform_libname("cvmfs_nfsfuse"));
+  for (const std::string &path : paths) {
+    void *handle = dlopen(path.c_str(), RTLD_NOW | RTLD_LOCAL);
+    if (handle == NULL)
+      continue;
+    typedef int (*GuardianMain)(int, int, const char *);
+    GuardianMain guardian_main = reinterpret_cast<GuardianMain>(
+        dlsym(handle, "cvmfs_nfsfuse_guardian_main"));
+    if (guardian_main == NULL)
+      return 1;
+    return guardian_main(atoi(argv[2]), atoi(argv[3]), argv[4]);
+  }
+  return 1;
+}
+
+}  // anonymous namespace
+
+
 int main(int argc, char **argv) {
+  if ((argc == 5) && (strcmp(argv[1], "__nfs_guardian__") == 0))
+    return RunNfsGuardian(argv);
+
   // Getopt option parsing modifies globals and the argv vector
   const int opterr_save = opterr;
   const int optc = argc;
@@ -37,7 +86,8 @@ int main(int argc, char **argv) {
   }
 
   bool debug = false;
-  unsigned enforce_libfuse = 0;
+  bool nfs = false;
+  bool fskit = false;
   int c;
   opterr = 0;
   while ((c = getopt(optc, optv, "do:")) != -1) {
@@ -51,14 +101,11 @@ int main(int argc, char **argv) {
           if (mount_options[i] == "debug") {
             debug = true;
           }
-
-          if (HasPrefix(mount_options[i], "libfuse=", false /*ign_case*/)) {
-            std::vector<std::string> t = SplitString(mount_options[i], '=');
-            enforce_libfuse = String2Uint64(t[1]);
-            if (debug) {
-              LogCvmfs(kLogCvmfs, kLogDebug | kLogStdout,
-                       "Debug: enforcing libfuse version %u", enforce_libfuse);
-            }
+          if (mount_options[i] == "nfs") {
+            nfs = true;
+          }
+          if (mount_options[i] == "obackend=fskit") {
+            fskit = true;
           }
         }
         break;
@@ -71,60 +118,40 @@ int main(int argc, char **argv) {
   }
   free(optv);
 
-  const std::string libname_fuse2 = platform_libname("cvmfs_fuse_stub");
-  const std::string libname_fuse3 = platform_libname("cvmfs_fuse3_stub");
+  // -o nfs selects the frontend that mounts through the kernel's NFS client,
+  // -o obackend=fskit the one built for the macFUSE FSKit backend
+  const std::string libname_fuse3 = platform_libname(
+      nfs ? "cvmfs_nfs_stub"
+          : (fskit ? "cvmfs_fskit_stub" : "cvmfs_fuse3_stub"));
 
   std::string error_messages;
 
-  if (enforce_libfuse > 0) {
-    if ((enforce_libfuse < 2) || (enforce_libfuse > 3)) {
-      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
-               "Error: invalid libfuse version '%u', valid values are 2 or 3.",
-               enforce_libfuse);
-      return 1;
-    }
-  }
+  const std::vector<std::string> library_paths = LibraryPaths(libname_fuse3);
 
-  std::string local_lib_path = "./";
-  if (getenv("CVMFS_LIBRARY_PATH") != NULL) {
-    local_lib_path = getenv("CVMFS_LIBRARY_PATH");
-    if (!local_lib_path.empty() && (*local_lib_path.rbegin() != '/'))
-      local_lib_path.push_back('/');
-  }
-
-  // Try loading libfuse3 module, else fallback to version 2
-  std::vector<std::string> library_paths;
-  if ((enforce_libfuse == 0) || (enforce_libfuse == 3)) {
-    library_paths.push_back(local_lib_path + libname_fuse3);
-    library_paths.push_back("/usr/lib/" + libname_fuse3);
-    library_paths.push_back("/usr/lib64/" + libname_fuse3);
-#ifdef __APPLE__
-    library_paths.push_back("/usr/local/lib/" + libname_fuse3);
-#endif
-  }
-  if ((enforce_libfuse == 0) || (enforce_libfuse == 2)) {
-    library_paths.push_back(local_lib_path + libname_fuse2);
-    library_paths.push_back("/usr/lib/" + libname_fuse2);
-    library_paths.push_back("/usr/lib64/" + libname_fuse2);
-#ifdef __APPLE__
-    library_paths.push_back("/usr/local/lib/" + libname_fuse2);
-#endif
-  }
-
-  void *library_handle;
-  std::vector<std::string>::const_iterator i = library_paths.begin();
-  const std::vector<std::string>::const_iterator iend = library_paths.end();
-  for (; i != iend; ++i) {
-    library_handle = dlopen(i->c_str(), RTLD_NOW | RTLD_LOCAL);
-    if (library_handle != NULL) {
+  // dlopen the library at the first good path
+  void *library_handle = nullptr;
+  for (const std::string &path : library_paths) {
+    library_handle = dlopen(path.c_str(), RTLD_NOW | RTLD_LOCAL);
+    if (nullptr != library_handle) {
       if (debug) {
         LogCvmfs(kLogCvmfs, kLogDebug | kLogStdout, "Debug: using library %s",
-                 i->c_str());
+                 path.c_str());
       }
       break;
     }
-
     error_messages += std::string(dlerror()) + "\n";
+  }
+
+  // Installations with only the NFS frontend still run helper commands
+  // (e.g. __wpad__ from cvmfs_config) without -o nfs
+  if (!library_handle && !nfs) {
+    const std::vector<std::string> nfs_paths =
+        LibraryPaths(platform_libname("cvmfs_nfs_stub"));
+    for (const std::string &path : nfs_paths) {
+      library_handle = dlopen(path.c_str(), RTLD_NOW | RTLD_LOCAL);
+      if (nullptr != library_handle)
+        break;
+    }
   }
 
   if (!library_handle) {

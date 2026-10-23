@@ -9,8 +9,6 @@
  * proper set of symbols to be used by a C program.
  */
 
-#define __STDC_FORMAT_MACROS
-
 
 #include <errno.h>
 #include <inttypes.h>

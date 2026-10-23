@@ -1,7 +1,6 @@
 package cvmfs
 
 import (
-	"archive/tar"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,14 +9,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	"golang.org/x/sys/unix"
-
 	copy "github.com/otiai10/copy"
-	"github.com/pkg/xattr"
 	log "github.com/sirupsen/logrus"
 
 	constants "github.com/cvmfs/ducc/constants"
 	da "github.com/cvmfs/ducc/docker-api"
+	exec "github.com/cvmfs/ducc/exec"
 	l "github.com/cvmfs/ducc/log"
 	temp "github.com/cvmfs/ducc/temp"
 )
@@ -28,24 +25,38 @@ import (
 // target: the path of the target in the normal FS, the thing to ingest
 // if no error is returned, we remove the target from the FS
 func PublishToCVMFS(CVMFSRepo string, path string, target string) (err error) {
+	return PublishToCVMFSWithLogger(nil, CVMFSRepo, path, target)
+}
+
+func PublishToCVMFSWithLogger(logger *log.Entry, CVMFSRepo string, path string, target string) (err error) {
+	logger = l.Ensure(logger)
+	opLogger := logger.WithFields(log.Fields{"target": target, "action": "ingesting"})
 	defer func() {
 		if err == nil {
-			l.Log().WithFields(log.Fields{"target": target, "action": "ingesting"}).Info("Deleting temporary directory")
+			opLogger.Trace("Deleting temporary directory")
 			os.RemoveAll(target)
 		}
 	}()
-	l.Log().WithFields(log.Fields{"target": target, "action": "ingesting"}).Info("Start ingesting")
+	opLogger.Trace("Start ingesting")
 
-	path = filepath.Join("/", "cvmfs", CVMFSRepo, path)
+	if MountlessPublishing() {
+		// The deferred cleanup above removes target on success (err == nil).
+		err = publishToCVMFSMountless(logger, CVMFSRepo, path, target)
+		return err
+	}
 
-	l.Log().WithFields(log.Fields{"target": target, "action": "ingesting"}).Info("Start transaction")
+	repoName, _ := GetRepoAndSubdir(CVMFSRepo)
+	path = PrefixRepoSubdirOnce(CVMFSRepo, path)
+	path = filepath.Join("/", "cvmfs", repoName, path)
 
-	err = WithinTransaction(CVMFSRepo, func() error {
-		l.Log().WithFields(log.Fields{"target": target, "path": path, "action": "ingesting"}).Info("Copying target into path")
+	opLogger.Trace("Start transaction")
+
+	err = WithinTransactionWithLogger(logger, CVMFSRepo, func() error {
+		opLogger.WithField("path", path).Trace("Copying target into path")
 
 		targetStat, err := os.Stat(target)
 		if err != nil {
-			l.LogE(err).WithFields(log.Fields{"target": target}).Error("Impossible to obtain information about the target")
+			opLogger.WithField("error", err).Error("Impossible to obtain information about the target")
 			return err
 		}
 
@@ -53,7 +64,7 @@ func PublishToCVMFS(CVMFSRepo string, path string, target string) (err error) {
 			os.RemoveAll(path)
 			err = os.MkdirAll(path, constants.DirPermision)
 			if err != nil {
-				l.LogE(err).WithFields(log.Fields{"repo": CVMFSRepo}).Warning("Error in creating the directory where to copy the singularity")
+				opLogger.WithFields(log.Fields{"repo": CVMFSRepo, "error": err}).Warning("Error in creating the directory where to copy the singularity")
 			}
 			err = copy.Copy(target, path, copy.Options{PreserveTimes: true})
 
@@ -82,7 +93,7 @@ func PublishToCVMFS(CVMFSRepo string, path string, target string) (err error) {
 		}
 
 		if err != nil {
-			l.LogE(err).WithFields(log.Fields{"repo": CVMFSRepo, "target": target}).Error("Error in moving the target inside the CVMFS repo")
+			opLogger.WithFields(log.Fields{"repo": CVMFSRepo, "error": err}).Error("Error in moving the target inside the CVMFS repo")
 			return err
 		}
 		return nil
@@ -95,22 +106,25 @@ func PublishToCVMFS(CVMFSRepo string, path string, target string) (err error) {
 // newLinkName: comes without the /cvmfs/$REPO/ prefix
 // toLinkPath: comes without the /cvmfs/$REPO/ prefix
 func CreateSymlinkIntoCVMFS(CVMFSRepo, newLinkName, toLinkPath string) (err error) {
+	return CreateSymlinkIntoCVMFSWithLogger(nil, CVMFSRepo, newLinkName, toLinkPath)
+}
+
+func CreateSymlinkIntoCVMFSWithLogger(logger *log.Entry, CVMFSRepo, newLinkName, toLinkPath string) (err error) {
+	logger = l.Ensure(logger)
+	// repository-relative link path (kept for the mountless ingest path)
+	repoRelLink := newLinkName
 	// add the necessary prefix
 	newLinkName = filepath.Join("/", "cvmfs", CVMFSRepo, newLinkName)
 	toLinkPath = filepath.Join("/", "cvmfs", CVMFSRepo, toLinkPath)
 
-	llog := func(l *log.Entry) *log.Entry {
-		return l.WithFields(log.Fields{"action": "save backlink",
+	llog := func(entry *log.Entry) *log.Entry {
+		return l.Ensure(entry).WithFields(log.Fields{"action": "create symlink",
 			"repo":           CVMFSRepo,
 			"link name":      newLinkName,
 			"target to link": toLinkPath})
 	}
 
-	// check if the file we want to link actually exists
-	if _, err := os.Stat(toLinkPath); os.IsNotExist(err) {
-		return err
-	}
-
+	// Compute the relative link target (pure path arithmetic, no I/O).
 	relativePath, err := filepath.Rel(newLinkName, toLinkPath)
 	if err != nil {
 		llog(l.LogE(err)).Error("Error in find the relative path")
@@ -121,7 +135,17 @@ func CreateSymlinkIntoCVMFS(CVMFSRepo, newLinkName, toLinkPath string) (err erro
 	linkChunks := strings.Split(relativePath, string(os.PathSeparator))
 	link := filepath.Join(linkChunks[1:]...)
 
-	err = WithinTransaction(CVMFSRepo, func() error {
+	if MountlessPublishing() {
+		// No mount to stat the target against; create the link via ingest.
+		return createSymlinkMountless(logger, CVMFSRepo, repoRelLink, link)
+	}
+
+	// check if the file we want to link actually exists
+	if _, err := os.Stat(toLinkPath); os.IsNotExist(err) {
+		return err
+	}
+
+	err = WithinTransactionWithLogger(logger, CVMFSRepo, func() error {
 		linkDir := filepath.Dir(newLinkName)
 		err = os.MkdirAll(linkDir, constants.DirPermision)
 		if err != nil {
@@ -156,6 +180,76 @@ func CreateSymlinkIntoCVMFS(CVMFSRepo, newLinkName, toLinkPath string) (err erro
 				"Error in creating the symlink")
 			return err
 		}
+		return nil
+	})
+
+	return err
+}
+
+// CreateVariantSymlinkIntoCVMFS creates a CVMFS variant symlink whose target
+// is stored verbatim (without path resolution or existence checks).  The
+// rawTarget may contain CVMFS variable-expansion expressions such as
+// $(CVMFS_ARCH:-amd64); the CVMFS client will expand them at read time.
+//
+// newLinkName is the symlink path relative to the repository root
+// (without the /cvmfs/<repo>/ prefix).  rawTarget is the exact string that
+// will be stored as the symlink destination.
+func CreateVariantSymlinkIntoCVMFS(CVMFSRepo, newLinkName, rawTarget string) error {
+	return CreateVariantSymlinkIntoCVMFSWithLogger(nil, CVMFSRepo, newLinkName, rawTarget)
+}
+
+func CreateVariantSymlinkIntoCVMFSWithLogger(logger *log.Entry, CVMFSRepo, newLinkName, rawTarget string) (err error) {
+	logger = l.Ensure(logger)
+	fullLinkName := filepath.Join("/", "cvmfs", CVMFSRepo, newLinkName)
+
+	llog := func(entry *log.Entry) *log.Entry {
+		return l.Ensure(entry).WithFields(log.Fields{
+			"action":    "create variant symlink",
+			"repo":      CVMFSRepo,
+			"link name": fullLinkName,
+			"target":    rawTarget,
+		})
+	}
+
+	if MountlessPublishing() {
+		// rawTarget is stored verbatim (it may contain $(...) expansions).
+		return createSymlinkMountless(logger, CVMFSRepo, newLinkName, rawTarget)
+	}
+
+	err = WithinTransactionWithLogger(logger, CVMFSRepo, func() error {
+		linkDir := filepath.Dir(fullLinkName)
+		if mkErr := os.MkdirAll(linkDir, constants.DirPermision); mkErr != nil {
+			llog(l.LogE(mkErr)).WithField("directory", linkDir).
+				Error("Error in creating the directory for the variant symlink")
+			return mkErr
+		}
+
+		// If the symlink already exists with the identical target, skip.
+		if existing, readErr := os.Readlink(fullLinkName); readErr == nil && existing == rawTarget {
+			llog(logger).Trace("Variant symlink already up to date, skipping")
+			return nil
+		}
+
+		// Remove any existing symlink; refuse to overwrite a real file/dir.
+		if lstat, lstatErr := os.Lstat(fullLinkName); !os.IsNotExist(lstatErr) {
+			if lstat.Mode()&os.ModeSymlink != 0 {
+				if rmErr := os.Remove(fullLinkName); rmErr != nil {
+					err := fmt.Errorf("error removing existing variant symlink: %s", rmErr)
+					llog(l.LogE(err)).Error("Error removing existing variant symlink")
+					return err
+				}
+			} else {
+				err := fmt.Errorf("refusing to overwrite non-symlink with variant symlink at %s", fullLinkName)
+				llog(l.LogE(err)).Error("Error creating variant symlink")
+				return err
+			}
+		}
+
+		if symErr := os.Symlink(rawTarget, fullLinkName); symErr != nil {
+			llog(l.LogE(symErr)).Error("Error in creating the variant symlink")
+			return symErr
+		}
+		llog(logger).Info("Created variant symlink")
 		return nil
 	})
 
@@ -213,14 +307,17 @@ func GetBacklinkFromLayer(CVMFSRepo, layerDigest string) (backlink Backlink, err
 	return
 }
 
-func SaveLayersBacklink(CVMFSRepo string, imgManifest da.Manifest, imageName string, layerDigest []string) error {
-	llog := func(l *log.Entry) *log.Entry {
-		return l.WithFields(log.Fields{"action": "save backlink",
-			"repo":  CVMFSRepo,
-			"image": imageName})
+func SaveLayersBacklink(CVMFSRepo string, imgManifest da.Manifest, layerDigest []string) error {
+	return SaveLayersBacklinkWithLogger(nil, CVMFSRepo, imgManifest, layerDigest)
+}
+
+func SaveLayersBacklinkWithLogger(logger *log.Entry, CVMFSRepo string, imgManifest da.Manifest, layerDigest []string) error {
+	llog := func(entry *log.Entry) *log.Entry {
+		return l.Ensure(entry).WithFields(log.Fields{"action": "save backlink",
+			"repo": CVMFSRepo})
 	}
 
-	llog(l.Log()).Info("Start saving backlinks")
+	llog(logger).Trace("Start saving backlinks")
 
 	backlinks := make(map[string][]byte)
 
@@ -246,8 +343,8 @@ func SaveLayersBacklink(CVMFSRepo string, imgManifest da.Manifest, imageName str
 		backlinks[backlinkPath] = backlinkBytesMarshal
 	}
 
-	llog(l.Log()).Info("Start transaction")
-	err := WithinTransaction(CVMFSRepo, func() error {
+	llog(logger).Trace("Start transaction")
+	err := WithinTransactionWithLogger(logger, CVMFSRepo, func() error {
 
 		for path, fileContent := range backlinks {
 			// the path may not be there, check,
@@ -268,7 +365,7 @@ func SaveLayersBacklink(CVMFSRepo string, imgManifest da.Manifest, imageName str
 					"Error in writing the backlink file, skipping...")
 				continue
 			}
-			llog(l.LogE(err)).WithFields(log.Fields{"file": path}).Info(
+			llog(logger).WithFields(log.Fields{"file": path}).Trace(
 				"Wrote backlink")
 		}
 		return nil
@@ -282,9 +379,13 @@ func RemoveScheduleLocation(CVMFSRepo string) string {
 }
 
 func AddManifestToRemoveScheduler(CVMFSRepo string, manifest da.Manifest) error {
+	return AddManifestToRemoveSchedulerWithLogger(nil, CVMFSRepo, manifest)
+}
+
+func AddManifestToRemoveSchedulerWithLogger(logger *log.Entry, CVMFSRepo string, manifest da.Manifest) error {
 	schedulePath := RemoveScheduleLocation(CVMFSRepo)
-	llog := func(l *log.Entry) *log.Entry {
-		return l.WithFields(log.Fields{
+	llog := func(entry *log.Entry) *log.Entry {
+		return l.Ensure(entry).WithFields(log.Fields{
 			"action": "add manifest to remove schedule",
 			"file":   schedulePath})
 	}
@@ -328,7 +429,7 @@ func AddManifestToRemoveScheduler(CVMFSRepo string, manifest da.Manifest) error 
 		return schedule
 	}()
 
-	err := WithinTransaction(CVMFSRepo, func() error {
+	err := WithinTransactionWithLogger(logger, CVMFSRepo, func() error {
 		if _, err := os.Stat(schedulePath); os.IsNotExist(err) {
 			err = os.MkdirAll(filepath.Dir(schedulePath), constants.DirPermision)
 			if err != nil {
@@ -345,7 +446,7 @@ func AddManifestToRemoveScheduler(CVMFSRepo string, manifest da.Manifest) error 
 			if err != nil {
 				llog(l.LogE(err)).Error("Error in writing the new schedule")
 			} else {
-				llog(l.Log()).Info("Wrote new remove schedule")
+				llog(logger).Trace("Wrote new remove schedule")
 			}
 		}
 		return nil
@@ -370,31 +471,6 @@ func RemoveSingularityImageFromManifest(CVMFSRepo string, manifest da.Manifest) 
 
 func LayerPath(CVMFSRepo, layerDigest string) string {
 	return filepath.Join("/", "cvmfs", CVMFSRepo, constants.SubDirInsideRepo, layerDigest[0:2], layerDigest)
-}
-
-func ChainPath(CVMFSRepo, layerDigest string) string {
-	layerDigest = removeHashMarkerIfPresent(layerDigest)
-	return filepath.Join("/", "cvmfs", CVMFSRepo, constants.ChainSubDir, layerDigest[0:2], layerDigest)
-}
-
-func DirtyChainPath(CVMFSRepo, layerDigest string) string {
-	layerDigest = removeHashMarkerIfPresent(layerDigest)
-	return filepath.Join("/", "cvmfs", CVMFSRepo, constants.DirtyChainSubDir, layerDigest)
-}
-
-func GetDirtyChains(CVMFSRepo string) []string {
-	path := filepath.Join("/", "cvmfs", CVMFSRepo, constants.DirtyChainSubDir)
-	result := make([]string, 0)
-	dirs, err := ioutil.ReadDir(path)
-	if err != nil {
-		return result
-	}
-	for _, dir := range dirs {
-		if dir.IsDir() {
-			result = append(result, dir.Name())
-		}
-	}
-	return result
 }
 
 func LayerRootfsPath(CVMFSRepo, layerDigest string) string {
@@ -424,13 +500,18 @@ func RemoveLayer(CVMFSRepo, layerDigest string) error {
 }
 
 func RemoveDirectory(CVMFSRepo string, dirPath ...string) error {
+	return RemoveDirectoryWithLogger(nil, CVMFSRepo, dirPath...)
+}
+
+func RemoveDirectoryWithLogger(logger *log.Entry, CVMFSRepo string, dirPath ...string) error {
+	logger = l.Ensure(logger)
 	path := []string{"/cvmfs", CVMFSRepo}
 	for _, p := range dirPath {
 		path = append(path, p)
 	}
 	directory := filepath.Join(path...)
-	llog := func(l *log.Entry) *log.Entry {
-		return l.WithFields(log.Fields{
+	llog := func(entry *log.Entry) *log.Entry {
+		return l.Ensure(entry).WithFields(log.Fields{
 			"action": "removing directory", "directory": directory})
 	}
 	stat, err := os.Stat(directory)
@@ -454,7 +535,7 @@ func RemoveDirectory(CVMFSRepo string, dirPath ...string) error {
 		llog(l.LogE(err)).Error("Error in opening the transaction")
 		return err
 	}
-	err = WithinTransaction(CVMFSRepo, func() error {
+	err = WithinTransactionWithLogger(logger, CVMFSRepo, func() error {
 		err := os.RemoveAll(directory)
 		if err != nil {
 			llog(l.LogE(err)).Error("Error in publishing after adding the backlinks")
@@ -466,14 +547,23 @@ func RemoveDirectory(CVMFSRepo string, dirPath ...string) error {
 }
 
 func CreateCatalogIntoDir(CVMFSRepo, dir string) (err error) {
-	catalogPath := filepath.Join("/", "cvmfs", CVMFSRepo, dir, ".cvmfscatalog")
+	return CreateCatalogIntoDirWithLogger(nil, CVMFSRepo, dir)
+}
+
+func CreateCatalogIntoDirWithLogger(logger *log.Entry, CVMFSRepo, dir string) (err error) {
+	repoName, _ := GetRepoAndSubdir(CVMFSRepo)
+	normalizedDir := PrefixRepoSubdirOnce(CVMFSRepo, dir)
+	catalogRelativePath := filepath.Join(normalizedDir, ".cvmfscatalog")
+	catalogPath := filepath.Join("/", "cvmfs", repoName, catalogRelativePath)
 	if _, err := os.Stat(catalogPath); os.IsNotExist(err) {
 		tmpFile, err := ioutil.TempFile("", "tempCatalog")
-		tmpFile.Close()
 		if err != nil {
 			return err
 		}
-		err = PublishToCVMFS(CVMFSRepo, TrimCVMFSRepoPrefix(catalogPath), tmpFile.Name())
+		if err := tmpFile.Close(); err != nil {
+			return err
+		}
+		err = PublishToCVMFSWithLogger(logger, repoName, catalogRelativePath, tmpFile.Name())
 		if err != nil {
 			return err
 		}
@@ -484,23 +574,28 @@ func CreateCatalogIntoDir(CVMFSRepo, dir string) (err error) {
 
 // writes data to file and publish in cvmfs repo path
 func WriteDataToCvmfs(CVMFSRepo, path string, data []byte) (err error) {
+	return WriteDataToCvmfsWithLogger(nil, CVMFSRepo, path, data)
+}
+
+func WriteDataToCvmfsWithLogger(logger *log.Entry, CVMFSRepo, path string, data []byte) (err error) {
+	logger = l.Ensure(logger)
 	tmpFile, err := temp.UserDefinedTempFile()
 	if err != nil {
-		l.LogE(err).Error("Error in creating temporary file for writing data")
+		logger.WithField("error", err).Error("Error in creating temporary file for writing data")
 		return err
 	}
 	defer os.RemoveAll(tmpFile.Name())
 	err = ioutil.WriteFile(tmpFile.Name(), data, 0644)
 	if err != nil {
-		l.LogE(err).Error("Error in writing data to file")
+		logger.WithField("error", err).Error("Error in writing data to file")
 		return err
 	}
 	err = tmpFile.Close()
 	if err != nil {
-		l.LogE(err).Error("Error in closing temporary file")
+		logger.WithField("error", err).Error("Error in closing temporary file")
 		return err
 	}
-	return PublishToCVMFS(CVMFSRepo, path, tmpFile.Name())
+	return PublishToCVMFSWithLogger(logger, CVMFSRepo, path, tmpFile.Name())
 }
 
 func removeHashMarkerIfPresent(digest string) string {
@@ -511,240 +606,55 @@ func removeHashMarkerIfPresent(digest string) string {
 	return digest
 }
 
-func CreateSneakyChain(CVMFSRepo, newChainId, previousChainId string, layer tar.Reader) error {
-	sneakyPath := filepath.Join("/", "var", "spool", "cvmfs", CVMFSRepo, "scratch", "current")
-	newChainPath := ChainPath(CVMFSRepo, newChainId)
-	dirtyChainPath := DirtyChainPath(CVMFSRepo, newChainId)
-	sneakyChainPath := filepath.Join(sneakyPath, TrimCVMFSRepoPrefix(newChainPath))
-	// we need to create the directory were to do the template transaction
-	dir := filepath.Dir(newChainPath)
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		// if the directory does not exists, we create it
+// Overlay calls `cvmfs_server overlay` to merge multiple layer directories into
+// a single flat image directory. The layers should be provided in bottom-to-top
+// order (base layer first). The destPath is the path inside the CVMFS repository
+// where the merged result will be placed (without the /cvmfs/$REPO prefix).
+func Overlay(CVMFSRepo string, layerPaths []string, destPath string) error {
+	return OverlayWithLogger(nil, CVMFSRepo, layerPaths, destPath, "", false)
+}
 
-		if err := WithinTransaction(CVMFSRepo, func() error {
-			os.MkdirAll(dir, constants.DirPermision)
-			filePath := filepath.Join(dir, ".cvmfscatalog")
-			f, err := os.OpenFile(filePath, os.O_CREATE|os.O_RDONLY, constants.FilePermision)
-			if err != nil {
-				l.LogE(err).Info("Error in creating ", filePath)
-				return err
-			}
-			f.Close()
-			l.Log().Info("Closed file: ", filePath)
-			return nil
-		}); err != nil {
-			return err
-		}
+func OverlayWithLogger(logger *log.Entry, CVMFSRepo string, layerPaths []string, destPath string, ociConfigPath string, skipSingularity bool) error {
+	logger = l.Ensure(logger)
+	if len(layerPaths) == 0 {
+		return fmt.Errorf("no layer paths provided for overlay")
 	}
-	// then we need the template transaction to populate it
-	if previousChainId != "" {
-		// if it is the very first chain, we don't need the template transaction
-		opt := TemplateTransaction{
-			source:      TrimCVMFSRepoPrefix(ChainPath(CVMFSRepo, previousChainId)),
-			destination: TrimCVMFSRepoPrefix(newChainPath),
-		}
-		if err := WithinTransaction(CVMFSRepo, func() error {
-			source := ChainPath(CVMFSRepo, previousChainId)
-			sourceDirs, err := ioutil.ReadDir(source)
-			if err != nil {
-				return err
-			}
-			destination := newChainPath
-			destinationDirs, err := ioutil.ReadDir(destination)
-			if err != nil {
-				return err
-			}
 
-			if len(sourceDirs) != len(destinationDirs) {
-				return fmt.Errorf("Different number of directories between the source and the target directories during a template transaction. source: %s , # of dir: %d, target: %s, # of dirs: %d", source, len(sourceDirs), destination, len(destinationDirs))
-			}
+	layers := strings.Join(layerPaths, ",")
 
-			f, _ := os.OpenFile(filepath.Join(destination, ".cvmfscatalog"), os.O_CREATE|os.O_RDONLY, constants.FilePermision)
-			f.Close()
-			err = os.MkdirAll(dirtyChainPath, constants.DirPermision)
-			if err != nil {
-				return err
-			}
-			return nil
-		}, opt); err != nil {
-			return err
-		}
+	llog := func(entry *log.Entry) *log.Entry {
+		return l.Ensure(entry).WithFields(log.Fields{
+			"action": "overlay",
+			"repo":   CVMFSRepo,
+			"layers": layers,
+			"dest":   destPath,
+		})
 	}
-	// finally we need the sneaky transaction to create the chain
-	if err := ExecuteAndOpenTransaction(CVMFSRepo, func() error {
-	loop:
-		for {
-			header, err := layer.Next()
-			if err == io.EOF {
-				f, _ := os.OpenFile(filepath.Join(sneakyChainPath, ".cvmfscatalog"), os.O_CREATE|os.O_RDONLY, constants.FilePermision)
-				f.Close()
-				return nil
-			}
 
-			if err != nil {
-				l.LogE(err).Error("Error in getting next layer")
-				return err
-			}
+	llog(logger).Trace("Starting overlay merge")
 
-			if header == nil {
-				continue loop
-			}
+	getLock(CVMFSRepo)
+	defer unlock(CVMFSRepo)
 
-			path := filepath.Join(sneakyChainPath, header.Name)
-			dir := filepath.Dir(path)
+	args := []string{"cvmfs_server", "overlay",
+		"-l", layers,
+		"-d", destPath}
 
-			os.MkdirAll(dir, constants.DirPermision)
-			if isWhiteout(path) {
-				// this will be an empty file
-				// check if it is an opaque directory or a standard whiteout file
-				base := filepath.Base(path)
-				if base == ".wh..wh..opq" {
-					// an opaque directory
-					if err := makeOpaqueDir(dir); err != nil {
-						l.LogE(err).Error("Error in making opaque directory")
-						return err
-					}
-				} else {
-					// a whiteout file
-					base = base[4:]
-					path := filepath.Join(dir, base)
-					if err := makeWhiteoutFile(path); err != nil {
-						l.LogE(err).Error("Error in creating whiteout file")
-						return err
-					}
-				}
-				continue
-			}
+	if ociConfigPath != "" {
+		args = append(args, "-c", ociConfigPath)
+	}
+	if skipSingularity {
+		args = append(args, "-S")
+	}
 
-			permissionMask := int64(0)
-			switch header.Typeflag {
+	args = append(args, CVMFSRepo)
 
-			case tar.TypeDir:
-				{
-					err := os.MkdirAll(path, constants.DirPermision)
-					if err != nil {
-						l.LogE(err).Error("Error in creating directory")
-						return err
-					}
-					permissionMask |= 0700
-				}
-			case tar.TypeReg, tar.TypeRegA:
-				{
-					f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, constants.FilePermision)
-					if err != nil {
-						l.LogE(err).Error("Error in creating file")
-						return err
-					}
-					if _, err = io.Copy(f, &layer); err != nil {
-						l.LogE(err).Error("Error in copying file from tar", path)
-						f.Close()
-						return err
-					}
-					f.Close()
-					permissionMask |= 0600
-				}
-			case tar.TypeLink:
-				{
-					// hardlink
-					// maybe we should just copy the file
-					oldLinkName := filepath.Join(sneakyChainPath, header.Linkname)
-					if err := os.Link(oldLinkName, path); err != nil {
-						l.LogE(err).Error("Error in creating hard link")
-						return err
-					}
-				}
-			case tar.TypeSymlink:
-				{
-					// symlink
-					if err := os.Symlink(header.Linkname, path); err != nil {
-						l.LogE(err).Error("Error in creating symbolic link")
-						return err
-					}
-					// TODO (smosciat)
-					// do we want to invoke also Lchmod ?
-					// the function does not really exist in std
-					os.Lchown(path, header.Uid, header.Gid)
-
-					continue loop
-				}
-			case tar.TypeChar, tar.TypeBlock, tar.TypeFifo:
-				{
-					// char device
-					var mode uint32
-					switch header.Typeflag {
-					case tar.TypeChar:
-						mode = unix.S_IFCHR
-					case tar.TypeBlock:
-						mode = unix.S_IFBLK
-					case tar.TypeFifo:
-						mode = unix.S_IFIFO
-					}
-					dev := unix.Mkdev(uint32(header.Devmajor), uint32(header.Devminor))
-					if err := unix.Mknod(path, uint32(os.FileMode(int64(mode)|header.Mode)), int(dev)); err != nil {
-						l.LogE(err).Error("Error in creating special file")
-						return err
-					}
-				}
-			default:
-				{
-					// unclear what to do here, just skip it
-					continue loop
-				}
-			}
-
-			// these are common to everything
-			if err := os.Chmod(path, os.FileMode(header.Mode|permissionMask)); err != nil {
-				l.LogE(err).Error("Error in chmod")
-				return err
-			}
-			// TODO(vavolkl): do we need to chown?
-			if os.Getenv("CVMFS_DUCC_NO_CHOWN") == "" {
-				if err := os.Chown(path, header.Uid, header.Gid); err != nil {
-					l.LogE(err).Error("Error in chown")
-					return err
-				}
-			}
-			if err := os.Chtimes(path, header.AccessTime, header.ModTime); err != nil {
-				l.LogE(err).Error("Error in chtimes")
-				return err
-			}
-		}
-	}); err != nil {
-		os.RemoveAll(filepath.Join(sneakyPath, ".chains"))
-		// the creation of the chain is not complete, we delete the template created as well
-		IngestDelete(CVMFSRepo, TrimCVMFSRepoPrefix(newChainPath))
-		// we catch a problem in the creation of the chain, and the chain was destructed
-		// we don't need anymore the dirty flag
-		IngestDelete(CVMFSRepo, TrimCVMFSRepoPrefix(dirtyChainPath))
+	err := exec.ExecCommandWithLogger(llog(logger), args...).Start()
+	if err != nil {
+		llog(l.LogE(err)).Error("Error in overlay merge")
 		return err
 	}
-	// everything went well, this flag is not necessary anymore
-	os.RemoveAll(dirtyChainPath)
 
-	// now the transaction is open and the sneaky overlay is populated
-	// we don't need to do anything else at this point and we can close the transaction
-	return Publish(CVMFSRepo)
-}
-
-func isWhiteout(path string) bool {
-	base := filepath.Base(path)
-	if len(base) <= 3 {
-		return false
-	}
-	return base[0:4] == ".wh."
-}
-
-func makeWhiteoutFile(path string) error {
-	dev := unix.Mkdev(0, 0)
-	mode := os.FileMode(int64(unix.S_IFCHR) | 0000)
-	return unix.Mknod(path, uint32(mode), int(dev))
-}
-
-func makeOpaqueDir(path string) error {
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		if err := os.MkdirAll(path, constants.DirPermision); err != nil {
-			return err
-		}
-	}
-	return xattr.Set(path, "trusted.overlay.opaque", []byte("y"))
+	llog(logger).Trace("Overlay merge complete")
+	return nil
 }

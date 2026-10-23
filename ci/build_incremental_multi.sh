@@ -45,6 +45,8 @@ if can_build_gateway; then
   build_gateway="ON"
 fi
 
+
+
 echo "configuring using CMake..."
 cmake -DBUILD_SERVER=$build_server          \
       -DBUILD_SERVER_DEBUG=$build_server    \

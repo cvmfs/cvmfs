@@ -5,12 +5,12 @@
 #ifndef CVMFS_NOTIFICATION_CLIENT_H_
 #define CVMFS_NOTIFICATION_CLIENT_H_
 
+#include <memory>
 #include <string>
 
 #include "fuse_remount.h"
 #include "network/download.h"
 #include "notify/subscriber.h"
-#include "util/pointer.h"
 #include "util/single_copy.h"
 
 namespace signature {
@@ -48,7 +48,7 @@ class NotificationClient : public SingleCopy {
   FuseRemounter *remounter_;
   download::DownloadManager *dl_mgr_;
   signature::SignatureManager *sig_mgr_;
-  UniquePtr<notify::Subscriber> subscriber_;
+  std::unique_ptr<notify::Subscriber> subscriber_;
   pthread_t thread_;
   bool spawned_;
 };

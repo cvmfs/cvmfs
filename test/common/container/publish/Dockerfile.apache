@@ -1,0 +1,50 @@
+# Dockerfile.apache – minimal Apache/httpd frontend for CVMFS repositories.
+#
+# This container proxies HTTP requests for /cvmfs/<repo> to the Garage S3
+# backend.  The actual Apache VirtualHost/ProxyPass config is written by the
+# gateway container on first boot and shared via the `apache-conf` volume.
+#
+# Build context: repository root
+#   docker build -f test/common/container/publish/Dockerfile.apache \
+#                -t cvmfs-apache:latest .
+
+FROM almalinux:9
+
+USER root
+
+# Same shadow workaround as the gateway image
+RUN chmod 0400 /etc/shadow
+
+RUN dnf install -y --allowerasing \
+        httpd \
+        mod_ssl \
+        curl \
+    && dnf clean all
+
+# Create the directory where the gateway will drop per-repo Apache conf files.
+# This will be bind-mounted / volume-mounted at runtime.
+RUN mkdir -p /apache-conf
+
+# ---------------------------------------------------------------------------
+# Base httpd config tweaks:
+#   - Enable required proxy and utility modules that may be disabled by default.
+#   - Add a minimal global config that loads before any per-repo snippets.
+# ---------------------------------------------------------------------------
+RUN echo 'ServerName localhost' >> /etc/httpd/conf/httpd.conf
+
+# Ensure proxy modules are not commented out
+RUN sed -i \
+        -e 's/^#\(LoadModule proxy_module\)/\1/' \
+        -e 's/^#\(LoadModule proxy_http_module\)/\1/' \
+        -e 's/^#\(LoadModule headers_module\)/\1/' \
+        -e 's/^#\(LoadModule expires_module\)/\1/' \
+        /etc/httpd/conf.modules.d/00-proxy.conf \
+        /etc/httpd/conf.modules.d/00-base.conf 2>/dev/null || true
+
+EXPOSE 80
+
+COPY test/common/container/publish/scripts/entrypoint-apache.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]
+

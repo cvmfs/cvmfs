@@ -13,6 +13,12 @@ cleanup() {
   fi
 
   if [ "x$CVMFS_TEST666_TEST_UID" != "x" ]; then
+    # systemd user session automatically started by `sudo` fails userdel. Seen on CentOS 9.
+    # Waiting for it to terminate on its own takes 10 seconds.
+    sudo kill $(ps -u cvmfstestuser -o pid=) || true
+    while ps -u cvmfstestuser -o pid= >/dev/null; do
+      sleep 1
+    done
     sudo userdel cvmfstestuser
   fi
 
@@ -55,7 +61,7 @@ cvmfs_run_test() {
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
 
   echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
-  create_empty_repo $CVMFS_TEST_REPO $USER || return $?
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
 
 
   echo "---------------------"

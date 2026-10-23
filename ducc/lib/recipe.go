@@ -1,7 +1,9 @@
 package lib
 
 import (
+	"io/ioutil"
 	"math/rand"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -18,11 +20,46 @@ type YamlRecipeV1 struct {
 	CVMFSRepo    string   `yaml:"cvmfs_repo"`
 	OutputFormat string   `yaml:"output_format"`
 	Input        []string `yaml:"input"`
+	IgnoreErrors []string `yaml:"ignoreErrors"`
+}
+
+type IgnoreErrorsConfig struct {
+	IgnoreErrors []string `yaml:"ignoreErrors"`
 }
 
 type Recipe struct {
-	Repo   string
-	Wishes chan WishFriendly
+	Repo             string
+	Wishes           chan WishFriendly
+	IgnoreErrorsList []string
+	OutputFormat     string
+}
+
+// loadIgnoreErrorsList loads the ignore errors list from an external file if DUCC_IGNORE_ERRORS_FILE env var is set
+func loadIgnoreErrorsList() ([]string, error) {
+	ignoreFilePath := os.Getenv("DUCC_IGNORE_ERRORS_FILE")
+	if ignoreFilePath == "" {
+		return []string{}, nil
+	}
+
+	data, err := ioutil.ReadFile(ignoreFilePath)
+	if err != nil {
+		l.LogE(err).WithFields(log.Fields{"file": ignoreFilePath}).Warning("Failed to read ignore errors file from DUCC_IGNORE_ERRORS_FILE")
+		return []string{}, err
+	}
+
+	var ignoreConfig IgnoreErrorsConfig
+	err = yaml.Unmarshal(data, &ignoreConfig)
+	if err != nil {
+		l.LogE(err).WithFields(log.Fields{"file": ignoreFilePath}).Warning("Failed to parse ignore errors file")
+		return []string{}, err
+	}
+
+	l.Log().WithFields(log.Fields{
+		"file":  ignoreFilePath,
+		"count": len(ignoreConfig.IgnoreErrors),
+	}).Info("Loaded ignore errors list from external file")
+
+	return ignoreConfig.IgnoreErrors, nil
 }
 
 func ParseYamlRecipeV1(data []byte) (Recipe, error) {
@@ -31,6 +68,20 @@ func ParseYamlRecipeV1(data []byte) (Recipe, error) {
 	recipe := Recipe{}
 	recipe.Repo = recipeYamlV1.CVMFSRepo
 	recipe.Wishes = make(chan WishFriendly, 500)
+	recipe.OutputFormat = recipeYamlV1.OutputFormat
+
+	// Load ignore errors list from recipe file
+	recipe.IgnoreErrorsList = recipeYamlV1.IgnoreErrors
+
+	// Load and merge ignore errors list from external file if DUCC_IGNORE_ERRORS_FILE is set
+	externalIgnoreList, errIgnore := loadIgnoreErrorsList()
+	if errIgnore == nil && len(externalIgnoreList) > 0 {
+		recipe.IgnoreErrorsList = append(recipe.IgnoreErrorsList, externalIgnoreList...)
+		l.Log().WithFields(log.Fields{
+			"total_count": len(recipe.IgnoreErrorsList),
+		}).Info("Merged ignore errors lists from recipe and external file")
+	}
+
 	var wg sync.WaitGroup
 	defer func() {
 		go func() {
@@ -53,15 +104,11 @@ func ParseYamlRecipeV1(data []byte) (Recipe, error) {
 	for reg, inputImages := range registryMap {
 		wg.Add(1)
 		go func(inputImages []Image, reg string) {
-			l.Log().Info("Starting with", inputImages[0])
 			defer wg.Done()
 			for _, input := range inputImages {
 				if reg == "gitlab-registry.cern.ch" {
 					time.Sleep(500*time.Millisecond + time.Duration(rand.Intn(500))*time.Millisecond)
 				}
-
-				l.Log().Info(reg)
-				l.Log().Info(input)
 
 				output := formatOutputImage(recipeYamlV1.OutputFormat, input)
 				wish, err := CreateWish(input, output, recipeYamlV1.CVMFSRepo, recipeYamlV1.User, recipeYamlV1.User)
@@ -80,7 +127,6 @@ func formatOutputImage(OutputFormat string, inputImage Image) string {
 
 	if OutputFormat == "" {
 		OutputFormat = "$(scheme)://$(registry)/$(repository)_thin:$(tag)"
-		l.Log().Info("Using default output image name ", OutputFormat)
 	}
 
 	s := strings.Replace(OutputFormat, "$(scheme)", inputImage.Scheme, 5)

@@ -5,6 +5,7 @@
 #ifndef CVMFS_SERVER_TOOL_H_
 #define CVMFS_SERVER_TOOL_H_
 
+#include <memory>
 #include <string>
 
 #include "crypto/signature.h"
@@ -12,7 +13,6 @@
 #include "network/download.h"
 #include "reflog.h"
 #include "statistics.h"
-#include "util/pointer.h"
 
 class ServerTool {
  public:
@@ -48,8 +48,8 @@ class ServerTool {
   const perf::Statistics *statistics() const { return &statistics_; }
 
  protected:
-  UniquePtr<download::DownloadManager> download_manager_;
-  UniquePtr<signature::SignatureManager> signature_manager_;
+  std::unique_ptr<download::DownloadManager> download_manager_;
+  std::unique_ptr<signature::SignatureManager> signature_manager_;
   perf::Statistics statistics_;
 
  private:
@@ -57,6 +57,6 @@ class ServerTool {
   static const unsigned kDownloadRetries = 3;   // 4 attempts in total
 };
 
-#include "server_tool_impl.h"
+#include "server_tool_impl.h"  // IWYU pragma: keep
 
 #endif  // CVMFS_SERVER_TOOL_H_

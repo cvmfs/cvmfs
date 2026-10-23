@@ -7,11 +7,11 @@
 
 #include <pthread.h>
 
+#include <atomic>
 #include <cassert>
 #include <cstddef>
 #include <vector>
 
-#include "util/atomic.h"
 #include "util/mutex.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
@@ -201,11 +201,11 @@ class PolymorphicConstructionImpl {
     //   fully initialized!
     // See StackOverflow:
     // http://stackoverflow.com/questions/8097439/lazy-initialized-caching-how-do-i-make-it-thread-safe
-    if (atomic_read32(&needs_init_)) {
+    if (needs_init_.load()) {
       MutexLockGuard m(&init_mutex_);
-      if (atomic_read32(&needs_init_)) {
+      if (needs_init_.load()) {
         AbstractProductT::RegisterPlugins();
-        atomic_dec32(&needs_init_);
+        needs_init_.fetch_sub(1);
       }
     }
 
@@ -258,7 +258,7 @@ class PolymorphicConstructionImpl {
   static RegisteredPlugins registered_plugins_;
 
  private:
-  static atomic_int32 needs_init_;
+  static std::atomic<int32_t> needs_init_;
   static pthread_mutex_t init_mutex_;
 };
 
@@ -307,8 +307,8 @@ class PolymorphicConstruction<AbstractProductT, ParameterT, void>
 
 
 template<class AbstractProductT, typename ParameterT, typename InfoT>
-atomic_int32 PolymorphicConstructionImpl<AbstractProductT, ParameterT,
-                                         InfoT>::needs_init_ = 1;
+std::atomic<int32_t> PolymorphicConstructionImpl<AbstractProductT, ParameterT,
+                                                 InfoT>::needs_init_(1);
 
 template<class AbstractProductT, typename ParameterT, typename InfoT>
 pthread_mutex_t
@@ -329,3 +329,4 @@ typename PolymorphicConstructionImpl<AbstractProductT, ParameterT,
 #endif
 
 #endif  // CVMFS_UTIL_PLUGIN_H_
+

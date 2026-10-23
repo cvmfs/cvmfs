@@ -8,10 +8,11 @@ set -euo pipefail
 # Options:
 #   -l, --list       List build and runtime dependencies instead of installing
 #   -i, --install    Install build dependencies (default)
+#   --test-deps      Install dependencies needed by integration tests
 #   -h, --help       Show this help
 # Examples:
 #   ci/build_install_builddeps.sh --list
-#   ci/build_install_builddeps.sh --install /path/to/cvmfs
+#   ci/build_install_builddeps.sh --test-deps
 
 ########################
 # Utilities
@@ -20,6 +21,67 @@ set -euo pipefail
 die() { echo "ERROR: $*" >&2; exit 1; }
 log() { echo "[builddeps] $*"; }
 check_available() { command -v "$1" >/dev/null 2>&1; }
+
+# cmake_version_ge A B — succeeds when cmake version A >= B
+cmake_version_ge() {
+  local a="$1" b="$2"
+  IFS='.' read -ra av <<< "$a"
+  IFS='.' read -ra bv <<< "$b"
+  local i
+  for i in 0 1 2; do
+    local an="${av[$i]:-0}"
+    local bn="${bv[$i]:-0}"
+    (( an > bn )) && return 0
+    (( an < bn )) && return 1
+  done
+  return 0
+}
+
+bootstrap_cmake_if_needed() {
+  local min_ver="3.24.0"
+  local current_ver=""
+  if check_available cmake; then
+    current_ver="$(cmake --version 2>/dev/null \
+      | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || true)"
+  fi
+  if [ -n "$current_ver" ] && cmake_version_ge "$current_ver" "$min_ver"; then
+    log "cmake ${current_ver} is sufficient (>= ${min_ver})"
+    return 0
+  fi
+  if [ -n "$current_ver" ]; then
+    log "cmake ${current_ver} < ${min_ver} — bootstrapping a newer cmake"
+  else
+    log "cmake not found — bootstrapping cmake"
+  fi
+  local cmake_dir_line
+  cmake_dir_line="$("${SCRIPT_DIR}/bootstrap_cmake.sh")"
+  eval "$cmake_dir_line"
+  export CVMFS_CMAKE_DIR
+  log "cmake bootstrapped at: ${CVMFS_CMAKE_DIR}/cmake"
+}
+
+bootstrap_golang_if_needed() {
+  local min_ver="1.24.0"
+  local current_ver=""
+  if check_available go; then
+    current_ver="$(go version 2>/dev/null \
+      | grep -oE 'go[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1 | sed 's/^go//' || true)"
+  fi
+  if [ -n "$current_ver" ] && cmake_version_ge "$current_ver" "$min_ver"; then
+    log "go ${current_ver} is sufficient (>= ${min_ver})"
+    return 0
+  fi
+  if [ -n "$current_ver" ]; then
+    log "go ${current_ver} < ${min_ver} — bootstrapping a newer go"
+  else
+    log "go not found — bootstrapping go"
+  fi
+  local go_dir_line
+  go_dir_line="$("${SCRIPT_DIR}/bootstrap_golang.sh")"
+  eval "$go_dir_line"
+  export CVMFS_GO_DIR
+  log "go bootstrapped at: ${CVMFS_GO_DIR}/go"
+}
 
 get_script_dir() { cd "$(dirname "$0")" && pwd; }
 
@@ -33,8 +95,9 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     -l|--list) MODE="list"; shift;;
     -i|--install) MODE="install"; shift;;
+    --test-deps) MODE="test-deps"; shift;;
     -h|--help)
-      sed -n '1,20p' "$0" | sed 's/^# \{0,1\}//'; exit 0;;
+      sed -n '5,15p' "$0" | sed 's/^# \{0,1\}//'; exit 0;;
     --) shift; break;;
     -*) die "Unknown option: $1";;
     *) REPO_ARG="$1"; shift;;
@@ -55,7 +118,7 @@ SUDO=""
 if check_available sudo; then
   SUDO="sudo"
 else
-  if [[ "${MODE}" = "install" ]] && [[ ${EUID:-$(id -u)} -ne 0 ]]; then
+  if [[ "${MODE}" != "list" ]] && [[ ${EUID:-$(id -u)} -ne 0 ]]; then
     die "sudo not found and not running as root; cannot install packages"
   fi
 fi
@@ -79,8 +142,7 @@ detect_platform() {
     PKG_MGR="apt-get"; OS_FAMILY="deb"; return 0
   fi
   if echo "$like_all" | grep -Eq '(rhel|centos|fedora|rocky|almalinux|ol)'; then
-    if check_available dnf; then PKG_MGR="dnf"; else PKG_MGR="yum"; fi
-    OS_FAMILY="rhel"; return 0
+    PKG_MGR="dnf"; OS_FAMILY="rhel"; return 0
   fi
   if echo "$like_all" | grep -Eq '(suse|sles|opensuse)'; then
     PKG_MGR="zypper"; OS_FAMILY="suse"; return 0
@@ -88,7 +150,6 @@ detect_platform() {
   # Fallbacks by package manager availability
   if check_available apt-get; then PKG_MGR="apt-get"; OS_FAMILY="deb"; return 0; fi
   if check_available dnf; then PKG_MGR="dnf"; OS_FAMILY="rhel"; return 0; fi
-  if check_available yum; then PKG_MGR="yum"; OS_FAMILY="rhel"; return 0; fi
   if check_available zypper; then PKG_MGR="zypper"; OS_FAMILY="suse"; return 0; fi
   return 1
 }
@@ -136,24 +197,41 @@ list_deps_deb() {
   | extract_deps_from_stanza true | sort -u
 }
 
+# extract_rpm_deps <spec> <rpmspec-query-flag> <tag>
+# Requires rpmspec (part of the 'rpm-build' package) to correctly expand
+# macros/conditionals. Parsing the raw spec text without it would silently
+# union every distro variant's requirements together (e.g. both gcc4 and
+# gcc, both sysvinit and systemd) and leave macros like %{cvmfs_go} and
+# %{version}-%{release} unresolved, so that is not offered as a fallback.
+extract_rpm_deps() {
+  local spec="$1" query_flag="$2" tag="$3" out=""
+  check_available rpmspec || \
+    die "rpmspec not found (part of the 'rpm-build' package) -- install it first, e.g. 'dnf install rpm-build' or 'zypper install rpm-build'"
+
+  out="$(rpmspec -q "$query_flag" "$spec" 2>/dev/null || true)"
+  if [ -z "$out" ]; then
+    # Older rpm without -q --buildrequires/--requires support: --parse still
+    # expands macros/conditionals correctly, just without the per-dependency
+    # splitting that -q provides.
+    out="$(rpmspec --parse "$spec" 2>/dev/null | grep -E "^${tag}:" || true)"
+    out="$(echo "$out" | sed -E "s/^${tag}:[[:space:]]*//" | tr -s '[:space:]' '\n')"
+  fi
+  echo "$out" \
+    | sed -E 's/[[:space:]]*(<=|>=|<|>|=).*$//' \
+    | grep -v '^/' \
+    | sed -e '/^$/d' | sort -u
+}
+
 list_deps_rpm() {
   local spec="$1"
   [ -f "$spec" ] || die "RPM spec file not found at $spec"
 
   echo "# Build Dependencies:"
-  if check_available rpmspec; then
-    rpmspec --parse "$spec" 2>/dev/null | grep -E '^BuildRequires:' || true
-  else
-    grep -E '^BuildRequires:' "$spec" || true
-  fi | awk '{print $2}' | sed -e '/^$/d' | sort -u
+  extract_rpm_deps "$spec" --buildrequires "BuildRequires"
 
   echo ""
   echo "# Runtime Dependencies:"
-  if check_available rpmspec; then
-    rpmspec --parse "$spec" 2>/dev/null | grep -E '^Requires:' || true
-  else
-    grep -E '^Requires:' "$spec" || true
-  fi | awk '{print $2}' | sed -e '/^$/d' | grep -v '^cvmfs' | sort -u
+  extract_rpm_deps "$spec" --requires "Requires" | grep -v '^cvmfs'
 }
 
 ########################
@@ -161,39 +239,28 @@ list_deps_rpm() {
 ########################
 install_deps_deb() {
   [ -f "$DEB_CONTROL" ] || die "Debian control file not found at $DEB_CONTROL"
+
+  export DEBIAN_FRONTEND=noninteractive
   $SUDO apt-get -y update
-  if ! check_available mk-build-deps; then
+  if ! check_available mk-build-deps || ! dpkg -s equivs >/dev/null 2>&1; then
     $SUDO apt-get -y install devscripts equivs
   fi
   # Use mk-build-deps to create and install the meta-package, then remove it
-  $SUDO DEBIAN_FRONTEND=noninteractive mk-build-deps -i -r "$DEB_CONTROL"
+  $SUDO mk-build-deps -t "apt-get -o Debug::pkgProblemResolver=yes --no-install-recommends -y" -i -r "$DEB_CONTROL"
 }
 
 install_deps_rhel() {
   [ -f "$RPM_SPEC" ] || die "RPM spec file not found at $RPM_SPEC"
-  if [[ "$PKG_MGR" = "dnf" ]]; then
-    $SUDO dnf -y install dnf-plugins-core || true
-    if check_available dnf; then
-      $SUDO dnf builddep -y "$RPM_SPEC" && return 0
-    fi
+  if ! check_available rpmbuild; then
+    $SUDO dnf -y install rpm-build
   fi
-  if [[ "$PKG_MGR" = "yum" ]]; then
-    $SUDO yum -y install yum-utils || true
-    if check_available yum-builddep; then
-      $SUDO yum-builddep -y "$RPM_SPEC" && return 0
-    else
-      $SUDO yum builddep -y "$RPM_SPEC" && return 0 || true
-    fi
-  fi
+  $SUDO dnf -y install dnf-plugins-core || true
+  $SUDO dnf builddep -y "$RPM_SPEC" && return 0
   # Fallback: parse spec and install packages directly
   local pkgs
-  pkgs=$(list_deps_rpm "$RPM_SPEC" || true)
+  pkgs=$(list_deps_rpm "$RPM_SPEC" | grep -v '^[[:space:]]*#' | grep -v '^[[:space:]]*$' || true)
   [ -n "${pkgs:-}" ] || die "Could not determine RPM build dependencies"
-  if [[ "$PKG_MGR" = "dnf" ]]; then
-    $SUDO dnf -y install $pkgs
-  else
-    $SUDO yum -y install $pkgs
-  fi
+  $SUDO dnf -y install $pkgs
 }
 
 install_deps_suse() {
@@ -202,9 +269,23 @@ install_deps_suse() {
     $SUDO zypper -n install rpm-build
   fi
   local pkgs
-  pkgs=$(list_deps_rpm "$RPM_SPEC" || true)
+  pkgs=$(list_deps_rpm "$RPM_SPEC" | grep -v '^[[:space:]]*#' | grep -v '^[[:space:]]*$' || true)
   [ -n "${pkgs:-}" ] || die "Could not determine RPM build dependencies"
   $SUDO zypper -n install $pkgs
+}
+
+install_test_deps() {
+  log "Installing integration test dependencies"
+  case "$OS_FAMILY" in
+    deb)
+      export DEBIAN_FRONTEND=noninteractive
+      $SUDO apt-get -y update
+      $SUDO apt-get -y install g++
+      ;;
+    rhel) $SUDO dnf -y install gcc-c++;;
+    suse) $SUDO zypper -n install gcc-c++;;
+    *) die "Unsupported OS family for test dependencies: $OS_FAMILY";;
+  esac
 }
 
 ########################
@@ -233,6 +314,12 @@ case "$MODE" in
       die "Unsupported OS family for install: $OS_FAMILY"
     fi
     log "Build dependencies installed successfully"
+    bootstrap_cmake_if_needed
+    bootstrap_golang_if_needed
+    ;;
+  test-deps)
+    install_test_deps
+    log "Integration test dependencies installed successfully"
     ;;
   *) die "Unknown mode: $MODE";;
 esac

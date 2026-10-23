@@ -2,9 +2,6 @@
  * This file is part of the CernVM File System.
  */
 
-#define __STDC_FORMAT_MACROS
-
-
 #include "glue_buffer.h"
 
 #include <errno.h>
@@ -15,12 +12,10 @@
 #include <cstdlib>
 #include <cstring>
 #include <string>
-#include <vector>
 
 #include "util/exception.h"
 #include "util/logging.h"
 #include "util/mutex.h"
-#include "util/platform.h"
 #include "util/posix.h"
 #include "util/smalloc.h"
 

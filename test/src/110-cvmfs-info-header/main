@@ -1,0 +1,81 @@
+#!/bin/bash
+cvmfs_test_name="cvmfs-info header"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+cvmfs_run_test() {
+  logfile=$1
+
+  if running_on_osx; then
+    echo "Skipping test on macOS"
+    return 0
+  fi
+
+  local repo=sft.cern.ch
+
+  # Use mktemp instead of a file in $pwd or the debug log fails to open.
+  # Use mktemp -u to only provide a file name without creating it,
+  # because otherwise the debug log also fails to open.  The -u option
+  # is in general considered unsafe but if cvmfs tests are run on
+  # machines with untrustworthy users there are a lot of easier targets
+  # than this.
+  CVMFS_TEST_DEBUGLOG="$(mktemp -u /tmp/cvmfs_test110.log.XXXXXXXX)"
+  CVMFS_TEST_QUOTED_PARAM_KEY_VAL='CVMFS_INFO_HEADER="%{path} %{pid} %{uid} %{gid}%{env:TEST110_INFO1}%{env:TEST110_INFO2}"'
+
+  echo "mount $repo"
+  cvmfs_mount $repo || return 1
+  trap "sudo umount /cvmfs/$repo && sudo rm -f $CVMFS_TEST_DEBUGLOG" EXIT
+
+  file1=README.md
+  file2=lcg/lastUpdate
+
+  local pid1 pid2
+  local info1 info2
+
+  echo "read first test file with test environment"
+  TEST110_INFO1="myinfo1" cat "/cvmfs/$repo/$file1" >/dev/null &
+  pid1=$!
+  wait $pid1 || return 2
+  info1="$(sudo grep "^cvmfs-info:" "$CVMFS_TEST_DEBUGLOG"|tail -n1)"
+
+  echo "do reload"
+  sudo cvmfs_config reload || return 3
+
+  echo "read second test file with test environment"
+  TEST110_INFO2="my info2" cat "/cvmfs/$repo/$file2" >/dev/null &
+  pid2=$!
+  wait $pid2 || return 4
+  info2="$(sudo grep "^cvmfs-info:" "$CVMFS_TEST_DEBUGLOG"|tail -n1)"
+
+  echo "check output read from $CVMFS_TEST_DEBUGLOG"
+  local path pid uid gid env x
+  local mygid="$(id -g)"
+  echo "$info1" | while read x path pid uid gid env x; do
+    echo "check if $path matches /$file1"
+    [ "$path" = "/$file1" ] || return 10
+    echo "check if $pid matches $pid1"
+    [ "$pid" = "$pid1" ] || return 11
+    echo "check if $uid matches $UID"
+    [ "$uid" = "$UID" ] || return 12
+    echo "check if $gid matches $mygid"
+    [ "$gid" = "$mygid" ] || return 13
+    echo "check if $env matches myinfo1"
+    [ "$env" = "myinfo1" ] || return 14
+  done || return $?
+
+  echo "$info2" | while read x path pid uid gid env x; do
+    echo "check if $path matches /$file2"
+    [ "$path" = "/$file2" ] || return 20
+    echo "check if $pid matches $pid2"
+    [ "$pid" = "$pid2" ] || return 21
+    echo "check if $uid matches $UID"
+    [ "$uid" = "$UID" ] || return 22
+    echo "check if $gid matches $mygid"
+    [ "$gid" = "$mygid" ] || return 13
+    echo "check if $env matches my%20info2"
+    [ "$env" = "my%20info2" ] || return 24
+  done || return $?
+
+  return 0
+}
+

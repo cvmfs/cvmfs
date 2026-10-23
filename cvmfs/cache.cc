@@ -13,8 +13,6 @@
 
 #include "compression/compression.h"
 #include "crypto/hash.h"
-#include "directory_entry.h"
-#include "network/download.h"
 #include "quota.h"
 #include "util/posix.h"
 #include "util/smalloc.h"

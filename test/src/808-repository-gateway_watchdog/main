@@ -8,7 +8,7 @@ cvmfs_run_test() {
     receiver_logdir=$(pwd)/receiver_logs
 
     # Receiver tries to read, fails, and exits gracefully
-    cvmfs_receiver -i 420 -o 421 -w $receiver_logdir
+    cvmfs_receiver -i 420 -o 421 -w $receiver_logdir || true
     n_stacktraces_1=$(ls $receiver_logdir | wc -l)
     # No stacktraces are produced
     [ $n_stacktraces_1 -eq 0 ] || return 2

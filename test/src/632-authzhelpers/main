@@ -61,7 +61,7 @@ cvmfs_run_test() {
   echo "mount secure mount point"
   secure_mount $mntpnt || return 20
 
-  echo "No memberhsip string set, this should work"
+  echo "No membership string set, this should work"
   sudo -u nobody /bin/sh -c "cat ${mntpnt}/hello_world" || return 30
   secure_unmount
 
@@ -93,18 +93,37 @@ cvmfs_run_test() {
   local secure_mnt_pid=$(get_xattr pid $mntpnt)
   echo "secure mount point has pid $secure_mnt_pid"
   local authz_helper_pid=$(pgrep -P $secure_mnt_pid cvmfs_allow)
+  # a bunch of info about /proc/PID dir, supposed to stay unchanged within process lifetime
+  # but be different if PID gets recycled.
+  local authz_helper_pid_stat=$(stat --terse /proc/"$authz_helper_pid")
   echo "authz helper has pid $authz_helper_pid; killing it."
-  sudo kill -SEGV $authz_helper_pid
+  sudo ps -fu -p "$authz_helper_pid"
+  sudo kill -KILL $authz_helper_pid
+  sudo ps -fu -p "$authz_helper_pid" || true
+  # authz_helper_pid is observed a zombie not reaped by cvmfs2 for a long time. 2026-05-30
+  while [[ -d /proc/"$authz_helper_pid" ]] && [[ "$(stat --terse /proc/"$authz_helper_pid")" == "$authz_helper_pid_stat" ]] && [[ "$(ps -o stat= -p "$authz_helper_pid")" != Z ]]; do
+    sleep 0.1
+  done
+  sudo ps -fu -p "$authz_helper_pid" || true
   echo "authz helper has died, access should fail"
-  sudo -u nobody setsid /bin/sh -c "cat ${mntpnt}/hello_world" && return 74
+  sudo -u nobody setsid -w /bin/sh -c "cat ${mntpnt}/hello_world" && return 74
   echo "Waiting for rate-limit timeout to pass"
   sleep 11
-  echo "authz helper should be restarted on access"
-  sudo -u nobody setsid /bin/sh -c "cat ${mntpnt}/hello_world" || return 75
+  #
+  # The helper can no longer be restarted on access because the main fuse
+  # thread has given up its privileges, but it is restarted on reload
+  #
+  # echo "authz helper should be restarted on access"
+  echo "reloading $mntpnt to restart helper"
+  sudo cvmfs2 __RELOAD__ $(get_cache_directory $mntpnt)/cvmfs.$CVMFS_TEST_REPO \
+        --debug || return 75
+  echo "Waiting for reload to finish"
+  sleep 2
+  sudo -u nobody setsid -w /bin/sh -c "cat ${mntpnt}/hello_world" || return 76
   local authz_helper_pid_new=$(pgrep -P $secure_mnt_pid cvmfs_allow)
   echo "new authz helper pid $authz_helper_pid_new"
-  [ "x$authz_helper_pid_new" = "x" ] && return 76
-  [ "x$authz_helper_pid" = "x$authz_helper_pid_new" ] && return 77
+  [ "x$authz_helper_pid_new" = "x" ] && return 77
+  [ "x$authz_helper_pid" = "x$authz_helper_pid_new" ] && return 78
 
   echo "checking authz attribute"
   attr -l $mntpnt || return 72

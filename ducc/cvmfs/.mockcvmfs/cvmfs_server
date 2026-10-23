@@ -5,6 +5,40 @@ echo "WARNING: This is a mock command for testing of ducc that does noops and si
 # Since /cvmfs + reponame  and /var/spool/cvmfs is hardcoded,
 # CVMFS_TEST_REPO is expected to look like ../../../tmp/testrepofolder
 
+# Helper function to extract repo name from repo or repo///subdir or repo/subdir
+get_repo_name() {
+    local repo="$1"
+    # Handle triple-slash separator (for testing): "../../tmp/mockrepo///subdir"
+    if [[ "$repo" == *"///"* ]]; then
+        echo "${repo%%///*}"
+    elif [[ "$repo" == ".."* ]] || [[ "$repo" == "/.."* ]]; then
+        # Relative/mock-absolute paths like "../../tmp/mockrepo" or "/../../../../tmp/mock" - return as-is
+        echo "$repo"
+    else
+        # Handle slash separator: "repo.cern.ch/subdir"
+        echo "${repo%%/*}"
+    fi
+}
+
+# Helper function to extract subdir from repo specification
+get_subdir() {
+    local repo="$1"
+    # Handle triple-slash separator: "../../tmp/mockrepo///subdir"
+    if [[ "$repo" == *"///"* ]]; then
+        local rest="${repo#*///}"
+        echo "${rest%/}"
+    elif [[ "$repo" == ".."* ]] || [[ "$repo" == "/.."* ]]; then
+        # Relative/mock-absolute paths like "../../tmp/mockrepo" or "/../../../../tmp/mock" have no subdir
+        echo ""
+    elif [[ "$repo" == *"/"* ]]; then
+        # Handle slash separator only for normal paths: "repo.cern.ch/subdir"
+        local rest="${repo#*/}"
+        echo "${rest%/}"
+    else
+        echo ""
+    fi
+}
+
 
 if [ "$1" == "list" ]; then
   echo "testunpacked.cern.ch"
@@ -14,8 +48,12 @@ fi
 # Template transaction (cvmfs_server transaction -T /from:/to)
 # just do a copy
 if [ "$1" == "transaction" ]; then
-  arg2=$(echo $@ | cut -d ' ' -f 2)
-  if [ "$arg2" == "-T" ]; then
+  repo_arg=$(echo $@ | cut -d ' ' -f 2)
+  if [[ "$repo_arg" == *"/"* ]]; then
+      echo "Transaction opened for subdirectory: $repo_arg"
+  fi
+  
+  if [ "$repo_arg" == "-T" ]; then
     arg3=$(echo $@ | cut -d ' ' -f 3)
     from=$(echo $arg3 | cut -d '=' -f 1)
     to=$(echo $arg3 | cut -d '=' -f 2)
@@ -40,26 +78,130 @@ fi
 if [ "$1" == "ingest" ]; then
   arg2=$(echo $@ | cut -d ' ' -f 2)
   if [ "$arg2" == "--delete" ]; then
-    echo "deleting /$CVMFS_TEST_REPO/$3"
-    rm -rf /$CVMFS_TEST_REPO/$3
+    # Get the repo argument (last one)
+    repo_arg=$(echo $@ | awk '{print $NF}')
+    # Extract repo name and subdir
+    repo_name=$(get_repo_name "$repo_arg")
+    subdir=$(get_subdir "$repo_arg")
+    
+    # Get the path to delete (3rd argument after --delete)
+    delete_path=$(echo $@ | cut -d ' ' -f 3)
+    
+    # If there's a subdir, prepend it to the delete path
+    if [ -n "$subdir" ]; then
+        delete_path="$subdir/$delete_path"
+    fi
+    
+    echo "deleting /$CVMFS_TEST_REPO/$delete_path (repo: $repo_name, subdir: $subdir)"
+    rm -rf /$CVMFS_TEST_REPO/$delete_path
   fi
 fi
 
-# cvmfs_server ingest --catalog -t - -b <dir>
-arg2=$(echo $@ | cut -d ' ' -f 2)
-arg3=$(echo $@ | cut -d ' ' -f 3)
-arg4=$(echo $@ | cut -d ' ' -f 4)
-arg5=$(echo $@ | cut -d ' ' -f 5)
+# cvmfs_server overlay -l <layers> -d <dest> [-c <oci_config>] [-S] <repo>
+# Mock: just create the destination directory and optionally singularity dotfiles
+if [ "$1" == "overlay" ]; then
+  shift
+  layers=""
+  dest=""
+  oci_config=""
+  skip_singularity=0
+  repo=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      -l) layers="$2"; shift 2 ;;
+      -d) dest="$2"; shift 2 ;;
+      -c) oci_config="$2"; shift 2 ;;
+      -S) skip_singularity=1; shift ;;
+      *)  repo="$1"; shift ;;
+    esac
+  done
+  echo "overlay: layers=$layers dest=$dest repo=$repo oci_config=$oci_config skip_singularity=$skip_singularity"
+  mkdir -p "$CVMFS_TEST_REPO/$dest"
+  # Write a marker file so tests can verify the overlay was called
+  echo "layers=$layers" > "$CVMFS_TEST_REPO/$dest/.overlay_marker"
+  # If OCI config is provided and singularity is not skipped, create dotfiles
+  if [ -n "$oci_config" ] && [ $skip_singularity -eq 0 ]; then
+    mkdir -p "$CVMFS_TEST_REPO/$dest/.singularity.d/libs"
+    mkdir -p "$CVMFS_TEST_REPO/$dest/.singularity.d/actions"
+    mkdir -p "$CVMFS_TEST_REPO/$dest/.singularity.d/env"
+    echo '#!/bin/sh' > "$CVMFS_TEST_REPO/$dest/.singularity.d/runscript"
+    echo '#!/bin/sh' > "$CVMFS_TEST_REPO/$dest/.singularity.d/startscript"
+    echo '#!/bin/sh' > "$CVMFS_TEST_REPO/$dest/.singularity.d/actions/exec"
+    echo '#!/bin/sh' > "$CVMFS_TEST_REPO/$dest/.singularity.d/actions/run"
+    echo '#!/bin/sh' > "$CVMFS_TEST_REPO/$dest/.singularity.d/actions/shell"
+    echo '#!/bin/sh' > "$CVMFS_TEST_REPO/$dest/.singularity.d/actions/start"
+    echo '#!/bin/sh' > "$CVMFS_TEST_REPO/$dest/.singularity.d/actions/test"
+    echo '#!/bin/sh' > "$CVMFS_TEST_REPO/$dest/.singularity.d/env/01-base.sh"
+    echo '#!/bin/sh' > "$CVMFS_TEST_REPO/$dest/.singularity.d/env/10-docker2singularity.sh"
+    echo '#!/bin/sh' > "$CVMFS_TEST_REPO/$dest/.singularity.d/env/90-environment.sh"
+    echo '#!/bin/sh' > "$CVMFS_TEST_REPO/$dest/.singularity.d/env/91-environment.sh"
+    echo '#!/bin/sh' > "$CVMFS_TEST_REPO/$dest/.singularity.d/env/95-apps.sh"
+    echo '#!/bin/sh' > "$CVMFS_TEST_REPO/$dest/.singularity.d/env/99-base.sh"
+    echo '#!/bin/sh' > "$CVMFS_TEST_REPO/$dest/.singularity.d/env/99-runtimevars.sh"
+    echo "oci_config=$oci_config" >> "$CVMFS_TEST_REPO/$dest/.overlay_marker"
+  fi
+fi
+
+# cvmfs_server ingest [--catalog] -t <tar|-> [--tolerate-missing-hardlinks] -b <dir> <repo>
+#
+# Parse the options position-independently.  The real cvmfs_server uses a
+# getopts-style loop, so flags may appear in any order; in particular the
+# tarball engine's --tolerate-missing-hardlinks (-m) sits between "-t -" and
+# "-b", which used to shift "-b" out of the fixed argument slot and silently
+# disable extraction here.
 if [ "$1" == "ingest" ]; then
-  if [ "$arg2" == "--catalog" ]; then
-    if [ "$arg3" == "-t" ]; then
-      if [ "$arg4" == "-" ]; then
-        if [ "$arg5" == "-b" ]; then
-          mkdir -p /$CVMFS_TEST_REPO/$6
-          cat - > /tmp/tmptar.tar
-          tar xf /tmp/tmptar.tar -C /$CVMFS_TEST_REPO/$6
-        fi
-      fi
+  shift
+  ingest_tar=""        # tar source: a path, or "-" for stdin
+  ingest_stdin=false
+  base_dir=""
+  repo_arg=""
+  tolerate_missing_hardlinks=false
+  saw_ingest_opts=false
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --catalog | -c )
+        saw_ingest_opts=true; shift ;;
+      -t | --tar_file )
+        ingest_tar="$2"; saw_ingest_opts=true
+        [ "$2" == "-" ] && ingest_stdin=true
+        shift 2 ;;
+      -b | --base_dir )
+        base_dir="$2"; saw_ingest_opts=true; shift 2 ;;
+      -m | --tolerate-missing-hardlinks )
+        tolerate_missing_hardlinks=true; saw_ingest_opts=true; shift ;;
+      * )
+        repo_arg="$1"; shift ;;
+    esac
+  done
+
+  # Only the tarball-ingest form is mocked here (it always carries -t); the
+  # --delete / --fast-delete forms have no tar and are handled above.  An empty
+  # base_dir is valid and means "extract at the repository root".
+  if [ "$saw_ingest_opts" == true ] && [ -n "$ingest_tar" ]; then
+    # Extract repo name and subdir
+    repo_name=$(get_repo_name "$repo_arg")
+    subdir=$(get_subdir "$repo_arg")
+
+    # If there's a subdir, prepend it to the base directory
+    if [ -n "$subdir" ]; then
+        base_dir="$subdir/$base_dir"
+    fi
+
+    echo "ingesting to $CVMFS_TEST_REPO/$base_dir (repo: $repo_name, subdir: $subdir, tolerate_missing_hardlinks: $tolerate_missing_hardlinks)"
+    mkdir -p /$CVMFS_TEST_REPO/$base_dir
+    if [ "$ingest_stdin" == true ]; then
+        cat - > /tmp/tmptar.tar
+    else
+        cp "$ingest_tar" /tmp/tmptar.tar
+    fi
+    if [ "$tolerate_missing_hardlinks" == true ]; then
+        # The real engine materializes an empty file for a hardlink whose
+        # target is missing from the archive; GNU tar instead fails the entry
+        # (exit != 0) but still extracts everything else.  Mirror "tolerate" by
+        # not letting a dangling hardlink fail the ingest.
+        tar xf /tmp/tmptar.tar -C /$CVMFS_TEST_REPO/$base_dir 2>/dev/null || true
+    else
+        tar xf /tmp/tmptar.tar -C /$CVMFS_TEST_REPO/$base_dir
     fi
   fi
 fi

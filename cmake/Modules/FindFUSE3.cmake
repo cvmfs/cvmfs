@@ -16,6 +16,7 @@ ENDIF (FUSE3_INCLUDE_DIR)
 IF (NOT DEFINED FUSE3_INCLUDE_DIR AND NOT DEFINED FUSE3_LIBRARY)
 # find includes
 FIND_PATH (FUSE3_INCLUDE_DIR fuse3/fuse.h
+           ${EXTERNALS_INSTALL_LOCATION}/include
            /usr/local/include
            /usr/include
 )
@@ -24,7 +25,7 @@ FIND_PATH (FUSE3_INCLUDE_DIR fuse3/fuse.h
 SET(FUSE3_NAMES fuse3)
 FIND_LIBRARY(FUSE3_LIBRARY
         NAMES ${FUSE3_NAMES}
-        PATHS /lib64 /lib /usr/lib64 /usr/lib /usr/local/lib64 /usr/local/lib
+        PATHS ${EXTERNALS_INSTALL_LOCATION}/lib /lib64 /lib /usr/lib64 /usr/lib /usr/local/lib64 /usr/local/lib
 )
 ENDIF()
 

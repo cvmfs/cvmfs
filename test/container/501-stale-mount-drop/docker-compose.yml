@@ -1,0 +1,62 @@
+# Regression stack for the gateway stale-mount content-drop bug (issue #3867).
+#
+#   gw1   - Stratum-0 + cvmfs-gateway (local Apache upstream)
+#   pub1  - release manager whose read-only mount goes stale (the victim)
+#   pub2  - release manager that advances HEAD while pub1 is parked
+#
+# All three are built from the PR's sources (Dockerfile-dev), so pub1 exercises
+# the fix. systemd runs as PID 1 -> privileged + cgroup host are required.
+#
+#   docker compose up --build -d
+#   ./test.sh
+#   docker compose down -v --remove-orphans
+
+name: cvmfs-stale-mount-drop
+
+x-cvmfs-dev: &cvmfs-dev
+  image: cvmfs-stale-mount:latest
+  privileged: true
+  cgroup: host
+  build:
+    context: ../../..
+    dockerfile: test/common/container/Dockerfile-dev
+
+services:
+  gw1:
+    <<: *cvmfs-dev
+    container_name: cvmfs-gw1
+    hostname: cvmfs-gw1
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup
+      - ./scripts:/scripts
+      - ./config:/etc/cvmfs/gateway
+      - keys:/etc/cvmfs/keys
+      - var_spool_gw:/var/spool/cvmfs
+
+  pub1:
+    <<: *cvmfs-dev
+    container_name: cvmfs-pub1
+    hostname: cvmfs-pub1
+    depends_on: [gw1]
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup
+      - ./scripts:/scripts
+      - keys:/etc/cvmfs/keys
+      - var_spool_pub1:/var/spool/cvmfs
+
+  pub2:
+    <<: *cvmfs-dev
+    container_name: cvmfs-pub2
+    hostname: cvmfs-pub2
+    depends_on: [gw1]
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup
+      - ./scripts:/scripts
+      - keys:/etc/cvmfs/keys
+      - var_spool_pub2:/var/spool/cvmfs
+
+volumes:
+  keys:
+  var_spool_gw:
+  var_spool_pub1:
+  var_spool_pub2:

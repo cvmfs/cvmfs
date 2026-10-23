@@ -32,7 +32,6 @@
 #include "sanitizer.h"
 #include "util/logging.h"
 #include "util/namespace.h"
-#include "util/platform.h"
 #include "util/posix.h"
 #include "util/string.h"
 
@@ -453,6 +452,7 @@ void CmdEnter::CleanupSession(bool keep_logs,
   RemoveSingle(session_dir_ + "/" + fqrn_ + "/server.conf");
   RemoveSingle(session_dir_ + "/" + fqrn_);
   RemoveSingle(session_dir_ + "/session_token");
+  RemoveSingle(session_dir_ + "/session_token.api_version");
   RemoveSingle(session_dir_ + "/in_transaction.lock");
   RemoveSingle(session_dir_ + "/shellaction.marker");
   RemoveSingle(session_dir_);
@@ -577,7 +577,7 @@ int CmdEnter::Main(const Options &options) {
     LogCvmfs(kLogCvmfs, kLogStdout, "done");
 
     SettingsBuilder builder;
-    UniquePtr<Publisher> publisher;
+    std::unique_ptr<Publisher> publisher;
 
     if (options.Has("transaction")) {
       LogCvmfs(kLogCvmfs, kLogStdout,
@@ -605,7 +605,7 @@ int CmdEnter::Main(const Options &options) {
 
       SettingsPublisher *settings_publisher = builder.CreateSettingsPublisher(
           fqrn_, false);
-      publisher = new Publisher(*settings_publisher);
+      publisher.reset(new Publisher(*settings_publisher));
       publisher->Transaction();
     }
 

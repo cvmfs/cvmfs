@@ -70,6 +70,24 @@ cvmfs_run_test() {
   echo "check that the temporary scratch directory is empty"
   [ $(ls ${CVMFS_SPOOL_DIR}/tmp | wc -l) -eq 0 ] || return 50
 
+  echo "check that the imported repository has no reflog"
+  local reflog_hash
+  reflog_hash="$(get_manifest_field $legacy_repo_name Y || true)"
+  [ -z "$reflog_hash" ] || return 51
+  peek_backend_raw $legacy_repo_name ".cvmfsreflog" && return 52
+
+  echo "reconstruct the reflog with cvmfs_server check -r"
+  local repair_log="${scratch_dir}/check-reflog.log"
+  cvmfs_server check -r $legacy_repo_name > "$repair_log" 2>&1 || {
+    cat "$repair_log"
+    return 53
+  }
+  cat "$repair_log"
+  grep -q "Verifying integrity" "$repair_log" && return 54
+  peek_backend_raw $legacy_repo_name ".cvmfsreflog" || return 55
+  [ -f "${CVMFS_SPOOL_DIR}/reflog.chksum" ] || return 56
+  [ $(ls ${CVMFS_SPOOL_DIR}/tmp | wc -l) -eq 0 ] || return 57
+
   # check if the migrated and imported catalogs are sane
   echo "check migrated catalogs and data chunks"
   check_repository $legacy_repo_name || return 6

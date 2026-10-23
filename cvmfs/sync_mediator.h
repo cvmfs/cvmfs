@@ -27,7 +27,7 @@
 #include <pthread.h>
 
 #include <map>
-#include <set>
+#include <memory>
 #include <stack>
 #include <string>
 #include <vector>
@@ -39,8 +39,6 @@
 #include "statistics.h"
 #include "swissknife_sync.h"
 #include "sync_item.h"
-#include "util/platform.h"
-#include "util/pointer.h"
 #include "util/shared_ptr.h"
 #include "xattr.h"
 
@@ -115,9 +113,12 @@ class AbstractSyncMediator {
 
   virtual void Add(SharedPtr<SyncItem> entry) = 0;
   virtual void Touch(SharedPtr<SyncItem> entry) = 0;
-  virtual void Remove(SharedPtr<SyncItem> entry) = 0;
+  virtual void Remove(SharedPtr<SyncItem> entry, bool fast_delete = false) = 0;
   virtual void Replace(SharedPtr<SyncItem> entry) = 0;
-  virtual void Clone(const std::string from, const std::string to) = 0;
+  // Returns false if the source was missing and fail_if_source_missing was
+  // false (the clone was skipped); true otherwise.
+  virtual bool Clone(const std::string from, const std::string to,
+                     bool fail_if_source_missing) = 0;
 
   virtual void AddUnmaterializedDirectory(SharedPtr<SyncItem> entry) = 0;
 
@@ -135,6 +136,12 @@ class AbstractSyncMediator {
  * Mapping of inode number to the related HardlinkGroup.
  */
 typedef std::map<uint64_t, HardlinkGroup> HardlinkGroupMap;
+
+/**
+ * List of bundle specification files found in a certain directory
+ * (non-recursive).
+ */
+typedef std::vector<std::string> BundleSpecs;
 
 /**
  * The SyncMediator refines the input received from a concrete UnionSync object.
@@ -158,9 +165,10 @@ class SyncMediator : public virtual AbstractSyncMediator {
 
   void Add(SharedPtr<SyncItem> entry);
   void Touch(SharedPtr<SyncItem> entry);
-  void Remove(SharedPtr<SyncItem> entry);
+  void Remove(SharedPtr<SyncItem> entry, bool fast_delete = false);
   void Replace(SharedPtr<SyncItem> entry);
-  void Clone(const std::string from, const std::string to);
+  bool Clone(const std::string from, const std::string to,
+             bool fail_if_source_missing);
 
   void AddUnmaterializedDirectory(SharedPtr<SyncItem> entry);
 
@@ -201,7 +209,8 @@ class SyncMediator : public virtual AbstractSyncMediator {
                                const std::string &link_name);
   void TouchDirectoryCallback(const std::string &parent_dir,
                               const std::string &dir_name);
-  void RemoveDirectoryRecursively(SharedPtr<SyncItem> entry);
+  void RemoveDirectoryRecursively(SharedPtr<SyncItem> entry,
+                                  bool fast_delete = false);
   void RemoveFileCallback(const std::string &parent_dir,
                           const std::string &file_name);
   void RemoveSymlinkCallback(const std::string &parent_dir,
@@ -246,6 +255,10 @@ class SyncMediator : public virtual AbstractSyncMediator {
   void PublishFilesCallback(const upload::SpoolerResult &result);
   void PublishHardlinksCallback(const upload::SpoolerResult &result);
 
+  std::string GetBundleTriggerPath(SharedPtr<SyncItem> bundle_spec_entry) const;
+  void InsertBundleSpec(SharedPtr<SyncItem> entry);
+  void AddBundleSpecs();
+
   // Hardlink handling
   void CompleteHardlinks(SharedPtr<SyncItem> entry);
   HardlinkGroupMap &GetHardlinkMap() { return hardlink_stack_.top(); }
@@ -274,6 +287,14 @@ class SyncMediator : public virtual AbstractSyncMediator {
   bool handle_hardlinks_;
 
   /**
+   * When fast_delete is requested but the target path is not a nested catalog
+   * transition point, we fall back to filesystem traversal.  This flag ensures
+   * that any nested catalog transition points encountered during the traversal
+   * are still fast-deleted instead of being recursively traversed.
+   */
+  bool recursive_fast_delete_;
+
+  /**
    * Hardlinks are supported as long as they all reside in the same directory.
    * If a recursion enters a directory, we push an empty HardlinkGroupMap to
    * keep track of the hardlinks of this directory.
@@ -281,6 +302,15 @@ class SyncMediator : public virtual AbstractSyncMediator {
    * popped and the HardlinkGroupMap is processed.
    */
   HardlinkGroupMapStack hardlink_stack_;
+
+  /**
+   * Files that trigger preloading a file bundle have a .cvmfsbundle-<filename>
+   * bundle specification file. We don't know in which order we encounter the
+   * main file and the bundle specification file. So we pick up all the bundle
+   * specifications first and compare them to the present files at the end of
+   * the transaction.
+   */
+  BundleSpecs bundle_specs_;
 
   /**
    * New and modified files are sent to an external spooler for hashing and
@@ -298,9 +328,9 @@ class SyncMediator : public virtual AbstractSyncMediator {
    * By default, files have no extended attributes.
    */
   XattrList default_xattrs_;
-  UniquePtr<perf::FsCounters> counters_;
+  std::unique_ptr<perf::FsCounters> counters_;
 
-  UniquePtr<SyncDiffReporter> reporter_;
+  std::unique_ptr<SyncDiffReporter> reporter_;
 };  // class SyncMediator
 
 }  // namespace publish

@@ -1,0 +1,68 @@
+name: packages_riscv
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Package version (X.Y.Z[~suffix]); empty = detect from git'
+        required: false
+        default: ''
+
+jobs:
+  # Build-only: the riscv64 runners have no systemd, so we can't install the
+  # packages (postinst runs cvmfs_config/autofs) or run the integration suite.
+  # Everything is package-manager agnostic: ci/build_install_builddeps.sh
+  # auto-detects deb/rhel/suse and ci/build_package.sh picks deb.sh/rpm.sh.
+  packages:
+    name: "Packages (${{ matrix.id }})"
+    runs-on: ubuntu-24.04-riscv
+    container:
+      image: ${{ matrix.container }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { id: debian-trixie, container: 'debian:trixie' }
+          - { id: ubuntu-24.04,  container: 'ubuntu:24.04' }
+          - { id: fedora-44,     container: 'fedora:44' }
+          # riscv64 for EL is still experimental; expect occasional red until
+          # upstream images stabilise.
+          - { id: almalinux-9,   container: 'almalinux:9' }
+    steps:
+      # Minimal images ship without git/sudo; actions/checkout needs git and the
+      # build scripts assume a working sudo (they run as root, so sudo is a no-op
+      # passthrough but must exist).
+      - name: Install prerequisites
+        run: |
+          if command -v apt-get >/dev/null 2>&1; then
+            apt-get -y update
+            apt-get -y install git sudo ca-certificates
+          elif command -v dnf >/dev/null 2>&1; then
+            dnf -y install git sudo ca-certificates
+          elif command -v yum >/dev/null 2>&1; then
+            yum -y install git sudo ca-certificates
+          fi
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          fetch-tags: true
+      - name: Mark workspace as safe for git
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - name: Install build dependencies
+        run: ./ci/build_install_builddeps.sh --install "$PWD"
+      - name: Build packages
+        env:
+          CVMFS_VERSION_OVERRIDE: ${{ inputs.version }}
+        run: |
+          mkdir -p /tmp/build /tmp/build-config
+          ./ci/build_package.sh "$PWD" /tmp/build-config cvmfs-config
+          ./ci/build_package.sh "$PWD" /tmp/build cvmfs
+      - name: Upload packages as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cvmfs-packages-${{ matrix.id }}
+          if-no-files-found: warn
+          path: |
+            /tmp/build/*.deb
+            /tmp/build/**/*.rpm
+            /tmp/build-config/*.deb
+            /tmp/build-config/**/*.rpm

@@ -15,6 +15,11 @@ cvmfs_run_test() {
     return 0
   fi
 
+  if [ "$(nproc)" == 1 ]; then
+    echo "Cannot test CPU affinity behaviour on a single core system"
+    CVMFS_GENERAL_WARNING_FLAG=1
+    return 0
+  fi
   echo "*** mount cernvm-prod.cern.ch with cpu affinity 0,1"
   cvmfs_mount cernvm-prod.cern.ch CVMFS_CPU_AFFINITY=0,1 || return 1
 

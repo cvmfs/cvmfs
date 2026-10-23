@@ -21,6 +21,15 @@ TEST_F(T_SwissknifeLeaseJson, ParseAcquireOk) {
   EXPECT_EQ(session_token_, "ABCD");
 }
 
+TEST_F(T_SwissknifeLeaseJson, ParseAcquireVersion) {
+  buffer_.data = "{ \"status\" : \"ok\", \"session_token\" : \"ABCD\", "
+                 "\"max_api_version\" : 4 }";
+  int max_api_version = 0;
+  EXPECT_EQ(kLeaseReplySuccess,
+            ParseAcquireReply(buffer_, &session_token_, &max_api_version));
+  EXPECT_EQ(4, max_api_version);
+}
+
 TEST_F(T_SwissknifeLeaseJson, ParseAcquireBusy) {
   buffer_.data = "{ \"status\" : \"path_busy\", \"time_remaining\" : 1234 }";
   EXPECT_EQ(kLeaseReplyBusy, ParseAcquireReply(buffer_, &session_token_));

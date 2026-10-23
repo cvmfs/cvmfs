@@ -5,15 +5,11 @@
 #include "catalog.h"
 
 #include <alloca.h>
-#include <errno.h>
 
-#include <algorithm>
 #include <cassert>
 
 #include "catalog_mgr.h"
-#include "util/concurrency.h"
 #include "util/logging.h"
-#include "util/platform.h"
 #include "util/smalloc.h"
 
 using namespace std;  // NOLINT

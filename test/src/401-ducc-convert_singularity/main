@@ -18,7 +18,7 @@ cvmfs_run_test() {
   trap ducc_test_401_clean_up EXIT HUP INT TERM
 
   echo "*** creating empty repo ***"
-  create_empty_repo $CVMFS_TEST_REPO $USER || return 1
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return 1
 
   echo "*** converting image to flat ***"
   cvmfs_ducc convert-single-image --skip-layers $DOCKER_TEST_IMAGE1 $CVMFS_TEST_REPO || return 2

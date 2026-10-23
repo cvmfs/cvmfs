@@ -42,7 +42,10 @@ cp -R ${workdir}/tmp/packaging/debian/cvmfs/* ${workdir}/src/cvmfs/debian
 echo "done"
 
 echo -n "figuring out version number... "
-upstream_version="$(cat ${srctree}/CMakeLists.txt | grep '## CVMFS_VERSION' | awk '{print $3}')-0"
+resolved_version="$(${srctree}/cmake/get_version.sh "${srctree}")"
+printf '%s\n' "$resolved_version" > "${workdir}/src/cvmfs.orig/CVMFS_VERSION"
+printf '%s\n' "$resolved_version" > "${workdir}/src/cvmfs/CVMFS_VERSION"
+upstream_version="${resolved_version}-0"
 echo "done"
 
 echo "building..."

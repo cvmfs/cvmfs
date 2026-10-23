@@ -102,7 +102,9 @@ cvmfs_run_test() {
   echo "*** ms0 ***"
   cat ms0
   echo "*** mr0 ***"
-  cat mr0
+  if ! running_on_s3; then
+    cat mr0
+  fi
   echo "*** mr1 ***"
   cat mr1
   echo "*** mr5 ***"
@@ -214,8 +216,9 @@ cvmfs_run_test() {
   [ "$rep4_last_gc" != "$rep4_now_gc" ]                   || return 83
 
   echo "*** checking that gc only ran in replica 4"
-  diff gc.log /var/log/cvmfs | grep ${replica_name}-1     && return 85
-  diff gc.log /var/log/cvmfs | grep ${replica_name}-4     || return 86
+  diff gc.log /var/log/cvmfs > gc.log.diff || true
+  grep ${replica_name}-1 gc.log.diff && return 85
+  grep ${replica_name}-4 gc.log.diff || return 86
 
   return 0
 }

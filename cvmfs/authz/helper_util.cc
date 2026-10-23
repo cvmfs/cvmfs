@@ -15,8 +15,7 @@
 #include <cstring>
 
 #include "authz/helper_log.h"
-#include "json.h"
-typedef struct json_value JSON;
+#include "json_document.h"
 
 #ifdef __APPLE__
 #define strdupa(s)                    \
@@ -40,53 +39,41 @@ void CheckCallContext() {
 
 
 void ParseHandshakeInit(const string &msg) {
-  block_allocator allocator(2048);
-  char *err_pos;
-  char *err_desc;
-  int err_line;
-  JSON *json = json_parse(strdupa(msg.c_str()), &err_pos, &err_desc, &err_line,
-                          &allocator);
-  assert((json != NULL) && (json->first_child != NULL));
-  json = json->first_child;
-  assert((string(json->name) == "cvmfs_authz_v1"));
-  json = json->first_child;
-  while (json) {
-    const string name(json->name);
-    if (name == "debug_log") {
-      SetLogAuthzDebug(string(json->string_value) + ".authz");
-    } else if (name == "fqrn") {
-      LogAuthz(kLogAuthzDebug, "fqrn is %s", json->string_value);
-      SetLogAuthzSyslogPrefix(string(json->string_value));
-    } else if (name == "syslog_level") {
-      SetLogAuthzSyslogLevel(json->int_value);
-    } else if (name == "syslog_facility") {
-      SetLogAuthzSyslogFacility(json->int_value);
+  JSON j = JSON::parse(msg);
+
+  if (j.contains("cvmfs_authz_v1")) {
+    const JSON &config = j["cvmfs_authz_v1"];
+
+    if (config.contains("debug_log")) {
+      SetLogAuthzDebug(config["debug_log"].get<string>() + ".authz");
     }
-    json = json->next_sibling;
+    if (config.contains("fqrn")) {
+      const string fqrn = config["fqrn"].get<string>();
+      LogAuthz(kLogAuthzDebug, "fqrn is %s", fqrn.c_str());
+      SetLogAuthzSyslogPrefix(fqrn);
+    }
+    if (config.contains("syslog_level")) {
+      SetLogAuthzSyslogLevel(config["syslog_level"].get<int>());
+    }
+    if (config.contains("syslog_facility")) {
+      SetLogAuthzSyslogFacility(config["syslog_facility"].get<int>());
+    }
   }
 }
 
 
 void ParseRequest(const string &msg) {
-  block_allocator allocator(2048);
-  char *err_pos;
-  char *err_desc;
-  int err_line;
-  JSON *json = json_parse(strdupa(msg.c_str()), &err_pos, &err_desc, &err_line,
-                          &allocator);
-  assert((json != NULL) && (json->first_child != NULL));
-  json = json->first_child;
-  assert((string(json->name) == "cvmfs_authz_v1"));
-  json = json->first_child;
-  while (json) {
-    const string name(json->name);
-    if (name == "msgid") {
-      if (json->int_value == 4) { /* kAuthzMsgQuit */
+  JSON j = JSON::parse(msg);
+
+  if (j.contains("cvmfs_authz_v1")) {
+    const JSON &req = j["cvmfs_authz_v1"];
+
+    if (req.contains("msgid")) {
+      if (req["msgid"].get<int>() == 4) { /* kAuthzMsgQuit */
         LogAuthz(kLogAuthzDebug, "shut down");
         exit(0);
       }
     }
-    json = json->next_sibling;
   }
 }
 

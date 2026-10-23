@@ -70,6 +70,12 @@ DirectoryEntryBase::Differences DirectoryEntry::CompareTo(
   if (IsDirectIo() != other.IsDirectIo()) {
     result |= Difference::kDirectIoFlag;
   }
+  if (IsBundleTrigger() != other.IsBundleTrigger()) {
+    result |= Difference::kBundleTriggerFlag;
+  }
+  if (IsVolatile() != other.IsVolatile()) {
+    result |= Difference::kVolatileFlag;
+  }
 
   return result;
 }

@@ -8,7 +8,9 @@
 #include <pthread.h>
 #include <stdint.h>
 
+#include <atomic>
 #include <cassert>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -17,8 +19,6 @@
 #include "file_chunk.h"
 #include "ingestion/chunk_detector.h"
 #include "ingestion/ingestion_source.h"
-#include "util/atomic.h"
-#include "util/pointer.h"
 #include "util/single_copy.h"
 
 namespace upload {
@@ -46,8 +46,9 @@ class FileItem : SingleCopy {
 
   static FileItem *CreateQuitBeacon() {
     const std::string quit_marker = std::string(1, kQuitBeaconMarker);
-    UniquePtr<FileIngestionSource> source(new FileIngestionSource(quit_marker));
-    return new FileItem(source.Release());
+    std::unique_ptr<FileIngestionSource> source(
+        new FileIngestionSource(quit_marker));
+    return new FileItem(source.release());
   }
   bool IsQuitBeacon() {
     return (path().length() == 1) && (path()[0] == kQuitBeaconMarker);
@@ -65,9 +66,9 @@ class FileItem : SingleCopy {
 
   void set_size(uint64_t val) { size_ = val; }
   void set_may_have_chunks(bool val) { may_have_chunks_ = val; }
-  void set_is_fully_chunked() { atomic_inc32(&is_fully_chunked_); }
-  bool is_fully_chunked() { return atomic_read32(&is_fully_chunked_) != 0; }
-  uint64_t nchunks_in_fly() { return atomic_read64(&nchunks_in_fly_); }
+  void set_is_fully_chunked() { is_fully_chunked_.fetch_add(1); }
+  bool is_fully_chunked() { return is_fully_chunked_.load() != 0; }
+  uint64_t nchunks_in_fly() { return nchunks_in_fly_.load(); }
 
   uint64_t GetNumChunks() { return chunks_.size(); }
   FileChunkList *GetChunksPtr() { return &chunks_; }
@@ -80,17 +81,17 @@ class FileItem : SingleCopy {
   bool GetSize(uint64_t *size) { return source_->GetSize(size); }
 
   // Called by ChunkItem constructor, decremented when a chunk is registered
-  void IncNchunksInFly() { atomic_inc64(&nchunks_in_fly_); }
+  void IncNchunksInFly() { nchunks_in_fly_.fetch_add(1); }
   void RegisterChunk(const FileChunk &file_chunk);
   bool IsProcessed() {
-    return is_fully_chunked() && (atomic_read64(&nchunks_in_fly_) == 0);
+    return is_fully_chunked() && (nchunks_in_fly_.load() == 0);
   }
 
  private:
   static const uint64_t kSizeUnknown = uint64_t(-1);
   static const char kQuitBeaconMarker = '\0';
 
-  UniquePtr<IngestionSource> source_;
+  std::unique_ptr<IngestionSource> source_;
   const zlib::Algorithms compression_algorithm_;
   const shash::Algorithms hash_algorithm_;
   const shash::Suffix hash_suffix_;
@@ -105,12 +106,12 @@ class FileItem : SingleCopy {
   /**
    * Number of chunks created but not yet uploaded and registered
    */
-  atomic_int64 nchunks_in_fly_;
+  std::atomic<int64_t> nchunks_in_fly_;
   /**
    * Switches to true once all of the file has been through the chunking
    * stage
    */
-  atomic_int32 is_fully_chunked_;
+  std::atomic<int32_t> is_fully_chunked_;
   pthread_mutex_t lock_;
 };
 
@@ -166,7 +167,7 @@ class ChunkItem : SingleCopy {
    * Deleted by the uploader.
    */
   upload::UploadStreamHandle *upload_handle_;
-  UniquePtr<zlib::Compressor> compressor_;
+  std::unique_ptr<zlib::Compressor> compressor_;
   shash::ContextPtr hash_ctx_;
   shash::Any hash_value_;
   unsigned char hash_ctx_buffer_[shash::kMaxContextSize];
@@ -220,13 +221,13 @@ class BlockItem : SingleCopy {
   int64_t tag() { return tag_; }
   FileItem *file_item() { return file_item_; }
   ChunkItem *chunk_item() { return chunk_item_; }
-  static uint64_t managed_bytes() { return atomic_read64(&managed_bytes_); }
+  static uint64_t managed_bytes() { return managed_bytes_.load(); }
 
  private:
   /**
    * Total capacity of all BlockItem()
    */
-  static atomic_int64 managed_bytes_;
+  static std::atomic<int64_t> managed_bytes_;
 
   // Forget pointer to the data
   void Discharge();

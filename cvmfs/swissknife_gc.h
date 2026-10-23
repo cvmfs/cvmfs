@@ -8,6 +8,7 @@
 #include <string>
 
 #include "catalog_traversal.h"
+#include "path_filters/inclusion_spec.h"
 #include "swissknife.h"
 
 namespace swissknife {

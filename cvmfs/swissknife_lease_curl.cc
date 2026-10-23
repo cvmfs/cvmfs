@@ -6,13 +6,14 @@
 
 #include <unistd.h>
 
+#include <memory>
+
 #include "crypto/hash.h"
 #include "gateway_util.h"
 #include "json_document.h"
 #include "json_document_write.h"
 #include "ssl.h"
 #include "util/logging.h"
-#include "util/pointer.h"
 #include "util/posix.h"
 #include "util/string.h"
 
@@ -154,11 +155,11 @@ bool MakeEndRequest(const std::string &method, const std::string &key_id,
   if (!doc) {
     ok = false;
   } else {
-    UniquePtr<JsonDocument> const reply_json(doc);
+    std::unique_ptr<JsonDocument> const reply_json(doc);
     const JSON *reply_status = JsonDocument::SearchInObject(
         reply_json->root(), "status", JSON_STRING);
     ok = (reply_status != NULL
-          && std::string(reply_status->string_value) == "ok");
+          && std::string(reply_status->get<std::string>()) == "ok");
     if (!ok) {
       LogCvmfs(kLogUploadGateway, kLogStderr,
                "Lease end request - error reply: %s", reply->data.c_str());
@@ -168,7 +169,7 @@ bool MakeEndRequest(const std::string &method, const std::string &key_id,
           reply_json->root(), "final_revision", JSON_INT);
       ok = (reply_final_rev != NULL);
       if (ok) {
-        g_final_revision = reply_final_rev->int_value;
+        g_final_revision = reply_final_rev->get<int>();
       } else {
         g_final_revision = -1;
       }

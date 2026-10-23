@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env sh
 
 #
 # This script builds a package that fits the current platform using custom build
@@ -30,6 +30,17 @@ CVMFS_BUILD_LOCATION="$2"
 CVMFS_PACKAGE_NAME="$3"
 shift 3
 
+# If ci/build_install_builddeps.sh bootstrapped custom tools it will have
+# exported CVMFS_CMAKE_DIR and CVMFS_GO_DIR (directories containing the
+# respective binaries).  Package build scripts that sanitise the environment
+# (e.g. ci/cvmfs/deb.sh via debuild) honour these variables to re-inject the
+# paths.  You can also set them manually when calling this script:
+#   CVMFS_CMAKE_DIR=/path/to/externals_install/bin \
+#   CVMFS_GO_DIR=/path/to/externals_install/go/bin \
+#   ci/build_package.sh ...
+# Alternatively, set CVMFS_EXTERNALS_PREFIX to the base directory used during
+# the bootstrap and both paths will be auto-detected from there.
+
 # build the invocation string and print it for debugging reasons
 args=""
 while [ $# -gt 0 ]; do
@@ -48,6 +59,7 @@ echo "++ $command_tmpl"
 # check if the requested build script is available
 [ -f $build_script ] || die "build script $build_script doesn't exist"
 [ -x $build_script ] || die "build script $build_script is not executable"
+
 
 # run the build script
 echo "switching to $CVMFS_BUILD_LOCATION..."

@@ -1,0 +1,33 @@
+# Garage S3-compatible object storage configuration
+# https://garagehq.deuxfleurs.fr/documentation/reference-manual/configuration/
+
+metadata_dir = "/var/lib/garage/meta"
+data_dir     = "/var/lib/garage/data"
+
+# Use the embedded SQLite back-end (simplest for single-node dev/test)
+db_engine = "sqlite"
+
+# Single-node: no replication
+replication_factor = 1
+
+# Compress stored objects
+compression_level = 1
+
+[s3_api]
+s3_region    = "garage"
+api_bind_addr = "0.0.0.0:3900"
+# Disable virtual-hosted-style bucket addressing so that path-style
+# (http://host:port/bucket/key) works – required by the CVMFS S3 uploader
+# when CVMFS_S3_DNS_BUCKETS=false
+root_domain  = ".s3.garage.localhost"
+
+[s3_web]
+bind_addr   = "0.0.0.0:3902"
+root_domain = ".web.garage.localhost"
+index       = "index.html"
+
+[admin]
+api_bind_addr = "0.0.0.0:3903"
+# Token used by setup_garage.sh to call the admin REST API
+admin_token   = "garage-admin-token"
+

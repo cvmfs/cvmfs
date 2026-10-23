@@ -4,12 +4,6 @@
  * Some common functions.
  */
 
-#ifndef __STDC_FORMAT_MACROS
-// NOLINTNEXTLINE
-#define __STDC_FORMAT_MACROS
-#endif
-
-
 #include "mmap_file.h"
 
 #include <cstddef>

@@ -50,7 +50,18 @@ cvmfs_server_list_catalogs() {
 
   # more sanity checks
   is_owner_or_root $name || die "Permission denied: Repository $name is owned by $CVMFS_USER"
-  health_check     $name || die "Repository $name is not healthy"
+  # Skip FUSE mount health check for mountless gateway publishers.
+  # The lsrepo command below reads from the Stratum0 HTTP URL and does not
+  # need FUSE mounts; health_check would report them missing and die.
+  local _hc_upstream_type
+  _hc_upstream_type=$(get_upstream_type "$CVMFS_UPSTREAM_STORAGE")
+  if [ "x$_hc_upstream_type" = xgw ] && \
+     ! is_mounted "${CVMFS_SPOOL_DIR}/rdonly" && \
+     ! is_mounted "/cvmfs/$name"; then
+    echo "Note: mountless gateway publisher detected – skipping FUSE mount health check."
+  else
+    health_check $name || die "Repository $name is not healthy"
+  fi
 
   # check if repository is compatible to the installed CernVM-FS version
   check_repository_compatibility $name

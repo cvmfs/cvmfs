@@ -570,6 +570,43 @@ TEST_F(T_QuotaManager, Touch) {
   EXPECT_EQ("a\n", PrintStringVector(quota_mgr_->List()));
 }
 
+TEST_F(T_QuotaManager, ReadPipeStringUsesExactLength) {
+  int mypipe[2];
+  MakePipe(mypipe);
+
+  const char payload[] = {'a', '\0', 'b'};
+  WritePipe(mypipe[1], payload, sizeof(payload));
+  close(mypipe[1]);
+
+  const string result = quota_mgr_->ReadPipeString(mypipe[0], sizeof(payload));
+  close(mypipe[0]);
+
+  ASSERT_EQ(sizeof(payload), result.size());
+  EXPECT_EQ('a', result[0]);
+  EXPECT_EQ('\0', result[1]);
+  EXPECT_EQ('b', result[2]);
+}
+
+
+TEST_F(T_QuotaManager, RegisterMountpointUsesCorrectDescriptionBuffer) {
+  quota_mgr_->Insert(hashes_[0], 0, "wrongmountpoint");
+  quota_mgr_->RegisterMountpoint("rightmountpoint");
+  quota_mgr_->List();  // synchronize with the quota manager thread
+
+  ASSERT_EQ(1U, quota_mgr_->mountpoints_.size());
+  EXPECT_EQ("rightmountpoint", quota_mgr_->mountpoints_[0]);
+}
+
+
+TEST_F(T_QuotaManager, SetCleanupPolicyUsesCorrectDescriptionBuffer) {
+  quota_mgr_->Insert(hashes_[0], 0, "regular");
+  quota_mgr_->SetCleanupPolicy(true);
+  quota_mgr_->List();  // synchronize with the quota manager thread
+
+  EXPECT_TRUE(quota_mgr_->cleanup_unused_first_);
+}
+
+
 TEST_F(T_QuotaManager, SetLimit) {
   quota_mgr_->SetLimit(100);
   const uint64_t limit = quota_mgr_->GetCapacity();

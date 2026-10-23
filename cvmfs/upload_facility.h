@@ -8,6 +8,8 @@
 #include <fcntl.h>
 #include <stdint.h>
 
+#include <atomic>
+#include <memory>
 #include <string>
 
 #include "ingestion/ingestion_source.h"
@@ -15,9 +17,7 @@
 #include "repository_tag.h"
 #include "statistics.h"
 #include "upload_spooler_definition.h"
-#include "util/atomic.h"
 #include "util/concurrency.h"
-#include "util/pointer.h"
 #include "util/posix.h"
 #include "util/tube.h"
 
@@ -419,7 +419,8 @@ class AbstractUploader
    * Used by concrete implementations when they use callbacks where it's not
    * already foreseen, e.g. S3Uploader::Peek().
    */
-  void IncJobsInFlight() { ++jobs_in_flight_; }
+  void IncJobsInFlight() const { ++jobs_in_flight_; }
+  void DecJobsInFlight() const { --jobs_in_flight_; }
 
  private:
   const SpoolerDefinition spooler_definition_;
@@ -432,7 +433,7 @@ class AbstractUploader
   mutable SynchronizingCounter<int32_t> jobs_in_flight_;
   TubeGroup<UploadJob> tubes_upload_;
   TubeConsumerGroup<UploadJob> tasks_upload_;
-  mutable UniquePtr<UploadCounters> counters_;
+  mutable std::unique_ptr<UploadCounters> counters_;
 };  // class AbstractUploader
 
 
@@ -462,11 +463,11 @@ class TaskUpload : public TubeConsumer<AbstractUploader::UploadJob> {
  */
 struct UploadStreamHandle {
   typedef AbstractUploader::CallbackTN CallbackTN;
-  static atomic_int64 g_upload_stream_tag;
+  static std::atomic<int64_t> g_upload_stream_tag;
 
   explicit UploadStreamHandle(const CallbackTN *commit_callback)
       : commit_callback(commit_callback)
-      , tag(atomic_xadd64(&g_upload_stream_tag, 1)) { }
+      , tag(g_upload_stream_tag.fetch_add(1)) { }
   virtual ~UploadStreamHandle() { }
 
   const CallbackTN *commit_callback;

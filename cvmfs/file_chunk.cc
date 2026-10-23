@@ -8,7 +8,6 @@
 #include <cassert>
 
 #include "util/murmur.hxx"
-#include "util/platform.h"
 
 using namespace std;  // NOLINT
 

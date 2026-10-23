@@ -2,7 +2,6 @@ name: unittest_ubuntu
 on:
   pull_request:
     branches: [devel, cvmfs*]
-  push:
   workflow_dispatch:
 
 jobs:
@@ -67,13 +66,12 @@ jobs:
           export CVMFS_EXTERNALS_PREFIX=/home/runner/.cache/cvmfs_externals_install
           export CMAKE_CXX_COMPILER_LAUNCHER=ccache
           mkdir build; cd build
-          cmake .. -DBUILD_UNITTESTS=ON
+          cmake .. -DBUILD_ALL=ON -DBUILD_UNITTESTS=ON
           make -j 8
           cd ..
       - name: Run Unittests - Mockfuse
         run: |
-          # ./build/test/unittests/cvmfs_unittests_mockfuse
-          echo "TODO: mockfuse unittests skipped"
+          ./build/test/unittests/cvmfs_unittests_mockfuse --gtest_shuffle
       - name: Run Unittests - Regular
         run: |
           ./build/test/unittests/cvmfs_unittests --gtest_filter="-T_Namespace.*"

@@ -34,6 +34,15 @@ Listen 127.0.0.1:8008
   </Proxy>
 </VirtualHost>
 EOF
+  # The following a2enmod invocation failure is not critical.
+  # Debian-like distros are expected to have a2enmod.
+  # Ubuntu 24.04 has it.
+  # The following don't, but have proxy module config enabled:
+  # Almalinux 9
+  # CentOS 9
+  # Fedora 43
+  sudo a2enmod proxy || true
+
   apache_switch off > /dev/null
   apache_switch on  > /dev/null
 

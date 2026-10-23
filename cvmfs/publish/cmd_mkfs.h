@@ -92,6 +92,11 @@ class CmdMkfs : public Command {
 
     p.push_back(Parameter::Switch(
         "external", 'X', "Enable to use this repository for external data"));
+
+    // Undocumented dev/convenience flag: publish the repo public key and a
+    // client mount helper script to the HTTP-served storage area.
+    p.push_back(Parameter::Switch("publish-client-setup", 'D', ""));
+
     return p;
   }
   virtual std::string GetUsage() const {

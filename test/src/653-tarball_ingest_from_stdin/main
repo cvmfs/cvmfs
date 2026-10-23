@@ -77,7 +77,7 @@ cvmfs_run_test() {
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
 
   echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
-  create_empty_repo $CVMFS_TEST_REPO $USER || return $?
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
 
   # ============================================================================
 

@@ -1,0 +1,200 @@
+name: virtme-ng CI
+on:
+  pull_request:
+    branches: [devel]
+  push:
+    branches: [ci/vng-testing]
+  workflow_dispatch:
+    inputs:
+      inputTestCases:
+        description: 'Ex. ../src/0* ../src/1*'
+        required: true
+        default: '../src/00* ../src/01*'
+      inputSuites:
+        description: 'Test scenario tags'
+        required: true
+        default: 'quick'
+
+jobs:
+  vng_tests:
+    runs-on: ubuntu-latest
+    steps:
+      - id: lsb-release
+        run: |
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            source /etc/lsb-release
+            echo "id=${DISTRIB_ID}" >> $GITHUB_OUTPUT
+            echo "release=${DISTRIB_RELEASE}" >> $GITHUB_OUTPUT
+            echo "codename=${DISTRIB_CODENAME}" >> $GITHUB_OUTPUT
+            echo "description=${DISTRIB_DESCRIPTION}" >> $GITHUB_OUTPUT
+            echo "id-release=${DISTRIB_ID}-${DISTRIB_RELEASE}" >> $GITHUB_OUTPUT
+            echo "arch=$(uname -m)" >> $GITHUB_OUTPUT
+          elif [ "$RUNNER_OS" == "macOS" ]; then
+            echo "id-release=macOS-$(sw_vers -productVersion)" >> $GITHUB_OUTPUT
+            echo "arch=$(uname -m)" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Create cache directories
+        run: |
+          mkdir -p /home/runner/.cache
+
+      - name: Restore CI cache
+        uses: actions/cache/restore@v4
+        id: cvmfs-ci-cache-restore
+        with:
+          path: /home/runner/.cache/
+          key: v3-cvmfs-ci-cache-${{ steps.lsb-release.outputs.id-release }}-${{ steps.lsb-release.outputs.arch }}
+
+      - name: "KVM support"
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Verify KVM
+        run: |
+          ls -la /dev/kvm
+          [ -w /dev/kvm ] || { echo "ERROR: /dev/kvm not writable"; exit 1; }
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-system-x86
+          pip install virtme-ng
+
+      - name: Get vng version
+        id: vng-version
+        run: echo "version=$(vng --version 2>&1)" >> $GITHUB_OUTPUT
+
+      - name: Restore kernel cache
+        uses: actions/cache@v4
+        id: kernel-cache
+        with:
+          path: test/vng_testing/kernel/
+          key: vng-kernel-v5.12-${{ hashFiles('test/vng_testing/configs/kernel_config.conf') }}-${{ steps.vng-version.outputs.version }}
+
+      - name: Build test kernel
+        if: steps.kernel-cache.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get install -y flex bison libelf-dev libssl-dev bc dwarves
+          git clone --depth 1 --branch v5.12 \
+            https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git /tmp/linux-src
+          ./test/vng_testing/build_kernel.sh /tmp/linux-src v5.12
+
+      - name: Check for builddep package
+        id: cvmfs-builddep-check
+        run: |
+          if [ -f "/home/runner/.cache/cvmfs-build-deps_*_all.deb" ]; then
+            echo "package_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "package_exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Generate build-dep metapackage
+        if: steps.cvmfs-builddep-check.outputs.package_exists != 'true'
+        run: |
+          sudo apt-get -y update
+          sudo apt-get install -y devscripts equivs ccache apache2 libapache2-mod-wsgi-py3
+          mk-build-deps ./packaging/debian/cvmfs/control
+          mv cvmfs-build-deps_*_all.deb /home/runner/.cache
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get install -y /home/runner/.cache/cvmfs-build-deps_*_all.deb
+
+      - name: Build packages
+        run: |
+          export CVMFS_EXTERNALS_PREFIX=/home/runner/.cache/cvmfs_externals_install
+          export CMAKE_CXX_COMPILER_LAUNCHER=ccache
+          mkdir /tmp/build-ubuntu
+          mkdir /tmp/build-ubuntu-config
+          ./ci/build_package.sh $PWD /tmp/build-ubuntu-config cvmfs-config
+          ./ci/build_package.sh $PWD /tmp/build-ubuntu cvmfs
+
+      - name: Install packages
+        run: |
+          sudo apt-get -y remove "cvmfs*"
+          sudo apt-get -y install /tmp/build-ubuntu*/*.deb
+          sudo cvmfs_config setup
+          sudo systemctl start apache2
+          sudo systemctl status apache2
+
+      - name: Run vng_testing
+        run: |
+          cd test/vng_testing
+
+          CVMFS_TESTCASES=${{ github.event.inputs.inputTestCases || '"src/00* src/01*"' }}
+          CVMFS_TEST_SUITES=${{ github.event.inputs.inputSuites || 'quick' }}
+          ./run.sh -- \
+                   -s "${CVMFS_TEST_SUITES}" \
+                   -x src/095-fuser \
+                      src/004-davinci \
+                      src/005-asetup \
+                      src/007-testjobs \
+                      src/024-reload-during-asetup \
+                      src/056-lowspeedlimit \
+                      src/084-premounted \
+                      src/094-attachmount \
+                      src/104-concurrent_mounts \
+                      src/518-hardlinkstresstest \
+                      src/593-nestedwhiteout \
+                      src/600-securecvmfs \
+                      src/628-pythonwrappedcvmfsserver \
+                      src/647-bearercvmfs \
+                      src/672-publish_stats_hardlinks \
+                      src/673-acl \
+                      src/682-enter \
+                      src/684-https_s3 \
+                      src/686-azureblob_s3 \
+                      src/687-import_s3 \
+                      src/692-https_azureblob_s3 \
+                      src/702-symlink_caching \
+                      src/803-repository_gateway_large_files \
+                      src/811-commit-gateway \
+                      src/013-certificate_cache \
+                      src/014-corrupt_lru \
+                      src/015-rebuild_on_crash \
+                      src/016-dnsunreachable \
+                      src/018-httpunreachable \
+                      src/020-emptyrepofailover \
+                      src/027-autoumount \
+                      src/030-missingrootcatalog \
+                      src/037-strictmount \
+                      src/040-aliencache \
+                      src/042-cleanuppipes \
+                      src/043-highinodes \
+                      src/046-defaultd \
+                      src/047-blacklist \
+                      src/051-failonbrokenpubkey \
+                      src/063-uidmap \
+                      src/065-http \
+                      src/067-wpad \
+                      src/068-rocache \
+                      src/074-oom \
+                      src/077-doublemount \
+                      src/078-offlinemode \
+                      src/079-dnsroaming \
+                      src/080-tracing \
+                      src/081-shrinkwrap \
+                      src/082-shrinkwrap \
+                      src/092-stat \
+                      src/096-cancelreq \
+                      src/098-telemetry \
+                      src/101-cpuaffinity \
+                      src/102-reusefd \
+                      src/103-reloadcachemgr \
+                      src/106-talksocket \
+                   -- \
+                   ${CVMFS_TESTCASES}
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vng_testing-results
+          path: |
+            /tmp/cvmfs-test-logs/
+

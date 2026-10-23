@@ -1,0 +1,110 @@
+Start test suite for cvmfs CernVM-FS version 2.13.3
+Thu Mar  5 15:40:20 UTC 2026
+
+
+
+
+
+
+
+
+
+
+-- Testing Dummy test (Thu Mar  5 15:40:20 UTC 2026 / test number 000)
+restarting autofs...
+using systemd
+# Created by CVMFS integration tests
+CVMFS_SERVER_APACHE_RELOAD_IS_RESTART=true
+Dummy test
+execution took 0.030 seconds
+Test passed
+
+
+
+
+
+
+
+
+
+
+-- Testing Check installation (Thu Mar  5 15:40:20 UTC 2026 / test number 001)
+restarting autofs...
+using systemd
+# Created by CVMFS integration tests
+CVMFS_SERVER_APACHE_RELOAD_IS_RESTART=true
+OK
+execution took 0.297 seconds
+Test passed
+
+
+
+
+
+
+
+
+
+
+-- Testing Probing atlas, lhcb (Thu Mar  5 15:40:21 UTC 2026 / test number 002)
+restarting autofs...
+using systemd
+# Created by CVMFS integration tests
+CVMFS_SERVER_APACHE_RELOAD_IS_RESTART=true
+repo
+test1
+README
+conda
+containers
+etc
+group_login.csh
+group_login.csh.pre-LBCORE-1949
+group_login.sh
+group_login.sh.pre-LBCORE-1949
+lhcbdirac
+lib
+execution took 1.350 seconds
+Test passed
+
+
+
+
+
+
+
+
+
+
+-- Testing Nested catalogs with same prefix (Thu Mar  5 15:40:23 UTC 2026 / test number 003)
+restarting autofs...
+using systemd
+# Created by CVMFS integration tests
+CVMFS_SERVER_APACHE_RELOAD_IS_RESTART=true
+  File: /cvmfs/lhcb.cern.ch/lib/lhcb/GEANT4/GEANT4_v92r4/Makefile
+  Size: 45        	Blocks: 1          IO Block: 4096   regular file
+Device: 0,57	Inode: 17559       Links: 1
+Access: (0664/-rw-rw-r--)  Uid: (  999/   cvmfs)   Gid: (  988/   cvmfs)
+Access: 2010-10-14 12:47:46.000000000 +0000
+Modify: 2010-10-14 12:47:46.000000000 +0000
+Change: 2010-10-14 12:47:46.000000000 +0000
+ Birth: -
+  File: /cvmfs/lhcb.cern.ch/lib/lhcb/GEANT4/GEANT4_v92r4p1/Makefile
+  Size: 45        	Blocks: 1          IO Block: 4096   regular file
+Device: 0,57	Inode: 32363       Links: 1
+Access: (0664/-rw-rw-r--)  Uid: (  999/   cvmfs)   Gid: (  988/   cvmfs)
+Access: 2011-05-02 09:50:21.000000000 +0000
+Modify: 2011-05-02 09:50:21.000000000 +0000
+Change: 2011-05-02 09:50:21.000000000 +0000
+ Birth: -
+execution took 0.687 seconds
+Test passed
+
+
+
+
+
+
+
+
+
+

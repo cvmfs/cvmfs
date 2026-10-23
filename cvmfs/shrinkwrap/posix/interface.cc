@@ -740,7 +740,8 @@ struct fs_traversal_context *posix_initialize(const char *repo,
   if (!DirectoryExists(req_dirs.c_str())) {
     if (!MkdirDeep(req_dirs.c_str(), 0755, true)) {
       LogCvmfs(kLogCvmfs, kLogStderr,
-               "Failed to create repository directory '%s'", req_dirs.c_str());
+               "Failed to create repository directory '%s' (%s)",
+               req_dirs.c_str(), strerror(errno));
       return NULL;
     }
   }

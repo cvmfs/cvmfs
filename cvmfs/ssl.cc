@@ -10,7 +10,7 @@
 #include <string>
 #include <vector>
 
-#include "duplex_curl.h"
+#include "duplex_curl.h"  // IWYU pragma: keep
 #include "util/platform.h"
 #include "util/posix.h"
 #include "util/string.h"

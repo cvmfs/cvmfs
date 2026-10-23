@@ -181,6 +181,27 @@ func FindLeaseByToken(ctx context.Context, tx *sql.Tx, token string) (*Lease, er
 	return &lease, nil
 }
 
+// UpdateLeaseExpirationByToken sets a new expiration time for the lease
+// identified by token. It returns the number of rows affected, which is 0 if
+// no lease with the given token exists.
+func UpdateLeaseExpirationByToken(ctx context.Context, tx *sql.Tx, token string, expiration time.Time) (int64, error) {
+	t0 := time.Now()
+
+	res, err := tx.ExecContext(ctx,
+		"update Lease set Expiration = ? where Token = ?", expiration.UnixMilli(), token)
+	if err != nil {
+		return 0, fmt.Errorf("update statement failed: %w", err)
+	}
+	numUpdated, _ := res.RowsAffected()
+
+	gw.LogC(ctx, "lease_entity", gw.LogDebug).
+		Str("operation", "update_expiration_by_token").
+		Dur("task_dt", time.Since(t0)).
+		Msgf("updated %v leases", numUpdated)
+
+	return numUpdated, nil
+}
+
 func DeleteAllExpiredLeases(ctx context.Context, tx *sql.Tx) error {
 	t0 := time.Now()
 

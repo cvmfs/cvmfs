@@ -24,14 +24,20 @@ add_executable(s3benchmark
 target_link_libraries (s3benchmark
                        cvmfs_crypto
                        cvmfs_util
-                       ${CURL_LIBRARIES}
-                       ${CARES_LIBRARIES} ${CARES_LDFLAGS}
+                       CURL::libcurl
+                       c-ares::cares
                        ${ZLIB_LIBRARIES}
                        ${OPENSSL_LIBRARIES}
-                       ${VJSON_LIBRARIES}
+                       LibArchive::LibArchive
+                       nlohmann_json::nlohmann_json
                        pthread
                        dl
 )
+
+if (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
+  target_link_libraries (s3benchmark GTest::gtest)
+endif()
+
 
 
 add_executable(s3mockserver
@@ -42,6 +48,7 @@ add_executable(s3mockserver
 
 target_link_libraries (s3mockserver
                        cvmfs_util
+                       CURL::libcurl
                        pthread
                        dl
 )

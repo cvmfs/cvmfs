@@ -7,13 +7,12 @@
 #include "session_token.h"
 
 #include <limits>
+#include <memory>
 
 #include "crypto/encrypt.h"
-#include "json.h"
 #include "json_document.h"
 #include "util/logging.h"
 #include "util/platform.h"
-#include "util/pointer.h"
 #include "util/string.h"
 
 namespace receiver {
@@ -40,14 +39,14 @@ bool GenerateSessionToken(const std::string &key_id, const std::string &path,
     return false;
   }
 
-  const UniquePtr<cipher::Key> secret(cipher::Key::CreateRandomly(32));
-  if (!secret.IsValid()) {
+  const std::unique_ptr<cipher::Key> secret(cipher::Key::CreateRandomly(32));
+  if (secret.get() == nullptr) {
     return false;
   }
 
-  const UniquePtr<cipher::Cipher> cipher(
+  const std::unique_ptr<cipher::Cipher> cipher(
       cipher::Cipher::Create(cipher::kAes256Cbc));
-  if (!cipher.IsValid()) {
+  if (cipher.get() == nullptr) {
     return false;
   }
 
@@ -89,9 +88,9 @@ bool GetTokenPublicId(const std::string &token, std::string *public_id) {
     return false;
   }
 
-  const UniquePtr<JsonDocument> token_json(
+  const std::unique_ptr<JsonDocument> token_json(
       JsonDocument::Create(debased64_token));
-  if (!token_json.IsValid()) {
+  if (token_json.get() == nullptr) {
     return false;
   }
 
@@ -104,7 +103,7 @@ bool GetTokenPublicId(const std::string &token, std::string *public_id) {
     return false;
   }
 
-  *public_id = token_id->string_value;
+  *public_id = token_id->get<std::string>();
 
   return true;
 }
@@ -123,9 +122,9 @@ TokenCheckResult CheckToken(const std::string &token, const std::string &secret,
     return kInvalid;
   }
 
-  const UniquePtr<JsonDocument> token_json(
+  const std::unique_ptr<JsonDocument> token_json(
       JsonDocument::Create(debased64_token));
-  if (!token_json.IsValid()) {
+  if (token_json.get() == nullptr) {
     return kInvalid;
   }
 
@@ -141,14 +140,14 @@ TokenCheckResult CheckToken(const std::string &token, const std::string &secret,
   if (!Debase64(secret, &debased64_secret)) {
     return kInvalid;
   }
-  const UniquePtr<cipher::Key> key(
+  const std::unique_ptr<cipher::Key> key(
       cipher::Key::CreateFromString(debased64_secret));
-  if (!key.IsValid()) {
+  if (key.get() == nullptr) {
     return kInvalid;
   }
 
   std::string encrypted_body;
-  if (!Debase64(blob->string_value, &encrypted_body)) {
+  if (!Debase64(blob->get<std::string>(), &encrypted_body)) {
     return kInvalid;
   }
 
@@ -157,8 +156,8 @@ TokenCheckResult CheckToken(const std::string &token, const std::string &secret,
     return kInvalid;
   }
 
-  const UniquePtr<JsonDocument> body_json(JsonDocument::Create(body));
-  if (!token_json.IsValid()) {
+  const std::unique_ptr<JsonDocument> body_json(JsonDocument::Create(body));
+  if (token_json.get() == nullptr) {
     return kInvalid;
   }
 
@@ -171,13 +170,13 @@ TokenCheckResult CheckToken(const std::string &token, const std::string &secret,
   }
 
   // TODO(radu): can we still use monotonic time if the process restarts?
-  const uint64_t expiry_time = String2Uint64(expiry->string_value);
+  const uint64_t expiry_time = String2Uint64(expiry->get<std::string>());
   const uint64_t current_time = platform_monotonic_time();
   if (current_time > expiry_time) {
     return kExpired;
   }
 
-  *lease_path = path->string_value;
+  *lease_path = path->get<std::string>();
 
   return kValid;
 }

@@ -10,8 +10,8 @@
 #include <string>
 
 #include "sink.h"
+// IWYU pragma: keep
 #include "util/posix.h"
-#include "util/smalloc.h"
 
 namespace cvmfs {
 

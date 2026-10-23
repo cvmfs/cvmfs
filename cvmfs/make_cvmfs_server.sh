@@ -42,6 +42,8 @@ COMPONENTS="\
     server/cvmfs_server_masterkeycard.sh
     server/cvmfs_server_import.sh
     server/cvmfs_server_mkfs.sh
+    server/cvmfs_server_connect_gw.sh
+    server/cvmfs_server_refresh_lease.sh
     server/cvmfs_server_add_replica.sh
     server/cvmfs_server_rmfs.sh
     server/cvmfs_server_resign.sh
@@ -67,6 +69,8 @@ COMPONENTS="\
     server/cvmfs_server_fix_permissions.sh
     server/cvmfs_server_fix_stats.sh
     server/cvmfs_server_ingest.sh
+    server/cvmfs_server_ingestsql.sh
+    server/cvmfs_server_overlay.sh
     server/cvmfs_server_print_stats.sh
     server/cvmfs_server_merge_stats.sh
     server/cvmfs_server_coda.sh

@@ -59,6 +59,11 @@ class CmdTransaction : public Command {
     p.push_back(Parameter::Optional(
         "template-to", 'V', "to-dir",
         "Use -U and -V as an alternative to the -T parameter"));
+    p.push_back(Parameter::Switch(
+        "allow-nonexistent-path", 'P',
+        "Allow opening a transaction on a lease path whose parent directory "
+        "does not exist yet (gateway publishing only; requires a gateway that "
+        "supports it)"));
     return p;
   }
 

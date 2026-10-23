@@ -9,12 +9,10 @@ cvmfs_run_test() {
   cvmfs_mount sft.cern.ch CVMFS_CLIENT_PROFILE=custom || return 1
 
   sudo cvmfs_talk -i sft.cern.ch proxy set "invalid"
-  ls /cvmfs/sft.cern.ch/lcg/external/ROOT
-  [ $? -eq 0 ] && return 2
+  ls /cvmfs/sft.cern.ch/lcg/external/ROOT && return 2
 
   sudo cvmfs_talk -i sft.cern.ch proxy set "DIRECT"
-  ls /cvmfs/sft.cern.ch/lcg/external/ROOT
-  [ $? -ne 0 ] && return 3
+  ls /cvmfs/sft.cern.ch/lcg/external/ROOT || return 3
 
   return 0
 }

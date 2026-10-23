@@ -3,7 +3,6 @@
  */
 
 #define _FILE_OFFSET_BITS 64
-#define __STDC_FORMAT_MACROS
 
 
 #include "libcvmfs_cache.h"
@@ -13,6 +12,7 @@
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
+#include <memory>
 #include <string>
 
 #include "cache_plugin/channel.h"
@@ -20,7 +20,6 @@
 #include "crypto/hash.h"
 #include "manifest.h"
 #include "monitor.h"
-#include "util/pointer.h"
 
 using namespace std;  // NOLINT
 
@@ -270,7 +269,7 @@ Watchdog *g_watchdog = NULL;
 
 struct cvmcache_context {
   explicit cvmcache_context(ForwardCachePlugin *p) : plugin(p) { }
-  UniquePtr<ForwardCachePlugin> plugin;
+  std::unique_ptr<ForwardCachePlugin> plugin;
 };
 
 
@@ -341,7 +340,7 @@ void cvmcache_get_session(cvmcache_session *session) {
 void cvmcache_spawn_watchdog(const char *crash_dump_file) {
   if (g_watchdog != NULL)
     return;
-  g_watchdog = Watchdog::Create(NULL);
+  g_watchdog = Watchdog::Create(NULL, false /* needs_read_environ */);
   assert(g_watchdog != NULL);
   g_watchdog->Spawn((crash_dump_file != NULL) ? string(crash_dump_file) : "");
 }

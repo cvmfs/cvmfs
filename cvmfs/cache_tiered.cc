@@ -9,9 +9,8 @@
 #include <string>
 #include <vector>
 
-#include "quota.h"
-#include "util/platform.h"
-#include "util/posix.h"
+#include "quota.h"  // IWYU pragma: keep - complete type needed for delete
+#include "util/posix.h"  // IWYU pragma: keep
 
 
 std::string TieredCacheManager::Describe() {

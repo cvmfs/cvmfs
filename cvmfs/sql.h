@@ -6,11 +6,11 @@
 #define CVMFS_SQL_H_
 
 #include <cassert>
+#include <memory>
 #include <string>
 
 #include "duplex_sqlite3.h"
 #include "util/file_guard.h"
-#include "util/pointer.h"
 
 namespace sqlite {
 
@@ -288,12 +288,12 @@ class Database : SingleCopy {
   float schema_version_;
   unsigned schema_revision_;
 
-  UniquePtr<Sql> begin_transaction_;
-  UniquePtr<Sql> commit_transaction_;
+  std::unique_ptr<Sql> begin_transaction_;
+  std::unique_ptr<Sql> commit_transaction_;
 
-  UniquePtr<Sql> has_property_;
-  UniquePtr<Sql> set_property_;
-  UniquePtr<Sql> get_property_;
+  std::unique_ptr<Sql> has_property_;
+  std::unique_ptr<Sql> set_property_;
+  std::unique_ptr<Sql> get_property_;
 };
 
 

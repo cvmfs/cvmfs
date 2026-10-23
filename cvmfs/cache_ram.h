@@ -9,14 +9,12 @@
 #include <cassert>
 #include <cstdlib>
 #include <string>
-#include <vector>
 
 #include "cache.h"
 #include "crypto/hash.h"
 #include "fd_table.h"
 #include "kvstore.h"
 #include "statistics.h"
-#include "util/pointer.h"
 
 
 /**

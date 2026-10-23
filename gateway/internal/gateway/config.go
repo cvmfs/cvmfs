@@ -16,8 +16,20 @@ type Config struct {
 	PProfPort int `mapstructure:"pprof_port"`
 	// If PProfPort is already in use, allow to use ports up to this value
 	PProfPortRangeMax int `mapstructure:"pprof_port_range_max"`
-	// MaxLeaseTime is the maximum lease duration in seconds
+	// MaxLeaseTime is the initial lease duration in seconds. It also caps the
+	// extension that a refresh (PATCH /leases/:token) can apply.
 	MaxLeaseTime time.Duration `mapstructure:"max_lease_time"`
+	// LeaseRefreshTime is the default duration (in seconds) by which an active
+	// lease's expiration is extended when it is refreshed via
+	// PATCH /leases/:token without an explicit expires_in_sec. It is capped by
+	// MaxLeaseTime. If unset (0), it defaults to MaxLeaseTime.
+	LeaseRefreshTime time.Duration `mapstructure:"lease_refresh_time"`
+	// CommitLeaseExpiryMargin is a safety margin (in seconds) subtracted from the
+	// lease expiration before a commit is published: if the lease would expire
+	// within this margin, the commit is refused. This guards against an
+	// overlapping lease being granted to another publisher as the lease expires
+	// during a slow commit.
+	CommitLeaseExpiryMargin time.Duration `mapstructure:"commit_lease_expiry_margin"`
 	// LogLevel sets the logging level
 	LogLevel string `mapstructure:"log_level"`
 	// LogTimestamps enables timestamps in the logging output
@@ -32,6 +44,9 @@ type Config struct {
 	WorkDir string `mapstructure:"work_dir"`
 	// MockReceiver enables a mocked implementation of the receiver worker
 	MockReceiver bool `mapstructure:"mock_receiver"`
+	// EnableKeyEndpoint enables the /repos/:name/keys endpoint that allows
+	// publishers to fetch the repository public key and certificate
+	EnableKeyEndpoint bool `mapstructure:"enable_key_endpoint"`
 }
 
 // ReadConfig reads configuration files and commandline flags, and populates a Config object
@@ -42,13 +57,16 @@ func ReadConfig() (*Config, error) {
 	pflag.Int("port", 4929, "HTTP frontend port")
 	pflag.Int("pprof_port", 6060, "pprof port on localhost")
 	pflag.Int("pprof_port_range_max", 6260, "pprof port on localhost")
+	pflag.Int("lease_refresh_time", 0, "lease extension in seconds applied on refresh (0: use max_lease_time)")
 	pflag.Int("max_lease_time", 7200, "maximum lease time in seconds")
+	pflag.Int("commit_lease_expiry_margin", 1, "safety margin in seconds before lease expiry within which a commit is refused")
 	pflag.String("log_level", "info", "log level (debug|info|warn|error|fatal|panic)")
 	pflag.Bool("log_timestamps", false, "enable timestamps in logging output")
 	pflag.Int("num_receivers", 1, "number of parallel cvmfs_receiver processes to run")
 	pflag.String("receiver_path", "/usr/bin/cvmfs_receiver", "the path of the cvmfs_receiver executable")
 	pflag.String("work_dir", "/var/lib/cvmfs-gateway", "the working directory for database files")
 	pflag.Bool("mock_receiver", false, "enable the mocked implementation of the receiver process (for testing)")
+	pflag.Bool("enable_key_endpoint", false, "enable the /repos/:name/keys endpoint for publisher key retrieval")
 	pflag.Parse()
 
 	viper.SetConfigFile(configFile)
@@ -62,6 +80,14 @@ func ReadConfig() (*Config, error) {
 
 	// max_lease_time is given in seconds in the config file or at the command line
 	conf.MaxLeaseTime = conf.MaxLeaseTime * time.Second
+	// commit_lease_expiry_margin is likewise given in seconds
+	conf.CommitLeaseExpiryMargin = conf.CommitLeaseExpiryMargin * time.Second
+
+	// lease_refresh_time is given in seconds; if unset it falls back to max_lease_time
+	conf.LeaseRefreshTime = conf.LeaseRefreshTime * time.Second
+	if conf.LeaseRefreshTime == 0 {
+		conf.LeaseRefreshTime = conf.MaxLeaseTime
+	}
 
 	// Manually handler legacy parameter names
 

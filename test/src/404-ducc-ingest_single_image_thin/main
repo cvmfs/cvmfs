@@ -11,6 +11,7 @@ ducc_test_401_clean_up() {
   sudo cvmfs_server rmfs -f $CVMFS_TEST_REPO
     
   export DUCC_DOCKER_REGISTRY_PASS=""
+  export DUCC_OUTPUT_REGISTRY_PASS=""
 
   echo -n "Stopping and deleting docker registry..."
   docker stop $CVMFS_TEST404_REGISTRY >> /dev/null
@@ -22,7 +23,7 @@ cvmfs_run_test() {
   trap ducc_test_401_clean_up EXIT HUP INT TERM
 
   echo "*** creating empty repo ***"
-  create_empty_repo $CVMFS_TEST_REPO $USER || return 1
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return 1
     
   echo -n "*** Starting docker registry for tests..."
   docker run -d -p 5000:5000 --name $CVMFS_TEST404_REGISTRY registry:2 >> /dev/null || return 3
@@ -30,6 +31,7 @@ cvmfs_run_test() {
 
   echo "*** converting image to flat ***"
   export DUCC_DOCKER_REGISTRY_PASS=mock_pass
+  export DUCC_OUTPUT_REGISTRY_PASS=mock_pass
   cvmfs_ducc convert-single-image \
         --skip-flat \
         --thin-image-name http://localhost:5000/mock/thin_404/centos:7 \

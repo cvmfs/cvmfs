@@ -9,7 +9,7 @@
     nomail
 }
 
-# vacuum the current stats db to stats.db.archive 
+# vacuum the current stats db to stats.db.archive
 /var/spool/cvmfs/*/stats.db {
     monthly
     rotate 0
@@ -22,9 +22,7 @@
         for db in /var/spool/cvmfs/*/stats.db; do
         if [ -f "$db" ]; then
         echo $db
-        rm ${db}.archive || true
-        sqlite3 $db "VACUUM INTO '${db}.archive';"
-        sqlite3 $db "delete from publish_statistics; delete from gc_statistics; vacuum;"
+        cvmfs_swissknife rotate-statsdb -p "$db"
         fi
         done
     endscript

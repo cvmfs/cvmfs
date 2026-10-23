@@ -27,5 +27,8 @@ log "\$PATH: $PATH"
 log ""
 log ""
 
+# Superseded by the per-user settings in 10-osx.conf
+rm -f /etc/cvmfs/default.d/11-osx-fskit.conf
+
 $cvmfs_cfg setup >> $postinstall_log 2>&1 || die "Configuring cvmfs failed."
 [ ! -d /var/run/cvmfs ] || $cvmfs_cfg reload >> $postinstall_log 2>&1

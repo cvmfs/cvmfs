@@ -25,7 +25,7 @@
 #include <cassert>
 #include <cstring>
 
-#include "duplex_zlib.h"
+#include "duplex_zlib.h"  // IWYU pragma: keep
 
 #if defined(MSDOS) || defined(OS2) || defined(WIN32) || defined(__CYGWIN__)
 #include <fcntl.h>

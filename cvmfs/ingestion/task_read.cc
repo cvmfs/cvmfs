@@ -18,13 +18,13 @@
 #include "util/smalloc.h"
 
 
-atomic_int64 TaskRead::tag_seq_ = 0;
+std::atomic<int64_t> TaskRead::tag_seq_(0);
 
 
 void TaskRead::Process(FileItem *item) {
   BackoffThrottle throttle(kThrottleInitMs, kThrottleMaxMs, kThrottleResetMs);
   if ((high_watermark_ > 0) && (BlockItem::managed_bytes() > high_watermark_)) {
-    atomic_inc64(&n_block_);
+    n_block_.fetch_add(1);
     do {
       throttle.Throttle();
     } while (BlockItem::managed_bytes() > low_watermark_);
@@ -45,7 +45,7 @@ void TaskRead::Process(FileItem *item) {
   }
 
   unsigned char *buffer[kBlockSize];
-  const uint64_t tag = atomic_xadd64(&tag_seq_, 1);
+  const uint64_t tag = tag_seq_.fetch_add(1);
   ssize_t nbytes = -1;
   unsigned cnt = 0;
   do {
@@ -82,3 +82,4 @@ void TaskRead::SetWatermarks(uint64_t low, uint64_t high) {
   low_watermark_ = low;
   high_watermark_ = high;
 }
+ 

@@ -13,7 +13,7 @@
 
 namespace upload {
 
-atomic_int64 UploadStreamHandle::g_upload_stream_tag = 0;
+std::atomic<int64_t> UploadStreamHandle::g_upload_stream_tag(0);
 
 AbstractUploader::UploadJob::UploadJob(UploadStreamHandle *handle,
                                        UploadBuffer buffer,
@@ -94,41 +94,41 @@ void AbstractUploader::TearDown() { tasks_upload_.Terminate(); }
 void AbstractUploader::WaitForUpload() const { jobs_in_flight_.WaitForZero(); }
 
 void AbstractUploader::InitCounters(perf::StatisticsTemplate *statistics) {
-  counters_ = new UploadCounters(*statistics);
+  counters_ = std::unique_ptr<UploadCounters>(new UploadCounters(*statistics));
 }
 
 void AbstractUploader::CountUploadedChunks() const {
-  if (counters_.IsValid()) {
+  if (counters_.get() != nullptr) {
     perf::Inc(counters_->n_chunks_added);
   }
 }
 
 void AbstractUploader::DecUploadedChunks() const {
-  if (counters_.IsValid()) {
+  if (counters_.get() != nullptr) {
     perf::Dec(counters_->n_chunks_added);
   }
 }
 
 void AbstractUploader::CountUploadedBytes(int64_t bytes_written) const {
-  if (counters_.IsValid()) {
+  if (counters_.get() != nullptr) {
     perf::Xadd(counters_->sz_uploaded_bytes, bytes_written);
   }
 }
 
 void AbstractUploader::CountDuplicates() const {
-  if (counters_.IsValid()) {
+  if (counters_.get() != nullptr) {
     perf::Inc(counters_->n_chunks_duplicated);
   }
 }
 
 void AbstractUploader::CountUploadedCatalogs() const {
-  if (counters_.IsValid()) {
+  if (counters_.get() != nullptr) {
     perf::Inc(counters_->n_catalogs_added);
   }
 }
 
 void AbstractUploader::CountUploadedCatalogBytes(int64_t bytes_written) const {
-  if (counters_.IsValid()) {
+  if (counters_.get() != nullptr) {
     perf::Xadd(counters_->sz_uploaded_catalog_bytes, bytes_written);
   }
 }
@@ -156,3 +156,4 @@ void TaskUpload::Process(AbstractUploader::UploadJob *upload_job) {
 }
 
 }  // namespace upload
+                      

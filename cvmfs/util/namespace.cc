@@ -43,6 +43,39 @@
 #endif
 
 
+#ifdef CVMFS_HAS_UNSHARE
+/**
+ * Some environments advertise unprivileged user namespaces as available (e.g.
+ * /proc/sys/kernel/unprivileged_userns_clone contains "1") but still deny the
+ * actual unshare() or uid_map setup.  Examples are the AppArmor restriction
+ * kernel.apparmor_restrict_unprivileged_userns on recent Ubuntu releases, an
+ * SELinux policy, or a nesting/quota limit inside a container.  Probe the real
+ * capability in a child process -- unshare() mutates the caller -- so that the
+ * kNsFeatureUserEnabled flag reflects what CreateUserNamespace() can actually
+ * do rather than what the sysctl claims.
+ */
+static bool ProbeUserNamespace() {
+  const pid_t pid = fork();
+  if (pid < 0)
+    return false;
+  if (pid == 0) {
+    // Child: exercise the same syscalls as CreateUserNamespace(), mapping our
+    // own ids onto themselves (the least privileged setup).  Probe two levels
+    // deep because some environments permit the first user namespace but deny
+    // nesting -- e.g. a max_user_namespaces limit or an outer user namespace --
+    // and T_Namespace.User nests two levels.
+    const bool ok = (CreateUserNamespace(geteuid(), getegid()) == kFailNsOk) &&
+                    (CreateUserNamespace(geteuid(), getegid()) == kFailNsOk);
+    _exit(ok ? 0 : 1);
+  }
+  int status;
+  if (waitpid(pid, &status, 0) < 0)
+    return false;
+  return WIFEXITED(status) && (WEXITSTATUS(status) == 0);
+}
+#endif
+
+
 int CheckNamespaceFeatures() {
 #ifdef __APPLE__
   return 0;
@@ -57,7 +90,15 @@ int CheckNamespaceFeatures() {
   char enabled = 0;
   SafeRead(fd, &enabled, 1);
   close(fd);
-  return (enabled != '1') ? result : (result | kNsFeatureUserEnabled);
+  if (enabled != '1')
+    return result;
+#ifdef CVMFS_HAS_UNSHARE
+  // The sysctl can report user namespaces as enabled even when the actual
+  // operations are denied; only advertise them as enabled if they really work.
+  if (ProbeUserNamespace())
+    result |= kNsFeatureUserEnabled;
+#endif
+  return result;
 #endif
 }
 

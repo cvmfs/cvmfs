@@ -4,52 +4,14 @@
 
 if (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
 
-# GoogleTest
-set(GOOGLETEST_MIN_VERSION "1.10.0")
-if(USE_EXTERNAL_GOOGLETEST)
-  if (USE_EXTERNAL_GOOGLETEST STREQUAL AUTO)
-    find_package(GTest ${GOOGLETEST_MIN_VERSION})
-  else()
-    find_package(GTest ${GOOGLETEST_MIN_VERSION} REQUIRED)
-  endif()
-endif()
-
-if(NOT GTest_FOUND)
-  message(STATUS "Fetching local copy of Googletest library v1.17.0 for unit-tests...")
-  Include(FetchContent)
-  set(INSTALL_GTEST OFF)
-
-  # Check if local file exists first
-  set(GOOGLETEST_LOCAL_PATH "${PROJECT_SOURCE_DIR}/externals/googletest-1.17.0.tar.gz")
-
-  if(EXISTS "${GOOGLETEST_LOCAL_PATH}")
-      message(STATUS "Using local GoogleTest archive: ${GOOGLETEST_LOCAL_PATH}")
-      FetchContent_Declare(
-          GoogleTest
-          #DOWNLOAD_EXTRACT_TIMESTAMP TRUE
-          DOWNLOAD_DIR ${PROJECT_SOURCE_DIR}/externals
-          URL "file://${GOOGLETEST_LOCAL_PATH}"
-          URL_HASH MD5=b6f100bc2a5853a48046aa168ececf84
-      )
-  else()
-      message(STATUS "Local GoogleTest archive not found, downloading from remote")
-      FetchContent_Declare(
-          GoogleTest
-          #DOWNLOAD_EXTRACT_TIMESTAMP TRUE
-          DOWNLOAD_DIR ${PROJECT_SOURCE_DIR}/externals
-          URL https://github.com/google/googletest/releases/download/v1.17.0/googletest-1.17.0.tar.gz
-              https://ecsft.cern.ch/dist/cvmfs/build_externals/googletest-1.17.0.tar.gz
-          URL_HASH MD5=b6f100bc2a5853a48046aa168ececf84
-      )
-  endif()
-
-FetchContent_MakeAvailable(GoogleTest)
-endif()
+include(SetupGoogleTest)
 get_target_property(GTEST_INCLUDE_DIRS GTest::gtest INCLUDE_DIRECTORIES)
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${GTEST_INCLUDE_DIRS})
 
 set (CVMFS_SOURCE_DIR "${CMAKE_SOURCE_DIR}/cvmfs")
 set (CVMFS_UNITTEST_COMMON_CFLAGS "-DCVMFS_LIBCVMFS -D_FILE_OFFSET_BITS=64 -fexceptions")
+set (CVMFS_UNITTEST_MOCKFUSE_CFLAGS
+     "-DCVMFS_FUSE_MODULE -DCVMFS_USE_LIBFUSE=3 -D_FILE_OFFSET_BITS=64 -fexceptions")
 
 #
 # Protobuf generated sources
@@ -143,6 +105,7 @@ if (BUILD_SHRINKWRAP)
                          cvmfs_crypto
                          cvmfs_util
                          GTest::gtest
+                         ${CAP_LIBRARIES}
                          pthread
                          dl
   )
@@ -263,14 +226,14 @@ if (BUILD_SERVER)
   list (APPEND CVMFS_UNITTEST_SERVER_LINK_LIBRARIES
         GTest::gtest
         ${OPENSSL_LIBRARIES}
-        ${CURL_LIBRARIES}
-        ${CARES_LIBRARIES} ${CARES_LDFLAGS}
+        CURL::libcurl
+        c-ares::cares
         ${OPENSSL_LIBRARIES}
-        ${SQLITE3_LIBRARY}
+        SQLite::SQLite3
         ${ZLIB_LIBRARIES}
-        ${VJSON_LIBRARIES}
+        nlohmann_json::nlohmann_json
         ${CAP_LIBRARIES}
-        ${LibArchive_LIBRARY}
+        LibArchive::LibArchive
         ${RT_LIBRARY}
         pthread
         dl
@@ -297,7 +260,7 @@ if (BUILD_SERVER)
   if (BUILD_UNITTESTS_DEBUG)
   add_executable (cvmfs_test_publish_debug ${CVMFS_UNITTEST_SERVER_SOURCES})
   set_target_properties (cvmfs_test_publish_debug PROPERTIES
-                         COMPILE_FLAGS "${CVMFS_UNITTEST_COMMON_CFLAGS} -O0 -DDEBUGMSG"
+                         COMPILE_FLAGS "${CVMFS_UNITTEST_COMMON_CFLAGS} -O0 -Wno-cpp -DDEBUGMSG"
   )
   target_link_libraries (cvmfs_test_publish_debug
                          cvmfs_crypto_debug
@@ -339,6 +302,8 @@ set(CVMFS_UNITTEST_SOURCES
   t_bigqueue.cc
   t_bigvector.cc
   t_blocking_counter.cc
+  t_bundle_mgr.cc
+  t_bundle_file_mgr.cc
   t_cache.cc
   t_cache_extern.cc
   t_cache_ram.cc
@@ -392,6 +357,7 @@ set(CVMFS_UNITTEST_SOURCES
   t_manifest.cc
   t_mountpoint.cc
   t_namespace.cc
+  t_nfs4_server.cc
   t_notify_messages.cc
   t_object_fetcher.cc
   t_options.cc
@@ -402,11 +368,14 @@ set(CVMFS_UNITTEST_SOURCES
   t_pipe.cc
   t_platforms.cc
   t_polymorphic_construction.cc
+  t_commit_processor.cc
   t_prng.cc
   t_quota.cc
   t_reactor.cc
   t_reflog.cc
+  t_repository_tag.cc
   t_relaxed_path_filter.cc
+  t_inclusion_spec.cc
   t_s3fanout.cc
   t_resolv_conf_event_handler.cc
   t_ring_buffer.cc
@@ -426,6 +395,7 @@ set(CVMFS_UNITTEST_SOURCES
   t_suid_util.cc
   t_supervisor.cc
   t_swissknife_lease.cc
+  t_gc_database.cc
   t_sync_union_tarball.cc
   t_synchronizing_counter.cc
   t_telemetry_aggregator.cc
@@ -435,7 +405,6 @@ set(CVMFS_UNITTEST_SOURCES
   t_trim_string.cc
   t_tube.cc
   t_uid_map.cc
-  t_unique_ptr.cc
   t_upload_facility.cc
   t_uploaders.cc
   t_gateway_uploader.cc
@@ -453,6 +422,7 @@ set(CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/authz/authz_fetch.cc
   ${CVMFS_SOURCE_DIR}/authz/authz_session.cc
   ${CVMFS_SOURCE_DIR}/backoff.cc
+  ${CVMFS_SOURCE_DIR}/bundle_mgr.cc
   ${CVMFS_SOURCE_DIR}/cache.cc
   ${CVMFS_SOURCE_DIR}/cache_extern.cc
   ${CVMFS_SOURCE_DIR}/cache_posix.cc
@@ -508,6 +478,12 @@ set(CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/manifest_fetch.cc
   ${CVMFS_SOURCE_DIR}/monitor.cc
   ${CVMFS_SOURCE_DIR}/mountpoint.cc
+  ${CVMFS_SOURCE_DIR}/nfs4/callback.cc
+  ${CVMFS_SOURCE_DIR}/nfs4/filehandle.cc
+  ${CVMFS_SOURCE_DIR}/nfs4/logging.cc
+  ${CVMFS_SOURCE_DIR}/nfs4/nfs4_server.cc
+  ${CVMFS_SOURCE_DIR}/nfs4/rpc.cc
+  ${CVMFS_SOURCE_DIR}/nfs4/xdr.cc
   ${CVMFS_SOURCE_DIR}/network/dns.cc
   ${CVMFS_SOURCE_DIR}/network/download.cc
   ${CVMFS_SOURCE_DIR}/network/jobinfo.cc
@@ -519,6 +495,7 @@ set(CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/options.cc
   ${CVMFS_SOURCE_DIR}/pack.cc
   ${CVMFS_SOURCE_DIR}/path_filters/dirtab.cc
+  ${CVMFS_SOURCE_DIR}/path_filters/inclusion_spec.cc
   ${CVMFS_SOURCE_DIR}/path_filters/relaxed_path_filter.cc
   ${CVMFS_SOURCE_DIR}/pathspec/pathspec.cc
   ${CVMFS_SOURCE_DIR}/pathspec/pathspec_pattern.cc
@@ -590,16 +567,17 @@ list (APPEND CVMFS_UNITTESTS_LINK_LIBRARIES
       GTest::gtest
       GTest::gmock
       ${OPENSSL_LIBRARIES}
-      ${CURL_LIBRARIES}
-      ${CARES_LIBRARIES} ${CARES_LDFLAGS}
+      CURL::libcurl
+      c-ares::cares
       ${OPENSSL_LIBRARIES}
-      ${SQLITE3_LIBRARY}
+      SQLite::SQLite3
       ${ZLIB_LIBRARIES}
       ${UUID_LIBRARIES}
-      ${PACPARSER_LIBRARIES}
-      ${VJSON_LIBRARIES}
+      pacparser::pacparser
+      nlohmann_json::nlohmann_json
       ${PROTOBUF_LITE_LIBRARY}
-      ${LibArchive_LIBRARY}
+      ${CAP_LIBRARIES}
+      LibArchive::LibArchive
       ${RT_LIBRARY}
       pthread
       dl
@@ -614,6 +592,9 @@ set(CVMFS_UNITTEST_MOCKFUSE_SOURCES
   ../common/testutil.cc
   ../common/catalog_test_tools.cc
 
+  # libfuse3 stub
+  mockfuse/fuse_stub.cc
+
   t_cvmfs.cc
   ${CVMFS_SOURCE_DIR}/acl.cc
   ${CVMFS_SOURCE_DIR}/authz/authz.cc
@@ -622,6 +603,7 @@ set(CVMFS_UNITTEST_MOCKFUSE_SOURCES
   ${CVMFS_SOURCE_DIR}/authz/authz_session.cc
   ${CVMFS_SOURCE_DIR}/auto_umount.cc
   ${CVMFS_SOURCE_DIR}/backoff.cc
+  ${CVMFS_SOURCE_DIR}/bundle_mgr.cc
   ${CVMFS_SOURCE_DIR}/cache.cc
   ${CVMFS_SOURCE_DIR}/cache_extern.cc
   ${CVMFS_SOURCE_DIR}/cache_posix.cc
@@ -679,6 +661,8 @@ set(CVMFS_UNITTEST_MOCKFUSE_SOURCES
   ${CVMFS_SOURCE_DIR}/manifest_fetch.cc
   ${CVMFS_SOURCE_DIR}/monitor.cc
   ${CVMFS_SOURCE_DIR}/mountpoint.cc
+  ${CVMFS_SOURCE_DIR}/nfs_maps_leveldb.cc
+  ${CVMFS_SOURCE_DIR}/nfs_maps_sqlite.cc
   ${CVMFS_SOURCE_DIR}/network/dns.cc
   ${CVMFS_SOURCE_DIR}/network/download.cc
   ${CVMFS_SOURCE_DIR}/network/jobinfo.cc
@@ -693,6 +677,7 @@ set(CVMFS_UNITTEST_MOCKFUSE_SOURCES
   ${CVMFS_SOURCE_DIR}/options.cc
   ${CVMFS_SOURCE_DIR}/pack.cc
   ${CVMFS_SOURCE_DIR}/path_filters/dirtab.cc
+  ${CVMFS_SOURCE_DIR}/path_filters/inclusion_spec.cc
   ${CVMFS_SOURCE_DIR}/path_filters/relaxed_path_filter.cc
   ${CVMFS_SOURCE_DIR}/pathspec/pathspec.cc
   ${CVMFS_SOURCE_DIR}/pathspec/pathspec_pattern.cc
@@ -762,12 +747,14 @@ endif ()
 add_executable (cvmfs_unittests_mockfuse ${CVMFS_UNITTEST_MOCKFUSE_SOURCES})
 add_dependencies (cvmfs_unittests_mockfuse cache.pb.generated-unittests)
 set_target_properties (cvmfs_unittests_mockfuse PROPERTIES
-	COMPILE_FLAGS "${CVMFS_UNITTEST_COMMON_CFLAGS}  -g"
+	COMPILE_FLAGS "${CVMFS_UNITTEST_MOCKFUSE_CFLAGS} -g"
 )
+# Build this target with the production fuse3 view, but keep stubbed reply
+# entry points so tests can call callbacks without a live fuse session.
 target_link_libraries (cvmfs_unittests_mockfuse
                        cvmfs_crypto
                        cvmfs_util
-		       ${FUSE3_LIBRARIES}
+                       leveldb::leveldb
                        ${CVMFS_UNITTESTS_LINK_LIBRARIES})
 
 add_executable (cvmfs_unittests ${CVMFS_UNITTEST_SOURCES})
@@ -792,7 +779,7 @@ if (BUILD_UNITTESTS_DEBUG)
   add_executable (cvmfs_unittests_debug ${CVMFS_UNITTEST_SOURCES})
   add_dependencies (cvmfs_unittests_debug cache.pb.generated-unittests)
   set_target_properties (cvmfs_unittests_debug PROPERTIES
-                         COMPILE_FLAGS "${CVMFS_UNITTEST_COMMON_CFLAGS} -O0 -DDEBUGMSG"
+                         COMPILE_FLAGS "${CVMFS_UNITTEST_COMMON_CFLAGS} -O0 -Wno-cpp -DDEBUGMSG"
   )
   target_link_libraries (cvmfs_unittests_debug
                          cvmfs_crypto_debug
@@ -814,6 +801,12 @@ endif ()
 # For `make check`
 #
 add_test (NAME cvmfs_unittests COMMAND cvmfs_unittests --gtest_filter=-*Slow)
-add_dependencies (check cvmfs_unittests)
+add_test (NAME cvmfs_unittests_mockfuse COMMAND cvmfs_unittests_mockfuse)
+# The `check` convenience target is not created when BUILD_QC_TESTS is on (see
+# top-level CMakeLists.txt), because Abseil (pulled in by FuzzTest) claims that
+# target name.
+if (TARGET check)
+  add_dependencies (check cvmfs_unittests cvmfs_unittests_mockfuse)
+endif ()
 
 endif (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)

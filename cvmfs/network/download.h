@@ -10,27 +10,26 @@
 #include <stdint.h>
 #include <unistd.h>
 
+#include <atomic>
 #include <cstdio>
 #include <map>
+#include <memory>
 #include <set>
 #include <string>
 #include <vector>
 
 #include "compression/compression.h"
 #include "crypto/hash.h"
-#include "duplex_curl.h"
+#include "duplex_curl.h"  // IWYU pragma: keep
 #include "duplex_testing.h"
 #include "network/dns.h"
 #include "network/health_check.h"
 #include "network/jobinfo.h"
 #include "network/network_errors.h"
 #include "network/sharding_policy.h"
-#include "network/sink.h"
 #include "ssl.h"
 #include "statistics.h"
-#include "util/atomic.h"
 #include "util/pipe.h"
-#include "util/pointer.h"
 #include "util/prng.h"
 #include "util/shared_ptr.h"
 
@@ -242,6 +241,9 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   bool SetShardingPolicy(const ShardingPolicySelector type);
   void SetFailoverIndefinitely();
   void SetFqrn(const std::string &fqrn) { fqrn_ = fqrn; }
+  void SetInfoHeaderTemplate(const std::string &templ) {
+    info_header_template_ = templ;
+  }
 
   unsigned num_hosts() {
     if (opt_host_.chain)
@@ -274,7 +276,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   void UpdateProxiesUnlocked(const std::string &reason);
   void RebalanceProxiesUnlocked(const std::string &reason);
   CURL *AcquireCurlHandle();
-  void ReleaseCurlHandle(CURL *handle);
+  void ReleaseCurlHandle(CURL *handle, bool allow_reuse);
   void ReleaseCredential(JobInfo *info);
   void InitializeRequest(JobInfo *info, CURL *handle);
   void SetUrlOptions(JobInfo *info);
@@ -291,10 +293,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   void CheckHostInfoReset(const std::string &typ, HostInfo &info,
                           JobInfo *jobinfo, time_t &now);
 
-  bool EscapeUrlChar(unsigned char input, char output[3]);
   std::string EscapeUrl(const int64_t jobinfo_id, const std::string &url);
-  unsigned EscapeHeader(const std::string &header, char *escaped_buf,
-                        size_t buf_size);
 
   inline std::vector<ProxyInfo> *current_proxy_group() const {
     return (opt_proxy_groups_
@@ -312,10 +311,10 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   char *user_agent_;
 
   pthread_t thread_download_;
-  atomic_int32 multi_threaded_;
-  UniquePtr<Pipe<kPipeThreadTerminator> > pipe_terminate_;
+  std::atomic<int32_t> multi_threaded_;
+  std::unique_ptr<Pipe<kPipeThreadTerminator> > pipe_terminate_;
 
-  UniquePtr<Pipe<kPipeDownloadJobs> > pipe_jobs_;
+  std::unique_ptr<Pipe<kPipeDownloadJobs> > pipe_jobs_;
   struct pollfd *watch_fds_;
   uint32_t watch_fds_size_;
   uint32_t watch_fds_inuse_;
@@ -324,6 +323,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   pthread_mutex_t *lock_options_;
   pthread_mutex_t *lock_synchronous_mode_;
   std::string opt_dns_server_;
+  std::string info_header_template_;
   unsigned opt_timeout_proxy_;
   unsigned opt_timeout_direct_;
   unsigned opt_low_speed_limit_;

@@ -1,0 +1,148 @@
+#!/bin/bash
+
+cvmfs_test_name="Re-export a repository over NFS (knfsd + leveldb inode maps)"
+cvmfs_test_autofs_on_startup=false
+# NOT in the "quick" suite: this test re-exports through the in-kernel NFS
+# server, which the generic cloudtest docker containers cannot provide (no
+# exportfs / nfsd / rpcbind). It runs under the dedicated "nfs" profile, whose
+# CI job (.github/workflows/ci_nfs.yml) stands up knfsd on a full VM.
+cvmfs_test_suites="nfs"
+
+# This test exercises the leveldb-backed persistent inode maps
+# (cvmfs/nfs_maps_leveldb.cc) end-to-end: a repository is mounted with
+# CVMFS_NFS_SOURCE=yes, re-exported through the in-kernel NFS server, mounted
+# back over loopback NFS, and read through the NFS path. The point of NFS mode
+# is that inodes survive a remount so that NFS file handles do not go stale --
+# we verify exactly that after publishing a new revision.
+
+TEST669_PRIVATE_MOUNT=
+TEST669_NFS_CLIENT_MOUNT=
+TEST669_EXPORT_SPEC=
+
+cleanup() {
+  # Preserve the test's exit status: this runs as an EXIT trap, and a bash EXIT
+  # trap that executes commands makes the shell exit with the status of the last
+  # command in the trap. Without this, a non-zero teardown umount would override
+  # a passing test. Every step below is therefore best-effort (|| true).
+  local exit_code=$?
+  echo "running cleanup()..."
+  if [ "x$TEST669_NFS_CLIENT_MOUNT" != "x" ]; then
+    sudo umount -f -l "$TEST669_NFS_CLIENT_MOUNT" 2>/dev/null || true
+  fi
+  if [ "x$TEST669_EXPORT_SPEC" != "x" ]; then
+    sudo exportfs -u "$TEST669_EXPORT_SPEC" 2>/dev/null || true
+  fi
+  if [ "x$TEST669_PRIVATE_MOUNT" != "x" ]; then
+    # The kernel nfsd can still hold a reference to the exported FUSE mount for a
+    # moment after the lazy client umount above (crossmnt), so a plain umount may
+    # fail with EBUSY. Try once, then fall back to a lazy umount.
+    sudo umount "$TEST669_PRIVATE_MOUNT" 2>/dev/null || \
+      sudo umount -l "$TEST669_PRIVATE_MOUNT" 2>/dev/null || true
+  fi
+  return $exit_code
+}
+
+private_mount() {
+  local mntpnt="$1"
+  TEST669_PRIVATE_MOUNT="$mntpnt"
+  # Mount as root with allow_other so the kernel NFS server (running as root)
+  # can traverse the FUSE mount.
+  do_local_mount_as_root "$mntpnt"          \
+                 "$CVMFS_TEST_REPO"          \
+                 "$(get_repo_url $CVMFS_TEST_REPO)" \
+                 ""                          \
+                 "CVMFS_NFS_SOURCE=yes" || return 1
+}
+
+cvmfs_run_test() {
+  local logfile=$1
+  local script_location=$2
+  local scratch_dir=$(pwd)
+
+  echo "*** check that a kernel NFS server is available"
+  if ! which exportfs > /dev/null 2>&1; then
+    echo "Warning: exportfs (nfs-kernel-server / nfs-utils) not available, skipping test"
+    CVMFS_GENERAL_WARNING_FLAG=1
+    return 0
+  fi
+
+  echo "*** allow FUSE mounts to be shared with other users (needed for nfsd)"
+  if ! grep -q '^[[:space:]]*user_allow_other' /etc/fuse.conf 2>/dev/null; then
+    echo "user_allow_other" | sudo tee -a /etc/fuse.conf > /dev/null || return 2
+  fi
+
+  echo "*** set a trap for system directory cleanup"
+  trap cleanup EXIT HUP INT TERM
+
+  echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "*** publish some content (small files, a nested tree and a chunked large file)"
+  start_transaction $CVMFS_TEST_REPO                                     || return $?
+  mkdir -p /cvmfs/$CVMFS_TEST_REPO/dir/sub                               || return 3
+  echo "hello nfs"  > /cvmfs/$CVMFS_TEST_REPO/dir/hello.txt              || return 3
+  echo "nested"     > /cvmfs/$CVMFS_TEST_REPO/dir/sub/nested.txt         || return 3
+  dd if=/dev/urandom bs=1M count=32 of=/cvmfs/$CVMFS_TEST_REPO/dir/large 2>/dev/null || return 3
+  publish_repo $CVMFS_TEST_REPO -v                                       || return $?
+
+  local mntpnt="${scratch_dir}/private_mnt"
+  echo "*** private mount point in NFS mode"
+  private_mount $mntpnt || return 20
+
+  echo "*** verify large file is chunked (multi-block inode mapping)"
+  local no_chunks=$(get_xattr chunks ${mntpnt}/dir/large) || return 21
+  [ $no_chunks -gt 1 ] || return 22
+
+  echo "*** record reference checksums via the cvmfs mount"
+  sha1sum ${mntpnt}/dir/hello.txt ${mntpnt}/dir/sub/nested.txt ${mntpnt}/dir/large \
+    | awk '{print $1}' > CHECKSUM_REF || return 23
+
+  echo "*** export the NFS-mode mount through the in-kernel NFS server"
+  TEST669_EXPORT_SPEC="localhost:${mntpnt}"
+  # fsid is mandatory: FUSE has no stable device id for nfsd to derive one from.
+  sudo exportfs -o ro,fsid=6669,no_subtree_check,no_root_squash,crossmnt \
+       "$TEST669_EXPORT_SPEC" || return 30
+  sudo exportfs -v
+
+  local nfs_mnt="${scratch_dir}/nfs_client"
+  mkdir -p $nfs_mnt
+  TEST669_NFS_CLIENT_MOUNT="$nfs_mnt"
+  echo "*** mount the export back over loopback NFS (v3)"
+  sudo mount -t nfs -o vers=3,nolock,actimeo=1 localhost:${mntpnt} $nfs_mnt || return 40
+
+  echo "*** read contents through the NFS path"
+  ls -lisa $nfs_mnt/dir/ || return 41
+  cat $nfs_mnt/dir/hello.txt || return 41
+  sha1sum $nfs_mnt/dir/hello.txt $nfs_mnt/dir/sub/nested.txt $nfs_mnt/dir/large \
+    | awk '{print $1}' > CHECKSUM_NFS || return 42
+  diff CHECKSUM_REF CHECKSUM_NFS || return 43
+
+  echo "*** capture NFS-visible inode numbers before the update"
+  local ino_hello_1=$(stat -c %i $nfs_mnt/dir/hello.txt) || return 44
+  local ino_large_1=$(stat -c %i $nfs_mnt/dir/large)     || return 44
+  echo "    hello.txt inode=$ino_hello_1  large inode=$ino_large_1"
+
+  echo "*** publish a new revision and remount the read-only cvmfs mount"
+  start_transaction $CVMFS_TEST_REPO                        || return $?
+  echo "second file" > /cvmfs/$CVMFS_TEST_REPO/dir/second.txt || return 50
+  publish_repo $CVMFS_TEST_REPO -v                          || return $?
+  sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO remount sync || return 51
+
+  echo "*** pre-existing NFS file handles must remain valid (no ESTALE)"
+  # If the leveldb inode maps did not keep inodes persistent across the remount,
+  # these reads through the still-cached NFS handles would fail with ESTALE.
+  sha1sum $nfs_mnt/dir/hello.txt $nfs_mnt/dir/large > /dev/null || return 60
+  cat $nfs_mnt/dir/sub/nested.txt > /dev/null                   || return 60
+
+  echo "*** and the inode numbers of unchanged files must not have moved"
+  local ino_hello_2=$(stat -c %i $nfs_mnt/dir/hello.txt) || return 61
+  local ino_large_2=$(stat -c %i $nfs_mnt/dir/large)     || return 61
+  echo "    hello.txt inode=$ino_hello_2  large inode=$ino_large_2"
+  [ "$ino_hello_1" = "$ino_hello_2" ] || { echo "inode of hello.txt changed"; return 62; }
+  [ "$ino_large_1" = "$ino_large_2" ] || { echo "inode of large changed";     return 62; }
+
+  echo "*** newly published file is visible through NFS"
+  cat $nfs_mnt/dir/second.txt || return 70
+
+  return 0
+}

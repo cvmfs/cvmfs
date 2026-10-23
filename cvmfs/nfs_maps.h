@@ -5,10 +5,6 @@
 #ifndef CVMFS_NFS_MAPS_H_
 #define CVMFS_NFS_MAPS_H_
 
-#ifndef __STDC_FORMAT_MACROS
-#define __STDC_FORMAT_MACROS
-#endif
-
 #include <inttypes.h>
 #include <stdint.h>
 

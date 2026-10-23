@@ -7,18 +7,15 @@
 #ifndef CVMFS_LRU_MD_H_
 #define CVMFS_LRU_MD_H_
 
-#ifndef __STDC_FORMAT_MACROS
-#define __STDC_FORMAT_MACROS
-#endif
-
 #include <stdint.h>
+
+#include <atomic>
 
 #include "crypto/hash.h"
 #include "directory_entry.h"
 #include "duplex_fuse.h"
 #include "lru.h"
 #include "shortstring.h"
-#include "util/atomic.h"
 #include "util/logging.h"
 #include "util/murmur.hxx"
 

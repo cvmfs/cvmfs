@@ -293,7 +293,7 @@ cvmfs_run_test() {
   sudo -u nobody /bin/sh -c "cat ${mntpnt}/hello_world" || return 31
 
   echo "This should not work"
-  sudo -u nobody setsid /bin/sh -c "env && cat ${mntpnt}/hello_world" && return 32
+  sudo -u nobody setsid -w /bin/sh -c "env && cat ${mntpnt}/hello_world" && return 32
 
   # Put in incorrect key into proxy file.
   echo "make invalid vomsproxy for 'nobody'"
@@ -305,7 +305,7 @@ cvmfs_run_test() {
   cat $nobody_vomsproxy
   sudo chown nobody:             $nobody_vomsproxy || return 21
   echo "This should not work"
-  sudo -u nobody setsid /bin/sh -c "export X509_USER_PROXY=$nobody_vomsproxy; cat ${mntpnt}/hello_world" && return 33
+  sudo -u nobody setsid -w /bin/sh -c "export X509_USER_PROXY=$nobody_vomsproxy; cat ${mntpnt}/hello_world" && return 33
 
   # Take the second proxy and remove the private key - should be invalid.
   echo "make second invalid vomsproxy for 'nobody'"
@@ -316,7 +316,7 @@ cvmfs_run_test() {
   sudo chown nobody:             $nobody_vomsproxy || return 21
   cat $nobody_vomsproxy
   echo "This should not work"
-  sudo -u nobody setsid /bin/sh -c "export X509_USER_PROXY=$nobody_vomsproxy; cat ${mntpnt}/hello_world" && return 33
+  sudo -u nobody setsid -w /bin/sh -c "export X509_USER_PROXY=$nobody_vomsproxy; cat ${mntpnt}/hello_world" && return 33
 
   # Make sure our second VOMS proxy was valid.
   echo "This should work"

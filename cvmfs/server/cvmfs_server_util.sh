@@ -1237,11 +1237,12 @@ cvmfs_server_update_geodb() {
 # @return   0 if the command was recognized
 is_subcommand() {
   local subcommand="$1"
-  local supported_commands="mkfs add-replica import publish rollback rmfs alterfs   \
+  local supported_commands="mkfs connect-gw add-replica import publish rollback rmfs alterfs   \
     resign list info tag list-tags lstags check transaction enter abort snapshot    \
     skeleton migrate list-catalogs diff checkout update-geodb gc catalog-chown      \
     eliminate-hardlinks eliminate-bulk-hashes fix-stats update-info update-repoinfo \
-    mount fix-permissions masterkeycard ingest merge-stats print-stats"
+    mount fix-permissions masterkeycard ingest ingestsql overlay merge-stats print-stats \
+    refresh-lease"
 
   for possible_command in $supported_commands; do
     if [ x"$possible_command" = x"$subcommand" ]; then
@@ -1284,16 +1285,39 @@ Usage: cvmfs_server COMMAND [options] <parameters>
 Supported Commands:
   mkfs            [-w stratum0 url] [-u upstream storage] [-o owner]
                   [-m replicable] [-f union filesystem type] [-s S3 config file]
-                  [-g disable auto tags] [-G Set timespan for auto tags]
+                  [-g disable auto tags]
+                  [-G timespan for auto tags (default: "2 weeks ago")]
                   [-a hash algorithm (default: SHA-1)]
                   [-z enable garbage collection] [-v volatile content]
                   [-Z compression algorithm (default: zlib)]
                   [-k path to existing keychain] [-p no apache config]
+                  [-P no publisher bootstrap]
                   [-R require masterkeycard key ]
                   [-V VOMS authorization] [-X (external data)]
                   [-x proxy url]
                   <fully qualified repository name>
                   Creates a new repository with a given name
+  connect-gw      -u <gateway hostname or API url>
+                  [-w stratum0 url (default: derived from gateway url)]
+                  [-o owner (default: current user)]
+                  [-k path to keys (default: /etc/cvmfs/keys)]
+                  [-K fetch .pub and .crt from the gateway key endpoint]
+                  [-P mountless setup (no FUSE mount, for use with ingest)]
+                  <fully qualified repository name>
+                  Connect to a gateway as a publisher. Requires the .gw key
+                  file in /etc/cvmfs/keys/ (or path given by -k). The .pub
+                  and .crt files can be fetched from the gateway with -K if
+                  the gateway has enable_key_endpoint enabled.
+                  Use -P for a mountless setup: the publisher is configured
+                  without mounting the repository via FUSE. This is intended
+                  for use with cvmfs_server ingest, which supports mountless
+                  gateway publishing.
+  refresh-lease   [-t requested extension in seconds]
+                  <fully qualified repository name>
+                  Renew the gateway lease of the repository's open transaction
+                  so it does not expire while a long-running publish is in
+                  progress. Without -t the gateway applies its configured
+                  default extension (capped by max_lease_time).
   add-replica     [-u stratum1 upstream storage] [-o owner] [-w stratum1 url]
                   [-a silence apache warning] [-z enable garbage collection]
                   [-n alias name] [-s S3 config file] [-p no apache config]
@@ -1320,6 +1344,8 @@ Supported Commands:
                   [-t time stamp after which revisions are preserved]
                   [-l print deleted objects] [-L log of deleted objects]
                   [-f force] [-d dry run]
+                  [-p prune excluded objects from a partial replica;
+                   granularity is nested catalogs]
                   {-A collect all garbage-collectable repos, log to gc.log |
                    -a collect all but replicas not collected upstream |
                     <fully qualified name>}
@@ -1335,7 +1361,7 @@ Supported Commands:
                   Re-publishes the given tag as the new latest revision.
                   All snapshots between trunk and the target tag become
                   inaccessible.  Without a tag name, trunk-previous is used.
-  resign          [ -w path to existing whitelist ]
+  resign          [ -w path to existing whitelist (avoids need for config) ]
                   [ -d days until expiration (default 30) ]
                   [ -f don't ask again ]
                   <fully qualified name>
@@ -1383,6 +1409,8 @@ Supported Commands:
                   Checks if the repository is sane
   transaction     [-t (timeout in seconds for waiting if the repository is busy, 0=infinite)]
                   [-T /template-from=/template-to]
+                  [-P allow a lease on a path whose parent does not exist yet
+                      (gateway publishing; requires a supporting gateway)]
                   <fully qualified name>
                   Start to edit a repository
   snapshot        [-t fail if other snapshot is in progress]
@@ -1411,10 +1439,37 @@ Supported Commands:
                   -b base directory
                   [-d <folder to delete>]
                   [-c create nested catalog in base directory]
+                  [-m tolerate hardlinks whose target is missing from the
+                      tarball; materialize an empty file with a warning
+                      instead of aborting]
+                  [--gc-db <path to GC SQLite database>]
                   <fully qualified name>
                   Extract the content of the tarfile inside the base directory,
                   in the same transaction it also delete the required folders.
                   Use '-' as -t argument to read the tarball from STDIN.
+                  Use --gc-db to delete pending paths from a GC database
+                  (as produced by cvmfs_ducc gc --scan-only).  Paths are
+                  removed in batches, one publish per batch; the batch size
+                  is controlled by CVMFS_GC_DB_BATCH_SIZE in the server
+                  config (default 1000, 0 = all in a single batch).
+  ingestsql       -D <sqlite database>
+                  [-l <lease path>] [-p <prefix>]
+                  [-q <concurrent jobs>] [-n <create empty db file>]
+                  [-C <config prefix>] [-B <block visibility mount point>]
+                  [-T <reset TTL>] [-r <lease retry interval>]
+                  [-P <priority>]
+                  [-a allow additions] [-d allow deletions]
+                  [-x force cancel lease] [-c enable core]
+                  [-z create nested catalogs] [-Z check completed]
+                  [-v verbose]
+                  <fully qualified name>
+                  Graft the contents of a SQLite database to the repository
+                  via the gateway.
+  overlay         -l <layer1,layer2,...> (comma-separated, bottom-to-top order)
+                  -d <destination path>
+                  <fully qualified name>
+                  Merge multiple subdirectory catalogs using overlay semantics
+                  and publish the result under the destination path.
   print-stats     [-o output_file]
                   [-t table_name]
                   [-s separator] - char

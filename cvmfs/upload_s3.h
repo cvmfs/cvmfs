@@ -7,15 +7,15 @@
 
 #include <pthread.h>
 
+#include <atomic>
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
 
 #include "network/s3fanout.h"
 #include "upload_facility.h"
-#include "util/atomic.h"
 #include "util/file_backed_buffer.h"
-#include "util/pointer.h"
 #include "util/single_copy.h"
 
 namespace upload {
@@ -25,11 +25,11 @@ struct S3StreamHandle : public UploadStreamHandle {
                  uint64_t in_memory_threshold,
                  const std::string &tmp_dir = "/tmp/")
       : UploadStreamHandle(commit_callback) {
-    buffer = FileBackedBuffer::Create(in_memory_threshold, tmp_dir);
+    buffer.reset(FileBackedBuffer::Create(in_memory_threshold, tmp_dir));
   }
 
   // Ownership is later transferred to the S3 fanout
-  UniquePtr<FileBackedBuffer> buffer;
+  std::unique_ptr<FileBackedBuffer> buffer;
 };
 
 /**
@@ -67,6 +67,7 @@ class S3Uploader : public AbstractUploader {
                                       const shash::Any &content_hash);
 
   virtual void DoRemoveAsync(const std::string &file_to_delete);
+  virtual void WaitForUpload() const;
   virtual bool Peek(const std::string &path);
   virtual bool Mkdir(const std::string &path);
   virtual bool PlaceBootstrappingShortcut(const shash::Any &object);
@@ -76,7 +77,7 @@ class S3Uploader : public AbstractUploader {
 
   // Only for testing
   s3fanout::S3FanoutManager *GetS3FanoutManager() {
-    return s3fanout_mgr_.weak_ref();
+    return s3fanout_mgr_.get();
   }
 
  private:
@@ -111,9 +112,16 @@ class S3Uploader : public AbstractUploader {
   bool ParseSpoolerDefinition(const SpoolerDefinition &spooler_definition);
   void UploadJobInfo(s3fanout::JobInfo *info);
 
-  s3fanout::JobInfo *CreateJobInfo(const std::string &path) const;
+  // Per S3 spec the multi-object DELETE request supports at most 1000 keys.
+  // kDefaultBatchDeleteSize is the default flush threshold; it can be tuned
+  // via CVMFS_S3_BATCH_DELETE_SIZE up to kMaxBatchDeleteSize.
+  static const unsigned kDefaultBatchDeleteSize = 100;
+  static const unsigned kMaxBatchDeleteSize = 1000;
 
-  UniquePtr<s3fanout::S3FanoutManager> s3fanout_mgr_;
+  s3fanout::JobInfo *CreateJobInfo(const std::string &path) const;
+  void FlushDeleteBatch() const;
+
+  mutable std::unique_ptr<s3fanout::S3FanoutManager> s3fanout_mgr_;
   std::string repository_alias_;
   std::string host_name_port_;
   std::string host_name_;
@@ -129,13 +137,18 @@ class S3Uploader : public AbstractUploader {
   s3fanout::AuthzMethods authz_method_;
   bool peek_before_put_;
   bool use_https_;
+  bool batch_delete_enabled_;
+  unsigned batch_delete_size_;
   std::string proxy_;
 
   const std::string temporary_path_;
-  mutable atomic_int32 io_errors_;
+  mutable std::atomic<int32_t> io_errors_;
   pthread_t thread_collect_results_;
 
   std::string x_amz_acl_;
+
+  mutable pthread_mutex_t delete_batch_mutex_;
+  mutable std::vector<std::string> pending_deletes_;
 };  // S3Uploader
 
 }  // namespace upload

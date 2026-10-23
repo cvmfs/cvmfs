@@ -7,10 +7,6 @@
 
 #define _FILE_OFFSET_BITS 64
 
-#ifndef __STDC_FORMAT_MACROS
-#define __STDC_FORMAT_MACROS
-#endif
-
 
 #include "libcvmfs.h"
 
@@ -27,7 +23,6 @@
 #include "statistics.h"
 #include "util/logging.h"
 #include "util/posix.h"
-#include "util/smalloc.h"
 #include "xattr.h"
 
 using namespace std;  // NOLINT

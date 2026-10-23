@@ -768,8 +768,9 @@ close_transaction() {
   run_suid_helper rw_mount $name
   clear_flag "$tx_flag"
 
-  # Remove session_token file, used for gateway transactions, if it exists
-  rm -f ${CVMFS_SPOOL_DIR}/session_token
+  # Remove gateway session state, if it exists
+  rm -f ${CVMFS_SPOOL_DIR}/session_token \
+        ${CVMFS_SPOOL_DIR}/session_token.api_version
 
   local fallback_msg=""
   [ $use_fd_fallback -eq 0 ] || fallback_msg="(using force)"
@@ -793,7 +794,8 @@ release_update_lock() {
 #
 # @param name               the repository to lock
 # @param update_type        update type such as snapshot or gc
-# @param abort_on_conflict  0 to wait for lock, 1 to abort if already acquired.
+# @param abort_on_conflict  0 to wait for lock, 1 to abort if already acquired,
+#                           2 to skip if already acquired.
 #                           Default 0.  Always aborts if initial snapshot is
 #                           in progress.
 # @return                   0 if lock successfully acquired
@@ -809,9 +811,13 @@ acquire_update_lock()
 
   # check for other updates in progress
   if ! acquire_lock $update_lock; then
-    if [ $abort_on_conflict -eq 1 ]; then
-      echo "another update is in progress... aborting"
-      to_syslog_for_repo $name "did not $update_type (another update in progress)"
+    if [ $abort_on_conflict -ge 1 ]; then
+      if [ $abort_on_conflict -ge 2 ]; then
+        echo "another update is in progress... skipping"
+      else
+        echo "another update is in progress... aborting"
+        to_syslog_for_repo $name "did not $update_type (another update in progress)"
+      fi
       return 1
     fi
 
@@ -822,8 +828,12 @@ acquire_update_lock()
     fi
 
     if [ $initial_snapshot -eq 1 ]; then
-      echo "an initial snapshot is in progress... aborting"
-      to_syslog_for_repo $name "did not $update_type (initial snapshot in progress)"
+      if [ $abort_on_conflict -ge 2 ]; then
+        echo "another update is in progress... skipping"
+      else
+        echo "an initial snapshot is in progress... aborting"
+        to_syslog_for_repo $name "did not $update_type (initial snapshot in progress)"
+      fi
       return 1
     fi
 
@@ -1007,6 +1017,7 @@ CVMFS_AUTO_TAG=$autotagging
 CVMFS_AUTO_TAG_TIMESPAN="$auto_tag_timespan"
 CVMFS_GARBAGE_COLLECTION=$garbage_collectable
 CVMFS_AUTO_REPAIR_MOUNTPOINT=true
+CVMFS_ALLOW_NONEXISTENT_PATH=false
 CVMFS_AUTOCATALOGS=false
 CVMFS_ASYNC_SCRATCH_CLEANUP=true
 CVMFS_PRINT_STATISTICS=false
@@ -1180,9 +1191,8 @@ EOF
 }
 
 
-setup_and_mount_new_repository() {
+setup_new_repository_mountpoints() {
   local name=$1
-  local http_timeout=15
 
   # get repository information
   load_repo_config $name
@@ -1209,6 +1219,15 @@ EOF
   fi
   local user_shell="$(get_user_shell $name)"
   $user_shell "touch ${CVMFS_SPOOL_DIR}/client.local"
+}
+
+
+mount_new_repository() {
+  local name=$1
+  local http_timeout=15
+
+  load_repo_config $name
+  local rdonly_dir="${CVMFS_SPOOL_DIR}/rdonly"
 
   # avoid racing against apache; we can safely ignore the certificate validation
   # at this step, we only want to check that the endpoint is up.
@@ -1232,6 +1251,14 @@ EOF
       /run/systemd/generator '' '' 2>/dev/null || true
     systemctl daemon-reload
   fi
+}
+
+
+setup_and_mount_new_repository() {
+  local name=$1
+
+  setup_new_repository_mountpoints $name || return 1
+  mount_new_repository $name
 }
 
 

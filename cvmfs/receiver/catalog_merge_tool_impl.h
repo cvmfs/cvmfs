@@ -5,11 +5,15 @@
 #ifndef CVMFS_RECEIVER_CATALOG_MERGE_TOOL_IMPL_H_
 #define CVMFS_RECEIVER_CATALOG_MERGE_TOOL_IMPL_H_
 
+#include <memory>
 #include <string>
+#include <vector>
 
 #include "catalog.h"
 #include "catalog_merge_tool.h"
+#include "catalog_mgr.h"
 #include "crypto/hash.h"
+#include "directory_entry.h"
 #include "manifest.h"
 #include "options.h"
 #include "shortstring.h"
@@ -18,6 +22,8 @@
 #include "util/logging.h"
 #include "util/posix.h"
 #include "util/raii_temp_dir.h"
+#include "util/string.h"
+#include "xattr.h"
 
 inline PathString MakeRelative(const PathString &path) {
   std::string rel_path;
@@ -56,26 +62,37 @@ template<typename RwCatalogMgr, typename RoCatalogMgr>
 bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::Run(
     const Params &params, std::string *new_manifest_path,
     shash::Any *new_manifest_hash, uint64_t *final_rev) {
-  UniquePtr<upload::Spooler> spooler;
+  std::unique_ptr<upload::Spooler> spooler;
   perf::StatisticsTemplate stats_tmpl("publish", statistics_);
-  counters_ = new perf::FsCounters(stats_tmpl);
+  counters_ = std::unique_ptr<perf::FsCounters>(
+      new perf::FsCounters(stats_tmpl));
 
-  UniquePtr<RaiiTempDir> raii_temp_dir(RaiiTempDir::Create(temp_dir_prefix_));
+  std::unique_ptr<RaiiTempDir> raii_temp_dir(
+      RaiiTempDir::Create(temp_dir_prefix_));
   if (needs_setup_) {
     upload::SpoolerDefinition definition(
         params.spooler_configuration, params.hash_alg, params.compression_alg,
         params.generate_legacy_bulk_chunks, params.use_file_chunking,
         params.min_chunk_size, params.avg_chunk_size, params.max_chunk_size,
         "dummy_token", "dummy_key");
-    spooler = upload::Spooler::Construct(definition, &stats_tmpl);
+    spooler = std::unique_ptr<upload::Spooler>(
+        upload::Spooler::Construct(definition, &stats_tmpl));
     const std::string temp_dir = raii_temp_dir->dir();
-    output_catalog_mgr_ = new RwCatalogMgr(
-        manifest_->catalog_hash(), repo_path_, temp_dir, spooler.weak_ref(),
+    output_catalog_mgr_ = std::unique_ptr<RwCatalogMgr>(new RwCatalogMgr(
+        manifest_->catalog_hash(), repo_path_, temp_dir, spooler.get(),
         download_manager_, params.enforce_limits, params.nested_kcatalog_limit,
         params.root_kcatalog_limit, params.file_mbyte_limit, statistics_,
         params.use_autocatalogs, params.max_weight, params.min_weight,
-        cache_dir_);
+        cache_dir_));
     output_catalog_mgr_->Init();
+  }
+
+  if (!CreateMissingAncestorDirs()) {
+    // The catalog manager owns SQLite statements backed by files in
+    // raii_temp_dir and may refer to spooler.  Destroy it before those
+    // function-local dependencies go out of scope on this error path.
+    output_catalog_mgr_.reset();
+    return false;
   }
 
   bool ret = CatalogDiffTool<RoCatalogMgr>::Run(PathString(""));
@@ -84,9 +101,95 @@ bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::Run(
   *new_manifest_hash = manifest_->catalog_hash();
   *final_rev = manifest_->revision();
 
-  output_catalog_mgr_.Destroy();
+  output_catalog_mgr_.reset();
 
   return ret;
+}
+
+template<typename RwCatalogMgr, typename RoCatalogMgr>
+bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::CreateMissingAncestorDirs() {
+  // DiffRec does not report ancestors of a scoped lease. Create them top-down
+  // so additions below a previously missing lease path have a parent catalog.
+  // C_N provides names and types only; the receiver supplies their metadata.
+  const std::string lease_path = lease_path_.ToString();
+  if (lease_path.empty()) {
+    return true;
+  }
+
+  RoCatalogMgr
+      *new_catalog_mgr = CatalogDiffTool<RoCatalogMgr>::GetNewCatalogMgr();
+
+  // An absent lease leaf has no reportable descendants: this is a no-op.
+  const PathString lease_abs_path("/" + lease_path);
+  catalog::DirectoryEntry lease_entry;
+  if (!new_catalog_mgr->LookupPath(lease_abs_path, catalog::kLookupDefault,
+                                   &lease_entry)) {
+    return true;
+  }
+
+  const std::vector<std::string> components = SplitString(lease_path, '/');
+  // Only the proper ancestors of the lease-path leaf are pre-created; the leaf
+  // itself is handled by the DiffRec pass.
+  std::string prefix;  // relative, no leading slash, e.g. "a/b"
+  std::string parent;  // parent of prefix, empty at the repository root
+  for (size_t i = 0; i + 1 < components.size(); ++i) {
+    parent = prefix;
+    if (!prefix.empty()) {
+      prefix += "/";
+    }
+    prefix += components[i];
+
+    const PathString abs_path("/" + prefix);
+
+    catalog::DirectoryEntry existing;
+    if (output_catalog_mgr_->LookupPath(abs_path, catalog::kLookupDefault,
+                                        &existing)) {
+      // Already present in the target catalog, e.g. created by a concurrent
+      // sibling lease that committed first. Reuse it; only a non-directory
+      // collision is fatal.
+      if (!existing.IsDirectory()) {
+        LogCvmfs(kLogReceiver, kLogSyslogErr,
+                 "CatalogMergeTool - lease path ancestor %s exists but is not "
+                 "a directory. Aborting merge.",
+                 abs_path.c_str());
+        return false;
+      }
+      continue;
+    }
+
+    catalog::DirectoryEntry dirent;
+    if (!new_catalog_mgr->LookupPath(abs_path, catalog::kLookupDefault,
+                                     &dirent)) {
+      LogCvmfs(kLogReceiver, kLogSyslogErr,
+               "CatalogMergeTool - lease path ancestor %s not found in the new "
+               "catalog. Aborting merge.",
+               abs_path.c_str());
+      return false;
+    }
+    if (!dirent.IsDirectory()) {
+      LogCvmfs(kLogReceiver, kLogSyslogErr,
+               "CatalogMergeTool - lease path ancestor %s is not a directory "
+               "in the new catalog. Aborting merge.",
+               abs_path.c_str());
+      return false;
+    }
+
+    // Ancestors use fixed metadata and no transition flags or xattrs.
+    dirent.SetImplicitDirectoryMetadata();
+    dirent.set_is_nested_catalog_mountpoint(false);
+    dirent.set_is_nested_catalog_root(false);
+    dirent.set_is_bind_mountpoint(false);
+    dirent.set_is_chunked_file(false);
+    dirent.set_is_hidden(false);
+
+    output_catalog_mgr_->AddDirectory(dirent, XattrList(), parent);
+    perf::Inc(counters_->n_directories_added);
+    LogCvmfs(kLogReceiver, kLogSyslog,
+             "CatalogMergeTool - created missing lease path ancestor %s",
+             abs_path.c_str());
+  }
+
+  return true;
 }
 
 template<typename RwCatalogMgr, typename RoCatalogMgr>

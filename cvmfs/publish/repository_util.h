@@ -53,6 +53,7 @@ class ServerLockFile {
   void Lock();
   bool TryLock();
   void Unlock();
+  void Touch();
 
   const std::string &path() const { return path_; }
 

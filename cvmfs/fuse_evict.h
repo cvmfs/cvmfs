@@ -8,11 +8,12 @@
 #include <pthread.h>
 #include <stdint.h>
 
+#include <atomic>
+
 #include "bigvector.h"
 #include "duplex_fuse.h"
 #include "duplex_testing.h"
 #include "shortstring.h"
-#include "util/atomic.h"
 #include "util/concurrency.h"
 #include "util/single_copy.h"
 
@@ -54,15 +55,18 @@ class FuseInvalidator : SingleCopy {
    public:
     explicit Handle(unsigned timeout_s);
     ~Handle();
-    bool IsDone() const { return atomic_read32(status_) == 1; }
-    void Reset() { atomic_write32(status_, 0); }
+    bool IsDone() const { return status_->load() == 1; }
+    void Reset() { status_->store(0); }
     void WaitFor();
 
    private:
-    void SetDone() { atomic_cas32(status_, 0, 1); }
+    void SetDone() {
+      int32_t expected_val = 0;
+      status_->compare_exchange_strong(expected_val, 1);
+    }
 
     unsigned timeout_s_;
-    atomic_int32 *status_;
+    std::atomic<int32_t> *status_;
   };
 
   struct Command {
@@ -78,7 +82,7 @@ class FuseInvalidator : SingleCopy {
   };
 
   FuseInvalidator(MountPoint *mountpoint,
-                  void **fuse_channel_or_session,
+                  struct fuse_session **fuse_session,
                   bool fuse_notify_invalidation);
   ~FuseInvalidator();
   void Spawn();
@@ -93,7 +97,7 @@ class FuseInvalidator : SingleCopy {
    */
   FuseInvalidator(glue::InodeTracker *inode_tracker,
                   glue::DentryTracker *dentry_tracker,
-                  void **fuse_channel_or_session,
+                  struct fuse_session **fuse_session,
                   bool fuse_notify_invalidation);
   /**
    * Add one second to the caller-provided timeout to be on the safe side.
@@ -115,10 +119,7 @@ class FuseInvalidator : SingleCopy {
 
   glue::InodeTracker *inode_tracker_;
   glue::DentryTracker *dentry_tracker_;
-  /**
-   * libfuse2 uses struct fuse_chan, libfuse3 uses struct fuse_session
-   */
-  void **fuse_channel_or_session_;
+  struct fuse_session **fuse_session_;
   bool spawned_;
   Channel<Command> channel_;
   pthread_t thread_invalidator_;
@@ -126,10 +127,11 @@ class FuseInvalidator : SingleCopy {
    * An invalidation run can take some time.  Allow for early cancellation if
    * thread should be shut down.
    */
-  atomic_int32 terminated_;
+  std::atomic<int32_t> terminated_;
   BigVector<uint64_t> evict_list_;
 
   static bool g_fuse_notify_invalidation_;
 };  // class FuseInvalidator
 
 #endif  // CVMFS_FUSE_EVICT_H_
+

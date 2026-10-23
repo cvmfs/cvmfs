@@ -135,7 +135,6 @@ CVMFS_INFLUX_SEND_DELTA=OFF"
 cvmfs_run_test() {
   logfile=$1
   local_script_dir=$2
-  trap cleanup HUP INT TERM EXIT || return $?
 
   echo "create temporary directory"
   CVMFS_TEST_098_TMPFILE=$(mktemp ./test098.log.XXXXXXXX)

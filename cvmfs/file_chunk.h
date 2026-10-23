@@ -13,6 +13,7 @@
 #include <stdint.h>
 #include <sys/types.h>
 
+#include <atomic>
 #include <string>
 #include <vector>
 
@@ -21,7 +22,6 @@
 #include "crypto/hash.h"
 #include "shortstring.h"
 #include "smallhash.h"
-#include "util/atomic.h"
 #include "util/single_copy.h"
 
 /**
@@ -50,12 +50,18 @@ struct FileChunkReflist {
   FileChunkReflist()
       : list(NULL)
       , compression_alg(zlib::kZlibDefault)
-      , external_data(false) { }
+      , external_data(false)
+      , volatile_data(false) { }
   FileChunkReflist(FileChunkList *l,
                    const PathString &p,
                    zlib::Algorithms alg,
-                   bool external)
-      : list(l), path(p), compression_alg(alg), external_data(external) { }
+                   bool external,
+                   bool volatil = false)
+      : list(l)
+      , path(p)
+      , compression_alg(alg)
+      , external_data(external)
+      , volatile_data(volatil) { }
 
   unsigned FindChunkIdx(const uint64_t offset);
   shash::Any HashChunkList();
@@ -64,6 +70,7 @@ struct FileChunkReflist {
   PathString path;
   zlib::Algorithms compression_alg;
   bool external_data;
+  bool volatile_data;
 };
 
 

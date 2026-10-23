@@ -1,0 +1,253 @@
+#!/bin/bash
+
+cvmfs_test_name="Shared quota manager atomic init commands"
+cvmfs_test_suites="quick"
+cvmfs_test_timeout=180
+cvmfs_test_autofs_on_startup=false
+
+# Focused regression test for the shared-cache FIFO protocol used by
+# SetCleanupPolicy and RegisterMountpoint during fnInit.
+#
+# One stable mount keeps the shared cachemgr alive and emits lightweight Touch
+# traffic by repeatedly reading a cached file. In parallel, private mount/
+# unmount cycles on other repositories repeatedly trigger fnInit and thus the
+# shared-FIFO init commands.
+#
+# This keeps the important multi-writer shared-FIFO coverage from
+# 112-quota-multiwrite-race, but runs much faster and avoids relying on talk
+# sockets for liveness checks.
+
+STABLE_REPO="atlas.cern.ch"
+CYCLE_REPOS="grid.cern.ch lhcb.cern.ch"
+# Each mount/umount cycle costs ~2-4s on a typical test host. Keep the count
+# low enough that two parallel cyclers comfortably finish inside
+# cvmfs_test_timeout, with margin for the polling loop and final checks.
+ITERATIONS_PER_CYCLER=25
+BG_PIDS=""
+TMPDIR_113=""
+SHARED_WORKSPACE=""
+
+cleanup() {
+  if [ -n "$BG_PIDS" ]; then
+    for p in $BG_PIDS; do
+      kill $p 2>/dev/null || true
+    done
+    wait 2>/dev/null || true
+  fi
+
+  for r in $CYCLE_REPOS; do
+    local mp="/tmp/cvmfs-cycle-${r//./_}"
+    sudo umount -l "$mp" 2>/dev/null || true
+    sudo rmdir "$mp" 2>/dev/null || true
+  done
+
+  if [ -n "$TMPDIR_113" ] && [ -d "$TMPDIR_113" ]; then
+    rm -rf "$TMPDIR_113"
+  fi
+}
+
+get_cachemgr_pid_from_lock() {
+  local lockfile="$SHARED_WORKSPACE/lock_cachemgr"
+  # The lockfile lives inside the shared-cache workspace, which is owned by
+  # the cvmfs user with mode 0700, so the unprivileged test driver can't
+  # read it directly — drop into the cvmfs user via sudo.
+  sudo python3 - "$lockfile" <<'PY'
+import os
+import struct
+import sys
+
+path = sys.argv[1]
+try:
+    data = open(path, 'rb').read()
+except IOError:
+    sys.exit(1)
+if len(data) < 8:
+    sys.exit(1)
+magic, pid = struct.unpack('=Ii', data[:8])
+if magic == 0 or pid <= 0:
+    sys.exit(1)
+print(pid)
+PY
+}
+
+light_toucher() {
+  local file=$1
+  cat "$file" >/dev/null 2>&1 || return
+  while true; do
+    cat "$file" >/dev/null 2>&1 || return
+  done
+}
+
+cycler() {
+  local repo=$1
+  local n=$2
+  local status_file=$3
+  local mp="/tmp/cvmfs-cycle-${repo//./_}"
+  local ok=0
+  local i
+
+  sudo mkdir -p "$mp" 2>/dev/null
+  # Initialise the status file so a kill mid-run still leaves an answer
+  # behind and the main test reports actual progress instead of "missing".
+  echo "$ok" > "$status_file"
+  for i in $(seq 1 $n); do
+    # mount itself drives cvmfs2 fnInit -> SetCleanupPolicy +
+    # RegisterMountpoint, which is the protocol we want to exercise. No
+    # need for an extra ls round-trip per iteration.
+    if sudo timeout 20 mount -t cvmfs $repo "$mp" >/dev/null 2>&1; then
+      ok=$((ok + 1))
+      sudo umount "$mp" >/dev/null 2>&1 \
+        || sudo umount -l "$mp" >/dev/null 2>&1 || true
+    fi
+    echo "$ok" > "$status_file"
+  done
+
+  sudo rmdir "$mp" 2>/dev/null || true
+}
+
+cvmfs_run_test() {
+  local logfile=$1
+  local src_location=$2
+  local repo
+
+  trap cleanup EXIT HUP INT TERM || return $?
+  TMPDIR_113=$(mktemp -d)
+
+  echo "*** mounting stable repo with shared cache: $STABLE_REPO"
+  cvmfs_mount "$STABLE_REPO" \
+    "CVMFS_KCACHE_TIMEOUT=3" \
+    "CVMFS_SHARED_CACHE=yes" \
+    || return 10
+
+  if ! sudo timeout 10 ls /cvmfs/$STABLE_REPO >/dev/null 2>&1; then
+    echo "ERROR: stable mount is not readable"
+    return 11
+  fi
+
+  SHARED_WORKSPACE="$(get_cvmfs_cachedir $STABLE_REPO)"
+  # The shared-cache workspace is mode 0700 owned by the cvmfs user, so
+  # the unprivileged test driver needs sudo to stat files inside it.
+  if ! sudo test -p "$SHARED_WORKSPACE/cachemgr"; then
+    echo "ERROR: shared cachemgr FIFO not found in $SHARED_WORKSPACE"
+    return 12
+  fi
+
+  local cachemgr_pid_initial
+  cachemgr_pid_initial=$(get_cachemgr_pid_from_lock)
+  if [ -z "$cachemgr_pid_initial" ]; then
+    echo "ERROR: no shared cachemgr pid found in lock file"
+    return 13
+  fi
+  if ! sudo kill -0 "$cachemgr_pid_initial" 2>/dev/null; then
+    echo "ERROR: shared cachemgr pid $cachemgr_pid_initial is not alive"
+    return 14
+  fi
+  echo "*** shared cachemgr PID: $cachemgr_pid_initial"
+
+  local stable_file
+  stable_file=$(find /cvmfs/$STABLE_REPO -maxdepth 4 -type f -print -quit)
+  if [ -z "$stable_file" ]; then
+    echo "ERROR: could not find a stable file to emit Touch traffic"
+    return 15
+  fi
+
+  echo "*** starting lightweight Touch traffic on $stable_file"
+  light_toucher "$stable_file" &
+  BG_PIDS="$BG_PIDS $!"
+
+  echo "*** starting cyclers on: $CYCLE_REPOS"
+  local cycler_pids=""
+  for repo in $CYCLE_REPOS; do
+    local status_file="$TMPDIR_113/${repo//./_}.ok"
+    cycler "$repo" "$ITERATIONS_PER_CYCLER" "$status_file" &
+    cycler_pids="$cycler_pids $!"
+    BG_PIDS="$BG_PIDS $!"
+  done
+
+  local poll=0
+  while true; do
+    sleep 2
+    poll=$((poll + 1))
+
+    local still_running=0
+    local p
+    for p in $cycler_pids; do
+      if kill -0 $p 2>/dev/null; then
+        still_running=$((still_running + 1))
+      fi
+    done
+
+    local pid_now
+    pid_now=$(get_cachemgr_pid_from_lock)
+    if [ -z "$pid_now" ]; then
+      echo "ERROR: cachemgr lock file became unreadable while cyclers were running"
+      return 20
+    fi
+    if [ "$pid_now" != "$cachemgr_pid_initial" ]; then
+      echo "ERROR: cachemgr PID changed from $cachemgr_pid_initial to $pid_now"
+      return 21
+    fi
+    if ! sudo kill -0 "$pid_now" 2>/dev/null; then
+      echo "ERROR: cachemgr pid $pid_now died while cyclers were running"
+      return 22
+    fi
+    if ! sudo test -p "$SHARED_WORKSPACE/cachemgr"; then
+      echo "ERROR: shared cachemgr FIFO disappeared"
+      return 23
+    fi
+
+    if ! sudo timeout 10 ls /cvmfs/$STABLE_REPO >/dev/null 2>&1; then
+      echo "ERROR: stable mount stopped being readable"
+      return 24
+    fi
+
+    # Log progress every 5 polls (~10s) so a hang is debuggable.
+    if (( poll % 5 == 0 )) || [ $still_running -eq 0 ]; then
+      local progress=""
+      for repo in $CYCLE_REPOS; do
+        local sf="$TMPDIR_113/${repo//./_}.ok"
+        local n="?"
+        [ -f "$sf" ] && n=$(cat "$sf")
+        progress="$progress $repo=$n"
+      done
+      echo "    poll $poll: cyclers running=$still_running cachemgr=$pid_now$progress"
+    fi
+
+    if [ $still_running -eq 0 ]; then
+      break
+    fi
+  done
+
+  for repo in $CYCLE_REPOS; do
+    local status_file="$TMPDIR_113/${repo//./_}.ok"
+    if [ ! -f "$status_file" ]; then
+      echo "ERROR: cycler status for $repo missing"
+      return 30
+    fi
+
+    local ok
+    ok=$(cat "$status_file")
+    echo "*** successful private mounts for $repo: $ok"
+    if [ "$ok" -eq 0 ]; then
+      echo "ERROR: cycler for $repo did not complete any successful mount cycle"
+      return 31
+    fi
+  done
+
+  local syslog_matches="$TMPDIR_113/syslog.matches"
+  for log in $CVMFS_TEST_SYSLOG_TARGET /var/log/messages; do
+    if [ -f "$log" ]; then
+      sudo tail -500 "$log" 2>/dev/null \
+        | grep -E "PANIC.*quota_posix\.cc|watchdog disappeared|Signal: 6.*errno: 2" \
+        >> "$syslog_matches" || true
+    fi
+  done
+  if [ -s "$syslog_matches" ]; then
+    cat "$syslog_matches" >> "$logfile"
+    echo "ERROR: detected cachemgr panic/watchdog signature in recent syslog"
+    return 40
+  fi
+
+  echo "*** cachemgr survived focused shared-FIFO init-command exercise"
+  return 0
+}

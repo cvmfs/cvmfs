@@ -8,7 +8,6 @@
 #include <string>
 
 #include "swissknife.h"
-#include "swissknife_sync.h"
 
 namespace swissknife {
 class Ingest : public Command {
@@ -49,6 +48,14 @@ class Ingest : public Command {
         'G',
         "gid of new owner of the ingested data (-1 for keep tarball owner)"));
     r.push_back(Parameter::Switch('j', "enable nanosecond timestamps"));
+    r.push_back(Parameter::Switch('f', "fast delete for nested catalogs"));
+    r.push_back(Parameter::Switch(
+        'm', "tolerate hardlinks whose target is missing from the tarball "
+             "(materialize an empty file with a warning instead of aborting)"));
+    r.push_back(Parameter::Optional(
+        'Q', "GC SQLite database: read pending paths and delete them"));
+    r.push_back(Parameter::Optional(
+        'X', "GC database batch size (rows per invocation, 0 = all)"));
 
     return r;
   }

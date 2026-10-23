@@ -8,7 +8,7 @@ file(GLOB_RECURSE CVMFS_GATEWAY_GO_SOURCES LIST_DIRECTORIES false ./*.go)
 
 add_custom_command(
   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/cvmfs_gateway
-  COMMAND ${GO_COMPILER} build -mod=vendor -o ${CMAKE_CURRENT_BINARY_DIR}/cvmfs_gateway -ldflags='-X main.Version=${CernVM-FS_VERSION_STRING}'
+  COMMAND ${GO_COMPILER} build -o ${CMAKE_CURRENT_BINARY_DIR}/cvmfs_gateway -ldflags='-X main.Version=${CernVM-FS_BUILD_VERSION}'
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   DEPENDS ${CVMFS_GATEWAY_GO_SOURCES}
   COMMENT "Build gateway using the Go Compiler"
@@ -31,8 +31,9 @@ install (
   PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
 )
 
-install (
-  FILES         config/repo.json config/user.json
-  DESTINATION   "${SYSCONF_INSTALL_DIR}/cvmfs/gateway"
-  PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+# Install config files.
+install(
+  FILES config/repo.json config/user.json
+  DESTINATION "${SYSCONF_INSTALL_DIR}/cvmfs/gateway"
+  PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
 )

@@ -3,7 +3,8 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_LIBCVMFS_CACHE OR
     BUILD_RECEIVER OR
     BUILD_SHRINKWRAP OR
     BUILD_PRELOADER OR
-    BUILD_UNITTESTS)
+    BUILD_UNITTESTS OR
+    BUILD_QC_TESTS)
 
 set (LIBCVMFS_CRYPTO_SOURCES
      crypto/crypto_util.cc
@@ -28,6 +29,7 @@ list (APPEND LIBCVMFS_CRYPTO_LINK_PUBLIC_LIBRARIES
 set (LIBCVMFS_CRYPTO_LINK_PRIVATE_LIBRARIES "")
 list (APPEND LIBCVMFS_CRYPTO_LINK_PRIVATE_LIBRARIES
       ${Libcrypto_LIBRARIES}
+      ${Libnettle_LIBRARIES}
       ${SHA3_LIBRARIES}
 )
 
@@ -36,7 +38,12 @@ set_target_properties (cvmfs_crypto PROPERTIES
     VERSION ${CernVM-FS_VERSION_STRING}
     COMPILE_FLAGS "${LIBCVMFS_CRYPTO_CFLAGS}"
     LINK_FLAGS "${LIBCVMFS_CRYPTO_LINK_FLAGS}")
-target_include_directories (cvmfs_crypto PRIVATE ${Libcrypto_INCLUDE_DIRS})
+# Prepend (BEFORE) the built-in LibreSSL include dir so it wins over the
+# directory-level system OpenSSL include (INCLUDE_DIRECTORIES / OPENSSL_INCLUDE_DIR).
+# On macOS the system OpenSSL lives in a non-standard path (e.g. Homebrew) that is
+# emitted as an explicit -I; without BEFORE it would precede LibreSSL and trip the
+# openssl_version.h safeguard.
+target_include_directories (cvmfs_crypto BEFORE PRIVATE ${Libcrypto_INCLUDE_DIRS})
 target_link_libraries (cvmfs_crypto
                        PUBLIC cvmfs_util
                               ${LIBCVMFS_CRYPTO_LINK_PUBLIC_LIBRARIES}
@@ -50,9 +57,9 @@ if (BUILD_CVMFS OR BUILD_SERVER_DEBUG OR BUILD_RECEIVER_DEBUG OR BUILD_UNITTESTS
   add_library (cvmfs_crypto_debug SHARED ${LIBCVMFS_CRYPTO_SOURCES})
   set_target_properties (cvmfs_crypto_debug PROPERTIES
       VERSION ${CernVM-FS_VERSION_STRING}
-      COMPILE_FLAGS "${LIBCVMFS_CRYPTO_CFLAGS} -O0 -DDEBUGMSG"
+      COMPILE_FLAGS "${LIBCVMFS_CRYPTO_CFLAGS} -O0 -Wno-cpp -DDEBUGMSG"
       LINK_FLAGS "${LIBCVMFS_CRYPTO_LINK_FLAGS}")
-  target_include_directories (cvmfs_crypto_debug PRIVATE ${Libcrypto_INCLUDE_DIRS})
+  target_include_directories (cvmfs_crypto_debug BEFORE PRIVATE ${Libcrypto_INCLUDE_DIRS})
   target_link_libraries (cvmfs_crypto_debug
                          PUBLIC cvmfs_util_debug
                                 ${LIBCVMFS_CRYPTO_LINK_PUBLIC_LIBRARIES}

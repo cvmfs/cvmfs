@@ -16,7 +16,6 @@
 #include "loader.h"
 #include "util/exception.h"
 #include "util/logging.h"
-#include "util/platform.h"
 #include "util/posix.h"
 
 using namespace std;  // NOLINT

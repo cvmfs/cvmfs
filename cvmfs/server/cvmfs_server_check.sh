@@ -28,7 +28,20 @@ __do_check() {
 
   # more sanity checks
   is_owner_or_root $name || die "Permission denied: Repository $name is owned by $CVMFS_USER"
-  health_check -r $name
+  # Skip FUSE mount health check for mountless gateway publishers.
+  # In mountless mode the rdonly and rw FUSE mounts are intentionally absent;
+  # health_check -r would attempt to mount them (via cvmfs_suid_helper), which
+  # fails in an unprivileged/no-systemd container.  The catalog integrity check
+  # below reads directly from the HTTP Stratum0 URL and works without FUSE.
+  local _hc_upstream_type
+  _hc_upstream_type=$(get_upstream_type "$CVMFS_UPSTREAM_STORAGE")
+  if [ "x$_hc_upstream_type" = xgw ] && \
+     ! is_mounted "${CVMFS_SPOOL_DIR}/rdonly" && \
+     ! is_mounted "/cvmfs/$name"; then
+    echo "Note: mountless gateway publisher detected – skipping FUSE mount health check."
+  else
+    health_check -r $name
+  fi
 
   # check if repository is compatible to the installed CernVM-FS version
   check_repository_compatibility $name
@@ -40,15 +53,23 @@ __do_check() {
     url=$CVMFS_STRATUM0
   fi
 
+  local gc_lock_held=0
   if [ "x$tag" = "x" ] && is_garbage_collectable $name; then
     # acquire gc lock
     # waits for gc on the same repository to finish
     # and prevents a gc from starting
     acquire_gc_lock $name check || die "Failed to acquire gc lock for $name"
+    gc_lock_held=1
     trap "release_gc_lock $name" EXIT HUP INT TERM
   fi
 
   # do it!
+  if [ $repair_reflog -eq 1 ]; then
+    echo "Checking reference log of ${name}..."
+    __check_repair_reflog $name
+    return $?
+  fi
+
   if [ $check_integrity -ne 0 ]; then
     if ! is_local_upstream $upstream; then
       echo "Storage integrity check only works locally. skipping."
@@ -73,15 +94,19 @@ __do_check() {
   fi
 
   echo "Verifying integrity of ${name}${subtree_msg}..."
-  if [ $repair_reflog -eq 1 ]; then
-    __check_repair_reflog $name
-  fi
   local with_reflog=
   has_reflog_checksum $name && with_reflog="-R $(get_reflog_checksum $name)"
 
   default_scratch_dir="${CVMFS_SPOOL_DIR}/tmp"
   if [ -z "$scratch_dir" ]; then
     scratch_dir=$default_scratch_dir
+  fi
+
+  local partial_replication_param=""
+  if [ x"$CVMFS_PARTIAL_REPLICATION" = x"true" ] && \
+     [ -n "$CVMFS_PARTIAL_REPLICATION_SPEC" ] && \
+     [ -f "$CVMFS_PARTIAL_REPLICATION_SPEC" ]; then
+    partial_replication_param="-E $CVMFS_PARTIAL_REPLICATION_SPEC"
   fi
 
   local user_shell="$(get_user_shell $name)"
@@ -96,16 +121,91 @@ __do_check() {
                      -N ${CVMFS_REPOSITORY_NAME}       \
                      $(get_swissknife_proxy)           \
                      $(get_follow_http_redirects_flag) \
-                     $with_reflog"
-  $user_shell "$check_cmd"
+                     $with_reflog                      \
+                     $partial_replication_param"
+
+  # Set CVMFS_SERVER_CHECK_SUMMARY=0 to restore the previous behavior.
+  if [ "${CVMFS_SERVER_CHECK_SUMMARY:-1}" = "0" ]; then
+    $user_shell "$check_cmd"
+    return $?
+  fi
+
+  # The check produces a lot of progress output on stdout while problems are
+  # reported on stderr.  Mirror stderr into a temporary file so that a concise
+  # summary can be printed at the end without changing the live output.
+  local check_error_log
+  check_error_log="$(mktemp)" || die "Failed to create temporary file"
+  local check_error_pipe
+  check_error_pipe="$(mktemp)"  \
+    || { rm -f "$check_error_log"; die "Failed to create temporary file"; }
+
+  # Make sure the temporary files are removed even if the function exits early,
+  # e.g. through 'die' or a signal.  Keep the gc lock release (set above) in the
+  # trap if it was installed.
+  local cleanup_cmd="rm -f '$check_error_pipe' '$check_error_log'"
+  [ $gc_lock_held -eq 1 ] && cleanup_cmd="release_gc_lock $name; $cleanup_cmd"
+  trap "$cleanup_cmd" EXIT HUP INT TERM
+
+  rm -f "$check_error_pipe"
+  mkfifo "$check_error_pipe" || die "Failed to create temporary pipe"
+
+  # Run tee in the background reading from a FIFO, rather than as the second
+  # stage of a pipeline (... 2>&1 | tee ...).  This way the check command keeps
+  # its own exit status in $? instead of it being masked by tee's.  In bash this
+  # could be done more simply with PIPESTATUS or the pipefail option, but this
+  # script must also run under dash (the default /bin/sh on Ubuntu), which
+  # supports neither.
+  tee -a "$check_error_log" < "$check_error_pipe" >&2 &
+  local tee_pid=$!
+
+  set +e
+  $user_shell "$check_cmd" 2>"$check_error_pipe"
+  local check_retval=$?
+  wait "$tee_pid"
+  set -e
+
+  rm -f "$check_error_pipe"
+  if [ $check_retval -ne 0 ]; then
+    __print_check_summary "$name" "$check_error_log"
+  fi
+  rm -f "$check_error_log"
+  return $check_retval
 }
 
-# Checks for mismatch between the reflog and the checksum and tries to fix them,
-# either by adjusting the checksum or by removing it.
+# Prints a summary of the errors reported by a check run.
+# $1: repository name
+# $2: path to a file holding the check's stderr output (one error per line)
+__print_check_summary() {
+  local name="$1"
+  local error_log="$2"
+  local max_show=50
+
+  echo
+  echo "Check summary for $name:"
+  if [ ! -s "$error_log" ]; then
+    echo "  no problems reported"
+    return 0
+  fi
+
+  local num_errors
+  num_errors=$(wc -l < "$error_log" | tr -d ' ')
+  echo "  $num_errors error message(s) reported:"
+  sed -e 's/^/    /' -e "${max_show}q" "$error_log"
+  if [ "$num_errors" -gt "$max_show" ]; then
+    echo "    ... ($((num_errors - max_show)) more, see the output above)"
+  fi
+}
+
+# Checks for mismatch between the reflog and the checksum and tries to fix them.
+# If the reflog is missing, reconstructs it from the catalog and history chains.
 __check_repair_reflog() {
   local name="$1"
   load_repo_config $name
   local user_shell="$(get_user_shell $name)"
+  default_scratch_dir="${CVMFS_SPOOL_DIR}/tmp"
+  if [ -z "$scratch_dir" ]; then
+    scratch_dir=$default_scratch_dir
+  fi
 
   local stored_checksum=
   has_reflog_checksum $name && stored_checksum="$(cat $(get_reflog_checksum $name))"
@@ -122,9 +222,24 @@ __check_repair_reflog() {
   if $user_shell "$(__swissknife_cmd) peek -d .cvmfsreflog -r $CVMFS_UPSTREAM_STORAGE" >/dev/null; then
     has_reflog=1
     local url="$repository_url/.cvmfsreflog"
-    local rehash_cmd="curl -sS --fail --connect-timeout 10 --max-time 300 $(get_curl_proxy) $url \
-      | cvmfs_publish hash -a ${CVMFS_HASH_ALGORITHM:-sha1}"
-    computed_checksum="$($user_shell "$rehash_cmd")"
+    # Download and hash in two steps: without pipefail, a failed download
+    # would be masked by hashing empty input.
+    local reflog_tmp
+    reflog_tmp="$($user_shell "mktemp ${scratch_dir}/reflog.XXXXXX")" \
+      || return 1
+    if ! $user_shell "curl -sS --fail --connect-timeout 10 --max-time 300 \
+                      $(get_curl_proxy) $url -o $reflog_tmp"; then
+      $user_shell "rm -f $reflog_tmp"
+      echo "Error: failed to download $url" >&2
+      return 1
+    fi
+    if ! computed_checksum="$($user_shell "cvmfs_publish hash \
+      -a ${CVMFS_HASH_ALGORITHM:-sha1} < $reflog_tmp")"; then
+      $user_shell "rm -f $reflog_tmp"
+      echo "Error: failed to hash $url" >&2
+      return 1
+    fi
+    $user_shell "rm -f $reflog_tmp"
     echo "Info: found $url with content hash $computed_checksum"
   fi
 
@@ -149,18 +264,13 @@ __check_repair_reflog() {
   # At this point we either have no .cvmfsreflog and no local reflog.chksum or
   # we have both files properly in sync.
 
-  # Remaining case: a reflog is registered in the manifest but the
-  # .cvmfsreflog file is missing.  In this case, we recreate the reflog.
+  # Remaining case: the .cvmfsreflog file is missing. Reconstruct it even if
+  # it has not been registered in the manifest, as is the case for legacy
+  # repositories.
 
-  if [ $has_reflog -eq 0 ] && get_repo_info -R | grep -q ^Y; then
-    echo "Warning: a reflog hash is registered in the manifest, re-creating missing reflog"
+  if [ $has_reflog -eq 0 ]; then
+    echo "Warning: reference log is missing, reconstructing it"
     to_syslog_for_repo $name "reference log reconstruction started"
-    local repository_url
-
-    default_scratch_dir="${CVMFS_SPOOL_DIR}/tmp"
-    if [ -z "$scratch_dir" ]; then
-      scratch_dir=$default_scratch_dir
-    fi
 
     local reflog_reconstruct_command="$(__swissknife_cmd dbg) reconstruct_reflog \
                                                   -r $repository_url             \
@@ -171,11 +281,13 @@ __check_repair_reflog() {
                                                   -k $CVMFS_PUBLIC_KEY           \
                                                   -R $(get_reflog_checksum $name)"
     if ! $user_shell "$reflog_reconstruct_command"; then
-      to_syslog_for_repo $name "failed to reconstruction reference log"
-    else
-      to_syslog_for_repo $name "successfully reconstructed reference log"
+      to_syslog_for_repo $name "failed to reconstruct reference log"
+      return 1
     fi
+    to_syslog_for_repo $name "successfully reconstructed reference log"
   fi
+
+  return 0
 }
 
 # This is a separate function because dash segfaults if it is inline :-(
@@ -196,17 +308,19 @@ __get_checks_repo_times() {
       continue
     fi
 
-    local check_status="$(read_repo_item $name .cvmfs_status.json)"
-    local last_check="$(get_json_field "$check_status" last_check)"
     local check_time=0
-    if [ -n "$last_check" ]; then
-      check_time="$(date --date "$last_check" +%s)"
-      local min_secs num_secs
-      min_secs="$((${CVMFS_CHECK_ALL_MIN_DAYS:-30}*60*60*24))"
-      num_secs="$(($(date +%s)-$check_time))"
-      if [ "$num_secs" -lt "$min_secs" ]; then
-        # less than $CVMFS_CHECK_ALL_MIN_DAYS has elapsed since last check
-        continue
+    if [ $repair_reflog -eq 0 ]; then
+      local check_status="$(read_repo_item $name .cvmfs_status.json)"
+      local last_check="$(get_json_field "$check_status" last_check)"
+      if [ -n "$last_check" ]; then
+        check_time="$(date --date "$last_check" +%s)"
+        local min_secs num_secs
+        min_secs="$((${CVMFS_CHECK_ALL_MIN_DAYS:-30}*60*60*24))"
+        num_secs="$(($(date +%s)-$check_time))"
+        if [ "$num_secs" -lt "$min_secs" ]; then
+          # less than $CVMFS_CHECK_ALL_MIN_DAYS has elapsed since last check
+          continue
+        fi
       fi
     fi
 
@@ -248,7 +362,9 @@ __do_all_checks() {
 
   for repo in $repos; do
     (
-    to_syslog_for_repo $repo "started check"
+    local check_kind="check"
+    [ $repair_reflog -eq 1 ] && check_kind="reference log check"
+    to_syslog_for_repo $repo "started $check_kind"
     echo
     echo "Starting $repo at `date`"
     # Work around the errexit (that is, set -e) misfeature of being
@@ -259,17 +375,19 @@ __do_all_checks() {
     __do_check $repo
     )
     local ret=$?
-    update_repo_status $repo last_check "`date --utc`"
     local check_status
     if [ $ret != 0 ]; then
       check_status=failed
-      to_syslog_for_repo $repo "check failed"
+      to_syslog_for_repo $repo "$check_kind failed"
       echo "ERROR from cvmfs_server check!" >&2
     else
       check_status=succeeded
-      to_syslog_for_repo $repo "successfully completed check"
+      to_syslog_for_repo $repo "successfully completed $check_kind"
     fi
-    update_repo_status $repo check_status $check_status
+    if [ $repair_reflog -eq 0 ]; then
+      update_repo_status $repo last_check "`date --utc`"
+      update_repo_status $repo check_status $check_status
+    fi
     echo "Finished $repo at `date`"
     ) >> $log 2>&1
 
@@ -322,6 +440,12 @@ cvmfs_server_check() {
   done
   shift $(($OPTIND-1))
 
+  if [ $repair_reflog -eq 1 ]; then
+    [ "x$tag" = "x" ] && [ $check_integrity -eq 0 ] && \
+      [ "x$subtree_path" = "x" ] \
+      || die "-r cannot be combined with -i, -t or -s"
+  fi
+
   if [ $do_all -eq 1 ]; then
     [ $# -eq 0 ] || die "no non-option parameters expected with -a"
 
@@ -339,7 +463,7 @@ cvmfs_server_check() {
       __do_check "$@"
     fi
     retcode=$?
-    if [ $retcode = 0 ]; then
+    if [ $retcode = 0 ] && [ $repair_reflog -eq 0 ]; then
       # Intentionally do not store the status for a failure when a check
       # is individually run, but do store the status for a success if the
       # status was previously saved.
