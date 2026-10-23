@@ -12,6 +12,7 @@
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
+#include <memory>
 #include <string>
 
 #include "cache_plugin/channel.h"
@@ -19,7 +20,6 @@
 #include "crypto/hash.h"
 #include "manifest.h"
 #include "monitor.h"
-#include "util/pointer.h"
 
 using namespace std;  // NOLINT
 
@@ -269,7 +269,7 @@ Watchdog *g_watchdog = NULL;
 
 struct cvmcache_context {
   explicit cvmcache_context(ForwardCachePlugin *p) : plugin(p) { }
-  UniquePtr<ForwardCachePlugin> plugin;
+  std::unique_ptr<ForwardCachePlugin> plugin;
 };
 
 

@@ -32,7 +32,7 @@ CommandMigrate::CommandMigrate()
     , uid_(0)
     , gid_(0)
     , root_catalog_(NULL) {
-  atomic_init32(&catalogs_processed_);
+  catalogs_processed_.store(0);
 }
 
 
@@ -135,8 +135,8 @@ int CommandMigrate::Main(const ArgumentList &args) {
   // Create an upstream spooler
   temporary_directory_ = tmp_dir;
   const upload::SpoolerDefinition spooler_definition(spooler, shash::kSha1);
-  spooler_ = upload::Spooler::Construct(spooler_definition);
-  if (!spooler_.IsValid()) {
+  spooler_.reset(upload::Spooler::Construct(spooler_definition));
+  if (spooler_.get() == nullptr) {
     Error("Failed to create upstream Spooler.");
     return 5;
   }
@@ -321,7 +321,7 @@ bool CommandMigrate::UpdateUndoTags(PendingCatalog *root_catalog,
   bool retval = CopyPath2Path(filename_old, filename_new);
   if (!retval)
     return false;
-  UniquePtr<history::SqliteHistory> history(
+  std::unique_ptr<history::SqliteHistory> history(
       history::SqliteHistory::OpenWritable(filename_new));
   history->TakeDatabaseFileOwnership();
 
@@ -352,7 +352,7 @@ bool CommandMigrate::UpdateUndoTags(PendingCatalog *root_catalog,
 
   history->SetPreviousRevision(manifest_upstream_->history());
   history->DropDatabaseFileOwnership();
-  history.Destroy();
+  history.reset();
 
   Future<shash::Any> history_hash_new;
   upload::Spooler::CallbackPtr callback = spooler_->RegisterListener(
@@ -421,7 +421,7 @@ bool CommandMigrate::DoMigrationAndCommit(
     manifest.set_revision(new_catalog->GetRevision());
 
     // Commit the new (migrated) repository revision...
-    if (history_upstream_.IsValid()) {
+    if (history_upstream_.get() != nullptr) {
       shash::Any history_hash(manifest_upstream_->history());
       LogCvmfs(kLogCatalog, kLogStdout | kLogNoLinebreak,
                "Updating repository tag database... ");
@@ -565,8 +565,8 @@ void CommandMigrate::UploadCallback(const upload::SpoolerResult &result) {
 void CommandMigrate::PrintStatusMessage(const PendingCatalog *catalog,
                                         const shash::Any &content_hash,
                                         const std::string &message) {
-  atomic_inc32(&catalogs_processed_);
-  const unsigned int processed = (atomic_read32(&catalogs_processed_) * 100)
+  catalogs_processed_.fetch_add(1);
+  const unsigned int processed = (catalogs_processed_.load() * 100)
                                  / catalog_count_;
   LogCvmfs(kLogCatalog, kLogStdout, "[%d%%] %s %sC %s", processed,
            message.c_str(), content_hash.ToString().c_str(),
@@ -843,7 +843,7 @@ bool CommandMigrate::AbstractMigrationWorker<DerivedT>::CleanupNestedCatalogs(
  * both the catalog management and migration classes get updated.
  */
 const float CommandMigrate::MigrationWorker_20x::kSchema = 2.5;
-const unsigned CommandMigrate::MigrationWorker_20x::kSchemaRevision = 7;
+const unsigned CommandMigrate::MigrationWorker_20x::kSchemaRevision = 9;
 
 
 template<class DerivedT>
@@ -899,9 +899,9 @@ bool CommandMigrate::MigrationWorker_20x::CreateNewEmptyCatalog(
   {
     // TODO(rmeusel): Attach catalog should work with an open catalog database
     // as well, to remove this inefficiency
-    const UniquePtr<catalog::CatalogDatabase> new_clg_db(
+    const std::unique_ptr<catalog::CatalogDatabase> new_clg_db(
         catalog::CatalogDatabase::Create(clg_db_path));
-    if (!new_clg_db.IsValid()
+    if (new_clg_db.get() == nullptr
         || !new_clg_db->InsertInitialValues(root_path, volatile_content, "")) {
       Error("Failed to create database for new catalog");
       unlink(clg_db_path.c_str());

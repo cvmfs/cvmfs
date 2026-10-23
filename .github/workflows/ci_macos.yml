@@ -9,139 +9,42 @@ on:
 jobs:
   macos_build_and_test:
     name: "macos_build_and_test"
-    runs-on: macos-15
+    # Build-only: hosted runners cannot load macFUSE (no headless way to
+    # approve it), so mounts and integration tests run in CI_MacOS_NFS_Tests.
+    runs-on: macos-26
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Debug output 
+      - name: Debug output
         run: |
-          csrutil status
-          sw_vers 
-          brew install coreutils
-          sudo ln -s /usr/local/bin/gtimeout /usr/local/bin/timeout
-          sudo ln -s /opt/homebrew/bin/greadlink /usr/local/bin/greadlink
-          sudo mkdir /usr/local/include
-          sudo xcode-select -s "/Applications/Xcode_16.app"
-          
-      - name: Install Fuse-t and dependencies
+          sw_vers
+          sudo mkdir -p /usr/local/include
+
+      - name: Install macFUSE
         run: |
-          brew install python-setuptools
-          wget -q https://github.com/macos-fuse-t/fuse-t/releases/download/1.0.49/fuse-t-macos-installer-1.0.49.pkg
-          sudo installer -pkg fuse-t-macos-installer-1.0.49.pkg -target /
-          mkdir -p /Library/Application\ Support/fuse-t/cfg/
-          sudo zsh -c 'echo "namedattr=true" >> /Library/Application\ Support/fuse-t/cfg/fuse-t.ini'
+          MACFUSE_VERSION=5.4.0
+          wget -q https://github.com/macfuse/macfuse/releases/download/macfuse-${MACFUSE_VERSION}/macfuse-${MACFUSE_VERSION}.dmg
+          hdiutil attach macfuse-${MACFUSE_VERSION}.dmg
+          MACFUSE_PKG=$(find /Volumes/macFUSE -name "*.pkg" | head -1)
+          sudo installer -pkg "${MACFUSE_PKG}" -target /
+          hdiutil detach /Volumes/macFUSE || true
+          ls -la /usr/local/lib/libfuse* /usr/local/include/fuse3
 
       - name: Build CVMFS
         run: |
           cd ${GITHUB_WORKSPACE}
           mkdir -p build
-          export USE_MACFUSE_KEXT=OFF
-          export CVMFS_TEST_USE_MACFUSE_KEXT=OFF
+          # macos-26 lacks the Command Line Tools SDK that cmake falls back to
+          export SDKROOT=$(xcrun --show-sdk-path)
+          export CVMFS_MACFUSE=ON
+          export CVMFS_EXTERNALS_EXCLUDE="zlib"
           export CPATH=$CPATH:/usr/local/include
           ./ci/build_package.sh ${GITHUB_WORKSPACE} ${GITHUB_WORKSPACE}/build cvmfs
-
-      - name: Setup firmlinks
-        run: |
-          # / is readonly on macos 11+ - do 'synthetic firmlink' to create /cvmfs
-          sudo zsh -c 'echo -e "cvmfs\tUsers/Shared/cvmfs\n#comment\n" > /etc/synthetic.conf'
-          sudo chown root:wheel /etc/synthetic.conf
-          sudo chmod a+r /etc/synthetic.conf
-          # apfs.util seems to return non-zero error codes also on success
-          sudo /System/Library/Filesystems/apfs.fs/Contents/Resources/apfs.util -t || true
-
-          
 
       - name: Install CVMFS
         run: |
           export CVMFS_PACKAGE=$(ls ${GITHUB_WORKSPACE}/build/pkg_result/cvmfs-*.pkg)
           sudo installer -pkg ${CVMFS_PACKAGE} -target /
-
-      - name: Setup CVMFS
-        run: |
-          # / is readonly on macos 11+ - do 'synthetic firmlink' to create /cvmfs
-          sudo zsh -c 'echo -e "cvmfs\tUsers/Shared/cvmfs\n#comment\n" > /etc/synthetic.conf'
-          sudo chown root:wheel /etc/synthetic.conf
-          sudo chmod a+r /etc/synthetic.conf
-          # apfs.util seems to return non-zero error codes also on success
-          sudo /System/Library/Filesystems/apfs.fs/Contents/Resources/apfs.util -t || true
-          sudo cvmfs_config setup
-          sudo cvmfs_config chksetup || exit 1
-
-      - name: Run Tests
-        run: |
-          sudo launchctl limit maxfiles 65536 65536 
-          export CVMFS_PLATFORM_NAME="macos"
-          export CVMFS_TIMESTAMP=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
-          export CVMFS_TEST_CLASS_NAME=ClientIntegrationTests
-          export CVMFS_TEST_PROXY=DIRECT
-          cd $GITHUB_WORKSPACE/test
-          ./run.sh /tmp/cvmfs-client-test.log -o /tmp/cvmfs-client-test.xunit.xml \
-            -s quick                                          \
-            -x src/004-davinci                                \
-            src/005-asetup                                    \
-            src/006-buildkernel                               \
-            src/007-testjobs                                  \
-            src/008-default_domain                            \
-            src/015-rebuild_on_crash                          \
-            src/016-dnsunreachable                            \
-            src/017-dnstimeout                                \
-            src/024-reload-during-asetup                      \
-            src/028-negativecache                             \
-            src/039-reloadalarm                               \
-            src/040-aliencache                                \
-            src/041-rocache                                   \
-            src/045-oasis                                     \
-            src/052-roundrobindns                             \
-            src/050-configrepo                                \
-            src/053-uuid                                      \
-            src/055-ownership                                 \
-            src/056-lowspeedlimit                             \
-            src/057-parallelmakecache                         \
-            src/059-fallbackproxy                             \
-            src/060-hidexattrs                                \
-            src/061-systemdnokill                             \
-            src/064-fsck                                      \
-            src/069-systemremount                             \
-            src/074-oom                                       \
-            src/077-doublemount                               \
-            src/078-offlinemode                               \
-            src/081-shrinkwrap                                \
-            src/082-shrinkwrap-cms                            \
-            src/083-suid                                      \
-            src/084-premounted                                \
-            src/087-xattrs                                    \
-            src/088-watchdog                                  \
-            src/089-external_cache_plugin                     \
-            src/090-talkchroot                                \
-            src/091-defaultconfigrepo                         \
-            src/091-talksocket                                \
-            src/092-stat                                      \
-            src/094-attachmount                               \
-            src/095-fuser                                     \
-            src/096-cancelreq                                 \
-            src/097-statfs                                    \
-            src/099-http_tracing                              \
-            src/100-reload-switch-debug                       \
-            src/102-reusefd                                   \
-            src/103-reloadcachemgr                            \
-            src/104-concurrent_mounts                         \
-            src/105-streaming-cache                           \
-            src/108-global-config                             \
-            src/406-ducc-webhook-notifications                \
-            --                                                \
-            src/0*                                            \
-            src/1*
-        
-        
-
-      - name: Upload logs as artifact
-        if: ${{ always () }}
-        uses: actions/upload-artifact@v4
-        with: 
-          name: CVMFS test logs
-          path: |
-              /tmp/cvmfs-client-test.log
-              /tmp/cvmfs-server-test.log
-
+          cvmfs2 --version

@@ -6,13 +6,14 @@
 
 #include <unistd.h>
 
+#include <memory>
+
 #include "crypto/hash.h"
 #include "gateway_util.h"
 #include "json_document.h"
 #include "json_document_write.h"
 #include "ssl.h"
 #include "util/logging.h"
-#include "util/pointer.h"
 #include "util/posix.h"
 #include "util/string.h"
 
@@ -154,7 +155,7 @@ bool MakeEndRequest(const std::string &method, const std::string &key_id,
   if (!doc) {
     ok = false;
   } else {
-    UniquePtr<JsonDocument> const reply_json(doc);
+    std::unique_ptr<JsonDocument> const reply_json(doc);
     const JSON *reply_status = JsonDocument::SearchInObject(
         reply_json->root(), "status", JSON_STRING);
     ok = (reply_status != NULL

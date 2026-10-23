@@ -7,6 +7,7 @@
 #include <sys/types.h>
 
 #include <cassert>
+#include <climits>
 #include <string>
 #include <vector>
 
@@ -109,6 +110,14 @@ bool SyncUnionOverlayfs::ReadlinkEquals(string const &path,
   char *buf;
   size_t compare_len;
 
+  // A readlink target can never exceed PATH_MAX; bounding the length here also
+  // lets the compiler prove the size passed to readlink() is sane (otherwise
+  // the value range derived from std::string::length() triggers a spurious
+  // -Wstringop-overflow warning from the fortified readlink wrapper).
+  if (compare_value.length() >= PATH_MAX) {
+    return false;
+  }
+
   // Compare to one more than compare_value length in case the link value
   // begins with compare_value but ends with something else
   compare_len = compare_value.length() + 1;
@@ -141,8 +150,8 @@ bool SyncUnionOverlayfs::ReadlinkEquals(string const &path,
 bool SyncUnionOverlayfs::HasXattr(string const &path, string const &attr_name) {
   // TODO(reneme): it is quite heavy-weight to allocate an object that contains
   //               an std::map<> just to check if an xattr is there...
-  const UniquePtr<XattrList> xattrs(XattrList::CreateFromFile(path));
-  assert(xattrs.IsValid());
+  const std::unique_ptr<XattrList> xattrs(XattrList::CreateFromFile(path));
+  assert(xattrs.get() != nullptr);
 
   std::vector<std::string> attrs = xattrs->ListKeys();
   std::vector<std::string>::const_iterator i = attrs.begin();
@@ -152,7 +161,7 @@ bool SyncUnionOverlayfs::HasXattr(string const &path, string const &attr_name) {
     LogCvmfs(kLogCvmfs, kLogDebug, "Attr: %s", i->c_str());
   }
 
-  return xattrs.IsValid() && xattrs->Has(attr_name);
+  return xattrs.get() != nullptr && xattrs->Has(attr_name);
 }
 
 bool SyncUnionOverlayfs::IsWhiteoutEntry(SharedPtr<SyncItem> entry) const {

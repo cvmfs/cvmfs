@@ -8,6 +8,7 @@ cvmfs_run_test() {
 
   local wpad_file="$(pwd)/wpad"
   local wpadex_file="$(pwd)/wpadex"
+  local wpadjs_file="$(pwd)/wpadjs"
   cat > $wpad_file << EOF
   function FindProxyForURL(url, host) {
     return "PROXY $CVMFS_TEST_PROXY; PROXY http://no-such-proxy.cern.ch:3128"
@@ -18,7 +19,29 @@ EOF
     return "PROXY $CVMFS_TEST_PROXY; PROXY http://no-such-proxy-ex.cern.ch:3128"
   }
 EOF
-  chmod 666 $wpad_file $wpadex_file || return 10
+  # A PAC that exercises the embedded JavaScript engine: the standard PAC helper
+  # functions plus ordinary JS control flow (rather than a constant string). This
+  # is the interesting coverage for the pacparser/QuickJS engine. Only the facts
+  # that hold for every cvmfs request are asserted (the URL always ends in
+  # /.cvmfspublished and the stratum-1 host is an FQDN), so it stays deterministic
+  # and independent of DNS. If the engine or a helper misbehaves, the PAC falls
+  # back to DIRECT and the assertion below fails.
+  cat > $wpadjs_file << EOF
+  function FindProxyForURL(url, host) {
+    var ok = true;
+    if (!shExpMatch(url, "*/.cvmfspublished")) ok = false;  // string globbing
+    if (isPlainHostName(host)) ok = false;                  // host is an FQDN/IP
+    if (dnsDomainLevels(host) < 1) ok = false;              // ... so it has dots
+    if (host.split(".").length < 2) ok = false;             // plain JS: arrays
+    var n = 0;                                              // plain JS: loop
+    for (var i = 0; i < 10; i++) { n += i; }
+    if (n != 45) ok = false;
+    if (ok)
+      return "PROXY $CVMFS_TEST_PROXY; PROXY http://no-such-proxy-js.cern.ch:3128";
+    return "DIRECT";
+  }
+EOF
+  chmod 666 $wpad_file $wpadex_file $wpadjs_file || return 10
 
   cvmfs_mount grid.cern.ch || return 1
   cvmfs_umount grid.cern.ch
@@ -39,6 +62,16 @@ EOF
   echo "Proxies are $proxies"
   if ! echo "$proxies" | grep -q "http://no-such-proxy-ex.cern.ch:3128"; then
     return 31
+  fi
+  cvmfs_umount grid.cern.ch
+
+  # PAC using helper functions and JS logic (exercises the JS engine)
+  cvmfs_mount grid.cern.ch "CVMFS_HTTP_PROXY=auto" \
+    "CVMFS_PAC_URLS=file://$wpadjs_file" || return 22
+  proxies="$(sudo cvmfs_talk -i grid.cern.ch proxy info)"
+  echo "Proxies are $proxies"
+  if ! echo "$proxies" | grep -q "http://no-such-proxy-js.cern.ch:3128"; then
+    return 32
   fi
 
   return 0

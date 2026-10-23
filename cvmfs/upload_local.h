@@ -8,10 +8,10 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <atomic>
 #include <string>
 
 #include "upload_facility.h"
-#include "util/atomic.h"
 #include "util/concurrency.h"
 
 namespace upload {
@@ -88,8 +88,8 @@ class LocalUploader : public AbstractUploader {
   // state information
   const std::string upstream_path_;
   const std::string temporary_path_;
-  mutable atomic_int32 copy_errors_;  //!< counts the number of occurred
-                                      //!< errors in Upload()
+  mutable std::atomic<int32_t> copy_errors_;  //!< counts the number of occurred
+                                              //!< errors in Upload()
 };
 
 }  // namespace upload

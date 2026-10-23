@@ -53,6 +53,31 @@ TEST(T_S3Fanout, DetectThrottleIndicator) {
 }
 
 
+TEST(T_S3Fanout, MkV2CanonicalResource) {
+  // The resource must mirror MkUrl().  With DNS buckets the request path is
+  // "/" + object_key, so an empty key keeps the trailing slash; in path style
+  // the bucket is the path and an empty key has no trailing slash.
+  EXPECT_EQ(
+      "/bkt/data/ab/file1",
+      s3fanout::MkV2CanonicalResource("bkt", "data/ab/file1", true, false));
+  EXPECT_EQ(
+      "/bkt/data/ab/file1",
+      s3fanout::MkV2CanonicalResource("bkt", "data/ab/file1", false, false));
+
+  // Multi-object delete posts to the bucket root with an empty object key.
+  // Signing "/bkt?delete" here makes Ceph RGW reject the request with
+  // SignatureDoesNotMatch, because it rebuilds the resource from the path "/".
+  EXPECT_EQ("/bkt/?delete",
+            s3fanout::MkV2CanonicalResource("bkt", "", true, true));
+  EXPECT_EQ("/bkt?delete",
+            s3fanout::MkV2CanonicalResource("bkt", "", false, true));
+
+  // Bucket creation is the other empty-key request
+  EXPECT_EQ("/bkt/", s3fanout::MkV2CanonicalResource("bkt", "", true, false));
+  EXPECT_EQ("/bkt", s3fanout::MkV2CanonicalResource("bkt", "", false, false));
+}
+
+
 TEST(T_S3Fanout, ComposeDeleteMultiXmlSingleKey) {
   vector<string> keys;
   keys.push_back("data/ab/file1");

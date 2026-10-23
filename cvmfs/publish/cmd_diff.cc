@@ -8,6 +8,7 @@
 #include <inttypes.h>
 
 #include <cassert>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -17,7 +18,6 @@
 #include "publish/repository.h"
 #include "publish/settings.h"
 #include "util/logging.h"
-#include "util/pointer.h"
 #include "util/string.h"
 
 namespace {
@@ -187,6 +187,10 @@ class DiffReporter : public publish::DiffListener {
       result_list.push_back(machine_readable_ ? "H" : "hidden");
     if (diff & catalog::DirectoryEntryBase::Difference::kDirectIoFlag)
       result_list.push_back(machine_readable_ ? "D" : "direct-io");
+    if (diff & catalog::DirectoryEntryBase::Difference::kBundleTriggerFlag)
+      result_list.push_back(machine_readable_ ? "A" : "bundle-trigger");
+    if (diff & catalog::DirectoryEntryBase::Difference::kVolatileFlag)
+      result_list.push_back(machine_readable_ ? "V" : "volatile");
     if (diff & catalog::DirectoryEntryBase::Difference::kUid)
       result_list.push_back(machine_readable_ ? "U" : "uid");
     if (diff & catalog::DirectoryEntryBase::Difference::kGid)
@@ -221,8 +225,10 @@ int CmdDiff::Main(const Options &options) {
   SettingsBuilder builder;
 
   if (options.Has("worktree")) {
-    const UniquePtr<SettingsPublisher> settings(builder.CreateSettingsPublisher(
-        options.plain_args().empty() ? "" : options.plain_args()[0].value_str));
+    const std::unique_ptr<SettingsPublisher> settings(
+        builder.CreateSettingsPublisher(
+            options.plain_args().empty() ? ""
+                                         : options.plain_args()[0].value_str));
     settings->SetIsSilent(true);
     settings->GetTransaction()->SetDryRun(true);
     settings->GetTransaction()->SetPrintChangeset(true);

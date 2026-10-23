@@ -46,7 +46,7 @@ jobs:
       - name: Run hotpatch/migration tests
         run: |
           docker exec -u sftnight -t cvmfs-dev bash -c \
-            "cd /home/sftnight/cvmfs && CVMFS_TEST_PROXY=DIRECT bash test/common/container/test_migration.sh"
+            "cd /home/sftnight/cvmfs && CVMFS_TEST_PROXY=DIRECT CVMFS_TEST_USE_CDN=yes bash test/common/container/test_migration.sh"
 
       - name: Archive logs
         if: ${{ always() }}

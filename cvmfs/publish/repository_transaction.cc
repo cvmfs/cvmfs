@@ -3,12 +3,14 @@
  */
 
 
+#include <memory>
 #include <string>
 
 #include "backoff.h"
 #include "catalog_mgr_ro.h"
 #include "catalog_mgr_rw.h"
 #include "directory_entry.h"
+#include "gateway_util.h"
 #include "manifest.h"
 #include "publish/except.h"
 #include "publish/repository.h"
@@ -16,15 +18,14 @@
 #include "publish/settings.h"
 #include "util/exception.h"
 #include "util/logging.h"
-#include "util/pointer.h"
 #include "util/posix.h"
+#include "util/string.h"
 
 namespace publish {
 
 
 void Publisher::TransactionRetry() {
-  bool waiting_on_lease = false;
-  if (managed_node_.IsValid()) {
+  if (managed_node_.get() != nullptr) {
     const int rvi = managed_node_->Check(false /* is_quiet */);
     if (rvi != 0)
       throw EPublish("cannot establish writable mountpoint");
@@ -40,7 +41,7 @@ void Publisher::TransactionRetry() {
 
   while (true) {
     try {
-      TransactionImpl(waiting_on_lease);
+      TransactionImpl();
       break;
     } catch (const publish::EPublish &e) {
       if (e.failure() != EPublish::kFailTransactionState) {
@@ -53,7 +54,6 @@ void Publisher::TransactionRetry() {
         if (platform_monotonic_time() > deadline)
           throw;
 
-        waiting_on_lease = true;
         LogCvmfs(kLogCvmfs, kLogStdout, "repository busy, retrying");
         throttle.Throttle();
         continue;
@@ -63,12 +63,12 @@ void Publisher::TransactionRetry() {
     }  // try-catch
   }  // while (true)
 
-  if (managed_node_.IsValid())
+  if (managed_node_.get() != nullptr)
     managed_node_->Open();
 }
 
 
-void Publisher::TransactionImpl(bool waiting_on_lease) {
+void Publisher::TransactionImpl() {
   if (in_transaction_.IsSet()) {
     throw EPublish("another transaction is already open",
                    EPublish::kFailTransactionState);
@@ -80,9 +80,30 @@ void Publisher::TransactionImpl(bool waiting_on_lease) {
   // the session
   session_->Acquire();
 
-  // We might have a valid lease for a non-existing path. Nevertheless, we run
-  // run into problems when merging catalogs later, so for the time being we
-  // disallow transactions on non-existing paths.
+  // Now that the lease is held (the lease subtree is frozen) refresh to the
+  // current HEAD before any HEAD-dependent step. The manifest fetched when this
+  // process started can be stale: another release manager may have advanced
+  // HEAD in the meantime. Refreshing here makes both the lease-path validation
+  // below and the catalog diff at publish time see post-lease HEAD. Without it,
+  // a parent path another publisher just created looks absent (spurious
+  // kFailLeaseNoEntry), and concurrently-added content looks deleted and gets
+  // dropped (#3867). Done on every gateway transaction, not only when waiting
+  // on a busy lease -- staleness is independent of contention.
+  // DownloadRootObjects also invalidates the cached read-only catalog manager;
+  // Check() remounts the read-only layer only if outdated; managed_node_ is
+  // absent for mount-less publishing.
+  if (settings_.storage().type() == upload::SpoolerDefinition::Gateway) {
+    DownloadRootObjects(settings_.url(), settings_.fqrn(),
+                        settings_.transaction().spool_area().tmp_dir());
+    if (managed_node_.get() != nullptr) {
+      const int rvi = managed_node_->Check(true /* is_quiet */);
+      if (rvi != 0)
+        throw EPublish("cannot establish writable mountpoint");
+    }
+  }
+
+  // Missing lease parents require --allow-nonexistent-path and receiver API 4.
+  // The receiver materializes the ancestors during the catalog merge.
   if (!settings_.transaction().lease_path().empty()) {
     const std::string path = GetParentPath(
         "/" + settings_.transaction().lease_path());
@@ -91,36 +112,56 @@ void Publisher::TransactionImpl(bool waiting_on_lease) {
     const bool retval = catalog_mgr->LookupPath(path, catalog::kLookupDefault,
                                                 &dirent);
     if (!retval) {
-      throw EPublish("cannot open transaction on non-existing path " + path,
-                     EPublish::kFailLeaseNoEntry);
-    }
-    if (!dirent.IsDirectory()) {
+      if (!settings_.transaction().allow_nonexistent_path()) {
+        throw EPublish("cannot open transaction on non-existing path " + path
+                           + " (use --allow-nonexistent-path to permit this)",
+                       EPublish::kFailLeaseNoEntry);
+      }
+      // Refuse before upload when the receiver cannot create the ancestors.
+      // Local publishing builds the complete catalog itself.
+      if (settings_.storage().type() == upload::SpoolerDefinition::Gateway
+          && session_->negotiated_api_version()
+                 < gateway::kApiVersionNonexistentPath) {
+        const int negotiated_version = session_->negotiated_api_version();
+        if (negotiated_version < 0) {
+          throw EPublish(
+              "cannot verify gateway support for opening a transaction on the "
+              "non-existing path "
+                  + path
+                  + ": the existing lease token has no recorded API "
+                    "negotiation; "
+                    "drop the lease and acquire it again",
+              EPublish::kFailInput);
+        }
+        throw EPublish(
+            "the gateway does not support opening a transaction on the "
+            "non-existing path "
+                + path + " (needs API version "
+                + StringifyInt(gateway::kApiVersionNonexistentPath)
+                + ", gateway negotiated " + StringifyInt(negotiated_version)
+                + "); upgrade the gateway or create the parent path first",
+            EPublish::kFailInput);
+      }
+      LogCvmfs(kLogCvmfs, llvl_ | kLogStdout | kLogSyslog,
+               "opening transaction on non-existing path %s; missing parent "
+               "directories will be created at commit time",
+               path.c_str());
+    } else if (!dirent.IsDirectory()) {
       throw EPublish(
           "cannot open transaction on " + path + ", which is not a directory",
           EPublish::kFailLeaseNoDir);
     }
   }
 
-  const UniquePtr<CheckoutMarker> marker(CheckoutMarker::CreateFrom(
+  const std::unique_ptr<CheckoutMarker> marker(CheckoutMarker::CreateFrom(
       settings_.transaction().spool_area().checkout_marker()));
-  // TODO(jblomer): take root hash from r/o mountpoint?
-
-
-  if (settings_.storage().type() == upload::SpoolerDefinition::Gateway
-      && waiting_on_lease) {
-    DownloadRootObjects(settings_.url(), settings_.fqrn(),
-                        settings_.transaction().spool_area().tmp_dir());
-    const int rvi = managed_node_->Check(true /* is_quiet */);
-    if (rvi != 0)
-      throw EPublish("cannot establish writable mountpoint");
-  }
 
   in_transaction_.Set();
   // Pre-create the publishing lock file so that Abort() can acquire it even
   // if the disk fills up before abort is called.
   is_publishing_.Touch();
   ConstructSpoolers();
-  if (marker.IsValid())
+  if (marker.get() != nullptr)
     settings_.GetTransaction()->SetBaseHash(marker->hash());
   else
     settings_.GetTransaction()->SetBaseHash(manifest_->catalog_hash());

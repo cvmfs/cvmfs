@@ -125,7 +125,7 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
   //       currently this is not possible, since Manifest::Fetch asks for the
   //       repository name... Which we want to figure out with the tool at hand.
   //       Possible Fix: Allow for a Manifest::Fetch with an empty name.
-  UniquePtr<manifest::Manifest> manifest;
+  std::unique_ptr<manifest::Manifest> manifest;
   if (IsRemote(repository)) {
     const string url = repository + "/.cvmfspublished";
     cvmfs::MemSink manifest_memsink;
@@ -139,18 +139,18 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
       return 1;
     }
 
-    manifest = manifest::Manifest::LoadMem(manifest_memsink.data(),
-                                           manifest_memsink.pos());
+    manifest.reset(manifest::Manifest::LoadMem(manifest_memsink.data(),
+                                               manifest_memsink.pos()));
   } else {
     if (chdir(repository.c_str()) != 0) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to switch to directory %s",
                repository.c_str());
       return 1;
     }
-    manifest = manifest::Manifest::LoadFile(".cvmfspublished");
+    manifest.reset(manifest::Manifest::LoadFile(".cvmfspublished"));
   }
 
-  if (!manifest.IsValid()) {
+  if (manifest.get() == nullptr) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to load repository manifest");
     return 1;
   }

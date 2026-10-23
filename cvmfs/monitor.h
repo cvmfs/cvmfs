@@ -11,11 +11,11 @@
 #include <unistd.h>
 
 #include <map>
+#include <memory>
 #include <string>
 
 #include "util/pipe.h"
 #include "util/platform.h"
-#include "util/pointer.h"
 #include "util/single_copy.h"
 
 
@@ -24,15 +24,16 @@
  * that needs to be preserved through reloads.
  */
 class WatchdogState {
- friend class Watchdog;
+  friend class Watchdog;
+
  public:
-  WatchdogState() :
-    version(0),
-    watchdog_write_fd(-1),
-    listener_read_fd(-1),
-    spawned(false),
-    pid(0)
-  { }
+  WatchdogState()
+      : version(0)
+      , watchdog_write_fd(-1)
+      , listener_read_fd(-1)
+      , spawned(false)
+      , pid(0) { }
+
  private:
   unsigned version;
   int watchdog_write_fd;
@@ -63,7 +64,8 @@ class Watchdog : SingleCopy {
 
   static Watchdog *Create(FnOnExit on_exit,
                           bool needs_read_environ,
-                          WatchdogState *saved_state = 0);
+                          WatchdogState *saved_state = 0,
+                          const std::string &oom_score_adj = "");
   static pid_t GetPid();
   ~Watchdog();
   void Spawn(const std::string &crash_dump_path);
@@ -119,7 +121,7 @@ class Watchdog : SingleCopy {
                                       void *context);
   static void SendTrace(int sig, siginfo_t *siginfo, void *context);
 
-  explicit Watchdog(FnOnExit on_exit);
+  Watchdog(FnOnExit on_exit, const std::string &oom_score_adj);
   void Fork(bool needs_read_environ);
   void RestoreState(WatchdogState *saved_state);
   bool WaitForSupervisee();
@@ -134,12 +136,13 @@ class Watchdog : SingleCopy {
   bool maintenance_mode_;
   std::string crash_dump_path_;
   std::string exe_path_;
+  std::string oom_score_adj_;
   pid_t watchdog_pid_;
-  UniquePtr<Pipe<kPipeWatchdog> > pipe_watchdog_;
+  std::unique_ptr<Pipe<kPipeWatchdog> > pipe_watchdog_;
   /// The supervisee makes sure its watchdog does not die
-  UniquePtr<Pipe<kPipeWatchdogSupervisor> > pipe_listener_;
+  std::unique_ptr<Pipe<kPipeWatchdogSupervisor> > pipe_listener_;
   /// Send the terminate signal to the listener
-  UniquePtr<Pipe<kPipeThreadTerminator> > pipe_terminate_;
+  std::unique_ptr<Pipe<kPipeThreadTerminator> > pipe_terminate_;
   pthread_t thread_listener_;
   FnOnExit on_exit_;
   platform_spinlock lock_handler_;

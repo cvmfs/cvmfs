@@ -11,6 +11,7 @@
 #include "crypto/hash.h"
 #include "history.h"
 #include "swissknife.h"
+#include "upload.h"
 #include "util/future.h"
 
 namespace manifest {
@@ -25,7 +26,6 @@ class WritableCatalog;
 namespace upload {
 struct SpoolerDefinition;
 struct SpoolerResult;
-class Spooler;
 }  // namespace upload
 
 namespace swissknife {
@@ -51,10 +51,10 @@ class CommandTag : public Command {
     const std::string tmp_path;
 
     UnlinkGuard manifest_path;
-    UniquePtr<manifest::Manifest> manifest;
-    UniquePtr<manifest::Manifest> previous_manifest;
-    UniquePtr<history::History> history;
-    UniquePtr<upload::Spooler> spooler;
+    std::unique_ptr<manifest::Manifest> manifest;
+    std::unique_ptr<manifest::Manifest> previous_manifest;
+    std::unique_ptr<history::History> history;
+    std::unique_ptr<upload::Spooler> spooler;
     UnlinkGuard history_path;
   };
 
@@ -116,6 +116,7 @@ class CommandEditTag : public CommandTag {
  protected:
   int RemoveTags(const ArgumentList &args, Environment *env);
   int AddNewTag(const ArgumentList &args, Environment *env);
+  int CleanupOldAutoTags(const ArgumentList &args, Environment *env);
 
   shash::Any GetTagRootHash(Environment *env,
                             const std::string &root_hash_string) const;

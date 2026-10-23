@@ -6,8 +6,10 @@ cvmfs_test_suites="quick"
 cvmfs_run_test() {
   logfile=$1
 
-  echo "*** set oom_score_adj to -1000"
-  cvmfs_mount lhcb.cern.ch "CVMFS_OOM_SCORE_ADJ=-1000" || return 1
+  echo "*** set oom_score_adj to -1000 and watchdog oom_score_adj to -997"
+  cvmfs_mount lhcb.cern.ch \
+    "CVMFS_OOM_SCORE_ADJ=-1000" \
+    "CVMFS_OOM_SCORE_WATCHDOG=-997" || return 1
   local pid_fuse=$(get_xattr pid /cvmfs/lhcb.cern.ch)
   echo "*** PID of Fuse module is $pid_fuse"
   local pid_watchdog=$(sudo cvmfs_talk -i lhcb.cern.ch pid watchdog)
@@ -23,7 +25,7 @@ cvmfs_run_test() {
   echo "*** OOM score adjustment of cache manager is $oom_score_adj_cachemgr"
 
   [ "x$oom_score_adj_fuse" != "x-1000" ] && return 10
-  [ "x$oom_score_adj_watchdog" != "x-1000" ] && return 11
+  [ "x$oom_score_adj_watchdog" != "x-997" ] && return 11
   [ "x$oom_score_adj_cachemgr" != "x-1000" ] && return 12
 
   return 0

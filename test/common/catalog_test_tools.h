@@ -149,20 +149,20 @@ class CatalogTestTool : public ServerTool {
 
   bool DirSpecAtRootHash(const shash::Any &root_hash, DirSpec *spec);
 
-  manifest::Manifest *manifest() { return manifest_.weak_ref(); }
+  manifest::Manifest *manifest() { return manifest_.get(); }
 
   History history() { return history_; }
 
   std::string repo_name() { return stratum0_; }
   std::string public_key() { return public_key_; }
   catalog::WritableCatalogManager *catalog_mgr() {
-    assert(catalog_mgr_.IsValid());
-    return catalog_mgr_.weak_ref();
+    assert(catalog_mgr_.get() != nullptr);
+    return catalog_mgr_.get();
   }
 
   // Necessary for libcvmfs unit tests in order to avoid clash of sqlite
   // configurations
-  void DestroyCatalogManager() { catalog_mgr_.Destroy(); }
+  void DestroyCatalogManager() { catalog_mgr_.reset(); }
 
   // ApplyAtRootHash creates the new catalog but does not write out the
   // updated manifest
@@ -192,10 +192,10 @@ class CatalogTestTool : public ServerTool {
   std::string public_key_;
   std::string temp_dir_;
 
-  UniquePtr<perf::Statistics> statistics_;
-  UniquePtr<manifest::Manifest> manifest_;
-  UniquePtr<upload::Spooler> spooler_;
-  UniquePtr<catalog::WritableCatalogManager> catalog_mgr_;
+  std::unique_ptr<perf::Statistics> statistics_;
+  std::unique_ptr<manifest::Manifest> manifest_;
+  std::unique_ptr<upload::Spooler> spooler_;
+  std::unique_ptr<catalog::WritableCatalogManager> catalog_mgr_;
   History history_;
 };
 

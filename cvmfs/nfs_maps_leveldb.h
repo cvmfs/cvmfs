@@ -7,12 +7,12 @@
 
 #include <pthread.h>
 
+#include <atomic>
 #include <string>
 
 #include "crypto/hash.h"
 #include "leveldb/env.h"
 #include "nfs_maps.h"
-#include "util/atomic.h"
 
 
 namespace leveldb {
@@ -65,7 +65,7 @@ class NfsMapsLeveldb : public NfsMaps {
     static void *MainFakeThread(void *data);
 
     NfsMapsLeveldb *maps_;
-    atomic_int32 num_bg_threads_;
+    std::atomic<int32_t> num_bg_threads_;
   };
 
   NfsMapsLeveldb();

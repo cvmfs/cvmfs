@@ -145,7 +145,7 @@ cvmfs_run_test() {
   echo "*** shared cachemgr PID: $cachemgr_pid_initial"
 
   local stable_file
-  stable_file=$(find /cvmfs/$STABLE_REPO -maxdepth 4 -type f 2>/dev/null | head -1)
+  stable_file=$(find /cvmfs/$STABLE_REPO -maxdepth 4 -type f -print -quit)
   if [ -z "$stable_file" ]; then
     echo "ERROR: could not find a stable file to emit Touch traffic"
     return 15

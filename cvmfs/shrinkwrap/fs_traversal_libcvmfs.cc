@@ -215,7 +215,8 @@ struct fs_traversal_context *libcvmfs_initialize(const char *repo,
 
   retval = cvmfs_init_v2(options_mgr);
   if (retval) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "CVMFS Initialization failed : %s", repo);
+    // cvmfs_init_v2() already reported the specific reason on stderr
+    LogCvmfs(kLogCvmfs, kLogDebug, "CVMFS Initialization failed : %s", repo);
     return NULL;
   }
 

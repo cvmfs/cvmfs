@@ -31,7 +31,10 @@ static void should_pass_noncompat(const char *textual, unsigned char *acl_binary
   } else {
     ASSERT_FALSE(equiv_mode);
     ASSERT_NE(binary_acl, nullptr);
-    ASSERT_EQ(0, memcmp(binary_acl, acl_binary_expected, binary_size));
+    ASSERT_NE(acl_binary_expected, nullptr);
+    if (acl_binary_expected != nullptr) {
+      ASSERT_EQ(0, memcmp(binary_acl, acl_binary_expected, binary_size));
+    }
   }
   free(binary_acl);
 }
@@ -54,7 +57,10 @@ static void should_pass(const char *textual, unsigned char *acl_binary_expected,
   } else {
     ASSERT_FALSE(equiv_mode);
     ASSERT_NE(binary_acl, nullptr);
-    ASSERT_EQ(0, memcmp(binary_acl, acl_binary_expected, binary_size));
+    ASSERT_NE(acl_binary_expected, nullptr);
+    if (acl_binary_expected != nullptr) {
+      ASSERT_EQ(0, memcmp(binary_acl, acl_binary_expected, binary_size));
+    }
   }
   free(binary_acl);
 }

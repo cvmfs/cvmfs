@@ -18,10 +18,10 @@ using namespace std;  // NOLINT
 
 namespace catalog {
 
-// Emergency fallback: if CVMFS_NO_IGNORE_LEGACY_BULKHASHES is set, revert to the
-// old behavior of including bulk hashes for chunked files.
-bool g_ignore_legacy_bulk_hashes =
-    (getenv("CVMFS_NO_IGNORE_LEGACY_BULKHASHES") == NULL);
+// Emergency fallback: if CVMFS_NO_IGNORE_LEGACY_BULKHASHES is set, revert to
+// the old behavior of including bulk hashes for chunked files.
+bool g_ignore_legacy_bulk_hashes = (getenv("CVMFS_NO_IGNORE_LEGACY_BULKHASHES")
+                                    == NULL);
 
 /**
  * NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE
@@ -86,7 +86,11 @@ const float CatalogDatabase::kLatestSupportedSchema = 2.5;  // + 1.X (r/o)
 //            * Store nanosecond timestamps (mtimens column) in catalog table.
 //              The mtimens column has only the nanosecond part of the timestamp
 //              and may be NULL
-const unsigned CatalogDatabase::kLatestSchemaRevision = 7;
+//   7 --> 8: (Sep 30 2025):
+//            * add kFlagBundleTrigger
+//   8 --> 9: (May 08 2026):
+//            * Add kFlagFileVolatile per-file flag bit (no DDL change)
+const unsigned CatalogDatabase::kLatestSchemaRevision = 9;
 
 bool CatalogDatabase::CheckSchemaCompatibility() {
   return !((schema_version() >= 2.0 - kSchemaEpsilon)
@@ -229,6 +233,27 @@ bool CatalogDatabase::LiveSchemaUpgradeIfNecessary() {
     }
 
     set_schema_revision(7);
+    if (!StoreSchemaRevision()) {
+      LogCvmfs(kLogCatalog, kLogDebug, "failed to upgrade schema revision");
+      return false;
+    }
+  }
+
+  if (IsEqualSchema(schema_version(), 2.5) && (schema_revision() == 7)) {
+    LogCvmfs(kLogCatalog, kLogDebug, "upgrading schema revision (7 --> 8)");
+
+    set_schema_revision(8);
+    if (!StoreSchemaRevision()) {
+      LogCvmfs(kLogCatalog, kLogDebug, "failed to upgrade schema revision");
+      return false;
+    }
+  }
+
+  if (IsEqualSchema(schema_version(), 2.5) && (schema_revision() == 8)) {
+    LogCvmfs(kLogCatalog, kLogDebug, "upgrading schema revision (8 --> 9)");
+
+    // No DDL change: kFlagFileVolatile is encoded in the existing flags column.
+    set_schema_revision(9);
     if (!StoreSchemaRevision()) {
       LogCvmfs(kLogCatalog, kLogDebug, "failed to upgrade schema revision");
       return false;
@@ -480,6 +505,10 @@ unsigned SqlDirent::CreateDatabaseFlags(const DirectoryEntry &entry) const {
       database_flags |= kFlagFileExternal;
     if (entry.IsDirectIo())
       database_flags |= kFlagDirectIo;
+    if (entry.IsBundleTrigger())
+      database_flags |= kFlagBundleTrigger;
+    if (entry.IsVolatile())
+      database_flags |= kFlagFileVolatile;
   }
 
   if (!entry.checksum_ptr()->IsNull() || entry.IsChunkedFile())
@@ -772,7 +801,9 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog,
     result.is_chunked_file_ = (database_flags & kFlagFileChunk);
     result.is_hidden_ = (database_flags & kFlagHidden);
     result.is_direct_io_ = (database_flags & kFlagDirectIo);
+    result.is_volatile_ = (database_flags & kFlagFileVolatile);
     result.is_external_file_ = (database_flags & kFlagFileExternal);
+    result.is_bundle_trigger_ = (database_flags & kFlagBundleTrigger);
     result.has_xattrs_ = RetrieveInt(15) != 0;
     result.mtime_ns_ = RetrieveNullableInt(16, -1);
     result.checksum_ = RetrieveHashBlob(0,
@@ -1363,8 +1394,9 @@ SqlAllChunks::SqlAllChunks(const CatalogDatabase &database) {
                                    + ") " + "AS compression_algorithm ";
 
   if (!g_ignore_legacy_bulk_hashes)
-    LogCvmfs(kLogCatalog, kLogDebug, "CVMFS_NO_IGNORE_LEGACY_BULKHASHES is set, "
-		     "legacy bulk hashes won't be ignored in catalog operations");
+    LogCvmfs(kLogCatalog, kLogDebug,
+             "CVMFS_NO_IGNORE_LEGACY_BULKHASHES is set, "
+             "legacy bulk hashes won't be ignored in catalog operations");
 
   // TODO(reneme): this depends on shash::kSuffix* being a char!
   //               it should be more generic or replaced entirely
@@ -1379,10 +1411,11 @@ SqlAllChunks::SqlAllChunks(const CatalogDatabase &database) {
                + "AS chunk_type, " + flags2hash + "," + flags2compression
                + "FROM catalog WHERE (hash IS NOT NULL) AND "
                  " (flags & "
-               + StringifyInt(SqlDirent::kFlagFileExternal |
-                              (g_ignore_legacy_bulk_hashes
-                                   ? SqlDirent::kFlagFileChunk
-                                   : 0)) + " = 0)";
+               + StringifyInt(SqlDirent::kFlagFileExternal
+                              | (g_ignore_legacy_bulk_hashes
+                                     ? SqlDirent::kFlagFileChunk
+                                     : 0))
+               + " = 0)";
   if (database.schema_version() >= 2.4 - CatalogDatabase::kSchemaEpsilon) {
     sql += " UNION "
            "SELECT DISTINCT chunks.hash, "
@@ -1440,9 +1473,9 @@ XattrList SqlLookupXattrs::GetXattrs() {
 
   const int size = RetrieveBytes(0);
   assert(size >= 0);
-  const UniquePtr<XattrList> xattrs(
+  const std::unique_ptr<XattrList> xattrs(
       XattrList::Deserialize(packed_xattrs, size));
-  if (!xattrs.IsValid()) {
+  if (xattrs.get() == nullptr) {
     LogCvmfs(kLogCatalog, kLogDebug, "corrupted xattr data");
     return XattrList();
   }

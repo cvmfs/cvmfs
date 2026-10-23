@@ -20,44 +20,82 @@ set -e
 
 case "$1" in
     configure)
+	base_url="http://cvmrepo.s3.cern.ch/cvmrepo/apt"
+	dest="/etc/apt/sources.list.d/cernvm.list"
+
 	codename=$(env -i sh -c '. /etc/os-release; echo $VERSION_CODENAME')
-	ID=$(env -i sh -c '. /etc/os-release; echo $ID')
-	repolist=/usr/share/cvmfs-release/cernvm.list.${codename}
-	mkdir -p /etc/apt/sources.list.d
-	if [ -f $repolist ]; then
-	  ln -f -s $repolist /etc/apt/sources.list.d/cernvm.list
-	else
-		version_major=$(env -i sh -c '. /etc/os-release; echo $VERSION_ID' | cut -d. -f1)
-		fallback_release=
-    if [ "$ID" = "ubuntu" ]; then
-      if [ $version_major -ge 26 ]; then
-        echo "Warning: this distribution is not supported. Using Ubuntu 26.04 packages as fallback."
-        fallback_release=resolute
-      elif [ $version_major -ge 24 ]; then
-        echo "Warning: this distribution is not supported. Using Ubuntu 24.04 packages as fallback."
-        fallback_release=noble
-      elif [ $version_major -ge 22 ]; then
-        echo "Warning: this distribution is not supported. Using Ubuntu 22.04 packages as fallback."
-        fallback_release=jammy
-      elif [ $version_major -ge 20 ]; then
-        echo "Warning: this distribution is not supported. Using Ubuntu 20.04 packages as fallback."
-        fallback_release=focal
-      elif [ $version_major -ge 18 ]; then
-        echo "Warning: this distribution is not supported. Using Ubuntu 18.04 packages as fallback."
-        fallback_release=bionic
-      else
-        echo "Warning: this distribution is not supported. Using Ubuntu 16.04 packages as fallback."
-        fallback_release=xenial
-      fi
-    else
-      # debian
-      echo "Warning: this distribution is not supported. Using Debian bookworm packages as fallback."
-      fallback_release=bookworm
-    fi
-    
-		ln -f -s /usr/share/cvmfs-release/cernvm.list.$fallback_release \
-	        /etc/apt/sources.list.d/cernvm.list
+	id=$(env -i sh -c '. /etc/os-release; echo $ID')
+
+	# Ordered fallback suites (newest first). Only used when the running
+	# distribution's own "<codename>-prod" suite is not (yet) published on
+	# the server, e.g. a freshly released distro CVMFS has not built for yet.
+	# This list changes rarely (roughly once per LTS), never per release.
+	case "$id" in
+	    ubuntu) fallbacks="resolute noble jammy focal bionic xenial" ;;
+	    *)      fallbacks="trixie bookworm bullseye buster" ;; # debian & derivatives
+	esac
+
+	# Returns 0 if "<suite>-prod" is published, 1 if not, 2 if we cannot tell
+	# (no probing tool / transport failure). Never aborts under 'set -e'.
+	suite_published() {
+	    _url="$base_url/dists/$1-prod/InRelease"
+	    if command -v curl >/dev/null 2>&1; then
+	        _status=$(curl -sS -o /dev/null -w '%{http_code}' -I --max-time 10 "$_url")
+	        _rc=$?
+	        [ $_rc -eq 0 ] || return 2
+	        [ "$_status" = 200 ] && return 0
+	        [ "$_status" = 404 ] && return 1
+	        return 2
+	    elif command -v wget >/dev/null 2>&1; then
+	        _response=$(wget -q --timeout=10 --spider --server-response "$_url" 2>&1)
+	        _rc=$?
+	        [ $_rc -eq 0 ] && return 0
+	        _status=$(printf '%s\n' "$_response" |
+	            awk '$1 ~ /^HTTP\// { status=$2 } END { print status }')
+	        [ "$_status" = 404 ] && return 1
+	        return 2
+	    elif [ -x /usr/lib/apt/apt-helper ]; then
+	        _tmp=$(mktemp)
+	        /usr/lib/apt/apt-helper download-file "$_url" "$_tmp" >/dev/null 2>&1
+	        _rc=$?; rm -f "$_tmp"
+	        [ $_rc -eq 0 ] && return 0
+	        return 2
+	    else
+	        return 2
+	    fi
+	}
+
+	# Prefer the distribution's own suite, derived from the codename. This is
+	# what makes new Debian/Ubuntu releases work with no package update: as
+	# soon as the server publishes "<codename>-prod", users get it. If that
+	# suite is not yet there (and we can probe), degrade to the newest
+	# available fallback. If we cannot probe at all, trust the codename.
+	suite=""
+	if [ -n "$codename" ]; then
+	    rc=0; suite_published "$codename" || rc=$?
+	    if [ $rc -eq 0 ] || [ $rc -eq 2 ]; then
+	        suite="$codename"
+	    fi
 	fi
+	if [ -z "$suite" ]; then
+	    for cand in $fallbacks; do
+	        rc=0; suite_published "$cand" || rc=$?
+	        if [ $rc -eq 0 ]; then suite="$cand"; break; fi
+	        [ $rc -eq 2 ] && break
+	    done
+	    if [ -n "$suite" ]; then
+	        echo "Warning: '${codename}-prod' is not available yet; using '${suite}-prod' as fallback." >&2
+	    fi
+	fi
+	# Last resort: trust the codename even if unverified, so apt at least
+	# points somewhere meaningful and reports a clear error on update.
+	[ -n "$suite" ] || suite="$codename"
+
+	mkdir -p /etc/apt/sources.list.d
+	cat > "$dest" <<EOF
+deb $base_url ${suite}-prod main
+# deb $base_url ${suite}-testing main
+EOF
     ;;
 
     abort-upgrade|abort-remove|abort-deconfigure)

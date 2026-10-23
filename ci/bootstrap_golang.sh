@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 
 # Bootstrap Go to a sufficiently new version for building CernVM-FS.
-# Downloads pre-built binaries from go.dev for Linux and macOS (x86_64/aarch64).
+# Downloads pre-built binaries from go.dev for Linux (x86_64/aarch64/riscv64/
+# ppc64le/s390x) and macOS (x86_64/aarch64).
 #
 # Usage:
 #   ci/bootstrap_golang.sh [OPTIONS]
@@ -136,6 +137,9 @@ go_arch() {
   case "$1" in
     x86_64)        echo "amd64" ;;
     aarch64|arm64) echo "arm64" ;;
+    riscv64)       echo "riscv64" ;;
+    ppc64le)       echo "ppc64le" ;;
+    s390x)         echo "s390x" ;;
     *) die "Unsupported architecture for Go pre-built binary: $1" ;;
   esac
 }

@@ -38,6 +38,7 @@ struct SyncParameters {
       , include_xattrs(false)
       , enable_mtime_ns(false)
       , fast_delete(false)
+      , tolerate_missing_hardlinks(false)
       , external_data(false)
       , direct_io(false)
       , voms_authz(false)
@@ -92,6 +93,7 @@ struct SyncParameters {
   bool include_xattrs;
   bool enable_mtime_ns;
   bool fast_delete;
+  bool tolerate_missing_hardlinks;
   bool external_data;
   bool direct_io;
   bool voms_authz;
@@ -257,7 +259,7 @@ class CommandSync : public Command {
     return "Pushes changes from scratch area back to the repository.";
   }
   virtual ParameterList GetParams() const {
-    // unused characters: J, 1-9, all special characters but @
+    // unused characters: 1-9, all special characters but @
     ParameterList r;
     r.push_back(Parameter::Mandatory('b', "base hash"));
     r.push_back(Parameter::Mandatory('c', "r/o volume"));
@@ -330,6 +332,9 @@ class CommandSync : public Command {
     r.push_back(Parameter::Optional('P', "session_token_file"));
     r.push_back(Parameter::Optional('H', "key file for HTTP API"));
     r.push_back(Parameter::Optional('@', "proxy URL"));
+    r.push_back(Parameter::Optional('C',
+        "auto tag cleanup threshold as a Unix timestamp; auto tags older than "
+        "this are removed (only used when upstream is GW)"));
 
     return r;
   }

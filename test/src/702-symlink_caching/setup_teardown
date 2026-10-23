@@ -30,11 +30,10 @@ add_some_tmp_file_to_repo() {
 
 private_mount() {
   local mntpnt="$1"
-  local fuse_version="$2"
-  local config_file_path="$3"
+  local config_file_path="$2"
   TEST702_PRIVATE_MOUNT="$mntpnt"
 
-  local mount_options="rw,system_mount,fsname=cvmfs2,libfuse=$fuse_version"
+  local mount_options="rw,system_mount,fsname=cvmfs2"
 
   do_local_mount_as_root "$mntpnt" \
                  "$CVMFS_TEST_REPO" \

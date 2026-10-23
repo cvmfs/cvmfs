@@ -33,7 +33,6 @@ cleanup() {
   echo "running cleanup()"
   if [ ! -z $CVMFS_TEST_541_MOUNTPOINT ]; then
     sudo fusermount -u $CVMFS_TEST_541_MOUNTPOINT
-    sudo umount        $CVMFS_TEST_541_MOUNTPOINT
   fi
 }
 

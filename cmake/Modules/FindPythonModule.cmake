@@ -4,13 +4,13 @@
 function(find_python_module module)
 	string(TOUPPER ${module} module_upper)
 	if(NOT PYTHON_${module_upper})
-		include (FindPythonInterp)
+		find_package(Python COMPONENTS Interpreter REQUIRED)
 		if(ARGC GREATER 1 AND ARGV1 STREQUAL "REQUIRED")
 			set(PY_${module}_FIND_REQUIRED TRUE)
 		endif()
 		# A module's location is usually a directory, but for binary modules
 		# it's a .so file.
-		execute_process(COMMAND "${PYTHON_EXECUTABLE}" "-c" 
+		execute_process(COMMAND "${Python_EXECUTABLE}" "-c"
 			"import re, ${module}; print(re.compile('/__init__.py.*').sub('',${module}.__file__))"
 			RESULT_VARIABLE _${module}_status 
 			OUTPUT_VARIABLE _${module}_location

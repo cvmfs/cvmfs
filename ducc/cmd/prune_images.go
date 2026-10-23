@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"bufio"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -20,8 +22,10 @@ import (
 const pruneImagesDefaultConfig = "ducc-prune.yaml"
 
 var (
-	pruneImagesDryRun bool
-	pruneImagesConfig string
+	pruneImagesDryRun  bool
+	pruneImagesConfig  string
+	pruneNotInWishlist bool
+	pruneImagesYes     bool
 )
 
 func init() {
@@ -30,15 +34,31 @@ func init() {
 	pruneImagesCmd.Flags().StringVar(&pruneImagesConfig, "config", "",
 		fmt.Sprintf("Path to a prune config file listing wishlist sources (default: %s in the current directory if present)",
 			pruneImagesDefaultConfig))
+	pruneImagesCmd.Flags().BoolVar(&pruneNotInWishlist, "prune-not-in-wishlist", false,
+		"Also delete images that are still available on the registry but are no longer listed in any wishlist")
+	pruneImagesCmd.Flags().BoolVarP(&pruneImagesYes, "yes", "y", false,
+		"Skip the confirmation prompt when deleting images not in the wishlist")
 	rootCmd.AddCommand(pruneImagesCmd)
 }
 
 var pruneImagesCmd = &cobra.Command{
 	Use:   "prune-images <cvmfs-repo> [wishlist...]",
-	Short: "Delete images from CVMFS that are no longer available on the registry",
+	Short: "Delete images from CVMFS that are no longer available on the registry or in the wishlist",
 	Long: `Reads one or more wishlist files, expands wildcard tags by querying the
 registry, and removes from the CVMFS repository any image that the wishlist
 covers but is no longer present on its source registry.
+
+With --prune-not-in-wishlist, the command additionally removes every image
+converted into the CVMFS repository that is not covered by any wishlist entry
+(fixed tags must match exactly, wildcard tags match as glob patterns). Since a
+mistake in the wishlist could delete everything, this mode lists the affected
+images and asks for confirmation unless --yes is given; without --yes, stdin
+must be a terminal. Combine with --dry-run to preview the deletion.
+
+All images in the repository are considered, so every wishlist that feeds the
+repository must be supplied. In this mode the command aborts before deleting
+anything if any wishlist source cannot be loaded or any of its entries cannot
+be parsed.
 
 Wishlist sources are collected from two places (merged together):
   1. Positional arguments on the command line
@@ -72,12 +92,41 @@ Each wishlist source can be:
 			return fmt.Errorf("no wishlist sources provided: supply them as arguments or in a config file")
 		}
 
-		totalDeleted := 0
+		// Load and merge all wishlists up front. The merged list is needed
+		// both to prune images that disappeared from the registry and to
+		// find CVMFS images that are no longer covered by any wishlist.
+		var allImages []lib.Image
 		for _, source := range wishlistSources {
-			n, err := pruneFromWishlist(CVMFSRepo, source, pruneImagesDryRun)
+			images, err := loadWishlistImages(source, pruneNotInWishlist)
 			if err != nil {
+				// A missing wishlist would make all of its images look
+				// orphaned, so they would be deleted.
+				if pruneNotInWishlist {
+					return fmt.Errorf("refusing to prune images not in the wishlist: %w", err)
+				}
 				l.LogE(err).WithFields(log.Fields{"source": source}).
-					Error("Error processing wishlist, continuing with others")
+					Error("Error loading wishlist, continuing with others")
+				continue
+			}
+			allImages = append(allImages, images...)
+		}
+
+		totalDeleted := 0
+
+		n, err := lib.PruneImages(CVMFSRepo, allImages, pruneImagesDryRun)
+		if err != nil {
+			l.LogE(err).Error("Error pruning images that disappeared from the registry")
+		}
+		totalDeleted += n
+
+		if pruneNotInWishlist {
+			if len(allImages) == 0 {
+				return fmt.Errorf("refusing to prune images not in the wishlist: " +
+					"no images could be loaded from any wishlist, this would delete everything")
+			}
+			n, err := pruneImagesNotInWishlist(CVMFSRepo, allImages, pruneImagesDryRun, pruneImagesYes)
+			if err != nil {
+				return err
 			}
 			totalDeleted += n
 		}
@@ -125,24 +174,86 @@ func loadPruneConfig(configPath string) ([]string, error) {
 	return cfg.Wishlists, nil
 }
 
-func pruneFromWishlist(CVMFSRepo, source string, dryRun bool) (int, error) {
+// loadWishlistImages fetches the wishlist from the given source and returns
+// the parsed input images. With strict set, an unparsable entry is an error
+// instead of being skipped.
+func loadWishlistImages(source string, strict bool) ([]lib.Image, error) {
 	data, err := loadWishlist(source)
 	if err != nil {
-		return 0, fmt.Errorf("failed to load wishlist %q: %w", source, err)
+		return nil, fmt.Errorf("failed to load wishlist %q: %w", source, err)
 	}
 
-	images, err := parseWishlistInputs(data)
+	images, err := parseWishlistInputs(data, strict)
 	if err != nil {
-		return 0, fmt.Errorf("failed to parse wishlist %q: %w", source, err)
+		return nil, fmt.Errorf("failed to parse wishlist %q: %w", source, err)
 	}
 
-	return lib.PruneImages(CVMFSRepo, images, dryRun)
+	return images, nil
+}
+
+// pruneImagesNotInWishlist deletes from CVMFSRepo every converted image that is
+// not covered by any wishlist entry. The affected images are listed first and,
+// unless dryRun or assumeYes is set, the user is asked to confirm the deletion.
+func pruneImagesNotInWishlist(CVMFSRepo string, wishlist []lib.Image, dryRun, assumeYes bool) (int, error) {
+	candidates, err := lib.FindCVMFSImagesNotInWishlist(CVMFSRepo, wishlist)
+	if err != nil {
+		return 0, fmt.Errorf("failed to scan CVMFS for images not in the wishlist: %w", err)
+	}
+
+	if len(candidates) == 0 {
+		fmt.Println("All images in CVMFS are covered by the wishlist, nothing to prune")
+		return 0, nil
+	}
+
+	fmt.Printf("Found %d image(s) in CVMFS that are not in any wishlist:\n", len(candidates))
+	for _, img := range candidates {
+		fmt.Printf("  %s\n", img.GetSimpleName())
+	}
+
+	if !dryRun && !assumeYes {
+		confirmed, err := confirmPruneNotInWishlist(os.Stdin)
+		if err != nil {
+			return 0, err
+		}
+		if !confirmed {
+			fmt.Println("Aborted, no images deleted")
+			return 0, nil
+		}
+	}
+
+	return lib.DeleteImagesFromCVMFS(CVMFSRepo, candidates, dryRun)
+}
+
+// confirmPruneNotInWishlist asks the user to confirm the deletion. A
+// non-interactive stdin is an error so that unattended runs missing --yes fail
+// visibly instead of silently doing nothing.
+func confirmPruneNotInWishlist(stdin *os.File) (bool, error) {
+	info, err := stdin.Stat()
+	if err != nil {
+		return false, fmt.Errorf("cannot inspect stdin for confirmation: %w", err)
+	}
+	if info.Mode()&os.ModeCharDevice == 0 {
+		return false, fmt.Errorf("stdin is not a terminal, cannot ask for confirmation: pass --yes to delete without confirmation")
+	}
+	return readConfirmation(stdin)
+}
+
+func readConfirmation(r io.Reader) (bool, error) {
+	fmt.Print("Delete these images from CVMFS? [y/N]: ")
+	answer, err := bufio.NewReader(r).ReadString('\n')
+	if err != nil && !(err == io.EOF && answer != "") {
+		return false, fmt.Errorf("failed to read confirmation: %w", err)
+	}
+	answer = strings.ToLower(strings.TrimSpace(answer))
+	return answer == "y" || answer == "yes", nil
 }
 
 // parseWishlistInputs reads the input image list from a wishlist YAML and
 // returns the parsed Image values. The cvmfs_repo and output_format fields
 // are intentionally ignored here since the repo is supplied on the command line.
-func parseWishlistInputs(data []byte) ([]lib.Image, error) {
+// Unparsable entries are skipped with a warning, or returned as an error if
+// strict is set.
+func parseWishlistInputs(data []byte, strict bool) ([]lib.Image, error) {
 	var recipe struct {
 		Input []string `yaml:"input"`
 	}
@@ -154,6 +265,9 @@ func parseWishlistInputs(data []byte) ([]lib.Image, error) {
 	for _, inputStr := range recipe.Input {
 		img, err := lib.ParseImage(inputStr)
 		if err != nil {
+			if strict {
+				return nil, fmt.Errorf("invalid wishlist entry %q: %w", inputStr, err)
+			}
 			l.LogE(err).WithFields(log.Fields{"image": inputStr}).
 				Warning("Failed to parse image from wishlist, skipping")
 			continue

@@ -11,6 +11,7 @@
 
 #include <cassert>
 #include <map>
+#include <memory>
 #include <set>
 #include <string>
 #include <vector>
@@ -27,7 +28,6 @@
 #include "shortstring.h"
 #include "util/exception.h"
 #include "util/logging.h"
-#include "util/pointer.h"
 #include "util/posix.h"
 
 using namespace std;  // NOLINT
@@ -44,7 +44,10 @@ static inline uint32_t hasher_any(const shash::Any &key) {
 namespace swissknife {
 
 CommandCheck::CommandCheck()
-    : check_chunks_(false), no_duplicates_map_(false), is_remote_(false) {
+    : check_chunks_(false)
+    , no_duplicates_map_(false)
+    , is_remote_(false)
+    , inclusion_spec_(NULL) {
   const shash::Any hash_null;
   duplicates_map_.Init(16, hash_null, hasher_any);
 }
@@ -115,6 +118,14 @@ bool CommandCheck::CompareEntries(const catalog::DirectoryEntry &a,
              "external file flag differs: %d / %d "
              "(%s / %s)",
              a.IsExternalFile(), b.IsExternalFile(), a.name().c_str(),
+             b.name().c_str());
+    retval = false;
+  }
+  if (diffs & Difference::kVolatileFlag) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "volatile flag differs: %d / %d "
+             "(%s / %s)",
+             a.IsVolatile(), b.IsVolatile(), a.name().c_str(),
              b.name().c_str());
     retval = false;
   }
@@ -230,8 +241,9 @@ bool CommandCheck::InspectReflog(const shash::Any &reflog_hash,
     return false;
   }
 
-  const UniquePtr<manifest::Reflog> reflog(manifest::Reflog::Open(reflog_path));
-  assert(reflog.IsValid());
+  const std::unique_ptr<manifest::Reflog> reflog(
+      manifest::Reflog::Open(reflog_path));
+  assert(reflog.get() != nullptr);
   reflog->TakeDatabaseFileOwnership();
 
   if (!reflog->ContainsCatalog(manifest->catalog_hash())) {
@@ -361,10 +373,11 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
   for (unsigned i = 0; i < entries.size(); ++i) {
     // for performance reasons, keep track of files already checked
     // and only run requests once per hash
-    const bool entry_needs_check = !entries[i].checksum().IsNull() &&
-                                   !entries[i].IsExternalFile() &&
-                                   !(catalog::g_ignore_legacy_bulk_hashes &&
-                                     entries[i].IsChunkedFile()) &&
+    const bool entry_needs_check = !entries[i].checksum().IsNull()
+                                   && !entries[i].IsExternalFile()
+                                   && !(catalog::g_ignore_legacy_bulk_hashes
+                                        && entries[i].IsChunkedFile())
+                                   &&
                                    // fallback cli option can force the entry to
                                    // be checked
                                    (no_duplicates_map_
@@ -790,7 +803,8 @@ bool CommandCheck::InspectTree(const string &path,
                                const uint64_t catalog_size,
                                const bool is_nested_catalog,
                                const catalog::DirectoryEntry *transition_point,
-                               catalog::DeltaCounters *computed_counters) {
+                               catalog::DeltaCounters *computed_counters,
+                               bool *pruned_subtree) {
   LogCvmfs(kLogCvmfs, kLogStdout | kLogInform, "[inspecting catalog] %s at %s",
            catalog_hash.ToString().c_str(), path == "" ? "/" : path.c_str());
 
@@ -843,6 +857,13 @@ bool CommandCheck::InspectTree(const string &path,
       retval = false;
     }
   }
+
+  // Partial replication: excluded subtrees are not replicated at all (their
+  // catalogs are pruned during snapshot), so InspectTree is only ever reached
+  // for catalogs that are present.  Pruning of the recursion happens in the
+  // nested-catalog loop below; here we just track whether anything was pruned
+  // so the aggregate counter comparison can be relaxed accordingly.
+  bool local_pruned = false;
 
   // Traverse the catalog
   set<PathString> bind_mountpoints;
@@ -911,6 +932,19 @@ bool CommandCheck::InspectTree(const string &path,
                i->mountpoint.c_str());
       continue;
     }
+    // Partial replication: a subtree that contains no included path is pruned
+    // on the Stratum-1 (catalog + objects absent), so we must not descend into
+    // it.  Skipping recursion here also means the aggregate counters for this
+    // catalog will be lower than the stored ones; record that so the counter
+    // comparison can be relaxed below.
+    if (inclusion_spec_ != NULL
+        && inclusion_spec_->IsExcluded(i->mountpoint.ToString())) {
+      LogCvmfs(kLogCvmfs, kLogStdout,
+               "  Skipping pruned (excluded) subtree at %s",
+               i->mountpoint.c_str());
+      local_pruned = true;
+      continue;
+    }
     catalog::DirectoryEntry nested_transition_point;
     if (!catalog->LookupPath(i->mountpoint, &nested_transition_point)) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to lookup transition point %s",
@@ -919,23 +953,40 @@ bool CommandCheck::InspectTree(const string &path,
     } else {
       catalog::DeltaCounters nested_counters;
       const bool is_nested = true;
+      bool nested_pruned = false;
       if (!InspectTree(i->mountpoint.ToString(), i->hash, i->size, is_nested,
-                       &nested_transition_point, &nested_counters))
+                       &nested_transition_point, &nested_counters,
+                       &nested_pruned))
         retval = false;
+      if (nested_pruned)
+        local_pruned = true;
       nested_counters.PopulateToParent(computed_counters);
     }
   }
 
+  if (pruned_subtree != NULL && local_pruned)
+    *pruned_subtree = true;
+
   // Check statistics counters
   // Additionally account for root directory
   computed_counters->self.directories++;
-  catalog::Counters compare_counters;
-  compare_counters.ApplyDelta(*computed_counters);
-  const catalog::Counters stored_counters = catalog->GetCounters();
-  if (!CompareCounters(compare_counters, stored_counters)) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "statistics counter mismatch [%s]",
-             catalog_hash.ToString().c_str());
-    retval = false;
+  // Partial replication: when descendant subtrees have been pruned, the
+  // aggregate (subtree) counters stored in this catalog necessarily exceed
+  // what we could recompute, so the comparison would always fail.  Skip it for
+  // affected catalogs; self counters and structure are still fully verified.
+  if (local_pruned) {
+    LogCvmfs(kLogCvmfs, kLogStdout,
+             "  Skipping aggregate counter check at %s (pruned subtree)",
+             path == "" ? "/" : path.c_str());
+  } else {
+    catalog::Counters compare_counters;
+    compare_counters.ApplyDelta(*computed_counters);
+    const catalog::Counters stored_counters = catalog->GetCounters();
+    if (!CompareCounters(compare_counters, stored_counters)) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "statistics counter mismatch [%s]",
+               catalog_hash.ToString().c_str());
+      retval = false;
+    }
   }
 
   delete catalog;
@@ -974,6 +1025,18 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
   if (args.find('N') != args.end())
     repo_name = *args.find('N')->second;
 
+  if (args.find('E') != args.end()) {
+    inclusion_spec_ = catalog::InclusionSpec::Create(*args.find('E')->second);
+    if (inclusion_spec_ == NULL || !inclusion_spec_->IsValid()) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "Failed to parse inclusion spec from '%s'",
+               args.find('E')->second->c_str());
+      return 1;
+    }
+    LogCvmfs(kLogCvmfs, kLogStdout,
+             "Partial replication: will skip pruned (excluded) subtrees");
+  }
+
   repo_base_path_ = MakeCanonicalPath(*args.find('r')->second);
   if (args.find('s') != args.end())
     subtree_path = MakeCanonicalPath(*args.find('s')->second);
@@ -1004,21 +1067,21 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
   }
 
   // Load Manifest
-  UniquePtr<manifest::Manifest> manifest;
+  std::unique_ptr<manifest::Manifest> manifest;
   bool successful = true;
 
   if (is_remote_) {
-    manifest = FetchRemoteManifest(repo_base_path_, repo_name);
+    manifest.reset(FetchRemoteManifest(repo_base_path_, repo_name));
   } else {
     if (chdir(repo_base_path_.c_str()) != 0) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to switch to directory %s",
                repo_base_path_.c_str());
       return 1;
     }
-    manifest = OpenLocalManifest(".cvmfspublished");
+    manifest.reset(OpenLocalManifest(".cvmfspublished"));
   }
 
-  if (!manifest.IsValid()) {
+  if (manifest.get() == nullptr) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to load repository manifest");
     return 1;
   }
@@ -1055,7 +1118,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
                ".cvmfsreflog present but no checksum provided, aborting");
       return 1;
     }
-    const bool retval = InspectReflog(reflog_hash, manifest.weak_ref());
+    const bool retval = InspectReflog(reflog_hash, manifest.get());
     if (!retval) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to verify reflog");
       return 1;
@@ -1074,7 +1137,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
   }
 
   // Load history
-  UniquePtr<history::History> tag_db;
+  std::unique_ptr<history::History> tag_db;
   if (!manifest->history().IsNull()) {
     string tmp_file;
     if (!is_remote_)
@@ -1086,14 +1149,14 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
                manifest->history().ToString().c_str());
       return 1;
     }
-    tag_db = history::SqliteHistory::Open(tmp_file);
-    if (!tag_db.IsValid()) {
+    tag_db.reset(history::SqliteHistory::Open(tmp_file));
+    if (tag_db.get() == nullptr) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to open history database %s",
                manifest->history().ToString().c_str());
       return 1;
     }
     tag_db->TakeDatabaseFileOwnership();
-    successful = InspectHistory(tag_db.weak_ref()) && successful;
+    successful = InspectHistory(tag_db.get()) && successful;
   }
 
   if (manifest->has_alt_catalog_path()) {
@@ -1114,7 +1177,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
   shash::Any root_hash = manifest->catalog_hash();
   uint64_t root_size = manifest->catalog_size();
   if (tag_name != "") {
-    if (!tag_db.IsValid()) {
+    if (tag_db.get() == nullptr) {
       LogCvmfs(kLogCvmfs, kLogStderr, "no history");
       return 1;
     }
@@ -1154,6 +1217,8 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
   }
 
   LogCvmfs(kLogCvmfs, kLogStdout, "no problems found");
+  delete inclusion_spec_;
+  inclusion_spec_ = NULL;
   return 0;
 }
 

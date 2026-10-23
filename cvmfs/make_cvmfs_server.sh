@@ -43,6 +43,7 @@ COMPONENTS="\
     server/cvmfs_server_import.sh
     server/cvmfs_server_mkfs.sh
     server/cvmfs_server_connect_gw.sh
+    server/cvmfs_server_refresh_lease.sh
     server/cvmfs_server_add_replica.sh
     server/cvmfs_server_rmfs.sh
     server/cvmfs_server_resign.sh

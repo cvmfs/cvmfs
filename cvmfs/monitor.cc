@@ -13,6 +13,7 @@
 
 #include <errno.h>
 #include <execinfo.h>
+#include <fcntl.h>
 #include <poll.h>
 #include <pthread.h>
 #include <signal.h>
@@ -66,9 +67,10 @@ int Watchdog::g_crash_signals[] = {SIGQUIT, SIGILL, SIGABRT, SIGFPE,
 
 Watchdog *Watchdog::Create(FnOnExit on_exit,
                            bool needs_read_environ,
-                           WatchdogState *saved_state) {
+                           WatchdogState *saved_state,
+                           const std::string &oom_score_adj) {
   assert(instance_ == NULL);
-  instance_ = new Watchdog(on_exit);
+  instance_ = new Watchdog(on_exit, oom_score_adj);
   if (saved_state != NULL)
     instance_->RestoreState(saved_state);
   else
@@ -86,7 +88,7 @@ string Watchdog::GenerateStackTrace(pid_t pid) {
   string result = "";
 
   // Get capability to ptrace the dead main cvmfs2 process.
-  // This is often necessary because the main process can have its own 
+  // This is often necessary because the main process can have its own
   // elevated capability which would otherwise block ptrace.
   if (!ObtainSysPtraceCapability()) {
     result += "failed to gain ptrace capability... still give it a try\n";
@@ -392,8 +394,10 @@ Watchdog::SigactionMap Watchdog::SetSignalHandlers(
  */
 void Watchdog::Fork(bool needs_read_environ) {
   Pipe<kPipeWatchdogPid> pipe_pid;
-  pipe_watchdog_ = new Pipe<kPipeWatchdog>();
-  pipe_listener_ = new Pipe<kPipeWatchdogSupervisor>();
+  pipe_watchdog_ = std::unique_ptr<Pipe<kPipeWatchdog> >(
+      new Pipe<kPipeWatchdog>());
+  pipe_listener_ = std::unique_ptr<Pipe<kPipeWatchdogSupervisor> >(
+      new Pipe<kPipeWatchdogSupervisor>());
 
   pid_t pid;
   int statloc;
@@ -408,6 +412,33 @@ void Watchdog::Fork(bool needs_read_environ) {
         case 0: {
           pipe_watchdog_->CloseWriteFd();
           Daemonize();
+#ifndef __APPLE__
+          if (!oom_score_adj_.empty()) {
+            // After seteuid() the process is non-dumpable and its /proc
+            // entries are owned by root, so temporarily regain root if possible
+            const uid_t euid = geteuid();
+            const gid_t egid = getegid();
+            const bool regain_root = (euid != 0) && (getuid() == 0);
+            if (regain_root)
+              SwitchCredentials(0, egid, true /* temporarily */);
+            const int fd_oom = open("/proc/self/oom_score_adj", O_WRONLY);
+            // Lowering the score requires CAP_SYS_RESOURCE, so failure is
+            // expected for unprivileged mounts
+            if ((fd_oom < 0)
+                || !SafeWrite(fd_oom, oom_score_adj_.data(),
+                              oom_score_adj_.length())) {
+              LogCvmfs(kLogMonitor, kLogDebug,
+                       "watchdog: failed to set oom_score_adj to %s",
+                       oom_score_adj_.c_str());
+            }
+            if (fd_oom >= 0)
+              close(fd_oom);
+            if (regain_root && !SwitchCredentials(euid, egid, true)) {
+              PANIC(kLogStderr | kLogSyslogErr,
+                    "Failed to drop watchdog credentials");
+            }
+          }
+#endif
           if ((geteuid() != 0) && SetuidCapabilityPermitted()) {
             const std::vector<cap_value_t> nocaps;
             if (on_exit_) {
@@ -419,18 +450,25 @@ void Watchdog::Fork(bool needs_read_environ) {
               // ptrace (needed for collecting a stack trace) is not
               // allowed on a process with more capabilities.
               if (needs_read_environ) {
-                const std::vector<cap_value_t> reservecaps = {CAP_SYS_ADMIN, CAP_SYS_PTRACE};
+                const std::vector<cap_value_t> reservecaps = {CAP_SYS_ADMIN,
+                                                              CAP_SYS_PTRACE};
                 const std::vector<cap_value_t> inheritcaps = {CAP_SYS_PTRACE};
-                assert(ClearPermittedCapabilities(reservecaps, inheritcaps));
+                if (!ClearPermittedCapabilities(reservecaps, inheritcaps))
+                  PANIC(kLogStderr | kLogSyslogErr,
+                        "Failed to reduce watchdog process capabilities");
               } else {
                 const std::vector<cap_value_t> reservecaps = {CAP_SYS_ADMIN};
-                assert(ClearPermittedCapabilities(reservecaps, nocaps));
+                if (!ClearPermittedCapabilities(reservecaps, nocaps))
+                  PANIC(kLogStderr | kLogSyslogErr,
+                        "Failed to reduce watchdog process capabilities");
               }
             } else {
               // Only need to be able to do the stack trace, and the
               // main process needs no extra capabilities, so we can
               // drop all capabilities.
-              assert(ClearPermittedCapabilities(nocaps, nocaps));
+              if (!ClearPermittedCapabilities(nocaps, nocaps))
+                PANIC(kLogStderr | kLogSyslogErr,
+                      "Failed to clear watchdog process capabilities");
             }
           }
           // send the watchdog PID to the supervisee
@@ -516,7 +554,8 @@ bool Watchdog::WaitForSupervisee() {
     case ControlFlow::kQuit:
       return false;
     case ControlFlow::kQuitWithExit:
-      if (on_exit_) on_exit_(false);
+      if (on_exit_)
+        on_exit_(false);
       return false;
     case ControlFlow::kSupervise:
       break;
@@ -576,7 +615,8 @@ void Watchdog::Spawn(const std::string &crash_dump_path) {
   }
   old_signal_handlers_ = SetSignalHandlers(signal_handlers);
 
-  pipe_terminate_ = new Pipe<kPipeThreadTerminator>();
+  pipe_terminate_ = std::unique_ptr<Pipe<kPipeThreadTerminator> >(
+      new Pipe<kPipeThreadTerminator>());
   const int retval = pthread_create(&thread_listener_, NULL,
                                     MainWatchdogListener, this);
   assert(retval == 0);
@@ -605,7 +645,9 @@ void *Watchdog::MainWatchdogListener(void *data) {
   if ((getuid() != 0) && SetuidCapabilityPermitted()) {
     // Drop all capabilities, none are needed in the listener
     const std::vector<cap_value_t> nocaps;
-    assert(ClearPermittedCapabilities(nocaps, nocaps));
+    if (!ClearPermittedCapabilities(nocaps, nocaps))
+      PANIC(kLogStderr | kLogSyslogErr,
+            "Failed to clear watchdog listener capabilities");
   }
 
   struct pollfd watch_fds[2];
@@ -697,19 +739,21 @@ void Watchdog::RestoreState(WatchdogState *saved_state) {
   if (!saved_state->spawned) {
     return;
   }
-  pipe_watchdog_ = new Pipe<kPipeWatchdog>(-1, saved_state->watchdog_write_fd);
-  pipe_listener_ = new Pipe<kPipeWatchdogSupervisor>(saved_state->listener_read_fd, -1);
+  pipe_watchdog_ = std::unique_ptr<Pipe<kPipeWatchdog> >(
+      new Pipe<kPipeWatchdog>(-1, saved_state->watchdog_write_fd));
+  pipe_listener_ = std::unique_ptr<Pipe<kPipeWatchdogSupervisor> >(
+      new Pipe<kPipeWatchdogSupervisor>(saved_state->listener_read_fd, -1));
   spawned_ = true;
 }
 
 
-Watchdog::Watchdog(FnOnExit on_exit)
+Watchdog::Watchdog(FnOnExit on_exit, const std::string &oom_score_adj)
     : spawned_(false)
     , maintenance_mode_(false)
     , exe_path_(string(platform_getexepath()))
+    , oom_score_adj_(oom_score_adj)
     , watchdog_pid_(0)
-    , on_exit_(on_exit)
-{
+    , on_exit_(on_exit) {
   const int retval = platform_spinlock_init(&lock_handler_, 0);
   assert(retval == 0);
   memset(&sighandler_stack_, 0, sizeof(sighandler_stack_));
@@ -747,8 +791,8 @@ Watchdog::~Watchdog() {
     pipe_listener_->CloseReadFd();
   } else {
     // Release the references to the watchdog pipes without closing them
-    pipe_watchdog_.Release();
-    pipe_listener_.Release();
+    pipe_watchdog_.release();
+    pipe_listener_.release();
   }
 
   platform_spinlock_destroy(&lock_handler_);

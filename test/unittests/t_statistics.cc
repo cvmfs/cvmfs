@@ -2,12 +2,13 @@
  * This file is part of the CernVM File System.
  */
 
+#include <memory>
+
 #include "gtest/gtest.h"
 #include "json_document.h"
 #include "json_document_write.h"
 #include "statistics.h"
 #include "util/platform.h"
-#include "util/pointer.h"
 
 using namespace std;  // NOLINT
 
@@ -177,8 +178,8 @@ TEST(T_Statistics, GenerateCorrectJsonEvenWithoutInput) {
   Statistics stats;
   std::string output = stats.PrintJSON();
 
-  UniquePtr<JsonDocument> json(JsonDocument::Create(output));
-  ASSERT_TRUE(json.IsValid());
+  std::unique_ptr<JsonDocument> json(JsonDocument::Create(output));
+  ASSERT_TRUE(json.get() != nullptr);
 }
 
 TEST(T_Statistics, GenerateJSONStatisticsTemplates) {

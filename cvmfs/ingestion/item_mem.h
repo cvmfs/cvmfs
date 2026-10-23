@@ -7,11 +7,11 @@
 
 #include <pthread.h>
 
+#include <atomic>
 #include <cassert>
 #include <vector>
 
 #include "malloc_arena.h"
-#include "util/atomic.h"
 
 /**
  * To avoid memory fragmentation, allocate the data buffer inside the BlockItem
@@ -25,11 +25,11 @@ class ItemAllocator {
   void *Malloc(unsigned size);
   void Free(void *ptr);
 
-  static int64_t total_allocated() { return atomic_read64(&total_allocated_); }
+  static int64_t total_allocated() { return total_allocated_.load(); }
 
  private:
   static const unsigned kArenaSize = 128 * 1024 * 1024;  // 128 MB
-  static atomic_int64 total_allocated_;
+  static std::atomic<int64_t> total_allocated_;
 
   std::vector<MallocArena *> malloc_arenas_;
   /**

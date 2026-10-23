@@ -108,14 +108,15 @@ func mockKeyImporter(ks KeySpec) (string, string, string, bool, error) {
 // testConfig is a set of backend configuration values for use in tests
 func testConfig(workDir string) gw.Config {
 	return gw.Config{
-		Port:          4929,
-		MaxLeaseTime:  50 * time.Millisecond, // use 50ms leases by default in testing mode
-		LogLevel:      "info",
-		LogTimestamps: false,
-		NumReceivers:  1,
-		ReceiverPath:  "/usr/bin/cvmfs_receiver",
-		WorkDir:       workDir,
-		MockReceiver:  true,
+		Port:                    4929,
+		MaxLeaseTime:            50 * time.Millisecond, // use 50ms leases by default in testing mode
+		CommitLeaseExpiryMargin: 1 * time.Second,
+		LogLevel:                "info",
+		LogTimestamps:           false,
+		NumReceivers:            1,
+		ReceiverPath:            "/usr/bin/cvmfs_receiver",
+		WorkDir:                 workDir,
+		MockReceiver:            true,
 	}
 }
 

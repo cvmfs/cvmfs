@@ -86,7 +86,7 @@ class BigQueue {
   }
 
   void Alloc(const size_t num_elements) {
-    size_t num_bytes = sizeof(Item) * num_elements;
+    size_t const num_bytes = sizeof(Item) * num_elements;
     buffer_ = static_cast<Item *>(smmap(num_bytes));
     capacity_ = num_elements;
     head_ = buffer_;
@@ -104,7 +104,7 @@ class BigQueue {
     assert(new_capacity > 0);
     assert(new_capacity >= size_);
 
-    size_t head_offset = GetHeadOffset();
+    size_t const head_offset = GetHeadOffset();
     Item *old_buffer = buffer_;
 
     Alloc(new_capacity);
@@ -123,7 +123,7 @@ class BigQueue {
   }
 
   void CopyFrom(const BigQueue<Item> &other) {
-    size_t min_items = kNumInit;
+    size_t const min_items = kNumInit;
     Alloc(std::max(other.size_, min_items));
     for (size_t i = 0; i < other.size_; ++i) {
       new (buffer_ + i) Item(*(other.buffer_ + other.GetHeadOffset() + i));

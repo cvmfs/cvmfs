@@ -9,12 +9,13 @@
 
 #include <stdint.h>
 
+#include <atomic>
+
 #include "crypto/hash.h"
 #include "directory_entry.h"
 #include "duplex_fuse.h"
 #include "lru.h"
 #include "shortstring.h"
-#include "util/atomic.h"
 #include "util/logging.h"
 #include "util/murmur.hxx"
 

@@ -33,22 +33,26 @@
 #include <pthread.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+
+#include <memory>
 #ifndef __APPLE__
 #include <sys/statfs.h>
 #endif
 #include <unistd.h>
 
 #include <algorithm>
+#include <atomic>
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+
 #include "crypto/hash.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
 #include "quota.h"
-#include "util/atomic.h"
 #include "util/logging.h"
+#include "util/mutex.h"
 #include "util/platform.h"
 #include "util/posix.h"
 #include "util/smalloc.h"
@@ -68,28 +72,29 @@ namespace {
 class CallGuard {
  public:
   CallGuard() {
-    const int32_t global_drainout = atomic_read32(&global_drainout_);
+    const int32_t global_drainout = global_drainout_.load();
     drainout_ = (global_drainout != 0);
     if (!drainout_)
-      atomic_inc32(&num_inflight_calls_);
+      num_inflight_calls_.fetch_add(1);
   }
   ~CallGuard() {
     if (!drainout_)
-      atomic_dec32(&num_inflight_calls_);
+      num_inflight_calls_.fetch_sub(1);
   }
   static void Drainout() {
-    atomic_cas32(&global_drainout_, 0, 1);
-    while (atomic_read32(&num_inflight_calls_) != 0)
+    int32_t expected_val = 0;
+    global_drainout_.compare_exchange_strong(expected_val, 1);
+    while (num_inflight_calls_.load() != 0)
       SafeSleepMs(50);
   }
 
  private:
   bool drainout_;
-  static atomic_int32 global_drainout_;
-  static atomic_int32 num_inflight_calls_;
+  static std::atomic<int32_t> global_drainout_;
+  static std::atomic<int32_t> num_inflight_calls_;
 };
-atomic_int32 CallGuard::num_inflight_calls_ = 0;
-atomic_int32 CallGuard::global_drainout_ = 0;
+std::atomic<int32_t> CallGuard::num_inflight_calls_(0);
+std::atomic<int32_t> CallGuard::global_drainout_(0);
 
 }  // anonymous namespace
 
@@ -106,7 +111,7 @@ int PosixCacheManager::AbortTxn(void *txn) {
   close(transaction->fd);
   const int result = unlink(transaction->tmp_path.c_str());
   transaction->~Transaction();
-  atomic_dec32(&no_inflight_txns_);
+  no_inflight_txns_.fetch_sub(1);
   if (result == -1)
     return -errno;
   return 0;
@@ -146,7 +151,7 @@ int PosixCacheManager::CommitTxn(void *txn) {
   if (result < 0) {
     unlink(transaction->tmp_path.c_str());
     transaction->~Transaction();
-    atomic_dec32(&no_inflight_txns_);
+    no_inflight_txns_.fetch_sub(1);
     return result;
   }
 
@@ -164,7 +169,7 @@ int PosixCacheManager::CommitTxn(void *txn) {
                     cache_path_ + "/quarantaine/" + transaction->id.ToString());
       unlink(transaction->tmp_path.c_str());
       transaction->~Transaction();
-      atomic_dec32(&no_inflight_txns_);
+      no_inflight_txns_.fetch_sub(1);
       return -EIO;
     }
   }
@@ -179,7 +184,7 @@ int PosixCacheManager::CommitTxn(void *txn) {
                transaction->id.ToString().c_str());
       unlink(transaction->tmp_path.c_str());
       transaction->~Transaction();
-      atomic_dec32(&no_inflight_txns_);
+      no_inflight_txns_.fetch_sub(1);
       return -ENOSPC;
     }
   }
@@ -210,21 +215,68 @@ int PosixCacheManager::CommitTxn(void *txn) {
     }
   }
   transaction->~Transaction();
-  atomic_dec32(&no_inflight_txns_);
+  no_inflight_txns_.fetch_sub(1);
   return result;
 }
 
 bool PosixCacheManager::InitCacheDirectory(const string &cache_path) {
-  const FileSystemInfo fs_info = GetFileSystemInfo(cache_path);
-
-  if (fs_info.type == kFsTypeTmpfs) {
-    is_tmpfs_ = true;
+  // For an alien cache the directory skeleton is created lazily on the first
+  // write (see EnsureCacheDirectories), so that merely trying to mount a bogus
+  // fqrn -- e.g. a stray access to /cvmfs/<typo> -- does not leave empty
+  // directories behind in a per-fqrn alien cache (see #4217).  A regular cache
+  // coincides with the workspace and backs the quota manager, which scans the
+  // 00..ff directories at start-up, so it is created eagerly.
+  if (!alien_cache_) {
+    if (!EnsureCacheDirectories())
+      return false;
   }
 
+  // TODO(jblomer): we might not need to look anymore for cvmfs 2.0 relicts
+  if (FileExists(cache_path + "/cvmfscatalog.cache")) {
+    LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
+             "Not mounting on cvmfs 2.0.X cache");
+    return false;
+  }
+  return true;
+}
+
+
+/**
+ * Idempotently create the on-disk cache skeleton and detect the underlying
+ * file system.  For alien caches this is deferred until the first cache write
+ * so that the skeleton is only materialized once the repository has actually
+ * been validated and content is about to be stored (see #4217).
+ */
+bool PosixCacheManager::EnsureCacheDirectories() {
+  if (cache_dirs_created_.load())
+    return true;
+
+  const MutexLockGuard guard(lock_cache_dirs_);
+  if (cache_dirs_created_.load())
+    return true;
+
+  const mode_t mode = alien_cache_ ? 0770 : 0700;
+
+  // Create the base directory first so that the file system type can be
+  // detected reliably: statfs() on a not-yet-existing path returns nothing.
+  if (!MkdirDeep(cache_path_, mode, false)) {
+    LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
+             "Failed to create cache directory %s", cache_path_.c_str());
+    return false;
+  }
+
+  const FileSystemInfo fs_info = GetFileSystemInfo(cache_path_);
+  if (fs_info.type == kFsTypeTmpfs)
+    is_tmpfs_ = true;
+
+  if (!MakeCacheDirectories(cache_path_, mode))
+    return false;
+
   if (alien_cache_) {
-    if (!MakeCacheDirectories(cache_path, 0770)) {
-      return false;
-    }
+    // Sentinel file for future use (see FileSystem::SetupPosixCacheMgr).  For
+    // an alien cache the skeleton -- and hence this file -- is created here
+    // lazily rather than at mount time; a read-only alien cache may reject it.
+    CreateFile(cache_path_ + "/.cvmfscache", 0600, true /* ignore_failure */);
     LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
              "Cache directory structure created.");
     switch (fs_info.type) {
@@ -240,17 +292,9 @@ bool PosixCacheManager::InitCacheDirectory(const string &cache_path) {
       default:
         break;
     }
-  } else {
-    if (!MakeCacheDirectories(cache_path, 0700))
-      return false;
   }
 
-  // TODO(jblomer): we might not need to look anymore for cvmfs 2.0 relicts
-  if (FileExists(cache_path + "/cvmfscatalog.cache")) {
-    LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
-             "Not mounting on cvmfs 2.0.X cache");
-    return false;
-  }
+  cache_dirs_created_.store(1);
   return true;
 }
 
@@ -258,9 +302,9 @@ PosixCacheManager *PosixCacheManager::Create(
     const string &cache_path, const bool alien_cache,
     const RenameWorkarounds rename_workaround, const bool do_refcount,
     const bool cleanup_unused_first) {
-  UniquePtr<PosixCacheManager> cache_manager(new PosixCacheManager(
+  std::unique_ptr<PosixCacheManager> cache_manager(new PosixCacheManager(
       cache_path, alien_cache, do_refcount, cleanup_unused_first));
-  assert(cache_manager.IsValid());
+  assert(cache_manager.get() != nullptr);
 
   cache_manager->rename_workaround_ = rename_workaround;
 
@@ -269,7 +313,7 @@ PosixCacheManager *PosixCacheManager::Create(
     return NULL;
   }
 
-  return cache_manager.Release();
+  return cache_manager.release();
 }
 
 
@@ -301,7 +345,7 @@ string PosixCacheManager::Describe() {
 void *PosixCacheManager::DoSaveState() {
   if (do_refcount_) {
     SavedState *state = new SavedState();
-    state->fd_mgr = fd_mgr_->Clone();
+    state->fd_mgr = std::unique_ptr<FdRefcountMgr>(fd_mgr_->Clone());
     return state;
   }
   char *c = reinterpret_cast<char *>(smalloc(1));
@@ -319,7 +363,7 @@ int PosixCacheManager::DoRestoreState(void *data) {
                "Restoring refcount cache manager from "
                "refcounted posix cache manager");
 
-      fd_mgr_->AssignFrom(state->fd_mgr.weak_ref());
+      fd_mgr_->AssignFrom(state->fd_mgr.get());
     } else {
       LogCvmfs(kLogCache, kLogDebug,
                "Restoring refcount cache manager from "
@@ -336,7 +380,7 @@ int PosixCacheManager::DoRestoreState(void *data) {
              "Restoring non-refcount cache manager from "
              "refcounted posix cache manager - this "
              " is not possible, keep refcounting.");
-    fd_mgr_->AssignFrom(state->fd_mgr.weak_ref());
+    fd_mgr_->AssignFrom(state->fd_mgr.get());
     do_refcount_ = true;
   }
   return -1;
@@ -513,9 +557,15 @@ int PosixCacheManager::Reset(void *txn) {
 int PosixCacheManager::StartTxn(const shash::Any &id,
                                 uint64_t size,
                                 void *txn) {
-  atomic_inc32(&no_inflight_txns_);
+  // Materialize the cache skeleton on first use.  For alien caches this is
+  // deferred from mount time to here, so that a bogus fqrn never creates any
+  // directories (see #4217); for regular caches this is a lock-free no-op.
+  if (!EnsureCacheDirectories())
+    return -EIO;
+
+  no_inflight_txns_.fetch_add(1);
   if (cache_mode_ == kCacheReadOnly) {
-    atomic_dec32(&no_inflight_txns_);
+    no_inflight_txns_.fetch_sub(1);
     return -EROFS;
   }
 
@@ -525,7 +575,7 @@ int PosixCacheManager::StartTxn(const shash::Any &id,
                "file too big for lru cache (%" PRIu64 " "
                "requested but only %" PRIu64 " bytes free)",
                size, quota_mgr_->GetMaxFileSize());
-      atomic_dec32(&no_inflight_txns_);
+      no_inflight_txns_.fetch_sub(1);
       return -ENOSPC;
     }
 
@@ -562,7 +612,7 @@ int PosixCacheManager::StartTxn(const shash::Any &id,
   transaction->fd = mkstemp(template_path);
   if (transaction->fd == -1) {
     transaction->~Transaction();
-    atomic_dec32(&no_inflight_txns_);
+    no_inflight_txns_.fetch_sub(1);
     return -errno;
   }
 
@@ -593,7 +643,7 @@ bool PosixCacheManager::StoreBreadcrumb(std::string fqrn,
 
 void PosixCacheManager::TearDown2ReadOnly() {
   cache_mode_ = kCacheReadOnly;
-  while (atomic_read32(&no_inflight_txns_) != 0)
+  while (no_inflight_txns_.load() != 0)
     SafeSleepMs(50);
 
   QuotaManager *old_manager = quota_mgr_;
@@ -636,4 +686,4 @@ int64_t PosixCacheManager::Write(const void *buf, uint64_t size, void *txn) {
   transaction->size += written;
   return written;
 }
-
+ 

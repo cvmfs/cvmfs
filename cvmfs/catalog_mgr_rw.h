@@ -110,6 +110,8 @@ class WritableCatalogManager : public SimpleCatalogManager {
                       const FileChunkList &file_chunks);
   void RemoveFile(const std::string &file_path);
 
+  void UpdateBundleTrigger(const std::string &file_path, bool new_value);
+
   void AddDirectory(const DirectoryEntryBase &entry,
                     const XattrList &xattrs,
                     const std::string &parent_directory);
@@ -118,7 +120,8 @@ class WritableCatalogManager : public SimpleCatalogManager {
                       const std::string &directory_path);
   void RemoveDirectory(const std::string &directory_path);
 
-  void Clone(const std::string from, const std::string to);
+  bool Clone(const std::string from, const std::string to,
+             const bool fail_if_source_missing = true);
   void CloneTree(const std::string &from_dir, const std::string &to_dir);
 
   // Hardlink group handling
@@ -136,6 +139,13 @@ class WritableCatalogManager : public SimpleCatalogManager {
                          const uint64_t new_size);
   void GraftNestedCatalog(const string &mountpoint, const shash::Any &new_hash,
                           const uint64_t new_size);
+  // Non-panicking variant used by the experimental DirectGraft gateway
+  // endpoint.  Returns false for expected request validation failures (wrong
+  // catalog root, existing target directory, missing parent, etc.) so malformed
+  // experimental requests do not abort the receiver worker.
+  bool TryGraftNestedCatalog(const string &mountpoint,
+                             const shash::Any &new_hash,
+                             const uint64_t new_size);
   bool IsTransitionPoint(const std::string &mountpoint);
   WritableCatalog *GetHostingCatalog(const std::string &path);
 

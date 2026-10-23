@@ -1,0 +1,178 @@
+#!/bin/bash
+cvmfs_test_name="Client Failover from Partial to Full Stratum-1"
+cvmfs_test_autofs_on_startup=false
+
+produce_files_in() {
+  local working_dir=$1
+  pushdir $working_dir
+
+  # Root files (always replicated)
+  echo "root content" > root_file.txt
+
+  # /included — will be INCLUDED in the partial replica
+  mkdir -p included
+  touch included/.cvmfscatalog
+  echo "included file content" > included/file_included.txt
+
+  # /excluded — will be EXCLUDED from the partial replica
+  mkdir -p excluded
+  touch excluded/.cvmfscatalog
+  echo "excluded file content" > excluded/file_excluded.txt
+
+  popdir
+}
+
+desaster_cleanup() {
+  local mnt1="$1"
+  local mnt2="$2"
+  local partial_replica="$3"
+  local full_replica="$4"
+
+  sudo umount $mnt1 > /dev/null 2>&1
+  sudo umount $mnt2 > /dev/null 2>&1
+  sudo cvmfs_server rmfs -f $partial_replica > /dev/null 2>&1
+  sudo cvmfs_server rmfs -f $full_replica    > /dev/null 2>&1
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local scratch_dir=$(pwd)
+
+  local partial_replica="$(get_stratum1_name $CVMFS_TEST_REPO).partial"
+  local full_replica="$(get_stratum1_name $CVMFS_TEST_REPO).full"
+  local mnt_partial="${scratch_dir}/mnt_partial"
+  local mnt_fail="${scratch_dir}/mnt_fail"
+
+  echo "*** Create repository $CVMFS_TEST_REPO"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "*** Publish files"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  produce_files_in $repo_dir          || return 3
+  publish_repo $CVMFS_TEST_REPO       || return $?
+
+  load_repo_config $CVMFS_TEST_REPO
+  local stratum0_url=$CVMFS_STRATUM0
+  local pub_key=/etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub
+
+  echo "*** Create full Stratum-1 (normal replica)"
+  create_stratum1 $full_replica          \
+                  $CVMFS_TEST_USER       \
+                  $stratum0_url          \
+                  $pub_key               \
+    || { desaster_cleanup $mnt_partial $mnt_fail $partial_replica $full_replica; return 7; }
+  sudo cvmfs_server snapshot $full_replica \
+    || { desaster_cleanup $mnt_partial $mnt_fail $partial_replica $full_replica; return 8; }
+
+  echo "*** Create partial Stratum-1 (excluding /excluded)"
+  create_stratum1 $partial_replica       \
+                  $CVMFS_TEST_USER       \
+                  $stratum0_url          \
+                  $pub_key               \
+    || { desaster_cleanup $mnt_partial $mnt_fail $partial_replica $full_replica; return 9; }
+
+  local spec_file="${scratch_dir}/partial_client_test.spec"
+  cat > $spec_file << EOF
+version 1
+/included
+EOF
+
+  load_repo_config $partial_replica
+  local partial_conf="/etc/cvmfs/repositories.d/${partial_replica}/server.conf"
+  sudo sh -c "echo 'CVMFS_PARTIAL_REPLICATION=true'            >> $partial_conf"
+  sudo sh -c "echo 'CVMFS_PARTIAL_REPLICATION_SPEC=$spec_file' >> $partial_conf"
+  load_repo_config $CVMFS_TEST_REPO
+
+  sudo cvmfs_server snapshot $partial_replica \
+    || { desaster_cleanup $mnt_partial $mnt_fail $partial_replica $full_replica; return 10; }
+
+  echo "*** Verify .cvmfs_partial_replication exists on partial replica"
+  peek_backend_raw $partial_replica ".cvmfs_partial_replication" \
+    || { desaster_cleanup $mnt_partial $mnt_fail $partial_replica $full_replica; return 11; }
+  echo "  .cvmfs_partial_replication found on partial replica"
+
+  local partial_url=$(get_repo_url $partial_replica)
+  local full_url=$(get_repo_url $full_replica)
+
+  # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+  echo "*** Mount via partial replica with failover mode"
+  # Build a config that points to the partial replica as primary
+  # and the full replica as fallback
+  local failover_config="${scratch_dir}/failover.conf"
+  local failover_cache="${scratch_dir}/cache_failover"
+  cat > $failover_config << EOF
+CVMFS_MOUNT_DIR=/cvmfs
+CVMFS_CACHE_BASE=$failover_cache
+CVMFS_RELOAD_SOCKETS=$failover_cache
+CVMFS_SERVER_URL=$partial_url
+CVMFS_HTTP_PROXY=DIRECT
+CVMFS_PUBLIC_KEY=$pub_key
+CVMFS_PARTIAL_REPLICA_MODE=failover
+CVMFS_FULL_STRATUM1_URL=$full_url
+CVMFS_DEBUGLOG=${scratch_dir}/failover.log
+EOF
+
+  mkdir -p $mnt_partial $failover_cache
+  cvmfs2 -d -o config=$failover_config $CVMFS_TEST_REPO $mnt_partial \
+    || { desaster_cleanup $mnt_partial $mnt_fail $partial_replica $full_replica; return 12; }
+
+  echo "*** In failover mode: included file should be readable"
+  cat ${mnt_partial}/included/file_included.txt \
+    || { desaster_cleanup $mnt_partial $mnt_fail $partial_replica $full_replica; return 13; }
+
+  echo "*** In failover mode: excluded file should be readable (via fallback)"
+  cat ${mnt_partial}/excluded/file_excluded.txt \
+    || { desaster_cleanup $mnt_partial $mnt_fail $partial_replica $full_replica; return 14; }
+
+  sudo umount $mnt_partial
+
+  # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+  echo "*** Mount via partial replica with fail mode"
+  local fail_config="${scratch_dir}/fail.conf"
+  local fail_cache="${scratch_dir}/cache_fail"
+  cat > $fail_config << EOF
+CVMFS_MOUNT_DIR=/cvmfs
+CVMFS_CACHE_BASE=$fail_cache
+CVMFS_RELOAD_SOCKETS=$fail_cache
+CVMFS_SERVER_URL=$partial_url
+CVMFS_HTTP_PROXY=DIRECT
+CVMFS_PUBLIC_KEY=$pub_key
+CVMFS_PARTIAL_REPLICA_MODE=fail
+CVMFS_DEBUGLOG=${scratch_dir}/fail.log
+EOF
+
+  mkdir -p $mnt_fail $fail_cache
+  cvmfs2 -d -o config=$fail_config $CVMFS_TEST_REPO $mnt_fail \
+    || { desaster_cleanup $mnt_partial $mnt_fail $partial_replica $full_replica; return 15; }
+
+  echo "*** In fail mode: included file should be readable"
+  cat ${mnt_fail}/included/file_included.txt \
+    || { desaster_cleanup $mnt_partial $mnt_fail $partial_replica $full_replica; return 16; }
+
+  echo "*** In fail mode: excluded file permissions should be 0000"
+  local perms
+  perms=$(stat -c "%a" ${mnt_fail}/excluded/file_excluded.txt 2>/dev/null || echo "000")
+  echo "  Permissions of excluded file: $perms"
+  [ "$perms" = "0" ] || [ "$perms" = "000" ] \
+    || { echo "WARN: expected 000 permissions on excluded file, got $perms"; }
+
+  echo "*** In fail mode: reading excluded file should fail"
+  if cat ${mnt_fail}/excluded/file_excluded.txt > /dev/null 2>&1; then
+    echo "ERROR: reading excluded file should have failed in fail mode"
+    desaster_cleanup $mnt_partial $mnt_fail $partial_replica $full_replica
+    return 17
+  fi
+  echo "  (read correctly returned an error)"
+
+  sudo umount $mnt_fail
+
+  # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+  echo "*** Clean up"
+  sudo cvmfs_server rmfs -f $partial_replica
+  sudo cvmfs_server rmfs -f $full_replica
+  return 0
+}

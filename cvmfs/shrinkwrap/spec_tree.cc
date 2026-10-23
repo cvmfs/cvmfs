@@ -50,9 +50,11 @@ bool SpecTree::IsMatching(std::string path) {
   SpecTreeNode *cur_node = root_;
   bool is_wildcard = (cur_node->mode == '*');
   bool is_flat_cp = (cur_node->mode == '^');
+  bool is_excluded_by_wildcard = false;
   if (cur_node->mode == '!') {
     return false;
   }
+
   if (path.length() > 0 && path.at(path.length() - 1) == '/') {
     path.erase(path.length() - 1);
   }
@@ -61,8 +63,12 @@ bool SpecTree::IsMatching(std::string path) {
            path_parts.begin() + 1;
        part_it != path_parts.end();
        part_it++) {
+    const bool parent_excludes_children = cur_node->exclude_children;
     cur_node = cur_node->GetNode(*part_it);
     if (cur_node == NULL) {
+      if (is_excluded_by_wildcard || parent_excludes_children) {
+        return false;
+      }
       if (is_wildcard || (is_flat_cp && (part_it + 1) == path_parts.end())) {
         return true;
       }
@@ -72,6 +78,9 @@ bool SpecTree::IsMatching(std::string path) {
     if (cur_node->mode == '!') {
       return false;
     }
+    if (parent_excludes_children || is_excluded_by_wildcard) {
+      is_excluded_by_wildcard = (cur_node->mode == '-');
+    }
     if (cur_node->mode == '*') {
       is_wildcard = true;
     }
@@ -79,8 +88,9 @@ bool SpecTree::IsMatching(std::string path) {
       is_flat_cp = true;
     }
   }
-  return is_wildcard || is_flat_cp || cur_node->mode == '_'
-         || cur_node->mode == 0;
+  return !is_excluded_by_wildcard
+         && (is_wildcard || is_flat_cp || cur_node->mode == '_'
+             || cur_node->mode == 0 || cur_node->exclude_children);
 }
 
 void SpecTree::Parse(FILE *spec_file) {
@@ -116,6 +126,7 @@ void SpecTree::Parse(FILE *spec_file) {
 
     // FIND inclusion_mode (START)
     inclusion_mode = 0;
+    bool exclude_children = false;
     if (line.at(0) == '^' || line.at(0) == '!') {
       inclusion_mode = line.at(0);
       line.erase(0, 1);
@@ -125,6 +136,9 @@ void SpecTree::Parse(FILE *spec_file) {
     if (line.at(line.length() - 1) == '*') {
       if (inclusion_mode == 0) {
         inclusion_mode = '*';
+      } else if (inclusion_mode == '!' && line.length() >= 2
+                 && line.at(line.length() - 2) == '/') {
+        exclude_children = true;
       }
       line.erase(line.length() - 1);
     } else if (inclusion_mode == '^') {
@@ -146,7 +160,7 @@ void SpecTree::Parse(FILE *spec_file) {
       }
     }
     char passthrough_mode = '_';
-    if (inclusion_mode == '!')
+    if (inclusion_mode == '!' && !exclude_children)
       passthrough_mode = '-';
     // Split remaining path into its parts
     std::vector<std::string> path_parts = SplitString(line, '/');
@@ -171,19 +185,24 @@ void SpecTree::Parse(FILE *spec_file) {
       past_1_mode = past_2_mode;
       past_2_mode = passthrough_mode;
     }
-    cur_node->mode = inclusion_mode;
-    if (inclusion_mode != '!' && past_1_mode == '-') {
-      node_cache.pop();
-      while (!node_cache.empty() && node_cache.top()->node->mode == '-') {
-        node_cache.top()->node->mode = '_';
-        node_backup.push(node_cache.top());
+    if (exclude_children) {
+      cur_node->exclude_children = true;
+      cur_node->ExcludeChildren();
+    } else {
+      cur_node->mode = inclusion_mode;
+      if (inclusion_mode != '!' && past_1_mode == '-') {
         node_cache.pop();
+        while (!node_cache.empty() && node_cache.top()->node->mode == '-') {
+          node_cache.top()->node->mode = '_';
+          node_backup.push(node_cache.top());
+          node_cache.pop();
+        }
+        while (!node_backup.empty()) {
+          node_cache.push(node_backup.top());
+          node_cache.pop();
+        }
+        node_cache.push(entr);
       }
-      while (!node_backup.empty()) {
-        node_cache.push(node_backup.top());
-        node_cache.pop();
-      }
-      node_cache.push(entr);
     }
   }
   while (!node_cache.empty()) {
@@ -198,9 +217,11 @@ int SpecTree::ListDir(const char *dir, char ***buf, size_t *len) {
   SpecTreeNode *cur_node = root_;
   bool is_wildcard = (cur_node->mode == '*');
   bool is_flat_cp = (cur_node->mode == '^');
+  bool is_excluded_by_wildcard = false;
   if (cur_node->mode == '!') {
     return -1;
   }
+
   if (path.length() > 0 && path.at(path.length() - 1) == '/') {
     path.erase(path.length() - 1);
   }
@@ -209,10 +230,14 @@ int SpecTree::ListDir(const char *dir, char ***buf, size_t *len) {
            path_parts.begin() + 1;
        part_it != path_parts.end();
        part_it++) {
+    const bool parent_excludes_children = cur_node->exclude_children;
     cur_node = cur_node->GetNode(*part_it);
     if (cur_node == NULL) {
+      if (is_excluded_by_wildcard || parent_excludes_children) {
+        return -1;
+      }
       if (is_wildcard) {
-        break;
+        return SPEC_READ_FS;
       }
       return -1;
     }
@@ -220,12 +245,24 @@ int SpecTree::ListDir(const char *dir, char ***buf, size_t *len) {
     if (cur_node->mode == '!') {
       return -1;
     }
+    if (parent_excludes_children || is_excluded_by_wildcard) {
+      is_excluded_by_wildcard = (cur_node->mode == '-');
+    }
     if (cur_node->mode == '*') {
       is_wildcard = true;
     }
     if (cur_node->mode == '^') {
       is_flat_cp = true;
     }
+  }
+  if (cur_node->exclude_children || is_excluded_by_wildcard) {
+    const int result = cur_node->GetListing(path, buf, len);
+    if (*len == 0) {
+      cvmfs_list_free(*buf);
+      *buf = NULL;
+      return -1;
+    }
+    return result;
   }
   if (is_wildcard || is_flat_cp) {
     return SPEC_READ_FS;
@@ -242,6 +279,14 @@ SpecTreeNode *SpecTreeNode::GetNode(const std::string &name) {
 
 void SpecTreeNode::AddNode(const std::string &name, SpecTreeNode *node) {
   nodes_[name] = node;
+}
+
+void SpecTreeNode::ExcludeChildren() {
+  for (std::map<std::string, SpecTreeNode *>::iterator it = nodes_.begin();
+       it != nodes_.end();
+       it++) {
+    it->second->mode = '!';
+  }
 }
 
 int SpecTreeNode::GetListing(std::string base_path, char ***buf, size_t *len) {

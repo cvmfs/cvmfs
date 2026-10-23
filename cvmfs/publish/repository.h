@@ -5,6 +5,7 @@
 #ifndef CVMFS_PUBLISH_REPOSITORY_H_
 #define CVMFS_PUBLISH_REPOSITORY_H_
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -13,7 +14,6 @@
 #include "publish/settings.h"
 #include "repository_util.h"
 #include "upload_spooler_result.h"
-#include "util/pointer.h"
 #include "util/single_copy.h"
 
 namespace catalog {
@@ -244,7 +244,8 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
      * For non-gateway nodes, we have an implicit lease for the entire
      * repository
      */
-    Session() : keep_alive_(false), has_lease_(true) { }
+    Session()
+        : keep_alive_(false), has_lease_(true), negotiated_api_version_(-1) { }
     explicit Session(const Settings &settings_session);
     explicit Session(const SettingsPublisher &settings_publisher, int llvl = 0);
     /**
@@ -258,6 +259,16 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
 
     bool has_lease() const { return has_lease_; }
     std::string token_path() const { return settings_.token_path; }
+    std::string api_version_path() const {
+      return gateway::SessionTokenApiVersionPath(settings_.token_path);
+    }
+    /**
+     * The gateway API protocol version negotiated on lease acquisition
+     * (min of the publisher's and the gateway's supported versions). A
+     * pre-existing gateway token restores this value from its sidecar file;
+     * -1 means that an old token has no recorded negotiation.
+     */
+    int negotiated_api_version() const { return negotiated_api_version_; }
 
    private:
     Settings settings_;
@@ -269,6 +280,7 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
      */
     bool keep_alive_;
     bool has_lease_;
+    int negotiated_api_version_;
   };  // class Session
 
   /**
@@ -305,6 +317,15 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   void EditTags(const std::vector<history::History::Tag> &add_tags,
                 const std::vector<std::string> &rm_tags);
   /**
+   * Edit tags on a gateway repository. The publisher cannot write the tag
+   * database directly, so a lease is acquired and the add/remove is forwarded
+   * to the receiver, which applies it in the commit's history transaction.
+   * The catalog is unchanged, so the commit carries the current root hash as
+   * both old and new hash. Called by EditTags() for gateway storage.
+   */
+  void EditTagsGateway(const std::vector<history::History::Tag> &add_tags,
+                       const std::vector<std::string> &rm_tags);
+  /**
    * Create empty $url/.cvmfs_master_replica
    */
   void MarkReplicatible(bool value);
@@ -316,7 +337,7 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   const SettingsPublisher &settings() const { return settings_; }
   const ServerFlagFile &in_transaction() const { return in_transaction_; }
   const ServerLockFile &is_publishing() const { return is_publishing_; }
-  Session *session() const { return session_.weak_ref(); }
+  Session *session() const { return session_.get(); }
   const upload::Spooler *spooler_files() const { return spooler_files_; }
   const upload::Spooler *spooler_catalogs() const { return spooler_catalogs_; }
 
@@ -358,10 +379,10 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   void CheckTagName(const std::string &name);
 
   void TransactionRetry();
-  void TransactionImpl(bool waiting_on_lease = false);
+  void TransactionImpl();
 
   SettingsPublisher settings_;
-  UniquePtr<perf::StatisticsTemplate> statistics_publish_;
+  std::unique_ptr<perf::StatisticsTemplate> statistics_publish_;
   /**
    * The log level, set to kLogNone if settings_.is_silent() == true
    */
@@ -376,8 +397,8 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
    * implemented, the lease should be dropped after the last successful write
    * operation.
    */
-  UniquePtr<Session> session_;
-  UniquePtr<ManagedNode> managed_node_;
+  std::unique_ptr<Session> session_;
+  std::unique_ptr<ManagedNode> managed_node_;
 
   upload::Spooler *spooler_files_;
   upload::Spooler *spooler_catalogs_;

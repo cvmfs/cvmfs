@@ -19,7 +19,9 @@
 /**
  * Method which initializes the .data directory with all subdirectories.
  * Depending on kDirLevels and kDigitsPerDirLevel (defined in helpers.h)
- * this process might be very slow.
+ * this process might be very slow, which is why the top level directories
+ * (and their independent subtrees) are distributed over the
+ * fs_traversal_posix_context::num_threads worker threads.
  */
 void InitializeDataDirectory(struct fs_traversal_context *ctx);
 

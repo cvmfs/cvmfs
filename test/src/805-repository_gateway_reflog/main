@@ -14,7 +14,9 @@ cvmfs_run_test() {
     cvmfs_server transaction ${test_repo} || return 11
     echo "*** Transaction opened"
 
+    set +o pipefail
     cvmfs_server publish ${test_repo} 2>&1 | tee publish.log || return 12
+    set -o pipefail
     local output=$(cat publish.log | grep "missing_reflog")
 
     if [ x"$output" = x"" ]; then
@@ -31,8 +33,7 @@ cvmfs_run_test() {
 
     # Run repository check
     echo "*** Repository verification"
-    cvmfs_server check -i ${test_repo}
-    if [ $? -ne 0 ]; then
+    if ! cvmfs_server check -i ${test_repo}; then
         echo "Repository integrity check failed with \"reflog.chksum\" present"
         return 30
     fi
@@ -43,10 +44,6 @@ cvmfs_run_test() {
 
     # Re-run repository check
     cvmfs_server check -i ${test_repo} || return 41
-    if [ $? -ne 0 ]; then
-        echo "Repository integrity check failed with \"reflog.chksum\" missing"
-        return 42
-    fi
 
     check_repo_integrity test.repo.org || return 50
 

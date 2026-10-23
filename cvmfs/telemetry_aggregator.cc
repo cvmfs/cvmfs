@@ -8,11 +8,12 @@
 #include <poll.h>
 #include <unistd.h>
 
+#include <memory>
+
 #include "glue_buffer.h"
 #include "telemetry_aggregator_influx.h"
 #include "util/exception.h"
 #include "util/logging.h"
-#include "util/pointer.h"
 #include "util/posix.h"
 namespace perf {
 
@@ -22,14 +23,15 @@ TelemetryAggregator *TelemetryAggregator::Create(Statistics *statistics,
                                                  MountPoint *mount_point,
                                                  const std::string &fqrn,
                                                  const TelemetrySelector type) {
-  UniquePtr<TelemetryAggregatorInflux> telemetryInflux;
-  UniquePtr<TelemetryAggregator> *telemetry;
+  std::unique_ptr<TelemetryAggregatorInflux> telemetryInflux;
+  std::unique_ptr<TelemetryAggregator> *telemetry;
 
   switch (type) {
     case kTelemetryInflux:
-      telemetryInflux = new TelemetryAggregatorInflux(
-          statistics, send_rate, options_mgr, mount_point, fqrn);
-      telemetry = reinterpret_cast<UniquePtr<TelemetryAggregator> *>(
+      telemetryInflux = std::unique_ptr<TelemetryAggregatorInflux>(
+          new TelemetryAggregatorInflux(statistics, send_rate, options_mgr,
+                                        mount_point, fqrn));
+      telemetry = reinterpret_cast<std::unique_ptr<TelemetryAggregator> *>(
           &telemetryInflux);
       break;
     default:
@@ -39,7 +41,7 @@ TelemetryAggregator *TelemetryAggregator::Create(Statistics *statistics,
       break;
   }
 
-  if (telemetry->weak_ref()->is_zombie_) {
+  if (telemetry->get()->is_zombie_) {
     LogCvmfs(kLogTelemetry, kLogDebug | kLogSyslogErr,
              "Requested telemetry will NOT be used. "
              "It was not constructed correctly.");
@@ -47,7 +49,7 @@ TelemetryAggregator *TelemetryAggregator::Create(Statistics *statistics,
   }
 
   LogCvmfs(kLogTelemetry, kLogDebug, "TelemetryAggregator created.");
-  return telemetry->Release();
+  return telemetry->release();
 }
 
 TelemetryAggregator::~TelemetryAggregator() {
@@ -83,22 +85,22 @@ void TelemetryAggregator::ManuallyUpdateSelectedCounters() {
       page_cache_stats = mount_point_->page_cache_tracker()->GetStatistics();
   mount_point_->statistics()
       ->Lookup("inode_tracker.n_insert")
-      ->Set(atomic_read64(&inode_stats.num_inserts));
+      ->Set(inode_stats.num_inserts.load());
   mount_point_->statistics()
       ->Lookup("inode_tracker.n_remove")
-      ->Set(atomic_read64(&inode_stats.num_removes));
+      ->Set(inode_stats.num_removes.load());
   mount_point_->statistics()
       ->Lookup("inode_tracker.no_reference")
-      ->Set(atomic_read64(&inode_stats.num_references));
+      ->Set(inode_stats.num_references.load());
   mount_point_->statistics()
       ->Lookup("inode_tracker.n_hit_inode")
-      ->Set(atomic_read64(&inode_stats.num_hits_inode));
+      ->Set(inode_stats.num_hits_inode.load());
   mount_point_->statistics()
       ->Lookup("inode_tracker.n_hit_path")
-      ->Set(atomic_read64(&inode_stats.num_hits_path));
+      ->Set(inode_stats.num_hits_path.load());
   mount_point_->statistics()
       ->Lookup("inode_tracker.n_miss_path")
-      ->Set(atomic_read64(&inode_stats.num_misses_path));
+      ->Set(inode_stats.num_misses_path.load());
   mount_point_->statistics()
       ->Lookup("dentry_tracker.n_insert")
       ->Set(dentry_stats.num_insert);

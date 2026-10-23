@@ -57,9 +57,7 @@ cleanup_mount_on_top() {
   fi
 }
 
-# should work both for libfuse2 and libfuse3 as
-# - libfuse2 does not evict dentries
-# - libfuse3.15.1 expires dentries instead of evicting
+# libfuse3.15.1 expires dentries instead of evicting them
 mount_on_top() {
   local mntpnt="$1"
   echo $mntpnt
@@ -91,40 +89,6 @@ mount_on_top() {
   cleanup_mount_on_top
 }
 
-# for fuse 2
-# checks that
-# 1) symlinks are not cached in kernel
-check_libfuse2() {
-  local mntpnt="$1"
-  local config_file_path="$2"
-  local symlink_name="$3"
-
-  
-  echo ""
-  echo "*** START Testing libfuse2"
-  
-  echo "Mounting repo..."
-  private_mount $mntpnt "2"|| return $?
-  
-  echo ""
-  echo "  *** Testing caching..."
-  local res=$(check_readlink_is_cached $mntpnt $symlink_name)
-
-  [ $res = "1" ] || return 11
-
-  echo ""
-  echo "  *** Testing mount on top..."
-  mount_on_top $mntpnt || return $?
-
-  echo ""
-  echo "  *** Unmount repo"
-  private_unmount
-  echo "*** FINISHED Testing libfuse2"
-  echo ""
-
-
-}
-
 # for fuse3 (prerequirement: fuse >= 3.10)
 # checks that
 # 1) symlinks are cached in kernel
@@ -145,7 +109,7 @@ check_libfuse3() {
   echo "*** START Testing libfuse3"
 
   echo "  *** Mounting repo..."
-  private_mount $mntpnt "3"
+  private_mount $mntpnt
 
   echo ""
   echo "  *** Testing caching..."
@@ -197,7 +161,6 @@ cvmfs_run_test() {
 
   create_symlink_repo ${short_name} ${long_name} ${symlink_name} || return $?
 
-  check_libfuse2 ${mntpnt} ${config_file_path} ${symlink_name} || return $?
   check_libfuse3 ${mntpnt} ${config_file_path} ${short_name} ${long_name} ${symlink_name} || return $?
 
   return 0

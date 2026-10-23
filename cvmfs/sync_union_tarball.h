@@ -35,7 +35,8 @@ class SyncUnionTarball : public SyncUnion {
                    const std::string &to_delete,
                    const bool create_catalog_on_root,
                    const bool fast_delete = false,
-                   const std::string &path_delimiter = ":");
+                   const std::string &path_delimiter = ":",
+                   const bool tolerate_missing_hardlinks = false);
 
   ~SyncUnionTarball();
 
@@ -72,6 +73,11 @@ class SyncUnionTarball : public SyncUnion {
   const bool create_catalog_on_root_;
   const bool fast_delete_;
   const std::string path_delimiter_;  ///< delimiter used to split paths
+  /// when true, a hardlink whose target is not present in the archive is
+  /// materialized as an empty file (with a warning) instead of aborting the
+  /// ingestion (used by ducc for OCI image layers that may contain cross-layer
+  /// hardlinks)
+  const bool tolerate_missing_hardlinks_;
   std::set<std::string>
       know_directories_;  ///< directory that we know already exist
 
@@ -88,10 +94,26 @@ class SyncUnionTarball : public SyncUnion {
   std::map<std::string, SharedPtr<SyncItem> > dirs_;
 
   /**
-   * map all the file that point to the same hardlink to the path of the file
-   * itself
+   * A hardlink destination: the path of the link plus the ownership and
+   * permission metadata captured from its tar header.  The metadata is only
+   * needed to materialize an empty file when the hardlink target is missing
+   * from the archive (see tolerate_missing_hardlinks_).
    */
-  std::map<const std::string, std::list<std::string> > hardlinks_;
+  struct HardlinkDestination {
+    HardlinkDestination(const std::string &p, unsigned int m, uid_t u, gid_t g,
+                        time_t t)
+        : path(p), mode(m), uid(u), gid(g), mtime(t) { }
+    std::string path;
+    unsigned int mode;
+    uid_t uid;
+    gid_t gid;
+    time_t mtime;
+  };
+
+  /**
+   * map the path of a hardlink target to the list of links pointing to it
+   */
+  std::map<const std::string, std::list<HardlinkDestination> > hardlinks_;
 
   /**
    * Conditional variable to keep track of when is possible to read the tar file

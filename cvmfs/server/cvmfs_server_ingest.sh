@@ -118,6 +118,7 @@ cvmfs_server_ingest() {
   local keep_ownership=false
   local create_catalog=false
   local fast_delete=false
+  local tolerate_missing_hardlinks=false
   local gc_db=""
 
   local force_native=0
@@ -174,6 +175,9 @@ cvmfs_server_ingest() {
       --gc-db )
         gc_db=$2
         fast_delete=true
+        ;;
+      -m | --tolerate-missing-hardlinks )
+        tolerate_missing_hardlinks=true
         ;;
     esac
     shift
@@ -502,6 +506,10 @@ cvmfs_server_ingest() {
     ingest_command="$ingest_command -f"
   fi
 
+  if [ "$tolerate_missing_hardlinks" = true ]; then
+    ingest_command="$ingest_command -m"
+  fi
+
   if [ ! x"$gc_db" = "x" ]; then
     ingest_command="$ingest_command -Q $gc_db"
     # Batch size from the repository's server.conf (loaded via
@@ -571,7 +579,8 @@ cvmfs_server_ingest() {
         # but the session_token file created by the lease acquire must still
         # be removed — the gateway committed and deleted it server-side via
         # FinalizeSession(true), so only the local file remains.
-        rm -f "${spool_dir}/session_token"
+        rm -f "${spool_dir}/session_token" \
+              "${spool_dir}/session_token.api_version"
       fi
       # For mountless gateway ingest the gateway lease was already committed
       # (and deleted server-side) by cvmfs_swissknife ingest via

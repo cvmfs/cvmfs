@@ -49,14 +49,17 @@ get_default_compiler_arch() {
   [ ! -z $compiler ] && $compiler -dumpmachine | grep -ohe '^[^-]\+'
 }
 
-get_cvmfs_version_from_cmake() {
+get_cvmfs_version() {
   local source_directory="$1"
-  cat ${source_directory}/CMakeLists.txt | grep '## CVMFS_VERSION' | awk '{print $3}'
+  "${source_directory}/cmake/get_version.sh" "$source_directory"
 }
 
-get_cvmfs_prerelease_from_cmake() {
-  local source_directory="$1"
-  cat ${source_directory}/CMakeLists.txt | grep '## CVMFS_PRERELEASE' | awk '{print $3}'
+set_cvmfs_version_sequence_from_nightly() {
+  local nightly_number="$1"
+  if [ "$nightly_number" -gt 0 ] && [ -z "${CVMFS_VERSION_SEQUENCE:-}" ]; then
+    CVMFS_VERSION_SEQUENCE=$nightly_number
+    export CVMFS_VERSION_SEQUENCE
+  fi
 }
 
 get_cvmfs_git_revision() {
@@ -92,6 +95,7 @@ create_cvmfs_source_tarball() {
   cd $tmpd
   cp -R --dereference ${source_directory}/CITATION.cff       \
                       ${source_directory}/CMakeLists.txt     \
+                      ${source_directory}/VERSION            \
                       ${source_directory}/COPYING            \
                       ${source_directory}/ChangeLog          \
                       ${source_directory}/INSTALL            \
@@ -107,12 +111,14 @@ create_cvmfs_source_tarball() {
                       ${source_directory}/test               \
                       ${source_directory}/ducc               \
                       $tar_name
+  get_cvmfs_version "$source_directory" > "$tar_name/CVMFS_VERSION"
   rm -r $tar_name/test/benchmarks
 
-  # Vendor Go dependencies so offline builds (e.g. koji) work without network access
-  for godir in ducc gateway snapshotter; do
-    (cd ${tmpd}/${tar_name}/${godir} && go mod vendor)
-  done
+  # Vendor Go dependencies and pre-populate the FetchContent download cache so
+  # offline RPM builds in mock/koji do not attempt network access.
+  ${source_directory}/ci/prefetch_fetchcontent_externals.sh \
+    ${tmpd}/${tar_name} \
+    ${tmpd}/${tar_name}/externals/download
 
   tar czf $destination_path $tar_name || true
   local retval=$?

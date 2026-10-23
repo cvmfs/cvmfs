@@ -2,17 +2,6 @@
 cvmfs_test_name="Local File Backend Health Check (Machine Readable)"
 cvmfs_test_autofs_on_startup=false
 
-inflate_file() {
-  local destination_file=$1
-  local source_file=$2
-  local desired_file_size=$3
-
-  touch $destination_file
-  while [ $(stat -c %s $destination_file) -lt $desired_file_size ]; do
-    cat $source_file >> $destination_file
-  done
-}
-
 produce_files_in() {
 	local working_dir=$1
 
@@ -361,6 +350,15 @@ cvmfs_run_test() {
 
   echo "cvmfs_server check should NOT report a sane repository after this rage"
   check_repository $CVMFS_TEST_REPO && return 24
+
+  echo "cvmfs_server check should print a summary by default"
+  local check_output
+  check_output="$(cvmfs_server check $CVMFS_TEST_REPO 2>&1)" && return 25
+  contains_line "$check_output" "Check summary for $CVMFS_TEST_REPO:" || return 25
+
+  echo "cvmfs_server check should allow disabling the summary"
+  check_output="$(CVMFS_SERVER_CHECK_SUMMARY=0 cvmfs_server check $CVMFS_TEST_REPO 2>&1)" && return 26
+  contains_line "$check_output" "Check summary for $CVMFS_TEST_REPO:" && return 26
 
   return 0
 }

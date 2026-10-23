@@ -16,9 +16,9 @@
 
 #include "crypto/hash.h"
 #include "util/exception.h"
+#include "util/platform.h"
 #include "util/posix.h"
 #include "util/string.h"
-#include "util/platform.h"
 
 using namespace std;  // NOLINT
 
@@ -33,12 +33,39 @@ static string XmlEscape(const string &input) {
   result.reserve(input.size());
   for (unsigned i = 0; i < input.size(); ++i) {
     switch (input[i]) {
-      case '&': result += "&amp;"; break;
-      case '<': result += "&lt;"; break;
-      default:  result += input[i]; break;
+      case '&':
+        result += "&amp;";
+        break;
+      case '<':
+        result += "&lt;";
+        break;
+      default:
+        result += input[i];
+        break;
     }
   }
   return result;
+}
+
+
+/**
+ * The CanonicalizedResource of an S3 V2 signature.  It must mirror MkUrl():
+ * the server rebuilds the resource from the request path, so any difference,
+ * down to a trailing slash, yields SignatureDoesNotMatch.
+ *
+ * With DNS buckets the bucket lives in the hostname and the path is
+ * "/" + object_key, so an empty key gives "/<bucket>/".  In path style the
+ * path already carries the bucket and an empty key gives "/<bucket>".
+ */
+string MkV2CanonicalResource(const string &bucket, const string &object_key,
+                             bool dns_buckets, bool multi_delete) {
+  string resource = "/" + bucket;
+  if (dns_buckets || !object_key.empty())
+    resource += "/" + object_key;
+  // V2 requires subresources to be signed; multi-delete posts to "?delete"
+  if (multi_delete)
+    resource += "?delete";
+  return resource;
 }
 
 
@@ -47,7 +74,8 @@ static string XmlEscape(const string &input) {
  * Uses Quiet mode so the response only contains errors, not successes.
  */
 string ComposeDeleteMultiXml(const vector<string> &keys) {
-  string xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Delete><Quiet>true</Quiet>";
+  string xml = "<?xml version=\"1.0\" "
+               "encoding=\"UTF-8\"?><Delete><Quiet>true</Quiet>";
   // ~70 bytes per <Object><Key>...</Key></Object> entry
   xml.reserve(xml.size() + keys.size() * 70 + 10);
   for (unsigned i = 0; i < keys.size(); ++i) {
@@ -78,8 +106,7 @@ unsigned ParseDeleteMultiResponse(const string &response,
     if (err_end == string::npos)
       break;
 
-    const string error_block = response.substr(err_start,
-                                                err_end - err_start);
+    const string error_block = response.substr(err_start, err_end - err_start);
     num_errors++;
 
     // Extract <Key>...</Key>
@@ -125,8 +152,8 @@ const unsigned S3FanoutManager::kThrottleReportIntervalSec = 10;
 const unsigned S3FanoutManager::kDefaultHTTPPort = 80;
 const unsigned S3FanoutManager::kDefaultHTTPSPort = 443;
 
-std::string S3FanoutManager::MkDotCvmfsCacheControlHeader(unsigned defaultMaxAge, int overrideMaxAge)
-{
+std::string S3FanoutManager::MkDotCvmfsCacheControlHeader(
+    unsigned defaultMaxAge, int overrideMaxAge) {
   const char *var;
   int max_age_sec;
   char *at_null_terminator_if_number;
@@ -141,8 +168,7 @@ std::string S3FanoutManager::MkDotCvmfsCacheControlHeader(unsigned defaultMaxAge
     var = getenv("CVMFS_MAX_TTL_SECS");
     if (var && var[0]) {
       max_age_sec = strtoll(var, &at_null_terminator_if_number, 10);
-      if (*at_null_terminator_if_number == '\0'
-          && max_age_sec >= 0) {
+      if (*at_null_terminator_if_number == '\0' && max_age_sec >= 0) {
         value_determined = true;
       }
     }
@@ -152,8 +178,7 @@ std::string S3FanoutManager::MkDotCvmfsCacheControlHeader(unsigned defaultMaxAge
     var = getenv("CVMFS_MAX_TTL");
     if (var && var[0]) {
       max_age_sec = strtoll(var, &at_null_terminator_if_number, 10);
-      if (*at_null_terminator_if_number == '\0'
-          && max_age_sec >= 0) {
+      if (*at_null_terminator_if_number == '\0' && max_age_sec >= 0) {
         max_age_sec *= 60;
         value_determined = true;
       }
@@ -604,25 +629,14 @@ bool S3FanoutManager::MkV2Authz(const JobInfo &info,
   const string timestamp = RfcTimestamp();
   string to_sign = request + "\n" + payload_hash + "\n" + content_type + "\n"
                    + timestamp + "\n";
-  if (config_.x_amz_acl != "") {
-    if (info.object_key.empty()) {
-      to_sign += "x-amz-acl:" + config_.x_amz_acl + "\n" +  // default ACL
-                 "/" + config_.bucket;
-    } else {
-      to_sign += "x-amz-acl:" + config_.x_amz_acl + "\n" +  // default ACL
-                 "/" + config_.bucket + "/" + info.object_key;
-    }
-  }
-  // S3 V2 requires subresources to be included in the string to sign.
-  // For kReqDeleteMulti, object_key is intentionally empty: the canonical
-  // resource becomes "/<bucket>?delete", matching the POST URL.
-  if (info.request == JobInfo::kReqDeleteMulti) {
-    if (config_.x_amz_acl == "")
-      to_sign += "/" + config_.bucket;
-    to_sign += "?delete";
-  }
-  LogCvmfs(kLogS3Fanout, kLogDebug, "%s string to sign for: %s",
-           request.c_str(), info.object_key.c_str());
+  if (config_.x_amz_acl != "")
+    to_sign += "x-amz-acl:" + config_.x_amz_acl
+               + "\n";  // CanonicalizedAmzHeaders
+  to_sign += MkV2CanonicalResource(config_.bucket, info.object_key,
+                                   config_.dns_buckets,
+                                   info.request == JobInfo::kReqDeleteMulti);
+  LogCvmfs(kLogS3Fanout, kLogDebug, "%s string to sign: %s", request.c_str(),
+           to_sign.c_str());
 
   shash::Any hmac;
   hmac.algorithm = shash::kSha1;
@@ -748,9 +762,9 @@ bool S3FanoutManager::MkV4Authz(const JobInfo &info,
 
   const string canonical_request = GetRequestString(info) + "\n"
                                    + GetUriEncode(uri, false) + "\n"
-                                   + canonical_query + "\n"
-                                   + canonical_headers + "\n" + signed_headers
-                                   + "\n" + payload_hash;
+                                   + canonical_query + "\n" + canonical_headers
+                                   + "\n" + signed_headers + "\n"
+                                   + payload_hash;
 
   const string hash_request = shash::Sha256String(canonical_request.c_str());
 
@@ -880,7 +894,7 @@ int S3FanoutManager::InitializeDnsSettings(CURL *handle,
   // We need to resolve the hostname
   // TODO(ssheikki): support ipv6 also...  if (opt_ipv4_only_)
   const dns::Host host = resolver_->Resolve(remote_host);
-  set<string> ipv4_addresses = host.ipv4_addresses();
+  set<string> const ipv4_addresses = host.ipv4_addresses();
   std::set<string>::iterator its = ipv4_addresses.begin();
   S3FanOutDnsEntry *dnse = NULL;
   for (; its != ipv4_addresses.end(); ++its) {
@@ -1190,9 +1204,9 @@ void S3FanoutManager::SetUrlOptions(JobInfo *info) const {
  * Adds transfer time and uploaded bytes to the global counters.
  */
 void S3FanoutManager::UpdateStatistics(CURL *handle) {
-  double val;
+  curl_off_t val;
 
-  if (curl_easy_getinfo(handle, CURLINFO_SIZE_UPLOAD, &val) == CURLE_OK)
+  if (curl_easy_getinfo(handle, CURLINFO_SIZE_UPLOAD_T, &val) == CURLE_OK)
     statistics_->transferred_bytes += val;
 }
 
@@ -1285,18 +1299,29 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     case CURLE_OPERATION_TIMEDOUT:
     case CURLE_SEND_ERROR:
     case CURLE_RECV_ERROR:
+    // Server or proxy dropped the connection mid-response (e.g. a reaped
+    // keep-alive connection); the request body is rewound before retrying.
+    case CURLE_PARTIAL_FILE:
+    case CURLE_GOT_NOTHING:
       info->error_code = kFailHostConnection;
       break;
     case CURLE_ABORTED_BY_CALLBACK:
     case CURLE_WRITE_ERROR:
       // Error set by callback
       break;
-    default:
+    default: {
+      const string what = (info->request == JobInfo::kReqDeleteMulti)
+                              ? "multi-delete of "
+                                    + StringifyUint(
+                                        info->multi_delete_keys.size())
+                                    + " objects"
+                              : "upload of '" + info->object_key + "'";
       LogCvmfs(kLogS3Fanout, kLogStderr | kLogSyslogErr,
-               "unexpected curl error (%d) while trying to upload %s: %s",
-               curl_error, info->object_key.c_str(), info->errorbuffer);
+               "unexpected curl error (%d) during %s: %s", curl_error,
+               what.c_str(), info->errorbuffer);
       info->error_code = kFailOther;
       break;
+    }
   }
 
   // Transform HEAD to PUT request
@@ -1349,7 +1374,7 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
   }
 
   // Cleanup opened resources
-  info->origin.Destroy();
+  info->origin.reset();
 
   if ((info->error_code != kFailOk) && (info->http_error != 0)
       && (info->http_error != 404)) {
@@ -1359,7 +1384,7 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
 }
 
 S3FanoutManager::S3FanoutManager(const S3Config &config) : config_(config) {
-  atomic_init32(&multi_threaded_);
+  multi_threaded_.store(0);
   MakePipe(pipe_terminate_);
   MakePipe(pipe_jobs_);
   MakePipe(pipe_completed_);
@@ -1434,7 +1459,7 @@ S3FanoutManager::~S3FanoutManager() {
   pthread_mutex_destroy(curl_handle_lock_);
   free(curl_handle_lock_);
 
-  if (atomic_xadd32(&multi_threaded_, 0) == 1) {
+  if (multi_threaded_.load() == 1) {
     // Shutdown I/O thread
     char buf = 'T';
     WritePipe(pipe_terminate_[1], &buf, 1);
@@ -1485,7 +1510,7 @@ void S3FanoutManager::Spawn() {
                                     static_cast<void *>(this));
   assert(retval == 0);
 
-  atomic_inc32(&multi_threaded_);
+  multi_threaded_.fetch_add(1);
 }
 
 const Statistics &S3FanoutManager::GetStatistics() { return *statistics_; }

@@ -17,7 +17,8 @@ enum LeaseReply {
 };
 
 LeaseReply ParseAcquireReply(const CurlBuffer &buffer,
-                             std::string *session_token);
+                             std::string *session_token,
+                             int *max_api_version = NULL);
 LeaseReply ParseAcquireReplyWithRevision(const CurlBuffer &buffer,
                                          std::string *session_token,
                                          uint64_t *current_revision,

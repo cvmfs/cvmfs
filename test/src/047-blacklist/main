@@ -10,6 +10,14 @@ cleanup_blacklist() {
 cvmfs_run_test() {
   logfile=$1
 
+  # Fetch the whitelist/manifest from the same servers the client uses: the
+  # OpenHTC CDN when the suite runs with CVMFS_TEST_USE_CDN=yes, otherwise the
+  # direct stratum 1.
+  local stratum1="http://cvmfs-stratum-one.cern.ch"
+  if [ "x${CVMFS_TEST_USE_CDN:-}" = "xyes" ]; then
+    stratum1="http://s1cern-cvmfs.openhtc.io"
+  fi
+
   local cache_dir=$(get_cvmfs_cachedir grid.cern.ch)
   echo "*** mount grid.cern.ch"
   cvmfs_mount grid.cern.ch || return 1
@@ -23,7 +31,7 @@ cvmfs_run_test() {
   cvmfs_umount grid.cern.ch || return 11
 
   echo "*** blacklist the grid.cern.ch fingerprint(s)"
-  curl -f -s http://cvmfs-stratum-one.cern.ch/cvmfs/grid.cern.ch/.cvmfswhitelist > white || return 10
+  curl -f -s $stratum1/cvmfs/grid.cern.ch/.cvmfswhitelist > white || return 10
 
   awk '/^N/{ok=1;next} /^--/{exit} ok==1 {print}' white | \
     sed 's/ .*//' | sudo sh -c "tee /etc/cvmfs/blacklist"
@@ -40,7 +48,7 @@ cvmfs_run_test() {
   cvmfs_mount grid.cern.ch || return 31
 
   echo "*** blacklist the grid.cern.ch revision"
-  curl -f -s http://cvmfs-stratum-one.cern.ch/cvmfs/grid.cern.ch/.cvmfspublished > pub || return 32
+  curl -f -s $stratum1/cvmfs/grid.cern.ch/.cvmfspublished > pub || return 32
 
   awk '/^S/{r=substr($1,2);print "<grid.cern.ch",r+1;}' pub \
     | sudo sh -c "tee /etc/cvmfs/blacklist"

@@ -11,6 +11,10 @@
   - follow the [documentation](https://cvmfs.readthedocs.io/en/stable/cpt-quickstart.html#building-from-source) 
   - or read about extra options below
 
+## Install build dependencies
+
+The `ci/build_install_builddeps.sh` script can be used to list or directly install build dependencies for supported platforms. Use `--list` to list them, or invoke it with sudo and no arguments to install directly.
+
 ## Replace `make` with `ninja`
 
 `ninja` has the advantage of running parallelized by default and only incrementally rebuilding resources that are affected by (code) changes.

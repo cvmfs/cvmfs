@@ -68,6 +68,7 @@ MagicXattrManager::MagicXattrManager(
   Register("user.chunks", new ChunksMagicXattr());
   Register("user.compression", new CompressionMagicXattr());
   Register("user.direct_io", new DirectIoMagicXattr());
+  Register("user.bundle_trigger", new BundleTriggerMagicXattr());
   Register("user.external_file", new ExternalFileMagicXattr());
 
   Register("user.rawlink", new RawlinkMagicXattr());
@@ -369,6 +370,14 @@ bool DirectIoMagicXattr::PrepareValueFenced() { return dirent_->IsRegular(); }
 
 void DirectIoMagicXattr::FinalizeValue() {
   result_pages_.push_back(dirent_->IsDirectIo() ? "1" : "0");
+}
+
+bool BundleTriggerMagicXattr::PrepareValueFenced() {
+  return dirent_->IsRegular();
+}
+
+void BundleTriggerMagicXattr::FinalizeValue() {
+  result_pages_.push_back(dirent_->IsBundleTrigger() ? "1" : "0");
 }
 
 bool ExternalFileMagicXattr::PrepareValueFenced() {
@@ -836,7 +845,7 @@ void ListOpenHashesMagicXattr::FinalizeValue() {
   std::string result;
   if (pcm != nullptr) {
     if (pcm->cleanup_unused_first()) {
-      if (pcm->fd_mgr_.IsValid()) {
+      if (pcm->fd_mgr_.get() != nullptr) {
         const auto &hash_map = pcm->fd_mgr_->map_fd_;
         auto empty = hash_map.empty_key();
         auto *keys = hash_map.keys();
@@ -852,4 +861,3 @@ void ListOpenHashesMagicXattr::FinalizeValue() {
   }
   result_pages_.push_back(result);
 }
-

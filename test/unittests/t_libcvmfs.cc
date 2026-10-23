@@ -285,9 +285,12 @@ TEST_F(T_Libcvmfs, TemplatingSlow) {
   // however it should reparse the attributes anyway...
   cvmfs_attach_repo_v2("test.cern.ch", opts_repo, &ctx);
 
-  EXPECT_STREQ("/tmp/test/", cvmfs_options_get(opts_repo, "CVMFS_CACHE_DIR"));
-  EXPECT_STREQ("/tmp/test.cern.ch.debug.log",
-               cvmfs_options_get(opts_repo, "CVMFS_DEBUGLOG"));
+  char *cache_dir = cvmfs_options_get(opts_repo, "CVMFS_CACHE_DIR");
+  EXPECT_STREQ("/tmp/test/", cache_dir);
+  cvmfs_options_free(cache_dir);
+  char *debuglog = cvmfs_options_get(opts_repo, "CVMFS_DEBUGLOG");
+  EXPECT_STREQ("/tmp/test.cern.ch.debug.log", debuglog);
+  cvmfs_options_free(debuglog);
   cvmfs_options_fini(opts_repo);
 
   cvmfs_fini();
@@ -756,6 +759,10 @@ TEST_F(T_Libcvmfs, ListStat) {
       FAIL() << "unexpected object in list: " << buf[i].name;
     }
   }
+  for (size_t i = 0; i < listlen; ++i) {
+    free(buf[i].name);
+  }
+  free(buf);
 
   // Finalize and close repo and options
   cvmfs_detach_repo(ctx);
@@ -796,6 +803,7 @@ TEST_F(T_Libcvmfs, Remount) {
     if (retval != LIBCVMFS_ERR_OK) {
       char c = '!';
       WritePipe(pipe_send[1], &c, 1);
+      cvmfs_options_fini(opts);
       exit(1);
     }
 
@@ -806,6 +814,7 @@ TEST_F(T_Libcvmfs, Remount) {
     if (retval != LIBCVMFS_ERR_OK) {
       char c = '!';
       WritePipe(pipe_send[1], &c, 1);
+      cvmfs_options_fini(opts);
       exit(1);
     }
 
@@ -823,6 +832,7 @@ TEST_F(T_Libcvmfs, Remount) {
     // Finalize and close repo and options
     cvmfs_detach_repo(ctx);
     cvmfs_fini();
+    cvmfs_options_fini(opts);
     exit(HasFailure() ? 1 : 0);
   }
 

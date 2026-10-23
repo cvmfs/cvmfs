@@ -1,0 +1,357 @@
+/**
+ * This file is part of the CernVM File System.
+ */
+
+#include <gmock/gmock.h>
+#include <gtest/gtest.h>
+#include <fcntl.h>
+#include <pthread.h>
+
+#include <algorithm>
+#include <atomic>
+#include <climits>
+#include <cstring>
+#include <string>
+#include <vector>
+
+#include "bundle_mgr.h"
+#include "catalog_mgr_client.h"
+#include "crypto/hash.h"
+#include "fetch.h"
+#include "file_bundle.h"
+#include "file_chunk.h"
+#include "json_document.h"
+#include "mountpoint.h"
+#include "options.h"
+#include "shortstring.h"
+#include "testutil.h"
+#include "util/mutex.h"
+#include "util/posix.h"
+
+class MockCatalogManager : public catalog::ClientCatalogManager {
+ public:
+  MockCatalogManager(MountPoint *mountpoint)
+      : ClientCatalogManager(mountpoint) { };
+  virtual ~MockCatalogManager() = default;
+  MOCK_METHOD(fuse_ino_t, MangleInode, (fuse_ino_t ino), (const));
+  MOCK_METHOD(bool,
+              LookupPath,
+              (const PathString &path,
+               const catalog::LookupOptions options,
+               catalog::DirectoryEntry *dirent),
+              (override));
+  MOCK_METHOD(bool,
+              ListFileChunks,
+              (const PathString &path,
+               const shash::Algorithms interpret_hashes_as,
+               FileChunkList *chunks),
+              (override));
+};
+
+class MockFetcher : public cvmfs::Fetcher {
+ public:
+  MockFetcher(CacheManager *cache_mgr,
+              download::DownloadManager *download_mgr,
+              BackoffThrottle *backoff_throttle,
+              perf::StatisticsTemplate statistics)
+      : Fetcher(cache_mgr, download_mgr, backoff_throttle, statistics)
+      , statistics_(statistics.statistics()) { };
+  int Fetch(const CacheManager::LabeledObject &object,
+            const std::string &alt_url = "") override {
+    ++counter_;
+    {
+      const MutexLockGuard guard(&fetched_mutex_);
+      fetched_hashes_.push_back(object.id);
+    }
+    // Return an invalid file descriptor on purpose. The mock does not place
+    // anything in the cache, so handing back a small fabricated fd (e.g. 1)
+    // would make the production code perform a real Pread()/Close() on an
+    // unrelated process file descriptor such as stdout.
+    return -1;
+  }
+  virtual ~MockFetcher() { delete statistics_; }
+  static void Reset() {
+    counter_ = 0;
+    const MutexLockGuard guard(&fetched_mutex_);
+    fetched_hashes_.clear();
+  }
+  static std::vector<shash::Any> FetchedHashes() {
+    const MutexLockGuard guard(&fetched_mutex_);
+    return fetched_hashes_;
+  }
+
+  // Shared across all fetcher instances and incremented from several worker
+  // threads concurrently, hence atomic.
+  inline static std::atomic<size_t> counter_{0};
+  // Every hash requested through Fetch(), in arrival order. Written by the
+  // worker threads concurrently, hence the mutex.
+  inline static pthread_mutex_t fetched_mutex_ = PTHREAD_MUTEX_INITIALIZER;
+  inline static std::vector<shash::Any> fetched_hashes_;
+  perf::Statistics *statistics_;
+};
+
+class T_BundleMgr : public ::testing::Test {
+ protected:
+  virtual void SetUp() {
+    tmp_path_ = CreateTempDir("./cvmfs_ut_cache");
+    options_mgr_.SetValue("CVMFS_CACHE_BASE", tmp_path_);
+    options_mgr_.SetValue("CVMFS_SHARED_CACHE", "no");
+    options_mgr_.SetValue("CVMFS_MAX_RETRIES", "0");
+    fs_info_.name = "unit-test";
+    fs_info_.options_mgr = &options_mgr_;
+    // Silence syslog error
+    options_mgr_.SetValue("CVMFS_MOUNT_DIR", "/no/such/dir");
+    file_system_ = FileSystem::Create(fs_info_);
+    ASSERT_TRUE(file_system_ != NULL);
+    EXPECT_TRUE(file_system_->IsValid());
+    mount_point_ = MountPoint::Create("keys.cern.ch", file_system_);
+
+    // MountPoint mocks allocation
+    mock_catalog_mgr_ = new testing::NiceMock<MockCatalogManager>(mount_point_);
+    mock_fetcher_ = new testing::NiceMock<MockFetcher>(
+        nullptr,
+        nullptr,
+        nullptr,
+        perf::StatisticsTemplate("fetch", new perf::Statistics()));
+    mock_external_fetcher_ = new testing::NiceMock<MockFetcher>(
+        nullptr,
+        nullptr,
+        nullptr,
+        perf::StatisticsTemplate("fetch", new perf::Statistics()));
+    // Determine mock behavior
+    ON_CALL(*mock_catalog_mgr_, LookupPath(testing::_, testing::_, testing::_))
+        .WillByDefault([this](const PathString &,
+                              const catalog::LookupOptions,
+                              catalog::DirectoryEntry *out) -> bool {
+          *out = this->trigger_dirent_;
+          return true;
+        });
+    // Plug mocks on mount_point_
+    mount_point_->catalog_mgr_ = mock_catalog_mgr_;
+    mount_point_->fetcher_ = mock_fetcher_;
+    mount_point_->external_fetcher_ = mock_external_fetcher_;
+
+    bundle_mgr_ = new BundleMgr(mount_point_);
+    EXPECT_TRUE(static_cast<bool>(*bundle_mgr_));
+    bundle_mgr_->Spawn();
+    EXPECT_TRUE(static_cast<bool>(*bundle_mgr_));
+
+    // A parsed bundle spec, handed to EnqueueDependencies() directly; the
+    // production path would obtain it from the dispatcher thread via
+    // ProcessTrigger().
+    bfm_ = new BundleFileMgr(JsonDocument::Create(CreateJsonTxt()));
+
+    // Reset the shared counters so each test starts from a clean slate
+    MockFetcher::Reset();
+    MakePipe(common_pipe_);
+  }
+
+  virtual void TearDown() {
+    // Destroy the BundleMgr first: its destructor joins the dispatcher and
+    // the worker threads, which may still dereference mount_point_ and
+    // file_system_ while draining their queues.
+    delete bundle_mgr_;
+    delete bfm_;
+    delete mount_point_;
+    delete file_system_;
+    ClosePipe(common_pipe_);
+    EXPECT_EQ(0, chdir("../.."));
+    if (not tmp_path_.empty()) {
+      EXPECT_TRUE(RemoveTree(tmp_path_));
+    }
+  }
+
+  template<typename CT,
+           typename = std::enable_if_t<std::is_trivially_copyable_v<CT> > >
+  void test_blocking_exchange(const CT &obj) {
+    using T = std::remove_cv_t<CT>;
+    bundle_mgr_->BlockingSend(wfd_, obj);
+    T reply = bundle_mgr_->BlockingReceive<T>(rfd_);
+    EXPECT_EQ(obj, reply);
+  }
+  void test_blocking_exchange(const std::string &obj) {
+    bundle_mgr_->BlockingSend(wfd_, obj);
+    std::string reply = bundle_mgr_->BlockingReceive(rfd_);
+    EXPECT_EQ(obj, reply);
+  }
+
+ protected:
+  MountPoint *mount_point_;
+  FileSystem *file_system_;
+  FileSystem::FileSystemInfo fs_info_;
+  SimpleOptionsParser options_mgr_;
+  std::string tmp_path_;
+
+  BundleMgr *bundle_mgr_;
+
+  catalog::DirectoryEntry trigger_dirent_{};
+
+  // Mocks
+  BundleFileMgr *bfm_;
+  testing::NiceMock<MockCatalogManager> *mock_catalog_mgr_;
+  testing::NiceMock<MockFetcher> *mock_fetcher_;
+  testing::NiceMock<MockFetcher> *mock_external_fetcher_;
+
+  int common_pipe_[2];
+  int &rfd_ = common_pipe_[0];
+  int &wfd_ = common_pipe_[1];
+
+  std::vector<std::string> dependencies_ = {"a_file_without_extension",
+                                            "a_file_with.extension",
+                                            "a/file/within/a/directory.foo"};
+
+  std::string CreateJsonTxt() {
+    std::ostringstream json;
+    json << "{";
+    json << "  \"name\": \"CVMFS_BUNDLE\",\n";
+    json << "  \"version\": \"1.0.0\",\n";
+    json << "  \"encoding\": \"UTF-8\",\n";
+    json << "  \"dependencies\": [\n";
+    for (size_t i = 0; i < dependencies_.size(); ++i) {
+      json << "    \"" << dependencies_[i] << "\"";
+      if (i < dependencies_.size() - 1) {
+        json << ",\n";
+      }
+    }
+    json << "]}";
+    return json.str();
+  }
+};
+
+TEST_F(T_BundleMgr, ExchangeCT) {
+  int integer = 42;
+  std::string string = "Test_String";
+
+  test_blocking_exchange(integer);
+  test_blocking_exchange(string);
+}
+
+TEST_F(T_BundleMgr, ExchangePathString) {
+  PathString path("path/to/file.txt");
+
+  bundle_mgr_->BlockingSend(wfd_, path);
+  EXPECT_EQ(path, bundle_mgr_->ReceivePath(rfd_));
+}
+
+// The transport helpers must carry paths longer than PIPE_BUF (4096 on
+// Linux, 512 on macOS) intact: BlockingReceive must not bound the payload
+// length. This mirrors ExchangePathString over the fixture's blocking
+// common_pipe_ with a payload beyond the PIPE_BUF boundary. (The production
+// work queue sends each message with a single atomic write and TrySendPath
+// drops paths that do not fit into PIPE_BUF, so overlong paths never reach
+// the workers there.)
+TEST_F(T_BundleMgr, ReceivePathLongerThanPipeBuf) {
+  // 2 * PIPE_BUF still fits comfortably in the pipe's buffer, so the single
+  // write()/read() in WritePipe/ReadPipe transfers the whole payload.
+  const PathString long_path(std::string(2 * PIPE_BUF, 'a'));
+  bundle_mgr_->BlockingSend(wfd_, long_path);
+  EXPECT_EQ(long_path, bundle_mgr_->ReceivePath(rfd_));
+}
+
+TEST_F(T_BundleMgr, EnqueueDependencies) {
+  bundle_mgr_->EnqueueDependencies(bfm_, PathString("/bundle/dir"));
+  // JoinFetcherPool() drains the work queue: every dependency is fetched
+  // before the workers reach their terminate command, so the resulting count
+  // is deterministic.
+  bundle_mgr_->JoinFetcherPool();
+  EXPECT_EQ(MockFetcher::counter_.load(), dependencies_.size());
+}
+
+TEST_F(T_BundleMgr, ScheduleTrigger) {
+  EXPECT_TRUE(bundle_mgr_->ScheduleTrigger(PathString("/trigger.txt")));
+  // JoinDispatcher() drains the trigger queue before terminating: the
+  // dispatcher tries to load the bundle spec through the mocked fetcher,
+  // which is the single fetch observed here (and fails, so no dependencies
+  // are enqueued).
+  bundle_mgr_->JoinDispatcher();
+  bundle_mgr_->JoinFetcherPool();
+  EXPECT_EQ(MockFetcher::counter_.load(), 1u);
+}
+
+// In the fuse client, Spawn() only runs after daemonization (threads do not
+// survive the fork), so a trigger scheduled before Spawn() must wait in the
+// queue and be processed once the threads come up.
+TEST_F(T_BundleMgr, ScheduleTriggerBeforeSpawn) {
+  BundleMgr mgr(mount_point_);
+  EXPECT_TRUE(mgr.ScheduleTrigger(PathString("/trigger.txt")));
+  mgr.Spawn();
+  mgr.JoinDispatcher();
+  mgr.JoinFetcherPool();
+  EXPECT_EQ(MockFetcher::counter_.load(), 1u);
+}
+
+TEST_F(T_BundleMgr, TrySendPathDropsWhenFull) {
+  int full_pipe[2];
+  MakePipe(full_pipe);
+  const int flags = fcntl(full_pipe[1], F_GETFL);
+  fcntl(full_pipe[1], F_SETFL, flags | O_NONBLOCK);
+
+  // Nobody reads from this pipe, so it fills up after finitely many sends;
+  // TrySendPath must then report failure instead of blocking the caller.
+  const PathString path("/some/bundle/dependency.txt");
+  const size_t kSendLimit = 1000000;
+  size_t n_sent = 0;
+  bool sent = true;
+  while (sent && (n_sent < kSendLimit)) {
+    sent = bundle_mgr_->TrySendPath(full_pipe[1], path);
+    if (sent)
+      ++n_sent;
+  }
+  EXPECT_FALSE(sent);
+  EXPECT_GT(n_sent, 0u);
+  ClosePipe(full_pipe);
+}
+
+namespace {
+shash::Any Sha1WithByte(const unsigned char byte) {
+  shash::Any result(shash::kSha1);
+  memset(result.digest, byte, shash::kDigestSizes[shash::kSha1]);
+  return result;
+}
+}  // namespace
+
+TEST_F(T_BundleMgr, FetchChunked) {
+  const shash::Any bulk_hash = Sha1WithByte(0xaa);
+  std::vector<shash::Any> chunk_hashes;
+  for (unsigned char i = 1; i <= 3; ++i) {
+    chunk_hashes.push_back(Sha1WithByte(i));
+  }
+
+  // Dependencies above the chunking threshold have no bulk object in the
+  // repository (unless CVMFS_GENERATE_LEGACY_BULK_CHUNKS is set); only the
+  // per-chunk objects exist.
+  const catalog::DirectoryEntry chunked_dirent =
+      catalog::DirectoryEntryTestFactory::ChunkedFile(bulk_hash);
+  ON_CALL(*mock_catalog_mgr_, LookupPath(testing::_, testing::_, testing::_))
+      .WillByDefault([chunked_dirent](const PathString &,
+                                      const catalog::LookupOptions,
+                                      catalog::DirectoryEntry *out) -> bool {
+        *out = chunked_dirent;
+        return true;
+      });
+  ON_CALL(*mock_catalog_mgr_,
+          ListFileChunks(testing::_, testing::_, testing::_))
+      .WillByDefault([chunk_hashes](const PathString &,
+                                    const shash::Algorithms,
+                                    FileChunkList *chunks) -> bool {
+        off_t offset = 0;
+        for (const shash::Any &hash : chunk_hashes) {
+          chunks->PushBack(FileChunk(hash, offset, 4096));
+          offset += 4096;
+        }
+        return true;
+      });
+
+  bundle_mgr_->EnqueueDependencies(bfm_, PathString("/bundle/dir"));
+  bundle_mgr_->JoinFetcherPool();
+
+  const std::vector<shash::Any> fetched = MockFetcher::FetchedHashes();
+  EXPECT_EQ(0, std::count(fetched.begin(), fetched.end(), bulk_hash))
+      << "prefetcher requested the (nonexistent) bulk object";
+  const ptrdiff_t n_deps = static_cast<ptrdiff_t>(dependencies_.size());
+  for (const shash::Any &hash : chunk_hashes) {
+    EXPECT_EQ(n_deps, std::count(fetched.begin(), fetched.end(), hash));
+  }
+  EXPECT_EQ(dependencies_.size() * chunk_hashes.size(), fetched.size());
+}
+

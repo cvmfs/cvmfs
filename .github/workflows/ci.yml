@@ -20,6 +20,11 @@ jobs:
           cd test/common/container
           docker compose up --build -d cvmfs-dev
 
+      - name: Install integration test dependencies
+        run: |
+          docker exec -u sftnight -t cvmfs-dev bash -c \
+            "cd /home/sftnight/cvmfs && ./ci/build_install_builddeps.sh --test-deps"
+
       - name: Setup CVMFS
         run: |
           docker exec -u sftnight -t cvmfs-dev bash -c \

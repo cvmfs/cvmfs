@@ -2,12 +2,17 @@
  * This file is part of the CernVM File System.
  */
 
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
 #include <unistd.h>
 
 #include <algorithm>
 #include <cassert>
 #include <cstdio>
+#include <cstring>
 #include <ctime>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -15,7 +20,6 @@
 #include "network/dns.h"
 #include "util/logging.h"
 #include "util/platform.h"
-#include "util/pointer.h"
 #include "util/posix.h"
 #include "util/string.h"
 
@@ -176,6 +180,29 @@ class DummyResolver : public Resolver {
     }
   }
 };
+
+/**
+ * Returns true if the host has a route for outbound IPv6 traffic.  Used to skip
+ * the live DNS tests that expect AAAA records on machines (e.g. CI VMs) without
+ * IPv6 connectivity, where c-ares legitimately returns no IPv6 address.  A UDP
+ * connect() does not send any packet; it only checks that a route exists.
+ */
+static bool HasIpv6Connectivity() {
+  int fd = socket(AF_INET6, SOCK_DGRAM, 0);
+  if (fd < 0)
+    return false;
+  struct sockaddr_in6 addr;
+  memset(&addr, 0, sizeof(addr));
+  addr.sin6_family = AF_INET6;
+  addr.sin6_port = htons(53);
+  // a.root-servers.net
+  inet_pton(AF_INET6, "2001:503:ba3e::2:30", &addr.sin6_addr);
+  int retval = connect(fd, reinterpret_cast<struct sockaddr *>(&addr),
+                       sizeof(addr));
+  close(fd);
+  return retval == 0;
+}
+
 
 static void ExpectResolvedName(const Host &host,
                                const string &fqdn,
@@ -614,6 +641,8 @@ TEST_F(T_Dns, CaresResolverConstruct) {
 
 
 TEST_F(T_Dns, CaresResolverSimple) {
+  if (!HasIpv6Connectivity())
+    GTEST_SKIP() << "no outbound IPv6 connectivity";
   Host host = default_resolver->Resolve("a.root-servers.net");
   ExpectResolvedName(host, "a.root-servers.net", "198.41.0.4",
                      "[2001:503:ba3e::2:30]");
@@ -621,6 +650,8 @@ TEST_F(T_Dns, CaresResolverSimple) {
 
 
 TEST_F(T_Dns, CaresResolverMany) {
+  if (!HasIpv6Connectivity())
+    GTEST_SKIP() << "no outbound IPv6 connectivity";
   vector<string> names;
   names.push_back("a.root-servers.net");
   names.push_back("b.root-servers.net");
@@ -695,6 +726,8 @@ TEST_F(T_Dns, CaresResolverFinalDot) {
 
 
 TEST_F(T_Dns, CaresResolverSearchDomainSlow) {
+  if (!HasIpv6Connectivity())
+    GTEST_SKIP() << "no outbound IPv6 connectivity";
   Host host = default_resolver->Resolve("a");
   EXPECT_TRUE((host.status() == kFailUnknownHost)
               || (host.status() == kFailTimeout)
@@ -764,8 +797,9 @@ TEST_F(T_Dns, CaresResolverReadConfig) {
 
 
 TEST_F(T_Dns, CaresResolverBadResolver) {
-  UniquePtr<CaresResolver> quick_resolver(CaresResolver::Create(false, 0, 100));
-  ASSERT_TRUE(quick_resolver.IsValid());
+  std::unique_ptr<CaresResolver> quick_resolver(
+      CaresResolver::Create(false, 0, 100));
+  ASSERT_TRUE(quick_resolver.get() != nullptr);
 
   vector<string> bad_resolvers;
   bad_resolvers.push_back("127.0.0.2");
@@ -784,8 +818,9 @@ TEST_F(T_Dns, CaresResolverTimeout) {
   // As of c-ares 1.15, the timeout algorithm changed to exponential backoff
   // without cutoff.  This should result in a total of 4 queries with timeouts
   // of 256, 256, 512, 1024, which sums up to a little over 2 seconds
-  UniquePtr<CaresResolver> quick_resolver(CaresResolver::Create(false, 3, 256));
-  ASSERT_TRUE(quick_resolver.IsValid());
+  std::unique_ptr<CaresResolver> quick_resolver(
+      CaresResolver::Create(false, 3, 256));
+  ASSERT_TRUE(quick_resolver.get() != nullptr);
 
   vector<string> bad_address;
   bad_address.push_back("127.0.0.2");
@@ -1046,8 +1081,9 @@ TEST_F(T_Dns, HostfileResolverBadFormat) {
 
 
 TEST_F(T_Dns, NormalResolverConstruct) {
-  UniquePtr<NormalResolver> resolver(NormalResolver::Create(false, 2, 2000));
-  ASSERT_TRUE(resolver.IsValid());
+  std::unique_ptr<NormalResolver> resolver(
+      NormalResolver::Create(false, 2, 2000));
+  ASSERT_TRUE(resolver.get() != nullptr);
   ASSERT_EQ(resolver->domains(), resolver->cares_resolver_->domains());
   ASSERT_EQ(resolver->resolvers(), resolver->cares_resolver_->resolvers());
   ASSERT_EQ(resolver->timeout_ms(), resolver->cares_resolver_->timeout_ms());
@@ -1055,17 +1091,21 @@ TEST_F(T_Dns, NormalResolverConstruct) {
 
   int retval = setenv("HOST_ALIASES", "/no/such/file", 1);
   ASSERT_EQ(0, retval);
-  UniquePtr<NormalResolver> resolver2(NormalResolver::Create(false, 2, 2000));
-  ASSERT_FALSE(resolver2.IsValid());
+  std::unique_ptr<NormalResolver> resolver2(
+      NormalResolver::Create(false, 2, 2000));
+  ASSERT_FALSE(resolver2.get() != nullptr);
 }
 
 
 TEST_F(T_Dns, NormalResolverSimple) {
-  UniquePtr<NormalResolver> resolver(NormalResolver::Create(false, 2, 2000));
-  ASSERT_TRUE(resolver.IsValid());
+  std::unique_ptr<NormalResolver> resolver(
+      NormalResolver::Create(false, 2, 2000));
+  ASSERT_TRUE(resolver.get() != nullptr);
 
   Host host = resolver->Resolve("localhost");
   EXPECT_EQ(kFailOk, host.status());
+  if (!HasIpv6Connectivity())
+    GTEST_SKIP() << "no outbound IPv6 connectivity";
   host = resolver->Resolve("a.root-servers.net");
   ExpectResolvedName(host, "a.root-servers.net", "198.41.0.4",
                      "[2001:503:ba3e::2:30]");
@@ -1073,8 +1113,9 @@ TEST_F(T_Dns, NormalResolverSimple) {
 
 
 TEST_F(T_Dns, NormalResolverLocalonly) {
-  UniquePtr<NormalResolver> resolver(NormalResolver::Create(false, 2, 2000));
-  ASSERT_TRUE(resolver.IsValid());
+  std::unique_ptr<NormalResolver> resolver(
+      NormalResolver::Create(false, 2, 2000));
+  ASSERT_TRUE(resolver.get() != nullptr);
 
   vector<string> no_resolvers;
   no_resolvers.push_back("127.0.0.2");
@@ -1086,8 +1127,11 @@ TEST_F(T_Dns, NormalResolverLocalonly) {
 
 // TODO(jblomer): figure out why this fails on Travis
 TEST_F(T_Dns, NormalResolverCombinedSlow) {
-  UniquePtr<NormalResolver> resolver(NormalResolver::Create(false, 2, 2000));
-  ASSERT_TRUE(resolver.IsValid());
+  if (!HasIpv6Connectivity())
+    GTEST_SKIP() << "no outbound IPv6 connectivity";
+  std::unique_ptr<NormalResolver> resolver(
+      NormalResolver::Create(false, 2, 2000));
+  ASSERT_TRUE(resolver.get() != nullptr);
 
   vector<string> names;
   names.push_back("a.root-servers.net");

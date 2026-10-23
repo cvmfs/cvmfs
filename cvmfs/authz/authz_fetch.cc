@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cstring>
+#include <memory>
 #include <vector>
 
 #include "monitor.h"
@@ -22,7 +23,6 @@
 #include "util/concurrency.h"
 #include "util/logging.h"
 #include "util/platform.h"
-#include "util/pointer.h"
 #include "util/posix.h"
 #include "util/smalloc.h"
 #include "util/string.h"
@@ -199,10 +199,10 @@ void AuthzExternalFetcher::ExecHelper() {
       // The helper expects traditional real uid root credentials
       const uid_t uid = geteuid();
       const gid_t gid = getegid();
-      if (!SwitchCredentials(0, 0, false) ||
-          !SwitchCredentials(uid, gid, true)) {
+      if (!SwitchCredentials(0, 0, false)
+          || !SwitchCredentials(uid, gid, true)) {
         syslog(LOG_USER | LOG_ERR,
-          "failed to switch back to real uid 0 for authz helper");
+               "failed to switch back to real uid 0 for authz helper");
         _exit(1);
       }
     }
@@ -224,9 +224,7 @@ void AuthzExternalFetcher::ExecHelper() {
 }
 
 
-AuthzStatus AuthzExternalFetcher::CheckHelper(
-  const std::string &membership)
-{
+AuthzStatus AuthzExternalFetcher::CheckHelper(const std::string &membership) {
   if ((fd_send_ < 0) && (membership != "")) {
     if (progname_.empty())
       progname_ = FindHelper(membership);
@@ -238,11 +236,9 @@ AuthzStatus AuthzExternalFetcher::CheckHelper(
 }
 
 
-AuthzStatus AuthzExternalFetcher::Fetch(
-  const QueryInfo &query_info,
-  AuthzToken *authz_token,
-  unsigned *ttl)
-{
+AuthzStatus AuthzExternalFetcher::Fetch(const QueryInfo &query_info,
+                                        AuthzToken *authz_token,
+                                        unsigned *ttl) {
   *ttl = kDefaultTtl;
 
   const MutexLockGuard lock_guard(lock_);
@@ -385,8 +381,9 @@ bool AuthzExternalFetcher::ParseMsg(const std::string &json_msg,
                                     AuthzExternalMsg *binary_msg) {
   assert(binary_msg != NULL);
 
-  const UniquePtr<JsonDocument> json_document(JsonDocument::Create(json_msg));
-  if (!json_document.IsValid()) {
+  const std::unique_ptr<JsonDocument> json_document(
+      JsonDocument::Create(json_msg));
+  if (json_document.get() == nullptr) {
     LogCvmfs(kLogAuthz, kLogSyslogErr | kLogDebug,
              "invalid json from authz helper %s: %s", progname_.c_str(),
              json_msg.c_str());

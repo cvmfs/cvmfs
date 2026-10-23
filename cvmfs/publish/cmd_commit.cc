@@ -36,9 +36,10 @@ int CmdCommit::Main(const Options &options) {
   const std::string session_dir = Env::GetEnterSessionDir();
   builder.SetConfigPath(session_dir);
 
-  UniquePtr<SettingsPublisher> settings;
+  std::unique_ptr<SettingsPublisher> settings;
   try {
-    settings = builder.CreateSettingsPublisher(fqrn, true /* needs_managed */);
+    settings.reset(
+        builder.CreateSettingsPublisher(fqrn, true /* needs_managed */));
   } catch (const EPublish &e) {
     if (e.failure() == EPublish::kFailRepositoryNotFound) {
       LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "CernVM-FS error: %s",
@@ -57,9 +58,9 @@ int CmdCommit::Main(const Options &options) {
   if (fs_info.type == kFsTypeAutofs)
     throw EPublish("Autofs on /cvmfs has to be disabled");
 
-  UniquePtr<Publisher> publisher;
+  std::unique_ptr<Publisher> publisher;
   try {
-    publisher = new Publisher(*settings);
+    publisher.reset(new Publisher(*settings));
     if (publisher->whitelist()->IsExpired()) {
       throw EPublish("Repository whitelist for $name is expired",
                      EPublish::kFailWhitelistExpired);

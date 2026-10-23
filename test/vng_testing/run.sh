@@ -116,6 +116,9 @@ echo '======================'
 # 10.0.2.2 is the host gateway in QEMU SLIRP mode;
 # DIRECT avoids needing squid on the host
 export CVMFS_TEST_PROXY=DIRECT
+# Route the cern.ch / egi.eu stratum 1s through the OpenHTC CDN to reduce
+# network flakiness instead of hitting a single stratum 1 directly
+export CVMFS_TEST_USE_CDN=yes
 # Skip autofs/systemd checks — the VM has no init system
 export CVMFS_TEST_DOCKER=yes
 

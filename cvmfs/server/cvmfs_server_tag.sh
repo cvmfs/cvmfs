@@ -134,6 +134,39 @@ cvmfs_server_tag() {
 
   is_checked_out $name && die "Cannot modify tags when checked out on another branch"
   is_in_transaction $name && die "Cannot change repository tags while in a transaction"
+
+  # Gateway repositories cannot edit the tag database directly: the publisher
+  # has no write access to the storage. Delegate the add/remove to cvmfs_publish,
+  # which acquires a lease and lets the gateway receiver apply the change in a
+  # commit. Listing and inspection above read from the stratum 0 URL and work
+  # unchanged.
+  if check_upstream_type "$CVMFS_UPSTREAM_STORAGE" gw; then
+    if [ $action_remove -eq 1 ] && [ $remove_tag_force -eq 0 ]; then
+      echo "You are about to remove these tags from $name:"
+      for t in $tag_names; do echo "* $t"; done
+      echo
+      local gw_reply
+      read -p "Are you sure (y/N)? " gw_reply
+      if [ "$gw_reply" != "y" ] && [ "$gw_reply" != "Y" ]; then
+        return 1
+      fi
+    fi
+
+    local publish_tag_command="$(__publish_cmd dbg) tag $name"
+    if [ $action_add -eq 1 ]; then
+      [ -z "$add_tag_root_hash" ] || die "Tagging a specific root hash is not supported on gateway repositories"
+      publish_tag_command="$publish_tag_command -a $tag_name"
+      if [ ! -z "$add_tag_description" ]; then
+        publish_tag_command="$publish_tag_command -D \"$add_tag_description\""
+      fi
+    fi
+    if [ $action_remove -eq 1 ]; then
+      publish_tag_command="$publish_tag_command -d \"$tag_names\""
+    fi
+    $user_shell "$publish_tag_command"
+    return $?
+  fi
+
   trap "close_transaction $name 0" EXIT HUP INT TERM
   open_transaction $name || die "Failed to open transaction for tag manipulation"
 

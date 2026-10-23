@@ -7,12 +7,12 @@
 #ifndef TEST_UNITTESTS_MOCK_M_SYNC_MEDIATOR_H_
 #define TEST_UNITTESTS_MOCK_M_SYNC_MEDIATOR_H_
 
+#include <memory>
 #include <string>
 
 #include "ingestion/ingestion_source.h"
 #include "sync_item.h"
 #include "sync_mediator.h"
-#include "util/pointer.h"
 #include "util/shared_ptr.h"
 
 namespace publish {
@@ -20,8 +20,12 @@ namespace publish {
 class MockSyncMediator : public AbstractSyncMediator {
  public:
   MockSyncMediator()
-      : n_register(0), n_reg(0), n_lnk(0), n_dir(0),
-        n_remove(0), last_fast_delete(false) { }
+      : n_register(0)
+      , n_reg(0)
+      , n_lnk(0)
+      , n_dir(0)
+      , n_remove(0)
+      , last_fast_delete(false) { }
   virtual ~MockSyncMediator() { }
 
   virtual void RegisterUnionEngine(SyncUnion * /* engine */) { n_register++; }
@@ -29,7 +33,7 @@ class MockSyncMediator : public AbstractSyncMediator {
   virtual void Add(SharedPtr<SyncItem> entry) {
     if (entry->IsRegularFile()) {
       // wake up the tar engine
-      UniquePtr<IngestionSource> is(entry->CreateIngestionSource());
+      std::unique_ptr<IngestionSource> is(entry->CreateIngestionSource());
       is->Close();
       n_reg++;
     } else {
@@ -43,7 +47,9 @@ class MockSyncMediator : public AbstractSyncMediator {
     last_fast_delete = fast_delete;
   }
   virtual void Replace(SharedPtr<SyncItem> /* entry */) { }
-  virtual void Clone(const std::string /* from */, const std::string /* to */) {
+  virtual bool Clone(const std::string /* from */, const std::string /* to */,
+                     bool /* fail_if_source_missing */) {
+    return true;
   }
 
   virtual void AddUnmaterializedDirectory(SharedPtr<SyncItem> /* entry */) {

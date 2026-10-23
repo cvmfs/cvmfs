@@ -29,19 +29,21 @@
 #include "upload.h"
 #include "util/logging.h"
 
-#define CHECK_SQLITE_ERROR(ret, expected)                         \
-  do {                                                            \
-    if ((ret) != expected) {                                      \
-      LogCvmfs(kLogCvmfs, kLogStderr, "SQLite error: %d", (ret)); \
-      assert(0);                                                  \
-    }                                                             \
+#define CHECK_SQLITE_ERROR(ret, expected)                            \
+  do {                                                               \
+    const int sqlite_result = (ret);                                \
+    if (sqlite_result != (expected)) {                              \
+      LogCvmfs(kLogCvmfs, kLogStderr, "SQLite error: %d",          \
+               sqlite_result);                                      \
+      abort();                                                       \
+    }                                                                \
   } while (0)
 
 #define CUSTOM_ASSERT(check, msg, ...)                     \
   do {                                                     \
     if (!(check)) {                                        \
       LogCvmfs(kLogCvmfs, kLogStderr, msg, ##__VA_ARGS__); \
-      assert(0);                                           \
+      abort();                                             \
     }                                                      \
   } while (0)
 
@@ -244,7 +246,8 @@ static uint64_t make_commit_on_gateway(const std::string &old_root_hash,
                               + "\",\n\"priority\": " + priorityStr + "}";
 
   return MakeEndRequest("POST", g_gateway_key_id, g_gateway_secret,
-                        g_session_token, g_gateway_url, payload, &buffer, true /*expect_final_revision*/);
+                        g_session_token, g_gateway_url, payload, &buffer,
+                        true /*expect_final_revision*/);
 }
 
 static void refresh_lease() {
@@ -255,7 +258,8 @@ static void refresh_lease() {
   }
 
   if (MakeEndRequest("PATCH", g_gateway_key_id, g_gateway_secret,
-                     g_session_token, g_gateway_url, "", &buffer, false /*expect_final_revision*/)) {
+                     g_session_token, g_gateway_url, "", &buffer,
+                     false /*expect_final_revision*/)) {
     const int ret = ParseDropReply(buffer);
     if (kLeaseReplySuccess == ret) {
       LogCvmfs(kLogCvmfs, kLogVerboseMsg, "Lease refreshed");
@@ -277,7 +281,8 @@ static void refresh_lease() {
 static void cancel_lease() {
   CurlBuffer buffer;
   if (MakeEndRequest("DELETE", g_gateway_key_id, g_gateway_secret,
-                     g_session_token, g_gateway_url, "", &buffer, false /*expect_final_revision*/)) {
+                     g_session_token, g_gateway_url, "", &buffer,
+                     false /*expect_final_revision*/)) {
     const int ret = ParseDropReply(buffer);
     if (kLeaseReplySuccess == ret) {
       LogCvmfs(kLogCvmfs, kLogStdout, "Lease cancelled");
@@ -436,9 +441,7 @@ static XattrList marshal_xattrs(const char *acl_string) {
   if (ret) {
     LogCvmfs(kLogCvmfs, kLogStderr,
              "failure of acl_from_text_to_xattr_value(%s)", acl_string);
-    assert(
-        0);  // TODO(vavolkl): incorporate error handling other than asserting
-    return aclobj;
+    abort();
   }
   if (!equiv_mode) {
     CUSTOM_ASSERT(
@@ -764,10 +767,10 @@ int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
   upload::SpoolerDefinition const spooler_definition_catalogs(
       spooler_definition.Dup2DefaultCompression());
 
-  UniquePtr<upload::Spooler> const spooler_catalogs(
+  std::unique_ptr<upload::Spooler> const spooler_catalogs(
       upload::Spooler::Construct(spooler_definition_catalogs, nullptr));
 
-  if (!spooler_catalogs.IsValid()) {
+  if (spooler_catalogs.get() == nullptr) {
     LogCvmfs(kLogCvmfs, kLogStderr, "spooler_catalogs invalid");
     cancel_lease();
     return 1;
@@ -783,11 +786,11 @@ int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
     return 1;
   }
 
-  UniquePtr<manifest::Manifest> manifest;
+  std::unique_ptr<manifest::Manifest> manifest;
 
-  manifest = FetchRemoteManifest(stratum0, repo_name, shash::Any());
+  manifest.reset(FetchRemoteManifest(stratum0, repo_name, shash::Any()));
 
-  if (!manifest.IsValid()) {
+  if (manifest.get() == nullptr) {
     LogCvmfs(kLogCvmfs, kLogStderr, "manifest invalid");
     cancel_lease();
     return 1;
@@ -839,8 +842,8 @@ int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
   bool const is_balanced = false;
 
   catalog::WritableCatalogManager catalog_manager(
-      base_hash, stratum0, dir_temp, spooler_catalogs.weak_ref(),
-      download_manager(), false, SyncParameters::kDefaultNestedKcatalogLimit,
+      base_hash, stratum0, dir_temp, spooler_catalogs.get(), download_manager(),
+      false, SyncParameters::kDefaultNestedKcatalogLimit,
       SyncParameters::kDefaultRootKcatalogLimit,
       SyncParameters::kDefaultFileMbyteLimit, statistics(), is_balanced,
       SyncParameters::kDefaultMaxWeight, SyncParameters::kDefaultMinWeight,
@@ -867,7 +870,7 @@ int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
 
   // commit changes
   LogCvmfs(kLogCvmfs, kLogStdout, "Committing changes...");
-  if (!catalog_manager.Commit(false, false, manifest.weak_ref())) {
+  if (!catalog_manager.Commit(false, false, manifest.get())) {
     LogCvmfs(kLogCvmfs, kLogStderr, "something went wrong during sync");
     cancel_lease();
     return 1;
@@ -1066,7 +1069,8 @@ int swissknife::IngestSQL::do_additions(
       bool exists = false;
       exists = catalog_manager.LookupDirEntry(
           MakeCatalogPath(curr_dir), catalog::kLookupDefault, &dir_entry);
-      assert(exists);  // the dir must exist at this point
+      CUSTOM_ASSERT(exists, "Directory %s is missing from the catalog",
+                    curr_dir.c_str());
       if (dir_entry.IsNestedCatalogMountpoint()
           || dir_entry.IsNestedCatalogRoot()) {
         catalog_manager.AddCatalogToQueue(curr_dir);

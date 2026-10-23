@@ -8,10 +8,11 @@ set -euo pipefail
 # Options:
 #   -l, --list       List build and runtime dependencies instead of installing
 #   -i, --install    Install build dependencies (default)
+#   --test-deps      Install dependencies needed by integration tests
 #   -h, --help       Show this help
 # Examples:
 #   ci/build_install_builddeps.sh --list
-#   ci/build_install_builddeps.sh --install /path/to/cvmfs
+#   ci/build_install_builddeps.sh --test-deps
 
 ########################
 # Utilities
@@ -94,8 +95,9 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     -l|--list) MODE="list"; shift;;
     -i|--install) MODE="install"; shift;;
+    --test-deps) MODE="test-deps"; shift;;
     -h|--help)
-      sed -n '1,20p' "$0" | sed 's/^# \{0,1\}//'; exit 0;;
+      sed -n '5,15p' "$0" | sed 's/^# \{0,1\}//'; exit 0;;
     --) shift; break;;
     -*) die "Unknown option: $1";;
     *) REPO_ARG="$1"; shift;;
@@ -116,7 +118,7 @@ SUDO=""
 if check_available sudo; then
   SUDO="sudo"
 else
-  if [[ "${MODE}" = "install" ]] && [[ ${EUID:-$(id -u)} -ne 0 ]]; then
+  if [[ "${MODE}" != "list" ]] && [[ ${EUID:-$(id -u)} -ne 0 ]]; then
     die "sudo not found and not running as root; cannot install packages"
   fi
 fi
@@ -195,24 +197,41 @@ list_deps_deb() {
   | extract_deps_from_stanza true | sort -u
 }
 
+# extract_rpm_deps <spec> <rpmspec-query-flag> <tag>
+# Requires rpmspec (part of the 'rpm-build' package) to correctly expand
+# macros/conditionals. Parsing the raw spec text without it would silently
+# union every distro variant's requirements together (e.g. both gcc4 and
+# gcc, both sysvinit and systemd) and leave macros like %{cvmfs_go} and
+# %{version}-%{release} unresolved, so that is not offered as a fallback.
+extract_rpm_deps() {
+  local spec="$1" query_flag="$2" tag="$3" out=""
+  check_available rpmspec || \
+    die "rpmspec not found (part of the 'rpm-build' package) -- install it first, e.g. 'dnf install rpm-build' or 'zypper install rpm-build'"
+
+  out="$(rpmspec -q "$query_flag" "$spec" 2>/dev/null || true)"
+  if [ -z "$out" ]; then
+    # Older rpm without -q --buildrequires/--requires support: --parse still
+    # expands macros/conditionals correctly, just without the per-dependency
+    # splitting that -q provides.
+    out="$(rpmspec --parse "$spec" 2>/dev/null | grep -E "^${tag}:" || true)"
+    out="$(echo "$out" | sed -E "s/^${tag}:[[:space:]]*//" | tr -s '[:space:]' '\n')"
+  fi
+  echo "$out" \
+    | sed -E 's/[[:space:]]*(<=|>=|<|>|=).*$//' \
+    | grep -v '^/' \
+    | sed -e '/^$/d' | sort -u
+}
+
 list_deps_rpm() {
   local spec="$1"
   [ -f "$spec" ] || die "RPM spec file not found at $spec"
 
   echo "# Build Dependencies:"
-  if check_available rpmspec; then
-    rpmspec --parse "$spec" 2>/dev/null | grep -E '^BuildRequires:' || true
-  else
-    grep -E '^BuildRequires:' "$spec" || true
-  fi | awk '{print $2}' | sed -e '/^$/d' | sort -u
+  extract_rpm_deps "$spec" --buildrequires "BuildRequires"
 
   echo ""
   echo "# Runtime Dependencies:"
-  if check_available rpmspec; then
-    rpmspec --parse "$spec" 2>/dev/null | grep -E '^Requires:' || true
-  else
-    grep -E '^Requires:' "$spec" || true
-  fi | awk '{print $2}' | sed -e '/^$/d' | grep -v '^cvmfs' | sort -u
+  extract_rpm_deps "$spec" --requires "Requires" | grep -v '^cvmfs'
 }
 
 ########################
@@ -255,6 +274,20 @@ install_deps_suse() {
   $SUDO zypper -n install $pkgs
 }
 
+install_test_deps() {
+  log "Installing integration test dependencies"
+  case "$OS_FAMILY" in
+    deb)
+      export DEBIAN_FRONTEND=noninteractive
+      $SUDO apt-get -y update
+      $SUDO apt-get -y install g++
+      ;;
+    rhel) $SUDO dnf -y install gcc-c++;;
+    suse) $SUDO zypper -n install gcc-c++;;
+    *) die "Unsupported OS family for test dependencies: $OS_FAMILY";;
+  esac
+}
+
 ########################
 # Main
 ########################
@@ -283,6 +316,10 @@ case "$MODE" in
     log "Build dependencies installed successfully"
     bootstrap_cmake_if_needed
     bootstrap_golang_if_needed
+    ;;
+  test-deps)
+    install_test_deps
+    log "Integration test dependencies installed successfully"
     ;;
   *) die "Unknown mode: $MODE";;
 esac

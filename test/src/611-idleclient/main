@@ -65,10 +65,7 @@ cvmfs_run_test() {
                  "$CVMFS_TEST_REPO"     \
                  "$(get_repo_url $CVMFS_TEST_REPO)" || return 4
 
-  stat $TEST_611_MOUNTPOINT/nested/updated
-  if [ $? -eq 0 ]; then
-    return 20
-  fi
+  stat $TEST_611_MOUNTPOINT/nested/updated && return 20
   stat $TEST_611_MOUNTPOINT/nested || return 25
 
   echo "starting transaction to update repository"
@@ -87,10 +84,7 @@ cvmfs_run_test() {
   local sleep_time=$((1 + $kcache_timeout + 2))
   echo "sleeping $sleep_time seconds to let ttl and kernel caches expire"
   sleep $sleep_time
-  stat $TEST_611_MOUNTPOINT/nested/updated
-  if [ $? -ne 0 ]; then
-    return 21
-  fi
+  stat $TEST_611_MOUNTPOINT/nested/updated || return 21
 
   echo "starting transaction to update repository again"
   start_transaction $CVMFS_TEST_REPO || return $?

@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/cvmfs/ducc/cvmfs"
 	lib "github.com/cvmfs/ducc/lib"
 	l "github.com/cvmfs/ducc/log"
 	"github.com/cvmfs/ducc/temp"
@@ -16,6 +17,10 @@ import (
 
 var v string
 
+// mountlessPublishing is bound to --mountless and applied in PersistentPreRun.
+// Its default tracks CVMFS_DUCC_MOUNTLESS_PUBLISHING (read in the cvmfs pkg).
+var mountlessPublishing bool
+
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&temp.TemporaryBaseDir, "temporary-dir", "t", "", "Temporary directory to store files necessary during the conversion of images, it can grow large ~1G. If not set we use the standard of the system $TMP, usually /tmp")
 	if temp.TemporaryBaseDir == "" {
@@ -23,6 +28,7 @@ func init() {
 	}
 	rootCmd.PersistentFlags().StringVarP(&lib.NotificationFile, "notification-file", "n", "", "File where to publish notification about DUCC progression")
 	rootCmd.PersistentFlags().StringVarP(&v, "verbosity", "v", logrus.InfoLevel.String(), "Log level (trace, debug, info, warn, error, fatal, panic")
+	rootCmd.PersistentFlags().BoolVar(&mountlessPublishing, "mountless", cvmfs.MountlessPublishing(), "Publish via 'cvmfs_server ingest' only, for mountless gateway publishers (no FUSE mount / transaction needed)")
 }
 
 func DuccRootCmd() *cobra.Command {
@@ -30,6 +36,7 @@ func DuccRootCmd() *cobra.Command {
 		Use:   "cvmfs_ducc",
 		Short: "Show the available commands.",
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			cvmfs.SetMountlessPublishing(mountlessPublishing)
 			lib.SetupNotification()
 			lib.SetupRegistries()
 			setUpLogs(os.Stdout, v)

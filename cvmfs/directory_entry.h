@@ -8,6 +8,7 @@
 #ifndef CVMFS_DIRECTORY_ENTRY_H_
 #define CVMFS_DIRECTORY_ENTRY_H_
 
+#include <sys/stat.h>
 #include <sys/types.h>
 
 #include <cassert>
@@ -27,6 +28,7 @@ class SyncItemNative;
 class SyncItemTar;
 class SyncItemDummyDir;
 class SyncItemDummyCatalog;
+class SyncItemDummyFile;
 }  // namespace publish
 namespace swissknife {
 class CommandMigrate;
@@ -69,6 +71,7 @@ class DirectoryEntryBase {
   friend class publish::SyncItemTar;
   friend class publish::SyncItemDummyDir;
   friend class publish::SyncItemDummyCatalog;
+  friend class publish::SyncItemDummyFile;
   friend class swissknife::CommandOverlay;
   friend class swissknife::IngestSQL;  // TODO(vvolkl): can probably avoided
                                        // with new setters
@@ -102,8 +105,10 @@ class DirectoryEntryBase {
     static const unsigned int kBindMountpointFlag = 0x01000;
     static const unsigned int kHiddenFlag = 0x02000;
     static const unsigned int kDirectIoFlag = 0x04000;
-    static const unsigned int kUid = 0x08000;
-    static const unsigned int kGid = 0x10000;
+    static const unsigned int kBundleTriggerFlag = 0x08000;
+    static const unsigned int kUid = 0x10000;
+    static const unsigned int kGid = 0x20000;
+    static const unsigned int kVolatileFlag = 0x40000;
   };
   typedef unsigned int Differences;
 
@@ -122,6 +127,8 @@ class DirectoryEntryBase {
       , has_xattrs_(false)
       , is_external_file_(false)
       , is_direct_io_(false)
+      , is_bundle_trigger_(false)
+      , is_volatile_(false)
       , compression_algorithm_(zlib::kZlibDefault) { }
 
   inline bool IsRegular() const { return S_ISREG(mode_); }
@@ -136,6 +143,8 @@ class DirectoryEntryBase {
   }
   inline bool IsExternalFile() const { return is_external_file_; }
   inline bool IsDirectIo() const { return is_direct_io_; }
+  inline bool IsBundleTrigger() const { return is_bundle_trigger_; }
+  inline bool IsVolatile() const { return is_volatile_; }
   inline bool HasXattrs() const { return has_xattrs_; }
   inline bool HasMtimeNs() const { return mtime_ns_ >= 0; }
 
@@ -179,6 +188,25 @@ class DirectoryEntryBase {
   inline void set_symlink(const LinkString &symlink) { symlink_ = symlink; }
   inline void set_has_xattrs(const bool has_xattrs) {
     has_xattrs_ = has_xattrs;
+  }
+  inline void set_is_bundle_trigger(bool val) { is_bundle_trigger_ = val; }
+
+  // Use fixed metadata for implicit lease ancestors. Epoch mtime is
+  // reproducible and distinguishes these entries from publisher data.
+  inline void SetImplicitDirectoryMetadata() {
+    mode_ = S_IFDIR | 0755;
+    uid_ = 0;
+    gid_ = 0;
+    size_ = 0;
+    mtime_ = 0;
+    mtime_ns_ = -1;
+    symlink_ = LinkString("");
+    has_xattrs_ = false;
+    checksum_ = shash::Any();
+    compression_algorithm_ = zlib::kZlibDefault;
+    is_external_file_ = false;
+    is_direct_io_ = false;
+    is_bundle_trigger_ = false;
   }
 
   inline zlib::Algorithms compression_algorithm() const {
@@ -254,6 +282,8 @@ class DirectoryEntryBase {
 
   bool is_external_file_;
   bool is_direct_io_;
+  bool is_bundle_trigger_;
+  bool is_volatile_;
 
   // The compression algorithm
   zlib::Algorithms compression_algorithm_;

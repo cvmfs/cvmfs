@@ -179,6 +179,10 @@ bool GetParamsFromFile(const std::string &repo_name, Params *params) {
     params->upload_stats_db = false;
   }
 
+  if (parser.IsDefined("CVMFS_AUTO_TAG_TIMESPAN")) {
+    parser.GetValue("CVMFS_AUTO_TAG_TIMESPAN", &params->auto_tag_timespan);
+  }
+
   return true;
 }
 

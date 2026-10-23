@@ -1,8 +1,11 @@
-#!/bin/sh
+#!/bin/bash
+set -x
+set -euo pipefail
 
 export GOROOT_FINAL=$EXTERNALS_INSTALL_LOCATION/go
 
 rm $EXTERNALS_INSTALL_LOCATION/bin/go || true
 rm $EXTERNALS_INSTALL_LOCATION/bin/gofmt || true
+mkdir -p "$EXTERNALS_INSTALL_LOCATION"/bin
 ln -s $EXTERNALS_INSTALL_LOCATION/go/bin/go $EXTERNALS_INSTALL_LOCATION/bin/go
 ln -s $EXTERNALS_INSTALL_LOCATION/go/bin/gofmt $EXTERNALS_INSTALL_LOCATION/bin/gofmt

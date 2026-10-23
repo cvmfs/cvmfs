@@ -1,0 +1,66 @@
+/* config.h for the vendored nettle build, replacing ./configure's output.
+ * Feature macros are pinned to the values that hold on the platforms cvmfs
+ * targets (Linux/glibc and macOS, gcc or clang). The HAVE_NATIVE_<func> macros
+ * are not set here: externals/libnettle/CMakeLists.txt derives them from the
+ * assembler files it selected and passes them on the command line. */
+
+#cmakedefine HAVE_ALLOCA 1
+#cmakedefine HAVE_ALLOCA_H 1
+#cmakedefine HAVE_BUILTIN_BSWAP64 1
+#cmakedefine HAVE_GCC_ATTRIBUTE 1
+#cmakedefine HAVE_INTTYPES_H 1
+#cmakedefine HAVE_MEMORY_H 1
+#cmakedefine HAVE_STDINT_H 1
+#cmakedefine HAVE_STDLIB_H 1
+#cmakedefine HAVE_STRERROR 1
+#cmakedefine HAVE_STRINGS_H 1
+#cmakedefine HAVE_STRING_H 1
+#cmakedefine HAVE_SYS_STAT_H 1
+#cmakedefine HAVE_SYS_TYPES_H 1
+#cmakedefine HAVE_UNISTD_H 1
+#cmakedefine STDC_HEADERS 1
+#cmakedefine TIME_WITH_SYS_TIME 1
+
+/* Used by the fat (run-time CPU dispatch) builds. */
+#cmakedefine HAVE_SECURE_GETENV 1
+#cmakedefine HAVE_ELF_AUX_INFO 1
+
+/* Endianness and type sizes, detected by CMake. */
+#cmakedefine WORDS_BIGENDIAN 1
+#define SIZEOF_LONG @SIZEOF_LONG@
+#define SIZEOF_SIZE_T @SIZEOF_SIZE_T@
+
+/* Public-key support (hogweed) and its GMP dependency are not built. */
+/* #undef WITH_HOGWEED */
+/* #undef HAVE_LIBGMP */
+
+/* Remaining autoconf knobs stay undefined: no openssl, dlopen or valgrind.
+ * HAVE_LINK_IFUNC is unset deliberately -- fat-setup.h disables ifunc anyway,
+ * so the dispatchers use a constructor plus wrappers, as a static library
+ * wants. */
+
+
+#if HAVE_STRERROR
+#define STRERROR strerror
+#else
+#define STRERROR(x) (sys_errlist[x])
+#endif
+
+
+#if __GNUC__ && HAVE_GCC_ATTRIBUTE
+# define NORETURN __attribute__ ((__noreturn__))
+# define PRINTF_STYLE(f, a) __attribute__ ((__format__ (__printf__, f, a)))
+# define UNUSED __attribute__ ((__unused__))
+#else
+# define NORETURN
+# define PRINTF_STYLE(f, a)
+# define UNUSED
+#endif
+
+
+#if defined(__x86_64__) || defined(__arch64__)
+# define HAVE_NATIVE_64_BIT 1
+#else
+/* Needs include of <limits.h> before use. */
+# define HAVE_NATIVE_64_BIT (SIZEOF_LONG * CHAR_BIT >= 64)
+#endif

@@ -61,7 +61,7 @@ S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition)
   assert(spooler_definition.IsValid()
          && spooler_definition.driver_type == SpoolerDefinition::S3);
 
-  atomic_init32(&io_errors_);
+  io_errors_.store(0);
   const int mutex_ret = pthread_mutex_init(&delete_batch_mutex_, NULL);
   assert(mutex_ret == 0);
 
@@ -96,7 +96,8 @@ S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition)
   }
   s3config.proxy = proxy_;
 
-  s3fanout_mgr_ = new s3fanout::S3FanoutManager(s3config);
+  s3fanout_mgr_ = std::unique_ptr<s3fanout::S3FanoutManager>(
+      new s3fanout::S3FanoutManager(s3config));
   s3fanout_mgr_->Spawn();
 
   const int retval = pthread_create(&thread_collect_results_, NULL,
@@ -292,9 +293,7 @@ bool S3Uploader::Create() {
 }
 
 
-unsigned int S3Uploader::GetNumberOfErrors() const {
-  return atomic_read32(&io_errors_);
-}
+unsigned int S3Uploader::GetNumberOfErrors() const { return io_errors_.load(); }
 
 
 /**
@@ -325,7 +324,7 @@ void *S3Uploader::MainCollectResults(void *data) {
                    s3fanout::Code2Ascii(info->error_code));
         }
         reply_code = 99;
-        atomic_inc32(&uploader->io_errors_);
+        uploader->io_errors_.fetch_add(1);
       }
     }
     if (info->request == s3fanout::JobInfo::kReqDeleteMulti) {
@@ -341,13 +340,15 @@ void *S3Uploader::MainCollectResults(void *data) {
                    "S3 multi-delete error for key '%s': %s - %s",
                    error_keys[i].c_str(), error_codes[i].c_str(),
                    error_messages[i].c_str());
-          atomic_inc32(&uploader->io_errors_);
+          uploader->io_errors_.fetch_add(1);
           failed_keys.insert(error_keys[i]);
         }
       }
       // Decrement jobs_in_flight_ once for the entire batch.
-      uploader->Respond(NULL, UploaderResults(UploaderResults::kRemove,
-                        (info->error_code != s3fanout::kFailOk) ? 99 : 0));
+      uploader->Respond(
+          NULL,
+          UploaderResults(UploaderResults::kRemove,
+                          (info->error_code != s3fanout::kFailOk) ? 99 : 0));
     } else if (info->request == s3fanout::JobInfo::kReqDelete) {
       uploader->Respond(NULL, UploaderResults());
     } else if (info->request == s3fanout::JobInfo::kReqHeadOnly) {
@@ -369,7 +370,7 @@ void *S3Uploader::MainCollectResults(void *data) {
           static_cast<CallbackTN *>(info->callback),
           UploaderResults(UploaderResults::kChunkCommit, reply_code));
 
-      assert(!info->origin.IsValid());
+      assert(info->origin.get() == nullptr);
     }
     delete info;
   }
@@ -485,7 +486,7 @@ void S3Uploader::FinalizeStreamedUpload(UploadStreamHandle *handle,
   s3fanout::JobInfo *info = new s3fanout::JobInfo(
       final_path,
       const_cast<void *>(static_cast<void const *>(handle->commit_callback)),
-      s3_handle->buffer.Release());
+      s3_handle->buffer.release());
 
   if (peek_before_put_)
     info->request = s3fanout::JobInfo::kReqHeadPut;
@@ -547,8 +548,7 @@ void S3Uploader::FlushDeleteBatch() const {
   if (pending_deletes_.empty())
     return;
 
-  LogCvmfs(kLogUploadS3, kLogDebug,
-           "Flushing batch delete of %lu objects",
+  LogCvmfs(kLogUploadS3, kLogDebug, "Flushing batch delete of %lu objects",
            pending_deletes_.size());
 
   // Build XML request body

@@ -107,7 +107,7 @@ void UmountOnExit(const bool crashed) {
     return;
   }
   const bool lazy = true;
-  bool retval = platform_umount(mountpoint_->c_str(), lazy);
+  bool const retval = platform_umount(mountpoint_->c_str(), lazy);
   if (!retval) {
     LogCvmfs(kLogCvmfs, kLogSyslogErr,
              "%s cleanup handler: "

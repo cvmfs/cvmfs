@@ -60,6 +60,7 @@
 #include "auto_umount.h"
 #include "backoff.h"
 #include "bigvector.h"
+#include "bundle_mgr.h"
 #include "cache.h"
 #include "cache_posix.h"
 #include "cache_stream.h"
@@ -71,7 +72,9 @@
 #include "crypto/crypto_util.h"
 #include "crypto/hash.h"
 #include "directory_entry.h"
-//#include "duplex_fuse.h"
+// #include "duplex_fuse.h"
+#include <memory>
+
 #include "fence.h"
 #include "fetch.h"
 #include "file_chunk.h"
@@ -104,7 +107,6 @@
 #include "util/exception.h"
 #include "util/logging.h"
 #include "util/mutex.h"
-#include "util/pointer.h"
 #include "util/posix.h"
 #include "util/smalloc.h"
 #include "util/string.h"
@@ -132,7 +134,8 @@ typedef struct fuse_passthru_ctx {
   int backing_id;
   int refcount;
 } fuse_passthru_ctx_t;
-static std::unordered_map<fuse_ino_t, fuse_passthru_ctx_t> *fuse_passthru_tracker = NULL;
+static std::unordered_map<fuse_ino_t, fuse_passthru_ctx_t>
+    *fuse_passthru_tracker = NULL;
 pthread_mutex_t fuse_passthru_tracker_lock = PTHREAD_MUTEX_INITIALIZER;
 #endif
 
@@ -649,8 +652,16 @@ lookup_reply_negative:
   mount_point_->dentry_tracker()->Add(parent_fuse, name, uint64_t(timeout));
   fuse_remounter_->fence()->Leave();
   perf::Inc(file_system_->n_fs_lookup_negative());
+#ifdef USE_MACFUSE_FSKIT
+  // FSKit does not interpret ino=0 in fuse_reply_entry as a negative lookup
+  // (unlike traditional FUSE).  It silently maps it to the mount root inode,
+  // making non-existent paths appear as directories.  Reply with an explicit
+  // ENOENT error instead.
+  fuse_reply_err(req, ENOENT);
+#else
   result.ino = 0;
   fuse_reply_entry(req, &result);
+#endif
   return;
 
 lookup_reply_error:
@@ -670,14 +681,7 @@ lookup_reply_error:
 /**
  *
  */
-static void cvmfs_forget(fuse_req_t req,
-                         fuse_ino_t ino,
-#if CVMFS_USE_LIBFUSE == 2
-                         unsigned long nlookup  // NOLINT
-#else
-                         uint64_t nlookup
-#endif
-) {
+static void cvmfs_forget(fuse_req_t req, fuse_ino_t ino, uint64_t nlookup) {
   const HighPrecisionTimer guard_timer(file_system_->hist_fs_forget());
 
   perf::Inc(file_system_->n_fs_forget());
@@ -705,7 +709,6 @@ static void cvmfs_forget(fuse_req_t req,
 }
 
 
-#if (FUSE_VERSION >= 29)
 static void cvmfs_forget_multi(fuse_req_t req,
                                size_t count,
                                struct fuse_forget_data *forgets) {
@@ -741,7 +744,6 @@ static void cvmfs_forget_multi(fuse_req_t req,
 
   fuse_reply_none(req);
 }
-#endif  // FUSE_VERSION >= 29
 
 
 /**
@@ -755,13 +757,15 @@ static void ReplyNegative(const catalog::DirectoryEntry &dirent,
   if (dirent.GetSpecial() == catalog::kDirentNegative) {
     fuse_reply_err(req, ENOENT);
   } else {
-    const char *name = dirent.name().c_str();
-    const char *link = dirent.symlink().c_str();
+    // name() and symlink() return by value, so the strings have to be kept
+    // alive across the log call; c_str() on the temporaries would dangle.
+    const NameString name = dirent.name();
+    const LinkString link = dirent.symlink();
 
     LogCvmfs(
         kLogCvmfs, kLogDebug | kLogSyslogErr,
         "EIO (02): CVMFS-specific metadata not found for name=%s symlink=%s",
-        name ? name : "<unset>", link ? link : "<unset>");
+        name.c_str(), link.c_str());
 
     perf::Inc(file_system_->n_eio_total());
     perf::Inc(file_system_->n_eio_02());
@@ -834,7 +838,26 @@ static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
     return;
   }
 
-  struct stat const info = dirent.GetStatStructure();
+  struct stat info = dirent.GetStatStructure();
+
+  // Partial replica in fail mode: mark excluded entries as unreadable so
+  // users get a clear indication rather than a confusing EIO at read time.
+  if (mount_point_->partial_replica_fail_mode()
+      && mount_point_->partial_inclusion_spec() != NULL) {
+    // Find the path for this inode to check against the inclusion spec.
+    glue::InodeEx inode_ex(ino, glue::InodeEx::kUnknownType);
+    PathString inode_path;
+    if (mount_point_->inode_tracker()->FindPath(&inode_ex, &inode_path)) {
+      const string path_str(inode_path.GetChars(), inode_path.GetLength());
+      if (mount_point_->partial_inclusion_spec()->IsExcluded(path_str)) {
+        // Present the entry with no permissions and a special uid/gid
+        // (65534 = traditional "nobody"/"nogroup").
+        info.st_mode &= ~static_cast<mode_t>(S_IRWXU | S_IRWXG | S_IRWXO);
+        info.st_uid = 65534;
+        info.st_gid = 65534;
+      }
+    }
+  }
 
   fuse_reply_attr(req, &info, GetKcacheTimeout());
 }
@@ -995,6 +1018,19 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
 
     struct stat fixed_info = listing_from_catalog.AtPtr(i)->info;
     fixed_info.st_ino = entry_dirent.inode();
+
+#ifdef USE_MACFUSE_FSKIT
+    // Register inode in tracker so that subsequent GETATTR calls can
+    // resolve inode -> path.  This is normally done in cvmfs_lookup(),
+    // but the macFUSE FSKit backend skips LOOKUP after READDIR and
+    // goes straight to GETATTR using the inodes from the listing.
+    if (!file_system_->IsNfsSource()) {
+      mount_point_->inode_tracker()->VfsGet(
+          glue::InodeEx(entry_dirent.inode(), entry_dirent.mode()),
+          entry_path);
+    }
+#endif
+
     AddToDirListing(req, listing_from_catalog.AtPtr(i)->name.c_str(),
                     &fixed_info, &fuse_listing);
   }
@@ -1021,13 +1057,11 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
   perf::Inc(file_system_->n_fs_dir_open());
   perf::Inc(file_system_->no_open_dirs());
 
-#if (FUSE_VERSION >= 30)
 #ifdef CVMFS_ENABLE_FUSE3_CACHE_READDIR
   // This affects only reads on the same open directory handle (e.g. multiple
   // reads with rewinddir() between them).  A new opendir on the same directory
   // will trigger readdir calls independently of this setting.
   fi->cache_readdir = 1;
-#endif
 #endif
   fuse_reply_open(req, fi);
 }
@@ -1103,6 +1137,27 @@ static void cvmfs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
       fi->fh);
   if (iter_handle != directory_handles_->end()) {
     listing = iter_handle->second;
+
+#ifdef __APPLE__
+    // Cut the reply at a directory entry boundary.  The Linux kernel drops a
+    // truncated trailing entry and re-requests it, but the macFUSE FSKit
+    // module does not cope with partial entries.  Layout of struct
+    // fuse_dirent: ino(8) off(8) namelen(4) type(4) name, 8-byte aligned.
+    if ((off >= 0) && (static_cast<size_t>(off) < listing.size)) {
+      const char *cursor = listing.buffer + off;
+      size_t whole_entries = 0;
+      while (whole_entries < listing.size - off) {
+        uint32_t namelen;
+        memcpy(&namelen, cursor + whole_entries + 16, sizeof(namelen));
+        const size_t entry_size = (24 + namelen + 7) & ~static_cast<size_t>(7);
+        if (whole_entries + entry_size > size)
+          break;
+        whole_entries += entry_size;
+      }
+      if (whole_entries > 0)
+        size = whole_entries;
+    }
+#endif
 
     ReplyBufferSlice(req, listing.buffer, listing.size, off, size);
     return;
@@ -1199,6 +1254,13 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
 
   perf::Inc(file_system_->n_fs_open());  // Count actual open / fetch operations
 
+  if (dirent.IsBundleTrigger() and (mount_point_->bundle_mgr() != nullptr)) {
+    // Hand the trigger over to the long-lived prefetcher; spec loading and
+    // dependency downloads happen on its background threads, so the open()
+    // does not wait for them (and does not hold the remount fence hostage).
+    mount_point_->bundle_mgr()->ScheduleTrigger(path);
+  }
+
   glue::PageCacheTracker::OpenDirectives open_directives;
   if (!dirent.IsChunkedFile()) {
     if (dirent.IsDirectIo()) {
@@ -1242,9 +1304,9 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
       chunk_tables->Unlock();
 
       // Retrieve File chunks from the catalog
-      UniquePtr<FileChunkList> chunks(new FileChunkList());
+      std::unique_ptr<FileChunkList> chunks(new FileChunkList());
       if (!catalog_mgr->ListFileChunks(path, dirent.hash_algorithm(),
-                                       chunks.weak_ref())
+                                       chunks.get())
           || chunks->IsEmpty()) {
         fuse_remounter_->fence()->Leave();
         LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
@@ -1261,9 +1323,10 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
       // Check again to avoid race
       if (!chunk_tables->inode2chunks.Contains(unique_inode)) {
         chunk_tables->inode2chunks.Insert(
-            unique_inode, FileChunkReflist(chunks.Release(), path,
+            unique_inode, FileChunkReflist(chunks.release(), path,
                                            dirent.compression_algorithm(),
-                                           dirent.IsExternalFile()));
+                                           dirent.IsExternalFile(),
+                                           dirent.IsVolatile()));
         chunk_tables->inode2references.Insert(unique_inode, 1);
       } else {
         uint32_t refctr;
@@ -1327,7 +1390,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   label.path = path.ToString();
   label.size = dirent.size();
   label.zip_algorithm = dirent.compression_algorithm();
-  if (mount_point_->catalog_mgr()->volatile_flag())
+  if (mount_point_->catalog_mgr()->volatile_flag() || dirent.IsVolatile())
     label.flags |= CacheManager::kLabelVolatile;
   if (dirent.IsExternalFile())
     label.flags |= CacheManager::kLabelExternal;
@@ -1341,19 +1404,20 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
       fi->fh = fd;
       FillOpenFlags(open_directives, fi);
 #ifdef FUSE_CAP_PASSTHROUGH
-      if (loader_exports_->fuse_passthrough) {
-        if(!dirent.IsChunkedFile()) {
-          /* "Currently there should be only one backing id per node / backing file."
-           * So says libfuse documentation on fuse_passthrough_open().
-           * So we reuse and refcount backing id based on inode.
-           * Passthrough can be used with libfuse methods open, opendir, create,
-           * but since CVMFS is read-only and has synthesizes its directories,
-           * we only need to handle it in `open`. */
+      if (loader_exports_ && loader_exports_->fuse_passthrough) {
+        if (!dirent.IsChunkedFile()) {
+          /* "Currently there should be only one backing id per node / backing
+           * file." So says libfuse documentation on fuse_passthrough_open(). So
+           * we reuse and refcount backing id based on inode. Passthrough can be
+           * used with libfuse methods open, opendir, create, but since CVMFS is
+           * read-only and has synthesizes its directories, we only need to
+           * handle it in `open`. */
           int backing_id;
           pthread_mutex_lock(&fuse_passthru_tracker_lock);
           auto iter = fuse_passthru_tracker->find(ino);
           if (iter == fuse_passthru_tracker->end()) {
-            auto pair_with_iterator = fuse_passthru_tracker->emplace(ino, fuse_passthru_ctx_t());
+            auto pair_with_iterator = fuse_passthru_tracker->emplace(
+                ino, fuse_passthru_ctx_t());
             assert(pair_with_iterator.second == true);
             iter = pair_with_iterator.first;
             fuse_passthru_ctx_t &entry = iter->second;
@@ -1450,8 +1514,14 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
   }
 #endif
 
-  // Get data chunk (<=128k guaranteed by Fuse)
+  // Get data chunk (<=128k guaranteed by Fuse, but FSKit worker threads have
+  // small stacks so alloca can overflow; use heap allocation instead)
+#ifdef USE_MACFUSE_FSKIT
+  std::vector<char> data_buf(size);
+  char *data = data_buf.data();
+#else
   char *data = static_cast<char *>(alloca(size));
+#endif
   unsigned int overall_bytes_fetched = 0;
 
   const int64_t fd = static_cast<int64_t>(fi->fh);
@@ -1503,7 +1573,8 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
         label.size = chunks.list->AtPtr(chunk_idx)->size();
         label.zip_algorithm = chunks.compression_alg;
         label.flags |= CacheManager::kLabelChunked;
-        if (mount_point_->catalog_mgr()->volatile_flag())
+        if (mount_point_->catalog_mgr()->volatile_flag()
+            || chunks.volatile_data)
           label.flags |= CacheManager::kLabelVolatile;
         if (chunks.external_data) {
           label.flags |= CacheManager::kLabelExternal;
@@ -1597,7 +1668,16 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
   }
 
   // Push it to user
+#if defined(__APPLE__) && !defined(CVMFS_NFS_FRONTEND)
+  // macFUSE's FSKit transport carries replies >= 64 KiB only through the
+  // zero-copy reply buffer, which libfuse uses for fuse_reply_data() but not
+  // for fuse_reply_buf(); with the latter such reads fail with EIO.
+  struct fuse_bufvec bufv = FUSE_BUFVEC_INIT(overall_bytes_fetched);
+  bufv.buf[0].mem = data;
+  fuse_reply_data(req, &bufv, FUSE_BUF_NO_SPLICE);
+#else
   fuse_reply_buf(req, data, overall_bytes_fetched);
+#endif
   LogCvmfs(kLogCvmfs, kLogDebug, "pushed %d bytes to user",
            overall_bytes_fetched);
 }
@@ -1606,6 +1686,20 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
 /**
  * File close operation, redirected into cache.
  */
+#ifdef USE_MACFUSE_FSKIT
+/**
+ * FSKit sends FSYNC on files opened for reading (e.g. during dyld loading).
+ * CVMFS is read-only so fsync is a no-op, but returning ENOSYS causes FSKit
+ * to report I/O errors.  Return success instead.
+ */
+static void cvmfs_fsync(fuse_req_t req, fuse_ino_t ino, int datasync,
+                        struct fuse_file_info *fi) {
+  LogCvmfs(kLogCvmfs, kLogDebug,
+           "cvmfs_fsync (no-op) on inode: %" PRIu64, uint64_t(ino));
+  fuse_reply_err(req, 0);
+}
+#endif
+
 static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
                           struct fuse_file_info *fi) {
   const HighPrecisionTimer guard_timer(file_system_->hist_fs_release());
@@ -1677,8 +1771,7 @@ static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
       perf::Dec(file_system_->no_open_files());
     }
 #ifdef FUSE_CAP_PASSTHROUGH
-    if (loader_exports_->fuse_passthrough) {
-
+    if (loader_exports_ && loader_exports_->fuse_passthrough) {
       if (fi->backing_id != 0) {
         int ret;
         pthread_mutex_lock(&fuse_passthru_tracker_lock);
@@ -1691,7 +1784,8 @@ static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
         if (entry.refcount == 0) {
           ret = fuse_passthrough_close(req, fi->backing_id);
           if (ret < 0) {
-            LogCvmfs(kLogCvmfs, kLogDebug, "fuse_passthrough_close(fd=%ld) failed: %d", fd, ret);
+            LogCvmfs(kLogCvmfs, kLogDebug,
+                     "fuse_passthrough_close(fd=%ld) failed: %d", fd, ret);
             assert(false);
           }
           fuse_passthru_tracker->erase(iter);
@@ -1773,14 +1867,8 @@ static void cvmfs_statfs(fuse_req_t req, fuse_ino_t ino) {
   fuse_reply_statfs(req, info);
 }
 
-#ifdef __APPLE__
 static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
-                           size_t size, uint32_t position)
-#else
-static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
-                           size_t size)
-#endif
-{
+                           size_t size) {
   const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
   FuseInterruptCue ic(&req);
   const ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid,
@@ -2176,7 +2264,7 @@ static void cvmfs_init(void *userdata, struct fuse_conn_info *conn) {
 
 #ifdef FUSE_CAP_PASSTHROUGH
   if (conn->capable & FUSE_CAP_PASSTHROUGH) {
-    if (loader_exports_->fuse_passthrough) {
+    if (loader_exports_ && loader_exports_->fuse_passthrough) {
       conn->want |= FUSE_CAP_PASSTHROUGH;
       /* "Passthrough and writeback cache are conflicting modes"
        * libfuse example/passthrough_hp.cc says,
@@ -2207,8 +2295,8 @@ static void cvmfs_destroy(void *unused __attribute__((unused))) {
   // The debug log is already closed at this point
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_destroy");
 #ifdef FUSE_CAP_PASSTHROUGH
+  // The tracker only exists if passthrough was both available and enabled
   pthread_mutex_lock(&fuse_passthru_tracker_lock);
-  assert(fuse_passthru_tracker);
   delete fuse_passthru_tracker;
   fuse_passthru_tracker = NULL;
   pthread_mutex_unlock(&fuse_passthru_tracker_lock);
@@ -2231,6 +2319,9 @@ static void SetCvmfsOperations(struct fuse_lowlevel_ops *cvmfs_operations) {
   cvmfs_operations->open = cvmfs_open;
   cvmfs_operations->read = cvmfs_read;
   cvmfs_operations->release = cvmfs_release;
+#ifdef USE_MACFUSE_FSKIT
+  cvmfs_operations->fsync = cvmfs_fsync;
+#endif
   cvmfs_operations->opendir = cvmfs_opendir;
   cvmfs_operations->readdir = cvmfs_readdir;
   cvmfs_operations->releasedir = cvmfs_releasedir;
@@ -2238,9 +2329,7 @@ static void SetCvmfsOperations(struct fuse_lowlevel_ops *cvmfs_operations) {
   cvmfs_operations->getxattr = cvmfs_getxattr;
   cvmfs_operations->listxattr = cvmfs_listxattr;
   cvmfs_operations->forget = cvmfs_forget;
-#if (FUSE_VERSION >= 29)
   cvmfs_operations->forget_multi = cvmfs_forget_multi;
-#endif
 }
 
 // Called by cvmfs_talk when switching into read-only cache mode
@@ -2256,14 +2345,7 @@ void UnregisterQuotaListener() {
 }
 
 bool SendFuseFd(const std::string &socket_path) {
-  int fuse_fd;
-#if (FUSE_VERSION >= 30)
-  fuse_fd = fuse_session_fd(*reinterpret_cast<struct fuse_session **>(
-      loader_exports_->fuse_channel_or_session));
-#else
-  fuse_fd = fuse_chan_fd(*reinterpret_cast<struct fuse_chan **>(
-      loader_exports_->fuse_channel_or_session));
-#endif
+  const int fuse_fd = fuse_session_fd(*loader_exports_->fuse_session);
   assert(fuse_fd >= 0);
   const int sock_fd = ConnectSocket(socket_path);
   if (sock_fd < 0) {
@@ -2408,6 +2490,10 @@ static void InitOptionsMgr(const loader::LoaderExports *loader_exports) {
   } else {
     cvmfs::options_mgr_->ParseDefault(loader_exports->repository_name);
   }
+#ifdef CVMFS_NFS_FRONTEND
+  // NFS has no forget, so inodes must not depend on lookup reference counts
+  cvmfs::options_mgr_->SetValue("CVMFS_NFS_SOURCE", "yes");
+#endif
 }
 
 
@@ -2442,6 +2528,16 @@ static bool NeedsReadEnviron() {
 }
 
 
+static string GetWatchdogOomScoreAdj() {
+  string oom_score_adj;
+  if (cvmfs::options_mgr_->GetValue("CVMFS_OOM_SCORE_WATCHDOG",
+                                    &oom_score_adj)) {
+    return oom_score_adj;
+  }
+  return "";
+}
+
+
 static int Init(const loader::LoaderExports *loader_exports) {
   g_boot_error = new string("unknown error");
   cvmfs::loader_exports_ = loader_exports;
@@ -2459,7 +2555,9 @@ static int Init(const loader::LoaderExports *loader_exports) {
   if (cvmfs::ShouldStartWatchdog()) {
     auto_umount::SetMountpoint(loader_exports->mount_point);
     cvmfs::watchdog_ = Watchdog::Create(auto_umount::UmountOnExit,
-                                        NeedsReadEnviron());
+                                        NeedsReadEnviron(),
+                                        NULL,
+                                        GetWatchdogOomScoreAdj());
     if (cvmfs::watchdog_ == NULL) {
       *g_boot_error = "failed to initialize watchdog.";
       return loader::kFailMonitor;
@@ -2521,9 +2619,9 @@ static int Init(const loader::LoaderExports *loader_exports) {
   LogCvmfs(kLogCvmfs, kLogDebug, "root inode is %" PRIu64,
            uint64_t(cvmfs::mount_point_->catalog_mgr()->GetRootInode()));
 
-  void **channel_or_session = NULL;
+  struct fuse_session **fuse_session = NULL;
   if (loader_exports->version >= 4) {
-    channel_or_session = loader_exports->fuse_channel_or_session;
+    fuse_session = loader_exports->fuse_session;
   }
 
   bool fuse_notify_invalidation = true;
@@ -2535,7 +2633,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
     }
   }
   cvmfs::fuse_remounter_ = new FuseRemounter(
-      cvmfs::mount_point_, &cvmfs::inode_generation_info_, channel_or_session,
+      cvmfs::mount_point_, &cvmfs::inode_generation_info_, fuse_session,
       fuse_notify_invalidation);
 
   // Control & command interface
@@ -2602,7 +2700,7 @@ static void Spawn() {
 
   // Start the helper before dropping capabilities, if it isn't running
   cvmfs::mount_point_->authz_fetcher()->CheckHelper(
-                                        cvmfs::mount_point_->membership_req());
+      cvmfs::mount_point_->membership_req());
 
   if ((getuid() != 0) && SetuidCapabilityPermitted()) {
     LogCvmfs(kLogCvmfs, kLogDebug, "Reducing to minimum capabilities");
@@ -2611,14 +2709,19 @@ static void Spawn() {
     const std::vector<cap_value_t> nocaps;
     if (NeedsReadEnviron()) {
       // Reserve the capabilities to read process environments
-      const std::vector<cap_value_t> reservecaps = {CAP_DAC_READ_SEARCH, CAP_SYS_PTRACE};
-      assert(ClearPermittedCapabilities(reservecaps, nocaps));
+      const std::vector<cap_value_t> reservecaps = {CAP_DAC_READ_SEARCH,
+                                                    CAP_SYS_PTRACE};
+      if (!ClearPermittedCapabilities(reservecaps, nocaps))
+        PANIC(kLogStderr | kLogSyslogErr,
+              "Failed to reduce process capabilities");
     } else {
-      assert(ClearPermittedCapabilities(nocaps, nocaps));
+      if (!ClearPermittedCapabilities(nocaps, nocaps))
+        PANIC(kLogStderr | kLogSyslogErr,
+              "Failed to clear process capabilities");
     }
   } else {
     LogCvmfs(kLogCvmfs, kLogDebug, "Not clearing capabilities, uid %d euid%d",
-                                   getuid(), geteuid());
+             getuid(), geteuid());
   }
 
   cvmfs::fuse_remounter_->Spawn();
@@ -2630,6 +2733,8 @@ static void Spawn() {
 
   cvmfs::mount_point_->download_mgr()->Spawn();
   cvmfs::mount_point_->external_download_mgr()->Spawn();
+  if (cvmfs::mount_point_->full_replica_download_mgr() != NULL)
+    cvmfs::mount_point_->full_replica_download_mgr()->Spawn();
   if (cvmfs::mount_point_->resolv_conf_watcher() != NULL) {
     cvmfs::mount_point_->resolv_conf_watcher()->Spawn();
   }
@@ -2658,6 +2763,10 @@ static void Spawn() {
 
   if (cvmfs::mount_point_->telemetry_aggr() != NULL) {
     cvmfs::mount_point_->telemetry_aggr()->Spawn();
+  }
+
+  if (cvmfs::mount_point_->bundle_mgr() != NULL) {
+    cvmfs::mount_point_->bundle_mgr()->Spawn();
   }
 }
 
@@ -3116,9 +3225,11 @@ static bool RestoreState(const int fd_progress,
       SendMsg2Socket(fd_progress, "Restoring watchdog listener state... ");
       WatchdogState *watchdog_state = static_cast<WatchdogState *>(
           saved_states[i]->state);
+      // The watchdog keeps running across reloads and is not re-forked, so
+      // the OOM score adjustment only takes effect on the next mount
       cvmfs::watchdog_ = Watchdog::Create(auto_umount::UmountOnExit,
-                                          NeedsReadEnviron(),
-                                          watchdog_state);
+                                          NeedsReadEnviron(), watchdog_state,
+                                          GetWatchdogOomScoreAdj());
       assert(cvmfs::watchdog_ != NULL);
       SendMsg2Socket(fd_progress, " done\n");
     }
@@ -3243,4 +3354,3 @@ static void __attribute__((destructor)) LibraryExit() {
   delete g_cvmfs_exports;
   g_cvmfs_exports = NULL;
 }
-

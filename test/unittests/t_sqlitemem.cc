@@ -7,13 +7,13 @@
 #include <cstdlib>
 #include <cstring>
 #include <map>
+#include <memory>
 #include <vector>
 
 #include "malloc_arena.h"
 #include "sqlitemem.h"
 #include "util/algorithm.h"
 #include "util/murmur.hxx"
-#include "util/pointer.h"
 #include "util/prng.h"
 
 using namespace std;  // NOLINT

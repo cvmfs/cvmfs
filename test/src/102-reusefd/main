@@ -106,9 +106,8 @@ cvmfs_run_test() {
   sleep 1
   local got_emfile=0
   for p in $job_pids; do
-    kill -USR1 $p
-    wait $p
-    if [ $? -ne 0 ]; then
+    kill -USR1 $p || true
+    if ! wait $p; then
       got_emfile=1
     fi
   done
@@ -125,9 +124,8 @@ cvmfs_run_test() {
   sleep 1
   got_emfile=0
   for p in $job_pids; do
-    kill -USR1 $p
-    wait $p
-    if [ $? -ne 0 ]; then
+    kill -USR1 $p || true
+    if ! wait $p; then
       got_emfile=1
     fi
   done

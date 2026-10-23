@@ -328,13 +328,13 @@ catalog::DirectoryEntry catalog::DirectoryEntryTestFactory::Make(
 //------------------------------------------------------------------------------
 
 
-atomic_int32 MockCatalog::instances;
+std::atomic<int32_t> MockCatalog::instances;
 
 const std::string MockCatalog::rhs = "f9d87ae2cc46be52b324335ff05fae4c1a7c4dd4";
 const shash::Any MockCatalog::root_hash = shash::Any(
     shash::kSha1, shash::HexPtr(MockCatalog::rhs), shash::kSuffixCatalog);
 
-void MockCatalog::ResetGlobalState() { atomic_init32(&MockCatalog::instances); }
+void MockCatalog::ResetGlobalState() { MockCatalog::instances.store(0); }
 
 MockCatalog *MockCatalog::AttachFreely(const std::string &root_path,
                                        const std::string &file,
@@ -485,6 +485,8 @@ MockCatalog *catalog::MockCatalogManager::CreateCatalog(
     MockCatalog *parent_catalog) {
   map<PathString, MockCatalog *>::iterator it = catalog_map_.find(mountpoint);
   if (it != catalog_map_.end()) {
+    // ownership passes to the AbstractCatalogManager
+    unmounted_catalogs_.erase(it->second);
     return it->second;
   }
   bool is_root = parent_catalog == NULL;
@@ -527,6 +529,7 @@ catalog::LoadReturn catalog::MockCatalogManager::LoadCatalogByHash(
         ctlg_context->mountpoint().ToString(), ctlg_context->hash(), 4096, 1, 0,
         true, NULL, NULL);
     catalog_map_[ctlg_context->mountpoint()] = catalog;
+    unmounted_catalogs_.insert(catalog);
   }
   return kLoadNew;
 }
@@ -539,8 +542,8 @@ MockObjectFetcher::Failures MockObjectFetcher::FetchManifest(
     manifest::Manifest **manifest) {
   const uint64_t catalog_size = 0;
   const std::string root_path = "";
-  *manifest = new manifest::Manifest(
-      MockCatalog::root_hash, catalog_size, root_path);
+  *manifest = new manifest::Manifest(MockCatalog::root_hash, catalog_size,
+                                     root_path);
   (*manifest)->set_history(MockHistory::root_hash);
   return MockObjectFetcher::kFailOk;
 }

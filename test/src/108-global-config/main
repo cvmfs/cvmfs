@@ -11,7 +11,8 @@ clean_up() {
 }
 
 do_test() {
-    sudo cp src/108-global-config/default.local "${CVMFS_CONFIG_FILE}"
+    local script_location=$1
+    sudo cp "$script_location"/default.local "${CVMFS_CONFIG_FILE}"
     sudo sed -i "s|LOGFILE|$logfile|g" "$CVMFS_CONFIG_FILE"
     sudo sed -i "s|PROXY_SERVER|$CVMFS_TEST_PROXY|g" "$CVMFS_CONFIG_FILE"
 
@@ -32,6 +33,7 @@ do_test() {
 
 cvmfs_run_test() {
   local logfile=$1
+  local script_location=$2
 
   if [[ -z "$logfile" ]]; then
     logfile=/tmp/version_env_test.log
@@ -42,10 +44,10 @@ cvmfs_run_test() {
 
   if [[ -f "${CVMFS_CONFIG_FILE}" ]]; then
     sudo mv "${CVMFS_CONFIG_FILE}" "${CVMFS_CONFIG_FILE}.bak"
-    do_test
+    do_test "$script_location"
     sudo mv "${CVMFS_CONFIG_FILE}.bak" "${CVMFS_CONFIG_FILE}"
   else
-    do_test
+    do_test "$script_location"
   fi
 }
 

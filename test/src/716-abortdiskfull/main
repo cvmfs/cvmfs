@@ -51,9 +51,10 @@ echo "Disk is full (touch test failed)."
 FILLDISK_EOF
 }
 
+repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
 cvmfs_run_test() {
   logfile=$1
-  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
 
   cleanup() {
     echo "cleanup: removing fill files"

@@ -1,0 +1,108 @@
+#!/bin/bash
+cvmfs_test_name="DUCC mountless convert tolerates missing hardlink targets"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="ducc"
+
+# This test reproduces the cross-layer / cleaned-cache hardlink crash:
+# cvmfs_ducc ingests each image layer in isolation, so a layer containing a
+# hardlink whose target lives in another layer used to PANIC the tarball
+# engine.  The fix (--tolerate-missing-hardlinks, passed by ducc on every layer
+# ingest) materializes an empty file instead.
+#
+# The whole conversion runs against a MOUNTLESS gateway publisher and a local
+# in-process registry (built from ducc/testutils/cmd/testregistry), so it needs
+# no external registry and exercises the mountless ducc-convert path end to end:
+# layer ingest, cvmfs_server overlay (flat image), and the symlink/catalog
+# writes — all via `cvmfs_server ingest`.
+
+CVMFS_TEST408_REG_PID=
+CVMFS_TEST408_REG_BIN=
+
+ducc_test_408_clean_up() {
+    echo "*** Cleaning up..."
+    [ -n "$CVMFS_TEST408_REG_PID" ] && kill "$CVMFS_TEST408_REG_PID" 2>/dev/null
+    [ -n "$CVMFS_TEST408_REG_BIN" ] && rm -f "$CVMFS_TEST408_REG_BIN"
+    sudo cvmfs_server rmfs -f test.repo.org 2>/dev/null
+}
+
+cvmfs_run_test() {
+    local repo="test.repo.org"
+    local image_ref="ducc-test/dangling-hardlink:latest"
+    local reg_port=5000
+
+    trap ducc_test_408_clean_up EXIT HUP INT TERM
+
+    # --- prerequisites -----------------------------------------------------
+    which cvmfs_ducc >/dev/null 2>&1 || { echo "cvmfs_ducc not installed"; return 1; }
+    which go >/dev/null 2>&1         || { echo "go toolchain not available"; return 1; }
+
+    local ducc_src="$TEST_ROOT/../ducc"
+    [ -d "$ducc_src" ] || { echo "ducc source tree not found at $ducc_src"; return 1; }
+
+    # --- 1. mountless gateway repository -----------------------------------
+    set_up_repository_gateway -P || return 10
+    load_repo_config "$repo"     || return 11
+
+    echo "*** verifying the publisher is mountless"
+    cat /proc/mounts | grep -e " /cvmfs/${repo} " && return 12
+    cat /proc/mounts | grep -e " ${CVMFS_SPOOL_DIR}/rdonly " && return 13
+
+    # --- 2. build & launch the local registry serving the crafted image ----
+    CVMFS_TEST408_REG_BIN="$(pwd)/testregistry"
+    echo "*** building test registry helper"
+    ( cd "$ducc_src" && go build -o "$CVMFS_TEST408_REG_BIN" ./testutils/cmd/testregistry ) \
+        || { echo "failed to build testregistry"; return 20; }
+
+    echo "*** starting test registry on :${reg_port}"
+    "$CVMFS_TEST408_REG_BIN" -addr ":${reg_port}" -ref "$image_ref" > registry.log 2>&1 &
+    CVMFS_TEST408_REG_PID=$!
+
+    local i=0
+    until grep -q "ready:" registry.log 2>/dev/null; do
+        sleep 1
+        i=$((i + 1))
+        if ! kill -0 "$CVMFS_TEST408_REG_PID" 2>/dev/null; then
+            echo "registry exited early"; cat registry.log; return 21
+        fi
+        [ $i -gt 30 ] && { echo "registry not ready in time"; cat registry.log; return 22; }
+    done
+    echo "*** registry ready"
+
+    # --- 3. full mountless conversion --------------------------------------
+    # -p: skip the podman store; the thin image is skipped by default.  The
+    # flat (singularity) image is created, exercising the mountless overlay.
+    echo "*** converting image via cvmfs_ducc --mountless"
+    cvmfs_ducc --mountless convert-single-image -p \
+        "http://localhost:${reg_port}/${image_ref}" "$repo" \
+        > convert.log 2>&1
+    local rc=$?
+
+    echo "*** ==== convert.log ===="
+    cat convert.log
+
+    # --- 4. assertions -----------------------------------------------------
+    # 4a. the pre-fix failure mode was a PANIC in the tarball engine
+    if grep -q "PANIC" convert.log; then
+        echo "FAIL: ingest PANICked on the missing hardlink target"
+        return 30
+    fi
+    # 4b. with the fix the whole conversion succeeds
+    if [ $rc -ne 0 ]; then
+        echo "FAIL: cvmfs_ducc convert exited with $rc"
+        return 31
+    fi
+    # 4c. the materialization path should have run (best effort: the engine
+    #     also logs this to syslog, which may not reach convert.log)
+    if ! grep -q "materialized an empty file" convert.log; then
+        echo "WARN: did not see the materialization message in convert.log"
+    fi
+
+    # --- 5. mountless invariant preserved ----------------------------------
+    cat /proc/mounts | grep -e " /cvmfs/${repo} " && return 32
+
+    # --- 6. layers were actually published ---------------------------------
+    cvmfs_server list-catalogs -x "$repo" | grep -q "\.layers" || return 33
+
+    echo "*** Test successful"
+    return 0
+}

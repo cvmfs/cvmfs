@@ -152,6 +152,7 @@ class SettingsTransaction {
       , autobalance_min_weight_(1000)
       , print_changeset_(false)
       , dry_run_(false)
+      , allow_nonexistent_path_(false)
       , union_fs_(kUnionFsUnknown)
       , timeout_s_(0)
       , spool_area_(fqrn) { }
@@ -172,6 +173,7 @@ class SettingsTransaction {
   void SetAutobalanceMinWeight(unsigned value);
   void SetPrintChangeset(bool value);
   void SetDryRun(bool value);
+  void SetAllowNonexistentPath(bool value);
   void SetTimeout(unsigned seconds);
   void SetLeasePath(const std::string &path);
   void SetTemplate(const std::string &from, const std::string &to);
@@ -207,6 +209,7 @@ class SettingsTransaction {
   unsigned autobalance_min_weight() const { return autobalance_min_weight_(); }
   bool print_changeset() const { return print_changeset_(); }
   bool dry_run() const { return dry_run_(); }
+  bool allow_nonexistent_path() const { return allow_nonexistent_path_(); }
   std::string voms_authz() const { return voms_authz_(); }
   UnionFsType union_fs() const { return union_fs_(); }
   std::string lease_path() const { return lease_path_(); }
@@ -253,6 +256,12 @@ class SettingsTransaction {
   Setting<unsigned> autobalance_min_weight_;
   Setting<bool> print_changeset_;
   Setting<bool> dry_run_;
+  /**
+   * Permit opening a transaction on a gateway lease path whose parent
+   * directory does not exist yet. The missing ancestor directories are
+   * materialized by the receiver during the commit's catalog merge.
+   */
+  Setting<bool> allow_nonexistent_path_;
   Setting<std::string> voms_authz_;
   Setting<UnionFsType> union_fs_;
   /**

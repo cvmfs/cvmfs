@@ -8,6 +8,7 @@
 #include <inttypes.h>
 #include <pthread.h>
 
+#include <atomic>
 #include <cassert>
 #include <map>
 #include <string>
@@ -20,7 +21,6 @@
 #include "manifest_fetch.h"
 #include "statistics.h"
 #include "util/algorithm.h"
-#include "util/atomic.h"
 #include "util/logging.h"
 #include "util/platform.h"
 
@@ -94,14 +94,14 @@ struct CatalogContext {
       sqlite_path_("")
       , root_ctlg_revision_(-1ul)
       , root_ctlg_location_(kCtlgNoLocationNeeded)
-      , manifest_ensemble_(NULL) { }
+      , manifest_ensemble_(nullptr) { }
   CatalogContext(const shash::Any &hash, const PathString &mountpoint)
       : hash_(hash)
       , mountpoint_(mountpoint)
       , sqlite_path_("")
       , root_ctlg_revision_(-1ul)
       , root_ctlg_location_(kCtlgNoLocationNeeded)
-      , manifest_ensemble_(NULL) { }
+      , manifest_ensemble_(nullptr) { }
 
   CatalogContext(const shash::Any &hash, const PathString &mountpoint,
                  const RootCatalogLocation location)
@@ -110,7 +110,7 @@ struct CatalogContext {
       , sqlite_path_("")
       , root_ctlg_revision_(-1ul)
       , root_ctlg_location_(location)
-      , manifest_ensemble_(NULL) { }
+      , manifest_ensemble_(nullptr) { }
 
   bool IsRootCatalog() { return mountpoint_.IsEmpty(); }
 
@@ -123,7 +123,7 @@ struct CatalogContext {
   uint64_t root_ctlg_revision() const { return root_ctlg_revision_; }
   RootCatalogLocation root_ctlg_location() const { return root_ctlg_location_; }
   manifest::ManifestEnsemble *manifest_ensemble() const {
-    return manifest_ensemble_.weak_ref();
+    return manifest_ensemble_.get();
   }
 
   void SetHash(shash::Any hash) { hash_ = hash; }
@@ -141,7 +141,8 @@ struct CatalogContext {
    * Gives ownership to CatalogContext
    */
   void TakeManifestEnsemble(manifest::ManifestEnsemble *manifest_ensemble) {
-    manifest_ensemble_ = manifest_ensemble;
+    manifest_ensemble_ = std::unique_ptr<manifest::ManifestEnsemble>(
+        manifest_ensemble);
   }
 
 
@@ -157,7 +158,7 @@ struct CatalogContext {
   // root catalog: location is mandatory for LoadCatalogByHash()
   RootCatalogLocation root_ctlg_location_;
   // root catalog: if location = server mandatory for LoadCatalogByHash()
-  UniquePtr<manifest::ManifestEnsemble> manifest_ensemble_;
+  std::unique_ptr<manifest::ManifestEnsemble> manifest_ensemble_;
 };
 
 inline const char *Code2Ascii(const LoadReturn error) {
@@ -249,8 +250,8 @@ class AbstractCatalogManager : public SingleCopy {
   LoadReturn ChangeRoot(const shash::Any &root_hash);
   void DetachNested();
 
-  bool LookupPath(const PathString &path, const LookupOptions options,
-                  DirectoryEntry *entry);
+  virtual bool LookupPath(const PathString &path, const LookupOptions options,
+                          DirectoryEntry *entry);
   bool LookupPath(const std::string &path, const LookupOptions options,
                   DirectoryEntry *entry) {
     PathString p;
@@ -278,9 +279,9 @@ class AbstractCatalogManager : public SingleCopy {
   }
   bool ListingStat(const PathString &path, StatEntryList *listing);
 
-  bool ListFileChunks(const PathString &path,
-                      const shash::Algorithms interpret_hashes_as,
-                      FileChunkList *chunks);
+  virtual bool ListFileChunks(const PathString &path,
+                              const shash::Algorithms interpret_hashes_as,
+                              FileChunkList *chunks);
   void SetOwnerMaps(const OwnerMap &uid_map, const OwnerMap &gid_map);
   void SetCatalogWatermark(unsigned limit);
 
@@ -289,7 +290,7 @@ class AbstractCatalogManager : public SingleCopy {
   Statistics statistics() const { return statistics_; }
   uint64_t inode_gauge() {
     ReadLock();
-    uint64_t r = inode_gauge_;
+    uint64_t const r = inode_gauge_;
     Unlock();
     return r;
   }

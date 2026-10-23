@@ -1,4 +1,12 @@
 
+cvmfs-release (5.0) unstable; urgency=low
+
+  * Derive the apt suite (<codename>-prod) from os-release at install time
+    instead of shipping a cernvm.list.<codename> file per release; new
+    Debian/Ubuntu releases now work without a cvmfs-release update
+
+ -- Valentin Volkl <vavolkl@cern.ch>  Mon, 25 May 2026 09:34:00 +0200
+
 cvmfs-release (4.9) unstable; urgency=low
 
   * Add Ubuntu 26.04 "resolute"

@@ -1,0 +1,17 @@
+#!/bin/bash
+
+# Configures cvmfs.  cvmfs_config setup creates /cvmfs, a synthetic firmlink
+# to /Volumes/cvmfs, since / is read-only on macOS 11+.
+
+set -e
+exec >> /tmp/cvmfs_postinstall 2>&1
+echo "cvmfs NFS postinstall, $(date)"
+
+# Superseded by the per-user settings in 10-osx.conf
+rm -f /etc/cvmfs/default.d/11-osx-fskit.conf
+rm -f /etc/cvmfs/default.d/11-osx-fskit.conf.disabled
+
+export PATH="$PATH:/usr/local/bin"
+/usr/local/bin/cvmfs_config setup
+
+[ -d /cvmfs ] || echo "/cvmfs not available before reboot"

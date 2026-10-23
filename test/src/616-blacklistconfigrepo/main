@@ -42,7 +42,7 @@ cvmfs_run_test() {
   TEST_616_MOUNTPOINT_MORE="$(pwd)/local_mount_more"
   do_616_mount || return 5
 
-  ls $TEST_611_MOUNTPOINT_MORE || return 11
+  ls $TEST_616_MOUNTPOINT_MORE || return 11
   remove_local_mount $TEST_616_MOUNTPOINT_MORE || return 13
 
   echo "starting transaction to edit repository"

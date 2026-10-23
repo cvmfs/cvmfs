@@ -43,6 +43,7 @@ cvmfs_run_test() {
   mkdir reference_dir
   local reference_dir=$scratch_dir/reference_dir
 
+  sudo mkdir -p /srv/cvmfs
   local backend_dir="/srv/cvmfs/${CVMFS_TEST_REPO}"
   local alternative_backend="/opt/cvmfs"
   local symlink_destination="${alternative_backend}/${CVMFS_TEST_REPO}"

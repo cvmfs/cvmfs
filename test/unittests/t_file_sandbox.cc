@@ -72,6 +72,7 @@ TEST_F(T_FileSandbox, CreateRandomBufferMethod) {
   }
 
   EXPECT_EQ(41207u, zeros);
+  free(buffer);
 }
 
 

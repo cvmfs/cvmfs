@@ -28,10 +28,8 @@ cvmfs_run_test() {
   ln -s regular /cvmfs/$CVMFS_TEST_REPO/nested/symlink6
   ln -s regular /cvmfs/$CVMFS_TEST_REPO/nested/symlink7
 
-  cat /dev/zero | base64 -w0 | head -c $((1024*1024*32)) \
-    > /cvmfs/$CVMFS_TEST_REPO/chunks
-  cat /dev/zero | base64 -w0 | head -c $((1024*1024*32)) \
-    > /cvmfs/$CVMFS_TEST_REPO/nested/chunks
+  dd if=/dev/zero bs=32K count=1024 of=/cvmfs/$CVMFS_TEST_REPO/chunks
+  cp /cvmfs/$CVMFS_TEST_REPO/chunks /cvmfs/$CVMFS_TEST_REPO/nested/chunks
 
   mkfifo /cvmfs/$CVMFS_TEST_REPO/fifo
   mkfifo /cvmfs/$CVMFS_TEST_REPO/nested/fifo

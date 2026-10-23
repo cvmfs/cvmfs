@@ -45,6 +45,52 @@ cvmfs_run_test() {
     cvmfs_server check -i test.repo.org || return 40
     check_repo_integrity test.repo.org || return 41
 
+    echo "Checking auto tag timespan cleanup via gateway"
+    # Re-enable auto tagging
+    sudo bash -c "echo CVMFS_AUTO_TAG=true >> /etc/cvmfs/repositories.d/test.repo.org/server.conf"
+
+    # Create several auto-tagged revisions
+    cvmfs_server transaction test.repo.org || return 50
+    cvmfs_server publish test.repo.org || return 51
+    sleep 2
+    cvmfs_server transaction test.repo.org || return 52
+    cvmfs_server publish test.repo.org || return 53
+    sleep 2
+    local tags_before=$(cvmfs_server tag -l -x test.repo.org | grep generic | wc -l)
+
+    # Set CVMFS_AUTO_TAG_TIMESPAN on the publisher (should be sent to gateway)
+    sudo bash -c "echo 'CVMFS_AUTO_TAG_TIMESPAN=\"$(date)\"' >> /etc/cvmfs/repositories.d/test.repo.org/server.conf"
+    sleep 2
+    cvmfs_server transaction test.repo.org || return 54
+    cvmfs_server publish test.repo.org || return 55
+    local tags_after=$(cvmfs_server tag -l -x test.repo.org | grep generic | wc -l)
+
+    # After cleanup, there should be fewer auto tags than before
+    # (the new publish adds one but the cleanup removes old ones)
+    echo "Auto tags before timespan cleanup: $tags_before"
+    echo "Auto tags after timespan cleanup: $tags_after"
+    if [ $tags_after -ge $tags_before ]; then
+        echo "Expected fewer auto tags after cleanup"
+        return 56
+    fi
+
+    # A cutoff at/in the future must still keep the freshly created tag
+    # ("latest auto tag is set in any case"), matching the non-gateway
+    # behaviour in test 636: cleanup removes all older auto tags but the new
+    # tag, created after the cleanup, survives.
+    sudo bash -c "echo 'CVMFS_AUTO_TAG_TIMESPAN=\"tomorrow\"' >> /etc/cvmfs/repositories.d/test.repo.org/server.conf"
+    cvmfs_server transaction test.repo.org || return 57
+    cvmfs_server publish test.repo.org || return 58
+    local tags_future=$(cvmfs_server tag -l -x test.repo.org | grep generic | wc -l)
+    echo "Auto tags after future-cutoff cleanup: $tags_future"
+    if [ $tags_future -ne 1 ]; then
+        echo "Expected exactly one (latest) auto tag to survive a future cutoff"
+        return 59
+    fi
+
+    cvmfs_server check -i test.repo.org || return 60
+    check_repo_integrity test.repo.org || return 61
+
     return 0
 }
 

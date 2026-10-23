@@ -99,7 +99,7 @@ template<class CatalogT>
 bool AbstractCatalogManager<CatalogT>::Init() {
   LogCvmfs(kLogCatalog, kLogDebug, "Initialize catalog");
   WriteLock();
-  bool attached = MountCatalog(PathString("", 0), shash::Any(), NULL);
+  bool const attached = MountCatalog(PathString("", 0), shash::Any(), NULL);
   Unlock();
 
   if (!attached) {
@@ -140,14 +140,14 @@ LoadReturn AbstractCatalogManager<CatalogT>::Remount() {
   const LoadReturn load_error = LoadCatalogByHash(&ctlg_context);
 
   if (load_error == kLoadNew) {
-    inode_t old_inode_gauge = inode_gauge_;
+    inode_t const old_inode_gauge = inode_gauge_;
     DetachAll();
     inode_gauge_ = AbstractCatalogManager<CatalogT>::kInodeOffset;
 
     CatalogT *new_root = CreateCatalog(ctlg_context.mountpoint(),
                                        ctlg_context.hash(), NULL);
     assert(new_root);
-    bool retval = AttachCatalog(ctlg_context.sqlite_path(), new_root);
+    bool const retval = AttachCatalog(ctlg_context.sqlite_path(), new_root);
     assert(retval);
 
     if (inode_annotation_) {
@@ -180,14 +180,14 @@ LoadReturn AbstractCatalogManager<CatalogT>::ChangeRoot(
   const LoadReturn load_error = LoadCatalogByHash(&ctlg_context);
 
   if (load_error == kLoadNew) {
-    inode_t old_inode_gauge = inode_gauge_;
+    inode_t const old_inode_gauge = inode_gauge_;
     DetachAll();
     inode_gauge_ = AbstractCatalogManager<CatalogT>::kInodeOffset;
 
     CatalogT *new_root = CreateCatalog(PathString("", 0), ctlg_context.hash(),
                                        NULL);
     assert(new_root);
-    bool retval = AttachCatalog(ctlg_context.sqlite_path(), new_root);
+    bool const retval = AttachCatalog(ctlg_context.sqlite_path(), new_root);
     assert(retval);
 
     if (inode_annotation_) {
@@ -337,7 +337,7 @@ bool AbstractCatalogManager<CatalogT>::LookupPath(const PathString &path,
 
   if ((options & kLookupRawSymlink) == kLookupRawSymlink) {
     LinkString raw_symlink;
-    bool retval = best_fit->LookupRawSymlink(path, &raw_symlink);
+    bool const retval = best_fit->LookupRawSymlink(path, &raw_symlink);
     assert(retval);  // Must be true, we have just found the entry
     dirent->set_symlink(raw_symlink);
   }
@@ -734,7 +734,7 @@ uint64_t AbstractCatalogManager<CatalogT>::GetTTL() const {
 template<class CatalogT>
 int AbstractCatalogManager<CatalogT>::GetNumCatalogs() const {
   ReadLock();
-  int result = catalogs_.size();
+  int const result = catalogs_.size();
   Unlock();
   return result;
 }
@@ -899,7 +899,7 @@ bool AbstractCatalogManager<CatalogT>::MountSubtree(const PathString &path,
       // in this case the path doesn't start with
       // the mountpoint in a file path sense
       // (e.g. path is /a/bc and mountpoint is /a/b), and will be ignored
-      unsigned mountpoint_len = i->mountpoint.GetLength();
+      unsigned const mountpoint_len = i->mountpoint.GetLength();
       if (path_len > mountpoint_len && path.GetChars()[mountpoint_len] != '/')
         continue;
 
@@ -1026,8 +1026,8 @@ bool AbstractCatalogManager<CatalogT>::AttachCatalog(const string &db_path,
   }
 
   // Determine the inode offset of this catalog
-  uint64_t inode_chunk_size = new_catalog->max_row_id();
-  InodeRange range = AcquireInodes(inode_chunk_size);
+  uint64_t const inode_chunk_size = new_catalog->max_row_id();
+  InodeRange const range = AcquireInodes(inode_chunk_size);
   new_catalog->set_inode_range(range);
   new_catalog->SetInodeAnnotation(inode_annotation_);
   new_catalog->SetOwnerMaps(&uid_map_, &gid_map_);
@@ -1118,7 +1118,7 @@ void AbstractCatalogManager<CatalogT>::DetachSiblings(
   bool again;
   do {
     again = false;
-    unsigned N = catalogs_.size();
+    unsigned const N = catalogs_.size();
     for (unsigned i = 0; i < N; ++i) {
       if (!HasPrefix(current_tree.ToString(),
                      catalogs_[i]->mountpoint().ToString(),
@@ -1152,7 +1152,7 @@ string AbstractCatalogManager<CatalogT>::PrintHierarchyRecursively(
 
   CatalogList children = catalog->GetChildren();
   typename CatalogList::const_iterator i = children.begin();
-  typename CatalogList::const_iterator iend = children.end();
+  typename CatalogList::const_iterator const iend = children.end();
   for (; i != iend; ++i) {
     output += PrintHierarchyRecursively(*i, level + 1);
   }
@@ -1168,7 +1168,7 @@ std::string AbstractCatalogManager<CatalogT>::PrintMemStatsRecursively(
 
   CatalogList children = catalog->GetChildren();
   typename CatalogList::const_iterator i = children.begin();
-  typename CatalogList::const_iterator iend = children.end();
+  typename CatalogList::const_iterator const iend = children.end();
   for (; i != iend; ++i) {
     result += PrintMemStatsRecursively(*i);
   }

@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include <unistd.h>
 
+#include <atomic>
 #include <cassert>
 #include <string>
 #include <vector>
@@ -15,10 +16,9 @@
 #include "cache.h"
 #include "cache_transport.h"
 #include "crypto/hash.h"
-#include "fd_table.h"
 #include "duplex_testing.h"
+#include "fd_table.h"
 #include "quota.h"
-#include "util/atomic.h"
 #include "util/concurrency.h"
 
 
@@ -298,7 +298,7 @@ class ExternalCacheManager : public CacheManager {
   static bool SpawnPlugin(const std::vector<std::string> &cmd_line);
 
   explicit ExternalCacheManager(int fd_connection, unsigned max_open_fds);
-  int64_t NextRequestId() { return atomic_xadd64(&next_request_id_, 1); }
+  int64_t NextRequestId() { return next_request_id_.fetch_add(1); }
   void CallRemotely(RpcJob *rpc_job);
   int ChangeRefcount(const shash::Any &id, int change_by);
   int DoOpen(const shash::Any &id);
@@ -313,7 +313,7 @@ class ExternalCacheManager : public CacheManager {
   bool spawned_;
   bool terminated_;
   pthread_rwlock_t rwlock_fd_table_;
-  atomic_int64 next_request_id_;
+  std::atomic<int64_t> next_request_id_;
 
   /**
    * Serialize concurrent write access to the session fd

@@ -4,10 +4,6 @@ create_evict_repo() {
   echo "*** CREATE a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
 
-  local short_name="$1"
-  local long_name="$2"
-  local symlink_name="$3"  
-
   start_transaction $CVMFS_TEST_REPO || return $?
 
   dd if=/dev/urandom of=/cvmfs/$CVMFS_TEST_REPO/large bs=2MB count=40 status=none

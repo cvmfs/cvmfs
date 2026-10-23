@@ -47,8 +47,16 @@
 #include "util/logging.h"
 #include "util/posix.h"
 #include "util/string.h"
+#ifdef CVMFS_NFS_FRONTEND
+#include "nfs4/fuse_shim_api.h"
+#endif
 
 using namespace std;  // NOLINT
+
+// Client library of this stub's frontend, set by cvmfs_add_frontend()
+#ifndef CVMFS_FRONTEND_LIBRARY
+#define CVMFS_FRONTEND_LIBRARY "cvmfs_fuse3"
+#endif
 
 namespace loader {
 
@@ -65,6 +73,7 @@ struct CvmfsOptions {
   int foreground;
   int fuse_debug;
   int fuse_passthrough;
+  int backend_fskit;
 
   // Ignored options
   int ign_netdev;
@@ -100,6 +109,7 @@ static struct fuse_opt cvmfs_array_opts[] = {
     CVMFS_SWITCH("fuse_debug", fuse_debug),
     CVMFS_SWITCH("fuse_passthrough", fuse_passthrough),
     CVMFS_SWITCH("fuse_passthru", fuse_passthrough),
+    CVMFS_SWITCH("obackend=fskit", backend_fskit),
 
     // Ignore these options
     CVMFS_SWITCH("_netdev", ign_netdev),
@@ -108,6 +118,8 @@ static struct fuse_opt cvmfs_array_opts[] = {
     CVMFS_SWITCH("users", ign_users),
     CVMFS_SWITCH("auto", ign_auto),
     CVMFS_SWITCH("noauto", ign_noauto),
+    // Kept for backwards compatibility with fstab entries written when both
+    // libfuse2 and libfuse3 were supported
     CVMFS_OPT("libfuse=%d", ign_libfuse, 0),
 
     FUSE_OPT_KEY("-V", KEY_VERSION),
@@ -178,7 +190,7 @@ static void Usage(const string &exename) {
     "  -o foreground        Run in foreground\n"
     "  -o fuse_passthrough  Enables FUSE passthrough (read requests bypass userspace, improves performance)\n"
     "  -o fuse_passthru     Alias for fuse_passthrough\n"
-    "  -o libfuse=[2,3]     Enforce a certain libfuse version\n"
+    "  -o obackend=fskit    Use the fskit object backend\n"
     "Fuse mount options:\n"
     "  -o allow_other       allow access to other users\n"
     "  -o allow_root        allow access to root\n"
@@ -285,20 +297,10 @@ static void stub_statfs(fuse_req_t req, fuse_ino_t ino) {
 }
 
 
-#ifdef __APPLE__
 static void stub_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
-                          size_t size, uint32_t position)
-#else
-static void stub_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
-                          size_t size)
-#endif
-{
+                          size_t size) {
   const FenceGuard fence_guard(fence_reload_);
-#ifdef __APPLE__
-  cvmfs_exports_->cvmfs_operations.getxattr(req, ino, name, size, position);
-#else
   cvmfs_exports_->cvmfs_operations.getxattr(req, ino, name, size);
-#endif
 }
 
 
@@ -308,27 +310,18 @@ static void stub_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
 }
 
 
-static void stub_forget(fuse_req_t req,
-                        fuse_ino_t ino,
-#if CVMFS_USE_LIBFUSE == 2
-                        unsigned long nlookup  // NOLINT
-#else
-                        uint64_t nlookup
-#endif
-) {
+static void stub_forget(fuse_req_t req, fuse_ino_t ino, uint64_t nlookup) {
   const FenceGuard fence_guard(fence_reload_);
   cvmfs_exports_->cvmfs_operations.forget(req, ino, nlookup);
 }
 
 
-#if (FUSE_VERSION >= 29)
 static void stub_forget_multi(fuse_req_t req,
                               size_t count,
                               struct fuse_forget_data *forgets) {
   const FenceGuard fence_guard(fence_reload_);
   cvmfs_exports_->cvmfs_operations.forget_multi(req, count, forgets);
 }
-#endif
 
 
 /**
@@ -427,11 +420,17 @@ static fuse_args *ParseCmdLine(int argc, char *argv[]) {
     fuse_opt_add_arg(mount_options, "-d");
   }
   fuse_passthrough_ = cvmfs_options.fuse_passthrough;
+  if (cvmfs_options.backend_fskit) {
+    fuse_opt_add_arg(mount_options, "-obackend=fskit");
+    // FSKit manages the mount lifecycle; daemonizing would break the
+    // FSKit connection, so we force foreground mode.
+    foreground_ = true;
+    disable_watchdog_ = true;
+  }
 
   return mount_options;
 }
 
-#if CVMFS_USE_LIBFUSE != 2
 static bool MatchFuseOption(const fuse_args *mount_options, const char *opt) {
   for (int i = 0; i < mount_options->argc; i++) {
     char *arg = mount_options->argv[i];
@@ -448,7 +447,6 @@ static bool MatchFuseOption(const fuse_args *mount_options, const char *opt) {
   }
   return false;
 }
-#endif
 
 static void SetFuseOperations(struct fuse_lowlevel_ops *loader_operations) {
   memset(loader_operations, 0, sizeof(*loader_operations));
@@ -500,34 +498,29 @@ static CvmfsExports *LoadLibrary(const bool debug_mode,
       local_lib_path.push_back('/');
   }
 
-#if CVMFS_USE_LIBFUSE == 2
-  string library_name = string("cvmfs_fuse") + ((debug_mode) ? "_debug" : "");
-#else
-  string library_name = string("cvmfs_fuse3") + ((debug_mode) ? "_debug" : "");
-#endif
+  string library_name =
+      string(CVMFS_FRONTEND_LIBRARY) + ((debug_mode) ? "_debug" : "");
   library_name = platform_libname(library_name);
   string error_messages;
 
-  vector<string> library_paths;  // TODO(rmeusel): C++11 initializer
-  if (library_paths.empty()) {
-    library_paths.push_back(local_lib_path + library_name);
-    library_paths.push_back("/usr/lib/" + library_name);
-    library_paths.push_back("/usr/lib64/" + library_name);
+  // build search paths for library
+  const vector<string> library_paths = {
+    local_lib_path + library_name,
+    "/usr/lib/" + library_name,
+    "/usr/lib64/" + library_name,
 #ifdef __APPLE__
     // Since OS X El Capitan (10.11) came with SIP, we needed to relocate our
     // binaries from /usr/... to /usr/local/...
-    library_paths.push_back("/usr/local/lib/" + library_name);
+    "/usr/local/lib/" + library_name,
 #endif
-  }
+  };
 
-  vector<string>::const_iterator i = library_paths.begin();
-  const vector<string>::const_iterator iend = library_paths.end();
-  for (; i != iend; ++i) {  // TODO(rmeusel): C++11 range based for
-    library_handle_ = OpenLibrary(*i);
-    if (library_handle_ != NULL) {
+  // dlopen the library at the first good search path
+  for (const string &path : library_paths) {
+    library_handle_ = OpenLibrary(path);
+    if (nullptr != library_handle_) {
       break;
     }
-
     error_messages += string(dlerror()) + "\n";
   }
 
@@ -625,6 +618,36 @@ Failures Reload(const int fd_progress, const bool stop_and_go,
 
 
 using namespace loader;  // NOLINT(build/namespaces)
+
+#ifdef CVMFS_NFS_FRONTEND
+/**
+ * Detaches like Daemonize(), but the calling process exits only once the
+ * daemon reports that the NFS mount is in place, with a matching exit code.
+ * Until then the daemon keeps stdout/stderr, so that startup errors still
+ * reach the terminal; libcvmfs_nfsfuse redirects them once the mount is ready.
+ */
+static void DaemonizeUntilMounted() {
+  int pipe_ready[2];
+  MakePipe(pipe_ready);
+  pid_t pid = fork();
+  assert(pid >= 0);
+  if (pid > 0) {
+    close(pipe_ready[1]);
+    char status = 1;
+    const ssize_t retval = read(pipe_ready[0], &status, 1);
+    _exit((retval == 1 && status == 0) ? kFailOk : kFailMount);
+  }
+  close(pipe_ready[0]);
+  const int retval = setsid();
+  assert(retval != -1);
+  pid = fork();
+  assert(pid >= 0);
+  if (pid > 0)
+    _exit(0);
+  cvmfs_nfsfuse_set_ready_fd(pipe_ready[1]);
+}
+#endif
+
 
 int FuseMain(int argc, char *argv[]) {
   // Set a decent umask for new files (no write access to group/everyone).
@@ -746,7 +769,7 @@ int FuseMain(int argc, char *argv[]) {
         new DefaultOptionsTemplateManager(*repository_name_));
   }
   if (config_files_) {
-    vector<string> tokens = SplitString(*config_files_, ':');
+    const vector<string> tokens = SplitString(*config_files_, ':');
     for (unsigned i = 0, s = tokens.size(); i < s; ++i) {
       options_manager->ParsePath(tokens[i], false);
     }
@@ -765,6 +788,15 @@ int FuseMain(int argc, char *argv[]) {
       && options_manager->IsOff(parameter)) {
     premount_fuse_ = false;
   }
+#ifdef CVMFS_NFS_FRONTEND
+  // The file system is mounted through the kernel's NFS client
+  premount_fuse_ = false;
+  // Settings of libcvmfs_nfsfuse, which only sees the environment
+  if (options_manager->GetValue("CVMFS_NFS_DELEGATIONS", &parameter))
+    setenv("CVMFS_NFS_DELEGATIONS", parameter.c_str(), 1);
+  if (options_manager->GetValue("CVMFS_NFS_MOUNT_OPTIONS", &parameter))
+    setenv("CVMFS_NFS_MOUNT_OPTIONS", parameter.c_str(), 1);
+#endif
 
   if (options_manager->GetValue("CVMFS_REPOSITORIES_NOMOUNT", &parameter)
       && !parameter.empty()) {
@@ -815,10 +847,10 @@ int FuseMain(int argc, char *argv[]) {
   if (options_manager->GetValue("CVMFS_CPU_AFFINITY", &parameter)) {
 #ifndef __APPLE__
     cpu_set_t mask;
-    vector<string> cpus = SplitString(parameter, ',');
+    const vector<string> cpus = SplitString(parameter, ',');
     CPU_ZERO(&mask);
-    for (vector<string>::iterator i = cpus.begin(); i != cpus.end(); i++) {
-      CPU_SET(String2Uint64(Trim(*i)), &mask);
+    for (const string &cpu : cpus) {
+      CPU_SET(String2Uint64(Trim(cpu)), &mask);
     }
     LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: setting CPU Affinity to %s",
              parameter.c_str());
@@ -947,9 +979,8 @@ int FuseMain(int argc, char *argv[]) {
   int fd_mountinfo = -1;
   const bool delegated_unmount = (!suid_mode_ && !disable_watchdog_);
   bool dounmount = false;
-#if CVMFS_USE_LIBFUSE != 2
   int premount_fd = -1;
-#endif
+  struct fuse_session *session = NULL;
 
   // Drop credentials, most likely temporarily since by default there is
   // a watchdog
@@ -1038,15 +1069,13 @@ int FuseMain(int argc, char *argv[]) {
   delete options_manager;
   options_manager = NULL;
 
-  struct fuse_session *session;
-#if CVMFS_USE_LIBFUSE == 2
-  struct fuse_chan *channel;
-  loader_exports_->fuse_channel_or_session = reinterpret_cast<void **>(
-      &channel);
-#else
-  loader_exports_->fuse_channel_or_session = reinterpret_cast<void **>(
-      &session);
+#ifdef CVMFS_NFS_FRONTEND
+  // Fork before the cvmfs library opens its databases: macOS' libsqlite3
+  // invalidates connections that are used again after fork()
+  if (!foreground_)
+    DaemonizeUntilMounted();
 #endif
+  loader_exports_->fuse_session = &session;
 
   // Load and initialize cvmfs library
   LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
@@ -1087,7 +1116,7 @@ int FuseMain(int argc, char *argv[]) {
     }
   }
 
-#if CVMFS_USE_LIBFUSE != 2
+#ifndef __APPLE__
   if (!premounted_ && !suid_mode_ && getuid() == 0 && premount_fuse_) {
     // If not already premounted or using suid mode, premount the fuse
     // mountpoint to avoid the need for fusermount.
@@ -1153,33 +1182,9 @@ int FuseMain(int argc, char *argv[]) {
 
   struct fuse_lowlevel_ops loader_operations;
   SetFuseOperations(&loader_operations);
-#if (FUSE_VERSION >= 29)
   if (cvmfs_exports_->cvmfs_operations.forget_multi)
     loader_operations.forget_multi = stub_forget_multi;
-#endif
 
-#if CVMFS_USE_LIBFUSE == 2
-  channel = fuse_mount(mount_point_->c_str(), mount_options);
-  if (!channel) {
-    LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
-             "failed to create Fuse channel");
-    cvmfs_exports_->fnFini();
-    retval = kFailMount;
-    goto cleanup;
-  }
-
-  session = fuse_lowlevel_new(mount_options, &loader_operations,
-                              sizeof(loader_operations), NULL);
-  if (!session) {
-    LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
-             "failed to create Fuse session");
-    fuse_unmount(mount_point_->c_str(), channel);
-    cvmfs_exports_->fnFini();
-    retval = kFailMount;
-    goto cleanup;
-  }
-#else
-  // libfuse3
   session = fuse_session_new(mount_options, &loader_operations,
                              sizeof(loader_operations), NULL);
   if (!session) {
@@ -1203,7 +1208,6 @@ int FuseMain(int argc, char *argv[]) {
     retval = kFailMount;
     goto cleanup;
   }
-#endif
 
   if (suid_mode_) {
     // Drop credentials again for now
@@ -1264,8 +1268,10 @@ int FuseMain(int argc, char *argv[]) {
   }
   LogCvmfs(kLogCvmfs, kLogSyslog, "CernVM-FS: linking %s to repository %s",
            mount_point_->c_str(), repository_name_->c_str());
+#ifndef CVMFS_NFS_FRONTEND
   if (!foreground_)
     Daemonize();
+#endif
 
   // Note that this has a side effect of significantly reducing capabilities
   // after it starts things that need more privileges
@@ -1288,15 +1294,9 @@ int FuseMain(int argc, char *argv[]) {
   SetLogMicroSyslog("");
   retval = fuse_set_signal_handlers(session);
   assert(retval == 0);
-#if CVMFS_USE_LIBFUSE == 2
-  fuse_session_add_chan(session, channel);
-#endif
   if (single_threaded_) {
     retval = fuse_session_loop(session);
   } else {
-#if CVMFS_USE_LIBFUSE == 2
-    retval = fuse_session_loop_mt(session);
-#else
 #ifdef CVMFS_ENABLE_FUSE3_LOOP_CONFIG
     struct fuse_loop_config *fuse_loop_cfg = fuse_loop_cfg_create();
 
@@ -1314,7 +1314,6 @@ int FuseMain(int argc, char *argv[]) {
 #else
     retval = fuse_session_loop_mt(session, 1 /* use fd per thread */);
 #endif  // CVMFS_ENABLE_FUSE3_LOOP_CONFIG
-#endif  // fuse2/3
   }
   SetLogMicroSyslog(*usyslog_path_);
 
@@ -1369,18 +1368,9 @@ int FuseMain(int argc, char *argv[]) {
 
   // fuse functions will unmount if they can and think they need to.
   // They won't ever unmount if it has been premounted.
-#if CVMFS_USE_LIBFUSE == 2
-  fuse_remove_signal_handlers(session);
-  fuse_session_remove_chan(channel);
-  fuse_session_destroy(session);
-  fuse_unmount(mount_point_->c_str(), channel);
-  channel = NULL;
-#else
-  // libfuse3
   fuse_remove_signal_handlers(session);
   fuse_session_unmount(session);
   fuse_session_destroy(session);
-#endif
   fuse_opt_free_args(mount_options);
   delete mount_options;
   session = NULL;
@@ -1400,9 +1390,7 @@ int FuseMain(int argc, char *argv[]) {
   if (dounmount) {
     goto cleanup;
   } else {
-#if CVMFS_USE_LIBFUSE != 2
     if (premount_fd >= 0) close(premount_fd);
-#endif
   }
 
   LogCvmfs(kLogCvmfs, kLogSyslog, "CernVM-FS: unmounted %s (%s) (exit success)",
@@ -1416,7 +1404,7 @@ int FuseMain(int argc, char *argv[]) {
   return retval;
 
 cleanup:
-#if CVMFS_USE_LIBFUSE != 2
+#ifndef __APPLE__
   if (dounmount && !delegated_unmount) {
     if (!SwitchCredentials(0, getgid(), true /* temporarily */)) {
       LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
@@ -1431,8 +1419,8 @@ cleanup:
                   mount_point_->c_str(), repository_name_->c_str());
     }
   }
-  if (premount_fd >= 0) close(premount_fd);
 #endif
+  if (premount_fd >= 0) close(premount_fd);
 
   delete repository_name_;
   delete mount_point_;

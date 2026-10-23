@@ -8,11 +8,11 @@
  * functions.
  */
 
-#include "duplex_testing.h"
 #include <pthread.h>
 #include <sched.h>
 #include <stdint.h>
 
+#include <atomic>
 #include <cassert>
 #include <cstring>
 #include <string>
@@ -21,9 +21,9 @@
 #include "bigvector.h"
 #include "crypto/hash.h"
 #include "directory_entry.h"
+#include "duplex_testing.h"
 #include "shortstring.h"
 #include "smallhash.h"
-#include "util/atomic.h"
 #include "util/exception.h"
 #include "util/mutex.h"
 #include "util/posix.h"  // IWYU pragma: keep
@@ -606,9 +606,9 @@ class InodeTracker {
         }
         tracker_->inode_ex_map_.Erase(inode);
         tracker_->path_map_.Erase(md5path);
-        atomic_inc64(&tracker_->statistics_.num_removes);
+        tracker_->statistics_.num_removes.fetch_add(1);
       }
-      atomic_xadd64(&tracker_->statistics_.num_references, -int32_t(by));
+      tracker_->statistics_.num_references.fetch_add(-int32_t(by));
       return removed;
     }
 
@@ -620,28 +620,47 @@ class InodeTracker {
   // reloads.  Added manually in the fuse module initialization and in talk.cc.
   struct Statistics {
     Statistics() {
-      atomic_init64(&num_inserts);
-      atomic_init64(&num_removes);
-      atomic_init64(&num_references);
-      atomic_init64(&num_hits_inode);
-      atomic_init64(&num_hits_path);
-      atomic_init64(&num_misses_path);
+      num_inserts.store(0);
+      num_removes.store(0);
+      num_references.store(0);
+      num_hits_inode.store(0);
+      num_hits_path.store(0);
+      num_misses_path.store(0);
     }
+    Statistics(const Statistics &reference)
+        : num_inserts(reference.num_inserts.load())
+        , num_removes(reference.num_removes.load())
+        , num_references(reference.num_references.load())
+        , num_hits_inode(reference.num_hits_inode.load())
+        , num_hits_path(reference.num_hits_path.load())
+        , num_misses_path(reference.num_misses_path.load()) { }
+
+    Statistics &operator=(const Statistics &reference) {
+      if (this != &reference) {
+        num_inserts.store(reference.num_inserts.load());
+        num_removes.store(reference.num_removes.load());
+        num_references.store(reference.num_references.load());
+        num_hits_inode.store(reference.num_hits_inode.load());
+        num_hits_path.store(reference.num_hits_path.load());
+        num_misses_path.store(reference.num_misses_path.load());
+      }
+      return *(this);
+    }
+
     std::string Print() {
-      return "inserts: " + StringifyInt(atomic_read64(&num_inserts))
-             + "  removes: " + StringifyInt(atomic_read64(&num_removes))
-             + "  references: " + StringifyInt(atomic_read64(&num_references))
-             + "  hits(inode): " + StringifyInt(atomic_read64(&num_hits_inode))
-             + "  hits(path): " + StringifyInt(atomic_read64(&num_hits_path))
-             + "  misses(path): "
-             + StringifyInt(atomic_read64(&num_misses_path));
+      return "inserts: " + StringifyInt(num_inserts.load())
+             + "  removes: " + StringifyInt(num_removes.load())
+             + "  references: " + StringifyInt(num_references.load())
+             + "  hits(inode): " + StringifyInt(num_hits_inode.load())
+             + "  hits(path): " + StringifyInt(num_hits_path.load())
+             + "  misses(path): " + StringifyInt(num_misses_path.load());
     }
-    atomic_int64 num_inserts;
-    atomic_int64 num_removes;
-    atomic_int64 num_references;
-    atomic_int64 num_hits_inode;
-    atomic_int64 num_hits_path;
-    atomic_int64 num_misses_path;
+    std::atomic<int64_t> num_inserts;
+    std::atomic<int64_t> num_removes;
+    std::atomic<int64_t> num_references;
+    std::atomic<int64_t> num_hits_inode;
+    std::atomic<int64_t> num_hits_path;
+    std::atomic<int64_t> num_misses_path;
   };
   Statistics GetStatistics() { return statistics_; }
 
@@ -659,9 +678,9 @@ class InodeTracker {
     inode_ex_map_.Insert(inode_ex, md5path);
     Unlock();
 
-    atomic_xadd64(&statistics_.num_references, by);
+    statistics_.num_references.fetch_add(by);
     if (is_new_inode)
-      atomic_inc64(&statistics_.num_inserts);
+      statistics_.num_inserts.fetch_add(1);
   }
 
   void VfsGet(const InodeEx inode_ex, const PathString &path) {
@@ -681,9 +700,9 @@ class InodeTracker {
     Unlock();
 
     if (found) {
-      atomic_inc64(&statistics_.num_hits_path);
+      statistics_.num_hits_path.fetch_add(1);
     } else {
-      atomic_inc64(&statistics_.num_misses_path);
+      statistics_.num_misses_path.fetch_add(1);
     }
     return found;
   }
@@ -692,7 +711,7 @@ class InodeTracker {
     Lock();
     const uint64_t inode = path_map_.LookupInodeByPath(path);
     Unlock();
-    atomic_inc64(&statistics_.num_hits_inode);
+    statistics_.num_hits_inode.fetch_add(1);
     return inode;
   }
 

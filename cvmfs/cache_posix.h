@@ -5,17 +5,18 @@
 #ifndef CVMFS_CACHE_POSIX_H_
 #define CVMFS_CACHE_POSIX_H_
 
+#include <pthread.h>
 #include <stdint.h>
 #include <sys/types.h>
 
+#include <atomic>
+#include <memory>
 #include <string>
 
 #include "cache.h"
-#include "util/pointer.h"
 #include "duplex_testing.h"
 #include "fd_refcount_mgr.h"
 #include "manifest_fetch.h"
-#include "util/atomic.h"
 
 namespace catalog {
 class DirectoryEntry;
@@ -68,7 +69,7 @@ class PosixCacheManager : public CacheManager {
       const std::string &cache_path, const bool alien_cache,
       const RenameWorkarounds rename_workaround = kRenameNormal,
       const bool do_refcount = true, const bool cleanup_unused_first = false);
-  virtual ~PosixCacheManager() { }
+  virtual ~PosixCacheManager() { pthread_mutex_destroy(&lock_cache_dirs_); }
   virtual bool AcquireQuotaManager(QuotaManager *quota_mgr);
 
   virtual int Open(const LabeledObject &object);
@@ -108,6 +109,15 @@ class PosixCacheManager : public CacheManager {
 
  private:
   bool InitCacheDirectory(const std::string &cache_path);
+  /**
+   * Physically create the cache directory skeleton (base directory, txn,
+   * quarantaine and the 00..ff content directories) and detect the underlying
+   * file system.  Idempotent and thread-safe (double-checked locking on
+   * cache_dirs_created_).  For alien caches this is deferred until the first
+   * cache write so that a bogus fqrn (e.g. a stray access under /cvmfs) does
+   * not leave empty directories behind.  See issue #4217.
+   */
+  bool EnsureCacheDirectories();
 
   struct Transaction {
     Transaction(const shash::Any &id, const std::string &final_path)
@@ -144,7 +154,9 @@ class PosixCacheManager : public CacheManager {
       , do_refcount_(do_refcount)
       , fd_mgr_(new FdRefcountMgr())
       , cleanup_unused_first_(cleanup_unused_first) {
-    atomic_init32(&no_inflight_txns_);
+    no_inflight_txns_.store(0);
+    cache_dirs_created_.store(0);
+    pthread_mutex_init(&lock_cache_dirs_, NULL);
   }
 
   std::string GetPathInCache(const shash::Any &id);
@@ -163,17 +175,17 @@ class PosixCacheManager : public CacheManager {
    * descriptors from transactions are closed.  This is indicated by a zero
    * value in this variable.
    */
-  atomic_int32 no_inflight_txns_;
+  std::atomic<int32_t> no_inflight_txns_;
 
   static const char kMagicRefcount = 123;
   static const char kMagicNoRefcount = '\0';
   struct SavedState {
-    SavedState() : magic_number(kMagicRefcount), version(0), fd_mgr(NULL) { }
+    SavedState() : magic_number(kMagicRefcount), version(0), fd_mgr(nullptr) { }
     /// this helps to distinguish from the SavedState of the normal
     /// posix cache manager
     char magic_number;
     unsigned int version;
-    UniquePtr<FdRefcountMgr> fd_mgr;
+    std::unique_ptr<FdRefcountMgr> fd_mgr;
   };
 
   /**
@@ -186,13 +198,23 @@ class PosixCacheManager : public CacheManager {
    */
   bool is_tmpfs_;
   /**
+   * Set to 1 by EnsureCacheDirectories() once the on-disk cache skeleton
+   * exists. For alien caches the skeleton is created lazily on the first write,
+   * so this starts at 0 and the flag is checked (lock-free) on every
+   * StartTxn().  See issue #4217.
+   */
+  std::atomic<int32_t> cache_dirs_created_;
+  /**
+   * Serializes the one-time skeleton creation in EnsureCacheDirectories().
+   */
+  pthread_mutex_t lock_cache_dirs_;
+  /**
    * Refcount and return only unique file descriptors
    */
   bool do_refcount_;
-  UniquePtr<FdRefcountMgr> fd_mgr_;
+  std::unique_ptr<FdRefcountMgr> fd_mgr_;
 
   bool cleanup_unused_first_;
 };  // class PosixCacheManager
 
 #endif  // CVMFS_CACHE_POSIX_H_
-

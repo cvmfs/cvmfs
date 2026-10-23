@@ -4,9 +4,10 @@
 
 #include "swissknife_lease_json.h"
 
+#include <memory>
+
 #include "json_document.h"
 #include "util/logging.h"
-#include "util/pointer.h"
 
 // TODO(@vvolkl): refactor
 LeaseReply ParseAcquireReplyWithRevision(const CurlBuffer &buffer,
@@ -17,8 +18,8 @@ LeaseReply ParseAcquireReplyWithRevision(const CurlBuffer &buffer,
     return kLeaseReplyFailure;
   }
 
-  const UniquePtr<JsonDocument> reply(JsonDocument::Create(buffer.data));
-  if (!reply.IsValid() || !reply->IsValid()) {
+  const std::unique_ptr<JsonDocument> reply(JsonDocument::Create(buffer.data));
+  if (reply.get() == nullptr || !reply->IsValid()) {
     return kLeaseReplyFailure;
   }
 
@@ -71,13 +72,14 @@ LeaseReply ParseAcquireReplyWithRevision(const CurlBuffer &buffer,
   return kLeaseReplyFailure;
 }
 LeaseReply ParseAcquireReply(const CurlBuffer &buffer,
-                             std::string *session_token) {
+                             std::string *session_token,
+                             int *max_api_version) {
   if (buffer.data.size() == 0 || session_token == NULL) {
     return kLeaseReplyFailure;
   }
 
-  const UniquePtr<JsonDocument> reply(JsonDocument::Create(buffer.data));
-  if (!reply.IsValid() || !reply->IsValid()) {
+  const std::unique_ptr<JsonDocument> reply(JsonDocument::Create(buffer.data));
+  if (reply.get() == nullptr || !reply->IsValid()) {
     return kLeaseReplyFailure;
   }
 
@@ -93,6 +95,11 @@ LeaseReply ParseAcquireReply(const CurlBuffer &buffer,
         LogCvmfs(kLogCvmfs, kLogDebug, "Session token: %s",
                  token->get<std::string>().c_str());
         *session_token = token->get<std::string>();
+        const JSON *api_version = JsonDocument::SearchInObject(
+            reply->root(), "max_api_version", JSON_INT);
+        if (api_version != NULL && max_api_version != NULL) {
+          *max_api_version = api_version->get<int>();
+        }
         return kLeaseReplySuccess;
       }
     } else if (status == "path_busy") {
@@ -125,8 +132,9 @@ LeaseReply ParseDropReply(const CurlBuffer &buffer) {
     return kLeaseReplyFailure;
   }
 
-  const UniquePtr<const JsonDocument> reply(JsonDocument::Create(buffer.data));
-  if (!reply.IsValid() || !reply->IsValid()) {
+  const std::unique_ptr<const JsonDocument> reply(
+      JsonDocument::Create(buffer.data));
+  if (reply.get() == nullptr || !reply->IsValid()) {
     return kLeaseReplyFailure;
   }
 

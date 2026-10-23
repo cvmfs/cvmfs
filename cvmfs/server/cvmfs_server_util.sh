@@ -1241,7 +1241,8 @@ is_subcommand() {
     resign list info tag list-tags lstags check transaction enter abort snapshot    \
     skeleton migrate list-catalogs diff checkout update-geodb gc catalog-chown      \
     eliminate-hardlinks eliminate-bulk-hashes fix-stats update-info update-repoinfo \
-    mount fix-permissions masterkeycard ingest ingestsql overlay merge-stats print-stats"
+    mount fix-permissions masterkeycard ingest ingestsql overlay merge-stats print-stats \
+    refresh-lease"
 
   for possible_command in $supported_commands; do
     if [ x"$possible_command" = x"$subcommand" ]; then
@@ -1284,7 +1285,8 @@ Usage: cvmfs_server COMMAND [options] <parameters>
 Supported Commands:
   mkfs            [-w stratum0 url] [-u upstream storage] [-o owner]
                   [-m replicable] [-f union filesystem type] [-s S3 config file]
-                  [-g disable auto tags] [-G Set timespan for auto tags]
+                  [-g disable auto tags]
+                  [-G timespan for auto tags (default: "2 weeks ago")]
                   [-a hash algorithm (default: SHA-1)]
                   [-z enable garbage collection] [-v volatile content]
                   [-Z compression algorithm (default: zlib)]
@@ -1310,6 +1312,12 @@ Supported Commands:
                   without mounting the repository via FUSE. This is intended
                   for use with cvmfs_server ingest, which supports mountless
                   gateway publishing.
+  refresh-lease   [-t requested extension in seconds]
+                  <fully qualified repository name>
+                  Renew the gateway lease of the repository's open transaction
+                  so it does not expire while a long-running publish is in
+                  progress. Without -t the gateway applies its configured
+                  default extension (capped by max_lease_time).
   add-replica     [-u stratum1 upstream storage] [-o owner] [-w stratum1 url]
                   [-a silence apache warning] [-z enable garbage collection]
                   [-n alias name] [-s S3 config file] [-p no apache config]
@@ -1336,6 +1344,8 @@ Supported Commands:
                   [-t time stamp after which revisions are preserved]
                   [-l print deleted objects] [-L log of deleted objects]
                   [-f force] [-d dry run]
+                  [-p prune excluded objects from a partial replica;
+                   granularity is nested catalogs]
                   {-A collect all garbage-collectable repos, log to gc.log |
                    -a collect all but replicas not collected upstream |
                     <fully qualified name>}
@@ -1399,6 +1409,8 @@ Supported Commands:
                   Checks if the repository is sane
   transaction     [-t (timeout in seconds for waiting if the repository is busy, 0=infinite)]
                   [-T /template-from=/template-to]
+                  [-P allow a lease on a path whose parent does not exist yet
+                      (gateway publishing; requires a supporting gateway)]
                   <fully qualified name>
                   Start to edit a repository
   snapshot        [-t fail if other snapshot is in progress]
@@ -1427,6 +1439,9 @@ Supported Commands:
                   -b base directory
                   [-d <folder to delete>]
                   [-c create nested catalog in base directory]
+                  [-m tolerate hardlinks whose target is missing from the
+                      tarball; materialize an empty file with a warning
+                      instead of aborting]
                   [--gc-db <path to GC SQLite database>]
                   <fully qualified name>
                   Extract the content of the tarfile inside the base directory,

@@ -1,0 +1,158 @@
+#!/bin/bash
+cvmfs_test_name="Partial Replication of Stratum1"
+cvmfs_test_autofs_on_startup=false
+
+produce_files_in() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  # Create nested catalog structure
+  mkdir -p dir1/sub1
+  touch dir1/sub1/.cvmfscatalog
+  echo "sub1 content alpha" > dir1/sub1/file_alpha.txt
+  echo "sub1 content beta"  > dir1/sub1/file_beta.txt
+
+  mkdir -p dir1/sub2
+  touch dir1/sub2/.cvmfscatalog
+  echo "sub2 content gamma" > dir1/sub2/file_gamma.txt
+  echo "sub2 content delta" > dir1/sub2/file_delta.txt
+
+  mkdir -p dir1/sub3
+  touch dir1/sub3/.cvmfscatalog
+  echo "sub3 content epsilon" > dir1/sub3/file_epsilon.txt
+
+  mkdir -p dir2/sub1
+  touch dir2/sub1/.cvmfscatalog
+  echo "dir2 sub1 content"   > dir2/sub1/file_zeta.txt
+
+  # Files in root catalog (always replicated)
+  echo "root file" > root_file.txt
+
+  popdir
+}
+
+produce_more_files_in() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  # Add files to both included (sub1, dir2) and excluded (sub2, sub3) dirs
+  echo "sub1 new content" > dir1/sub1/file_new.txt
+  echo "sub2 new content" > dir1/sub2/file_new.txt
+  echo "sub3 new content" > dir1/sub3/file_new.txt
+  echo "dir2 new content" > dir2/sub1/file_new.txt
+
+  popdir
+}
+
+desaster_cleanup() {
+  local mountpoint=$1
+  local replica_name=$2
+
+  sudo umount $mountpoint > /dev/null 2>&1
+  sudo cvmfs_server rmfs -f $replica_name > /dev/null 2>&1
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  local scratch_dir=$(pwd)
+  local mnt_point="$(pwd)/mountpoint"
+  local replica_name="$(get_stratum1_name $CVMFS_TEST_REPO)"
+
+  echo "*** Create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  # 'NO' = no debug log; -z = enable garbage collection in the manifest
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -z || return $?
+
+  echo "*** Starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "*** Putting files with nested catalogs in the repository"
+  produce_files_in $repo_dir || return 3
+
+  echo "*** Publishing repository"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "*** Check catalog and data integrity of Stratum-0"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+  echo "*** Create Stratum1 repository on the same machine"
+  load_repo_config $CVMFS_TEST_REPO
+  create_stratum1 $replica_name                          \
+                  $CVMFS_TEST_USER                       \
+                  $CVMFS_STRATUM0                        \
+                  /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub \
+    || { desaster_cleanup $mnt_point $replica_name; return 7; }
+
+  echo "*** Configure partial replication"
+  # Create inclusion spec: replicate /dir1/sub1 and /dir2, which leaves
+  # /dir1/sub2 and /dir1/sub3 excluded. Excluded subtrees are pruned entirely:
+  # neither their catalogs nor their objects are replicated. The /dir1 parent
+  # catalog is still replicated as an ancestor of the included /dir1/sub1.
+  # 'cvmfs_server check -c' below validates that this prune is self-consistent.
+  local spec_file="${scratch_dir}/partial_replication.spec"
+  cat > $spec_file << EOF
+version 1
+# Include sub1 and dir2; sub2 and sub3 are excluded
+/dir1/sub1
+/dir2
+EOF
+
+  # Add partial replication config to the replica
+  load_repo_config $replica_name
+  local replica_conf="/etc/cvmfs/repositories.d/${replica_name}/server.conf"
+  sudo sh -c "echo 'CVMFS_PARTIAL_REPLICATION=true' >> $replica_conf"
+  sudo sh -c "echo 'CVMFS_PARTIAL_REPLICATION_SPEC=$spec_file' >> $replica_conf"
+  load_repo_config $CVMFS_TEST_REPO
+
+  echo "*** Create a partial snapshot of the Stratum0 repository"
+  sudo cvmfs_server snapshot $replica_name || { desaster_cleanup $mnt_point $replica_name; return 9; }
+
+  echo "*** Verify .cvmfs_partial_replication exists in backend"
+  peek_backend_raw $replica_name ".cvmfs_partial_replication" \
+    || { desaster_cleanup $mnt_point $replica_name; return 10; }
+  echo "  .cvmfs_partial_replication found in backend"
+
+  echo "*** Run cvmfs_server check on the partial replica"
+  sudo cvmfs_server check $replica_name || { desaster_cleanup $mnt_point $replica_name; return 11; }
+
+  echo "*** Run cvmfs_server check -c (with chunk check) on the partial replica"
+  sudo cvmfs_server check -c $replica_name || { desaster_cleanup $mnt_point $replica_name; return 12; }
+
+  # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+  echo "*** Test second revision"
+  echo "*** Starting transaction"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "*** Adding more files"
+  produce_more_files_in $repo_dir || return 13
+
+  echo "*** Publishing new revision"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "*** Snapshot the new revision"
+  sudo cvmfs_server snapshot $replica_name || { desaster_cleanup $mnt_point $replica_name; return 14; }
+
+  echo "*** Check partial replica after second snapshot"
+  sudo cvmfs_server check -c $replica_name || { desaster_cleanup $mnt_point $replica_name; return 15; }
+
+  # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+  echo "*** Test garbage collection on partial replica"
+  sudo cvmfs_server gc -f $replica_name || { desaster_cleanup $mnt_point $replica_name; return 16; }
+
+  echo "*** Check partial replica after GC"
+  sudo cvmfs_server check -c $replica_name || { desaster_cleanup $mnt_point $replica_name; return 17; }
+
+  # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+  echo "*** Clean up"
+  sudo cvmfs_server rmfs -f $replica_name
+
+  return 0
+}

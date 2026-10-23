@@ -312,6 +312,11 @@ class DirectIoMagicXattr : public RegularMagicXattr {
   virtual void FinalizeValue();
 };
 
+class BundleTriggerMagicXattr : public RegularMagicXattr {
+  virtual bool PrepareValueFenced();
+  virtual void FinalizeValue();
+};
+
 class ExternalFileMagicXattr : public RegularMagicXattr {
   virtual bool PrepareValueFenced();
   virtual void FinalizeValue();
