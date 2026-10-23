@@ -1487,7 +1487,11 @@ cvmfs_reload() {
 
   if [ "x$CVMFS_CONFIG_REPOSITORY" != "x" ]; then
     # Ensure that we capture the config repository as well
-    cd "${CVMFS_MOUNT_DIR}/${CVMFS_CONFIG_REPOSITORY}" 2>/dev/null
+    if ! cd "${CVMFS_MOUNT_DIR}/${CVMFS_CONFIG_REPOSITORY}" 2>/dev/null; then
+      # Not fatal: the config repo is paused separately at the end
+      echo "WARNING: cannot access config repository" \
+           "${CVMFS_MOUNT_DIR}/${CVMFS_CONFIG_REPOSITORY}" 1>&2
+    fi
   fi
   # TODO(jblomer): here is a pretty big race: fuse clients could have passed
   # the check for this directory in their mount helper but are not yet fully
