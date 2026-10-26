@@ -680,6 +680,7 @@ systemctl daemon-reload
 %defattr(-,root,root)
 %{_bindir}/cvmfs2
 %{_bindir}/cvmfs_talk
+%{_bindir}/cvmfs_dcoredumper
 %{_bindir}/cvmfs_fsck
 %{_bindir}/cvmfs_config
 /usr/libexec/cvmfs/auto.cvmfs

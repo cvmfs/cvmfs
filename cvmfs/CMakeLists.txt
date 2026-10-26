@@ -157,6 +157,14 @@ if (BUILD_CVMFS)
   )
 
   #
+  # /usr/bin/cvmfs_dcoredumper (Linux only, standalone)
+  # Also folded into cvmfs2 via __COREDUMP__ subcommand.
+  #
+  if (NOT MACOSX)
+    add_executable (cvmfs_dcoredumper Dcoredumper.cc)
+  endif ()
+
+  #
   # /usr/bin/cvmfs_talk`
   #
   add_executable (cvmfs_talk
@@ -196,6 +204,7 @@ if (BUILD_CVMFS)
   # the client library.
   #
   set (CVMFS_STUB_SOURCES
+       Dcoredumper.cc
        globals.cc
        loader.cc
        loader_talk.cc
@@ -410,12 +419,16 @@ if (BUILD_CVMFS)
   if (NOT MACOSX)
     # Systemd service unit for reloads after package upgrades
     install (
-    FILES pkg/cvmfs-reload.service
-    DESTINATION /usr/lib/systemd/system
-    PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
-  )
-
-  endif()
+        FILES pkg/cvmfs-reload.service
+        DESTINATION /usr/lib/systemd/system
+        PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+    )
+    install (
+        TARGETS       cvmfs_dcoredumper
+        RUNTIME
+        DESTINATION   bin
+    )
+  endif ()
 
 endif (BUILD_CVMFS)
 
