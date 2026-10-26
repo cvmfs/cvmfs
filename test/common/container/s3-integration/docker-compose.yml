@@ -84,7 +84,10 @@ services:
     # Garage setup – runs once after Garage is healthy
     # -----------------------------------------------------------------------
     garage-setup:
-        image: alpine:3
+        image: cvmfs-dev:garage-setup
+        build:
+            context: ../../../..
+            dockerfile: test/common/container/s3-integration/Containerfile.garage-setup
         depends_on:
             garage:
                 condition: service_healthy
@@ -100,8 +103,6 @@ services:
         command:
             - |
               set -e
-              echo '[garage-setup] Installing curl, jq, openssl ...'
-              apk add --no-cache curl jq openssl
               # If a previous run already populated /shared/test_s3.conf,
               # reuse those credentials so re-running setup_garage.sh against
               # the existing Garage state stays idempotent.  Otherwise honour
