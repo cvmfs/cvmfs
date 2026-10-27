@@ -5,15 +5,11 @@ int kCatalogDownloadMultiplier = 32;
 CatalogItem::CatalogItem(const shash::Any &hash) : hash_(hash) { }
 
 void TaskCatalogDownload::Process(CatalogItem *input) {
-  std::string const catalog_path;
-  shash::Any const catalog_hash;
   // will PANIC if download failed
-  // catalog_mgr_->LoadCatalog(PathString("") /* not used */, *input->GetHash(),
-  // &catalog_path, &catalog_hash, NULL);
-  catalog::CatalogContext context(*input->GetHash(), PathString(catalog_path));
+  catalog::CatalogContext context(*input->GetHash(), PathString());
   catalog_mgr_->LoadCatalogByHash(&context);
-  NotifyListeners(
-      CatalogDownloadResult(catalog_path, input->GetHash()->ToString()));
+  NotifyListeners(CatalogDownloadResult(context.sqlite_path(),
+                                        input->GetHash()->ToString()));
   tube_counter_->PopFront();  // pop after calling callback as callback could
                               // enqueue additional items
 }
