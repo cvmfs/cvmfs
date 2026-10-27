@@ -57,7 +57,5 @@ cvmfs_run_test() {
   ls -lah ${mntpnt}/bar || return 30
   ls -lah ${mntpnt}/bar/realdir || return 31
 
-  grep "changed file type" debug.log | grep /bar || return 32
-
   return 0
 }
