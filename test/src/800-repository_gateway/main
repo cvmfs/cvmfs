@@ -25,9 +25,8 @@ cvmfs_run_test() {
     cvmfs_server check test.repo.org         || return 12
 
     cvmfs_server transaction test.repo.org   || return 13
-    mkdir -p /cvmfs/test.repo.org/usr/bin
-    for f in $(find /usr/bin -type f | head -n32); do
-      cp -v $f /cvmfs/test.repo.org/usr/bin/ || return 14
+    for i in {1..32}; do
+        dd if=/dev/random count=1 bs=512 of=/cvmfs/test.repo.org/"$i" status=none
     done
     cvmfs_server abort -f test.repo.org      || return 15
     cvmfs_server check test.repo.org         || return 16
