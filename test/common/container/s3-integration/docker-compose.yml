@@ -23,8 +23,6 @@
 # test_s3.conf to a shared volume that cvmfs-dev mounts read-only.  Override
 # by exporting S3_ACCESS_KEY / S3_SECRET_KEY before `docker compose up`.
 
-name: cvmfs-s3-integration
-
 # ---------------------------------------------------------------------------
 # Shared S3 environment – passed through from the host (empty by default,
 # in which case garage-setup generates random values at runtime).
@@ -41,7 +39,6 @@ services:
     # -----------------------------------------------------------------------
     cvmfs-dev:
         image: ghcr.io/cvmfs/cvmfs-dev:latest
-        container_name: cvmfs-dev
         hostname: cvmfs-dev
         privileged: true
         cgroup: host
@@ -68,7 +65,6 @@ services:
     # -----------------------------------------------------------------------
     garage:
         image: docker.io/dxflrs/garage:v2.2.0
-        container_name: cvmfs-garage
         hostname: cvmfs-garage
         networks:
             default:
@@ -88,8 +84,10 @@ services:
     # Garage setup – runs once after Garage is healthy
     # -----------------------------------------------------------------------
     garage-setup:
-        image: alpine:3
-        container_name: cvmfs-garage-setup
+        image: cvmfs-dev:garage-setup
+        build:
+            context: ../../../..
+            dockerfile: test/common/container/s3-integration/Containerfile.garage-setup
         depends_on:
             garage:
                 condition: service_healthy
@@ -105,8 +103,6 @@ services:
         command:
             - |
               set -e
-              echo '[garage-setup] Installing curl, jq, openssl ...'
-              apk add --no-cache curl jq openssl
               # If a previous run already populated /shared/test_s3.conf,
               # reuse those credentials so re-running setup_garage.sh against
               # the existing Garage state stays idempotent.  Otherwise honour
