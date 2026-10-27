@@ -49,6 +49,10 @@ class IngestSQL : public Command {
         'C', "config prefix, default /etc/cvmfs/gateway-client/"));
     r.push_back(Parameter::Optional(
         'B', "mount point to block on pending visibility of update"));
+    r.push_back(Parameter::Optional(
+        'W', "Timeout, in seconds, for waiting on "
+             "pending visibility of update (default: if "
+             "-B given, wait infinitely; if no -B, immediate exit)"));
     r.push_back(Parameter::Optional('T', "reset TTL in sec"));
     r.push_back(Parameter::Switch('z', "Create missing nested catalogs"));
     r.push_back(Parameter::Optional('r', "lease retry interval"));

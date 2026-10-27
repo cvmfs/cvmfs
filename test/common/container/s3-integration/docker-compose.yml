@@ -41,6 +41,7 @@ services:
         image: ghcr.io/cvmfs/cvmfs-dev:latest
         hostname: cvmfs-dev
         privileged: true
+        pids_limit: -1
         cgroup: host
         build:
             context: ../../../..
