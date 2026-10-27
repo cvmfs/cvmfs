@@ -107,9 +107,10 @@ services:
             - ./config/repo.json:/etc/cvmfs/gateway/repo.json:ro
             - etc-cvmfs-repos:/etc/cvmfs/repositories.d
             - etc-cvmfs-keys:/etc/cvmfs/keys
-            - var-spool-cvmfs:/var/spool/cvmfs
-            - var-lib-gateway:/var/lib/cvmfs-gateway
             - apache-conf:/apache-conf
+        tmpfs:
+            - /var/lib/cvmfs-gateway
+            - /var/spool/cvmfs
         ports:
             - "4929:4929"   # Gateway lease API
 
@@ -133,11 +134,7 @@ services:
             - "80:80"
 
 volumes:
-    garage-meta:
-    garage-data:
     etc-cvmfs-repos:
     etc-cvmfs-keys:
-    var-spool-cvmfs:
-    var-lib-gateway:
     apache-conf:
 

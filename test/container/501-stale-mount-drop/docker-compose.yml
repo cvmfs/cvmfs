@@ -31,7 +31,8 @@ services:
       - ./scripts:/scripts
       - ./config:/etc/cvmfs/gateway
       - keys:/etc/cvmfs/keys
-      - var_spool_gw:/var/spool/cvmfs
+    tmpfs:
+        - /var/spool/cvmfs
 
   pub1:
     <<: *cvmfs-dev
@@ -42,7 +43,8 @@ services:
       - /sys/fs/cgroup:/sys/fs/cgroup
       - ./scripts:/scripts
       - keys:/etc/cvmfs/keys
-      - var_spool_pub1:/var/spool/cvmfs
+    tmpfs:
+        - /var/spool/cvmfs
 
   pub2:
     <<: *cvmfs-dev
@@ -53,10 +55,8 @@ services:
       - /sys/fs/cgroup:/sys/fs/cgroup
       - ./scripts:/scripts
       - keys:/etc/cvmfs/keys
-      - var_spool_pub2:/var/spool/cvmfs
+    tmpfs:
+        - /var/spool/cvmfs
 
 volumes:
   keys:
-  var_spool_gw:
-  var_spool_pub1:
-  var_spool_pub2:
