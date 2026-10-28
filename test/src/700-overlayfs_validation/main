@@ -75,6 +75,9 @@ check_file_path() {
 
     # Cleaning up
     kill -9 $tail_pid
+    # Wait here to reap $tail_pid so that umount can suceed.
+    # Ignore wait's exitcode, as waited upon process was terminated with a signal
+    wait "$tail_pid" || :
     clean_work_dir $@
 
     return $(check_status $status)
