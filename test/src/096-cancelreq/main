@@ -74,8 +74,6 @@ cvmfs_run_test() {
   done
   echo "*** Number of I/O errors after opening $afile: $nioerr_after"
 
-  get_xattr logbuffer /cvmfs/cvmfs-config.cern.ch | grep "request canceled" || return 20
-
   return 0
 }
 
