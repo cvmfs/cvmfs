@@ -1770,26 +1770,23 @@ static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
     }
 #ifdef FUSE_CAP_PASSTHROUGH
     if (loader_exports_ && loader_exports_->fuse_passthrough) {
-      if (fi->backing_id != 0) {
-        int ret;
-        pthread_mutex_lock(&fuse_passthru_tracker_lock);
-        auto iter = fuse_passthru_tracker->find(ino);
-        assert(iter != fuse_passthru_tracker->end());
-        fuse_passthru_ctx_t &entry = iter->second;
-        assert(entry.refcount > 0);
-        assert(entry.backing_id == fi->backing_id);
-        entry.refcount--;
-        if (entry.refcount == 0) {
-          ret = fuse_passthrough_close(req, fi->backing_id);
-          if (ret < 0) {
-            LogCvmfs(kLogCvmfs, kLogDebug,
-                     "fuse_passthrough_close(fd=%ld) failed: %d", fd, ret);
-            assert(false);
-          }
-          fuse_passthru_tracker->erase(iter);
+      int ret;
+      pthread_mutex_lock(&fuse_passthru_tracker_lock);
+      auto iter = fuse_passthru_tracker->find(ino);
+      assert(iter != fuse_passthru_tracker->end());
+      fuse_passthru_ctx_t &entry = iter->second;
+      assert(entry.refcount > 0);
+      assert(entry.backing_id == fi->backing_id);
+      entry.refcount--;
+      if (entry.refcount == 0) {
+        ret = fuse_passthrough_close(req, fi->backing_id);
+        if (ret < 0) {
+          LogCvmfs(kLogCvmfs, kLogDebug, "fuse_passthrough_close(fd=%ld) failed: %d", fd, ret);
+          assert(false);
         }
-        pthread_mutex_unlock(&fuse_passthru_tracker_lock);
+        fuse_passthru_tracker->erase(iter);
       }
+      pthread_mutex_unlock(&fuse_passthru_tracker_lock);
     }
 #endif
   }
