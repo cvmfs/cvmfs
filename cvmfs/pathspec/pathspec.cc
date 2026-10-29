@@ -5,6 +5,7 @@
 #include "pathspec.h"
 
 #include <cassert>
+#include <cstdlib>
 
 #include "util/logging.h"
 #include "util/smalloc.h"
@@ -252,6 +253,7 @@ void Pathspec::DestroyRegularExpressions() {
   if (regex_compiled_) {
     assert(regex_ != NULL);
     regfree(regex_);
+    free(regex_);
     regex_ = NULL;
     regex_compiled_ = false;
   }
@@ -259,8 +261,17 @@ void Pathspec::DestroyRegularExpressions() {
   if (relaxed_regex_compiled_) {
     assert(relaxed_regex_ != NULL);
     regfree(relaxed_regex_);
+    free(relaxed_regex_);
     relaxed_regex_ = NULL;
     relaxed_regex_compiled_ = false;
+  }
+
+  if (prefix_regex_compiled_) {
+    assert(prefix_regex_ != NULL);
+    regfree(prefix_regex_);
+    free(prefix_regex_);
+    prefix_regex_ = NULL;
+    prefix_regex_compiled_ = false;
   }
 }
 
