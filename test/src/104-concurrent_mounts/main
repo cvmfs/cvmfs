@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 cvmfs_test_name="Check that simultaneous mount attempts only mount the repository once"
 cvmfs_test_suites="quick"

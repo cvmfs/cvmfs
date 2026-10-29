@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 source "$TEST_ROOT"/test_functions
 set -euo pipefail
 set -x

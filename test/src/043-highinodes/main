@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 cvmfs_test_name="Warn on high inode watermark"
 cvmfs_test_suites="quick"

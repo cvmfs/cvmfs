@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 cvmfs_test_name="Cleanup outdated repository tags"
 cvmfs_test_autofs_on_startup=false
 

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 cvmfs_test_name="Abort Transaction Under Disk Full Conditions"
 cvmfs_test_autofs_on_startup=false
@@ -7,7 +7,7 @@ cvmfs_test_suites="quick"
 # Script to fill the disk by creating files until touch fails
 filldisk_script() {
   cat << 'FILLDISK_EOF'
-#!/bin/bash
+#!/usr/bin/env bash
 
 TARGET_DIR="${1:-$PWD}"
 OUTPUT_DIR="${2:-$TARGET_DIR}"
