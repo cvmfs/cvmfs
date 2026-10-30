@@ -1,0 +1,23 @@
+{
+  "CVMFS_CREATOR_VERSION": "143",
+  "CVMFS_REPOSITORY_NAME": "sw.cvmfs.io",
+  "CVMFS_REPOSITORY_TYPE": "stratum0",
+  "CVMFS_USER": "cvmfsowner",
+  "CVMFS_STRATUM0": "http://localhost/cvmfs/sw.cvmfs.io",
+  "CVMFS_SPOOL_DIR": "/var/spool/cvmfs/sw.cvmfs.io",
+  "CVMFS_UNION_DIR": "/cvmfs/sw.cvmfs.io",
+  "CVMFS_UNION_FS_TYPE": "overlayfs",
+  "CVMFS_UPSTREAM_STORAGE": "local,/srv/cvmfs/sw.cvmfs.io/data/txn,/srv/cvmfs/sw.cvmfs.io",
+  "CVMFS_USE_FILE_CHUNKING": "true",
+  "CVMFS_MIN_CHUNK_SIZE": 4194304,
+  "CVMFS_AVG_CHUNK_SIZE": 8388608,
+  "CVMFS_MAX_CHUNK_SIZE": 16777216,
+  "CVMFS_COMPRESSION_ALGORITHM": "default",
+  "CVMFS_HASH_ALGORITHM": "shake128",
+  "CVMFS_AUTO_TAG": "true",
+  "CVMFS_GARBAGE_COLLECTION": "true",
+  "CVMFS_AUTO_GC": "true",
+  "CVMFS_AUTO_GC_TIMESPAN": "3 days ago",
+  "CVMFS_PRINT_STATISTICS": "false",
+  "X509_CERT_DIR": "/etc/grid-security/certificates"
+}

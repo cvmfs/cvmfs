@@ -1,0 +1,33 @@
+#!/bin/bash
+
+cvmfs_test_name="cvmfs_config validate accepts and rejects real client configs"
+cvmfs_test_suites="quick"
+
+cvmfs_run_test() {
+  logfile=$1
+
+  local output retval
+
+  echo "*** validate must accept a correct config"
+  sudo sh -c 'echo CVMFS_HTTP_PROXY=DIRECT > /etc/cvmfs/default.local'
+  output=$(cvmfs_config validate atlas.cern.ch) && retval=0 || retval=$?
+  echo "$output"
+  [ $retval -eq 0 ] || return 1
+  echo "$output" | grep -q "Configuration of atlas.cern.ch is valid" || return 2
+
+  echo "*** validate must reject an empty CVMFS_HTTP_PROXY"
+  sudo sh -c 'echo CVMFS_HTTP_PROXY= > /etc/cvmfs/default.local'
+  output=$(cvmfs_config validate atlas.cern.ch) && retval=0 || retval=$?
+  echo "$output"
+  [ $retval -ne 0 ] || return 3
+  echo "$output" | grep -q "Configuration of atlas.cern.ch is invalid" || return 4
+
+  echo "*** validate with no repository argument must validate every repo in CVMFS_REPOSITORIES"
+  sudo sh -c 'printf "CVMFS_HTTP_PROXY=DIRECT\nCVMFS_REPOSITORIES=atlas.cern.ch\n" > /etc/cvmfs/default.local'
+  output=$(cvmfs_config validate) && retval=0 || retval=$?
+  echo "$output"
+  [ $retval -eq 0 ] || return 5
+  echo "$output" | grep -q "Configuration of atlas.cern.ch is valid" || return 6
+
+  return 0
+}

@@ -54,6 +54,7 @@ COMPONENTS="\
     server/cvmfs_server_tag.sh
     server/cvmfs_server_deprecated.sh
     server/cvmfs_server_check.sh
+    server/cvmfs_server_validate.sh
     server/cvmfs_server_list.sh
     server/cvmfs_server_rollback.sh
     server/cvmfs_server_gc.sh
