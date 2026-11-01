@@ -40,7 +40,7 @@ cvmfs_run_test() {
     [ -d "$ducc_src" ] || { echo "ducc source tree not found at $ducc_src"; return 1; }
 
     # --- 1. mountless gateway repository -----------------------------------
-    set_up_repository_gateway -P || return 10
+    set_up_repository_gateway test.repo.org -P || return 10
     load_repo_config "$repo"     || return 11
 
     echo "*** verifying the publisher is mountless"

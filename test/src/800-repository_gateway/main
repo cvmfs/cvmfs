@@ -16,7 +16,7 @@ compare_file_checksum() {
 }
 
 cvmfs_run_test() {
-    set_up_repository_gateway || return 1
+    set_up_repository_gateway test.repo.org || return 1
 
     echo "*** Pre-checks"
     ## Pre-checks: starting and aborting transactions should leave no trace

@@ -12,7 +12,7 @@
 # flaky on an S3 backend.
 
 PROFILE_CLASS_NAME="S3ServerIntegrationTests"
-PROFILE_TESTSUITE="src/5* src/6* src/8*"
+PROFILE_TESTSUITE="src/5* src/6* src/8* src/9*"
 
 PROFILE_EXCLUSIONS="\
   src/514-changechunkedfile \
@@ -81,7 +81,9 @@ PROFILE_EXCLUSIONS="\
   src/702-symlink_caching \
   src/800-repository_gateway \
   src/803-repository_gateway_large_files \
-  src/811-commit-gateway"
+  src/811-commit-gateway \
+  src/900-notification_system \
+"
 
 profile_setup() {
   local missing=""
