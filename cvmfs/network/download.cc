@@ -1047,12 +1047,20 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
       if (changed) {
         proxy = ChooseProxyUnlocked(info->expected_hash());
       }
-      info->SetProxy(proxy->url);
-      if (proxy->host.status() == dns::kFailOk) {
+      if (!proxy) {
+        // The DNS refresh left nothing selectable.  Fail via the old proxy
+        // rather than going DIRECT, so the failure is a proxy failure.
+        // Note: "0.0.0.0" fails fast only if nothing listens on local port
+        // 1080 (curl's default proxy port); Linux maps 0.0.0.0 to localhost.
+        info->SetProxy(purl);
+        curl_easy_setopt(info->curl_handle(), CURLOPT_PROXY, "0.0.0.0");
+      } else if (proxy->host.status() == dns::kFailOk) {
+        info->SetProxy(proxy->url);
         curl_easy_setopt(info->curl_handle(), CURLOPT_PROXY,
                          info->proxy().c_str());
       } else {
         // We know it can't work, don't even try to download
+        info->SetProxy(proxy->url);
         curl_easy_setopt(info->curl_handle(), CURLOPT_PROXY, "0.0.0.0");
       }
     }
@@ -1148,7 +1156,8 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
         curl_easy_setopt(info->curl_handle(), CURLOPT_PROXY, "");
         replacement = proxy_template_direct_;
       } else {
-        replacement = ChooseProxyUnlocked(info->expected_hash())->host.name();
+        const ProxyInfo *proxy = ChooseProxyUnlocked(info->expected_hash());
+        replacement = proxy ? proxy->host.name() : proxy_template_direct_;
       }
     }
     replacement = (replacement == "") ? proxy_template_direct_ : replacement;
