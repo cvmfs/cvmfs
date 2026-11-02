@@ -11,6 +11,7 @@
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
+#include <string>
 
 #include "util/logging.h"
 
@@ -44,7 +45,9 @@ void Panic(const char *coordinates, const LogSource source, const int mask,
 #ifdef CVMFS_RAISE_EXCEPTIONS
   (void)source;
   (void)mask;
-  throw ECvmfsException(msg);
+  const std::string what(msg);
+  free(msg);
+  throw ECvmfsException(what);
 #else
   LogCvmfs(source, mask, "%s", msg);
   abort();

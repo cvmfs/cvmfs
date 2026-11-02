@@ -12,6 +12,7 @@
 #include <new>
 
 #include "kvstore.h"
+#include "quota.h"
 #include "util/logging.h"
 #include "util/posix.h"
 #include "util/string.h"
@@ -68,6 +69,8 @@ int RamCacheManager::AddFd(const ReadOnlyHandle &handle) {
 
 bool RamCacheManager::AcquireQuotaManager(QuotaManager *quota_mgr) {
   assert(quota_mgr != NULL);
+  if (quota_mgr_ != quota_mgr)
+    delete quota_mgr_;
   quota_mgr_ = quota_mgr;
   LogCvmfs(kLogCache, kLogDebug, "set quota manager");
   return true;

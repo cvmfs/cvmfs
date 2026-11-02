@@ -235,6 +235,9 @@ bool SessionContextBase::CommitBucket(const ObjectPack::BucketContentType type,
 
     if (current_pack_->GetNoObjects() > 0) {
       Dispatch();
+    } else {
+      // Nothing to upload, the pack is superseded by new_pack
+      delete current_pack_;
     }
     current_pack_ = new_pack;
 

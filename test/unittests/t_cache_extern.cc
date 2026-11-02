@@ -426,8 +426,7 @@ TEST_F(T_ExternalCacheManager, Transaction) {
       scalloc(large_size, 1));
   EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(id, "test"), large_buffer,
                                         large_size));
-  unsigned char *large_buffer_verify = reinterpret_cast<unsigned char *>(
-      smalloc(large_size));
+  unsigned char *large_buffer_verify = NULL;
   EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithPath(id, "test"),
                                    &large_buffer_verify, &size));
   EXPECT_EQ(large_size, size);
@@ -439,7 +438,7 @@ TEST_F(T_ExternalCacheManager, Transaction) {
   large_buffer = reinterpret_cast<unsigned char *>(scalloc(large_size, 1));
   EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(id, "test"), large_buffer,
                                         large_size));
-  large_buffer_verify = reinterpret_cast<unsigned char *>(smalloc(large_size));
+  large_buffer_verify = NULL;
   EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithPath(id, "test"),
                                    &large_buffer_verify, &size));
   EXPECT_EQ(large_size, size);
@@ -472,7 +471,7 @@ TEST_F(T_ExternalCacheManager, TransactionAbort) {
   EXPECT_EQ(0, cache_mgr_->CommitTxn(txn));
 
   uint64_t read_size = write_size;
-  unsigned char *read_buffer = static_cast<unsigned char *>(smalloc(read_size));
+  unsigned char *read_buffer = NULL;
   EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithPath(id, "test"), &read_buffer,
                                    &read_size));
   EXPECT_EQ(read_size, write_size);
