@@ -1619,6 +1619,11 @@ cvmfs_reload() {
   do
     touch ${CVMFS_RELOAD_SOCKETS}/cvmfs.pause/$(echo -n "$m" | base64_nowrap)
   done
+  if [ "x$CVMFS_CONFIG_REPOSITORY" != "x" ]; then
+    # The config repo may be missing from the mount list, and reading any
+    # repository's configuration below can automount it
+    touch ${CVMFS_RELOAD_SOCKETS}/cvmfs.pause/$(echo -n "${CVMFS_MOUNT_DIR}/${CVMFS_CONFIG_REPOSITORY}" | base64_nowrap)
+  fi
 
   # Avoid deadlock if cwd is on cvmfs
   cd /
@@ -1647,7 +1652,6 @@ cvmfs_reload() {
 
   if [ "x${CVMFS_CONFIG_REPOSITORY}" != "x" ]; then
     # If we have a config repository, now is the time to pause it at the very end
-    touch ${CVMFS_RELOAD_SOCKETS}/cvmfs.pause/$(echo -n "${CVMFS_MOUNT_DIR}/${CVMFS_CONFIG_REPOSITORY}" | base64_nowrap)
     _cvmfs_reload_pause "${CVMFS_MOUNT_DIR}/${CVMFS_CONFIG_REPOSITORY}" &&
       _cvmfs_reload_waitfor "${CVMFS_RELOAD_SOCKETS}/cvmfs.${CVMFS_CONFIG_REPOSITORY}.paused"
   fi
