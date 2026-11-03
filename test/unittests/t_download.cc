@@ -4,12 +4,14 @@
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <pthread.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
 #include <cassert>
 #include <cstdio>
 #include <cstring>
+#include <vector>
 
 #include "c_file_sandbox.h"
 #include "c_http_server.h"
@@ -845,29 +847,18 @@ TEST_F(T_Download, MandatoryProxyBlockFailsAsProxyError) {
 
 namespace {
 /**
- * Stands in for a proxy that starts healthy and then saturates.  The first
- * `serve_ok` requests are answered in full, which is what tells the client
- * the local proxy set is alive; after that every body is cut short.  That is
- * a throughput symptom, reported as kFailProxyShortTransfer, not evidence of
- * a dead peer.
- *
- * Starting with serve_ok == 0 gives a proxy that was never seen to work,
- * which the escalation gate must not protect.
+ * A proxy that cuts every body short: kFailProxyShortTransfer, a broken
+ * cache rather than a saturated one.
  */
 struct TruncatingProxy {
-  TruncatingProxy() : hits(0), serve_ok(0) { }
+  TruncatingProxy() : hits(0) { }
   int hits;
-  int serve_ok;
 };
 
 HTTPResponse TruncatingProxyHandler(const HTTPRequest & /* req */, void *data) {
   TruncatingProxy *state = static_cast<TruncatingProxy *>(data);
+  state->hits++;
   HTTPResponse response;
-  if (state->hits++ < state->serve_ok) {
-    response.code = 200;
-    response.body = "a complete response from a healthy proxy";
-    return response;
-  }
   response.raw = true;
   response.body = "HTTP/1.1 200 OK\r\nContent-Length: 65536\r\n\r\nshort";
   return response;
@@ -882,49 +873,112 @@ HTTPResponse CountingProxyHandler(const HTTPRequest & /* req */, void *data) {
   response.body = "served by the fallback proxy";
   return response;
 }
+/**
+ * A proxy that answers every request with the headers and a few body bytes
+ * and then goes quiet, keeping the connection open until Stop().  The client
+ * sees a kFailProxyTooSlow on a response that has started: a saturated
+ * proxy, not a dead one.
+ */
+class StallingProxy {
+ public:
+  StallingProxy() : fd_(-1), hits_(0) { }
+  ~StallingProxy() { Stop(); }
+
+  bool Start(int port) {
+    fd_ = socket(AF_INET, SOCK_STREAM, 0);
+    if (fd_ < 0)
+      return false;
+    const int on = 1;
+    setsockopt(fd_, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port);
+    addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+    if (::bind(fd_, reinterpret_cast<struct sockaddr *>(&addr), sizeof(addr))
+            != 0
+        || listen(fd_, 16) != 0) {
+      return false;
+    }
+    return pthread_create(&thread_, NULL, MainLoop, this) == 0;
+  }
+
+  void Stop() {
+    if (fd_ < 0)
+      return;
+    // Unblocks accept() in the server thread.
+    shutdown(fd_, SHUT_RDWR);
+    pthread_join(thread_, NULL);
+    close(fd_);
+    fd_ = -1;
+    for (unsigned i = 0; i < stalled_.size(); ++i)
+      close(stalled_[i]);
+    stalled_.clear();
+  }
+
+  int hits() const { return __sync_fetch_and_add(&hits_, 0); }
+
+ private:
+  static void *MainLoop(void *data) {
+    StallingProxy *self = static_cast<StallingProxy *>(data);
+    while (true) {
+      const int conn = accept(self->fd_, NULL, NULL);
+      if (conn < 0)
+        return NULL;
+      char buf[4096];
+      if (read(conn, buf, sizeof(buf)) <= 0) {
+        close(conn);
+        continue;
+      }
+      __sync_fetch_and_add(&self->hits_, 1);
+      const string reply = "HTTP/1.1 200 OK\r\nContent-Length: 65536\r\n"
+                           "Connection: close\r\n\r\nslow";
+      (void)!write(conn, reply.data(), reply.size());
+      self->stalled_.push_back(conn);
+    }
+  }
+
+  int fd_;
+  mutable int hits_;
+  pthread_t thread_;
+  vector<int> stalled_;
+};
+
+HTTPResponse ProxyForbiddenHandler(const HTTPRequest & /* req */, void *data) {
+  int *hits = static_cast<int *>(data);
+  HTTPResponse response;
+  (*hits)++;
+  response.code = 403;
+  response.body = "access denied";
+  return response;
+}
 }  // namespace
 
 
 TEST_F(T_Download, SlowProxyDoesNotEscalateToDirect) {
-  // The regression for the leak measured under load: a proxy that is merely
-  // saturated must not promote the DIRECT tier, because that puts unproxied
-  // traffic on the wire and then lets host failover roam the server list.
-  //
-  // The proxy serves one request in full before it starts truncating, which
-  // is what tells the gate the local proxy set is alive.  Without that
-  // evidence the gate stands aside; see DeadProxyIsNotProtectedByTheGate.
+  // A saturated proxy (response started, then stalled) must not promote the
+  // DIRECT tier while the local proxy set has recently served.
   string src_path = GetSmallFile();
   MockFileServer origin(8110, sandbox_path_);
-  TruncatingProxy proxy_state;
-  proxy_state.serve_ok = 1;
-  MockHTTPServer slow_proxy(8111);
-  ASSERT_TRUE(
-      slow_proxy.SetResponseCallback(TruncatingProxyHandler, &proxy_state));
-  ASSERT_TRUE(slow_proxy.Start());
+  StallingProxy slow_proxy;
+  ASSERT_TRUE(slow_proxy.Start(8111));
 
   download_mgr.SetProxyFailoverOnSlow(false);
   download_mgr.SetProxyChain("http://127.0.0.1:8111;DIRECT", "",
                              DownloadManager::kSetProxyBoth);
-  download_mgr.SetRetryParameters(2, 0, 0);
+  download_mgr.SetRetryParameters(0, 0, 0);
+  download_mgr.SetTimeout(1, 1);
+  // Fresh evidence for the whole test, independent of timing.
+  download_mgr.last_proxy_success_ = time(NULL) + 3600;
 
   const string url = "http://127.0.0.1:8110/" + GetFileName(src_path);
-
-  // A healthy request first, so the proxy is known to be serving.
-  cvmfs::MemSink warmup;
-  JobInfo warm(&url, false /* compressed */, false /* probe hosts */, NULL,
-               &warmup);
-  download_mgr.Fetch(&warm);
-  ASSERT_EQ(kFailOk, warm.error_code());
-  ASSERT_EQ("http://127.0.0.1:8111", warm.proxy());
-
   cvmfs::MemSink sink;
   JobInfo info(&url, false /* compressed */, false /* probe hosts */, NULL,
                &sink);
   download_mgr.Fetch(&info);
 
-  EXPECT_NE(kFailOk, info.error_code());
-  EXPECT_GT(proxy_state.hits, 1) << "the proxy was never retried";
-  // The decisive assertion: the origin was never contacted directly.
+  EXPECT_EQ(kFailProxyTooSlow, info.error_code());
+  EXPECT_GT(slow_proxy.hits(), 1) << "the proxy was never retried";
   EXPECT_EQ(0, origin.num_processed_requests());
   EXPECT_NE("DIRECT", info.proxy());
   slow_proxy.Stop();
@@ -932,23 +986,18 @@ TEST_F(T_Download, SlowProxyDoesNotEscalateToDirect) {
 
 
 TEST_F(T_Download, DeadProxyIsNotProtectedByTheGate) {
-  // The backstop.  A proxy that has never been seen to serve anything gets no
-  // protection from the gate, however it fails.  Truncating every body looks
-  // like saturation on each individual attempt, so without this the client
-  // would sit on a comprehensively broken cache for good rather than use the
-  // DIRECT tier that was configured for exactly this.
+  // Without recent success evidence the gate stands aside, so a proxy that
+  // never serves cannot pin the client.
   string src_path = GetSmallFile();
   MockFileServer origin(8120, sandbox_path_);
-  TruncatingProxy proxy_state;  // serve_ok == 0: never works
-  MockHTTPServer dead_proxy(8121);
-  ASSERT_TRUE(
-      dead_proxy.SetResponseCallback(TruncatingProxyHandler, &proxy_state));
-  ASSERT_TRUE(dead_proxy.Start());
+  StallingProxy slow_proxy;
+  ASSERT_TRUE(slow_proxy.Start(8121));
 
   download_mgr.SetProxyFailoverOnSlow(false);
   download_mgr.SetProxyChain("http://127.0.0.1:8121;DIRECT", "",
                              DownloadManager::kSetProxyBoth);
-  download_mgr.SetRetryParameters(2, 0, 0);
+  download_mgr.SetRetryParameters(0, 0, 0);
+  download_mgr.SetTimeout(1, 1);
 
   const string url = "http://127.0.0.1:8120/" + GetFileName(src_path);
   cvmfs::MemSink sink;
@@ -956,11 +1005,70 @@ TEST_F(T_Download, DeadProxyIsNotProtectedByTheGate) {
                &sink);
   download_mgr.Fetch(&info);
 
-  EXPECT_GT(proxy_state.hits, 0) << "the proxy was never tried";
+  EXPECT_GT(slow_proxy.hits(), 0) << "the proxy was never tried";
   EXPECT_EQ(kFailOk, info.error_code());
   EXPECT_EQ("DIRECT", info.proxy());
   EXPECT_EQ(1, origin.num_processed_requests());
-  dead_proxy.Stop();
+  slow_proxy.Stop();
+}
+
+
+TEST_F(T_Download, ShortTransferBypassesTheGate) {
+  // A truncating cache is broken, not saturated: escalate even with fresh
+  // evidence.
+  string src_path = GetSmallFile();
+  MockFileServer origin(8122, sandbox_path_);
+  TruncatingProxy proxy_state;
+  MockHTTPServer bad_proxy(8123);
+  ASSERT_TRUE(
+      bad_proxy.SetResponseCallback(TruncatingProxyHandler, &proxy_state));
+  ASSERT_TRUE(bad_proxy.Start());
+
+  download_mgr.SetProxyFailoverOnSlow(false);
+  download_mgr.SetProxyChain("http://127.0.0.1:8123;DIRECT", "",
+                             DownloadManager::kSetProxyBoth);
+  download_mgr.SetRetryParameters(0, 0, 0);
+  download_mgr.last_proxy_success_ = time(NULL) + 3600;
+
+  const string url = "http://127.0.0.1:8122/" + GetFileName(src_path);
+  cvmfs::MemSink sink;
+  JobInfo info(&url, false /* compressed */, false /* probe hosts */, NULL,
+               &sink);
+  download_mgr.Fetch(&info);
+
+  EXPECT_GT(proxy_state.hits, 0);
+  EXPECT_EQ(kFailOk, info.error_code());
+  EXPECT_EQ("DIRECT", info.proxy());
+  EXPECT_EQ(1, origin.num_processed_requests());
+  bad_proxy.Stop();
+}
+
+
+TEST_F(T_Download, ProxyHttpErrorBypassesTheGate) {
+  string src_path = GetSmallFile();
+  MockFileServer origin(8124, sandbox_path_);
+  int proxy_hits = 0;
+  MockHTTPServer bad_proxy(8125);
+  ASSERT_TRUE(bad_proxy.SetResponseCallback(ProxyForbiddenHandler, &proxy_hits));
+  ASSERT_TRUE(bad_proxy.Start());
+
+  download_mgr.SetProxyFailoverOnSlow(false);
+  download_mgr.SetProxyChain("http://127.0.0.1:8125;DIRECT", "",
+                             DownloadManager::kSetProxyBoth);
+  download_mgr.SetRetryParameters(0, 0, 0);
+  download_mgr.last_proxy_success_ = time(NULL) + 3600;
+
+  const string url = "http://127.0.0.1:8124/" + GetFileName(src_path);
+  cvmfs::MemSink sink;
+  JobInfo info(&url, false /* compressed */, false /* probe hosts */, NULL,
+               &sink);
+  download_mgr.Fetch(&info);
+
+  EXPECT_EQ(1, proxy_hits);
+  EXPECT_EQ(kFailOk, info.error_code());
+  EXPECT_EQ("DIRECT", info.proxy());
+  EXPECT_EQ(1, origin.num_processed_requests());
+  bad_proxy.Stop();
 }
 
 
@@ -1037,21 +1145,18 @@ TEST_F(T_Download, SilentProxyCountsAsUnreachable) {
 
 
 TEST_F(T_Download, SlowProxyEscalatesToDirectByDefault) {
-  // The mirror image of the test above, and the one that shows the gate is
-  // genuinely opt-in: with CVMFS_PROXY_FAILOVER_ON_SLOW left at its default a
-  // saturated proxy still promotes the DIRECT tier and the origin is still
-  // contacted unproxied, exactly as before this branch.
+  // With CVMFS_PROXY_FAILOVER_ON_SLOW at its default the gate is off: a
+  // saturated proxy still promotes the DIRECT tier.
   string src_path = GetSmallFile();
   MockFileServer origin(8116, sandbox_path_);
-  TruncatingProxy proxy_state;
-  MockHTTPServer slow_proxy(8117);
-  ASSERT_TRUE(
-      slow_proxy.SetResponseCallback(TruncatingProxyHandler, &proxy_state));
-  ASSERT_TRUE(slow_proxy.Start());
+  StallingProxy slow_proxy;
+  ASSERT_TRUE(slow_proxy.Start(8117));
 
   download_mgr.SetProxyChain("http://127.0.0.1:8117;DIRECT", "",
                              DownloadManager::kSetProxyBoth);
-  download_mgr.SetRetryParameters(2, 0, 0);
+  download_mgr.SetRetryParameters(0, 0, 0);
+  download_mgr.SetTimeout(1, 1);
+  download_mgr.last_proxy_success_ = time(NULL) + 3600;
 
   const string url = "http://127.0.0.1:8116/" + GetFileName(src_path);
   cvmfs::MemSink sink;
@@ -1059,25 +1164,21 @@ TEST_F(T_Download, SlowProxyEscalatesToDirectByDefault) {
                &sink);
   download_mgr.Fetch(&info);
 
-  EXPECT_GT(proxy_state.hits, 0) << "the proxy was never even tried";
+  EXPECT_EQ(1, slow_proxy.hits());
+  EXPECT_EQ(kFailOk, info.error_code());
   EXPECT_EQ("DIRECT", info.proxy());
-  EXPECT_GT(origin.num_processed_requests(), 0);
+  EXPECT_EQ(1, origin.num_processed_requests());
   slow_proxy.Stop();
 }
 
 
 TEST_F(T_Download, SlowProxyDoesNotEscalateToFallback) {
-  // Same rule for the off-site fallback proxies: saturation at the local
-  // proxy is not a reason to ship the request to another site.
+  // Same rule for the off-site fallback proxies.
   string src_path = GetSmallFile();
   MockFileServer origin(8112, sandbox_path_);
-  TruncatingProxy proxy_state;
-  proxy_state.serve_ok = 1;
+  StallingProxy slow_proxy;
+  ASSERT_TRUE(slow_proxy.Start(8113));
   int fallback_hits = 0;
-  MockHTTPServer slow_proxy(8113);
-  ASSERT_TRUE(
-      slow_proxy.SetResponseCallback(TruncatingProxyHandler, &proxy_state));
-  ASSERT_TRUE(slow_proxy.Start());
   MockHTTPServer fallback_proxy(8114);
   ASSERT_TRUE(
       fallback_proxy.SetResponseCallback(CountingProxyHandler, &fallback_hits));
@@ -1087,24 +1188,18 @@ TEST_F(T_Download, SlowProxyDoesNotEscalateToFallback) {
   download_mgr.SetProxyChain("http://127.0.0.1:8113",
                              "http://127.0.0.1:8114",
                              DownloadManager::kSetProxyBoth);
-  download_mgr.SetRetryParameters(2, 0, 0);
+  download_mgr.SetRetryParameters(0, 0, 0);
+  download_mgr.SetTimeout(1, 1);
+  download_mgr.last_proxy_success_ = time(NULL) + 3600;
 
   const string url = "http://127.0.0.1:8112/" + GetFileName(src_path);
-
-  // A healthy request first, so the local proxy is known to be serving.
-  cvmfs::MemSink warmup;
-  JobInfo warm(&url, false /* compressed */, false /* probe hosts */, NULL,
-               &warmup);
-  download_mgr.Fetch(&warm);
-  ASSERT_EQ(kFailOk, warm.error_code());
-
   cvmfs::MemSink sink;
   JobInfo info(&url, false /* compressed */, false /* probe hosts */, NULL,
                &sink);
   download_mgr.Fetch(&info);
 
-  EXPECT_NE(kFailOk, info.error_code());
-  EXPECT_GT(proxy_state.hits, 1);
+  EXPECT_EQ(kFailProxyTooSlow, info.error_code());
+  EXPECT_GT(slow_proxy.hits(), 1);
   EXPECT_EQ(0, fallback_hits) << "a saturated local proxy escalated off-site";
   EXPECT_EQ(0, origin.num_processed_requests());
   slow_proxy.Stop();
