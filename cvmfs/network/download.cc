@@ -1608,6 +1608,13 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
                                                      : kFailProxyShortTransfer);
       break;
     case CURLE_FILE_COULDNT_READ_FILE:
+      // A local file:// read error says nothing about a network peer.
+      if (info->proxy() != "DIRECT") {
+        info->SetErrorCode(kFailProxyConnection);
+      } else {
+        info->SetErrorCode(kFailHostConnection);
+      }
+      break;
     case CURLE_COULDNT_CONNECT:
       // The connect failed, so no response was ever started, whatever the
       // reason.  ECONNREFUSED in particular is the kernel answering with a
