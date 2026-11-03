@@ -1089,7 +1089,7 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
 
     ProxyInfo *proxy = ChooseProxyUnlocked(info->expected_hash());
     if (!proxy || (proxy->url == "DIRECT")) {
-      if (opt_proxy_mandatory_) {
+      if (opt_proxy_mandatory_effective_) {
         // No usable proxy and DIRECT is not allowed.  The attempt still runs
         // through curl so it is retried and reported like any other failure,
         // but the socket callback refuses to connect anywhere.  "BLOCKED"
@@ -1220,7 +1220,7 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
         // rewrite the URL, though: forcing CURLOPT_PROXY to "" here sent the
         // request off unproxied, and the condition above is true precisely
         // while the local proxies are down and the fallbacks are in use.
-        if (!opt_proxy_mandatory_) {
+        if (!opt_proxy_mandatory_effective_) {
           info->SetProxy("DIRECT");
           curl_easy_setopt(info->curl_handle(), CURLOPT_PROXY, "");
         }
@@ -2026,8 +2026,8 @@ DownloadManager::DownloadManager(const unsigned max_pool_handles,
     , opt_proxy_groups_current_burned_(0)
     , opt_proxy_groups_fallback_(0)
     , opt_num_proxies_(0)
-    , opt_proxy_require_(false)
-    , opt_proxy_mandatory_(false)
+    , opt_proxy_mandatory_requested_(false)
+    , opt_proxy_mandatory_effective_(false)
     , opt_proxy_failover_on_slow_(true)
     , last_proxy_success_(0)
     , opt_proxy_shard_(false)
@@ -3102,7 +3102,7 @@ void DownloadManager::SetProxyChain(const string &proxy_list,
              "(manager '%s') fallback proxies do not support DIRECT, removing",
              name_.c_str());
   }
-  if (!opt_proxy_require_) {
+  if (!opt_proxy_mandatory_requested_) {
     // Default: the chain is assembled exactly as it always has been.  A
     // configured DIRECT is discarded outright whenever fallback proxies also
     // exist, and a DIRECT sharing a load-balance group with a real proxy is
@@ -3119,7 +3119,7 @@ void DownloadManager::SetProxyChain(const string &proxy_list,
                  name_.c_str());
       }
     }
-    opt_proxy_mandatory_ = false;
+    opt_proxy_mandatory_effective_ = false;
   } else {
     // CVMFS_PROXY_MANDATORY.  Keep a DIRECT tier if one was configured, but
     // never let DIRECT compete with a healthy proxy inside a load-balance
@@ -3143,7 +3143,7 @@ void DownloadManager::SetProxyChain(const string &proxy_list,
     // that tier and what remains is the real proxies.
     string real_proxies;
     StripDirect(set_proxy_list, &real_proxies);
-    opt_proxy_mandatory_ = !has_direct_group
+    opt_proxy_mandatory_effective_ = !has_direct_group
                            && ((real_proxies != "")
                                || (set_proxy_fallback_list != ""));
   }
@@ -3451,7 +3451,9 @@ void DownloadManager::UpdateProxiesUnlocked(const string &reason) {
  * installed: SetProxyChain() reads the policy while it normalises the chain,
  * and a chain already in place is not revisited.
  */
-void DownloadManager::EnableMandatoryProxy() { opt_proxy_require_ = true; }
+void DownloadManager::EnableMandatoryProxy() {
+  opt_proxy_mandatory_requested_ = true;
+}
 
 
 /**
@@ -3653,8 +3655,8 @@ void DownloadManager::CloneProxyConfig(DownloadManager *clone) {
   clone->opt_proxy_groups_current_ = opt_proxy_groups_current_;
   clone->opt_proxy_groups_current_burned_ = opt_proxy_groups_current_burned_;
   clone->opt_proxy_groups_fallback_ = opt_proxy_groups_fallback_;
-  clone->opt_proxy_require_ = opt_proxy_require_;
-  clone->opt_proxy_mandatory_ = opt_proxy_mandatory_;
+  clone->opt_proxy_mandatory_requested_ = opt_proxy_mandatory_requested_;
+  clone->opt_proxy_mandatory_effective_ = opt_proxy_mandatory_effective_;
   clone->opt_proxy_failover_on_slow_ = opt_proxy_failover_on_slow_;
   clone->opt_num_proxies_ = opt_num_proxies_;
   clone->opt_proxy_shard_ = opt_proxy_shard_;

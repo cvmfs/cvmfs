@@ -528,7 +528,7 @@ TEST_F(T_Download, ProxyChainDefaultsToPreviousBehaviour) {
   EXPECT_EQ("http://127.0.0.1:3128", chain[0][0].url);
   EXPECT_EQ("http://127.0.0.2:3128", chain[1][0].url);
   EXPECT_EQ(1U, fallback_group);
-  EXPECT_FALSE(download_mgr.opt_proxy_mandatory_);
+  EXPECT_FALSE(download_mgr.opt_proxy_mandatory_effective_);
 
   // DIRECT is still kept as a peer inside a load-balance group.
   download_mgr.SetProxyChain("http://127.0.0.1:3128|DIRECT", "",
@@ -536,12 +536,12 @@ TEST_F(T_Download, ProxyChainDefaultsToPreviousBehaviour) {
   download_mgr.GetProxyInfo(&chain, &current_group, &fallback_group);
   ASSERT_EQ(1U, chain.size());
   EXPECT_EQ(2U, chain[0].size());
-  EXPECT_FALSE(download_mgr.opt_proxy_mandatory_);
+  EXPECT_FALSE(download_mgr.opt_proxy_mandatory_effective_);
 
   // And a proxy-only chain never makes the proxy mandatory by itself.
   download_mgr.SetProxyChain("http://127.0.0.1:3128", "",
                              DownloadManager::kSetProxyBoth);
-  EXPECT_FALSE(download_mgr.opt_proxy_mandatory_);
+  EXPECT_FALSE(download_mgr.opt_proxy_mandatory_effective_);
 }
 
 
@@ -563,7 +563,7 @@ TEST_F(T_Download, ProxyDirectKeptAsLastResortTier) {
   // The proxy is where we start, and direct connections are permitted only
   // because the administrator asked for them.
   EXPECT_EQ(0U, current_group);
-  EXPECT_FALSE(download_mgr.opt_proxy_mandatory_);
+  EXPECT_FALSE(download_mgr.opt_proxy_mandatory_effective_);
 
   // Configured fallback proxies must no longer discard the DIRECT tier.  This
   // is the EGI case: the configuration repository always sets fallback
@@ -594,7 +594,7 @@ TEST_F(T_Download, ProxyDirectNotPeerOfLiveProxy) {
   ASSERT_EQ(1U, chain.size());
   ASSERT_EQ(1U, chain[0].size());
   EXPECT_EQ("http://127.0.0.1:3128", chain[0][0].url);
-  EXPECT_TRUE(download_mgr.opt_proxy_mandatory_);
+  EXPECT_TRUE(download_mgr.opt_proxy_mandatory_effective_);
 }
 
 
@@ -610,7 +610,7 @@ TEST_F(T_Download, ProxyDirectOnlyPreserved) {
   ASSERT_EQ(1U, chain.size());
   ASSERT_EQ(1U, chain[0].size());
   EXPECT_EQ("DIRECT", chain[0][0].url);
-  EXPECT_FALSE(download_mgr.opt_proxy_mandatory_);
+  EXPECT_FALSE(download_mgr.opt_proxy_mandatory_effective_);
 }
 
 
@@ -620,17 +620,17 @@ TEST_F(T_Download, ProxyMandatorySurvivesClone) {
   download_mgr.EnableMandatoryProxy();
   download_mgr.SetProxyChain("http://127.0.0.1:3128", "",
                              DownloadManager::kSetProxyBoth);
-  EXPECT_TRUE(download_mgr.opt_proxy_mandatory_);
+  EXPECT_TRUE(download_mgr.opt_proxy_mandatory_effective_);
 
   DownloadManager *clone = download_mgr.Clone(
       perf::StatisticsTemplate("clone", &statistics), "clone");
-  EXPECT_TRUE(clone->opt_proxy_mandatory_);
+  EXPECT_TRUE(clone->opt_proxy_mandatory_effective_);
 
   // And a DIRECT-only chain must clone as "direct is allowed".
   download_mgr.SetProxyChain("DIRECT", "", DownloadManager::kSetProxyBoth);
   DownloadManager *clone2 = download_mgr.Clone(
       perf::StatisticsTemplate("clone2", &statistics), "clone2");
-  EXPECT_FALSE(clone2->opt_proxy_mandatory_);
+  EXPECT_FALSE(clone2->opt_proxy_mandatory_effective_);
   delete clone;
   delete clone2;
 }
@@ -641,7 +641,7 @@ TEST_F(T_Download, NoProxyChainIsNotSelectable) {
   // rather than dereferencing an empty map or an empty group.
   download_mgr.SetProxyChain("", "", DownloadManager::kSetProxyBoth);
   EXPECT_TRUE(download_mgr.ChooseProxyUnlocked(NULL) == NULL);
-  EXPECT_FALSE(download_mgr.opt_proxy_mandatory_);
+  EXPECT_FALSE(download_mgr.opt_proxy_mandatory_effective_);
   // Rebalancing an empty chain must be a no-op, not a crash.
   download_mgr.RebalanceProxies();
   download_mgr.SwitchProxyGroup();
@@ -828,7 +828,7 @@ TEST_F(T_Download, MandatoryProxyBlockFailsAsProxyError) {
   download_mgr.SetProxyChain("http://127.0.0.1:8131", "",
                              DownloadManager::kSetProxyBoth);
   download_mgr.SetRetryParameters(0, 0, 0);
-  ASSERT_TRUE(download_mgr.opt_proxy_mandatory_);
+  ASSERT_TRUE(download_mgr.opt_proxy_mandatory_effective_);
   download_mgr.opt_proxy_groups_current_burned_ = 1;
   download_mgr.UpdateProxiesUnlocked("test: all burned");
   ASSERT_TRUE(download_mgr.ChooseProxyUnlocked(NULL) == NULL);

@@ -404,18 +404,16 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
    * than sent unproxied when no proxy can be selected.  While this is off the
    * client behaves exactly as it did before the option existed.
    */
-  bool opt_proxy_require_;
+  bool opt_proxy_mandatory_requested_;
   /**
-   * The effective conclusion drawn from opt_proxy_require_ and the chain that
-   * was actually configured: true when the policy is on, a real (non-DIRECT)
-   * proxy is configured, and the chain offers no DIRECT tier to fall back on.
-   * While this holds, a direct connection is never an acceptable substitute
-   * for the proxy.  Writing DIRECT into the chain, as in "proxy;DIRECT",
-   * clears it and re-enables an unproxied last resort -- reached only once
-   * the proxy has actually failed, see DemoteDirect().  Configurations with
-   * no proxy at all also leave it false.
+   * The effective conclusion drawn from opt_proxy_mandatory_requested_ and
+   * the chain that was actually configured: true when the policy is on, a
+   * real (non-DIRECT) proxy is configured, and the chain offers no DIRECT
+   * tier.  While this holds, a direct connection is never used.  A DIRECT
+   * tier ("proxy;DIRECT") clears it; see DemoteDirect().  A chain with no
+   * proxy at all leaves it false.
    */
-  bool opt_proxy_mandatory_;
+  bool opt_proxy_mandatory_effective_;
   /**
    * CVMFS_PROXY_FAILOVER_ON_SLOW, on by default, which is the behaviour the
    * client has always had: any proxy failure, including one that only says
