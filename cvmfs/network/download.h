@@ -398,39 +398,26 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
    */
   unsigned opt_num_proxies_;
   /**
-   * CVMFS_PROXY_MANDATORY, off by default.  Opts in to treating the configured
-   * proxy as the only way out of the host: DIRECT is honoured solely where it
-   * was written as a failover tier of its own, and a request is failed rather
-   * than sent unproxied when no proxy can be selected.  While this is off the
-   * client behaves exactly as it did before the option existed.
+   * CVMFS_PROXY_MANDATORY, off by default.  DIRECT is used only where written
+   * as a tier of its own, and a request with no selectable proxy fails instead
+   * of going out unproxied.
    */
   bool opt_proxy_mandatory_requested_;
   /**
-   * The effective conclusion drawn from opt_proxy_mandatory_requested_ and
-   * the chain that was actually configured: true when the policy is on, a
-   * real (non-DIRECT) proxy is configured, and the chain offers no DIRECT
-   * tier.  While this holds, a direct connection is never used.  A DIRECT
-   * tier ("proxy;DIRECT") clears it; see DemoteDirect().  A chain with no
-   * proxy at all leaves it false.
+   * True when opt_proxy_mandatory_requested_ is set, the chain has a real
+   * proxy and no DIRECT tier.  Then a direct connection is never used.
    */
   bool opt_proxy_mandatory_effective_;
   /**
-   * CVMFS_PROXY_FAILOVER_ON_SLOW, on by default, which is the behaviour the
-   * client has always had: any proxy failure, including one that only says
-   * the proxy is slow, may carry the request out of the local proxy set and
-   * on to a DIRECT tier or an off-site fallback proxy.  Turning it off keeps
-   * a slow but answering proxy for one more attempt per request; see
-   * SwitchProxy().  Worst case, a request on a saturated proxy takes one
-   * extra CVMFS_TIMEOUT before it escalates.
+   * CVMFS_PROXY_FAILOVER_ON_SLOW, on by default (previous behaviour).  Off
+   * keeps a slow but answering local proxy for one more attempt per request
+   * instead of escalating to DIRECT or a fallback; see SwitchProxy().  Worst
+   * case cost: one extra CVMFS_TIMEOUT per request.
    */
   bool opt_proxy_failover_on_slow_;
   /**
-   * When a request last completed through a proxy of a local (non-escalated)
-   * group, or 0 if none has.  The escalation gate withholds a step off-site
-   * only while this shows the local proxy set to be serving; without it any
-   * persistent failure that still delivers bytes -- a cache truncating every
-   * body, say -- would pin the client to a broken proxy for good.  It is
-   * deliberately not carried into a clone, which starts with no evidence.
+   * Last request completed through a local (non-escalated) proxy, or 0.
+   * Evidence for the gate in SwitchProxy().  Not copied to clones.
    */
   time_t last_proxy_success_;
   /**

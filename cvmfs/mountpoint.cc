@@ -1448,9 +1448,7 @@ bool MountPoint::CreateDownloadManagers() {
   download_mgr_->SetProxyTemplates(file_system_->uuid_cache()->uuid(),
                                    forced_proxy_template);
 
-  // Both of these must be set before SetProxyChain() below: the first is read
-  // while the chain is normalised, and neither revisits a chain already in
-  // place.  Both default to the behaviour the client had before they existed.
+  // Must precede SetProxyChain(), which reads the proxy policy.
   if (options_mgr_->GetValue("CVMFS_PROXY_MANDATORY", &optarg)
       && options_mgr_->IsOn(optarg)) {
     download_mgr_->EnableMandatoryProxy();
@@ -2327,15 +2325,10 @@ bool MountPoint::SetupExternalDownloadMgr(bool dogeosort) {
     }
   }
 
-  // Without an explicit setting the external download manager connects
-  // directly, which is the long-standing default and stays the default here.
-  //
-  // Under CVMFS_PROXY_MANDATORY that would be a leak with nothing to do with
-  // failover: external data would bypass the very proxy the option exists to
-  // enforce, and on a host where only proxied traffic may leave it would do
-  // so silently.  So inherit the regular manager's chain instead.
-  // CVMFS_EXTERNAL_HTTP_PROXY=DIRECT still asks for a direct connection
-  // explicitly, whatever the policy.
+  // By default external data goes direct.  Under CVMFS_PROXY_MANDATORY that
+  // would bypass the site proxy, so inherit the regular chain instead; note
+  // this sends external (often uncacheable) data through the site squid.
+  // CVMFS_EXTERNAL_HTTP_PROXY=DIRECT still opts out explicitly.
   string proxies = "DIRECT";
   string fallback_proxies;
   if (options_mgr_->GetValue("CVMFS_PROXY_MANDATORY", &optarg)
@@ -2355,10 +2348,7 @@ bool MountPoint::SetupExternalDownloadMgr(bool dogeosort) {
       boot_status_ = loader::kFailWpad;
       return false;
     }
-    // An explicit external chain replaces the inherited one outright; a
-    // fallback list inherited from the regular manager would otherwise be
-    // silently appended to it.  Without CVMFS_PROXY_MANDATORY nothing was
-    // inherited and this is a no-op, so the default path is unchanged.
+    // An explicit chain replaces the inherited one, fallbacks included.
     fallback_proxies = "";
   }
   if (options_mgr_->GetValue("CVMFS_EXTERNAL_FALLBACK_PROXY", &optarg))
