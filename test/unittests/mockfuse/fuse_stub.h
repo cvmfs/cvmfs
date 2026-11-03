@@ -68,12 +68,14 @@ struct fuse_req {
 /**
  * fuse_passthrough_open() returns fuse_stub_passthrough_open_result (a backing
  * id, or 0 as libfuse does when the kernel refuses) with errno set to
- * fuse_stub_passthrough_open_errno; both calls are counted.
+ * fuse_stub_passthrough_open_errno. fuse_passthrough_close() records the
+ * backing id it was asked to close. Both calls are counted.
  */
 extern int fuse_stub_passthrough_open_result;
 extern int fuse_stub_passthrough_open_errno;
 extern int fuse_stub_passthrough_open_calls;
 extern int fuse_stub_passthrough_close_calls;
+extern int fuse_stub_passthrough_close_backing_id;
 #endif
 
 #endif  // TEST_UNITTESTS_MOCKFUSE_FUSE_STUB_H_
