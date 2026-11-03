@@ -133,25 +133,11 @@ static Failures PrepareDownloadDestination(JobInfo *info) {
 
 
 /**
- * True when the peer sent at least one byte of this transfer, whatever
- * happened afterwards.  It tells a peer that never answered apart from one
- * that answered and then misbehaved, which is the difference between "look
- * elsewhere" and "stay here".
+ * True when the peer sent at least one byte of the response.  Unlike "did the
+ * connect complete", this also catches a dead proxy whose listening socket
+ * still accepts, and works for connections reused from the pool.
  *
- * CURLINFO_STARTTRANSFER_TIME stays zero until the first byte of the response
- * arrives, so it covers both ways of never answering.  One is a connect that
- * never completed.  The other, and the more common shape of a dead proxy, is
- * a peer whose listening socket still accepts: the connect succeeds, the
- * request goes out, and nothing ever comes back until the low-speed limit
- * trips.  Asking only whether the connect completed would call that peer
- * alive.  It is also the right question for a connection taken from the
- * keep-alive pool, where this transfer performs no connect of its own.
- *
- * CURLINFO_STARTTRANSFER_TIME rather than the newer _T variant: the build
- * accepts libcurl from 7.55.0 (see externals/libcurl/CMakeLists.txt) while
- * the _T variants only arrived in 7.61.0.  The two carry the same meaning and
- * differ only in resolution, and all that is asked here is whether the value
- * is still zero, so the older one needs no version guard.
+ * Not the _T variant: that needs libcurl 7.61.0, the build accepts 7.55.0.
  */
 static bool ResponseStarted(CURL *handle) {
   double start_transfer_time = 0.0;
@@ -1216,10 +1202,8 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
     } else {
       if (opt_proxy_groups_current_ >= opt_proxy_groups_fallback_) {
         // It doesn't make sense to use the fallback proxies in Geo-API requests
-        // since the fallback proxies are supposed to get sorted, too.  Only
-        // rewrite the URL, though: forcing CURLOPT_PROXY to "" here sent the
-        // request off unproxied, and the condition above is true precisely
-        // while the local proxies are down and the fallbacks are in use.
+        // since the fallback proxies are supposed to get sorted, too.  Under a
+        // mandatory proxy, only rewrite the URL; the request stays proxied.
         if (!opt_proxy_mandatory_effective_) {
           info->SetProxy("DIRECT");
           curl_easy_setopt(info->curl_handle(), CURLOPT_PROXY, "");
@@ -1533,10 +1517,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
            info->proxy().c_str(), curl_error);
   UpdateStatistics(info->curl_handle());
 
-  // Classify this attempt on its own evidence.  A retry reuses the same
-  // JobInfo and the same curl handle, so a peer_unresponsive_ left true by an
-  // earlier attempt would otherwise let SwitchProxy() act on evidence that no
-  // longer applies.  The branches below set it from this result.
+  // Retries reuse the JobInfo; don't carry over an earlier attempt's verdict.
   info->SetPeerUnresponsive(false);
 
   bool was_metalink;
@@ -1604,15 +1585,8 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
       info->SetErrorCode(kFailHostResolve);
       break;
     case CURLE_OPERATION_TIMEDOUT:
-      // A timeout means one of two opposite things.  If nothing came back at
-      // all, nobody answered: the peer is unreachable, which is exactly the
-      // case that justifies looking elsewhere.  That covers a connect that
-      // never completed and, just as much, a peer that accepted the
-      // connection and then sent nothing -- a dead proxy still has a socket
-      // listening.  If part of the response did arrive and the transfer then
-      // crawled, the peer is alive and merely saturated, and abandoning it
-      // would move traffic off-site for no good reason.  See
-      // ResponseStarted().
+      // Nothing received: the peer is down.  Partial response: it is alive
+      // but saturated.
       info->SetPeerUnresponsive(!ResponseStarted(info->curl_handle()));
       info->SetErrorCode((info->proxy() == "DIRECT") ? kFailHostTooSlow
                                                      : kFailProxyTooSlow);
@@ -1632,12 +1606,8 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
       }
       break;
     case CURLE_COULDNT_CONNECT:
-      // The connect failed, so no response was ever started, whatever the
-      // reason.  ECONNREFUSED in particular is the kernel answering with a
-      // reset because nothing is listening on the port -- the signature of a
-      // daemon that has died, not of a busy one.  A proxy that is merely out
-      // of slots does not refuse: with tcp_abort_on_overflow at its default
-      // the kernel drops the SYN and the connect times out instead.
+      // Includes ECONNREFUSED: a busy proxy drops the SYN rather than
+      // refusing, so a refusal means nothing is listening.
       info->SetPeerUnresponsive(true);
       if (info->proxy() != "DIRECT") {
         // This is a guess.  Fail-over can still change to switching host
@@ -2987,19 +2957,10 @@ bool DownloadManager::ValidateGeoReply(const string &reply_order,
 
 
 /**
- * Keeps DIRECT as a failover tier of its own but never as a peer of a real
- * proxy.
- *
- * "proxy;DIRECT" is the documented way of asking for "use the proxy, and only
- * if it has failed connect directly".  Load-balance groups, however, are
- * chosen from at random, so a DIRECT sharing a group with a real proxy
- * ("proxy|DIRECT") would send a share of the traffic unproxied while the
- * proxy is perfectly healthy.  DIRECT is therefore dropped from any group that
- * also holds a real proxy, and kept when it forms a group on its own.  Because
- * proxy groups are tried in order, the surviving DIRECT group is only reached
- * after every proxy in the preceding groups has been burned.
- *
- * *has_direct_group is set when such a DIRECT-only group survives.
+ * Drops DIRECT from any load-balance group that also holds a real proxy, so
+ * "proxy|DIRECT" does not send a random share of requests unproxied.  A
+ * DIRECT-only group ("proxy;DIRECT") is kept as a last-resort tier, and
+ * *has_direct_group is set.
  */
 string DownloadManager::DemoteDirect(const string &proxy_list,
                                      bool *has_direct_group) {
@@ -3103,11 +3064,6 @@ void DownloadManager::SetProxyChain(const string &proxy_list,
              name_.c_str());
   }
   if (!opt_proxy_mandatory_requested_) {
-    // Default: the chain is assembled exactly as it always has been.  A
-    // configured DIRECT is discarded outright whenever fallback proxies also
-    // exist, and a DIRECT sharing a load-balance group with a real proxy is
-    // kept as a peer of it.  See the branch below for why CVMFS_PROXY_MANDATORY
-    // changes both.
     if (set_proxy_fallback_list == "") {
       set_proxy_list = opt_proxy_list_;
     } else {
@@ -3121,13 +3077,8 @@ void DownloadManager::SetProxyChain(const string &proxy_list,
     }
     opt_proxy_mandatory_effective_ = false;
   } else {
-    // CVMFS_PROXY_MANDATORY.  Keep a DIRECT tier if one was configured, but
-    // never let DIRECT compete with a healthy proxy inside a load-balance
-    // group.  A configured DIRECT is no longer discarded merely because
-    // fallback proxies also exist: "proxy;DIRECT" keeps meaning "use the
-    // proxy, and connect directly only once it has failed".  Under the EGI
-    // configuration repository fallback proxies are always present, so
-    // ";DIRECT" is otherwise silently inert.
+    // Unlike the default, keep a ";DIRECT" tier even with fallback proxies:
+    // the EGI configuration always sets fallbacks, which would make it inert.
     bool has_direct_group = false;
     set_proxy_list = DemoteDirect(opt_proxy_list_, &has_direct_group);
     if (set_proxy_list != opt_proxy_list_) {
@@ -3137,15 +3088,11 @@ void DownloadManager::SetProxyChain(const string &proxy_list,
                name_.c_str(), opt_proxy_list_.c_str(), set_proxy_list.c_str());
     }
 
-    // A direct connection is an acceptable substitute for the proxy only
-    // where something asked for one.  DemoteDirect() has left any DIRECT tier
-    // as a group of its own, so what StripDirect() removes here is exactly
-    // that tier and what remains is the real proxies.
     string real_proxies;
     StripDirect(set_proxy_list, &real_proxies);
     opt_proxy_mandatory_effective_ = !has_direct_group
-                           && ((real_proxies != "")
-                               || (set_proxy_fallback_list != ""));
+                                     && ((real_proxies != "")
+                                         || (set_proxy_fallback_list != ""));
   }
 
   // From this point on, use set_proxy_list and set_fallback_proxy_list as
@@ -3303,12 +3250,7 @@ string DownloadManager::GetFallbackProxyList() {
 }
 
 /**
- * True when using this proxy group means the request has left the local proxy
- * set: either it is a DIRECT tier, so the request goes out unproxied, or it is
- * one of the fallback groups, which are by construction off-site.
- *
- * Moving between the regular groups is ordinary load-balancing failover and is
- * not escalation.
+ * True for a DIRECT tier or a fallback group, i.e. leaving the local proxies.
  */
 bool DownloadManager::IsEscalatedProxyGroup(unsigned group_idx) const {
   if (!opt_proxy_groups_ || (group_idx >= opt_proxy_groups_->size()))
@@ -3358,9 +3300,7 @@ DownloadManager::ProxyInfo *DownloadManager::ChooseProxyUnlocked(
   const uint32_t key = (hash ? hash->Partial32() : 0);
   const map<uint32_t, ProxyInfo *>::iterator it = opt_proxy_map_.lower_bound(
       key);
-  // The map is empty whenever nothing in the current group is selectable, and
-  // lower_bound() then returns end().  Dereferencing it was undefined
-  // behaviour; "nothing to choose" is a state the callers already handle.
+  // Empty map: nothing in the current group is selectable.
   if (it == opt_proxy_map_.end())
     return NULL;
   ProxyInfo *proxy = it->second;
@@ -3377,14 +3317,8 @@ void DownloadManager::UpdateProxiesUnlocked(const string &reason) {
 
   // Identify number of non-burned proxies within the current group
   vector<ProxyInfo> *group = current_proxy_group();
-  // Nothing in this group is usable when every proxy in it has been burned,
-  // and -- since the burn count is then 0 -- when the group is empty, which a
-  // DNS refresh that drops every address of a proxy can leave behind.  Either
-  // way the subtraction below would wrap, and the two branches that follow
-  // would run prng_.Next(0) and index (*group)[0] on an empty vector.
-  // Publish "nothing is selectable" instead: the map holds ProxyInfo pointers
-  // into the group, so leaving the previous selection in place would hand
-  // ChooseProxyUnlocked() pointers into entries that have just been erased.
+  // All burned, or the group is empty after a DNS refresh.  Clear the map
+  // too: it holds pointers into the group.
   if (opt_proxy_groups_current_burned_ >= group->size()) {
     opt_proxy_map_.clear();
     opt_proxies_.clear();
@@ -3447,9 +3381,7 @@ void DownloadManager::UpdateProxiesUnlocked(const string &reason) {
 }
 
 /**
- * Opts in to CVMFS_PROXY_MANDATORY.  Must be called before the proxy chain is
- * installed: SetProxyChain() reads the policy while it normalises the chain,
- * and a chain already in place is not revisited.
+ * CVMFS_PROXY_MANDATORY.  Call before SetProxyChain(), which reads it.
  */
 void DownloadManager::EnableMandatoryProxy() {
   opt_proxy_mandatory_requested_ = true;
@@ -3457,9 +3389,7 @@ void DownloadManager::EnableMandatoryProxy() {
 
 
 /**
- * CVMFS_PROXY_FAILOVER_ON_SLOW.  True, the default, is the long-standing
- * behaviour: any proxy failure may carry the request out of the local proxy
- * set.  False requires the proxy to look unreachable first, see SwitchProxy().
+ * CVMFS_PROXY_FAILOVER_ON_SLOW; false enables the gate in SwitchProxy().
  */
 void DownloadManager::SetProxyFailoverOnSlow(bool value) {
   opt_proxy_failover_on_slow_ = value;
