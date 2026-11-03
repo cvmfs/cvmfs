@@ -678,6 +678,34 @@ TEST_F(T_Download, EscalatedProxyGroupClassification) {
 }
 
 
+TEST_F(T_Download, RecordProxySuccessOnlyForLocalProxies) {
+  // Mandatory normalisation keeps DIRECT next to a fallback list, so the
+  // chain has a local group, a DIRECT tier and a fallback group.
+  download_mgr.EnableMandatoryProxy();
+  download_mgr.SetProxyChain("http://127.0.0.1:3128;DIRECT",
+                             "http://127.0.0.2:3128",
+                             DownloadManager::kSetProxyBoth);
+  ASSERT_EQ(0, download_mgr.last_proxy_success_);
+
+  download_mgr.RecordProxySuccess("DIRECT");
+  EXPECT_EQ(0, download_mgr.last_proxy_success_);
+  download_mgr.RecordProxySuccess("http://127.0.0.2:3128");
+  EXPECT_EQ(0, download_mgr.last_proxy_success_);
+  download_mgr.RecordProxySuccess("BLOCKED");
+  EXPECT_EQ(0, download_mgr.last_proxy_success_);
+
+  // A fallback success while group 0 is current must not count either.
+  download_mgr.opt_proxy_groups_current_ = 0;
+  download_mgr.RecordProxySuccess("http://127.0.0.2:3128");
+  EXPECT_EQ(0, download_mgr.last_proxy_success_);
+
+  // A local success counts even when another job moved to the fallback.
+  download_mgr.opt_proxy_groups_current_ = 2;
+  download_mgr.RecordProxySuccess("http://127.0.0.1:3128");
+  EXPECT_NE(0, download_mgr.last_proxy_success_);
+}
+
+
 // ---------------------------------------------------------------------------
 // End-to-end: which peer actually receives the request.  Each of these was
 // confirmed to fail before the corresponding fix.

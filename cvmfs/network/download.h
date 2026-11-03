@@ -127,6 +127,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   FRIEND_TEST(T_Download, NoProxyChainIsNotSelectable);
   FRIEND_TEST(T_Download, EscalatedProxyGroupClassification);
   FRIEND_TEST(T_Download, ProxyChainDefaultsToPreviousBehaviour);
+  FRIEND_TEST(T_Download, RecordProxySuccessOnlyForLocalProxies);
   FRIEND_TEST(T_Download, MandatoryProxyBlockFailsAsProxyError);
 
  public:
@@ -279,7 +280,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   std::string DemoteDirect(const std::string &proxy_list,
                            bool *has_direct_group);
   bool IsEscalatedProxyGroup(unsigned group_idx) const;
-  void RecordProxySuccess();
+  void RecordProxySuccess(const std::string &proxy_url);
   bool ValidateGeoReply(const std::string &reply_order,
                         const unsigned expected_size,
                         std::vector<uint64_t> *reply_vals);
