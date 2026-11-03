@@ -2517,50 +2517,32 @@ void DownloadManager::SwitchProxy(JobInfo *info) {
     if (opt_proxy_groups_->size() > 1) {
       const unsigned next_group = (opt_proxy_groups_current_ + 1)
                                   % opt_proxy_groups_->size();
-      // With CVMFS_PROXY_FAILOVER_ON_SLOW turned off, leaving the local
-      // proxy set -- for an unproxied connection, or for an off-site fallback
-      // proxy -- needs evidence that the local proxy is actually unreachable.
-      // A proxy that is merely saturated answers requests, just too slowly,
-      // and reports itself as "too slow" or as a short transfer; that is a
-      // throughput symptom, not a dead peer, and escalating on it is what
-      // silently moves traffic off-site under load.  Stay on the group
-      // instead; the burn counter has just been cleared, so the proxy is
-      // usable again and the normal retry and backoff path decides whether
-      // the request ultimately fails.  The default leaves this step ungated,
-      // as it has always been.
+      // With CVMFS_PROXY_FAILOVER_ON_SLOW=no, a proxy that answered and then
+      // stalled is saturated, not dead; stay on the local group instead of
+      // escalating to DIRECT or an off-site fallback.  Only a timeout after the
+      // response started qualifies: an unresponsive peer, a resolve failure,
+      // an HTTP error (squid 502/503) or a truncated body escalate as before.
+      // The burn count was just cleared, so the retry path reuses the proxy.
       //
-      // Note the test is peer_unresponsive(), not kFailProxyConnection:
-      // libcurl reports a refused connect as CURLE_COULDNT_CONNECT but an
-      // unanswered one as CURLE_OPERATION_TIMEDOUT, so keying on the error
-      // code alone gets both cases exactly backwards.
-      //
-      // info is non-NULL on this path: the loop above only raises the burn
-      // count for a job, and a zero count returns before reaching here.
-      const bool proxy_unreachable = info->peer_unresponsive()
-                                     || (info->error_code()
-                                         == kFailProxyResolve);
+      // info is non-NULL here: a zero burn count returns above.
+      const bool proxy_saturated = !info->peer_unresponsive()
+                                   && (info->error_code() == kFailProxyTooSlow);
       const bool would_escalate = IsEscalatedProxyGroup(next_group)
                                   && !IsEscalatedProxyGroup(
                                       opt_proxy_groups_current_);
-      // Withholding the step is only defensible while the local proxy set is
-      // demonstrably still serving.  Without this, a cache that fails in a
-      // way that still delivers bytes -- truncating every body, answering
-      // with garbage -- would never look unreachable, and the client would
-      // stay on it for good rather than use a healthy fallback.  Two timeout
-      // periods with nothing completing anywhere in the group is taken as
-      // having no current evidence.  It makes the gate load-dependent on
-      // purpose: the saturation it exists for only happens under load, and a
-      // near-idle client falls back to the stock behaviour.
+      // Withhold only while a local proxy completed a request within the
+      // last two timeouts, so a cache that never serves cannot pin the client.
       const time_t evidence_secs = 2 * static_cast<time_t>(opt_timeout_proxy_);
       const bool proxy_recently_served = (last_proxy_success_ != 0)
                                          && ((time(NULL) - last_proxy_success_)
                                              <= evidence_secs);
-      if (!opt_proxy_failover_on_slow_ && would_escalate && !proxy_unreachable
+      if (!opt_proxy_failover_on_slow_ && would_escalate && proxy_saturated
           && proxy_recently_served) {
         LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
                  "(manager '%s' - id %" PRId64 ") "
-                 "keeping proxy group %u: '%s' does not show the proxy to be "
-                 "unreachable, so not falling back to group %u",
+                 "keeping proxy group %u: '%s' after a started response "
+                 "means the proxy is slow, not down; not falling back to "
+                 "group %u",
                  name_.c_str(), info->id(), opt_proxy_groups_current_,
                  Code2Ascii(info->error_code()), next_group);
         UpdateProxiesUnlocked("failed proxy, escalation withheld");
