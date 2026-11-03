@@ -1207,6 +1207,45 @@ TEST_F(T_Download, SlowProxyDoesNotEscalateToFallback) {
 }
 
 
+TEST_F(T_Download, WithheldEscalationIsCappedPerJob) {
+  // With several fallback groups, opt_num_proxies_ would allow the job to
+  // retry the slow local proxy once per configured proxy.  The cap lets it
+  // stay once and then escalate.
+  string src_path = GetSmallFile();
+  MockFileServer origin(8126, sandbox_path_);
+  StallingProxy slow_proxy;
+  ASSERT_TRUE(slow_proxy.Start(8127));
+  int fallback_hits = 0;
+  MockHTTPServer fallback_proxy(8128);
+  ASSERT_TRUE(
+      fallback_proxy.SetResponseCallback(CountingProxyHandler, &fallback_hits));
+  ASSERT_TRUE(fallback_proxy.Start());
+
+  download_mgr.SetProxyFailoverOnSlow(false);
+  download_mgr.SetProxyChain(
+      "http://127.0.0.1:8127",
+      "http://127.0.0.1:8128;http://127.0.0.1:8129;http://127.0.0.1:8132",
+      DownloadManager::kSetProxyBoth);
+  download_mgr.SetRetryParameters(0, 0, 0);
+  download_mgr.SetTimeout(1, 1);
+  download_mgr.last_proxy_success_ = time(NULL) + 3600;
+
+  const string url = "http://127.0.0.1:8126/" + GetFileName(src_path);
+  cvmfs::MemSink sink;
+  JobInfo info(&url, false /* compressed */, false /* probe hosts */, NULL,
+               &sink);
+  download_mgr.Fetch(&info);
+
+  EXPECT_EQ(2, slow_proxy.hits());
+  EXPECT_EQ(1, info.num_withheld_escalations());
+  EXPECT_EQ(1, fallback_hits);
+  EXPECT_EQ(kFailOk, info.error_code());
+  EXPECT_EQ("http://127.0.0.1:8128", info.proxy());
+  slow_proxy.Stop();
+  fallback_proxy.Stop();
+}
+
+
 TEST_F(T_Download, ValidateGeoReply) {
   vector<uint64_t> geo_order;
   EXPECT_FALSE(download_mgr.ValidateGeoReply("", geo_order.size(), &geo_order));

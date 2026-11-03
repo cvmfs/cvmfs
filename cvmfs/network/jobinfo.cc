@@ -81,6 +81,7 @@ void JobInfo::Init() {
   num_used_metalinks_ = 0;
   num_used_hosts_ = 0;
   num_retries_ = 0;
+  num_withheld_escalations_ = 0;
   backoff_ms_ = 0;
   current_metalink_chain_index_ = -1;
   current_host_chain_index_ = -1;

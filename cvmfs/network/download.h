@@ -134,6 +134,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   FRIEND_TEST(T_Download, ShortTransferBypassesTheGate);
   FRIEND_TEST(T_Download, ProxyHttpErrorBypassesTheGate);
   FRIEND_TEST(T_Download, SlowProxyEscalatesToDirectByDefault);
+  FRIEND_TEST(T_Download, WithheldEscalationIsCappedPerJob);
 
  public:
   // HostInfo is used for both metalink and host
@@ -419,9 +420,10 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
    * CVMFS_PROXY_FAILOVER_ON_SLOW, on by default, which is the behaviour the
    * client has always had: any proxy failure, including one that only says
    * the proxy is slow, may carry the request out of the local proxy set and
-   * on to a DIRECT tier or an off-site fallback proxy.  Turning it off makes
-   * that step require evidence that the proxy is actually unreachable; see
-   * SwitchProxy().
+   * on to a DIRECT tier or an off-site fallback proxy.  Turning it off keeps
+   * a slow but answering proxy for one more attempt per request; see
+   * SwitchProxy().  Worst case, a request on a saturated proxy takes one
+   * extra CVMFS_TIMEOUT before it escalates.
    */
   bool opt_proxy_failover_on_slow_;
   /**
