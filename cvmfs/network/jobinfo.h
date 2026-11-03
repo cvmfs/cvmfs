@@ -107,6 +107,7 @@ class JobInfo {
   unsigned char num_used_metalinks_;
   unsigned char num_used_hosts_;
   unsigned char num_retries_;
+  unsigned char num_withheld_escalations_;
   unsigned backoff_ms_;
   int current_metalink_chain_index_;
   int current_host_chain_index_;
@@ -215,6 +216,9 @@ class JobInfo {
   unsigned char num_used_metalinks() const { return num_used_metalinks_; }
   unsigned char num_used_hosts() const { return num_used_hosts_; }
   unsigned char num_retries() const { return num_retries_; }
+  unsigned char num_withheld_escalations() const {
+    return num_withheld_escalations_;
+  }
   unsigned backoff_ms() const { return backoff_ms_; }
   int current_metalink_chain_index() const {
     return current_metalink_chain_index_;
@@ -278,6 +282,9 @@ class JobInfo {
     num_used_hosts_ = num_used_hosts;
   }
   void SetNumRetries(unsigned char num_retries) { num_retries_ = num_retries; }
+  void SetNumWithheldEscalations(unsigned char n) {
+    num_withheld_escalations_ = n;
+  }
   void SetBackoffMs(unsigned backoff_ms) { backoff_ms_ = backoff_ms; }
   void SetCurrentMetalinkChainIndex(int current_metalink_chain_index) {
     current_metalink_chain_index_ = current_metalink_chain_index;

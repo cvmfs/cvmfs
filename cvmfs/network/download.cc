@@ -168,6 +168,13 @@ static bool ResponseStarted(CURL *handle) {
  * Called by curl for every HTTP header. Not called for file:// transfers.
  */
 /**
+ * Per job, how often SwitchProxy() may keep a slow local proxy instead of
+ * escalating.  Bounds the extra latency to this many CVMFS_TIMEOUT periods.
+ */
+static const unsigned kMaxWithheldEscalations = 1;
+
+
+/**
  * Installed on a handle whose request must not go out.  curl then fails with
  * CURLE_COULDNT_CONNECT without opening a socket, whatever CURLOPT_PROXY says.
  */
@@ -2531,13 +2538,17 @@ void DownloadManager::SwitchProxy(JobInfo *info) {
                                   && !IsEscalatedProxyGroup(
                                       opt_proxy_groups_current_);
       // Withhold only while a local proxy completed a request within the
-      // last two timeouts, so a cache that never serves cannot pin the client.
+      // last two timeouts, so a cache that never serves cannot pin the client,
+      // and only kMaxWithheldEscalations times per job: each withhold costs
+      // the job another CVMFS_TIMEOUT on the same proxy.
       const time_t evidence_secs = 2 * static_cast<time_t>(opt_timeout_proxy_);
       const bool proxy_recently_served = (last_proxy_success_ != 0)
                                          && ((time(NULL) - last_proxy_success_)
                                              <= evidence_secs);
       if (!opt_proxy_failover_on_slow_ && would_escalate && proxy_saturated
-          && proxy_recently_served) {
+          && proxy_recently_served
+          && (info->num_withheld_escalations() < kMaxWithheldEscalations)) {
+        info->SetNumWithheldEscalations(info->num_withheld_escalations() + 1);
         LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
                  "(manager '%s' - id %" PRId64 ") "
                  "keeping proxy group %u: '%s' after a started response "
