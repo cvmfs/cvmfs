@@ -167,6 +167,17 @@ static bool ResponseStarted(CURL *handle) {
 /**
  * Called by curl for every HTTP header. Not called for file:// transfers.
  */
+/**
+ * Installed on a handle whose request must not go out.  curl then fails with
+ * CURLE_COULDNT_CONNECT without opening a socket, whatever CURLOPT_PROXY says.
+ */
+static curl_socket_t CallbackRefuseSocket(void * /* clientp */,
+                                          curlsocktype /* purpose */,
+                                          struct curl_sockaddr * /* addr */) {
+  return CURL_SOCKET_BAD;
+}
+
+
 static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
                                  void *info_link) {
   const size_t num_bytes = size * nmemb;
@@ -1030,6 +1041,11 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
 
   const MutexLockGuard m(lock_options_);
 
+  // NULL restores curl's default; the handle may carry the refusing callback
+  // from an earlier attempt.
+  curl_easy_setopt(curl_handle, CURLOPT_OPENSOCKETFUNCTION,
+                   static_cast<curl_opensocket_callback>(NULL));
+
   // sharding policy
   if (sharding_policy_.UseCount() > 0) {
     if (info->proxy() != "") {
@@ -1067,28 +1083,19 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
     ProxyInfo *proxy = ChooseProxyUnlocked(info->expected_hash());
     if (!proxy || (proxy->url == "DIRECT")) {
       if (opt_proxy_mandatory_) {
-        // Every configured proxy is currently unusable.  Connecting directly
-        // would bypass the site proxy, so fail the request and let the normal
-        // retry/backoff path report the outage.
-        //
-        // The request is failed by pointing the handle at an address that
-        // cannot be connected to, rather than by returning early, so that the
-        // attempt still runs through the ordinary curl result handling and is
-        // counted, retried and reported like any other failure.  0.0.0.0:1
-        // fails immediately and without a DNS lookup.
-        //
-        // The proxy is recorded as "BLOCKED" rather than "DIRECT" because the
-        // classification in VerifyAndFinalize() reads info->proxy(): the
-        // string "DIRECT" would make this look like a *host* problem and send
-        // the client roaming the CVMFS_SERVER_URL list, when in fact only the
-        // proxy is at fault.  Any value other than "DIRECT" gives the right
-        // answer; a distinct one also makes the state visible in the logs.
+        // No usable proxy and DIRECT is not allowed.  The attempt still runs
+        // through curl so it is retried and reported like any other failure,
+        // but the socket callback refuses to connect anywhere.  "BLOCKED"
+        // rather than "DIRECT" so VerifyAndFinalize() classifies it as a
+        // proxy failure, not a host failure.
         LogCvmfs(kLogDownload, kLogSyslogErr | kLogDebug,
                  "(manager '%s' - id %" PRId64 ") "
                  "no usable proxy available, refusing to connect directly",
                  name_.c_str(), info->id());
         info->SetProxy("BLOCKED");
         curl_easy_setopt(info->curl_handle(), CURLOPT_PROXY, "0.0.0.0:1");
+        curl_easy_setopt(info->curl_handle(), CURLOPT_OPENSOCKETFUNCTION,
+                         CallbackRefuseSocket);
       } else {
         info->SetProxy("DIRECT");
         curl_easy_setopt(info->curl_handle(), CURLOPT_PROXY, "");
@@ -1111,6 +1118,8 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
       } else {
         // We know it can't work, don't even try to download
         curl_easy_setopt(info->curl_handle(), CURLOPT_PROXY, "0.0.0.0");
+        curl_easy_setopt(info->curl_handle(), CURLOPT_OPENSOCKETFUNCTION,
+                         CallbackRefuseSocket);
       }
     }
   }  // end !sharding

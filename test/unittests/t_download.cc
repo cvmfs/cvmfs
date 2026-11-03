@@ -788,6 +788,33 @@ TEST_F(T_Download, ProxyWithoutDirectNeverLeaks) {
 }
 
 
+TEST_F(T_Download, MandatoryProxyBlockFailsAsProxyError) {
+  // With every proxy burned and no DIRECT tier, the request is failed as a
+  // proxy error without reaching the origin.
+  string src_path = GetSmallFile();
+  MockFileServer origin(8130, sandbox_path_);
+
+  download_mgr.EnableMandatoryProxy();
+  download_mgr.SetProxyChain("http://127.0.0.1:8131", "",
+                             DownloadManager::kSetProxyBoth);
+  download_mgr.SetRetryParameters(0, 0, 0);
+  ASSERT_TRUE(download_mgr.opt_proxy_mandatory_);
+  download_mgr.opt_proxy_groups_current_burned_ = 1;
+  download_mgr.UpdateProxiesUnlocked("test: all burned");
+  ASSERT_TRUE(download_mgr.ChooseProxyUnlocked(NULL) == NULL);
+
+  const string url = "http://127.0.0.1:8130/" + GetFileName(src_path);
+  cvmfs::MemSink sink;
+  JobInfo info(&url, false /* compressed */, false /* probe hosts */, NULL,
+               &sink);
+  download_mgr.Fetch(&info);
+
+  EXPECT_EQ(kFailProxyConnection, info.error_code());
+  EXPECT_EQ("BLOCKED", info.proxy());
+  EXPECT_EQ(0, origin.num_processed_requests());
+}
+
+
 namespace {
 /**
  * Stands in for a proxy that starts healthy and then saturates.  The first
