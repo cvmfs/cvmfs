@@ -203,11 +203,10 @@ class JobInfo {
   std::string link() const { return link_; }
   bool nocache() const { return nocache_; }
   /**
-   * True when the failure means the peer never answered at all: the connect
-   * ran out of time without completing, or the network reported the peer as
-   * unreachable.  A refused connection does not count -- the peer answered,
-   * with a reset -- and neither does a connection that was established and
-   * then ran slowly.
+   * True when the peer never sent a byte of the response: the connect failed
+   * (including ECONNREFUSED) or timed out, or the connection was accepted and
+   * then nothing came back.  A transfer that started and then ran slowly does
+   * not count.
    */
   bool peer_unresponsive() const { return peer_unresponsive_; }
   Failures error_code() const { return error_code_; }
