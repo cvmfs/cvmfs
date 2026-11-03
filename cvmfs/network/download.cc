@@ -1582,7 +1582,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
       }
 
       info->SetErrorCode(kFailOk);
-      RecordProxySuccess();
+      RecordProxySuccess(info->proxy());
       break;
     case CURLE_UNSUPPORTED_PROTOCOL:
       info->SetErrorCode(kFailUnsupportedProtocol);
@@ -3328,18 +3328,29 @@ bool DownloadManager::IsEscalatedProxyGroup(unsigned group_idx) const {
 
 
 /**
- * Notes that a request has just completed through a proxy of a local
- * (non-escalated) group, which is the evidence the escalation gate in
- * SwitchProxy() rests on.  A success on a DIRECT tier or a fallback proxy
- * says nothing about the local proxy set and is deliberately not recorded.
+ * Records evidence for the escalation gate in SwitchProxy(): a request has
+ * completed through `proxy_url`, and that proxy is a member of a local
+ * (non-escalated) group.  The group is looked up rather than taken from
+ * opt_proxy_groups_current_, which another job may have changed since this
+ * one selected its proxy.
  */
-void DownloadManager::RecordProxySuccess() {
+void DownloadManager::RecordProxySuccess(const std::string &proxy_url) {
+  if (proxy_url.empty() || (proxy_url == "DIRECT") || (proxy_url == "BLOCKED"))
+    return;
   const MutexLockGuard m(lock_options_);
-  if (!opt_proxy_groups_ || opt_proxy_groups_->empty())
+  if (!opt_proxy_groups_)
     return;
-  if (IsEscalatedProxyGroup(opt_proxy_groups_current_))
-    return;
-  last_proxy_success_ = time(NULL);
+  for (unsigned i = 0; i < opt_proxy_groups_->size(); ++i) {
+    if (IsEscalatedProxyGroup(i))
+      continue;
+    const std::vector<ProxyInfo> &group = (*opt_proxy_groups_)[i];
+    for (unsigned j = 0; j < group.size(); ++j) {
+      if (group[j].url == proxy_url) {
+        last_proxy_success_ = time(NULL);
+        return;
+      }
+    }
+  }
 }
 
 
