@@ -6,6 +6,7 @@
 #define CVMFS_GARBAGE_COLLECTION_GARBAGE_COLLECTOR_IMPL_H_
 
 #include <algorithm>
+#include <ctime>
 #include <limits>
 #include <string>
 #include <vector>
@@ -172,7 +173,7 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::SweepDataObjects(
              "      - %02.0f%%    %" PRIu64 " / %" PRIu64
              " unreferenced revisions removed [%s]",
              100.0 * threshold, condemned_trees_, unreferenced_trees_,
-             RfcTimestamp().c_str());
+             StringifyLocalTime(time(NULL)).c_str());
     last_reported_status_ = threshold;
   }
 }
@@ -284,7 +285,7 @@ template<class CatalogTraversalT, class HashFilterT>
 bool GarbageCollector<CatalogTraversalT,
                       HashFilterT>::AnalyzePreservedCatalogTree() {
   LogCvmfs(kLogGc, kLogStdout, "  --> marking unreferenced objects [%s]",
-           RfcTimestamp().c_str());
+           StringifyLocalTime(time(NULL)).c_str());
   if (configuration_.verbose) {
     LogCvmfs(kLogGc, kLogStdout | kLogDebug,
              "Preserving data objects in latest revision");
@@ -324,7 +325,7 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepExcludedCatalogs() {
     return true;
 
   LogCvmfs(kLogGc, kLogStdout, "  --> pruning excluded subtrees [%s]",
-           RfcTimestamp().c_str());
+           StringifyLocalTime(time(NULL)).c_str());
   // Excluded catalogs listed in the reflog are already removed by SweepReflog.
   // This pass covers those missing from the reflog. It needs a fresh traversal
   // because the marking traversal remembers all visited catalogs.
@@ -346,7 +347,7 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepExcludedCatalogs() {
 template<class CatalogTraversalT, class HashFilterT>
 bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepReflog() {
   LogCvmfs(kLogGc, kLogStdout, "  --> sweeping unreferenced objects [%s]",
-           RfcTimestamp().c_str());
+           StringifyLocalTime(time(NULL)).c_str());
 
   const ReflogTN *reflog = configuration_.reflog;
   std::vector<shash::Any> catalogs;
@@ -381,7 +382,7 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepReflog() {
 
   configuration_.uploader->WaitForUpload();
   LogCvmfs(kLogGc, kLogStdout, "  --> done garbage collecting [%s]",
-           RfcTimestamp().c_str());
+           StringifyLocalTime(time(NULL)).c_str());
   return success && (configuration_.uploader->GetNumberOfErrors() == 0);
 }
 
