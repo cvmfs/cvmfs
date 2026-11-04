@@ -1376,6 +1376,12 @@ cvmfs_reload() {
   RETVAL=0
   local mount_list
   mount_list=`list_mounts | awk '{print $3}'`
+  if [ "x$CVMFS_CONFIG_REPOSITORY" != "x" ]; then
+    # The config repo may not be mounted yet, and reading any repository's
+    # configuration below can automount it. Canonical so that the pause loop
+    # below still skips it.
+    mount_list="$mount_list $(canonicalize_path ${CVMFS_MOUNT_DIR}/${CVMFS_CONFIG_REPOSITORY})"
+  fi
   # Make sure that if autofs unmounts any of these guys, they (but only they)
   # can be remounted
   for m in $mount_list
@@ -1410,7 +1416,6 @@ cvmfs_reload() {
 
   if [ "x${CVMFS_CONFIG_REPOSITORY}" != "x" ]; then
     # If we have a config repository, now is the time to pause it at the very end
-    touch ${CVMFS_RELOAD_SOCKETS}/cvmfs.pause/$(echo -n "${CVMFS_MOUNT_DIR}/${CVMFS_CONFIG_REPOSITORY}" | base64_nowrap)
     _cvmfs_reload_pause "${CVMFS_MOUNT_DIR}/${CVMFS_CONFIG_REPOSITORY}" &&
       _cvmfs_reload_waitfor "${CVMFS_RELOAD_SOCKETS}/cvmfs.${CVMFS_CONFIG_REPOSITORY}.paused"
   fi
@@ -1446,7 +1451,7 @@ cvmfs_reload() {
   if stat ${CVMFS_RELOAD_SOCKETS}/pid.* >/dev/null 2>&1; then
     if [ "x$CVMFS_CONFIG_REPOSITORY" != "x" ]; then
       # This is for the unlikely case that the config repo got
-      # unmounted by the autmounter between the time that the
+      # unmounted by the automounter between the time that the
       # _cvmfs_reload_pause above deleted this file and now.
       touch ${CVMFS_RELOAD_SOCKETS}/cvmfs.pause/$(echo -n "${CVMFS_MOUNT_DIR}/${CVMFS_CONFIG_REPOSITORY}" | base64_nowrap)
     fi
