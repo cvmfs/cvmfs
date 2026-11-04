@@ -1688,7 +1688,7 @@ cvmfs_reload() {
   if stat ${CVMFS_RELOAD_SOCKETS}/pid.* >/dev/null 2>&1; then
     if [ "x$CVMFS_CONFIG_REPOSITORY" != "x" ]; then
       # This is for the unlikely case that the config repo got
-      # unmounted by the autmounter between the time that the
+      # unmounted by the automounter between the time that the
       # _cvmfs_reload_pause above deleted this file and now.
       touch ${CVMFS_RELOAD_SOCKETS}/cvmfs.pause/$(echo -n "${CVMFS_MOUNT_DIR}/${CVMFS_CONFIG_REPOSITORY}" | base64_nowrap)
     fi
