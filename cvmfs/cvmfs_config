@@ -1613,17 +1613,18 @@ cvmfs_reload() {
   RETVAL=0
   local mount_list
   mount_list=`list_mounts | awk '{print $3}'`
+  if [ "x$CVMFS_CONFIG_REPOSITORY" != "x" ]; then
+    # The config repo may not be mounted yet, and reading any repository's
+    # configuration below can automount it. Canonical so that the pause loop
+    # below still skips it.
+    mount_list="$mount_list $(canonicalize_path ${CVMFS_MOUNT_DIR}/${CVMFS_CONFIG_REPOSITORY})"
+  fi
   # Make sure that if autofs unmounts any of these guys, they (but only they)
   # can be remounted
   for m in $mount_list
   do
     touch ${CVMFS_RELOAD_SOCKETS}/cvmfs.pause/$(echo -n "$m" | base64_nowrap)
   done
-  if [ "x$CVMFS_CONFIG_REPOSITORY" != "x" ]; then
-    # The config repo may be missing from the mount list, and reading any
-    # repository's configuration below can automount it
-    touch ${CVMFS_RELOAD_SOCKETS}/cvmfs.pause/$(echo -n "${CVMFS_MOUNT_DIR}/${CVMFS_CONFIG_REPOSITORY}" | base64_nowrap)
-  fi
 
   # Avoid deadlock if cwd is on cvmfs
   cd /
