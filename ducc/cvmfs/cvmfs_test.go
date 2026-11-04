@@ -250,3 +250,22 @@ func TestOverlay(t *testing.T) {
 		t.Fatalf("Marker file missing expected layers, got: %s", content)
 	}
 }
+
+func TestOverlaySubdir(t *testing.T) {
+	mockrepo := filepath.Clean("/" + os.Getenv("CVMFS_TEST_REPO"))
+	subdirName := "overlay_subdir"
+	fullRepoPath := ".." + mockrepo + "///" + subdirName
+
+	// cvmfs_server must receive the bare repository name, and the destination
+	// must land inside the subdirectory
+	destPath := "overlay_test"
+	err := Overlay(fullRepoPath, []string{"layer1"}, destPath)
+	if err != nil {
+		t.Fatalf("Overlay failed: %s", err)
+	}
+
+	markerPath := filepath.Join(mockrepo, subdirName, destPath, ".overlay_marker")
+	if _, err := os.Stat(markerPath); err != nil {
+		t.Fatalf("Overlay did not create %s: %s", markerPath, err)
+	}
+}
