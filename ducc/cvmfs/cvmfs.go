@@ -620,6 +620,11 @@ func OverlayWithLogger(logger *log.Entry, CVMFSRepo string, layerPaths []string,
 		return fmt.Errorf("no layer paths provided for overlay")
 	}
 
+	// cvmfs_server only knows the repository name: the subdirectory goes into
+	// the destination, as it already does for the layer paths
+	repoName, _ := GetRepoAndSubdir(CVMFSRepo)
+	destPath = PrefixRepoSubdirOnce(CVMFSRepo, destPath)
+
 	layers := strings.Join(layerPaths, ",")
 
 	llog := func(entry *log.Entry) *log.Entry {
@@ -635,11 +640,6 @@ func OverlayWithLogger(logger *log.Entry, CVMFSRepo string, layerPaths []string,
 
 	getLock(CVMFSRepo)
 	defer unlock(CVMFSRepo)
-
-	// cvmfs_server only knows the repository name: the subdirectory goes into
-	// the destination, as it already does for the layer paths
-	repoName, _ := GetRepoAndSubdir(CVMFSRepo)
-	destPath = PrefixRepoSubdirOnce(CVMFSRepo, destPath)
 
 	args := []string{"cvmfs_server", "overlay",
 		"-l", layers,
