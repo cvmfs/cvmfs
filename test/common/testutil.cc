@@ -47,7 +47,8 @@ pid_t GetParentPid(const pid_t pid) {
 
   mib[3] = pid;
   len = sizeof(kp);
-  if (sysctl(mib, 4, &kp, &len, NULL, 0) == 0) {
+  // A nonexistent pid yields success with len == 0 and kp untouched
+  if (sysctl(mib, 4, &kp, &len, NULL, 0) == 0 && len > 0) {
     parent_pid = kp.kp_eproc.e_ppid;
   }
 #else
