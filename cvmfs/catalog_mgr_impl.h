@@ -855,10 +855,15 @@ void AbstractCatalogManager<CatalogT>::StageNestedCatalogAndUnlock(
     if (!is_listable && (path_len == mountpoint_len))
       break;
 
+    // Copy before unlocking: `i` points into the parent catalog, which the
+    // quota back channel (DetachNested on the pinned-files high watermark)
+    // may delete while the catalog is being staged without the lock held.
+    const shash::Any nested_hash = i->hash;
+    const PathString nested_mountpoint = i->mountpoint;
     Unlock();
     LogCvmfs(kLogCatalog, kLogDebug, "staging nested catalog at %s (%s)",
-             i->mountpoint.c_str(), i->hash.ToString().c_str());
-    StageNestedCatalogByHash(i->hash, i->mountpoint);
+             nested_mountpoint.c_str(), nested_hash.ToString().c_str());
+    StageNestedCatalogByHash(nested_hash, nested_mountpoint);
     return;
   }
   Unlock();

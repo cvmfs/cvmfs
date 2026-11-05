@@ -320,6 +320,7 @@ set(CVMFS_UNITTEST_SOURCES
   t_catalog_traversal.cc
   t_catalog_virtual.cc
   t_chunk_detectors.cc
+  t_chunk_readahead.cc
   t_clientctx.cc
   t_compression.cc
   t_compressor.cc
