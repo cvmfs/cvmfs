@@ -1,0 +1,10 @@
+set -x
+set -e
+subshell_output=$(echo -n a)
+echo "subshell output is '$subshell_output'" | grep "subshell output is 'a'"
+true |& cat
+VARNAME=1
+[[ -v VARNAME ]]
+
+source test/test_functions
+get_millisecond_epoch

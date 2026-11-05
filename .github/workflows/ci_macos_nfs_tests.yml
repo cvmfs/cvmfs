@@ -169,6 +169,22 @@ jobs:
           sudo ln -sf "$(brew --prefix)/bin/gtimeout" /usr/local/bin/timeout
           sudo ln -sf "$(brew --prefix)/bin/greadlink" /usr/local/bin/greadlink
 
+      - name: Install modern bash
+        run: |
+          brew install bash
+          brew info bash
+          sudo ln -s `brew --prefix`/bin/bash /usr/local/bin/bash
+          echo $PATH
+          bash --version
+          /bin/bash --version
+          which bash || true
+          env bash
+          `brew --prefix`/bin/bash --version
+          cd ${GITHUB_WORKSPACE}
+          /bin/bash ci/bash-test || true # epic failures expected
+          bash ci/bash-test
+          `brew --prefix`/bin/bash ci/bash-test
+
       - name: Install package
         run: |
           sudo installer -pkg pkg/cvmfs-*.pkg -target / \

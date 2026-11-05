@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 cvmfs_test_name="Large directory listings"
 cvmfs_test_autofs_on_startup=false
 

@@ -32,6 +32,22 @@ jobs:
           hdiutil detach /Volumes/macFUSE || true
           ls -la /usr/local/lib/libfuse* /usr/local/include/fuse3
 
+      - name: Install modern bash
+        run: |
+          brew install bash
+          brew info bash
+          sudo ln -s `brew --prefix`/bin/bash /usr/local/bin/bash
+          echo $PATH
+          bash --version
+          /bin/bash --version
+          which bash || true
+          env bash
+          `brew --prefix`/bin/bash --version
+          cd ${GITHUB_WORKSPACE}
+          /bin/bash ci/bash-test || true # epic failures expected
+          bash ci/bash-test
+          `brew --prefix`/bin/bash ci/bash-test
+
       - name: Build CVMFS
         run: |
           cd ${GITHUB_WORKSPACE}

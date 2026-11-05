@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #!/bin/sh -x
 
 cvmfs_test_name="Test CVMFS over HTTPS with HTTP Bearer Authorization"

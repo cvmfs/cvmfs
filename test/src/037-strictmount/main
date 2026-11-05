@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 cvmfs_test_name="Enforce CVMFS_STRICT_MOUNT"
 cvmfs_test_suites="quick"

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 cvmfs_test_name="Start image from runc"
 cvmfs_test_suites="quick"
 

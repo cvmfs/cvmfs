@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 cvmfs_test_name="Commit command in a repository connected to the gateway"
 cvmfs_test_autofs_on_startup=false
 #TODO(vavolkl): Investigate flaky test, and re-add to quick suite

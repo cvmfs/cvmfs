@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 cvmfs_test_name="Check that open cache file descriptors from different processes are not duplicated in cvmfs"
 cvmfs_test_suites="quick"

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 cvmfs_test_name="Setting CVMFS_FALLBACK_PROXY"
 cvmfs_test_suites="quick"

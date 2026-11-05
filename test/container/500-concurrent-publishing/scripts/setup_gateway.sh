@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # setup_gateway.sh – initialise the gateway Stratum-0 inside a container.
 #
 # Set USE_SYSTEMCTL=1 to manage services via systemd (the default when the

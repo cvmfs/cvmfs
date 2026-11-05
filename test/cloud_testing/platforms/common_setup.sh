@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 portable_dirname() {
   if [ "x$(uname -s)" = "xDarwin" ]; then

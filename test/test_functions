@@ -1,4 +1,9 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
+# bash self-test against outdated bash shipped with macos
+if ! bash -c ': |& cat'; then
+  sudo kill -9 $$
+fi
 
 CVMFS_SERVER_APACHE_RELOAD_IS_RESTART=true
 # Written as CVMFS_MOUNT_BACKEND to default.local; empty keeps the installed default
@@ -455,7 +460,7 @@ wait_for_umount() {
 cvmfs_clean() {
   pkill   openwaitprint || true
   pidwait openwaitprint || true
-  sudo cvmfs_config umount > /dev/null  || return 100
+  sudo cvmfs_config umount || return 100
   sudo sh -c "rm -rf /var/lib/cvmfs/*"                  || return 101
   if running_on_osx; then
     rm -rf "$HOME/Library/Caches/cvmfs"                  || return 101
@@ -546,7 +551,7 @@ cvmfs_mount() {
     cvmfs_mount_direct $repositories
   fi
 
-  $proberunner cvmfs_config probe > /dev/null 2>&1 || return 101
+  $proberunner cvmfs_config probe || return 101
 
   return 0
 }
@@ -570,7 +575,7 @@ _cvmfs_mount_manually() {
   local repository=$1
   cvmfs_config status | grep -q "/cvmfs/$repository" && return 0
   mkdir -p "/cvmfs/$repository" 2>/dev/null || sudo mkdir -p "/cvmfs/$repository"
-  _cvmfs_mount_cmd "$repository" >/dev/null
+  _cvmfs_mount_cmd "$repository"
   if running_on_osx; then
     sleep 3
   fi
@@ -588,9 +593,9 @@ cvmfs_umount() {
   for r in $(echo $repositories | tr , " "); do
     while (( result != 0 && times > 0  )); do
       if [ "$sys_arch" = "Darwin" ] && is_nfs_mount /cvmfs/$r; then
-        sudo umount -f /cvmfs/$r 2>/dev/null
+        sudo umount -f /cvmfs/$r
       else
-        sudo umount /cvmfs/$r > /dev/null 2>&1
+        sudo umount /cvmfs/$r
       fi
       result=$?
       times=$(( $times - 1 ))
@@ -2533,7 +2538,7 @@ try_automount() {
       retval=0
     else
       mkdir -p "/cvmfs/$repo" 2>/dev/null || sudo mkdir -p "/cvmfs/$repo"
-      _cvmfs_mount_cmd "$repo" >/dev/null 2>&1
+      _cvmfs_mount_cmd "$repo"
       retval=$?
     fi
     sleep 3
