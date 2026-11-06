@@ -118,16 +118,19 @@ EOC
 
 # Starts cvmfs2 in the foreground under strace, in the background of the test
 mount_under_strace() {
-  echo "*** mounting $CVMFS_TEST115_REPO under strace (getxattr delayed by ${CVMFS_TEST115_DELAY}s)"
+  echo "*** mounting $CVMFS_TEST115_REPO under strace (first getxattr delayed by ${CVMFS_TEST115_DELAY}s)"
   # strace needs root so that the traced cvmfs2 can perform the fuse mount
   # (ptrace strips the setuid bit from fusermount for unprivileged tracers).
   # -f follows all threads and forked processes of cvmfs2, -tt timestamps every
   # traced call; the log is restricted to the xattr family to keep it small.
   # cvmfs2 runs in the foreground (-f) so that strace stays attached to the
   # actual fuse daemon and not only to a short-lived parent.
+  # when=1 delays only the first getxattr() of the process: the size query of
+  # the hash collector.  The subsequent fetch of the value runs undelayed, so
+  # the collector thread continues right after the first delay expires.
   sudo strace -f -tt -o "$CVMFS_TEST115_STRACE_LOG" \
     -e trace=/xattr \
-    -e inject=getxattr:delay_enter=${CVMFS_TEST115_DELAY}s \
+    -e inject=getxattr:delay_enter=${CVMFS_TEST115_DELAY}s:when=1 \
     cvmfs2 -f -o allow_other,config="$CVMFS_TEST115_CONFIG" \
       $CVMFS_TEST115_REPO "$CVMFS_TEST115_MOUNTPOINT" \
     > "$CVMFS_TEST115_CVMFS2_LOG" 2>&1 &
@@ -272,9 +275,9 @@ cleanup_cache() {
 }
 
 # Checks the complete strace log (call after unmount_and_wait): cvmfs2 must
-# have issued the getxattr() of the hash collector, and every getxattr() must
-# have been held by strace.  A held call that never returned because cvmfs2
-# exited meanwhile shows up as "= ?" instead of "(DELAYED)".
+# have issued the getxattr() of the hash collector, and exactly the first
+# getxattr() must have been held by strace.  A held call that never returned
+# because cvmfs2 exited meanwhile shows up as "= ?" instead of "(DELAYED)".
 inspect_strace_log() {
   echo "*** inspecting strace log"
   sudo chown $(id -u):$(id -g) "$CVMFS_TEST115_STRACE_LOG" || return 1
@@ -293,8 +296,8 @@ inspect_strace_log() {
     echo "  the cache cleanup did not query the open hashes via getxattr()"
     return 2
   fi
-  if [ $num_entries -ne $(( num_delayed + num_aborted )) ]; then
-    echo "  not every getxattr() of cvmfs2 was delayed by strace"
+  if [ $(( num_delayed + num_aborted )) -ne 1 ]; then
+    echo "  expected exactly the first getxattr() of cvmfs2 to be held by strace"
     return 3
   fi
 }
