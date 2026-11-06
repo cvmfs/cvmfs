@@ -16,10 +16,11 @@ services:
         volumes:
             - /sys/fs/cgroup:/sys/fs/cgroup
             - ./keys/:/etc/cvmfs/keys
-            - var_spool_cvmfs1:/var/spool/cvmfs
             - ../../../:/home/sftnight/cvmfs
             - ./config/:/etc/cvmfs/gateway
             - ./scripts:/scripts
+        tmpfs:
+            - /var/spool/cvmfs
         ports:
             - "4929"
             - "80"
@@ -40,8 +41,9 @@ services:
             - /sys/fs/cgroup:/sys/fs/cgroup
             - ./keys/:/etc/cvmfs/keys
             - ./scripts:/scripts
-            - var_spool_cvmfs2:/var/spool/cvmfs
             - ../../../:/home/sftnight/cvmfs
+        tmpfs:
+            - /var/spool/cvmfs
 
     cvmfs-test-pub2:
         image: registry.cern.ch/cvmfs-dev-pub:latest
@@ -59,8 +61,9 @@ services:
             - /sys/fs/cgroup:/sys/fs/cgroup
             - ./keys/:/etc/cvmfs/keys
             - ./scripts:/scripts
-            - var_spool_cvmfs3:/var/spool/cvmfs
             - ../../../:/home/sftnight/cvmfs
+        tmpfs:
+            - /var/spool/cvmfs
 
     cvmfs-test-s3:
         image: minio/minio:latest
@@ -71,8 +74,8 @@ services:
         environment:
             MINIO_ROOT_USER: minioadmin
             MINIO_ROOT_PASSWORD: minioadmin123
-        volumes:
-            - minio-data:/data
+        tmpfs:
+            - /data
         command: server --console-address ":9001" /data
         healthcheck:
             test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
@@ -94,10 +97,3 @@ services:
             /usr/bin/mc anonymous set public myminio/stratum0bucket;
             exit 0;
             "
-
-volumes:
-    var_spool_cvmfs1:
-    var_spool_cvmfs2:
-    var_spool_cvmfs3:
-    minio-data:
-

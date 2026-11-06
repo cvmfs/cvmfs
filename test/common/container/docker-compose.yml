@@ -12,9 +12,6 @@ services:
             dockerfile: test/common/container/Dockerfile-dev
         volumes:
             - /sys/fs/cgroup:/sys/fs/cgroup
-            - var_spool_cvmfs:/var/spool/cvmfs
             - ../../../:/home/sftnight/cvmfs
-
-volumes:
-    var_spool_cvmfs:
-
+        tmpfs:
+            - /var/spool/cvmfs

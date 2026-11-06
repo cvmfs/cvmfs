@@ -70,8 +70,9 @@ services:
                     - cvmfs.web.garage.internal
         volumes:
             - ./config/garage.toml:/etc/garage.toml:ro
-            - garage-meta:/var/lib/garage/meta
-            - garage-data:/var/lib/garage/data
+        tmpfs:
+            - /var/lib/garage/meta
+            - /var/lib/garage/data
         ports:
             - "3900:3900"   # S3 API
             - "3901:3901"   # RPC
@@ -137,7 +138,8 @@ services:
             - ./config/repo.json:/etc/cvmfs/gateway/repo.json:ro
             - etc-cvmfs-repos:/etc/cvmfs/repositories.d
             - etc-cvmfs-keys:/etc/cvmfs/keys
-            - var-lib-gateway:/var/lib/cvmfs-gateway
+        tmpfs:
+            - /var/lib/cvmfs-gateway
         ports:
             - "4929:4929"   # Gateway lease API
 
@@ -160,8 +162,5 @@ services:
             <<: *gw-key-env
 
 volumes:
-    garage-meta:
-    garage-data:
     etc-cvmfs-repos:
     etc-cvmfs-keys:
-    var-lib-gateway:

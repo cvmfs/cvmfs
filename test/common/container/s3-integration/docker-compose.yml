@@ -54,9 +54,10 @@ services:
             CVMFS_TEST_S3_STORAGE: /tmp/unused-garage-storage
         volumes:
             - /sys/fs/cgroup:/sys/fs/cgroup
-            - var_spool_cvmfs:/var/spool/cvmfs
             - ../../../../:/home/sftnight/cvmfs
             - s3-conf:/shared:ro
+        tmpfs:
+            - /var/spool/cvmfs
         depends_on:
             garage-setup:
                 condition: service_completed_successfully
@@ -73,8 +74,9 @@ services:
                     - cvmfs.web.garage.internal
         volumes:
             - ../publish-mountless/config/garage.toml:/etc/garage.toml:ro
-            - garage-meta:/var/lib/garage/meta
-            - garage-data:/var/lib/garage/data
+        tmpfs:
+            - /var/lib/garage/meta
+            - /var/lib/garage/data
         healthcheck:
             test: ["CMD", "/garage", "node", "id"]
             interval: 3s
@@ -137,7 +139,6 @@ services:
         restart: "no"
 
 volumes:
-    var_spool_cvmfs:
     garage-meta:
     garage-data:
     s3-conf:
