@@ -197,6 +197,7 @@ class S3FanoutManager : SingleCopy {
       opt_backoff_init_ms = 100;
       opt_backoff_max_ms = 2000;
       x_amz_acl = "public-read";
+      azure_msi = false;
     }
     std::string access_key;
     std::string secret_key;
@@ -204,6 +205,9 @@ class S3FanoutManager : SingleCopy {
     AuthzMethods authz_method;
     std::string region;
     std::string flavor;
+    // MSI bearer-token auth; azure_mi_client_id empty => system-assigned
+    bool azure_msi;
+    std::string azure_mi_client_id;
     std::string bucket;
     bool dns_buckets;
     std::string protocol;
@@ -266,6 +270,7 @@ class S3FanoutManager : SingleCopy {
   bool MkV4Authz(const JobInfo &info, std::vector<std::string> *headers) const;
   bool MkAzureAuthz(const JobInfo &info,
                     std::vector<std::string> *headers) const;
+  bool RefreshAzureToken() const;
   std::string MkUrl(const std::string &objkey) const {
     if (config_.dns_buckets) {
       return config_.protocol + "://" + complete_hostname_ + "/" + objkey;
@@ -287,6 +292,9 @@ class S3FanoutManager : SingleCopy {
   }
 
   const S3Config config_;
+  mutable std::string azure_token_;
+  mutable uint64_t azure_token_expiry_;
+  mutable pthread_mutex_t azure_token_lock_;
   std::string complete_hostname_;
 
   Prng prng_;
