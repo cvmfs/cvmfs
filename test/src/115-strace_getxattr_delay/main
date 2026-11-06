@@ -1,0 +1,345 @@
+#!/bin/bash
+
+cvmfs_test_name="Mount under strace with delayed getxattr and read random files"
+# Deliberately not part of the "quick" suite: every getxattr() issued by the
+# traced cvmfs2 process is delayed by CVMFS_TEST115_DELAY seconds.
+#
+# A normally running client never calls getxattr() itself.  The exception is
+# the cache cleanup with CVMFS_CACHE_CLEANUP_NONOPENLRU=yes: the quota manager
+# asks the mounted file system for its open hashes via
+# getxattr(<mountpoint>, "user.list_open_hashes") from a collector thread and
+# waits at most CVMFS_TEST115_COLLECTOR_TIMEOUT seconds for the answer (see
+# PosixQuotaManager::CollectAllOpenHashes).  The injected delay simulates a
+# hanging self-query; the cleanup must still finish within the timeout.
+
+CVMFS_TEST115_REPO="grid.cern.ch"
+CVMFS_TEST115_DELAY=13         # seconds injected before each getxattr()
+CVMFS_TEST115_NUM_FILES=10      # number of random files to read
+CVMFS_TEST115_FIND_DEPTH=4      # how deep to look for candidate files
+CVMFS_TEST115_MOUNT_TIMEOUT=300 # seconds to wait for the mount to appear
+CVMFS_TEST115_COLLECTOR_TIMEOUT=10 # hard-coded in quota_posix.cc
+
+# set by prepare_environment()
+CVMFS_TEST115_WORKDIR=
+CVMFS_TEST115_MOUNTPOINT=
+CVMFS_TEST115_CACHE=
+CVMFS_TEST115_CONFIG=
+CVMFS_TEST115_STRACE_LOG=
+CVMFS_TEST115_CVMFS2_LOG=
+CVMFS_TEST115_CANDIDATES=
+# set by mount_under_strace()
+CVMFS_TEST115_STRACE_PID=
+# set by wait_for_mount()
+CVMFS_TEST115_MOUNT_SECONDS=
+# set by cleanup_cache()
+CVMFS_TEST115_CLEANUP_SECONDS=
+
+cleanup() {
+  echo "*** cleanup"
+  if [ "x$CVMFS_TEST115_MOUNTPOINT" != "x" ]; then
+    if grep -q " $CVMFS_TEST115_MOUNTPOINT " /proc/mounts; then
+      sudo umount "$CVMFS_TEST115_MOUNTPOINT" || \
+        sudo umount -l "$CVMFS_TEST115_MOUNTPOINT" || true
+    fi
+  fi
+  if [ "x$CVMFS_TEST115_STRACE_PID" != "x" ]; then
+    # the umount makes cvmfs2 exit, which in turn ends strace; give it a moment
+    wait_for_strace_exit 30 || sudo kill $CVMFS_TEST115_STRACE_PID 2>/dev/null || true
+  fi
+}
+
+# Returns 0 if strace (and with it cvmfs2) is still running
+strace_is_running() {
+  sudo kill -0 $CVMFS_TEST115_STRACE_PID 2>/dev/null
+}
+
+# Waits up to $1 seconds for strace to exit
+wait_for_strace_exit() {
+  local timeout="$1"
+  while [ $timeout -gt 0 ] && strace_is_running; do
+    timeout=$(( timeout - 1 ))
+    sleep 1
+  done
+  ! strace_is_running
+}
+
+# Returns 0 if the test can run on this platform, 1 (with a warning) otherwise
+check_prerequisites() {
+  if running_on_osx; then
+    echo "Warning: strace is not available on macOS, skipping test"
+    return 1
+  fi
+  if ! which strace > /dev/null 2>&1; then
+    echo "Warning: strace is not installed, skipping test"
+    return 1
+  fi
+  if ! strace -h 2>&1 | grep -q "delay_enter"; then
+    echo "Warning: strace does not support syscall delay injection, skipping test"
+    return 1
+  fi
+  return 0
+}
+
+# Creates cache, mountpoint and client configuration in the current workdir
+prepare_environment() {
+  echo "*** preparing cache, mountpoint and configuration"
+  CVMFS_TEST115_WORKDIR="$(pwd)"
+  CVMFS_TEST115_MOUNTPOINT="$CVMFS_TEST115_WORKDIR/mnt"
+  CVMFS_TEST115_CACHE="$CVMFS_TEST115_WORKDIR/cache"
+  CVMFS_TEST115_CONFIG="$CVMFS_TEST115_WORKDIR/local.conf"
+  CVMFS_TEST115_STRACE_LOG="$CVMFS_TEST115_WORKDIR/strace.log"
+  CVMFS_TEST115_CVMFS2_LOG="$CVMFS_TEST115_WORKDIR/cvmfs2.log"
+  CVMFS_TEST115_CANDIDATES="$CVMFS_TEST115_WORKDIR/candidates.txt"
+
+  mkdir -p "$CVMFS_TEST115_CACHE" "$CVMFS_TEST115_MOUNTPOINT" || return 1
+  cat > "$CVMFS_TEST115_CONFIG" << EOC
+CVMFS_CACHE_BASE=$CVMFS_TEST115_CACHE
+CVMFS_RELOAD_SOCKETS=$CVMFS_TEST115_CACHE
+CVMFS_SERVER_URL=http://cvmfs-stratum-one.cern.ch/cvmfs/$CVMFS_TEST115_REPO
+CVMFS_HTTP_PROXY=DIRECT
+CVMFS_KEYS_DIR=/etc/cvmfs/keys/cern.ch
+CVMFS_TIMEOUT=30
+CVMFS_TIMEOUT_DIRECT=30
+CVMFS_QUOTA_LIMIT=1000
+CVMFS_CACHE_CLEANUP_NONOPENLRU=yes
+CVMFS_USYSLOG=$CVMFS_TEST115_WORKDIR/usyslog.log
+EOC
+  cat "$CVMFS_TEST115_CONFIG"
+}
+
+# Starts cvmfs2 in the foreground under strace, in the background of the test
+mount_under_strace() {
+  echo "*** mounting $CVMFS_TEST115_REPO under strace (getxattr delayed by ${CVMFS_TEST115_DELAY}s)"
+  # strace needs root so that the traced cvmfs2 can perform the fuse mount
+  # (ptrace strips the setuid bit from fusermount for unprivileged tracers).
+  # -f follows all threads and forked processes of cvmfs2, -tt timestamps every
+  # traced call; the log is restricted to the xattr family to keep it small.
+  # cvmfs2 runs in the foreground (-f) so that strace stays attached to the
+  # actual fuse daemon and not only to a short-lived parent.
+  sudo strace -f -tt -o "$CVMFS_TEST115_STRACE_LOG" \
+    -e trace=/xattr \
+    -e inject=getxattr:delay_enter=${CVMFS_TEST115_DELAY}s \
+    cvmfs2 -f -o allow_other,config="$CVMFS_TEST115_CONFIG" \
+      $CVMFS_TEST115_REPO "$CVMFS_TEST115_MOUNTPOINT" \
+    > "$CVMFS_TEST115_CVMFS2_LOG" 2>&1 &
+  CVMFS_TEST115_STRACE_PID=$!
+}
+
+# Waits until the mountpoint shows up in /proc/mounts and records how long
+# that took in CVMFS_TEST115_MOUNT_SECONDS.  On failure, dumps the logs.
+wait_for_mount() {
+  local waited=0
+  while ! grep -q " $CVMFS_TEST115_MOUNTPOINT fuse" /proc/mounts; do
+    if [ $waited -ge $CVMFS_TEST115_MOUNT_TIMEOUT ]; then
+      echo "mount did not appear within ${CVMFS_TEST115_MOUNT_TIMEOUT}s"
+      dump_mount_logs
+      return 1
+    fi
+    if ! strace_is_running; then
+      echo "traced cvmfs2 exited before the mount appeared"
+      dump_mount_logs
+      return 2
+    fi
+    sleep 1
+    waited=$(( waited + 1 ))
+  done
+  CVMFS_TEST115_MOUNT_SECONDS=$waited
+  echo "*** $CVMFS_TEST115_REPO mounted after ${CVMFS_TEST115_MOUNT_SECONDS}s"
+}
+
+dump_mount_logs() {
+  echo "cvmfs2 output:"
+  cat "$CVMFS_TEST115_CVMFS2_LOG"
+  echo "strace log:"
+  sudo cat "$CVMFS_TEST115_STRACE_LOG" 2>/dev/null || true
+}
+
+# First lookups through the freshly mounted file system
+verify_mount() {
+  ls -la "$CVMFS_TEST115_MOUNTPOINT" || return 1
+  local revision
+  revision=$(get_xattr revision "$CVMFS_TEST115_MOUNTPOINT") || return 2
+  [ "x$revision" != "x" ] || return 2
+  echo "*** repository revision: $revision"
+}
+
+# Writes the list of regular, non-empty files up to CVMFS_TEST115_FIND_DEPTH
+# into CVMFS_TEST115_CANDIDATES
+collect_candidate_files() {
+  echo "*** collecting candidate files (max depth $CVMFS_TEST115_FIND_DEPTH)"
+  find "$CVMFS_TEST115_MOUNTPOINT" -maxdepth $CVMFS_TEST115_FIND_DEPTH \
+    -type f -size +0 2>/dev/null > "$CVMFS_TEST115_CANDIDATES" || true
+  local num_candidates=$(wc -l < "$CVMFS_TEST115_CANDIDATES")
+  echo "  found $num_candidates candidate files"
+  [ $num_candidates -gt 0 ]
+}
+
+# Reads one file completely and compares the byte count with its stat() size
+read_and_check_file() {
+  local f="$1"
+  local expected_size=$(stat -c %s "$f")
+  local read_start=$(date +%s)
+  local actual_size
+  actual_size=$(cat "$f" | wc -c) || { echo "  failed to read $f"; return 1; }
+  local read_seconds=$(( $(date +%s) - read_start ))
+  echo "  read $f ($actual_size bytes, ${read_seconds}s)"
+  if [ "$actual_size" -ne "$expected_size" ]; then
+    echo "  size mismatch for $f: read $actual_size bytes, stat says $expected_size"
+    return 2
+  fi
+}
+
+# Picks CVMFS_TEST115_NUM_FILES random candidates and reads them
+read_random_files() {
+  echo "*** reading $CVMFS_TEST115_NUM_FILES random files"
+  local num_read=0
+  local f
+  while read -r f; do
+    read_and_check_file "$f" || return $?
+    num_read=$(( num_read + 1 ))
+  done < <(shuf -n $CVMFS_TEST115_NUM_FILES "$CVMFS_TEST115_CANDIDATES")
+  [ $num_read -gt 0 ] || return 3
+  echo "*** successfully read $num_read files"
+}
+
+# Reports how many files cvmfs2 currently holds open, as listed by the magic
+# xattr user.list_open_hashes.  This is the same list the hash collector of the
+# cache cleanup asks for; only populated with CVMFS_CACHE_CLEANUP_NONOPENLRU=yes.
+# Queried from the test shell, so not subject to the strace delay.
+get_open_hashes() {
+  echo "*** retrieving the open hashes from cvmfs2"
+  # the harness runs with set -x, which would echo the whole hash list into
+  # the log; suspend tracing while the list is handled
+  local xtrace_state="$(set +o | grep xtrace)"
+  set +x
+  local open_hashes
+  local retval=0
+  open_hashes=$(get_xattr list_open_hashes "$CVMFS_TEST115_MOUNTPOINT") || retval=$?
+  local num_open_hashes=0
+  if [ "x$open_hashes" != "x" ]; then
+    num_open_hashes=$(echo "$open_hashes" | wc -l)
+  fi
+  eval "$xtrace_state"
+  [ $retval -eq 0 ] || return 1
+  echo "  cvmfs2 reports $num_open_hashes open hashes"
+}
+
+# Instructs the running cvmfs2 over its talk socket to evict everything from
+# the cache that is not pinned.  Requires a quota limit (CVMFS_QUOTA_LIMIT),
+# otherwise cvmfs2 runs without an evicting quota manager.
+# With CVMFS_CACHE_CLEANUP_NONOPENLRU=yes the cleanup first collects the open
+# hashes via a delayed getxattr(); it must give up on that after
+# CVMFS_TEST115_COLLECTOR_TIMEOUT seconds and not wait for the full delay.
+cleanup_cache() {
+  echo "*** instructing cvmfs2 to clean up the cache"
+  local socket="$CVMFS_TEST115_CACHE/$CVMFS_TEST115_REPO/cvmfs_io.$CVMFS_TEST115_REPO"
+  local size_before
+  size_before=$(sudo cvmfs_talk -p "$socket" cache size) || return 1
+  echo "  before: $size_before"
+
+  local answer
+  local cleanup_start=$(date +%s)
+  answer=$(sudo cvmfs_talk -p "$socket" cleanup 0) || return 2
+  CVMFS_TEST115_CLEANUP_SECONDS=$(( $(date +%s) - cleanup_start ))
+  echo "  cvmfs_talk cleanup 0: $answer (took ${CVMFS_TEST115_CLEANUP_SECONDS}s)"
+  # pinned chunks (e.g. the loaded catalogs) legitimately survive the cleanup
+  case "$answer" in
+    OK*|"Not fully cleaned"*) ;;
+    *) echo "  unexpected answer from cvmfs2"; return 3 ;;
+  esac
+
+  local size_after
+  size_after=$(sudo cvmfs_talk -p "$socket" cache size) || return 4
+  echo "  after:  $size_after"
+
+  if [ $CVMFS_TEST115_CLEANUP_SECONDS -lt $CVMFS_TEST115_COLLECTOR_TIMEOUT ]; then
+    echo "  cleanup returned before the collector timeout, the delayed getxattr() was not hit"
+    return 5
+  fi
+  if [ $CVMFS_TEST115_CLEANUP_SECONDS -ge $CVMFS_TEST115_DELAY ]; then
+    echo "  cleanup waited for the delayed getxattr() instead of timing out"
+    return 6
+  fi
+}
+
+# Checks the complete strace log (call after unmount_and_wait): cvmfs2 must
+# have issued the getxattr() of the hash collector, and every getxattr() must
+# have been held by strace.  A held call that never returned because cvmfs2
+# exited meanwhile shows up as "= ?" instead of "(DELAYED)".
+inspect_strace_log() {
+  echo "*** inspecting strace log"
+  sudo chown $(id -u):$(id -g) "$CVMFS_TEST115_STRACE_LOG" || return 1
+  grep "getxattr" "$CVMFS_TEST115_STRACE_LOG" || true
+
+  # with -tt, a plain getxattr() entry is preceded by the last digit of the
+  # timestamp; lgetxattr()/fgetxattr() are not delayed and must not appear
+  local num_entries=$(grep -c "[0-9] getxattr(" "$CVMFS_TEST115_STRACE_LOG" || true)
+  local num_delayed=$(grep -Ec "([0-9] getxattr\(|getxattr resumed>).*\(DELAYED\)" \
+                        "$CVMFS_TEST115_STRACE_LOG" || true)
+  local num_aborted=$(grep -Ec "getxattr resumed>.*= \?" "$CVMFS_TEST115_STRACE_LOG" || true)
+  echo "  cvmfs2 issued $num_entries getxattr() calls:" \
+       "$num_delayed delayed, $num_aborted aborted by process exit while delayed"
+
+  if [ $num_entries -eq 0 ]; then
+    echo "  the cache cleanup did not query the open hashes via getxattr()"
+    return 2
+  fi
+  if [ $num_entries -ne $(( num_delayed + num_aborted )) ]; then
+    echo "  not every getxattr() of cvmfs2 was delayed by strace"
+    return 3
+  fi
+}
+
+# cvmfs2 must have survived the cleanup with the hanging hash collector
+check_cvmfs2_alive() {
+  echo "*** checking that the traced cvmfs2 is still running"
+  if ! strace_is_running; then
+    echo "  strace/cvmfs2 exited after the cache cleanup"
+    dump_mount_logs
+    return 1
+  fi
+  if ! grep -q " $CVMFS_TEST115_MOUNTPOINT fuse" /proc/mounts; then
+    echo "  $CVMFS_TEST115_MOUNTPOINT is no longer mounted"
+    dump_mount_logs
+    return 2
+  fi
+  echo "  cvmfs2 is alive and $CVMFS_TEST115_REPO is still mounted"
+}
+
+# Unmounts and makes sure cvmfs2 and strace terminate
+unmount_and_wait() {
+  echo "*** unmounting"
+  sudo umount "$CVMFS_TEST115_MOUNTPOINT" || return 1
+  if ! wait_for_strace_exit 30; then
+    echo "strace/cvmfs2 still running after umount"
+    return 2
+  fi
+  CVMFS_TEST115_STRACE_PID=
+}
+
+cvmfs_run_test() {
+  logfile=$1
+
+  if ! check_prerequisites; then
+    CVMFS_GENERAL_WARNING_FLAG=1
+    return 0
+  fi
+
+  prepare_environment       || return 1
+  mount_under_strace        || return 5
+  trap cleanup EXIT HUP INT TERM
+  wait_for_mount            || return 10
+  verify_mount              || return $(( 10 + $? ))
+  collect_candidate_files   || return 20
+  read_random_files         || return $(( 20 + $? ))
+  get_open_hashes           || return 24
+  cleanup_cache             || return $(( 25 + $? ))
+  # After asking for a cleanup, we need to stall for a couple of seconds
+  # in order to allow the worker threads to return from getxattr().
+  sleep 16
+  check_cvmfs2_alive        || return $(( 35 + $? ))
+  unmount_and_wait          || return $(( 50 + $? ))
+  inspect_strace_log        || return $(( 40 + $? ))
+
+  return 0
+}
