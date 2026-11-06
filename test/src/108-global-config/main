@@ -7,47 +7,74 @@ CVMFS_CONFIG_FILE=/etc/cvmfs/default.local
 REPO=/cvmfs/atlas.cern.ch
 
 clean_up() {
-  sudo rm -rf $1
+  local retval=$?
+  local cleanup_retval=0
+
+  if [[ -e "$config_backup" || -L "$config_backup" ]]; then
+    sudo mv "$config_backup" "$CVMFS_CONFIG_FILE" || cleanup_retval=$?
+  elif ! $config_existed; then
+    sudo rm -f "$CVMFS_CONFIG_FILE" || cleanup_retval=$?
+  fi
+
+  if [[ $cleanup_retval -eq 0 ]]; then
+    rm -rf "$test_dir" || cleanup_retval=$?
+  else
+    echo "Configuration cleanup failed; test files retained in $test_dir" >&2
+  fi
+  if [[ $retval -eq 0 ]]; then
+    retval=$cleanup_retval
+  fi
+  exit "$retval"
 }
 
 do_test() {
     local script_location=$1
-    sudo cp "$script_location"/default.local "${CVMFS_CONFIG_FILE}"
-    sudo sed -i "s|LOGFILE|$logfile|g" "$CVMFS_CONFIG_FILE"
-    sudo sed -i "s|PROXY_SERVER|$CVMFS_TEST_PROXY|g" "$CVMFS_CONFIG_FILE"
+    sudo cp "$script_location"/default.local "${CVMFS_CONFIG_FILE}" || return $?
+    sudo sed -i "s|LOGFILE|$logfile|g" "$CVMFS_CONFIG_FILE" || return $?
+    sudo sed -i "s|PROXY_SERVER|$CVMFS_TEST_PROXY|g" "$CVMFS_CONFIG_FILE" \
+      || return $?
 
-    if [[ -n "$(mount | grep ${REPO})" ]]; then
-      sudo umount "${REPO}" > /dev/null
+    local mounts
+    mounts=$(mount) || return $?
+    if [[ "$mounts" == *" on ${REPO} "* ]]; then
+      sudo umount "${REPO}" > /dev/null || return $?
     fi
-    ls "${REPO}" &> /dev/null
-    if ! grep -q -- "CVMFS_VERSION" "$logfile"; then
+    ls "${REPO}" > /dev/null || return $?
+    if ! grep -qxF -- "CVMFS_VERSION available" "$logfile"; then
       return 1
     fi
 
-    if ! grep -q -- "CVMFS_ARCH" "$logfile"; then
+    if ! grep -qxF -- "CVMFS_ARCH available" "$logfile"; then
       return 2
     fi
-
-    sudo rm -rf "${CVMFS_CONFIG_FILE}"
 }
 
-cvmfs_run_test() {
-  local logfile=$1
+cvmfs_run_test() (
   local script_location=$2
+  # Subshell-scoped state remains available to the EXIT trap after errexit.
+  test_dir=$(mktemp -d "$PWD/global-config.XXXXXX") || return $?
+  logfile="$test_dir/variables.log"
+  config_backup="$test_dir/default.local"
+  config_existed=false
 
-  if [[ -z "$logfile" ]]; then
-    logfile=/tmp/version_env_test.log
-    touch $logfile
-    trap "eval 'clean_up $logfile'" EXIT HUP INT TERM || return $?
+  if [[ -e "$CVMFS_CONFIG_FILE" || -L "$CVMFS_CONFIG_FILE" ]]; then
+    config_existed=true
   fi
+  trap clean_up EXIT
+  trap 'exit 129' HUP
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
 
+  # Keep assertions separate from the harness log, which includes shell tracing.
+  # Configuration parsing can run with the credentials of the cvmfs user.
+  chmod 755 "$test_dir" || return $?
+  touch "$logfile" || return $?
+  chmod 666 "$logfile" || return $?
 
-  if [[ -f "${CVMFS_CONFIG_FILE}" ]]; then
-    sudo mv "${CVMFS_CONFIG_FILE}" "${CVMFS_CONFIG_FILE}.bak"
-    do_test "$script_location"
-    sudo mv "${CVMFS_CONFIG_FILE}.bak" "${CVMFS_CONFIG_FILE}"
-  else
-    do_test "$script_location"
+  if $config_existed; then
+    [[ -f "$CVMFS_CONFIG_FILE" || -L "$CVMFS_CONFIG_FILE" ]] || return 1
+    sudo mv "$CVMFS_CONFIG_FILE" "$config_backup" || return $?
   fi
-}
+  do_test "$script_location"
+)
 
