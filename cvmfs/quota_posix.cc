@@ -1935,15 +1935,10 @@ PosixQuotaManager::PosixQuotaManager(const uint64_t limit,
   cleanup_recorder_.AddRecorder(20 * 60, 60 * 60 * 18);
   // last 4 days with hour resolution
   cleanup_recorder_.AddRecorder(60 * 60, 60 * 60 * 24 * 4);
-
-  lock_open_files_ = reinterpret_cast<pthread_mutex_t *>(
-      smalloc(sizeof(pthread_mutex_t)));
 }
 
 
 PosixQuotaManager::~PosixQuotaManager() {
-  free(lock_open_files_);
-
   if (!initialized_)
     return;
 
@@ -2328,91 +2323,127 @@ void PosixQuotaManager::ManagedReadHalfPipe(int fd, void *buf, size_t nbyte) {
   }
 }
 
-void *PosixQuotaManager::CollectMountpointsHashes(void *data) {
-#ifndef __APPLE__
-  pthread_setname_np(pthread_self(), "hash_collector");
-  auto *handler = static_cast<CollectorHandler *>(data);
-
-  const std::string mountpoint = handler->mp[handler->i];
-  ssize_t n = getxattr(mountpoint.c_str(), "user.list_open_hashes", nullptr, 0);
-  if (n < 0) {
-    pthread_exit(nullptr);
+void PosixQuotaManager::ReleaseOpenHashCollection(
+    OpenHashCollection *collection) {
+  bool last;
+  {
+    const MutexLockGuard lock_guard(&collection->lock);
+    last = (--collection->refs == 0);
   }
-  std::vector<char> buf((size_t)n);
-  n = getxattr(mountpoint.c_str(), "user.list_open_hashes", buf.data(),
-               buf.size());
-  if (n < 0) {
-    pthread_exit(nullptr);
+  if (last) {
+    pthread_cond_destroy(&collection->done);
+    pthread_mutex_destroy(&collection->lock);
+    delete collection;
   }
-
-  std::vector<std::string> hash_strs;
-  std::string hash_str;
-  for (const char c : buf) {
-    if (c == '\n') {
-      hash_strs.push_back(hash_str);
-      hash_str.clear();
-    } else {
-      hash_str += c;
-    }
-  }
-  const MutexLockGuard lock_guard(handler->l);
-  for (auto hash_str : hash_strs) {
-    handler->of.push_back(
-        shash::Short(shash::MkFromHexPtr(shash::HexPtr(hash_str))));
-  }
-#endif
-  pthread_exit(nullptr);
 }
 
-std::vector<shash::Short> PosixQuotaManager::CollectAllOpenHashes() {
-  std::vector<CollectorHandler *> handlers;
-  std::vector<pthread_t *> threads;
-  open_files_.clear();
+void *PosixQuotaManager::CollectMountpointsHashes(void *data) {
+  CollectorArgs *args = static_cast<CollectorArgs *>(data);
+  OpenHashCollection *collection = args->collection;
+  std::vector<shash::Short> hashes;
 #ifndef __APPLE__
-  auto &&a_after_b = [](const struct timespec a, const struct timespec b) {
-    return (a.tv_sec > b.tv_sec) ? true : false;
-  };
+  pthread_setname_np(pthread_self(), "hash_collector");
 
-  for (size_t i = 0; i < mountpoints_.size(); ++i) {
-    handlers.push_back(
-        new CollectorHandler{open_files_, mountpoints_, lock_open_files_, i});
-    threads.push_back(new pthread_t);
+  const char *mountpoint = args->mountpoint.c_str();
+  ssize_t n = getxattr(mountpoint, "user.list_open_hashes", nullptr, 0);
+  std::vector<char> buf;
+  if (n > 0) {
+    buf.resize(static_cast<size_t>(n));
+    n = getxattr(mountpoint, "user.list_open_hashes", buf.data(), buf.size());
   }
-
-  const int retval = pthread_mutex_init(lock_open_files_, NULL);
-  assert(retval == 0);
-
-  for (size_t i = 0; i < mountpoints_.size(); ++i) {
-    pthread_create(threads[i], nullptr, CollectMountpointsHashes, handlers[i]);
-  }
-
-  std::vector<bool> joined(handlers.size(), false);
-  struct timespec reference, current;
-  clock_gettime(CLOCK_REALTIME, &reference);
-  clock_gettime(CLOCK_REALTIME, &current);
-  reference.tv_sec += 10;  // Give 10sec for hash collection
-  size_t i = 0;
-  while (
-      (not std::all_of(joined.begin(), joined.end(), [](bool b) { return b; }))
-      and a_after_b(reference, current)) {
-    // as long as there are still threads that haven't joined yet
-    // and for 10 seconds
-    if (not joined[i]) {
-      const int s = pthread_tryjoin_np(*threads[i], NULL);
-      if (s == 0) {
-        joined[i] = true;
+  if (n > 0) {
+    buf.resize(static_cast<size_t>(n));
+    std::string hash_str;
+    for (const char c : buf) {
+      if (c == '\n') {
+        hashes.push_back(
+            shash::Short(shash::MkFromHexPtr(shash::HexPtr(hash_str))));
+        hash_str.clear();
+      } else {
+        hash_str += c;
       }
     }
-    ++i;
-    i = i % handlers.size();
-    clock_gettime(CLOCK_REALTIME, &current);
   }
-
-  for (size_t i = 0; i < handlers.size(); ++i) {
-    delete handlers[i];
-  }
-
-  pthread_mutex_destroy(lock_open_files_);
 #endif
-  return open_files_;
+  delete args;
+
+  {
+    const MutexLockGuard lock_guard(&collection->lock);
+    // Once the caller has timed out it no longer looks at the result
+    if (!collection->abandoned) {
+      collection->hashes.insert(collection->hashes.end(), hashes.begin(),
+                                hashes.end());
+    }
+    collection->pending--;
+    pthread_cond_signal(&collection->done);
+  }
+  ReleaseOpenHashCollection(collection);
+  return nullptr;
+}
+
+/**
+ * Collects the hashes of the files currently open on all registered
+ * mountpoints, one thread per mountpoint, waiting at most 10 seconds.
+ * Collector threads that are still running after that are left to finish on
+ * their own: they are detached and only touch the reference counted
+ * collection state, never the quota manager.
+ */
+std::vector<shash::Short> PosixQuotaManager::CollectAllOpenHashes() {
+  std::vector<shash::Short> result;
+#ifndef __APPLE__
+  OpenHashCollection *collection = new OpenHashCollection();
+  int retval = pthread_mutex_init(&collection->lock, NULL);
+  assert(retval == 0);
+  retval = pthread_cond_init(&collection->done, NULL);
+  assert(retval == 0);
+  collection->pending = 0;
+  collection->refs = 1;  // the caller
+  collection->abandoned = false;
+
+  for (size_t i = 0; i < mountpoints_.size(); ++i) {
+    // Copy the mountpoint: mountpoints_ may change while the thread runs
+    CollectorArgs *args = new CollectorArgs{collection, mountpoints_[i]};
+    {
+      const MutexLockGuard lock_guard(&collection->lock);
+      collection->pending++;
+      collection->refs++;
+    }
+    pthread_t thread;
+    if (pthread_create(&thread, NULL, CollectMountpointsHashes, args) != 0) {
+      LogCvmfs(kLogQuota, kLogDebug | kLogSyslogWarn,
+               "failed to start open hash collection for %s",
+               mountpoints_[i].c_str());
+      delete args;
+      const MutexLockGuard lock_guard(&collection->lock);
+      collection->pending--;
+      collection->refs--;
+      continue;
+    }
+    pthread_detach(thread);
+  }
+
+  struct timespec deadline;
+  clock_gettime(CLOCK_REALTIME, &deadline);
+  deadline.tv_sec += 10;  // Give 10sec for hash collection
+  {
+    const MutexLockGuard lock_guard(&collection->lock);
+    while (collection->pending > 0) {
+      if (pthread_cond_timedwait(&collection->done, &collection->lock,
+                                 &deadline)
+          == ETIMEDOUT) {
+        break;
+      }
+    }
+    if (collection->pending > 0) {
+      LogCvmfs(kLogQuota, kLogDebug | kLogSyslogWarn,
+               "open hash collection timed out, %u of %zu mountpoints did "
+               "not respond",
+               collection->pending, mountpoints_.size());
+    }
+    result.swap(collection->hashes);
+    collection->abandoned = true;
+  }
+  ReleaseOpenHashCollection(collection);
+#endif
+  return result;
 }
