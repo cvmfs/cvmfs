@@ -44,7 +44,16 @@ cleanup() {
   fi
   if [ "x$CVMFS_TEST115_STRACE_PID" != "x" ]; then
     # the umount makes cvmfs2 exit, which in turn ends strace; give it a moment
-    wait_for_strace_exit 30 || sudo kill $CVMFS_TEST115_STRACE_PID 2>/dev/null || true
+    if ! wait_for_strace_exit 30; then
+      # killing strace only detaches it, so kill the traced cvmfs2 as well
+      sudo pkill -f "cvmfs2 -f -o allow_other,config=$CVMFS_TEST115_CONFIG" || true
+      sudo kill $CVMFS_TEST115_STRACE_PID 2>/dev/null || true
+    fi
+  fi
+  # cvmfs2 ran as root and left root-owned files (cache, logs) in the workdir;
+  # the harness removes a kept workdir without sudo before the next run
+  if [ "x$CVMFS_TEST115_WORKDIR" != "x" ]; then
+    sudo chown -R "$(id -u):$(id -g)" "$CVMFS_TEST115_WORKDIR" || true
   fi
 }
 
