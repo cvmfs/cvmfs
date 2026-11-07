@@ -65,7 +65,8 @@ class Watchdog : SingleCopy {
   static Watchdog *Create(FnOnExit on_exit,
                           bool needs_read_environ,
                           WatchdogState *saved_state = 0,
-                          const std::string &oom_score_adj = "");
+                          const std::string &oom_score_adj = "",
+                          bool retain_root = false);
   static pid_t GetPid();
   ~Watchdog();
   void Spawn(const std::string &crash_dump_path);
@@ -122,7 +123,7 @@ class Watchdog : SingleCopy {
   static void SendTrace(int sig, siginfo_t *siginfo, void *context);
 
   Watchdog(FnOnExit on_exit, const std::string &oom_score_adj);
-  void Fork(bool needs_read_environ);
+  void Fork(bool needs_read_environ, bool retain_root);
   void RestoreState(WatchdogState *saved_state);
   bool WaitForSupervisee();
   SigactionMap SetSignalHandlers(const SigactionMap &signal_handlers);
@@ -138,6 +139,12 @@ class Watchdog : SingleCopy {
   std::string exe_path_;
   std::string oom_score_adj_;
   pid_t watchdog_pid_;
+  /**
+   * Loaders older than version 6 keep the supervisee's real uid at root and
+   * only switch the effective uid.  The watchdog must then keep the same
+   * credentials and switch back to root to ptrace and kill the supervisee.
+   */
+  bool retain_root_;
   std::unique_ptr<Pipe<kPipeWatchdog> > pipe_watchdog_;
   /// The supervisee makes sure its watchdog does not die
   std::unique_ptr<Pipe<kPipeWatchdogSupervisor> > pipe_listener_;
