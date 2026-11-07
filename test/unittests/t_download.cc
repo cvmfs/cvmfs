@@ -551,4 +551,28 @@ TEST_F(T_Download, EscapeUrl) {
   EXPECT_TRUE(res == correct);
 }
 
+
+TEST_F(T_Download, NoProxyChainIsNotSelectable) {
+  download_mgr.SetProxyChain("http://127.0.0.1:3128", "",
+                             DownloadManager::kSetProxyBoth);
+  ASSERT_TRUE(download_mgr.ChooseProxyUnlocked(NULL) != NULL);
+
+  // Every proxy of the group burned
+  download_mgr.opt_proxy_groups_current_burned_ = 1;
+  download_mgr.UpdateProxiesUnlocked("test");
+  EXPECT_TRUE(download_mgr.ChooseProxyUnlocked(NULL) == NULL);
+  EXPECT_TRUE(download_mgr.opt_proxies_.empty());
+
+  // Group emptied, as by a DNS refresh that dropped every address
+  download_mgr.opt_proxy_groups_current_burned_ = 0;
+  (*download_mgr.opt_proxy_groups_)[0].clear();
+  download_mgr.UpdateProxiesUnlocked("test");
+  EXPECT_TRUE(download_mgr.ChooseProxyUnlocked(NULL) == NULL);
+  EXPECT_TRUE(download_mgr.opt_proxies_.empty());
+
+  download_mgr.SetProxyChain("http://127.0.0.1:3128", "",
+                             DownloadManager::kSetProxyBoth);
+  EXPECT_TRUE(download_mgr.ChooseProxyUnlocked(NULL) != NULL);
+}
+
 }  // namespace download
