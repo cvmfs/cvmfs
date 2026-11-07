@@ -15,6 +15,15 @@ template<class OptionsT>
 class T_Options : public ::testing::Test {
  protected:
   virtual void SetUp() {
+    // Options managers setenv() parsed keys; the bash shell would inherit
+    // values leaked by previously run tests.
+    const char *keys[] = {"CVMFS_CACHE_BASE", "CVMFS_RELOAD_SOCKETS",
+                          "CVMFS_SERVER_URL", "I", "XYZABC", "value",
+                          "CVMFS_SHARED_CACHE", "CVMFS_HTTP_PROXY", "A", "B",
+                          "D", "F", "H", "VALFALSE", "VALTRUE", "FOO", "BAR"};
+    for (unsigned i = 0; i < sizeof(keys) / sizeof(keys[0]); ++i)
+      unsetenv(keys[i]);
+
     FILE *temp_file = CreateTempFile("./cvmfs_ut_options", 0600, "w",
                                      &config_file_);
     ASSERT_TRUE(temp_file != NULL);
