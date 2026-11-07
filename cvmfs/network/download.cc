@@ -133,8 +133,44 @@ static Failures PrepareDownloadDestination(JobInfo *info) {
 
 
 /**
+ * True when the peer sent at least one byte of the response.  Unlike "did the
+ * connect complete", this also catches a dead proxy whose listening socket
+ * still accepts, and works for connections reused from the pool.
+ *
+ * Not the _T variant: that needs libcurl 7.61.0, the build accepts 7.55.0.
+ */
+static bool ResponseStarted(CURL *handle) {
+  double start_transfer_time = 0.0;
+  if (curl_easy_getinfo(handle, CURLINFO_STARTTRANSFER_TIME,
+                        &start_transfer_time)
+      != CURLE_OK) {
+    return false;
+  }
+  return start_transfer_time > 0.0;
+}
+
+
+/**
  * Called by curl for every HTTP header. Not called for file:// transfers.
  */
+/**
+ * Per job, how often SwitchProxy() may keep a slow local proxy instead of
+ * escalating.  Bounds the extra latency to this many CVMFS_TIMEOUT periods.
+ */
+static const unsigned kMaxWithheldEscalations = 1;
+
+
+/**
+ * Installed on a handle whose request must not go out.  curl then fails with
+ * CURLE_COULDNT_CONNECT without opening a socket, whatever CURLOPT_PROXY says.
+ */
+static curl_socket_t CallbackRefuseSocket(void * /* clientp */,
+                                          curlsocktype /* purpose */,
+                                          struct curl_sockaddr * /* addr */) {
+  return CURL_SOCKET_BAD;
+}
+
+
 static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
                                  void *info_link) {
   const size_t num_bytes = size * nmemb;
@@ -998,6 +1034,11 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
 
   const MutexLockGuard m(lock_options_);
 
+  // NULL restores curl's default; the handle may carry the refusing callback
+  // from an earlier attempt.
+  curl_easy_setopt(curl_handle, CURLOPT_OPENSOCKETFUNCTION,
+                   static_cast<curl_opensocket_callback>(NULL));
+
   // sharding policy
   if (sharding_policy_.UseCount() > 0) {
     if (info->proxy() != "") {
@@ -1034,8 +1075,24 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
 
     ProxyInfo *proxy = ChooseProxyUnlocked(info->expected_hash());
     if (!proxy || (proxy->url == "DIRECT")) {
-      info->SetProxy("DIRECT");
-      curl_easy_setopt(info->curl_handle(), CURLOPT_PROXY, "");
+      if (opt_proxy_mandatory_effective_) {
+        // No usable proxy and DIRECT is not allowed.  The attempt still runs
+        // through curl so it is retried and reported like any other failure,
+        // but the socket callback refuses to connect anywhere.  "BLOCKED"
+        // rather than "DIRECT" so VerifyAndFinalize() classifies it as a
+        // proxy failure, not a host failure.
+        LogCvmfs(kLogDownload, kLogSyslogErr | kLogDebug,
+                 "(manager '%s' - id %" PRId64 ") "
+                 "no usable proxy available, refusing to connect directly",
+                 name_.c_str(), info->id());
+        info->SetProxy("BLOCKED");
+        curl_easy_setopt(info->curl_handle(), CURLOPT_PROXY, "0.0.0.0:1");
+        curl_easy_setopt(info->curl_handle(), CURLOPT_OPENSOCKETFUNCTION,
+                         CallbackRefuseSocket);
+      } else {
+        info->SetProxy("DIRECT");
+        curl_easy_setopt(info->curl_handle(), CURLOPT_PROXY, "");
+      }
     } else {
       // Note: inside ValidateProxyIpsUnlocked() we may change the proxy data
       // structure, so we must not pass proxy->... (== current_proxy())
@@ -1054,6 +1111,8 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
       } else {
         // We know it can't work, don't even try to download
         curl_easy_setopt(info->curl_handle(), CURLOPT_PROXY, "0.0.0.0");
+        curl_easy_setopt(info->curl_handle(), CURLOPT_OPENSOCKETFUNCTION,
+                         CallbackRefuseSocket);
       }
     }
   }  // end !sharding
@@ -1143,12 +1202,16 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
     } else {
       if (opt_proxy_groups_current_ >= opt_proxy_groups_fallback_) {
         // It doesn't make sense to use the fallback proxies in Geo-API requests
-        // since the fallback proxies are supposed to get sorted, too.
-        info->SetProxy("DIRECT");
-        curl_easy_setopt(info->curl_handle(), CURLOPT_PROXY, "");
+        // since the fallback proxies are supposed to get sorted, too.  Under a
+        // mandatory proxy, only rewrite the URL; the request stays proxied.
+        if (!opt_proxy_mandatory_effective_) {
+          info->SetProxy("DIRECT");
+          curl_easy_setopt(info->curl_handle(), CURLOPT_PROXY, "");
+        }
         replacement = proxy_template_direct_;
       } else {
-        replacement = ChooseProxyUnlocked(info->expected_hash())->host.name();
+        const ProxyInfo *proxy = ChooseProxyUnlocked(info->expected_hash());
+        replacement = proxy ? proxy->host.name() : proxy_template_direct_;
       }
     }
     replacement = (replacement == "") ? proxy_template_direct_ : replacement;
@@ -1454,6 +1517,9 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
            info->proxy().c_str(), curl_error);
   UpdateStatistics(info->curl_handle());
 
+  // Retries reuse the JobInfo; don't carry over an earlier attempt's verdict.
+  info->SetPeerUnresponsive(false);
+
   bool was_metalink;
   std::string typ;
   if (info->current_metalink_chain_index() >= 0) {
@@ -1504,6 +1570,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
       }
 
       info->SetErrorCode(kFailOk);
+      RecordProxySuccess(info->proxy());
       break;
     case CURLE_UNSUPPORTED_PROTOCOL:
       info->SetErrorCode(kFailUnsupportedProtocol);
@@ -1518,6 +1585,9 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
       info->SetErrorCode(kFailHostResolve);
       break;
     case CURLE_OPERATION_TIMEDOUT:
+      // Nothing received: the peer is down.  Partial response: it is alive
+      // but saturated.
+      info->SetPeerUnresponsive(!ResponseStarted(info->curl_handle()));
       info->SetErrorCode((info->proxy() == "DIRECT") ? kFailHostTooSlow
                                                      : kFailProxyTooSlow);
       break;
@@ -1528,7 +1598,17 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
                                                      : kFailProxyShortTransfer);
       break;
     case CURLE_FILE_COULDNT_READ_FILE:
+      // A local file:// read error says nothing about a network peer.
+      if (info->proxy() != "DIRECT") {
+        info->SetErrorCode(kFailProxyConnection);
+      } else {
+        info->SetErrorCode(kFailHostConnection);
+      }
+      break;
     case CURLE_COULDNT_CONNECT:
+      // Includes ECONNREFUSED: a busy proxy drops the SYN rather than
+      // refusing, so a refusal means nothing is listening.
+      info->SetPeerUnresponsive(true);
       if (info->proxy() != "DIRECT") {
         // This is a guess.  Fail-over can still change to switching host
         info->SetErrorCode(kFailProxyConnection);
@@ -1916,6 +1996,10 @@ DownloadManager::DownloadManager(const unsigned max_pool_handles,
     , opt_proxy_groups_current_burned_(0)
     , opt_proxy_groups_fallback_(0)
     , opt_num_proxies_(0)
+    , opt_proxy_mandatory_requested_(false)
+    , opt_proxy_mandatory_effective_(false)
+    , opt_proxy_failover_on_slow_(true)
+    , last_proxy_success_(0)
     , opt_proxy_shard_(false)
     , failover_indefinitely_(false)
     , name_(name)
@@ -2408,8 +2492,44 @@ void DownloadManager::SwitchProxy(JobInfo *info) {
   if (opt_proxy_groups_current_burned_ == group->size()) {
     opt_proxy_groups_current_burned_ = 0;
     if (opt_proxy_groups_->size() > 1) {
-      opt_proxy_groups_current_ = (opt_proxy_groups_current_ + 1)
+      const unsigned next_group = (opt_proxy_groups_current_ + 1)
                                   % opt_proxy_groups_->size();
+      // With CVMFS_PROXY_FAILOVER_ON_SLOW=no, a proxy that answered and then
+      // stalled is saturated, not dead; stay on the local group instead of
+      // escalating to DIRECT or an off-site fallback.  Only a timeout after the
+      // response started qualifies: an unresponsive peer, a resolve failure,
+      // an HTTP error (squid 502/503) or a truncated body escalate as before.
+      // The burn count was just cleared, so the retry path reuses the proxy.
+      //
+      // info is non-NULL here: a zero burn count returns above.
+      const bool proxy_saturated = !info->peer_unresponsive()
+                                   && (info->error_code() == kFailProxyTooSlow);
+      const bool would_escalate = IsEscalatedProxyGroup(next_group)
+                                  && !IsEscalatedProxyGroup(
+                                      opt_proxy_groups_current_);
+      // Withhold only while a local proxy completed a request within the
+      // last two timeouts, so a cache that never serves cannot pin the client,
+      // and only kMaxWithheldEscalations times per job: each withhold costs
+      // the job another CVMFS_TIMEOUT on the same proxy.
+      const time_t evidence_secs = 2 * static_cast<time_t>(opt_timeout_proxy_);
+      const bool proxy_recently_served = (last_proxy_success_ != 0)
+                                         && ((time(NULL) - last_proxy_success_)
+                                             <= evidence_secs);
+      if (!opt_proxy_failover_on_slow_ && would_escalate && proxy_saturated
+          && proxy_recently_served
+          && (info->num_withheld_escalations() < kMaxWithheldEscalations)) {
+        info->SetNumWithheldEscalations(info->num_withheld_escalations() + 1);
+        LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
+                 "(manager '%s' - id %" PRId64 ") "
+                 "keeping proxy group %u: '%s' after a started response "
+                 "means the proxy is slow, not down; not falling back to "
+                 "group %u",
+                 name_.c_str(), info->id(), opt_proxy_groups_current_,
+                 Code2Ascii(info->error_code()), next_group);
+        UpdateProxiesUnlocked("failed proxy, escalation withheld");
+        return;
+      }
+      opt_proxy_groups_current_ = next_group;
       // Remember the timestamp of switching to backup proxies
       if (opt_proxy_groups_reset_after_ > 0) {
         if (opt_proxy_groups_current_ > 0) {
@@ -2837,6 +2957,46 @@ bool DownloadManager::ValidateGeoReply(const string &reply_order,
 
 
 /**
+ * Drops DIRECT from any load-balance group that also holds a real proxy, so
+ * "proxy|DIRECT" does not send a random share of requests unproxied.  A
+ * DIRECT-only group ("proxy;DIRECT") is kept as a last-resort tier, and
+ * *has_direct_group is set.
+ */
+string DownloadManager::DemoteDirect(const string &proxy_list,
+                                     bool *has_direct_group) {
+  assert(has_direct_group);
+  *has_direct_group = false;
+  if (proxy_list == "")
+    return "";
+
+  const vector<string> groups = SplitString(proxy_list, ';');
+  vector<string> kept_groups;
+  for (unsigned i = 0; i < groups.size(); ++i) {
+    const vector<string> members = SplitString(groups[i], '|');
+    vector<string> real_members;
+    bool group_has_direct = false;
+    for (unsigned j = 0; j < members.size(); ++j) {
+      if (members[j] == "DIRECT") {
+        group_has_direct = true;
+        continue;
+      }
+      if (members[j] == "")
+        continue;
+      real_members.push_back(members[j]);
+    }
+    if (!real_members.empty()) {
+      kept_groups.push_back(JoinStrings(real_members, "|"));
+    } else if (group_has_direct) {
+      kept_groups.push_back("DIRECT");
+      *has_direct_group = true;
+    }
+  }
+
+  return JoinStrings(kept_groups, ";");
+}
+
+
+/**
  * Removes DIRECT from a list of ';' and '|' separated proxies.
  * \return true if DIRECT was present, false otherwise
  */
@@ -2885,6 +3045,8 @@ void DownloadManager::SetProxyChain(const string &proxy_list,
 
   opt_timestamp_backup_proxies_ = 0;
   opt_timestamp_failover_proxies_ = 0;
+  // A new chain carries no evidence about the proxies in it.
+  last_proxy_success_ = 0;
   string set_proxy_list = opt_proxy_list_;
   string set_proxy_fallback_list = opt_proxy_fallback_list_;
   bool contains_direct;
@@ -2901,15 +3063,36 @@ void DownloadManager::SetProxyChain(const string &proxy_list,
              "(manager '%s') fallback proxies do not support DIRECT, removing",
              name_.c_str());
   }
-  if (set_proxy_fallback_list == "") {
-    set_proxy_list = opt_proxy_list_;
-  } else {
-    const bool contains_direct = StripDirect(opt_proxy_list_, &set_proxy_list);
-    if (contains_direct) {
-      LogCvmfs(kLogDownload, kLogSyslog | kLogDebug,
-               "(manager '%s') skipping DIRECT proxy to use fallback proxy",
-               name_.c_str());
+  if (!opt_proxy_mandatory_requested_) {
+    if (set_proxy_fallback_list == "") {
+      set_proxy_list = opt_proxy_list_;
+    } else {
+      const bool contains_direct = StripDirect(opt_proxy_list_,
+                                               &set_proxy_list);
+      if (contains_direct) {
+        LogCvmfs(kLogDownload, kLogSyslog | kLogDebug,
+                 "(manager '%s') skipping DIRECT proxy to use fallback proxy",
+                 name_.c_str());
+      }
     }
+    opt_proxy_mandatory_effective_ = false;
+  } else {
+    // Unlike the default, keep a ";DIRECT" tier even with fallback proxies:
+    // the EGI configuration always sets fallbacks, which would make it inert.
+    bool has_direct_group = false;
+    set_proxy_list = DemoteDirect(opt_proxy_list_, &has_direct_group);
+    if (set_proxy_list != opt_proxy_list_) {
+      LogCvmfs(kLogDownload, kLogSyslog | kLogDebug,
+               "(manager '%s') proxy chain '%s' normalised to '%s': DIRECT is "
+               "only used as a last resort, never alongside a live proxy",
+               name_.c_str(), opt_proxy_list_.c_str(), set_proxy_list.c_str());
+    }
+
+    string real_proxies;
+    StripDirect(set_proxy_list, &real_proxies);
+    opt_proxy_mandatory_effective_ = !has_direct_group
+                                     && ((real_proxies != "")
+                                         || (set_proxy_fallback_list != ""));
   }
 
   // From this point on, use set_proxy_list and set_fallback_proxy_list as
@@ -3067,6 +3250,46 @@ string DownloadManager::GetFallbackProxyList() {
 }
 
 /**
+ * True for a DIRECT tier or a fallback group, i.e. leaving the local proxies.
+ */
+bool DownloadManager::IsEscalatedProxyGroup(unsigned group_idx) const {
+  if (!opt_proxy_groups_ || (group_idx >= opt_proxy_groups_->size()))
+    return false;
+  if (group_idx >= opt_proxy_groups_fallback_)
+    return true;
+  const std::vector<ProxyInfo> &group = (*opt_proxy_groups_)[group_idx];
+  return !group.empty() && (group[0].url == "DIRECT");
+}
+
+
+/**
+ * Records evidence for the escalation gate in SwitchProxy(): a request has
+ * completed through `proxy_url`, and that proxy is a member of a local
+ * (non-escalated) group.  The group is looked up rather than taken from
+ * opt_proxy_groups_current_, which another job may have changed since this
+ * one selected its proxy.
+ */
+void DownloadManager::RecordProxySuccess(const std::string &proxy_url) {
+  if (proxy_url.empty() || (proxy_url == "DIRECT") || (proxy_url == "BLOCKED"))
+    return;
+  const MutexLockGuard m(lock_options_);
+  if (!opt_proxy_groups_)
+    return;
+  for (unsigned i = 0; i < opt_proxy_groups_->size(); ++i) {
+    if (IsEscalatedProxyGroup(i))
+      continue;
+    const std::vector<ProxyInfo> &group = (*opt_proxy_groups_)[i];
+    for (unsigned j = 0; j < group.size(); ++j) {
+      if (group[j].url == proxy_url) {
+        last_proxy_success_ = time(NULL);
+        return;
+      }
+    }
+  }
+}
+
+
+/**
  * Choose proxy
  */
 DownloadManager::ProxyInfo *DownloadManager::ChooseProxyUnlocked(
@@ -3077,6 +3300,9 @@ DownloadManager::ProxyInfo *DownloadManager::ChooseProxyUnlocked(
   const uint32_t key = (hash ? hash->Partial32() : 0);
   const map<uint32_t, ProxyInfo *>::iterator it = opt_proxy_map_.lower_bound(
       key);
+  // Empty map: nothing in the current group is selectable.
+  if (it == opt_proxy_map_.end())
+    return NULL;
   ProxyInfo *proxy = it->second;
 
   return proxy;
@@ -3091,6 +3317,13 @@ void DownloadManager::UpdateProxiesUnlocked(const string &reason) {
 
   // Identify number of non-burned proxies within the current group
   vector<ProxyInfo> *group = current_proxy_group();
+  // All burned, or the group is empty after a DNS refresh.  Clear the map
+  // too: it holds pointers into the group.
+  if (opt_proxy_groups_current_burned_ >= group->size()) {
+    opt_proxy_map_.clear();
+    opt_proxies_.clear();
+    return;
+  }
   const unsigned num_alive = (group->size() - opt_proxy_groups_current_burned_);
   const string old_proxy = JoinStrings(opt_proxies_, "|");
 
@@ -3146,6 +3379,22 @@ void DownloadManager::UpdateProxiesUnlocked(const string &reason) {
              curr_host.c_str());
   }
 }
+
+/**
+ * CVMFS_PROXY_MANDATORY.  Call before SetProxyChain(), which reads it.
+ */
+void DownloadManager::EnableMandatoryProxy() {
+  opt_proxy_mandatory_requested_ = true;
+}
+
+
+/**
+ * CVMFS_PROXY_FAILOVER_ON_SLOW; false enables the gate in SwitchProxy().
+ */
+void DownloadManager::SetProxyFailoverOnSlow(bool value) {
+  opt_proxy_failover_on_slow_ = value;
+}
+
 
 /**
  * Enable proxy sharding
@@ -3336,6 +3585,9 @@ void DownloadManager::CloneProxyConfig(DownloadManager *clone) {
   clone->opt_proxy_groups_current_ = opt_proxy_groups_current_;
   clone->opt_proxy_groups_current_burned_ = opt_proxy_groups_current_burned_;
   clone->opt_proxy_groups_fallback_ = opt_proxy_groups_fallback_;
+  clone->opt_proxy_mandatory_requested_ = opt_proxy_mandatory_requested_;
+  clone->opt_proxy_mandatory_effective_ = opt_proxy_mandatory_effective_;
+  clone->opt_proxy_failover_on_slow_ = opt_proxy_failover_on_slow_;
   clone->opt_num_proxies_ = opt_num_proxies_;
   clone->opt_proxy_shard_ = opt_proxy_shard_;
   clone->opt_proxy_list_ = opt_proxy_list_;

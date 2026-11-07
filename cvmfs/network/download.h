@@ -119,6 +119,22 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   FRIEND_TEST(T_Download, ValidateGeoReply);
   FRIEND_TEST(T_Download, StripDirect);
   FRIEND_TEST(T_Download, EscapeUrl);
+  FRIEND_TEST(T_Download, ProxyDemoteDirect);
+  FRIEND_TEST(T_Download, ProxyDirectKeptAsLastResortTier);
+  FRIEND_TEST(T_Download, ProxyDirectNotPeerOfLiveProxy);
+  FRIEND_TEST(T_Download, ProxyDirectOnlyPreserved);
+  FRIEND_TEST(T_Download, ProxyMandatorySurvivesClone);
+  FRIEND_TEST(T_Download, NoProxyChainIsNotSelectable);
+  FRIEND_TEST(T_Download, EscalatedProxyGroupClassification);
+  FRIEND_TEST(T_Download, ProxyChainDefaultsToPreviousBehaviour);
+  FRIEND_TEST(T_Download, RecordProxySuccessOnlyForLocalProxies);
+  FRIEND_TEST(T_Download, MandatoryProxyBlockFailsAsProxyError);
+  FRIEND_TEST(T_Download, SlowProxyDoesNotEscalateToDirect);
+  FRIEND_TEST(T_Download, SlowProxyDoesNotEscalateToFallback);
+  FRIEND_TEST(T_Download, ShortTransferBypassesTheGate);
+  FRIEND_TEST(T_Download, ProxyHttpErrorBypassesTheGate);
+  FRIEND_TEST(T_Download, SlowProxyEscalatesToDirectByDefault);
+  FRIEND_TEST(T_Download, WithheldEscalationIsCappedPerJob);
 
  public:
   // HostInfo is used for both metalink and host
@@ -221,6 +237,8 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   std::string GetProxyList();
   std::string GetFallbackProxyList();
   void ShardProxies();
+  void EnableMandatoryProxy();
+  void SetProxyFailoverOnSlow(bool value);
   void RebalanceProxies();
   void SwitchProxyGroup();
   void SetProxyGroupResetDelay(const unsigned seconds);
@@ -265,6 +283,10 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   static void *MainDownload(void *data);
 
   bool StripDirect(const std::string &proxy_list, std::string *cleaned_list);
+  std::string DemoteDirect(const std::string &proxy_list,
+                           bool *has_direct_group);
+  bool IsEscalatedProxyGroup(unsigned group_idx) const;
+  void RecordProxySuccess(const std::string &proxy_url);
   bool ValidateGeoReply(const std::string &reply_order,
                         const unsigned expected_size,
                         std::vector<uint64_t> *reply_vals);
@@ -375,6 +397,29 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
    * Overall number of proxies summed over all the groups.
    */
   unsigned opt_num_proxies_;
+  /**
+   * CVMFS_PROXY_MANDATORY, off by default.  DIRECT is used only where written
+   * as a tier of its own, and a request with no selectable proxy fails instead
+   * of going out unproxied.
+   */
+  bool opt_proxy_mandatory_requested_;
+  /**
+   * True when opt_proxy_mandatory_requested_ is set, the chain has a real
+   * proxy and no DIRECT tier.  Then a direct connection is never used.
+   */
+  bool opt_proxy_mandatory_effective_;
+  /**
+   * CVMFS_PROXY_FAILOVER_ON_SLOW, on by default (previous behaviour).  Off
+   * keeps a slow but answering local proxy for one more attempt per request
+   * instead of escalating to DIRECT or a fallback; see SwitchProxy().  Worst
+   * case cost: one extra CVMFS_TIMEOUT per request.
+   */
+  bool opt_proxy_failover_on_slow_;
+  /**
+   * Last request completed through a local (non-escalated) proxy, or 0.
+   * Evidence for the gate in SwitchProxy().  Not copied to clones.
+   */
+  time_t last_proxy_success_;
   /**
    * The original proxy list provided to SetProxyChain.
    */
