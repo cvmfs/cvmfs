@@ -644,4 +644,47 @@ TEST_F(T_CvmfsPassthrough, NonPosixCacheServesWithoutPassthrough) {
   Release(kTestInode, opened.fi);
   EXPECT_EQ(0, fuse_stub_passthrough_close_calls);
 }
+
+
+/**
+ * A reload hands the tracker to a fresh library instance, which never sees the
+ * FUSE init callback. A handle opened before the reload still closes its
+ * backing id, also when the reload turned the config option off.
+ */
+TEST_F(T_CvmfsPassthrough, ReloadKeepsBackingReferences) {
+  PublishRegularFile(kTestInode, kTestPath);
+  fuse_stub_passthrough_open_result = 7;
+  EXPECT_CALL(*cvmfs::mount_point_->mock_fetcher(), Fetch(_, _))
+      .WillOnce(Return(42));
+  EXPECT_CALL(*cvmfs::file_system_->mock_cache_mgr(), Close(42))
+      .WillOnce(Return(0));
+  const fuse_req opened = Open(kTestInode);
+  ASSERT_EQ(7, opened.fi.backing_id);
+  cvmfs::fuse_passthru_refused = true;
+
+  cvmfs::FusePassthruState *saved = cvmfs::SaveFusePassthruState();
+  ASSERT_TRUE(saved != NULL);
+  delete cvmfs::fuse_passthru_tracker;
+  cvmfs::fuse_passthru_tracker = NULL;
+  cvmfs::fuse_passthru_refused = false;
+  cvmfs::RestoreFusePassthruState(*saved);
+  delete saved;
+
+  ASSERT_TRUE(cvmfs::fuse_passthru_tracker != NULL);
+  EXPECT_TRUE(cvmfs::fuse_passthru_refused);
+  EXPECT_EQ(1u, cvmfs::fuse_passthru_tracker->count(kTestInode));
+
+  exports_.fuse_passthrough = false;
+  Release(kTestInode, opened.fi);
+  EXPECT_EQ(1, fuse_stub_passthrough_close_calls);
+  EXPECT_EQ(7, fuse_stub_passthrough_close_backing_id);
+  EXPECT_TRUE(cvmfs::fuse_passthru_tracker->empty());
+}
+
+
+TEST_F(T_CvmfsPassthrough, NoSavedStateWithoutPassthrough) {
+  delete cvmfs::fuse_passthru_tracker;
+  cvmfs::fuse_passthru_tracker = NULL;
+  EXPECT_TRUE(cvmfs::SaveFusePassthruState() == NULL);
+}
 #endif  // FUSE_CAP_PASSTHROUGH

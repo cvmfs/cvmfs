@@ -108,6 +108,7 @@ enum StateId {
   kStatePageCacheTracker,  // >= 2.10
   kStateFuse,              // >= 2.11
   kStateWatchdog,          // >= 2.14
+  kStateFusePassthrough,   // >= 2.15
 
   // Note: kStateOpenFilesXXX was renamed to kStateOpenChunksXXX as of 2.4
 };
