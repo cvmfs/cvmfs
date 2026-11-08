@@ -115,10 +115,32 @@ class CredentialsAttachment {
  * Note when adding new fields: Clone() probably needs to be adjusted, too.
  * TODO(jblomer): improve ordering of members
  */
+/**
+ * Exposed for unit tests: applies the socket options libcurl would set from
+ * inside a live connection attempt.
+ */
+int CallbackCurlSockoptForTest(void *clientp, curl_socket_t curlfd,
+                               curlsocktype purpose);
+
+
 class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   FRIEND_TEST(T_Download, ValidateGeoReply);
   FRIEND_TEST(T_Download, StripDirect);
   FRIEND_TEST(T_Download, EscapeUrl);
+  FRIEND_TEST(T_Download, ProxyDemoteDirect);
+  FRIEND_TEST(T_Download, ProxyDirectKeptAsLastResortTier);
+  FRIEND_TEST(T_Download, ProxyDirectNotPeerOfLiveProxy);
+  FRIEND_TEST(T_Download, ProxyDirectOnlyPreserved);
+  FRIEND_TEST(T_Download, HttpStatusLineAnyVersion);
+  FRIEND_TEST(T_Download, CurlHandlePoolRespectsMaximum);
+  FRIEND_TEST(T_Download, WatchFdsShrinkBackToFloor);
+  FRIEND_TEST(T_Download, TcpKeepaliveOnByDefault);
+  FRIEND_TEST(T_Download, SocketTeardownIsBounded);
+  FRIEND_TEST(T_Download, ParallelFetchAndProxyMandatorySurviveClone);
+  FRIEND_TEST(T_Download, NoProxyChainIsNotSelectable);
+  FRIEND_TEST(T_Download, EscalatedProxyGroupClassification);
+  FRIEND_TEST(T_Download, TimeoutQuarantinesThePooledConnections);
+  FRIEND_TEST(T_Download, BackoffDefersInsteadOfSleepingWhenThreaded);
 
  public:
   // HostInfo is used for both metalink and host
@@ -183,6 +205,15 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   DownloadManager *Clone(const perf::StatisticsTemplate &statistics,
                          const std::string &cloned_name);
   Failures Fetch(JobInfo *info);
+  /**
+   * Splits one large object into several concurrent range requests, which on a
+   * high-latency link recovers the throughput a single TCP stream cannot.
+   * Returns kFailUnsupportedProtocol when the job is not a candidate -- too
+   * small, no expected hash, a sink that pre-reserves, already a range request,
+   * single-threaded manager -- which the caller treats as "not applicable" and
+   * falls back to an ordinary fetch rather than as an error.
+   */
+  Failures FetchParallel(JobInfo *info);
 
   void SetCredentialsAttachment(CredentialsAttachment *ca);
   std::string GetDnsServer() const;
@@ -193,6 +224,8 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   void SetTimeout(const unsigned seconds_proxy, const unsigned seconds_direct);
   void GetTimeout(unsigned *seconds_proxy, unsigned *seconds_direct);
   void SetLowSpeedLimit(const unsigned low_speed_limit);
+  void SetTcpKeepalive(const unsigned idle_seconds);
+  void SetParallelFetch(const unsigned num_connections);
   void SetMetalinkChain(const std::string &metalink_list);
   void SetMetalinkChain(const std::vector<std::string> &metalink_list);
   void GetMetalinkInfo(std::vector<std::string> *metalink_chain,
@@ -260,11 +293,18 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   dns::IpPreference opt_ip_preference() const { return opt_ip_preference_; }
 
  private:
+  // libcurl's CURLMOPT_TIMERFUNCTION dictates the long parameter
+  static int CallbackCurlTimer(CURLM *multi,
+                               long timeout_ms,  // NOLINT(runtime/int)
+                               void *userp);
   static int CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
                                 void *userp, void *socketp);
   static void *MainDownload(void *data);
 
   bool StripDirect(const std::string &proxy_list, std::string *cleaned_list);
+  std::string DemoteDirect(const std::string &proxy_list,
+                           bool *has_direct_group);
+  bool IsEscalatedProxyGroup(unsigned group_idx) const;
   bool ValidateGeoReply(const std::string &reply_order,
                         const unsigned expected_size,
                         std::vector<uint64_t> *reply_vals);
@@ -319,6 +359,8 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   uint32_t watch_fds_size_;
   uint32_t watch_fds_inuse_;
   uint32_t watch_fds_max_;
+  /** Next timeout requested by libcurl (CURLMOPT_TIMERFUNCTION), -1: none */
+  long curl_timeout_ms_;  // NOLINT
 
   pthread_mutex_t *lock_options_;
   pthread_mutex_t *lock_synchronous_mode_;
@@ -327,6 +369,17 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   unsigned opt_timeout_proxy_;
   unsigned opt_timeout_direct_;
   unsigned opt_low_speed_limit_;
+  /** TCP keep-alive probe interval in seconds, 0 disables keep-alive */
+  unsigned opt_tcp_keepalive_;
+  /** Split large objects into this many concurrent range requests, 0: off */
+  unsigned opt_parallel_fetch_;
+  /**
+   * Until this time, new requests bypass libcurl's connection pool.  Set after
+   * a transfer timeout: the other pooled connections were idle for as long as
+   * the one that just stalled and were most likely killed by the same
+   * middlebox.
+   */
+  time_t opt_fresh_connect_until_;
   unsigned opt_max_retries_;
   unsigned opt_backoff_init_ms_;
   unsigned opt_backoff_max_ms_;
@@ -375,6 +428,16 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
    * Overall number of proxies summed over all the groups.
    */
   unsigned opt_num_proxies_;
+  /**
+   * True when a real (non-DIRECT) proxy is configured and the configuration
+   * offers no DIRECT tier to fall back on.  While this holds, a direct
+   * connection is never an acceptable substitute for the proxy and requests
+   * are failed instead of silently bypassing it.  Writing DIRECT into the
+   * chain, as in "proxy;DIRECT", clears the flag and re-enables an unproxied
+   * last resort -- reached only once the proxy has actually failed, see
+   * DemoteDirect().  Configurations with no proxy at all also leave it false.
+   */
+  bool opt_proxy_mandatory_;
   /**
    * The original proxy list provided to SetProxyChain.
    */

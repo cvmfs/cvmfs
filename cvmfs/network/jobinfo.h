@@ -87,6 +87,10 @@ class JobInfo {
   // Allow byte ranges to be specified.
   off_t range_offset_;
   off_t range_size_;
+  /** Bytes of this object already received in earlier attempts (resume) */
+  uint64_t resume_offset_;
+  /** Content-Length of the last response, -1 if none */
+  int64_t content_length_;
 
   // Internal state
   CURL *curl_handle_;
@@ -107,6 +111,15 @@ class JobInfo {
   unsigned char num_used_hosts_;
   unsigned char num_retries_;
   unsigned backoff_ms_;
+  /** Monotonic time (ms) before which a retry must not be re-issued */
+  uint64_t retry_not_before_ms_;
+  /** Monotonic time (ms) of the first failed attempt without progress,
+   *  0: none */
+  uint64_t no_progress_since_ms_;
+  /** Large single objects may be fetched as parallel ranges (catalogs) */
+  bool parallel_ok_;
+  /** Failure meant the peer never answered; see peer_unresponsive() */
+  bool peer_unresponsive_;
   int current_metalink_chain_index_;
   int current_host_chain_index_;
 
@@ -189,6 +202,8 @@ class JobInfo {
 
   off_t range_offset() const { return range_offset_; }
   off_t range_size() const { return range_size_; }
+  uint64_t resume_offset() const { return resume_offset_; }
+  int64_t content_length() const { return content_length_; }
 
   CURL *curl_handle() const { return curl_handle_; }
   curl_slist *headers() const { return headers_; }
@@ -208,6 +223,16 @@ class JobInfo {
   unsigned char num_used_hosts() const { return num_used_hosts_; }
   unsigned char num_retries() const { return num_retries_; }
   unsigned backoff_ms() const { return backoff_ms_; }
+  uint64_t retry_not_before_ms() const { return retry_not_before_ms_; }
+  uint64_t no_progress_since_ms() const { return no_progress_since_ms_; }
+  bool parallel_ok() const { return parallel_ok_; }
+  /**
+   * True when the failure means the peer never answered at all: the connect
+   * ran out of time without completing.  A refused connection does not count
+   * -- the peer answered, with a reset -- and neither does a connection that
+   * was established and then ran slowly.
+   */
+  bool peer_unresponsive() const { return peer_unresponsive_; }
   int current_metalink_chain_index() const {
     return current_metalink_chain_index_;
   }
@@ -237,6 +262,8 @@ class JobInfo {
 
   void SetRangeOffset(off_t range_offset) { range_offset_ = range_offset; }
   void SetRangeSize(off_t range_size) { range_size_ = range_size; }
+  void SetResumeOffset(uint64_t offset) { resume_offset_ = offset; }
+  void SetContentLength(int64_t length) { content_length_ = length; }
 
   void SetCurlHandle(CURL *curl_handle) { curl_handle_ = curl_handle; }
   void SetHeaders(curl_slist *headers) { headers_ = headers; }
@@ -270,6 +297,10 @@ class JobInfo {
   }
   void SetNumRetries(unsigned char num_retries) { num_retries_ = num_retries; }
   void SetBackoffMs(unsigned backoff_ms) { backoff_ms_ = backoff_ms; }
+  void SetRetryNotBeforeMs(uint64_t t) { retry_not_before_ms_ = t; }
+  void SetNoProgressSinceMs(uint64_t t) { no_progress_since_ms_ = t; }
+  void SetParallelOk(bool ok) { parallel_ok_ = ok; }
+  void SetPeerUnresponsive(bool v) { peer_unresponsive_ = v; }
   void SetCurrentMetalinkChainIndex(int current_metalink_chain_index) {
     current_metalink_chain_index_ = current_metalink_chain_index;
   }

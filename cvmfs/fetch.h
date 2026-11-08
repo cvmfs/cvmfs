@@ -97,6 +97,7 @@ class TransactionSink : public Sink {
  */
 class Fetcher : SingleCopy {
   FRIEND_TEST(T_Fetcher, GetTls);
+  FRIEND_TEST(T_Fetcher, ParallelOkOnlyForCatalogs);
   FRIEND_TEST(T_Fetcher, SignalWaitingThreads);
   friend void *TestGetTls(void *data);
   friend void *TestFetchCollapse(void *data);

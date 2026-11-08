@@ -277,6 +277,36 @@ TEST_F(T_Fetcher, Fetch) {
 }
 
 
+TEST_F(T_Fetcher, ParallelOkOnlyForCatalogs) {
+  // Parallel fetching is reserved for catalogs: they are large single objects
+  // on the metadata critical path, whereas file chunks already get their
+  // parallelism from the chunk read-ahead.  The flag is set before the
+  // download is attempted, so a failing fetch exercises it just as well.
+  CacheManager::Label lbl;
+  lbl.size = CacheManager::kSizeUnknown;
+  lbl.path = "rnd";
+
+  shash::Any rnd_regular(shash::kSha1);
+  rnd_regular.Randomize();
+  lbl.flags = 0;
+  EXPECT_LT(fetcher_->Fetch(CacheManager::LabeledObject(rnd_regular, lbl)), 0);
+  EXPECT_FALSE(fetcher_->GetTls()->download_job.parallel_ok())
+      << "a regular object asked for parallel fetching";
+
+  shash::Any rnd_catalog(shash::kSha1, shash::kSuffixCatalog);
+  rnd_catalog.Randomize();
+  lbl.flags = CacheManager::kLabelCatalog;
+  EXPECT_LT(fetcher_->Fetch(CacheManager::LabeledObject(rnd_catalog, lbl)), 0);
+  EXPECT_TRUE(fetcher_->GetTls()->download_job.parallel_ok())
+      << "a catalog did not ask for parallel fetching";
+
+  // And it is not sticky: a regular object after a catalog clears it again.
+  lbl.flags = 0;
+  EXPECT_LT(fetcher_->Fetch(CacheManager::LabeledObject(rnd_regular, lbl)), 0);
+  EXPECT_FALSE(fetcher_->GetTls()->download_job.parallel_ok());
+}
+
+
 TEST_F(T_Fetcher, FetchUncompressed) {
   EXPECT_EQ(-ENOENT,
             cache_mgr_->Open(CacheManager::LabeledObject(hash_uncompressed_)));

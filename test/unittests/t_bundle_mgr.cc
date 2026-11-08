@@ -93,6 +93,17 @@ class MockFetcher : public cvmfs::Fetcher {
 class T_BundleMgr : public ::testing::Test {
  protected:
   virtual void SetUp() {
+    // FileSystem::SetupCwd() chdir()s into its workspace, so remember where we
+    // started and return there in TearDown().  The previous code instead did a
+    // relative chdir("../..") on the way out, which assumed the workspace sat
+    // exactly two levels down; it sits one level down, so every test left the
+    // process one directory higher than it found it.  After this fixture ran,
+    // the working directory had climbed to "/", and later tests that bind or
+    // open relative paths -- T_ExternalCacheManager binds the relative socket
+    // "cvmfs_cache_plugin.socket" -- failed in the full-suite run while
+    // passing in isolation.
+    fd_cwd_ = open(".", O_RDONLY);
+    ASSERT_GE(fd_cwd_, 0);
     tmp_path_ = CreateTempDir("./cvmfs_ut_cache");
     options_mgr_.SetValue("CVMFS_CACHE_BASE", tmp_path_);
     options_mgr_.SetValue("CVMFS_SHARED_CACHE", "no");
@@ -155,7 +166,8 @@ class T_BundleMgr : public ::testing::Test {
     delete mount_point_;
     delete file_system_;
     ClosePipe(common_pipe_);
-    EXPECT_EQ(0, chdir("../.."));
+    EXPECT_EQ(0, fchdir(fd_cwd_));
+    close(fd_cwd_);
     if (not tmp_path_.empty()) {
       EXPECT_TRUE(RemoveTree(tmp_path_));
     }
@@ -180,6 +192,7 @@ class T_BundleMgr : public ::testing::Test {
   FileSystem *file_system_;
   FileSystem::FileSystemInfo fs_info_;
   SimpleOptionsParser options_mgr_;
+  int fd_cwd_;
   std::string tmp_path_;
 
   BundleMgr *bundle_mgr_;
