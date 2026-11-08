@@ -26,7 +26,7 @@ Standards-Version: 3.9.6.1
 Homepage: http://cernvm.cern.ch/portal/filesystem
 
 Package: cvmfs
-Architecture: amd64 armhf arm64
+Architecture: amd64 armhf arm64 riscv64
 Depends:
  cvmfs-config-default | cvmfs-config,
  cvmfs-fuse3 (= ${binary:Version}),
@@ -50,14 +50,14 @@ Description: CernVM File System
  HTTP File System for Distributing Software to CernVM.
 
 Package: cvmfs-libs
-Architecture: amd64 armhf arm64
+Architecture: amd64 armhf arm64 riscv64
 Depends: ${misc:Depends}
 Homepage: http://cernvm.cern.ch
 Description: CernVM-FS common libraries
  Common utility libraries for CernVM-FS packages.
 
 Package: cvmfs-server
-Architecture: amd64 armhf arm64
+Architecture: amd64 armhf arm64 riscv64
 Depends:
 # TODO(vavolkl): remove fuse3 once server fstab is modernized
  fuse3,
@@ -86,7 +86,7 @@ Description: CernVM-FS server utilities
  HTTP File System Repository Server for Distributing Software to CernVM.
 
 Package: cvmfs-dev
-Architecture: amd64 armhf arm64
+Architecture: amd64 armhf arm64 riscv64
 Depends:
  openssl,
  ${misc:Depends}
@@ -95,7 +95,7 @@ Description: CernVM-FS client library
  CernVM-FS static client library
 
 Package: cvmfs-shrinkwrap
-Architecture: amd64 armhf arm64
+Architecture: amd64 armhf arm64 riscv64
 Depends:
  openssl,
  python3,
@@ -106,7 +106,7 @@ Description: CernVM-FS shrinkwrap utility to export /cvmfs file system trees
  CernVM-FS shrinkwrap utility to export /cvmfs file system trees into container images.
 
 Package: cvmfs-fuse3
-Architecture: amd64 armhf arm64
+Architecture: amd64 armhf arm64 riscv64
 Depends:
  cvmfs-libs (= ${binary:Version}),
  ${shlibs:Depends}
