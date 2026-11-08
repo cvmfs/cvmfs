@@ -29,7 +29,7 @@
 namespace {
 constexpr size_t kDefaultBundlePoolSize = 8;
 
-// Read the .cvmfsbundle-<basename> file via the cvmfs cache
+// Read the .cvmfsbundle-<basename>[.cvmfsbundle] file via the cvmfs cache
 BundleFileMgr *LoadBundleFromCvmfs(MountPoint *mp,
                                    const PathString &bundle_file_path) {
   catalog::DirectoryEntry dirent;
@@ -254,13 +254,17 @@ void BundleMgr::JoinDispatcher() {
 void BundleMgr::ProcessTrigger(const PathString &trigger_path) {
   const NameString fname = GetFileName(trigger_path);
   const PathString parent_path = GetParentPath(trigger_path);
-  // There is a naming convention regarding the name of the file with the
-  // contents of the bundle
-  const PathString bundle_file_path(parent_path.ToString() + "/.cvmfsbundle-"
-                                    + fname.ToString());
-
-  const std::unique_ptr<BundleFileMgr> bfm(
-      LoadBundleFromCvmfs(mount_point_, bundle_file_path));
+  // The catalog does not record which spec name form was published; the
+  // publisher guarantees at most one exists.
+  const std::string parent = parent_path.ToString() + "/";
+  std::unique_ptr<BundleFileMgr> bfm(LoadBundleFromCvmfs(
+      mount_point_,
+      PathString(parent + bundle::SuffixedSpecName(fname.ToString()))));
+  if (bfm == nullptr) {
+    bfm.reset(LoadBundleFromCvmfs(
+        mount_point_,
+        PathString(parent + bundle::PlainSpecName(fname.ToString()))));
+  }
   if (bfm == nullptr) {
     LogCvmfs(kLogCvmfs, kLogDebug, "Couldn't fetch bundle associated to %s",
              trigger_path.ToString().c_str());
