@@ -132,6 +132,11 @@ static Failures PrepareDownloadDestination(JobInfo *info) {
 }
 
 
+static bool IsGatewayHttpError(const int http_code) {
+  return (http_code == 502) || (http_code == 503) || (http_code == 504);
+}
+
+
 /**
  * Called by curl for every HTTP header. Not called for file:// transfers.
  */
@@ -178,15 +183,16 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
       LogCvmfs(kLogDownload, kLogDebug,
                "(id %" PRId64 ") http status error code: %s [%d]", info->id(),
                header_line.c_str(), info->http_code());
-      if (((info->http_code() / 100) == 5) || (info->http_code() == 400)
-          || (info->http_code() == 404)) {
+      if ((info->http_code() == 429) || IsGatewayHttpError(info->http_code())) {
+        // 429: rate throttling (we ignore the backoff hint for the time being)
+        // 502/503/504: transient, retry the same URL with backoff
+        info->SetErrorCode(kFailHostConnection);
+      } else if (((info->http_code() / 100) == 5) || (info->http_code() == 400)
+                 || (info->http_code() == 404)) {
         // 5XX returned by host
         // 400: error from the GeoAPI module
         // 404: the stratum 1 does not have the newest files
         info->SetErrorCode(kFailHostHttp);
-      } else if (info->http_code() == 429) {
-        // 429: rate throttling (we ignore the backoff hint for the time being)
-        info->SetErrorCode(kFailHostConnection);
       } else {
         info->SetErrorCode((info->proxy() == "DIRECT") ? kFailHostHttp
                                                        : kFailProxyHttp);
