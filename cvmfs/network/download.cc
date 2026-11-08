@@ -321,6 +321,21 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
   return num_bytes;
 }
 
+/**
+ * Probes the option directly: curl_version_info() does not reliably tell the
+ * threaded resolver from c-ares.  Without c-ares, older curl returns
+ * CURLE_NOT_BUILT_IN and newer curl CURLE_UNKNOWN_OPTION.
+ */
+static bool CurlSupportsDnsServers() {
+  CURL *handle = curl_easy_init();
+  assert(handle != NULL);
+  const CURLcode retval = curl_easy_setopt(handle, CURLOPT_DNS_SERVERS,
+                                           "127.0.0.1");
+  curl_easy_cleanup(handle);
+  return retval == CURLE_OK;
+}
+
+
 #ifdef DEBUGMSG
 static int CallbackCurlDebug(CURL *handle,
                              curl_infotype type,
@@ -1070,7 +1085,7 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
     curl_easy_setopt(curl_handle, CURLOPT_CONNECTTIMEOUT, opt_timeout_direct_);
     curl_easy_setopt(curl_handle, CURLOPT_LOW_SPEED_TIME, opt_timeout_direct_);
   }
-  if (!opt_dns_server_.empty())
+  if (!opt_dns_server_.empty() && curl_dns_servers_supported_)
     curl_easy_setopt(curl_handle, CURLOPT_DNS_SERVERS, opt_dns_server_.c_str());
 
   if (info->probe_hosts()) {
@@ -1953,6 +1968,7 @@ DownloadManager::DownloadManager(const unsigned max_pool_handles,
   prng_.InitLocaltime();
 
   // Name resolving
+  curl_dns_servers_supported_ = CurlSupportsDnsServers();
   if ((getenv("CVMFS_IPV4_ONLY") != NULL)
       && (strlen(getenv("CVMFS_IPV4_ONLY")) > 0)) {
     opt_ipv4_only_ = true;
@@ -2204,6 +2220,15 @@ void DownloadManager::SetDnsServer(const string &address) {
   }
   LogCvmfs(kLogDownload, kLogSyslog, "(manager '%s') set nameserver to %s",
            name_.c_str(), address.c_str());
+  // Once per process: DNS roaming calls this on every resolv.conf change
+  static std::atomic<bool> warned(false);
+  if (!curl_dns_servers_supported_ && !warned.exchange(true)) {
+    LogCvmfs(kLogDownload, kLogSyslogWarn,
+             "(manager '%s') libcurl lacks c-ares support: nameserver %s "
+             "only applies to proxy name resolution, other hosts use the "
+             "system resolver",
+             name_.c_str(), address.c_str());
+  }
 }
 
 

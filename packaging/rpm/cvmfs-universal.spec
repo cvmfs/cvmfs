@@ -112,6 +112,10 @@ BuildRequires: fuse-devel
 BuildRequires: fuse3-devel >= 3.3.0
 BuildRequires: libattr-devel
 BuildRequires: openssl-devel
+# The vendored curl does not compile against OpenSSL 4 (opaque ASN1 types)
+%if 0%{?fedora} >= 45
+BuildRequires: libcurl-devel >= 7.55.0
+%endif
 BuildRequires: patch
 BuildRequires: pkgconfig
 BuildRequires: %{cvmfs_python_devel}
@@ -387,6 +391,10 @@ BUILD_LIBFUSE2=no
 %if 0%{?build_fuse2}
 BUILD_LIBFUSE2=yes
 %endif
+BUILTIN_EXTERNALS_EXCLUDE=
+%if 0%{?fedora} >= 45
+BUILTIN_EXTERNALS_EXCLUDE=curl
+%endif
 BUILD_UNITTESTS=no
 INSTALL_UNITTESTS=no
 %if 0%{?build_testing}
@@ -408,6 +416,7 @@ cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} \
   -DBUILD_SNAPSHOTTER=$BUILD_SNAPSHOTTER \
   -DINSTALL_UNITTESTS=$INSTALL_UNITTESTS \
   -DBUILD_LIBFUSE2=$BUILD_LIBFUSE2 \
+  -DBUILTIN_EXTERNALS_EXCLUDE="$BUILTIN_EXTERNALS_EXCLUDE" \
   -DCMAKE_INSTALL_PREFIX:PATH=/usr .
 
 make %{?_smp_mflags}
