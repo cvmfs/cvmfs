@@ -229,6 +229,19 @@ static inline bool IncAndCheckNoOpenFiles() {
   return no_open_files < (static_cast<int>(max_open_files_) - kNumReservedFd);
 }
 
+#ifdef FUSE_CAP_PASSTHROUGH
+/**
+ * The kernel reads a passthrough file from its backing fd, so that must be an
+ * OS file descriptor. Only the posix cache manager returns one; the others
+ * return indices into their own tables, which can alias unrelated daemon fds.
+ */
+static inline bool UseFusePassthrough() {
+  return loader_exports_ && loader_exports_->fuse_passthrough
+         && fuse_passthru_tracker
+         && file_system_->cache_mgr()->id() == kPosixCacheManager;
+}
+#endif
+
 static inline double GetKcacheTimeout() {
   if (!fuse_remounter_->IsCaching())
     return 0.0;
@@ -1410,7 +1423,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
       fi->fh = fd;
       FillOpenFlags(open_directives, fi);
 #ifdef FUSE_CAP_PASSTHROUGH
-      if (loader_exports_ && loader_exports_->fuse_passthrough) {
+      if (UseFusePassthrough()) {
         if (!dirent.IsChunkedFile()) {
           /* "Currently there should be only one backing id per node / backing
            * file." So says libfuse documentation on fuse_passthrough_open(). So
@@ -2307,7 +2320,12 @@ static void cvmfs_init(void *userdata, struct fuse_conn_info *conn) {
 
 #ifdef FUSE_CAP_PASSTHROUGH
   if (conn->capable & FUSE_CAP_PASSTHROUGH) {
-    if (loader_exports_ && loader_exports_->fuse_passthrough) {
+    if (loader_exports_ && loader_exports_->fuse_passthrough
+        && file_system_->cache_mgr()->id() != kPosixCacheManager) {
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+               "FUSE: Passthrough requires the posix cache manager, "
+               "serving files without passthrough.");
+    } else if (loader_exports_ && loader_exports_->fuse_passthrough) {
       conn->want |= FUSE_CAP_PASSTHROUGH;
       /* "Passthrough and writeback cache are conflicting modes"
        * libfuse example/passthrough_hp.cc says,

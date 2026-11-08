@@ -445,6 +445,8 @@ class T_CvmfsPassthrough : public T_Cvmfs {
     cvmfs::fuse_passthru_tracker =
         new std::unordered_map<fuse_ino_t, cvmfs::fuse_passthru_ctx_t>();
     cvmfs::fuse_passthru_refused = false;
+    ON_CALL(*cvmfs::file_system_->mock_cache_mgr(), id())
+        .WillByDefault(Return(kPosixCacheManager));
     fuse_stub_passthrough_open_calls = 0;
     fuse_stub_passthrough_close_calls = 0;
     fuse_stub_passthrough_close_backing_id = -1;
@@ -615,5 +617,31 @@ TEST_F(T_CvmfsPassthrough, FailedOpenReleaseLeavesLaterBackingIdOpen) {
   EXPECT_EQ(1, fuse_stub_passthrough_close_calls);
   EXPECT_EQ(7, fuse_stub_passthrough_close_backing_id);
   EXPECT_TRUE(cvmfs::fuse_passthru_tracker->empty());
+}
+
+
+/**
+ * Other cache managers return indices into their own fd tables, which the
+ * kernel would resolve to unrelated daemon fds. No backing file is requested.
+ */
+TEST_F(T_CvmfsPassthrough, NonPosixCacheServesWithoutPassthrough) {
+  PublishRegularFile(kTestInode, kTestPath);
+  ON_CALL(*cvmfs::file_system_->mock_cache_mgr(), id())
+      .WillByDefault(Return(kRamCacheManager));
+  fuse_stub_passthrough_open_result = 7;
+  EXPECT_CALL(*cvmfs::mount_point_->mock_fetcher(), Fetch(_, _))
+      .WillOnce(Return(0));
+  EXPECT_CALL(*cvmfs::file_system_->mock_cache_mgr(), Close(0))
+      .WillOnce(Return(0));
+
+  const fuse_req opened = Open(kTestInode);
+  ASSERT_EQ(fuse_req::kReplyOpen, opened.kind);
+  EXPECT_EQ(0, opened.fi.backing_id);
+  EXPECT_EQ(0u, opened.fi.fh);
+  EXPECT_EQ(0, fuse_stub_passthrough_open_calls);
+  EXPECT_TRUE(cvmfs::fuse_passthru_tracker->empty());
+
+  Release(kTestInode, opened.fi);
+  EXPECT_EQ(0, fuse_stub_passthrough_close_calls);
 }
 #endif  // FUSE_CAP_PASSTHROUGH
