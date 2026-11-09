@@ -35,9 +35,11 @@ class Recorder;
  * the mutex lives as long as its last user.
  *
  * Also carries the epoch of the current round of open hash collection.  The
- * epoch is non-zero while a round accepts results and zero once the round is
- * closed.  Collector threads compare it against the epoch they were started
- * with and drop their results if the round has moved on.  It is read and
+ * epoch is a counter that only ever moves forward.  It is advanced when a
+ * round is closed early because collectors ran late; collector threads compare
+ * it against the epoch they were started with and drop their results if the
+ * round has moved on.  A round whose collectors all finished leaves none of
+ * them running, so the next round can safely reuse its epoch.  The epoch is
  * written only while holding the mutex, so that a check followed by an insert
  * cannot interleave with the closing of the round.
  */
@@ -51,12 +53,16 @@ class OpenHashesLock : SingleCopy {
 
   pthread_mutex_t *Get() { return &mutex_; }
 
-  int epoch() const { return epoch_.load(); }
-  void set_epoch(int epoch) { epoch_.store(epoch); }
+  uint64_t epoch() const { return epoch_.load(); }
+  /**
+   * Moves on to the next epoch and returns it.  Collectors started with the
+   * previous epoch are thereby cut off from the result set.
+   */
+  uint64_t NextEpoch() { return ++epoch_; }
 
  private:
   pthread_mutex_t mutex_;
-  std::atomic<int> epoch_;
+  std::atomic<uint64_t> epoch_;
 };
 
 /**
@@ -76,7 +82,8 @@ class PosixQuotaManager : public QuotaManager {
   FRIEND_TEST(T_QuotaManager, CollectorHandlerSharesOpenHashesLock);
   FRIEND_TEST(T_QuotaManager, CollectorThreadReleasesHandlerReference);
   FRIEND_TEST(T_QuotaManager, CollectorThreadWritesOnlyInItsEpoch);
-  FRIEND_TEST(T_QuotaManager, CollectAllOpenHashesOpensNewEpoch);
+  FRIEND_TEST(T_QuotaManager,
+              CollectAllOpenHashesKeepsEpochWithoutLateCollectors);
   FRIEND_TEST(T_QuotaManager, ReadPipeStringUsesExactLength);
   FRIEND_TEST(T_QuotaManager, RegisterMountpointUsesCorrectDescriptionBuffer);
   FRIEND_TEST(T_QuotaManager, SetCleanupPolicyUsesCorrectDescriptionBuffer);
@@ -461,7 +468,7 @@ class PosixQuotaManager : public QuotaManager {
                      const std::vector<std::string> &mountpoints,
                      const std::shared_ptr<OpenHashesLock> &lock,
                      size_t index,
-                     int round_epoch)
+                     uint64_t round_epoch)
         : of(open_files)
         , mp(mountpoints)
         , l(lock)
@@ -472,7 +479,7 @@ class PosixQuotaManager : public QuotaManager {
     const std::vector<std::string> &mp;
     std::shared_ptr<OpenHashesLock> l;
     size_t i;
-    int epoch; /**< the round this collector belongs to */
+    uint64_t epoch; /**< the round this collector belongs to */
   };
 
   static void *CollectMountpointsHashes(void *data);

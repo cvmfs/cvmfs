@@ -57,7 +57,6 @@
 #include "util/exception.h"
 #include "util/logging.h"
 #include "util/posix.h"
-#include "util/prng.h"
 #include "util/string.h"
 
 using namespace std;  // NOLINT
@@ -2379,17 +2378,11 @@ std::set<shash::Short> PosixQuotaManager::CollectAllOpenHashes() {
     return (a.tv_sec > b.tv_sec) ? true : false;
   };
 
-  // Open a new round: a fresh, non-zero epoch that late collectors of
-  // previous rounds cannot match
-  Prng prng;
-  prng.InitLocaltime();
-  const int epoch = 1
-                    + static_cast<int>(
-                        prng.Next(std::numeric_limits<int>::max()));
-  {
-    const MutexLockGuard lock_guard(lock_open_files_->Get());
-    lock_open_files_->set_epoch(epoch);
-  }
+  // The collectors of this round belong to the current epoch.  Late
+  // collectors of previous rounds cannot match it: closing a round on them
+  // moved the epoch on.  Nobody else writes the epoch, so no lock is needed
+  // to read it here.
+  const uint64_t epoch = lock_open_files_->epoch();
 
   for (size_t i = 0; i < mountpoints_.size(); ++i) {
     // each handler gets its own reference to the lock
@@ -2437,13 +2430,13 @@ std::set<shash::Short> PosixQuotaManager::CollectAllOpenHashes() {
   }
 
   // Threads that did not finish in time keep running on their own reference
-  // of the handler.  Close the round so that they drop their results instead
-  // of writing into open_files_ behind our back, then detach them so that
-  // their resources are released on exit.
+  // of the handler.  Close the round by moving on to the next epoch so that
+  // they drop their results instead of writing into open_files_ behind our
+  // back, then detach them so that their resources are released on exit.
   if (not std::all_of(joined.begin(), joined.end(), [](bool b) { return b; })) {
     {
       const MutexLockGuard lock_guard(lock_open_files_->Get());
-      lock_open_files_->set_epoch(0);
+      lock_open_files_->NextEpoch();
     }
     for (size_t i = 0; i < threads.size(); ++i) {
       if (not joined[i]) {

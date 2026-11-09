@@ -740,52 +740,48 @@ TEST_F(T_QuotaManager, CollectorThreadWritesOnlyInItsEpoch) {
   }
   std::set<shash::Short> open_files;
   const std::vector<std::string> mountpoints(1, tmp_path_);
-  const int epoch = 4711;
 
   // the round is still open: results are accepted and, as in DoCleanup,
   // can be looked up with the full hash of an eviction candidate
-  qm->lock_open_files_->set_epoch(epoch);
+  const uint64_t epoch = qm->lock_open_files_->epoch();
   run_collector(std::make_shared<PosixQuotaManager::CollectorHandler>(
       open_files, mountpoints, qm->lock_open_files_, 0, epoch));
   EXPECT_EQ(2u, open_files.size());
   EXPECT_TRUE(open_files.find(shash::Short(hash_a)) != open_files.end());
   EXPECT_TRUE(open_files.find(shash::Short(hash_b)) != open_files.end());
 
-  // the round was closed (late collector, round moved on): results dropped
+  // the round was closed on this late collector: results dropped
   open_files.clear();
-  qm->lock_open_files_->set_epoch(0);
+  qm->lock_open_files_->NextEpoch();
   run_collector(std::make_shared<PosixQuotaManager::CollectorHandler>(
       open_files, mountpoints, qm->lock_open_files_, 0, epoch));
   EXPECT_TRUE(open_files.empty());
 
-  // a new round started meanwhile: results of the old round dropped
-  qm->lock_open_files_->set_epoch(epoch + 1);
+  // still dropped after further rounds were closed meanwhile
+  qm->lock_open_files_->NextEpoch();
   run_collector(std::make_shared<PosixQuotaManager::CollectorHandler>(
       open_files, mountpoints, qm->lock_open_files_, 0, epoch));
   EXPECT_TRUE(open_files.empty());
 
-  // collectors of the new round are fine
+  // collectors of the current epoch are fine
   run_collector(std::make_shared<PosixQuotaManager::CollectorHandler>(
-      open_files, mountpoints, qm->lock_open_files_, 0, epoch + 1));
+      open_files, mountpoints, qm->lock_open_files_, 0,
+      qm->lock_open_files_->epoch()));
   EXPECT_EQ(2u, open_files.size());
 }
 
 
-TEST_F(T_QuotaManager, CollectAllOpenHashesOpensNewEpoch) {
+TEST_F(T_QuotaManager, CollectAllOpenHashesKeepsEpochWithoutLateCollectors) {
   PosixQuotaManager *qm = quota_mgr_not_spawned_;
   ASSERT_TRUE(qm->mountpoints_.empty());
-  EXPECT_EQ(0, qm->lock_open_files_->epoch());
+  EXPECT_EQ(0u, qm->lock_open_files_->epoch());
 
-  // without mountpoints there are no collectors and hence no late ones, the
-  // round stays open with a non-zero epoch
+  // without mountpoints there are no collectors and hence no late ones to
+  // close a round on: the epoch stays where it is, round after round
   EXPECT_TRUE(qm->CollectAllOpenHashes().empty());
-  const int first_epoch = qm->lock_open_files_->epoch();
-  EXPECT_NE(0, first_epoch);
-
-  // every round gets its own epoch
+  EXPECT_EQ(0u, qm->lock_open_files_->epoch());
   EXPECT_TRUE(qm->CollectAllOpenHashes().empty());
-  EXPECT_NE(0, qm->lock_open_files_->epoch());
-  EXPECT_NE(first_epoch, qm->lock_open_files_->epoch());
+  EXPECT_EQ(0u, qm->lock_open_files_->epoch());
 }
 #endif
 
@@ -801,11 +797,13 @@ TEST(T_OpenHashesLock, NotCopyable) {
 
 TEST(T_OpenHashesLock, Epoch) {
   OpenHashesLock lock;
-  EXPECT_EQ(0, lock.epoch());
-  lock.set_epoch(42);
-  EXPECT_EQ(42, lock.epoch());
-  lock.set_epoch(0);
-  EXPECT_EQ(0, lock.epoch());
+  EXPECT_EQ(0u, lock.epoch());
+
+  // the epoch only ever moves forward, one step at a time
+  EXPECT_EQ(1u, lock.NextEpoch());
+  EXPECT_EQ(1u, lock.epoch());
+  EXPECT_EQ(2u, lock.NextEpoch());
+  EXPECT_EQ(2u, lock.epoch());
 }
 
 
