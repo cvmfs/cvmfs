@@ -101,6 +101,8 @@ jobs:
 
       - name: Setup CVMFS
         run: |
+          # systemd-coredump captures cores for the failure log dump
+          sudo apt-get install -y systemd-coredump
           sudo cvmfs_config setup
           sudo systemctl start apache2
 
@@ -116,6 +118,15 @@ jobs:
         if: ${{ failure() }}
         run: |
           cat /tmp/cvmfs-migration-test.log || true
+          echo "=== cvmfs-reload unit ==="
+          sudo journalctl --no-pager -u cvmfs-reload || true
+          echo "=== cvmfs2 syslog ==="
+          sudo journalctl --no-pager -t cvmfs2 || true
+          echo "=== core dumps ==="
+          sudo coredumpctl --no-pager list || true
+          sudo coredumpctl --no-pager info cvmfs2 || true
+          echo "=== stack traces ==="
+          sudo find /var/lib/cvmfs -name 'stacktrace.*' -exec sh -c 'echo "--- $1"; cat "$1"' _ {} \; || true
 
       - name: Upload logs as artifact
         if: ${{ always() }}

@@ -7,6 +7,8 @@
 
 #include "fuse_stub.h"
 
+#include <errno.h>
+
 #include <cassert>
 #include <cstring>
 
@@ -152,13 +154,23 @@ int fuse_lowlevel_notify_expire_entry(
   return -1;
 }
 
+int fuse_stub_passthrough_open_result = -1;
+int fuse_stub_passthrough_open_errno = 0;
+int fuse_stub_passthrough_open_calls = 0;
+int fuse_stub_passthrough_close_calls = 0;
+int fuse_stub_passthrough_close_backing_id = -1;
+
 int fuse_passthrough_open(fuse_req_t req __attribute__((unused)),
                           int fd __attribute__((unused))) {
-  return -1;
+  fuse_stub_passthrough_open_calls++;
+  errno = fuse_stub_passthrough_open_errno;
+  return fuse_stub_passthrough_open_result;
 }
 
 int fuse_passthrough_close(fuse_req_t req __attribute__((unused)),
-                           int backing_id __attribute__((unused))) {
-  return -1;
+                           int backing_id) {
+  fuse_stub_passthrough_close_calls++;
+  fuse_stub_passthrough_close_backing_id = backing_id;
+  return 0;
 }
 #endif
