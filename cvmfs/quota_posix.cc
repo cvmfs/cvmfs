@@ -2339,7 +2339,7 @@ void *PosixQuotaManager::CollectMountpointsHashes(void *data) {
       hash_str += c;
     }
   }
-  const MutexLockGuard lock_guard(handler->l);
+  const MutexLockGuard lock_guard(handler->l->Get());
   for (auto hash_str : hash_strs) {
     handler->of.insert(
         shash::Short(shash::MkFromHexPtr(shash::HexPtr(hash_str))));
@@ -2358,8 +2358,9 @@ std::set<shash::Short> PosixQuotaManager::CollectAllOpenHashes() {
   };
 
   for (size_t i = 0; i < mountpoints_.size(); ++i) {
-    handlers.push_back(new CollectorHandler{open_files_, mountpoints_,
-                                            lock_open_files_->Get(), i});
+    // each handler gets its own reference to the lock
+    handlers.push_back(
+        new CollectorHandler{open_files_, mountpoints_, lock_open_files_, i});
     threads.push_back(new pthread_t);
   }
 

@@ -637,6 +637,38 @@ TEST_F(T_QuotaManager, OpenHashesLockInitializedOnConstruction) {
 }
 
 
+TEST_F(T_QuotaManager, CollectorHandlerSharesOpenHashesLock) {
+  PosixQuotaManager *qm = quota_mgr_not_spawned_;
+  ASSERT_EQ(1, qm->lock_open_files_.use_count());
+
+  // one handler per collector thread, each with its own reference
+  PosixQuotaManager::CollectorHandler
+      *handler_a = new PosixQuotaManager::CollectorHandler{
+          qm->open_files_, qm->mountpoints_, qm->lock_open_files_, 0};
+  PosixQuotaManager::CollectorHandler
+      *handler_b = new PosixQuotaManager::CollectorHandler{
+          qm->open_files_, qm->mountpoints_, qm->lock_open_files_, 1};
+  EXPECT_EQ(3, qm->lock_open_files_.use_count());
+  EXPECT_EQ(qm->lock_open_files_->Get(), handler_a->l->Get());
+  EXPECT_EQ(qm->lock_open_files_->Get(), handler_b->l->Get());
+
+  // a handler's reference survives the manager letting go of the lock
+  pthread_mutex_t *mutex = qm->lock_open_files_->Get();
+  qm->lock_open_files_.reset();
+  EXPECT_EQ(2, handler_a->l.use_count());
+  EXPECT_EQ(mutex, handler_a->l->Get());
+  EXPECT_EQ(0, pthread_mutex_trylock(handler_a->l->Get()));
+  EXPECT_EQ(0, pthread_mutex_unlock(handler_a->l->Get()));
+
+  delete handler_a;
+  EXPECT_EQ(1, handler_b->l.use_count());
+  delete handler_b;
+
+  // restore the manager's lock for the fixture's tear down
+  qm->lock_open_files_ = std::make_shared<OpenHashesLock>();
+}
+
+
 //------------------------------------------------------------------------------
 
 

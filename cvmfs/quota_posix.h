@@ -61,6 +61,7 @@ class PosixQuotaManager : public QuotaManager {
   FRIEND_TEST(T_QuotaManager, InitDatabase);
   FRIEND_TEST(T_QuotaManager, MakeReturnPipe);
   FRIEND_TEST(T_QuotaManager, OpenHashesLockInitializedOnConstruction);
+  FRIEND_TEST(T_QuotaManager, CollectorHandlerSharesOpenHashesLock);
   FRIEND_TEST(T_QuotaManager, ReadPipeStringUsesExactLength);
   FRIEND_TEST(T_QuotaManager, RegisterMountpointUsesCorrectDescriptionBuffer);
   FRIEND_TEST(T_QuotaManager, SetCleanupPolicyUsesCorrectDescriptionBuffer);
@@ -421,10 +422,15 @@ class PosixQuotaManager : public QuotaManager {
 
   std::set<shash::Short> CollectAllOpenHashes();
 
+  /**
+   * Per collector thread context.  Every handler holds its own reference to
+   * the lock, so the mutex stays alive as long as any collector thread's
+   * handler does.
+   */
   struct CollectorHandler {
     std::set<shash::Short> &of;
     const std::vector<std::string> &mp;
-    pthread_mutex_t *l;
+    std::shared_ptr<OpenHashesLock> l;
     size_t i;
   };
 
