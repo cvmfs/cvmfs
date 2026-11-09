@@ -2598,10 +2598,13 @@ static int Init(const loader::LoaderExports *loader_exports) {
   // an old loader that expected the FUSE module to start a watchdog
   if (cvmfs::ShouldStartWatchdog()) {
     auto_umount::SetMountpoint(loader_exports->mount_point);
+    // Loaders before version 6 never drop the real root uid
+    const bool retain_root = (loader_exports->version < 6);
     cvmfs::watchdog_ = Watchdog::Create(auto_umount::UmountOnExit,
                                         NeedsReadEnviron(),
                                         NULL,
-                                        GetWatchdogOomScoreAdj());
+                                        GetWatchdogOomScoreAdj(),
+                                        retain_root);
     if (cvmfs::watchdog_ == NULL) {
       *g_boot_error = "failed to initialize watchdog.";
       return loader::kFailMonitor;

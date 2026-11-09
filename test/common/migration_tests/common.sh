@@ -125,7 +125,7 @@ package_version() {
   if [[ "$ID_LIKE" =~ rhel ]]; then
     rpm -qp --queryformat='%{VERSION}' $pkg_path
   elif [[ "$ID_LIKE" =~ debian ]]; then
-    dpkg --info $pkg_path 2>/dev/null | grep -e "^ Version:" | sed 's/^ Version: \([0-9]\.[0-9]\.[0-9]*\).*$/\1/'
+    dpkg --info $pkg_path 2>/dev/null | grep -e "^ Version:" | sed 's/^ Version: \([0-9]*\.[0-9]*\.[0-9]*\).*$/\1/'
   else
     return 1
   fi
@@ -153,7 +153,7 @@ installed_package_version() {
   if [[ "$ID_LIKE" =~ rhel ]]; then
     echo $(rpm -qa --queryformat '%{version}' $pkg_name)
   elif [[ "$ID_LIKE" =~ debian ]]; then
-    dpkg --status $pkg_name 2>/dev/null | grep -e "^Version:" | sed 's/^Version: \([0-9]\.[0-9]\.[0-9]*\).*$/\1/'
+    dpkg --status $pkg_name 2>/dev/null | grep -e "^Version:" | sed 's/^Version: \([0-9]*\.[0-9]*\.[0-9]*\).*$/\1/'
   else
     return 1
   fi

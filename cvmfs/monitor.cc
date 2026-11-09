@@ -68,13 +68,14 @@ int Watchdog::g_crash_signals[] = {SIGQUIT, SIGILL, SIGABRT, SIGFPE,
 Watchdog *Watchdog::Create(FnOnExit on_exit,
                            bool needs_read_environ,
                            WatchdogState *saved_state,
-                           const std::string &oom_score_adj) {
+                           const std::string &oom_score_adj,
+                           bool retain_root) {
   assert(instance_ == NULL);
   instance_ = new Watchdog(on_exit, oom_score_adj);
   if (saved_state != NULL)
     instance_->RestoreState(saved_state);
   else
-    instance_->Fork(needs_read_environ);
+    instance_->Fork(needs_read_environ, retain_root);
   return instance_;
 }
 
@@ -87,10 +88,14 @@ string Watchdog::GenerateStackTrace(pid_t pid) {
   int retval;
   string result = "";
 
-  // Get capability to ptrace the dead main cvmfs2 process.
-  // This is often necessary because the main process can have its own 
-  // elevated capability which would otherwise block ptrace.
-  if (!ObtainSysPtraceCapability()) {
+  if (retain_root_) {
+    if (!SwitchCredentials(0, getgid(), true /* temporarily */, true)) {
+      result += "failed to re-gain root permissions... still give it a try\n";
+    }
+  } else if (!ObtainSysPtraceCapability()) {
+    // Get capability to ptrace the dead main cvmfs2 process.
+    // This is often necessary because the main process can have its own
+    // elevated capability which would otherwise block ptrace.
     result += "failed to gain ptrace capability... still give it a try\n";
   }
 
@@ -392,7 +397,8 @@ Watchdog::SigactionMap Watchdog::SetSignalHandlers(
 /**
  * Fork the watchdog process and put it on hold until Spawn() is called.
  */
-void Watchdog::Fork(bool needs_read_environ) {
+void Watchdog::Fork(bool needs_read_environ, bool retain_root) {
+  retain_root_ = retain_root;
   Pipe<kPipeWatchdogPid> pipe_pid;
   pipe_watchdog_ = new Pipe<kPipeWatchdog>();
   pipe_listener_ = new Pipe<kPipeWatchdogSupervisor>();
@@ -437,7 +443,8 @@ void Watchdog::Fork(bool needs_read_environ) {
             }
           }
 #endif
-          if ((geteuid() != 0) && SetuidCapabilityPermitted()) {
+          if (!retain_root_ && (geteuid() != 0)
+              && SetuidCapabilityPermitted()) {
             const std::vector<cap_value_t> nocaps;
             if (on_exit_) {
               // Reduce to minimum capabilities, which unfortunately is
@@ -738,6 +745,7 @@ Watchdog::Watchdog(FnOnExit on_exit, const std::string &oom_score_adj)
     , exe_path_(string(platform_getexepath()))
     , oom_score_adj_(oom_score_adj)
     , watchdog_pid_(0)
+    , retain_root_(false)
     , on_exit_(on_exit)
 {
   const int retval = platform_spinlock_init(&lock_handler_, 0);
