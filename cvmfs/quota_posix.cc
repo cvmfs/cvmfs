@@ -56,8 +56,8 @@
 #include "util/concurrency.h"
 #include "util/exception.h"
 #include "util/logging.h"
+#include "util/platform.h"
 #include "util/posix.h"
-#include "util/smalloc.h"
 #include "util/string.h"
 
 using namespace std;  // NOLINT
@@ -1935,15 +1935,10 @@ PosixQuotaManager::PosixQuotaManager(const uint64_t limit,
   cleanup_recorder_.AddRecorder(20 * 60, 60 * 60 * 18);
   // last 4 days with hour resolution
   cleanup_recorder_.AddRecorder(60 * 60, 60 * 60 * 24 * 4);
-
-  lock_open_files_ = reinterpret_cast<pthread_mutex_t *>(
-      smalloc(sizeof(pthread_mutex_t)));
 }
 
 
 PosixQuotaManager::~PosixQuotaManager() {
-  free(lock_open_files_);
-
   if (!initialized_)
     return;
 
@@ -2333,7 +2328,7 @@ void *PosixQuotaManager::CollectMountpointsHashes(void *data) {
   pthread_setname_np(pthread_self(), "hash_collector");
   auto *handler = static_cast<CollectorHandler *>(data);
 
-  const std::string mountpoint = handler->mp[handler->i];
+  const std::string mountpoint = handler->mountpoint;
   ssize_t n = getxattr(mountpoint.c_str(), "user.list_open_hashes", nullptr, 0);
   if (n < 0) {
     pthread_exit(nullptr);
@@ -2355,9 +2350,8 @@ void *PosixQuotaManager::CollectMountpointsHashes(void *data) {
       hash_str += c;
     }
   }
-  const MutexLockGuard lock_guard(handler->l);
   for (auto hash_str : hash_strs) {
-    handler->of.push_back(
+    handler->hashes.push_back(
         shash::Short(shash::MkFromHexPtr(shash::HexPtr(hash_str))));
   }
 #endif
@@ -2365,54 +2359,56 @@ void *PosixQuotaManager::CollectMountpointsHashes(void *data) {
 }
 
 std::vector<shash::Short> PosixQuotaManager::CollectAllOpenHashes() {
-  std::vector<CollectorHandler *> handlers;
-  std::vector<pthread_t *> threads;
-  open_files_.clear();
+  std::vector<shash::Short> result;
 #ifndef __APPLE__
-  auto &&a_after_b = [](const struct timespec a, const struct timespec b) {
-    return (a.tv_sec > b.tv_sec) ? true : false;
-  };
-
+  std::vector<CollectorHandler *> handlers;
+  std::vector<pthread_t> threads;
   for (size_t i = 0; i < mountpoints_.size(); ++i) {
-    handlers.push_back(
-        new CollectorHandler{open_files_, mountpoints_, lock_open_files_, i});
-    threads.push_back(new pthread_t);
+    CollectorHandler *handler = new CollectorHandler();
+    handler->mountpoint = mountpoints_[i];
+    pthread_t thread;
+    if (pthread_create(&thread, nullptr, CollectMountpointsHashes, handler)
+        != 0) {
+      LogCvmfs(kLogQuota, kLogDebug | kLogSyslogWarn,
+               "failed to start open hash collector for %s",
+               mountpoints_[i].c_str());
+      delete handler;
+      continue;
+    }
+    handlers.push_back(handler);
+    threads.push_back(thread);
   }
 
-  const int retval = pthread_mutex_init(lock_open_files_, NULL);
-  assert(retval == 0);
-
-  for (size_t i = 0; i < mountpoints_.size(); ++i) {
-    pthread_create(threads[i], nullptr, CollectMountpointsHashes, handlers[i]);
-  }
-
-  std::vector<bool> joined(handlers.size(), false);
-  struct timespec reference, current;
-  clock_gettime(CLOCK_REALTIME, &reference);
-  clock_gettime(CLOCK_REALTIME, &current);
-  reference.tv_sec += 10;  // Give 10sec for hash collection
-  size_t i = 0;
-  while (
-      (not std::all_of(joined.begin(), joined.end(), [](bool b) { return b; }))
-      and a_after_b(reference, current)) {
-    // as long as there are still threads that haven't joined yet
-    // and for 10 seconds
-    if (not joined[i]) {
-      const int s = pthread_tryjoin_np(*threads[i], NULL);
-      if (s == 0) {
+  std::vector<bool> joined(threads.size(), false);
+  size_t remaining = threads.size();
+  const uint64_t deadline = platform_monotonic_time_ns() + 10ull * 1000000000;
+  while (remaining > 0) {
+    for (size_t i = 0; i < threads.size(); ++i) {
+      if (!joined[i] && pthread_tryjoin_np(threads[i], nullptr) == 0) {
         joined[i] = true;
+        --remaining;
+        result.insert(result.end(), handlers[i]->hashes.begin(),
+                      handlers[i]->hashes.end());
+        delete handlers[i];
       }
     }
-    ++i;
-    i = i % handlers.size();
-    clock_gettime(CLOCK_REALTIME, &current);
+    if (remaining == 0 || platform_monotonic_time_ns() >= deadline)
+      break;
+    SafeSleepMs(10);
   }
 
-  for (size_t i = 0; i < handlers.size(); ++i) {
-    delete handlers[i];
+  if (remaining > 0) {
+    for (size_t i = 0; i < threads.size(); ++i) {
+      if (joined[i])
+        continue;
+      // The thread may still write into its handler, so the handler is leaked
+      pthread_detach(threads[i]);
+    }
+    LogCvmfs(kLogQuota, kLogDebug | kLogSyslogWarn,
+             "open hash collection timed out, %zu of %zu mountpoints did not "
+             "respond",
+             remaining, threads.size());
   }
-
-  pthread_mutex_destroy(lock_open_files_);
 #endif
-  return open_files_;
+  return result;
 }

@@ -392,7 +392,6 @@ class PosixQuotaManager : public QuotaManager {
    */
   // TODO(gchr): it would be faster if it was a std::set. Needs a comparison
   // operator for shash::Any
-  pthread_mutex_t *lock_open_files_;
   std::vector<shash::Short> open_files_;
 
   bool cleanup_unused_first_;
@@ -400,11 +399,13 @@ class PosixQuotaManager : public QuotaManager {
 
   std::vector<shash::Short> CollectAllOpenHashes();
 
+  /**
+   * Private to one collector thread, so a thread stuck in getxattr() can
+   * outlive CollectAllOpenHashes()
+   */
   struct CollectorHandler {
-    std::vector<shash::Short> &of;
-    const std::vector<std::string> &mp;
-    pthread_mutex_t *l;
-    size_t i;
+    std::string mountpoint;
+    std::vector<shash::Short> hashes;
   };
 
   static void *CollectMountpointsHashes(void *data);
