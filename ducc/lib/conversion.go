@@ -246,11 +246,15 @@ func ConvertWishFlat(wish WishFriendly, multiArch bool) error {
 			}
 			continue
 		}
+		var archPaths []string
 		for _, manifestEntry := range filterManifestList(manifestList, multiArch) {
 			inputImage.Manifest = &(manifestEntry.Manifest)
 			nameWithArch := ""
 			if multiArch {
 				nameWithArch = GetNameWithArch(manifestEntry)
+				if nameWithArch != "" {
+					archPaths = append(archPaths, nameWithArch)
+				}
 			}
 			imageLogger := l.WithImage(imageNameWithPlatform(inputImage, manifestEntry))
 			publicSymlinkPath := inputImage.GetPublicSymlinkPathWithArch(nameWithArch)
@@ -443,14 +447,19 @@ func ConvertWishFlat(wish WishFriendly, multiArch bool) error {
 
 		// After processing all architectures for this image, create (or update)
 		// the user-facing variant symlink at <registry>/<repo>:<tag>.  The
-		// symlink contains a $(CVMFS_ARCH:-<native>) expression so that the
+		// symlink contains a $(CVMFS_ARCH:-<default>) expression so that the
 		// CVMFS client resolves it to the correct architecture-specific flat
 		// image at runtime without any server-side changes.
 		// A plain image (not an index) has no .multiarch entry: its flat
-		// symlink is already at that path.
-		if multiArch && manifestList.MediaType != "SingleManifest" {
+		// symlink is already at that path.  An index none of whose
+		// architectures got a flat image gets no symlink rather than a dangling one.
+		defaultArch := ""
+		if multiArch {
+			defaultArch = pickVariantDefaultArch(wish.CvmfsRepo, inputImage, archPaths)
+		}
+		if defaultArch != "" {
 			variantPath := inputImage.GetPublicSymlinkPath()
-			variantTarget := inputImage.GetVariantSymlinkTarget(runtime.GOARCH)
+			variantTarget := inputImage.GetVariantSymlinkTarget(defaultArch)
 			variantLogger := l.WithImage(inputImage.GetSimpleName())
 			variantLogger.WithFields(log.Fields{
 				"symlink path": variantPath,
@@ -468,6 +477,32 @@ func ConvertWishFlat(wish WishFriendly, multiArch bool) error {
 		createMultiarchAliasSymlinksWithLogger(nil, wish.CvmfsRepo)
 	}
 	return firstError
+}
+
+// pickVariantDefaultArch returns the .multiarch/ directory that the variant
+// symlink uses when CVMFS_ARCH is unset: the server's native arch if it has a
+// flat image, else the first arch that has one, else "".
+func pickVariantDefaultArch(repo string, img *Image, archPaths []string) string {
+	available := []string{}
+	for _, archPath := range archPaths {
+		pubPath := filepath.Join("/", "cvmfs", repo, img.GetPublicSymlinkPathWithArch(archPath))
+		if _, err := os.Stat(pubPath); err == nil {
+			available = append(available, strings.TrimPrefix(archPath, ".multiarch/"))
+		}
+	}
+	return chooseDefaultArch(available, runtime.GOARCH)
+}
+
+func chooseDefaultArch(available []string, nativeArch string) string {
+	for _, arch := range available {
+		if arch == nativeArch {
+			return arch
+		}
+	}
+	if len(available) > 0 {
+		return available[0]
+	}
+	return ""
 }
 
 // ConvertWishPodman publishes a podman additional image store entry for each
