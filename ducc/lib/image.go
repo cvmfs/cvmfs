@@ -312,29 +312,9 @@ func (img *Image) FetchManifestList2() (*da.ManifestList, error) {
 		return nil, fmt.Errorf("got empty manifest list")
 	}
 
-	var validIndex []int
-	var manifestReference string
-	if len(manifestList.Manifests) == 1 {
-		manifestReference = manifestList.Manifests[0].Digest
-		validIndex = append(validIndex, 0)
-	} else {
-
-		for i, v := range manifestList.Manifests {
-			if v.Platform.Architecture == "amd64" {
-				manifestReference = v.Digest
-
-			}
-			// skip "unknown" architecture
-			if v.Platform.Architecture != "unknown" {
-				validIndex = append(validIndex, i)
-
-			}
-		}
-	}
-
-	manifestsFiltered := make([]da.ManifestListItem, 0)
-	for _, j := range validIndex {
-		manifestsFiltered = append(manifestsFiltered, manifestList.Manifests[j])
+	manifestsFiltered, manifestReference, err := selectIndexEntries(manifestList.Manifests)
+	if err != nil {
+		return nil, err
 	}
 	manifestList.Manifests = manifestsFiltered
 
@@ -369,6 +349,30 @@ func (img *Image) FetchManifestList2() (*da.ManifestList, error) {
 	}
 	img.Manifest = &manifest
 	return &manifestList, nil
+}
+
+// selectIndexEntries drops "unknown" platform entries (attestations) from an
+// image index and picks the default entry: amd64 if present, else the first
+// remaining one.
+func selectIndexEntries(entries []da.ManifestListItem) ([]da.ManifestListItem, string, error) {
+	filtered := make([]da.ManifestListItem, 0, len(entries))
+	defaultRef := ""
+	for _, v := range entries {
+		if v.Platform.Architecture == "unknown" {
+			continue
+		}
+		if v.Platform.Architecture == "amd64" && defaultRef == "" {
+			defaultRef = v.Digest
+		}
+		filtered = append(filtered, v)
+	}
+	if len(filtered) == 0 {
+		return nil, "", fmt.Errorf("image index has no usable platform entries")
+	}
+	if defaultRef == "" {
+		defaultRef = filtered[0].Digest
+	}
+	return filtered, defaultRef, nil
 }
 
 func (img *Image) fetchManifest() (*da.Manifest, error) {
