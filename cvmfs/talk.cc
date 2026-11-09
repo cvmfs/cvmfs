@@ -330,7 +330,8 @@ void *TalkManager::MainResponder(void *data) {
     } else if (line == "mountpoint") {
       talk_mgr->Answer(con_fd, cvmfs::loader_exports_->mount_point + "\n");
     } else if (line == "device id") {
-      if (cvmfs::loader_exports_->version >= 5)
+      // Version 6 shifted device_id; older loaders have it at another offset
+      if (cvmfs::loader_exports_->version >= 6)
         talk_mgr->Answer(con_fd, cvmfs::loader_exports_->device_id + "\n");
       else
         talk_mgr->Answer(con_fd, "0:0\n");
