@@ -109,6 +109,7 @@ catalog::InclusionSpec *inclusion_spec = NULL;
 atomic_int64 overall_chunks;
 atomic_int64 overall_new;
 atomic_int64 chunk_queue;
+atomic_int64 failed_chunks;
 bool preload_cache = false;
 string *preload_cachedir = NULL;
 bool inspect_existing_catalogs = false;
@@ -167,8 +168,13 @@ static void ReportDownloadError(const download::JobInfo &download_job) {
       break;
 
     default:
-      if (download::IsProxyTransferError(error_code)
-          || download::IsHostTransferError(error_code)) {
+      if ((error_code == download::kFailHostConnection) && (http_code >= 400)) {
+        LogCvmfs(kLogCvmfs, kLogStderr,
+                 "last HTTP error code %d - "
+                 "please check the stratum 0 health",
+                 http_code);
+      } else if (download::IsProxyTransferError(error_code)
+                 || download::IsHostTransferError(error_code)) {
         LogCvmfs(kLogCvmfs, kLogStderr,
                  "couldn't reach Stratum 0 - "
                  "please check the network connection");
@@ -282,14 +288,16 @@ static void *MainWorker(void *data) {
 
       const download::Failures download_result = download_manager->Fetch(
           &download_chunk);
+      fclose(fchunk);
       if (download_result != download::kFailOk) {
         ReportDownloadError(download_chunk);
-        PANIC(kLogStderr, "Download error");
+        unlink(tmp_file.c_str());
+        atomic_inc64(&failed_chunks);
+      } else {
+        Store(tmp_file, chunk_hash,
+              (compression_alg == zlib::kZlibDefault) ? true : false);
+        atomic_inc64(&overall_new);
       }
-      fclose(fchunk);
-      Store(tmp_file, chunk_hash,
-            (compression_alg == zlib::kZlibDefault) ? true : false);
-      atomic_inc64(&overall_new);
     }
     if (atomic_xadd64(&overall_chunks, 1) % 1000 == 0)
       LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, ".");
@@ -392,6 +400,7 @@ bool CommandPull::Pull(const shash::Any &catalog_hash,
 
   const int64_t gauge_chunks = atomic_read64(&overall_chunks);
   const int64_t gauge_new = atomic_read64(&overall_new);
+  const int64_t gauge_failed = atomic_read64(&failed_chunks);
 
   // Download and uncompress catalog
   shash::Any chunk_hash;
@@ -508,6 +517,14 @@ bool CommandPull::Pull(const shash::Any &catalog_hash,
              "%" PRId64 " unique chunks",
              atomic_read64(&overall_new) - gauge_new,
              atomic_read64(&overall_chunks) - gauge_chunks);
+    const int64_t num_failed = atomic_read64(&failed_chunks) - gauge_failed;
+    if (num_failed > 0) {
+      // The catalog is not stored, so a rerun picks up its missing chunks
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "failed to download %" PRId64 " chunks of catalog %s",
+               num_failed, catalog_hash.ToString().c_str());
+      goto pull_cleanup;
+    }
   }
 
   retval = PullRecursion(catalog, path);
@@ -642,6 +659,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   // Initialization
   atomic_init64(&overall_chunks);
   atomic_init64(&overall_new);
+  atomic_init64(&failed_chunks);
   atomic_init64(&chunk_queue);
 
   const bool follow_redirects = false;
@@ -872,6 +890,10 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
                                  iend = historic_tags.end();
        i != iend;
        ++i) {
+    // Tags mostly share objects with the trunk; retrying the same failing
+    // chunks for every tag only delays the error
+    if (atomic_read64(&failed_chunks) > 0)
+      break;
     if (Peek(i->root_hash) && !inspect_existing_catalogs)
       continue;
     LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from %s repository tag",
@@ -906,6 +928,12 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   }
   ClosePipe(pipe_chunks);
 
+  if (atomic_read64(&failed_chunks) > 0) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "%" PRId64 " chunks failed to download, not publishing the "
+             "revision; a rerun resumes from the catalogs already stored",
+             atomic_read64(&failed_chunks));
+  }
   if (!retval)
     goto fini;
 
