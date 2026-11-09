@@ -10,6 +10,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <atomic>
 #include <cassert>
 #include <map>
 #include <memory>
@@ -32,10 +33,17 @@ class Recorder;
  * Owns a pthread mutex that is initialized on construction and destroyed on
  * destruction.  Not copyable; meant to be shared via std::shared_ptr so that
  * the mutex lives as long as its last user.
+ *
+ * Also carries the epoch of the current round of open hash collection.  The
+ * epoch is non-zero while a round accepts results and zero once the round is
+ * closed.  Collector threads compare it against the epoch they were started
+ * with and drop their results if the round has moved on.  It is read and
+ * written only while holding the mutex, so that a check followed by an insert
+ * cannot interleave with the closing of the round.
  */
 class OpenHashesLock : SingleCopy {
  public:
-  OpenHashesLock() {
+  OpenHashesLock() : epoch_(0) {
     const int retval = pthread_mutex_init(&mutex_, NULL);
     assert(retval == 0);
   }
@@ -43,8 +51,12 @@ class OpenHashesLock : SingleCopy {
 
   pthread_mutex_t *Get() { return &mutex_; }
 
+  int epoch() const { return epoch_.load(); }
+  void set_epoch(int epoch) { epoch_.store(epoch); }
+
  private:
   pthread_mutex_t mutex_;
+  std::atomic<int> epoch_;
 };
 
 /**
@@ -63,6 +75,8 @@ class PosixQuotaManager : public QuotaManager {
   FRIEND_TEST(T_QuotaManager, OpenHashesLockInitializedOnConstruction);
   FRIEND_TEST(T_QuotaManager, CollectorHandlerSharesOpenHashesLock);
   FRIEND_TEST(T_QuotaManager, CollectorThreadReleasesHandlerReference);
+  FRIEND_TEST(T_QuotaManager, CollectorThreadWritesOnlyInItsEpoch);
+  FRIEND_TEST(T_QuotaManager, CollectAllOpenHashesOpensNewEpoch);
   FRIEND_TEST(T_QuotaManager, ReadPipeStringUsesExactLength);
   FRIEND_TEST(T_QuotaManager, RegisterMountpointUsesCorrectDescriptionBuffer);
   FRIEND_TEST(T_QuotaManager, SetCleanupPolicyUsesCorrectDescriptionBuffer);
@@ -446,13 +460,19 @@ class PosixQuotaManager : public QuotaManager {
     CollectorHandler(std::set<shash::Short> &open_files,
                      const std::vector<std::string> &mountpoints,
                      const std::shared_ptr<OpenHashesLock> &lock,
-                     size_t index)
-        : of(open_files), mp(mountpoints), l(lock), i(index) { }
+                     size_t index,
+                     int round_epoch)
+        : of(open_files)
+        , mp(mountpoints)
+        , l(lock)
+        , i(index)
+        , epoch(round_epoch) { }
 
     std::set<shash::Short> &of;
     const std::vector<std::string> &mp;
     std::shared_ptr<OpenHashesLock> l;
     size_t i;
+    int epoch; /**< the round this collector belongs to */
   };
 
   static void *CollectMountpointsHashes(void *data);

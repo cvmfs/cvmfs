@@ -57,6 +57,7 @@
 #include "util/exception.h"
 #include "util/logging.h"
 #include "util/posix.h"
+#include "util/prng.h"
 #include "util/string.h"
 
 using namespace std;  // NOLINT
@@ -2345,6 +2346,14 @@ void *PosixQuotaManager::CollectMountpointsHashes(void *data) {
     }
   }
   const MutexLockGuard lock_guard(handler->l->Get());
+  if (handler->l->epoch() != handler->epoch) {
+    // the round this collector was started for is over, don't touch the
+    // result set that the quota manager has moved on with
+    LogCvmfs(kLogQuota, kLogDebug,
+             "hash collector for %s finished late, dropping %lu hashes",
+             mountpoint.c_str(), hash_strs.size());
+    pthread_exit(nullptr);
+  }
   for (auto hash_str : hash_strs) {
     handler->of.insert(
         shash::Short(shash::MkFromHexPtr(shash::HexPtr(hash_str))));
@@ -2363,10 +2372,22 @@ std::set<shash::Short> PosixQuotaManager::CollectAllOpenHashes() {
     return (a.tv_sec > b.tv_sec) ? true : false;
   };
 
+  // Open a new round: a fresh, non-zero epoch that late collectors of
+  // previous rounds cannot match
+  Prng prng;
+  prng.InitLocaltime();
+  const int epoch = 1
+                    + static_cast<int>(
+                        prng.Next(std::numeric_limits<int>::max()));
+  {
+    const MutexLockGuard lock_guard(lock_open_files_->Get());
+    lock_open_files_->set_epoch(epoch);
+  }
+
   for (size_t i = 0; i < mountpoints_.size(); ++i) {
     // each handler gets its own reference to the lock
     handlers.push_back(std::make_shared<CollectorHandler>(
-        open_files_, mountpoints_, lock_open_files_, i));
+        open_files_, mountpoints_, lock_open_files_, i, epoch));
   }
 
   for (size_t i = 0; i < mountpoints_.size(); ++i) {
@@ -2409,13 +2430,21 @@ std::set<shash::Short> PosixQuotaManager::CollectAllOpenHashes() {
   }
 
   // Threads that did not finish in time keep running on their own reference
-  // of the handler; detach them so that their resources are released on exit.
-  for (size_t i = 0; i < threads.size(); ++i) {
-    if (not joined[i]) {
-      LogCvmfs(kLogQuota, kLogDebug | kLogSyslogWarn,
-               "hash collector for %s did not finish in time, ignoring it",
-               mountpoints_[i].c_str());
-      pthread_detach(threads[i]);
+  // of the handler.  Close the round so that they drop their results instead
+  // of writing into open_files_ behind our back, then detach them so that
+  // their resources are released on exit.
+  if (not std::all_of(joined.begin(), joined.end(), [](bool b) { return b; })) {
+    {
+      const MutexLockGuard lock_guard(lock_open_files_->Get());
+      lock_open_files_->set_epoch(0);
+    }
+    for (size_t i = 0; i < threads.size(); ++i) {
+      if (not joined[i]) {
+        LogCvmfs(kLogQuota, kLogDebug | kLogSyslogWarn,
+                 "hash collector for %s did not finish in time, ignoring it",
+                 mountpoints_[i].c_str());
+        pthread_detach(threads[i]);
+      }
     }
   }
 #endif

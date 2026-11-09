@@ -6,9 +6,11 @@
 #include <gtest/gtest.h>
 #include <pthread.h>
 #include <signal.h>
+#include <sys/xattr.h>
 
 #include <algorithm>
 #include <memory>
+#include <set>
 #include <string>
 #include <type_traits>
 #include <vector>
@@ -644,10 +646,10 @@ TEST_F(T_QuotaManager, CollectorHandlerSharesOpenHashesLock) {
   // one handler per collector thread, each with its own reference
   std::shared_ptr<PosixQuotaManager::CollectorHandler>
       handler_a = std::make_shared<PosixQuotaManager::CollectorHandler>(
-          qm->open_files_, qm->mountpoints_, qm->lock_open_files_, 0);
+          qm->open_files_, qm->mountpoints_, qm->lock_open_files_, 0, 1);
   std::shared_ptr<PosixQuotaManager::CollectorHandler>
       handler_b = std::make_shared<PosixQuotaManager::CollectorHandler>(
-          qm->open_files_, qm->mountpoints_, qm->lock_open_files_, 1);
+          qm->open_files_, qm->mountpoints_, qm->lock_open_files_, 1, 1);
   EXPECT_EQ(3, qm->lock_open_files_.use_count());
   EXPECT_EQ(qm->lock_open_files_->Get(), handler_a->l->Get());
   EXPECT_EQ(qm->lock_open_files_->Get(), handler_b->l->Get());
@@ -679,7 +681,7 @@ TEST_F(T_QuotaManager, CollectorThreadReleasesHandlerReference) {
   const std::vector<std::string> mountpoints(1, tmp_path_);
   std::shared_ptr<PosixQuotaManager::CollectorHandler>
       handler = std::make_shared<PosixQuotaManager::CollectorHandler>(
-          open_files, mountpoints, qm->lock_open_files_, 0);
+          open_files, mountpoints, qm->lock_open_files_, 0, 1);
   EXPECT_EQ(1, handler.use_count());
   EXPECT_EQ(2, qm->lock_open_files_.use_count());
 
@@ -703,6 +705,80 @@ TEST_F(T_QuotaManager, CollectorThreadReleasesHandlerReference) {
   handler.reset();
   EXPECT_EQ(1, qm->lock_open_files_.use_count());
 }
+
+
+TEST_F(T_QuotaManager, CollectorThreadWritesOnlyInItsEpoch) {
+  PosixQuotaManager *qm = quota_mgr_not_spawned_;
+
+  // runs one collector thread for the given handler and waits for it
+  auto run_collector =
+      [](const std::shared_ptr<PosixQuotaManager::CollectorHandler> &handler) {
+        std::shared_ptr<PosixQuotaManager::CollectorHandler>
+            *thread_ref = new std::shared_ptr<
+                PosixQuotaManager::CollectorHandler>(handler);
+        pthread_t thread;
+        ASSERT_EQ(0, pthread_create(&thread, NULL,
+                                    PosixQuotaManager::CollectMountpointsHashes,
+                                    thread_ref));
+        ASSERT_EQ(0, pthread_join(thread, NULL));
+      };
+
+  // fake a mounted repository: a directory carrying the magic xattr
+  const std::string hashes = "0123456789abcdef0123456789abcdef01234567\n"
+                             "fedcba9876543210fedcba9876543210fedcba98\n";
+  if (setxattr(tmp_path_.c_str(), "user.list_open_hashes", hashes.data(),
+               hashes.size(), 0)
+      != 0) {
+    printf("Warning: user xattrs not supported on %s, skipping test\n",
+           tmp_path_.c_str());
+    return;
+  }
+  std::set<shash::Short> open_files;
+  const std::vector<std::string> mountpoints(1, tmp_path_);
+  const int epoch = 4711;
+
+  // the round is still open: results are accepted
+  qm->lock_open_files_->set_epoch(epoch);
+  run_collector(std::make_shared<PosixQuotaManager::CollectorHandler>(
+      open_files, mountpoints, qm->lock_open_files_, 0, epoch));
+  EXPECT_EQ(2u, open_files.size());
+
+  // the round was closed (late collector, round moved on): results dropped
+  open_files.clear();
+  qm->lock_open_files_->set_epoch(0);
+  run_collector(std::make_shared<PosixQuotaManager::CollectorHandler>(
+      open_files, mountpoints, qm->lock_open_files_, 0, epoch));
+  EXPECT_TRUE(open_files.empty());
+
+  // a new round started meanwhile: results of the old round dropped
+  qm->lock_open_files_->set_epoch(epoch + 1);
+  run_collector(std::make_shared<PosixQuotaManager::CollectorHandler>(
+      open_files, mountpoints, qm->lock_open_files_, 0, epoch));
+  EXPECT_TRUE(open_files.empty());
+
+  // collectors of the new round are fine
+  run_collector(std::make_shared<PosixQuotaManager::CollectorHandler>(
+      open_files, mountpoints, qm->lock_open_files_, 0, epoch + 1));
+  EXPECT_EQ(2u, open_files.size());
+}
+
+
+TEST_F(T_QuotaManager, CollectAllOpenHashesOpensNewEpoch) {
+  PosixQuotaManager *qm = quota_mgr_not_spawned_;
+  ASSERT_TRUE(qm->mountpoints_.empty());
+  EXPECT_EQ(0, qm->lock_open_files_->epoch());
+
+  // without mountpoints there are no collectors and hence no late ones, the
+  // round stays open with a non-zero epoch
+  EXPECT_TRUE(qm->CollectAllOpenHashes().empty());
+  const int first_epoch = qm->lock_open_files_->epoch();
+  EXPECT_NE(0, first_epoch);
+
+  // every round gets its own epoch
+  EXPECT_TRUE(qm->CollectAllOpenHashes().empty());
+  EXPECT_NE(0, qm->lock_open_files_->epoch());
+  EXPECT_NE(first_epoch, qm->lock_open_files_->epoch());
+}
 #endif
 
 
@@ -712,6 +788,16 @@ TEST_F(T_QuotaManager, CollectorThreadReleasesHandlerReference) {
 TEST(T_OpenHashesLock, NotCopyable) {
   EXPECT_FALSE(std::is_copy_constructible<OpenHashesLock>::value);
   EXPECT_FALSE(std::is_copy_assignable<OpenHashesLock>::value);
+}
+
+
+TEST(T_OpenHashesLock, Epoch) {
+  OpenHashesLock lock;
+  EXPECT_EQ(0, lock.epoch());
+  lock.set_epoch(42);
+  EXPECT_EQ(42, lock.epoch());
+  lock.set_epoch(0);
+  EXPECT_EQ(0, lock.epoch());
 }
 
 
