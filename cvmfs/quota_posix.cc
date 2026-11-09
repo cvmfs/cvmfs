@@ -1441,7 +1441,7 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
       if (return_pipe < 0)
         continue;
 
-      std::set<shash::Short> gh = quota_mgr->CollectAllOpenHashes();
+      const std::set<shash::Short> gh = quota_mgr->CollectAllOpenHashes();
       std::string result;
       for (auto it = gh.begin(); it != gh.end(); ++it) {
         result += (*it).ToString() + "\n";
