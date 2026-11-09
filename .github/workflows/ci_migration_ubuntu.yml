@@ -87,6 +87,7 @@ jobs:
             attr \
             autofs \
             fuse3 \
+            gdb \
             jq \
             libapache2-mod-wsgi-py3 \
             lsof \
@@ -112,6 +113,7 @@ jobs:
           CVMFS_TEST_PROXY=DIRECT CVMFS_TEST_USE_CDN=yes CVMFS_TEST_CLASS_NAME=MigrationTests \
             ./run.sh /tmp/cvmfs-migration-test.log \
             migration_tests/001-hotpatch \
+            migration_tests/003-watchdog-old-loader \
             migration_tests/500-server_repo
 
       - name: Dump logs

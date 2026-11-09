@@ -1,0 +1,107 @@
+#!/bin/bash
+cvmfs_test_name="Watchdog started by a hotpatched client under a pre-2.14 loader"
+
+# After a hotpatch from a pre-2.14 loader the new FUSE module spawns its own
+# watchdog.  The supervisee keeps real uid 0 there, so a watchdog that drops
+# its capabilities can neither ptrace nor kill nor unmount it on a crash.
+
+cleanup() {
+  echo "running cleanup()"
+  sudo umount -l /cvmfs/$MIGTEST_003_REPO > /dev/null 2>&1 || true
+}
+
+MIGTEST_003_REPO=lhcb.cern.ch
+
+cvmfs_run_test() {
+  local logfile=$1
+  local script_location=$2
+
+  . ${script_location}/../../common/migration_tests/common.sh
+
+  local repo=$MIGTEST_003_REPO
+  trap cleanup EXIT HUP INT TERM || return $?
+
+  current_version=$(package_version $(find_new_package cvmfs))
+  echo "Version of testee:        $current_version"
+  # Must ship a loader older than version 6
+  previous_version="2.13.3"
+  echo "Version to be downloaded: $previous_version"
+  upstream_packages=""
+  for name in cvmfs cvmfs-libs cvmfs-fuse3; do
+    upstream_package_url=$(guess_package_url $name ${previous_version})
+    echo "Download URL:             $upstream_package_url"
+    wget --no-check-certificate --quiet $upstream_package_url || return 2
+    upstream_packages="$upstream_packages $(basename $upstream_package_url)"
+  done
+
+  for name in cvmfs cvmfs-libs cvmfs-fuse3; do
+    if is_installed $name; then
+      echo "uninstalling $name $(installed_package_version $name)"
+      uninstall_package $name || return 3
+    fi
+  done
+
+  echo "installing CernVM-FS $previous_version"
+  install_packages $upstream_packages || return 4
+  sudo cvmfs_config setup    || return 5
+  sudo cvmfs_config chksetup || return 5
+
+  cvmfs_mount $repo || return 6
+  ls /cvmfs/$repo || return 6
+  local old_pid=$(sudo cvmfs_talk -i $repo pid)
+
+  echo "updating CernVM-FS package to version $current_version (hotpatch)"
+  install_new_packages || return 7
+  # cvmfs-reload.service is Type=simple, so the package install returns early
+  if [ -d /run/systemd/system ]; then
+    local i
+    for i in $(seq 120); do
+      systemctl is-active -q cvmfs-reload.service || break
+      sleep 1
+    done
+    systemctl is-active -q cvmfs-reload.service && return 7
+  fi
+  ls /cvmfs/$repo || return 8
+
+  local pid=$(sudo cvmfs_talk -i $repo pid)
+  [ "$pid" = "$old_pid" ] || { echo "client was remounted, not hotpatched"; return 9; }
+  sudo cvmfs_talk -i $repo version
+  sudo cvmfs_talk -i $repo version | grep -q "$current_version" || return 10
+
+  local watchdog_pid=$(sudo cvmfs_talk -i $repo pid watchdog)
+  echo "watchdog PID: $watchdog_pid"
+  [ -n "$watchdog_pid" ] && [ "$watchdog_pid" != "0" ] || return 10
+
+  local stacktrace_path="$(get_cvmfs_cachedir $repo)/stacktrace.${repo}"
+  sudo rm -f $stacktrace_path
+
+  # Avoid the main thread: the old module frees its sigaltstack on reload
+  # without disabling it, so the crash handler cannot run there
+  local tid=$(sudo ls /proc/$pid/task | grep -vx $pid | sort -n | tail -n 1)
+  echo "crashing the hotpatched client (PID $pid, TID $tid)"
+  [ -n "$tid" ] || return 11
+  sudo python3 -c \
+    'import ctypes, sys; sys.exit(ctypes.CDLL(None, use_errno=True).tgkill(int(sys.argv[1]), int(sys.argv[2]), 11))' \
+    $pid $tid || return 11
+  # The watchdog writes the trace after killing the client, then unmounts
+  for i in $(seq 60); do
+    sudo kill -0 $watchdog_pid 2>/dev/null || break
+    sleep 1
+  done
+
+  sudo [ -f $stacktrace_path ] || return 12
+  sudo cat $stacktrace_path
+  if sudo grep -q -e 'failed to gain ptrace capability' \
+                  -e 'Failed to kill cvmfs client' $stacktrace_path; then
+    return 13
+  fi
+  sudo grep -q '^#[0-9]' $stacktrace_path || return 14
+  sudo kill -0 $pid 2>/dev/null && return 15
+
+  # The watchdog unmounts the crashed mount point on its own
+  if mount | grep -q " /cvmfs/$repo "; then
+    return 16
+  fi
+
+  return 0
+}
