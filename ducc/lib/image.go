@@ -316,6 +316,7 @@ func (img *Image) FetchManifestList2() (*da.ManifestList, error) {
 	var manifestReference string
 	if len(manifestList.Manifests) == 1 {
 		manifestReference = manifestList.Manifests[0].Digest
+		validIndex = append(validIndex, 0)
 	} else {
 
 		for i, v := range manifestList.Manifests {

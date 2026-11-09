@@ -1,6 +1,9 @@
 package lib
 
 import (
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -427,5 +430,32 @@ func TestGetVariantSymlinkTarget(t *testing.T) {
 				t.Errorf("GetVariantSymlinkTarget(%q) = %q, want %q", tt.defaultArch, got, tt.want)
 			}
 		})
+	}
+}
+
+// An index with a single entry (e.g. an amd64-only image pushed as an index)
+// must keep that entry, or --multi-arch converts nothing.
+func TestGetManifestListSingleEntryIndex(t *testing.T) {
+	const digest = "sha256:aaaa"
+	registry := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/manifests/"+digest) {
+			w.Write([]byte(`{"schemaVersion": 2, "mediaType": "application/vnd.oci.image.manifest.v1+json", "layers": [{"digest": "sha256:bbbb"}]}`))
+			return
+		}
+		w.Write([]byte(`{"schemaVersion": 2, "mediaType": "application/vnd.oci.image.index.v1+json",
+			"manifests": [{"digest": "` + digest + `", "platform": {"architecture": "amd64", "os": "linux"}}]}`))
+	}))
+	defer registry.Close()
+
+	img, err := ParseImage(registry.URL + "/lab/single:1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifestList, err := img.GetManifestList()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(manifestList.Manifests) != 1 || manifestList.Manifests[0].Platform.Architecture != "amd64" {
+		t.Fatalf("want the single amd64 entry, got %+v", manifestList.Manifests)
 	}
 }
