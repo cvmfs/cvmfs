@@ -914,9 +914,11 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   if (!mediator.Commit(manifest.get())) {
     PrintError("Swissknife Sync: Something went wrong during sync");
     if (!params.dry_run) {
-      stats_db->StorePublishStatistics(this->statistics(), start_time, false);
-      if (upload_statsdb) {
-        stats_db->UploadStatistics(params.spooler);
+      if (stats_db != NULL) {
+        stats_db->StorePublishStatistics(this->statistics(), start_time, false);
+        if (upload_statsdb) {
+          stats_db->UploadStatistics(params.spooler);
+        }
       }
     }
     return 5;
@@ -947,18 +949,22 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
                                          params.repo_tag)) {
     PrintError("Swissknife Sync: Failed to commit transaction.");
     if (!params.dry_run) {
-      stats_db->StorePublishStatistics(this->statistics(), start_time, false);
-      if (upload_statsdb) {
-        stats_db->UploadStatistics(params.spooler);
+      if (stats_db != NULL) {
+        stats_db->StorePublishStatistics(this->statistics(), start_time, false);
+        if (upload_statsdb) {
+          stats_db->UploadStatistics(params.spooler);
+        }
       }
     }
     return 9;
   }
 
   if (!params.dry_run) {
-    stats_db->StorePublishStatistics(this->statistics(), start_time, true);
-    if (upload_statsdb) {
-      stats_db->UploadStatistics(params.spooler);
+    if (stats_db != NULL) {
+      stats_db->StorePublishStatistics(this->statistics(), start_time, true);
+      if (upload_statsdb) {
+        stats_db->UploadStatistics(params.spooler);
+      }
     }
   }
 
