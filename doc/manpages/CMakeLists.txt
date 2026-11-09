@@ -72,7 +72,14 @@ else()
                 ${CMAKE_CURRENT_LIST_DIR} # location of include files
                 ${MAN_OUTPUT_DIR} # directory for generated manpage
                 ${CMAKE_BINARY_DIR}/cvmfs # location of swissknife binary
-        DEPENDS cvmfs_server_script
+        # cvmfs_swissknife as well as the script: cvmfs_server runs it to print
+        # the version in its usage text, so the man page cannot be generated
+        # before it is linked. The dependency was previously absent and the
+        # build happened to order it correctly; that is not something to rely
+        # on under -j, and it is now load-bearing because
+        # generate_manpage_cvmfs_server.sh deliberately runs the BUILT binary
+        # rather than whatever is installed on the host.
+        DEPENDS cvmfs_server_script cvmfs_swissknife
         COMMENT "Generating man page for cvmfs_server"
         VERBATIM
     )
