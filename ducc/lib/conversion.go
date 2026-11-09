@@ -446,7 +446,9 @@ func ConvertWishFlat(wish WishFriendly, multiArch bool) error {
 		// symlink contains a $(CVMFS_ARCH:-<native>) expression so that the
 		// CVMFS client resolves it to the correct architecture-specific flat
 		// image at runtime without any server-side changes.
-		if multiArch {
+		// A plain image (not an index) has no .multiarch entry: its flat
+		// symlink is already at that path.
+		if multiArch && manifestList.MediaType != "SingleManifest" {
 			variantPath := inputImage.GetPublicSymlinkPath()
 			variantTarget := inputImage.GetVariantSymlinkTarget(runtime.GOARCH)
 			variantLogger := l.WithImage(inputImage.GetSimpleName())
