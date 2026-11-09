@@ -515,7 +515,7 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
 
   open_files_.clear();
   open_files_ = (cleanup_unused_first_) ? CollectAllOpenHashes()
-                                        : std::vector<shash::Short>();
+                                        : std::set<shash::Short>();
 
   do {
     sqlite3_reset(stmt_lru_);
@@ -552,23 +552,12 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
       const bool is_pinned = pinned_chunks_.find(candidates[i].hash)
                              != pinned_chunks_.end();
 
-      // Avoid evicting open files hopping there are enough more recently used
-      // files to satisfy the cleanup request
-      /*
-            const bool is_open = std::find_if(
-                                     open_files_.begin(), open_files_.end(),
-                                     [&candidates, &i](const auto &elem) -> bool
-         { return elem.Collide(candidates[i].hash);
-                                     })
-                                 != open_files_.end();
-      */
-      bool is_open = false;
-      for (auto it = open_files_.begin(); it != open_files_.end(); ++it) {
-        if (it->Collide(candidates[i].hash)) {
-          is_open = true;
-          break;
-        }
-      }
+      // Avoid evicting open files hoping there are enough more recently used
+      // files to satisfy the cleanup request.  Short hashes are ordered by
+      // their prefix, so the lookup finds the entry colliding with the
+      // candidate's full hash.
+      const bool is_open = open_files_.find(shash::Short(candidates[i].hash))
+                           != open_files_.end();
 
       if (is_pinned) {
         SkipEviction(candidates[i]);
@@ -1451,7 +1440,7 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
       if (return_pipe < 0)
         continue;
 
-      std::vector<shash::Short> gh = quota_mgr->CollectAllOpenHashes();
+      std::set<shash::Short> gh = quota_mgr->CollectAllOpenHashes();
       std::string result;
       for (auto it = gh.begin(); it != gh.end(); ++it) {
         result += (*it).ToString() + "\n";
@@ -2352,14 +2341,14 @@ void *PosixQuotaManager::CollectMountpointsHashes(void *data) {
   }
   const MutexLockGuard lock_guard(handler->l);
   for (auto hash_str : hash_strs) {
-    handler->of.push_back(
+    handler->of.insert(
         shash::Short(shash::MkFromHexPtr(shash::HexPtr(hash_str))));
   }
 #endif
   pthread_exit(nullptr);
 }
 
-std::vector<shash::Short> PosixQuotaManager::CollectAllOpenHashes() {
+std::set<shash::Short> PosixQuotaManager::CollectAllOpenHashes() {
   std::vector<CollectorHandler *> handlers;
   std::vector<pthread_t *> threads;
   open_files_.clear();

@@ -13,6 +13,7 @@
 #include <cassert>
 #include <map>
 #include <memory>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -412,18 +413,16 @@ class PosixQuotaManager : public QuotaManager {
   /**
    * Used in DoCleanup to exclude currently used files from eviction
    */
-  // TODO(gchr): it would be faster if it was a std::set. Needs a comparison
-  // operator for shash::Any
   std::shared_ptr<OpenHashesLock> lock_open_files_;
-  std::vector<shash::Short> open_files_;
+  std::set<shash::Short> open_files_;
 
   bool cleanup_unused_first_;
   std::vector<std::string> mountpoints_;
 
-  std::vector<shash::Short> CollectAllOpenHashes();
+  std::set<shash::Short> CollectAllOpenHashes();
 
   struct CollectorHandler {
-    std::vector<shash::Short> &of;
+    std::set<shash::Short> &of;
     const std::vector<std::string> &mp;
     pthread_mutex_t *l;
     size_t i;

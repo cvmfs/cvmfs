@@ -498,7 +498,25 @@ struct CVMFS_EXPORT Short : public Digest<kShortDigestSize, kAny> {
     return true;
   }
 
-  std::string ToString(const bool with_suffix = false) {
+  /**
+   * Orders by algorithm and the shortened prefix only, consistent with
+   * operator== and Collide().  Hides Digest<>::operator<, which would compare
+   * the full digest and thus not find a Short built from a full hash in an
+   * ordered container of Shorts built from short hex strings.
+   */
+  bool operator<(const Short &other) const {
+    if (this->algorithm != other.algorithm)
+      return this->algorithm < other.algorithm;
+    if (this->digest_size_ != other.digest_size_)
+      return this->digest_size_ < other.digest_size_;
+    for (unsigned i = 0; i < digest_size_; ++i) {
+      if (this->digest[i] != other.digest[i])
+        return this->digest[i] < other.digest[i];
+    }
+    return false;
+  }
+
+  std::string ToString(const bool with_suffix = false) const {
     const Hex hex(this);
     const bool use_suffix = with_suffix && HasSuffix();
     const unsigned string_length = hex_size_ + use_suffix;
