@@ -203,3 +203,21 @@ func TestArm64AliasTargetsArm64v8(t *testing.T) {
 		t.Errorf("archAliases[\"arm64\"] = %v; want [\"arm64:v8\"]", candidates)
 	}
 }
+
+func TestChooseDefaultArch(t *testing.T) {
+	tests := []struct {
+		available []string
+		native    string
+		want      string
+	}{
+		{[]string{"arm64", "amd64"}, "amd64", "amd64"},
+		{[]string{"arm64"}, "amd64", "arm64"},
+		{[]string{"arm64:v8", "ppc64le"}, "amd64", "arm64:v8"},
+		{nil, "amd64", ""},
+	}
+	for _, tt := range tests {
+		if got := chooseDefaultArch(tt.available, tt.native); got != tt.want {
+			t.Errorf("chooseDefaultArch(%v, %q) = %q, want %q", tt.available, tt.native, got, tt.want)
+		}
+	}
+}

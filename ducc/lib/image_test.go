@@ -1,8 +1,14 @@
 package lib
 
 import (
+	"net/http"
+	"net/http/httptest"
+	"reflect"
+	"strings"
 	"testing"
 	"time"
+
+	da "github.com/cvmfs/ducc/docker-api"
 )
 
 func TestParseTags(t *testing.T) {
@@ -425,6 +431,75 @@ func TestGetVariantSymlinkTarget(t *testing.T) {
 			got := img.GetVariantSymlinkTarget(tt.defaultArch)
 			if got != tt.want {
 				t.Errorf("GetVariantSymlinkTarget(%q) = %q, want %q", tt.defaultArch, got, tt.want)
+			}
+		})
+	}
+}
+
+// An index with a single entry (e.g. an amd64-only image pushed as an index)
+// must keep that entry, or --multi-arch converts nothing.
+func TestGetManifestListSingleEntryIndex(t *testing.T) {
+	const digest = "sha256:aaaa"
+	registry := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/manifests/"+digest) {
+			w.Write([]byte(`{"schemaVersion": 2, "mediaType": "application/vnd.oci.image.manifest.v1+json", "layers": [{"digest": "sha256:bbbb"}]}`))
+			return
+		}
+		w.Write([]byte(`{"schemaVersion": 2, "mediaType": "application/vnd.oci.image.index.v1+json",
+			"manifests": [{"digest": "` + digest + `", "platform": {"architecture": "amd64", "os": "linux"}}]}`))
+	}))
+	defer registry.Close()
+
+	img, err := ParseImage(registry.URL + "/lab/single:1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifestList, err := img.GetManifestList()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(manifestList.Manifests) != 1 || manifestList.Manifests[0].Platform.Architecture != "amd64" {
+		t.Fatalf("want the single amd64 entry, got %+v", manifestList.Manifests)
+	}
+}
+
+func TestSelectIndexEntries(t *testing.T) {
+	entry := func(digest, arch string) da.ManifestListItem {
+		var e da.ManifestListItem
+		e.Digest = digest
+		e.Platform.Architecture = arch
+		return e
+	}
+	tests := []struct {
+		name        string
+		entries     []da.ManifestListItem
+		wantDigests []string
+		wantRef     string
+		wantErr     bool
+	}{
+		{"single amd64", []da.ManifestListItem{entry("a", "amd64")}, []string{"a"}, "a", false},
+		{"single arm64", []da.ManifestListItem{entry("b", "arm64")}, []string{"b"}, "b", false},
+		{"amd64 and arm64", []da.ManifestListItem{entry("b", "arm64"), entry("a", "amd64")}, []string{"b", "a"}, "a", false},
+		{"attestation dropped", []da.ManifestListItem{entry("a", "amd64"), entry("x", "unknown")}, []string{"a"}, "a", false},
+		{"no amd64", []da.ManifestListItem{entry("b", "arm64"), entry("c", "ppc64le")}, []string{"b", "c"}, "b", false},
+		{"only attestation", []da.ManifestListItem{entry("x", "unknown")}, nil, "", true},
+		{"empty", nil, nil, "", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ref, err := selectIndexEntries(tt.entries)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("err = %v, wantErr %v", err, tt.wantErr)
+			}
+			if ref != tt.wantRef {
+				t.Errorf("ref = %q, want %q", ref, tt.wantRef)
+			}
+			var digests []string
+			for _, e := range got {
+				digests = append(digests, e.Digest)
+			}
+			if !reflect.DeepEqual(digests, tt.wantDigests) {
+				t.Errorf("digests = %v, want %v", digests, tt.wantDigests)
 			}
 		})
 	}
