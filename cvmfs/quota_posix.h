@@ -392,6 +392,12 @@ class PosixQuotaManager : public QuotaManager {
    */
   perf::MultiRecorder cleanup_recorder_;
 
+  /**
+   * Allows the QuotaManager to know if an open files aware cleanup policy is
+   * employed.
+   */
+  bool cleanup_unused_first_;
+
   sqlite3 *database_;
   sqlite3_stmt *stmt_touch_;
   sqlite3_stmt *stmt_unpin_;
@@ -416,9 +422,16 @@ class PosixQuotaManager : public QuotaManager {
    * Used in DoCleanup to exclude currently used files from eviction
    */
   std::shared_ptr<OpenHashesLock> lock_open_files_;
+
+  /**
+   * Used in DoCleanup as the source of truth for open hashes
+   */
   std::set<shash::Short> open_files_;
 
-  bool cleanup_unused_first_;
+  /*
+   * Used during the collection of open hashes. Holds all the
+   * mountpoints of the shared Cache Manager.
+   */
   std::vector<std::string> mountpoints_;
 
   std::set<shash::Short> CollectAllOpenHashes();

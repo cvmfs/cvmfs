@@ -1898,6 +1898,7 @@ PosixQuotaManager::PosixQuotaManager(const uint64_t limit,
     , fd_lock_cachedb_(-1)
     , async_delete_(true)
     , cachemgr_pid_(0)
+    , cleanup_unused_first_(false)
     , database_(NULL)
     , stmt_touch_(NULL)
     , stmt_unpin_(NULL)
@@ -1913,8 +1914,7 @@ PosixQuotaManager::PosixQuotaManager(const uint64_t limit,
     , stmt_list_catalogs_(NULL)
     , stmt_list_volatile_(NULL)
     , initialized_(false)
-    , lock_open_files_(std::make_shared<OpenHashesLock>())
-    , cleanup_unused_first_(false) {
+    , lock_open_files_(std::make_shared<OpenHashesLock>()) {
   ParseDirectories(cache_workspace, &cache_dir_, &workspace_dir_);
   pipe_lru_[0] = pipe_lru_[1] = -1;
   cleanup_recorder_.AddRecorder(1, 90);  // last 1.5 min with second resolution
