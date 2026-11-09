@@ -42,6 +42,12 @@ cleanup() {
     [ -n "$DOCKER_CONTAINER_ID" ] && docker rm "$DOCKER_CONTAINER_ID" >/dev/null 2>&1 || true
     if [ "$KEEP_TEMP" -eq 0 ] && [ -n "$WORK_DIR" ] && [ -d "$WORK_DIR" ]; then
         rm -rf "$WORK_DIR"
+    elif [ -n "$WORK_DIR" ] && [ -d "$WORK_DIR" ]; then
+        # This script is typically run under sudo, so WORK_DIR (created via
+        # mktemp -d) is root-owned with mode 700. Open it up so a non-root
+        # step later in the CI pipeline (e.g. actions/upload-artifact
+        # collecting logs on failure) can read it instead of hitting EACCES.
+        chmod -R a+rX "$WORK_DIR" 2>/dev/null || true
     fi
     exit $rc
 }
@@ -260,17 +266,25 @@ if [ "$PODMAN_AVAILABLE" -eq 1 ]; then
         2>&1 | tee "$WORK_DIR/podman_store.log" \
         || die "create-podman-store failed (see $WORK_DIR/podman_store.log)"
 
-    # Configure podman to use the new store for this test only, via an
-    # overriding storage.conf in a throwaway $HOME.
-    PODMAN_HOME="$WORK_DIR/podman_home"
-    mkdir -p "$PODMAN_HOME/.config/containers"
+    # Configure podman to use the new store for this test only, via a
+    # throwaway storage.conf selected with CONTAINERS_STORAGE_CONF.
+    #
+    # NB: a $HOME/XDG_CONFIG_HOME override (as used previously) is NOT a
+    # reliable way to point a `sudo`-invoked (real EUID 0) podman at a custom
+    # config: whether it is honored depends on podman's rootless detection,
+    # which is not guaranteed for a true root process. When it silently falls
+    # back to the system default storage.conf, `podman images` succeeds but
+    # returns whatever (if anything) is in the real system store instead of
+    # our additional store -- on a fresh CI runner that's an empty list, and
+    # this check fails with no error to explain why.
+    PODMAN_STORAGE_CONF="$WORK_DIR/podman_storage.conf"
     # Use a fresh, isolated graphroot/runroot so we avoid the
     # "database graph driver '' does not match overlay" mismatch that occurs
     # when the system graphroot was previously initialised without a driver.
     PODMAN_GRAPH_ROOT="$WORK_DIR/podman_graph"
     PODMAN_RUN_ROOT="$WORK_DIR/podman_run"
     mkdir -p "$PODMAN_GRAPH_ROOT" "$PODMAN_RUN_ROOT"
-    cat > "$PODMAN_HOME/.config/containers/storage.conf" <<EOF
+    cat > "$PODMAN_STORAGE_CONF" <<EOF
 [storage]
 driver = "overlay"
 graphroot = "$PODMAN_GRAPH_ROOT"
@@ -282,10 +296,9 @@ mountopt = "nodev"
 EOF
 
     PODMAN_IMAGE_REF="${IMAGE_URL#*://}"
-    PODMAN_HOME="$PODMAN_HOME"
 
     # Verify that the image is listed in the additional store (R/O: true)
-    PODMAN_IMAGES=$(sudo env HOME="$PODMAN_HOME" XDG_CONFIG_HOME="$PODMAN_HOME/.config" \
+    PODMAN_IMAGES=$(sudo env CONTAINERS_STORAGE_CONF="$PODMAN_STORAGE_CONF" \
         podman images --format '{{.Repository}}:{{.Tag}} RO={{.ReadOnly}}' 2>/dev/null || true)
     log_dbg "Podman images: $PODMAN_IMAGES"
     if ! echo "$PODMAN_IMAGES" | grep -q "RO=true"; then
@@ -297,7 +310,7 @@ EOF
     fi
 
     # Verify that a container can start from the additional store without pulling.
-    PODMAN_RUN_OUT=$(sudo env HOME="$PODMAN_HOME" XDG_CONFIG_HOME="$PODMAN_HOME/.config" \
+    PODMAN_RUN_OUT=$(sudo env CONTAINERS_STORAGE_CONF="$PODMAN_STORAGE_CONF" \
         podman run --rm --pull=never "$PODMAN_IMAGE_REF" echo "podman-store-ok" 2>&1 || true)
     log_dbg "podman run output: $PODMAN_RUN_OUT"
     if echo "$PODMAN_RUN_OUT" | grep -q "podman-store-ok"; then
