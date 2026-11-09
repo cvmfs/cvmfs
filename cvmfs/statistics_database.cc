@@ -605,8 +605,8 @@ void StatisticsDatabase::GetDBParams(const std::string &repo_name,
     }
   }
 
-  const std::string days_to_keep_str = "";
-  if (!parser.GetValue("CVMFS_STATS_DB_DAYS_TO_KEEP", &statistics_db)) {
+  std::string days_to_keep_str = "";
+  if (!parser.GetValue("CVMFS_STATS_DB_DAYS_TO_KEEP", &days_to_keep_str)) {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
              "Parameter %s was not set in the repository configuration file. "
              "Using default value: %s",
