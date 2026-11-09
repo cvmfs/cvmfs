@@ -434,7 +434,7 @@ TEST_F(T_Cvmfs, OpenReleaseRoundTripLeavesNoState) {
  * FUSE passthrough: the open path asks for a backing file, the release path
  * gives it back.  libfuse's release request carries fh and flags but no
  * backing_id, so these tests release with a fuse_file_info rebuilt the same
- * way. A handle that took a passthrough reference records that in fh.
+ * way. Both fallback and passthrough handles record an inode-mode ref in fh.
  */
 class T_CvmfsPassthrough : public T_Cvmfs {
  protected:
@@ -504,6 +504,12 @@ TEST_F(T_CvmfsPassthrough, RefusedBackingOpenServesWithoutPassthrough) {
   EXPECT_EQ(0, first.fi.backing_id);
   EXPECT_EQ(0, second.fi.backing_id);
   EXPECT_EQ(1, fuse_stub_passthrough_open_calls);
+  EXPECT_EQ(2u, cvmfs::fuse_passthru_tracker->size());
+  EXPECT_CALL(*cvmfs::file_system_->mock_cache_mgr(), Close(_))
+      .WillRepeatedly(Return(0));
+  Release(kTestInode, first.fi);
+  Release(kTestInode + 1, second.fi);
+  EXPECT_EQ(0, fuse_stub_passthrough_close_calls);
   EXPECT_TRUE(cvmfs::fuse_passthru_tracker->empty());
 }
 
@@ -529,6 +535,12 @@ TEST_F(T_CvmfsPassthrough, OtherBackingOpenFailureKeepsPassthroughOn) {
   EXPECT_EQ(0, first.fi.backing_id);
   EXPECT_EQ(2, fuse_stub_passthrough_open_calls);
   EXPECT_FALSE(cvmfs::fuse_passthru_refused);
+  EXPECT_CALL(*cvmfs::file_system_->mock_cache_mgr(), Close(_))
+      .WillRepeatedly(Return(0));
+  Release(kTestInode, first.fi);
+  Release(kTestInode + 1, second.fi);
+  EXPECT_EQ(0, fuse_stub_passthrough_close_calls);
+  EXPECT_TRUE(cvmfs::fuse_passthru_tracker->empty());
 }
 
 
@@ -571,52 +583,72 @@ TEST_F(T_CvmfsPassthrough, ReleaseClosesBackingFileOnLastReference) {
 
 
 /**
- * An open whose fuse_passthrough_open fails with an error other than EPERM
- * takes no tracker reference. Releasing that handle must leave the backing id
- * from a later successful open of the same inode open. Only releasing the
- * later handle may close it.
+ * Linux rejects passthrough opens while the inode has cached handles. After a
+ * transient backing-open failure, keep every open on the fallback path until
+ * the last handle closes, then allow a fresh passthrough attempt.
  */
-TEST_F(T_CvmfsPassthrough, FailedOpenReleaseLeavesLaterBackingIdOpen) {
+TEST_F(T_CvmfsPassthrough, FallbackPinsInodeModeUntilLastRelease) {
   PublishRegularFile(kTestInode, kTestPath);
   EXPECT_CALL(*cvmfs::mount_point_->mock_fetcher(), Fetch(_, _))
       .WillOnce(Return(42))
-      .WillOnce(Return(43));
-  EXPECT_CALL(*cvmfs::file_system_->mock_cache_mgr(), Close(42))
-      .WillOnce(Return(0));
-  EXPECT_CALL(*cvmfs::file_system_->mock_cache_mgr(), Close(43))
-      .WillOnce(Return(0));
+      .WillOnce(Return(43))
+      .WillOnce(Return(44))
+      .WillOnce(Return(45));
+  EXPECT_CALL(*cvmfs::file_system_->mock_cache_mgr(), Close(_))
+      .WillRepeatedly(Return(0));
 
   fuse_stub_passthrough_open_result = 0;
-  fuse_stub_passthrough_open_errno = EBADF;
-  const fuse_req failed = Open(kTestInode);
-  ASSERT_EQ(fuse_req::kReplyOpen, failed.kind);
-  EXPECT_EQ(0, failed.fi.backing_id);
-  EXPECT_EQ(42u, failed.fi.fh);
+  fuse_stub_passthrough_open_errno = ENOMEM;
+  const fuse_req first = Open(kTestInode);
+  ASSERT_EQ(fuse_req::kReplyOpen, first.kind);
+  EXPECT_EQ(0, first.fi.backing_id);
+  EXPECT_TRUE(TestBit(cvmfs::kBitPassthroughRef, first.fi.fh));
 
   fuse_stub_passthrough_open_result = 7;
   fuse_stub_passthrough_open_errno = 0;
-  const fuse_req opened = Open(kTestInode);
-  ASSERT_EQ(fuse_req::kReplyOpen, opened.kind);
-  EXPECT_EQ(7, opened.fi.backing_id);
-  EXPECT_EQ(2, fuse_stub_passthrough_open_calls);
+  const fuse_req second = Open(kTestInode);
+  ASSERT_EQ(fuse_req::kReplyOpen, second.kind);
+  EXPECT_EQ(0, second.fi.backing_id);
+  EXPECT_EQ(1, fuse_stub_passthrough_open_calls);
 
-  const fuse_req release_failed = Release(kTestInode, failed.fi);
-  EXPECT_EQ(fuse_req::kReplyErr, release_failed.kind);
-  EXPECT_EQ(0, release_failed.err);
-  EXPECT_EQ(0, fuse_stub_passthrough_close_calls);
+  Release(kTestInode, first.fi);
+  const fuse_req third = Open(kTestInode);
+  EXPECT_EQ(0, third.fi.backing_id);
+  EXPECT_EQ(1, fuse_stub_passthrough_open_calls);
   ASSERT_EQ(1u, cvmfs::fuse_passthru_tracker->count(kTestInode));
-  std::unordered_map<fuse_ino_t,
-                     cvmfs::fuse_passthru_ctx_t>::const_iterator iter =
-      cvmfs::fuse_passthru_tracker->find(kTestInode);
-  EXPECT_EQ(7, iter->second.backing_id);
-  EXPECT_EQ(1, iter->second.refcount);
+  EXPECT_EQ(2, cvmfs::fuse_passthru_tracker->at(kTestInode).refcount);
+  EXPECT_EQ(0, cvmfs::fuse_passthru_tracker->at(kTestInode).backing_id);
 
-  const fuse_req release_opened = Release(kTestInode, opened.fi);
-  EXPECT_EQ(fuse_req::kReplyErr, release_opened.kind);
-  EXPECT_EQ(0, release_opened.err);
+  Release(kTestInode, second.fi);
+  Release(kTestInode, third.fi);
+  EXPECT_EQ(0, fuse_stub_passthrough_close_calls);
+  EXPECT_TRUE(cvmfs::fuse_passthru_tracker->empty());
+
+  const fuse_req fourth = Open(kTestInode);
+  EXPECT_EQ(7, fourth.fi.backing_id);
+  EXPECT_EQ(2, fuse_stub_passthrough_open_calls);
+  Release(kTestInode, fourth.fi);
   EXPECT_EQ(1, fuse_stub_passthrough_close_calls);
   EXPECT_EQ(7, fuse_stub_passthrough_close_backing_id);
-  EXPECT_TRUE(cvmfs::fuse_passthru_tracker->empty());
+}
+
+
+TEST_F(T_CvmfsPassthrough, FallbackReadStripsModeReferenceBit) {
+  PublishRegularFile(kTestInode, kTestPath);
+  fuse_stub_passthrough_open_result = 0;
+  fuse_stub_passthrough_open_errno = ENOMEM;
+  EXPECT_CALL(*cvmfs::mount_point_->mock_fetcher(), Fetch(_, _))
+      .WillOnce(Return(42));
+  EXPECT_CALL(*cvmfs::file_system_->mock_cache_mgr(), Pread(42, _, 4, 0))
+      .WillOnce(Return(0));
+  EXPECT_CALL(*cvmfs::file_system_->mock_cache_mgr(), Close(42))
+      .WillOnce(Return(0));
+
+  fuse_req opened = Open(kTestInode);
+  fuse_req read_req;
+  cvmfs::cvmfs_read(&read_req, kTestInode, 4, 0, &opened.fi);
+  EXPECT_EQ(fuse_req::kReplyBuf, read_req.kind);
+  Release(kTestInode, opened.fi);
 }
 
 
@@ -664,8 +696,9 @@ TEST_F(T_CvmfsPassthrough, ReloadKeepsBackingReferences) {
 
   cvmfs::FusePassthruState *saved = cvmfs::SaveFusePassthruState();
   ASSERT_TRUE(saved != NULL);
-  delete cvmfs::fuse_passthru_tracker;
-  cvmfs::fuse_passthru_tracker = NULL;
+  // Saving must release the old instance's tracker, not rely on dlclose()
+  // keeping its static pointer alive or on the test deleting it manually.
+  EXPECT_TRUE(cvmfs::fuse_passthru_tracker == NULL);
   cvmfs::fuse_passthru_refused = false;
   cvmfs::RestoreFusePassthruState(*saved);
   delete saved;
@@ -679,6 +712,75 @@ TEST_F(T_CvmfsPassthrough, ReloadKeepsBackingReferences) {
   EXPECT_EQ(1, fuse_stub_passthrough_close_calls);
   EXPECT_EQ(7, fuse_stub_passthrough_close_backing_id);
   EXPECT_TRUE(cvmfs::fuse_passthru_tracker->empty());
+}
+
+
+TEST_F(T_CvmfsPassthrough, ReloadKeepsFallbackMode) {
+  PublishRegularFile(kTestInode, kTestPath);
+  EXPECT_CALL(*cvmfs::mount_point_->mock_fetcher(), Fetch(_, _))
+      .WillOnce(Return(42))
+      .WillOnce(Return(43));
+  EXPECT_CALL(*cvmfs::file_system_->mock_cache_mgr(), Close(_))
+      .WillRepeatedly(Return(0));
+  fuse_stub_passthrough_open_result = 0;
+  fuse_stub_passthrough_open_errno = ENOMEM;
+  const fuse_req first = Open(kTestInode);
+
+  cvmfs::FusePassthruState *saved = cvmfs::SaveFusePassthruState();
+  ASSERT_TRUE(saved != NULL);
+  EXPECT_TRUE(cvmfs::fuse_passthru_tracker == NULL);
+  cvmfs::RestoreFusePassthruState(*saved);
+  delete saved;
+
+  fuse_stub_passthrough_open_result = 7;
+  fuse_stub_passthrough_open_errno = 0;
+  const fuse_req second = Open(kTestInode);
+  EXPECT_EQ(0, second.fi.backing_id);
+  EXPECT_EQ(1, fuse_stub_passthrough_open_calls);
+  Release(kTestInode, first.fi);
+  Release(kTestInode, second.fi);
+  EXPECT_TRUE(cvmfs::fuse_passthru_tracker->empty());
+  EXPECT_EQ(0, fuse_stub_passthrough_close_calls);
+}
+
+
+TEST_F(T_CvmfsPassthrough, DisabledOptionRetainsExistingInodeMode) {
+  PublishRegularFile(kTestInode, kTestPath);
+  EXPECT_CALL(*cvmfs::mount_point_->mock_fetcher(), Fetch(_, _))
+      .WillOnce(Return(42))
+      .WillOnce(Return(43))
+      .WillOnce(Return(44));
+  EXPECT_CALL(*cvmfs::file_system_->mock_cache_mgr(), Close(_))
+      .WillRepeatedly(Return(0));
+  fuse_stub_passthrough_open_result = 7;
+  const fuse_req first = Open(kTestInode);
+  exports_.fuse_passthrough = false;
+  const fuse_req second = Open(kTestInode);
+  EXPECT_EQ(7, second.fi.backing_id);
+  EXPECT_EQ(1, fuse_stub_passthrough_open_calls);
+  Release(kTestInode, first.fi);
+  Release(kTestInode, second.fi);
+  EXPECT_EQ(1, fuse_stub_passthrough_close_calls);
+
+  const fuse_req third = Open(kTestInode);
+  EXPECT_EQ(0, third.fi.backing_id);
+  EXPECT_EQ(1, fuse_stub_passthrough_open_calls);
+  Release(kTestInode, third.fi);
+  EXPECT_TRUE(cvmfs::fuse_passthru_tracker->empty());
+}
+
+
+TEST_F(T_CvmfsPassthrough, ReloadTransfersEmptyTracker) {
+  // An empty but negotiated tracker must survive every reload as well.
+  for (unsigned i = 0; i < 3; ++i) {
+    cvmfs::FusePassthruState *saved = cvmfs::SaveFusePassthruState();
+    ASSERT_TRUE(saved != NULL);
+    EXPECT_TRUE(cvmfs::fuse_passthru_tracker == NULL);
+    EXPECT_TRUE(saved->tracker.empty());
+    cvmfs::RestoreFusePassthruState(*saved);
+    delete saved;
+    ASSERT_TRUE(cvmfs::fuse_passthru_tracker != NULL);
+  }
 }
 
 

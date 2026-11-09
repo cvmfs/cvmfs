@@ -131,7 +131,7 @@ InodeGenerationInfo inode_generation_info_;
 
 #ifdef FUSE_CAP_PASSTHROUGH
 typedef struct fuse_passthru_ctx {
-  int backing_id;
+  int backing_id;  // 0 pins this inode to the regular read path
   int refcount;
 } fuse_passthru_ctx_t;
 typedef std::unordered_map<fuse_ino_t, fuse_passthru_ctx_t> FusePassthruTracker;
@@ -142,7 +142,7 @@ pthread_mutex_t fuse_passthru_tracker_lock = PTHREAD_MUTEX_INITIALIZER;
 // requested. Guarded by fuse_passthru_tracker_lock.
 static bool fuse_passthru_refused = false;
 // fi->fh bit 63 is the chunked-file sign and bit 62 is direct I/O. Bit 60
-// records that this handle incremented the passthrough refcount. libfuse
+// records an inode I/O-mode reference, including fallback opens. libfuse
 // rebuilds fuse_file_info on release without backing_id, but it returns fh.
 // Bit 61 is the macOS kFileHandleIgnore sentinel.
 static const unsigned int kBitPassthroughRef = 60;
@@ -247,9 +247,9 @@ static inline bool IncAndCheckNoOpenFiles() {
  * OS file descriptor. Only the posix cache manager returns one; the others
  * return indices into their own tables, which can alias unrelated daemon fds.
  */
-static inline bool UseFusePassthrough() {
-  return loader_exports_ && loader_exports_->fuse_passthrough
-         && fuse_passthru_tracker
+static inline bool TrackFusePassthrough() {
+  // Track even with the option off: existing inodes must retain their mode.
+  return loader_exports_ && fuse_passthru_tracker
          && file_system_->cache_mgr()->id() == kPosixCacheManager;
 }
 
@@ -259,14 +259,17 @@ static FusePassthruState *SaveFusePassthruState() {
   FusePassthruState *state = new FusePassthruState();
   pthread_mutex_lock(&fuse_passthru_tracker_lock);
   state->refused = fuse_passthru_refused;
-  state->tracker = *fuse_passthru_tracker;
+  // Reload has drained all callbacks. Transfer ownership before dlclose(),
+  // which otherwise loses the old library's pointer and leaks its tracker.
+  state->tracker.swap(*fuse_passthru_tracker);
+  delete fuse_passthru_tracker;
+  fuse_passthru_tracker = NULL;
   pthread_mutex_unlock(&fuse_passthru_tracker_lock);
   return state;
 }
 
 static void RestoreFusePassthruState(const FusePassthruState &state) {
   pthread_mutex_lock(&fuse_passthru_tracker_lock);
-  // Still set if dlclose() did not unload the previous library instance
   delete fuse_passthru_tracker;
   fuse_passthru_tracker = new FusePassthruTracker(state.tracker);
   fuse_passthru_refused = state.refused;
@@ -1455,11 +1458,13 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
       fi->fh = fd;
       FillOpenFlags(open_directives, fi);
 #ifdef FUSE_CAP_PASSTHROUGH
-      if (UseFusePassthrough()) {
+      if (TrackFusePassthrough()) {
         if (!dirent.IsChunkedFile()) {
           /* "Currently there should be only one backing id per node / backing
            * file." So says libfuse documentation on fuse_passthrough_open(). So
-           * we reuse and refcount backing id based on inode. Passthrough can be
+           * we reuse and refcount the I/O mode based on inode. A zero backing
+           * id pins fallback opens to cached I/O until the last release: Linux
+           * rejects passthrough while cached handles exist. Passthrough can be
            * used with libfuse methods open, opendir, create, but since CVMFS is
            * read-only and has synthesizes its directories, we only need to
            * handle it in `open`. */
@@ -1474,7 +1479,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
              * Such a file is served through the regular read path, and after
              * an EPERM no further backing files are requested. */
             backing_id = 0;
-            if (!fuse_passthru_refused) {
+            if (loader_exports_->fuse_passthrough && !fuse_passthru_refused) {
               errno = 0;
               backing_id = fuse_passthrough_open(req, fd);
               const int open_errno = errno;
@@ -1490,14 +1495,12 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
                          uint64_t(ino), open_errno);
               }
             }
-            if (backing_id > 0) {
-              auto pair_with_iterator = fuse_passthru_tracker->emplace(
-                  ino, fuse_passthru_ctx_t());
-              assert(pair_with_iterator.second == true);
-              fuse_passthru_ctx_t &entry = pair_with_iterator.first->second;
-              entry.backing_id = backing_id;
-              entry.refcount++;
-            }
+            auto pair_with_iterator = fuse_passthru_tracker->emplace(
+                ino, fuse_passthru_ctx_t());
+            assert(pair_with_iterator.second == true);
+            fuse_passthru_ctx_t &entry = pair_with_iterator.first->second;
+            entry.backing_id = backing_id > 0 ? backing_id : 0;
+            entry.refcount++;
           } else {
             fuse_passthru_ctx_t &entry = iter->second;
             assert(entry.refcount > 0);
@@ -1506,15 +1509,13 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
           }
           pthread_mutex_unlock(&fuse_passthru_tracker_lock);
 
+          // Both fallback and passthrough handles hold an inode-mode reference.
+          SetBit(kBitPassthroughRef, &fi->fh);
           if (backing_id > 0) {
             fi->backing_id = backing_id;
             /* according to libfuse example/passthrough_hp.cc:
              * "open in passthrough mode must drop old page cache" */
             fi->keep_cache = false;
-            /* Release learns about this handle's reference from fh. An open
-             * that failed to get a backing id leaves the bit clear and must
-             * not drop a reference a later open of this inode took. */
-            SetBit(kBitPassthroughRef, &fi->fh);
           }
         }
       }
@@ -1859,11 +1860,9 @@ static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
 #ifdef FUSE_CAP_PASSTHROUGH
     if (took_passthrough_ref && fuse_passthru_tracker) {
       /* libfuse rebuilds fuse_file_info for release without backing_id.
-       * Only a handle that took a reference (kBitPassthroughRef in fh) may
-       * drop one. An earlier open of this inode can fail with a non-EPERM
-       * error and take none; releasing it must not close a later handle's
-       * backing id. Not gated on the config option, which a reload can turn
-       * off while handles still hold references. */
+       * Both passthrough and fallback opens hold an inode-mode reference.
+       * Not gated on the config option, which a reload can turn off while
+       * handles still hold references. */
       pthread_mutex_lock(&fuse_passthru_tracker_lock);
       auto iter = fuse_passthru_tracker->find(ino);
       assert(iter != fuse_passthru_tracker->end());
@@ -1871,11 +1870,13 @@ static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
       assert(entry.refcount > 0);
       entry.refcount--;
       if (entry.refcount == 0) {
-        const int ret = fuse_passthrough_close(req, entry.backing_id);
-        if (ret < 0) {
-          LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
-                   "fuse_passthrough_close(backing_id=%d) failed: %d",
-                   entry.backing_id, ret);
+        if (entry.backing_id > 0) {
+          const int ret = fuse_passthrough_close(req, entry.backing_id);
+          if (ret < 0) {
+            LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+                     "fuse_passthrough_close(backing_id=%d) failed: %d",
+                     entry.backing_id, ret);
+          }
         }
         fuse_passthru_tracker->erase(iter);
       }
@@ -3066,7 +3067,7 @@ static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
   if (saved_passthru != NULL) {
     msg_progress = "Saving FUSE passthrough tracker ("
                    + StringifyInt(saved_passthru->tracker.size())
-                   + " backing files)\n";
+                   + " inodes)\n";
     SendMsg2Socket(fd_progress, msg_progress);
     loader::SavedState *state_passthru = new loader::SavedState();
     state_passthru->state_id = loader::kStateFusePassthrough;
