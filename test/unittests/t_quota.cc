@@ -642,12 +642,12 @@ TEST_F(T_QuotaManager, CollectorHandlerSharesOpenHashesLock) {
   ASSERT_EQ(1, qm->lock_open_files_.use_count());
 
   // one handler per collector thread, each with its own reference
-  PosixQuotaManager::CollectorHandler
-      *handler_a = new PosixQuotaManager::CollectorHandler{
-          qm->open_files_, qm->mountpoints_, qm->lock_open_files_, 0};
-  PosixQuotaManager::CollectorHandler
-      *handler_b = new PosixQuotaManager::CollectorHandler{
-          qm->open_files_, qm->mountpoints_, qm->lock_open_files_, 1};
+  std::shared_ptr<PosixQuotaManager::CollectorHandler>
+      handler_a = std::make_shared<PosixQuotaManager::CollectorHandler>(
+          qm->open_files_, qm->mountpoints_, qm->lock_open_files_, 0);
+  std::shared_ptr<PosixQuotaManager::CollectorHandler>
+      handler_b = std::make_shared<PosixQuotaManager::CollectorHandler>(
+          qm->open_files_, qm->mountpoints_, qm->lock_open_files_, 1);
   EXPECT_EQ(3, qm->lock_open_files_.use_count());
   EXPECT_EQ(qm->lock_open_files_->Get(), handler_a->l->Get());
   EXPECT_EQ(qm->lock_open_files_->Get(), handler_b->l->Get());
@@ -660,13 +660,50 @@ TEST_F(T_QuotaManager, CollectorHandlerSharesOpenHashesLock) {
   EXPECT_EQ(0, pthread_mutex_trylock(handler_a->l->Get()));
   EXPECT_EQ(0, pthread_mutex_unlock(handler_a->l->Get()));
 
-  delete handler_a;
+  handler_a.reset();
   EXPECT_EQ(1, handler_b->l.use_count());
-  delete handler_b;
+  handler_b.reset();
 
   // restore the manager's lock for the fixture's tear down
   qm->lock_open_files_ = std::make_shared<OpenHashesLock>();
 }
+
+
+#ifndef __APPLE__
+TEST_F(T_QuotaManager, CollectorThreadReleasesHandlerReference) {
+  PosixQuotaManager *qm = quota_mgr_not_spawned_;
+
+  // a plain directory has no user.list_open_hashes xattr, so the collector
+  // thread gives up right after the first getxattr()
+  std::set<shash::Short> open_files;
+  const std::vector<std::string> mountpoints(1, tmp_path_);
+  std::shared_ptr<PosixQuotaManager::CollectorHandler>
+      handler = std::make_shared<PosixQuotaManager::CollectorHandler>(
+          open_files, mountpoints, qm->lock_open_files_, 0);
+  EXPECT_EQ(1, handler.use_count());
+  EXPECT_EQ(2, qm->lock_open_files_.use_count());
+
+  // the thread's reference, as created by CollectAllOpenHashes()
+  std::shared_ptr<PosixQuotaManager::CollectorHandler>
+      *thread_ref = new std::shared_ptr<PosixQuotaManager::CollectorHandler>(
+          handler);
+  EXPECT_EQ(2, handler.use_count());
+
+  pthread_t thread;
+  ASSERT_EQ(0, pthread_create(&thread, NULL,
+                              PosixQuotaManager::CollectMountpointsHashes,
+                              thread_ref));
+  ASSERT_EQ(0, pthread_join(thread, NULL));
+
+  // the thread released its reference, the caller's one is left
+  EXPECT_EQ(1, handler.use_count());
+  EXPECT_EQ(2, qm->lock_open_files_.use_count());
+  EXPECT_TRUE(open_files.empty());
+
+  handler.reset();
+  EXPECT_EQ(1, qm->lock_open_files_.use_count());
+}
+#endif
 
 
 //------------------------------------------------------------------------------

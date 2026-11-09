@@ -2315,7 +2315,12 @@ void PosixQuotaManager::ManagedReadHalfPipe(int fd, void *buf, size_t nbyte) {
 void *PosixQuotaManager::CollectMountpointsHashes(void *data) {
 #ifndef __APPLE__
   pthread_setname_np(pthread_self(), "hash_collector");
-  auto *handler = static_cast<CollectorHandler *>(data);
+  // Take over the reference that CollectAllOpenHashes() created for this
+  // thread; it is released when the thread returns.
+  std::shared_ptr<CollectorHandler>
+      *thread_ref = static_cast<std::shared_ptr<CollectorHandler> *>(data);
+  const std::shared_ptr<CollectorHandler> handler(*thread_ref);
+  delete thread_ref;
 
   const std::string mountpoint = handler->mp[handler->i];
   ssize_t n = getxattr(mountpoint.c_str(), "user.list_open_hashes", nullptr, 0);
@@ -2349,26 +2354,38 @@ void *PosixQuotaManager::CollectMountpointsHashes(void *data) {
 }
 
 std::set<shash::Short> PosixQuotaManager::CollectAllOpenHashes() {
-  std::vector<CollectorHandler *> handlers;
-  std::vector<pthread_t *> threads;
   open_files_.clear();
 #ifndef __APPLE__
+  std::vector<std::shared_ptr<CollectorHandler> > handlers;
+  std::vector<pthread_t> threads(mountpoints_.size());
+  std::vector<bool> joined(mountpoints_.size(), false);
   auto &&a_after_b = [](const struct timespec a, const struct timespec b) {
     return (a.tv_sec > b.tv_sec) ? true : false;
   };
 
   for (size_t i = 0; i < mountpoints_.size(); ++i) {
     // each handler gets its own reference to the lock
-    handlers.push_back(
-        new CollectorHandler{open_files_, mountpoints_, lock_open_files_, i});
-    threads.push_back(new pthread_t);
+    handlers.push_back(std::make_shared<CollectorHandler>(
+        open_files_, mountpoints_, lock_open_files_, i));
   }
 
   for (size_t i = 0; i < mountpoints_.size(); ++i) {
-    pthread_create(threads[i], nullptr, CollectMountpointsHashes, handlers[i]);
+    // The thread gets its own reference to the handler and releases it when
+    // it is done.  pthread_create() only takes a raw pointer, hence the
+    // heap-allocated shared_ptr.
+    std::shared_ptr<CollectorHandler>
+        *thread_ref = new std::shared_ptr<CollectorHandler>(handlers[i]);
+    const int retval = pthread_create(&threads[i], nullptr,
+                                      CollectMountpointsHashes, thread_ref);
+    if (retval != 0) {
+      LogCvmfs(kLogQuota, kLogDebug | kLogSyslogWarn,
+               "failed to start hash collector for %s (%d)",
+               mountpoints_[i].c_str(), retval);
+      delete thread_ref;
+      joined[i] = true;  // nothing to wait for
+    }
   }
 
-  std::vector<bool> joined(handlers.size(), false);
   struct timespec reference, current;
   clock_gettime(CLOCK_REALTIME, &reference);
   clock_gettime(CLOCK_REALTIME, &current);
@@ -2380,7 +2397,7 @@ std::set<shash::Short> PosixQuotaManager::CollectAllOpenHashes() {
     // as long as there are still threads that haven't joined yet
     // and for 10 seconds
     if (not joined[i]) {
-      const int s = pthread_tryjoin_np(*threads[i], NULL);
+      const int s = pthread_tryjoin_np(threads[i], NULL);
       if (s == 0) {
         joined[i] = true;
       }
@@ -2391,8 +2408,15 @@ std::set<shash::Short> PosixQuotaManager::CollectAllOpenHashes() {
     SafeSleepMs(10);
   }
 
-  for (size_t i = 0; i < handlers.size(); ++i) {
-    delete handlers[i];
+  // Threads that did not finish in time keep running on their own reference
+  // of the handler; detach them so that their resources are released on exit.
+  for (size_t i = 0; i < threads.size(); ++i) {
+    if (not joined[i]) {
+      LogCvmfs(kLogQuota, kLogDebug | kLogSyslogWarn,
+               "hash collector for %s did not finish in time, ignoring it",
+               mountpoints_[i].c_str());
+      pthread_detach(threads[i]);
+    }
   }
 #endif
   return open_files_;
