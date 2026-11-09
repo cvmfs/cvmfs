@@ -243,6 +243,15 @@ static inline bool IncAndCheckNoOpenFiles() {
 
 #ifdef FUSE_CAP_PASSTHROUGH
 /**
+ * LoaderExports version 6 (2.14) inserted fuse_passthrough before device_id.
+ * In an older loader that offset holds device_id, so it must not be read.
+ */
+static inline bool LoaderFusePassthrough() {
+  return loader_exports_ && loader_exports_->version >= 6
+         && loader_exports_->fuse_passthrough;
+}
+
+/**
  * The kernel reads a passthrough file from its backing fd, so that must be an
  * OS file descriptor. Only the posix cache manager returns one; the others
  * return indices into their own tables, which can alias unrelated daemon fds.
@@ -1479,7 +1488,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
              * Such a file is served through the regular read path, and after
              * an EPERM no further backing files are requested. */
             backing_id = 0;
-            if (loader_exports_->fuse_passthrough && !fuse_passthru_refused) {
+            if (LoaderFusePassthrough() && !fuse_passthru_refused) {
               errno = 0;
               backing_id = fuse_passthrough_open(req, fd);
               const int open_errno = errno;
@@ -2353,12 +2362,12 @@ static void cvmfs_init(void *userdata, struct fuse_conn_info *conn) {
 
 #ifdef FUSE_CAP_PASSTHROUGH
   if (conn->capable & FUSE_CAP_PASSTHROUGH) {
-    if (loader_exports_ && loader_exports_->fuse_passthrough
+    if (LoaderFusePassthrough()
         && file_system_->cache_mgr()->id() != kPosixCacheManager) {
       LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
                "FUSE: Passthrough requires the posix cache manager, "
                "serving files without passthrough.");
-    } else if (loader_exports_ && loader_exports_->fuse_passthrough) {
+    } else if (LoaderFusePassthrough()) {
       conn->want |= FUSE_CAP_PASSTHROUGH;
       /* "Passthrough and writeback cache are conflicting modes"
        * libfuse example/passthrough_hp.cc says,
