@@ -2227,8 +2227,8 @@ void DownloadManager::SetDnsServer(const string &address) {
   LogCvmfs(kLogDownload, kLogSyslog, "(manager '%s') set nameserver to %s",
            name_.c_str(), address.c_str());
   // Once per process: DNS roaming calls this on every resolv.conf change
-  static std::atomic<bool> warned(false);
-  if (!curl_dns_servers_supported_ && !warned.exchange(true)) {
+  static atomic_int32 warned = 0;
+  if (!curl_dns_servers_supported_ && atomic_cas32(&warned, 0, 1)) {
     LogCvmfs(kLogDownload, kLogSyslogWarn,
              "(manager '%s') libcurl lacks c-ares support: nameserver %s "
              "only applies to proxy name resolution, other hosts use the "
