@@ -2,12 +2,15 @@
  * This file is part of the CernVM File System.
  */
 
+#include <errno.h>
 #include <gtest/gtest.h>
 #include <pthread.h>
 #include <signal.h>
 
 #include <algorithm>
+#include <memory>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 #include "cache_posix.h"
@@ -17,6 +20,7 @@
 #include "testutil.h"
 #include "util/algorithm.h"
 #include "util/fs_traversal.h"
+#include "util/mutex.h"
 
 using namespace std;  // NOLINT
 
@@ -613,3 +617,110 @@ TEST_F(T_QuotaManager, SetLimit) {
   EXPECT_EQ(100ul, limit);
 }
 
+
+//------------------------------------------------------------------------------
+
+
+TEST_F(T_QuotaManager, OpenHashesLockInitializedOnConstruction) {
+  ASSERT_TRUE(quota_mgr_not_spawned_->lock_open_files_ != nullptr);
+  EXPECT_EQ(1, quota_mgr_not_spawned_->lock_open_files_.use_count());
+
+  // the mutex is usable right after construction, no cleanup needed first
+  pthread_mutex_t *mutex = quota_mgr_not_spawned_->lock_open_files_->Get();
+  ASSERT_TRUE(mutex != nullptr);
+  EXPECT_EQ(0, pthread_mutex_trylock(mutex));
+  EXPECT_EQ(0, pthread_mutex_unlock(mutex));
+
+  // every quota manager owns its own lock
+  EXPECT_NE(quota_mgr_->lock_open_files_.get(),
+            quota_mgr_not_spawned_->lock_open_files_.get());
+}
+
+
+//------------------------------------------------------------------------------
+
+
+TEST(T_OpenHashesLock, NotCopyable) {
+  EXPECT_FALSE(std::is_copy_constructible<OpenHashesLock>::value);
+  EXPECT_FALSE(std::is_copy_assignable<OpenHashesLock>::value);
+}
+
+
+TEST(T_OpenHashesLock, LockUnlock) {
+  OpenHashesLock lock;
+  pthread_mutex_t *mutex = lock.Get();
+  ASSERT_TRUE(mutex != nullptr);
+  EXPECT_EQ(mutex, lock.Get());
+
+  EXPECT_EQ(0, pthread_mutex_trylock(mutex));
+  EXPECT_EQ(EBUSY, pthread_mutex_trylock(mutex));
+  EXPECT_EQ(0, pthread_mutex_unlock(mutex));
+  EXPECT_EQ(0, pthread_mutex_trylock(mutex));
+  EXPECT_EQ(0, pthread_mutex_unlock(mutex));
+}
+
+
+TEST(T_OpenHashesLock, WorksWithMutexLockGuard) {
+  OpenHashesLock lock;
+  {
+    const MutexLockGuard guard(lock.Get());
+    EXPECT_EQ(EBUSY, pthread_mutex_trylock(lock.Get()));
+  }
+  EXPECT_EQ(0, pthread_mutex_trylock(lock.Get()));
+  EXPECT_EQ(0, pthread_mutex_unlock(lock.Get()));
+}
+
+
+namespace {
+
+struct TryLockResult {
+  pthread_mutex_t *mutex;
+  int retval;
+};
+
+void *MainTryLock(void *data) {
+  TryLockResult *result = static_cast<TryLockResult *>(data);
+  result->retval = pthread_mutex_trylock(result->mutex);
+  if (result->retval == 0)
+    pthread_mutex_unlock(result->mutex);
+  return NULL;
+}
+
+int TryLockFromOtherThread(pthread_mutex_t *mutex) {
+  TryLockResult result = {mutex, -1};
+  pthread_t thread;
+  EXPECT_EQ(0, pthread_create(&thread, NULL, MainTryLock, &result));
+  EXPECT_EQ(0, pthread_join(thread, NULL));
+  return result.retval;
+}
+
+}  // anonymous namespace
+
+
+TEST(T_OpenHashesLock, ExcludesOtherThreads) {
+  OpenHashesLock lock;
+
+  EXPECT_EQ(0, pthread_mutex_lock(lock.Get()));
+  EXPECT_EQ(EBUSY, TryLockFromOtherThread(lock.Get()));
+  EXPECT_EQ(0, pthread_mutex_unlock(lock.Get()));
+  EXPECT_EQ(0, TryLockFromOtherThread(lock.Get()));
+}
+
+
+TEST(T_OpenHashesLock, SharedOwnershipOutlivesFirstOwner) {
+  std::shared_ptr<OpenHashesLock> owner = std::make_shared<OpenHashesLock>();
+  pthread_mutex_t *mutex = owner->Get();
+
+  // a second owner, as a collector thread would hold it
+  std::shared_ptr<OpenHashesLock> late_user = owner;
+  EXPECT_EQ(2, owner.use_count());
+
+  // the first owner lets go, e.g. the quota manager is destroyed
+  owner.reset();
+  EXPECT_EQ(1, late_user.use_count());
+
+  // the mutex is still the same and still usable for the remaining owner
+  EXPECT_EQ(mutex, late_user->Get());
+  EXPECT_EQ(0, pthread_mutex_trylock(late_user->Get()));
+  EXPECT_EQ(0, pthread_mutex_unlock(late_user->Get()));
+}

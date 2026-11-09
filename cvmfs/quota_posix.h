@@ -10,7 +10,9 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <cassert>
 #include <map>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -26,6 +28,25 @@ class Recorder;
 }
 
 /**
+ * Owns a pthread mutex that is initialized on construction and destroyed on
+ * destruction.  Not copyable; meant to be shared via std::shared_ptr so that
+ * the mutex lives as long as its last user.
+ */
+class OpenHashesLock : SingleCopy {
+ public:
+  OpenHashesLock() {
+    const int retval = pthread_mutex_init(&mutex_, NULL);
+    assert(retval == 0);
+  }
+  ~OpenHashesLock() { pthread_mutex_destroy(&mutex_); }
+
+  pthread_mutex_t *Get() { return &mutex_; }
+
+ private:
+  pthread_mutex_t mutex_;
+};
+
+/**
  * Works with the PosixCacheManager.  Uses an SQlite database for cache contents
  * tracking.  Tracking is asynchronously.
  *
@@ -38,6 +59,7 @@ class PosixQuotaManager : public QuotaManager {
   FRIEND_TEST(T_QuotaManager, Contains);
   FRIEND_TEST(T_QuotaManager, InitDatabase);
   FRIEND_TEST(T_QuotaManager, MakeReturnPipe);
+  FRIEND_TEST(T_QuotaManager, OpenHashesLockInitializedOnConstruction);
   FRIEND_TEST(T_QuotaManager, ReadPipeStringUsesExactLength);
   FRIEND_TEST(T_QuotaManager, RegisterMountpointUsesCorrectDescriptionBuffer);
   FRIEND_TEST(T_QuotaManager, SetCleanupPolicyUsesCorrectDescriptionBuffer);
@@ -392,7 +414,7 @@ class PosixQuotaManager : public QuotaManager {
    */
   // TODO(gchr): it would be faster if it was a std::set. Needs a comparison
   // operator for shash::Any
-  pthread_mutex_t *lock_open_files_;
+  std::shared_ptr<OpenHashesLock> lock_open_files_;
   std::vector<shash::Short> open_files_;
 
   bool cleanup_unused_first_;

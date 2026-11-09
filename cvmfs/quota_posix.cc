@@ -57,7 +57,6 @@
 #include "util/exception.h"
 #include "util/logging.h"
 #include "util/posix.h"
-#include "util/smalloc.h"
 #include "util/string.h"
 
 using namespace std;  // NOLINT
@@ -1925,6 +1924,7 @@ PosixQuotaManager::PosixQuotaManager(const uint64_t limit,
     , stmt_list_catalogs_(NULL)
     , stmt_list_volatile_(NULL)
     , initialized_(false)
+    , lock_open_files_(std::make_shared<OpenHashesLock>())
     , cleanup_unused_first_(false) {
   ParseDirectories(cache_workspace, &cache_dir_, &workspace_dir_);
   pipe_lru_[0] = pipe_lru_[1] = -1;
@@ -1935,15 +1935,10 @@ PosixQuotaManager::PosixQuotaManager(const uint64_t limit,
   cleanup_recorder_.AddRecorder(20 * 60, 60 * 60 * 18);
   // last 4 days with hour resolution
   cleanup_recorder_.AddRecorder(60 * 60, 60 * 60 * 24 * 4);
-
-  lock_open_files_ = reinterpret_cast<pthread_mutex_t *>(
-      smalloc(sizeof(pthread_mutex_t)));
 }
 
 
 PosixQuotaManager::~PosixQuotaManager() {
-  free(lock_open_files_);
-
   if (!initialized_)
     return;
 
@@ -2374,13 +2369,10 @@ std::vector<shash::Short> PosixQuotaManager::CollectAllOpenHashes() {
   };
 
   for (size_t i = 0; i < mountpoints_.size(); ++i) {
-    handlers.push_back(
-        new CollectorHandler{open_files_, mountpoints_, lock_open_files_, i});
+    handlers.push_back(new CollectorHandler{open_files_, mountpoints_,
+                                            lock_open_files_->Get(), i});
     threads.push_back(new pthread_t);
   }
-
-  const int retval = pthread_mutex_init(lock_open_files_, NULL);
-  assert(retval == 0);
 
   for (size_t i = 0; i < mountpoints_.size(); ++i) {
     pthread_create(threads[i], nullptr, CollectMountpointsHashes, handlers[i]);
@@ -2412,8 +2404,6 @@ std::vector<shash::Short> PosixQuotaManager::CollectAllOpenHashes() {
   for (size_t i = 0; i < handlers.size(); ++i) {
     delete handlers[i];
   }
-
-  pthread_mutex_destroy(lock_open_files_);
 #endif
   return open_files_;
 }
