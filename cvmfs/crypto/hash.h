@@ -484,6 +484,48 @@ struct CVMFS_EXPORT Short : public Digest<kShortDigestSize, kAny> {
     memcpy(digest, full.digest, kShortDigestSize);
   }
 
+  /**
+   * Parses the string form produced by ToString(): the lower-case hex digits
+   * of the shortened prefix followed by the algorithm identifier, which is
+   * empty for SHA-1 (MD5 is never used for content hashes).  Anything else
+   * yields a null hash with algorithm kAny, in line with MkFromHexPtr().
+   * Bytes beyond the prefix are zero; all comparisons of Short only look at
+   * the prefix.
+   */
+  explicit Short(const HexPtr hex) : Digest<kShortDigestSize, kAny>() {
+    digest_size_ = kShortDigestSize / 4;
+    hex_size_ = 2 * digest_size_;
+    const std::string &str = *hex.str;
+    const unsigned num_hex_digits = 2 * digest_size_;
+
+    Algorithms parsed_algorithm = kAny;
+    for (unsigned i = kSha1; i < kAny; ++i) {
+      const Algorithms candidate = static_cast<Algorithms>(i);
+      if ((str.length() == num_hex_digits + kAlgorithmIdSizes[candidate])
+          && (str.compare(num_hex_digits, std::string::npos,
+                          kAlgorithmIds[candidate])
+              == 0)) {
+        parsed_algorithm = candidate;
+        break;
+      }
+    }
+    if (parsed_algorithm == kAny)
+      return;
+    for (unsigned i = 0; i < num_hex_digits; ++i) {
+      const char c = str[i];
+      if (!(((c >= '0') && (c <= '9')) || ((c >= 'a') && (c <= 'f'))))
+        return;
+    }
+
+    algorithm = parsed_algorithm;
+    hex_size_ = num_hex_digits + kAlgorithmIdSizes[algorithm];
+    for (unsigned i = 0; i < num_hex_digits; i += 2) {
+      digest[i / 2] = (str[i] <= '9' ? str[i] - '0' : str[i] - 'a' + 10) * 16
+                      + (str[i + 1] <= '9' ? str[i + 1] - '0'
+                                           : str[i + 1] - 'a' + 10);
+    }
+  }
+
   bool operator==(const Short &other) const {
     if (this->algorithm != other.algorithm) {
       return false;
@@ -516,21 +558,27 @@ struct CVMFS_EXPORT Short : public Digest<kShortDigestSize, kAny> {
     return false;
   }
 
+  /**
+   * The hex digits of the shortened prefix followed by the algorithm
+   * identifier (e.g. "0123456789-rmd160").  Does not use Digest<>::Hex, which
+   * places the identifier after the full-length digest and would print further
+   * digest digits instead of it.
+   */
   std::string ToString(const bool with_suffix = false) const {
-    const Hex hex(this);
+    static const char hex_digits[] = "0123456789abcdef";
     const bool use_suffix = with_suffix && HasSuffix();
-    const unsigned string_length = hex_size_ + use_suffix;
-    std::string result(string_length, 0);
-
-    for (unsigned int i = 0; i < hex_size_; ++i) {
-      result[i] = hex[i];
+    std::string result;
+    result.reserve(hex_size_ + use_suffix);
+    for (unsigned i = 0; i < digest_size_; ++i) {
+      result.push_back(hex_digits[digest[i] / 16]);
+      result.push_back(hex_digits[digest[i] % 16]);
     }
-
+    result += kAlgorithmIds[algorithm];
     if (use_suffix) {
-      result[string_length - 1] = suffix;
+      result.push_back(suffix);
     }
 
-    assert(result.length() == string_length);
+    assert(result.length() == hex_size_ + use_suffix);
     return result;
   }
 

@@ -1308,6 +1308,62 @@ TEST(T_Shash, ShortHashOrdering) {
 }
 
 
+TEST(T_Shash, ShortHashRoundTrip) {
+  // The quota manager's hash collector parses what the list_open_hashes
+  // magic xattr prints: Short::ToString() -> Short(HexPtr)
+  Prng rng;
+  rng.InitSeed(42);
+  const shash::Algorithms algorithms[] = {shash::kSha1, shash::kRmd160,
+                                          shash::kShake128};
+  for (unsigned i = 0; i < 3; ++i) {
+    shash::Any full(algorithms[i]);
+    full.Randomize(&rng);
+    const shash::Short printed(full);
+    const std::string line = printed.ToString();
+    EXPECT_EQ(2 * (shash::kShortDigestSize / 4)
+                  + shash::kAlgorithmIdSizes[algorithms[i]],
+              line.length())
+        << line;
+    // the prefix digits of the full hash, then the algorithm identifier
+    EXPECT_EQ(full.ToString().substr(0, 2 * (shash::kShortDigestSize / 4)),
+              line.substr(0, 2 * (shash::kShortDigestSize / 4)));
+    EXPECT_EQ(std::string(shash::kAlgorithmIds[algorithms[i]]),
+              line.substr(2 * (shash::kShortDigestSize / 4)));
+
+    const shash::Short parsed((shash::HexPtr(line)));
+    EXPECT_EQ(algorithms[i], parsed.algorithm) << line;
+    EXPECT_TRUE(parsed.Collide(full)) << line;
+    EXPECT_TRUE(parsed == printed) << line;
+    EXPECT_EQ(line, parsed.ToString());
+
+    std::set<shash::Short> open_hashes;
+    open_hashes.insert(parsed);
+    EXPECT_TRUE(open_hashes.find(shash::Short(full)) != open_hashes.end())
+        << line;
+
+    // the full hash is not what the xattr prints
+    const shash::Short from_full((shash::HexPtr(full.ToString())));
+    EXPECT_EQ(shash::kAny, from_full.algorithm) << full.ToString();
+  }
+
+  // malformed input yields a null short hash
+  const char *malformed[] = {"",
+                             "012345678",         // too short
+                             "0123456789a",       // too long
+                             "0123456789ABCDEF",  // upper case
+                             "0123456789-sha1",   // unknown identifier
+                             "0123456789-rmd16",  // truncated identifier
+                             "012345678g",        // not hex
+                             "0123456789-shake128x"};
+  for (unsigned i = 0; i < sizeof(malformed) / sizeof(malformed[0]); ++i) {
+    const std::string line(malformed[i]);
+    const shash::Short parsed((shash::HexPtr(line)));
+    EXPECT_EQ(shash::kAny, parsed.algorithm) << "'" << line << "'";
+    EXPECT_TRUE(parsed.IsNull()) << "'" << line << "'";
+  }
+}
+
+
 TEST(T_Shash, ShortHashSetLookup) {
   Prng rng;
   rng.InitSeed(137);

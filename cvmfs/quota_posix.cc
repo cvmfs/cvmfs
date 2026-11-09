@@ -2355,8 +2355,15 @@ void *PosixQuotaManager::CollectMountpointsHashes(void *data) {
     pthread_exit(nullptr);
   }
   for (auto hash_str : hash_strs) {
-    handler->of.insert(
-        shash::Short(shash::MkFromHexPtr(shash::HexPtr(hash_str))));
+    // the lines carry short hashes as printed by shash::Short::ToString()
+    const shash::Short short_hash((shash::HexPtr(hash_str)));
+    if (short_hash.algorithm == shash::kAny) {
+      LogCvmfs(kLogQuota, kLogDebug,
+               "ignoring malformed open hash '%s' reported by %s",
+               hash_str.c_str(), mountpoint.c_str());
+      continue;
+    }
+    handler->of.insert(short_hash);
   }
 #endif
   pthread_exit(nullptr);

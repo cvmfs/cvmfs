@@ -723,9 +723,14 @@ TEST_F(T_QuotaManager, CollectorThreadWritesOnlyInItsEpoch) {
         ASSERT_EQ(0, pthread_join(thread, NULL));
       };
 
-  // fake a mounted repository: a directory carrying the magic xattr
-  const std::string hashes = "0123456789abcdef0123456789abcdef01234567\n"
-                             "fedcba9876543210fedcba9876543210fedcba98\n";
+  // fake a mounted repository: a directory carrying the magic xattr with
+  // two open files, in the short form the xattr uses
+  const shash::Any hash_a = shash::MkFromHexPtr(
+      shash::HexPtr("0123456789abcdef0123456789abcdef01234567"));
+  const shash::Any hash_b = shash::MkFromHexPtr(
+      shash::HexPtr("fedcba9876543210fedcba9876543210fedcba98"));
+  const std::string hashes = shash::Short(hash_a).ToString() + "\n"
+                             + shash::Short(hash_b).ToString() + "\n";
   if (setxattr(tmp_path_.c_str(), "user.list_open_hashes", hashes.data(),
                hashes.size(), 0)
       != 0) {
@@ -737,11 +742,14 @@ TEST_F(T_QuotaManager, CollectorThreadWritesOnlyInItsEpoch) {
   const std::vector<std::string> mountpoints(1, tmp_path_);
   const int epoch = 4711;
 
-  // the round is still open: results are accepted
+  // the round is still open: results are accepted and, as in DoCleanup,
+  // can be looked up with the full hash of an eviction candidate
   qm->lock_open_files_->set_epoch(epoch);
   run_collector(std::make_shared<PosixQuotaManager::CollectorHandler>(
       open_files, mountpoints, qm->lock_open_files_, 0, epoch));
   EXPECT_EQ(2u, open_files.size());
+  EXPECT_TRUE(open_files.find(shash::Short(hash_a)) != open_files.end());
+  EXPECT_TRUE(open_files.find(shash::Short(hash_b)) != open_files.end());
 
   // the round was closed (late collector, round moved on): results dropped
   open_files.clear();
