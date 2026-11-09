@@ -16,6 +16,7 @@
 #include "compression/compression.h"
 #include "crypto/hash.h"
 #include "directory_entry.h"
+#include "file_bundle.h"
 #include "json_document.h"
 #include "publish/repository.h"
 #include "sync_union.h"
@@ -381,8 +382,8 @@ bool SyncMediator::Commit(manifest::Manifest *manifest) {
 std::string SyncMediator::GetBundleTriggerPath(
   SharedPtr<SyncItem> bundle_spec_entry) const
 {
-  static const size_t nStrip = strlen(".cvmfsbundle-");
-  const std::string main_file_name = bundle_spec_entry->filename().substr(nStrip);
+  const std::string main_file_name =
+    bundle::TriggerName(bundle_spec_entry->filename());
   if (main_file_name.empty()) {
     PANIC(kLogStderr, "invalid empty bundle specification: %s",
           bundle_spec_entry->GetUnionPath().c_str());

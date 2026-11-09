@@ -14,6 +14,7 @@
 
 #include "catalog_balancer.h"
 #include "catalog_rw.h"
+#include "file_bundle.h"
 #include "manifest.h"
 #include "statistics.h"
 #include "upload.h"
@@ -238,8 +239,15 @@ void WritableCatalogManager::RemoveFile(const std::string &path) {
   DirectoryEntry entry;
   if (FindCatalog(file_path, &catalog, &entry)) {
     if (entry.IsBundleTrigger()) {
-      catalog->RemoveEntry(
-        GetParentPath(file_path) + "/.cvmfsbundle-" + GetFileName(file_path));
+      const string parent = GetParentPath(file_path) + "/";
+      const string specs[] = {
+          parent + bundle::SuffixedSpecName(GetFileName(file_path)),
+          parent + bundle::PlainSpecName(GetFileName(file_path))};
+      for (const string &spec : specs) {
+        DirectoryEntry spec_entry;
+        if (catalog->LookupPath(PathString(spec), &spec_entry))
+          catalog->RemoveEntry(spec);
+      }
     }
     catalog->RemoveEntry(file_path);
   }
@@ -614,6 +622,22 @@ void WritableCatalogManager::UpdateBundleTrigger(const std::string &file_path,
     SyncUnlock();
     PANIC(kLogStderr, "failed to set bundle trigger on non-regular file %s",
           file_path.c_str());
+  }
+
+  if (new_value) {
+    const string parent = GetParentPath(file_path) + "/";
+    const string trigger = GetFileName(file_path);
+    DirectoryEntry spec_entry;
+    if (catalog->LookupPath(
+            PathString(parent + bundle::SuffixedSpecName(trigger)), &spec_entry)
+        && catalog->LookupPath(
+            PathString(parent + bundle::PlainSpecName(trigger)), &spec_entry)) {
+      SyncUnlock();
+      PANIC(kLogStderr,
+            "conflicting bundle specifications for %s: both %s and %s exist",
+            file_path.c_str(), bundle::PlainSpecName(trigger).c_str(),
+            bundle::SuffixedSpecName(trigger).c_str());
+    }
   }
 
   entry.set_is_bundle_trigger(new_value);
