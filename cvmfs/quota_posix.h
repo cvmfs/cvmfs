@@ -40,6 +40,7 @@ class PosixQuotaManager : public QuotaManager {
   FRIEND_TEST(T_QuotaManager, MakeReturnPipe);
   FRIEND_TEST(T_QuotaManager, ReadPipeStringUsesExactLength);
   FRIEND_TEST(T_QuotaManager, RegisterMountpointUsesCorrectDescriptionBuffer);
+  FRIEND_TEST(T_QuotaManager, RegisterMountpointIgnoresDuplicates);
   FRIEND_TEST(T_QuotaManager, SetCleanupPolicyUsesCorrectDescriptionBuffer);
 
  public:

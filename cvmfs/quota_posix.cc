@@ -1410,7 +1410,14 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
       const std::string mountpoint(
           &description_buffer[num_commands * kMaxDescription],
           command_buffer[num_commands].desc_length);
-      quota_mgr->mountpoints_.push_back(mountpoint);
+      std::vector<std::string> &mps = quota_mgr->mountpoints_;
+      // Every client (re)initialization registers again, e.g. on reload
+      if (std::find(mps.begin(), mps.end(), mountpoint) != mps.end()) {
+        LogCvmfs(kLogQuota, kLogDebug, "Mountpoint %s already registered",
+                 mountpoint.c_str());
+        continue;
+      }
+      mps.push_back(mountpoint);
       LogCvmfs(kLogQuota, kLogDebug | kLogSyslog,
                "Mountpoint %s registered in the group", mountpoint.c_str());
       continue;

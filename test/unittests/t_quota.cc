@@ -598,6 +598,18 @@ TEST_F(T_QuotaManager, RegisterMountpointUsesCorrectDescriptionBuffer) {
 }
 
 
+TEST_F(T_QuotaManager, RegisterMountpointIgnoresDuplicates) {
+  quota_mgr_->RegisterMountpoint("/cvmfs/a");
+  quota_mgr_->RegisterMountpoint("/cvmfs/b");
+  quota_mgr_->RegisterMountpoint("/cvmfs/a");
+  quota_mgr_->List();  // synchronize with the quota manager thread
+
+  ASSERT_EQ(2U, quota_mgr_->mountpoints_.size());
+  EXPECT_EQ("/cvmfs/a", quota_mgr_->mountpoints_[0]);
+  EXPECT_EQ("/cvmfs/b", quota_mgr_->mountpoints_[1]);
+}
+
+
 TEST_F(T_QuotaManager, SetCleanupPolicyUsesCorrectDescriptionBuffer) {
   quota_mgr_->Insert(hashes_[0], 0, "regular");
   quota_mgr_->SetCleanupPolicy(true);
