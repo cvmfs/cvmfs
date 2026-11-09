@@ -2406,6 +2406,7 @@ std::vector<shash::Short> PosixQuotaManager::CollectAllOpenHashes() {
     ++i;
     i = i % handlers.size();
     clock_gettime(CLOCK_REALTIME, &current);
+    SafeSleepMs(10);
   }
 
   for (size_t i = 0; i < handlers.size(); ++i) {
@@ -2416,3 +2417,4 @@ std::vector<shash::Short> PosixQuotaManager::CollectAllOpenHashes() {
 #endif
   return open_files_;
 }
+
