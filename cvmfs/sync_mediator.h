@@ -304,9 +304,10 @@ class SyncMediator : public virtual AbstractSyncMediator {
   HardlinkGroupMapStack hardlink_stack_;
 
   /**
-   * Files that trigger preloading a file bundle have a .cvmfsbundle-<filename>
-   * bundle specification file. We don't know in which order we encounter the
-   * main file and the bundle specification file. So we pick up all the bundle
+   * Files that trigger preloading a file bundle have a
+   * .cvmfsbundle-<filename>[.cvmfsbundle] bundle specification file. We don't
+   * know in which order we encounter the main file and the bundle
+   * specification file. So we pick up all the bundle
    * specifications first and compare them to the present files at the end of
    * the transaction.
    */
