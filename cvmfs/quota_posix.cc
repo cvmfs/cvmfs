@@ -514,6 +514,10 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
   int64_t max_acseq = -1;
   std::vector<EvictCandidate> lru_ordered_open;
 
+  open_files_.clear();
+  open_files_ = (cleanup_unused_first_) ? CollectAllOpenHashes()
+                                        : std::vector<shash::Short>();
+
   do {
     sqlite3_reset(stmt_lru_);
     sqlite3_bind_int64(stmt_lru_, 1,
@@ -541,10 +545,6 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
     }
 
     const unsigned N = candidates.size();
-
-    open_files_.clear();
-    open_files_ = (cleanup_unused_first_) ? CollectAllOpenHashes()
-                                          : std::vector<shash::Short>();
 
     for (i = 0; i < N; ++i) {
       // That's a critical condition.  We must not delete a not yet inserted
