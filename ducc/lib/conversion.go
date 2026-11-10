@@ -23,6 +23,7 @@ import (
 
 	dockerImage "github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
+	digest "github.com/opencontainers/go-digest"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -202,6 +203,30 @@ func createMultiarchAliasSymlinksWithLogger(logger *log.Entry, repo string) {
 	}
 }
 
+// imageDigestSymlinkPaths maps an OCI manifest digest to its lookup symlink
+// under .images and the corresponding unpacked directory under .flat.
+func imageDigestSymlinkPaths(manifestDigest, flatPath string) (string, string, error) {
+	d := digest.Digest(manifestDigest)
+	if err := d.Validate(); err != nil {
+		return "", "", fmt.Errorf("invalid image manifest digest %q: %w", manifestDigest, err)
+	}
+
+	algorithm, encoded := d.Algorithm().String(), d.Encoded()
+	if len(encoded) < 2 {
+		return "", "", fmt.Errorf("image manifest digest %q is too short", manifestDigest)
+	}
+	linkPath := filepath.Join(".images", algorithm+":"+encoded[:2], encoded[2:])
+	return linkPath, flatPath, nil
+}
+
+func createImageDigestSymlink(logger *log.Entry, repo, manifestDigest, flatPath string) error {
+	linkPath, targetPath, err := imageDigestSymlinkPaths(manifestDigest, flatPath)
+	if err != nil {
+		return err
+	}
+	return cvmfs.CreateSymlinkIntoCVMFSWithLogger(logger, repo, linkPath, targetPath)
+}
+
 // filterManifestList returns the subset of manifests to process.
 // If multiArch is true, all manifests are returned.
 // If multiArch is false, only the manifest matching the native architecture is returned.
@@ -236,6 +261,9 @@ func ConvertWishFlat(wish WishFriendly, multiArch bool) error {
 	if err := cvmfs.CreateCatalogIntoDir(wish.CvmfsRepo, ".flat"); err != nil {
 		l.LogE(err).Error("Error in creating catalog inside `.flat` directory")
 	}
+	if err := cvmfs.CreateCatalogIntoDir(wish.CvmfsRepo, ".images"); err != nil {
+		l.LogE(err).Error("Error in creating catalog inside `.images` directory")
+	}
 
 	for _, inputImage := range wish.ExpandedTagImagesFlat {
 		manifestList, err := inputImage.GetManifestList()
@@ -246,8 +274,18 @@ func ConvertWishFlat(wish WishFriendly, multiArch bool) error {
 			}
 			continue
 		}
+		manifestEntries := filterManifestList(manifestList, multiArch)
+		indexManifestEntry := 0
+		if multiArch {
+			for i, entry := range manifestEntries {
+				if entry.Platform.Architecture == runtime.GOARCH {
+					indexManifestEntry = i
+					break
+				}
+			}
+		}
 		var archPaths []string
-		for _, manifestEntry := range filterManifestList(manifestList, multiArch) {
+		for entryIndex, manifestEntry := range manifestEntries {
 			inputImage.Manifest = &(manifestEntry.Manifest)
 			nameWithArch := ""
 			if multiArch {
@@ -257,6 +295,8 @@ func ConvertWishFlat(wish WishFriendly, multiArch bool) error {
 				}
 			}
 			imageLogger := l.WithImage(imageNameWithPlatform(inputImage, manifestEntry))
+			indexImageDigest := manifestList.Digest
+			indexThisManifest := !multiArch || entryIndex == indexManifestEntry
 			publicSymlinkPath := inputImage.GetPublicSymlinkPathWithArch(nameWithArch)
 			completePubSymPath := filepath.Join("/", "cvmfs", wish.CvmfsRepo, publicSymlinkPath)
 			pubDirInfo, errPub := os.Stat(completePubSymPath)
@@ -293,6 +333,16 @@ func ConvertWishFlat(wish WishFriendly, multiArch bool) error {
 					// Reset stat results so we fall through to the overlay creation below
 					errPri = fmt.Errorf("flat image deleted (was incomplete)")
 					priDirInfo = nil
+				}
+			}
+			// The index entry is independent of the user-facing tag symlink. Keep
+			// it up to date whenever the flat image already exists.
+			if errPri == nil && indexThisManifest && indexImageDigest != "" {
+				if err := createImageDigestSymlink(imageLogger, wish.CvmfsRepo, indexImageDigest, singularityPrivatePath); err != nil {
+					imageLogger.WithField("error", err).Error("Error creating image digest symlink")
+					if firstError == nil {
+						firstError = err
+					}
 				}
 			}
 			// Check for a dangling public symlink (Lstat succeeds but Stat failed)
@@ -418,6 +468,14 @@ func ConvertWishFlat(wish WishFriendly, multiArch bool) error {
 				imageLogger.WithField("error", err).Error("Error in creating the flat overlay")
 				i.Error(err).Elapsed(t1).Send()
 				continue
+			}
+			if indexThisManifest && indexImageDigest != "" {
+				if err := createImageDigestSymlink(imageLogger, wish.CvmfsRepo, indexImageDigest, singularityPrivatePath); err != nil {
+					imageLogger.WithField("error", err).Error("Error creating image digest symlink")
+					if firstError == nil {
+						firstError = err
+					}
+				}
 			}
 			// we create the public link
 

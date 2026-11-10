@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -9,7 +10,45 @@ import (
 	"time"
 
 	da "github.com/cvmfs/ducc/docker-api"
+	digest "github.com/opencontainers/go-digest"
 )
+
+func TestImagetoolsDigestPrefersContainerConfigDigest(t *testing.T) {
+	got := imagetoolsDigest([]byte(`{"container_config":{"digest":"sha256:config"},"manifest":{"digest":"sha256:manifest"}}`))
+	if got != "sha256:config" {
+		t.Fatalf("expected container config digest, got %q", got)
+	}
+}
+
+func TestImagetoolsDigestFallsBackToManifestDigest(t *testing.T) {
+	got := imagetoolsDigest([]byte(`{"manifest":{"digest":"sha256:manifest"}}`))
+	if got != "sha256:manifest" {
+		t.Fatalf("expected manifest digest, got %q", got)
+	}
+}
+
+func TestImagetoolsDigestUsesRawRegistryManifestDigest(t *testing.T) {
+	rawManifest := []byte(`{"schemaVersion":2,"mediaType":"application/vnd.oci.image.index.v1+json","manifests":[]}`)
+	want := digest.FromBytes(rawManifest).String()
+	if got := imagetoolsDigest(rawManifest); got != want {
+		t.Fatalf("expected digest of raw manifest %q, got %q", want, got)
+	}
+}
+
+func TestManifestListCarriesTopLevelDigestOutsideJSON(t *testing.T) {
+	manifestList := da.ManifestList{Digest: "sha256:" + strings.Repeat("a", 64)}
+	data, err := json.Marshal(manifestList)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoded da.ManifestList
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if decoded.Digest != "" {
+		t.Fatalf("internal digest leaked into manifest JSON: %q", decoded.Digest)
+	}
+}
 
 func TestParseTags(t *testing.T) {
 	imageString := "https://registry.hub.docker.com/library/redis:*"

@@ -20,6 +20,7 @@ import (
 
 	"github.com/aoliveti/curling"
 	"github.com/olekukonko/tablewriter"
+	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	log "github.com/sirupsen/logrus"
 
@@ -311,6 +312,7 @@ func (img *Image) FetchManifestList2() (*da.ManifestList, error) {
 	if reflect.DeepEqual(da.ManifestList{}, manifestList) {
 		return nil, fmt.Errorf("got empty manifest list")
 	}
+	manifestList.Digest = imagetoolsDigest(bytes1)
 
 	manifestsFiltered, manifestReference, err := selectIndexEntries(manifestList.Manifests)
 	if err != nil {
@@ -460,6 +462,7 @@ func (img *Image) GetManifestList() (da.ManifestList, error) {
 	} else if err == nil {
 		var placeholderitem da.ManifestListItem
 		placeholderitem.Manifest = *manifest
+		manifestList.Digest = imagetoolsDigest(img.rawManifestBytes)
 		placeholderitem.Platform.Architecture = "" //for images without manifestlist, assume amd64 arch
 		manifestList.Manifests = append(manifestList.Manifests, placeholderitem)
 		manifestList.MediaType = "SingleManifest"
@@ -467,6 +470,31 @@ func (img *Image) GetManifestList() (da.ManifestList, error) {
 	}
 
 	return manifestList, nil
+}
+
+// imagetoolsDigest returns the digest selected by
+// `buildx imagetools inspect --format '{{json .}}' | jq -r
+// '.container_config.digest // .manifest.digest'`. When receiving a registry
+// manifest directly, the equivalent .manifest.digest is the digest of those
+// exact bytes. container_config is supported for wrapped metadata responses.
+func imagetoolsDigest(rawManifest []byte) string {
+	var metadata struct {
+		ContainerConfig struct {
+			Digest string `json:"digest"`
+		} `json:"container_config"`
+		Manifest struct {
+			Digest string `json:"digest"`
+		} `json:"manifest"`
+	}
+	if err := json.Unmarshal(rawManifest, &metadata); err == nil {
+		if metadata.ContainerConfig.Digest != "" {
+			return metadata.ContainerConfig.Digest
+		}
+		if metadata.Manifest.Digest != "" {
+			return metadata.Manifest.Digest
+		}
+	}
+	return digest.FromBytes(rawManifest).String()
 }
 
 func (img *Image) GetManifest() (da.Manifest, error) {
