@@ -55,9 +55,9 @@
 #include "util/concurrency.h"
 #include "util/exception.h"
 #include "util/logging.h"
+#include "util/platform.h"
 #include "util/pointer.h"
 #include "util/posix.h"
-#include "util/smalloc.h"
 #include "util/string.h"
 
 using namespace std;  // NOLINT
@@ -512,6 +512,10 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
   int64_t max_acseq = -1;
   std::vector<EvictCandidate> lru_ordered_open;
 
+  open_files_.clear();
+  open_files_ = (cleanup_unused_first_) ? CollectAllOpenHashes()
+                                        : std::set<shash::Short>();
+
   do {
     sqlite3_reset(stmt_lru_);
     sqlite3_bind_int64(stmt_lru_, 1,
@@ -540,10 +544,6 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
 
     const unsigned N = candidates.size();
 
-    open_files_.clear();
-    open_files_ = (cleanup_unused_first_) ? CollectAllOpenHashes()
-                                          : std::vector<shash::Short>();
-
     for (i = 0; i < N; ++i) {
       // That's a critical condition.  We must not delete a not yet inserted
       // pinned file as it is already reserved (but will be inserted later).
@@ -551,23 +551,12 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
       const bool is_pinned = pinned_chunks_.find(candidates[i].hash)
                              != pinned_chunks_.end();
 
-      // Avoid evicting open files hopping there are enough more recently used
-      // files to satisfy the cleanup request
-      /*
-            const bool is_open = std::find_if(
-                                     open_files_.begin(), open_files_.end(),
-                                     [&candidates, &i](const auto &elem) -> bool
-         { return elem.Collide(candidates[i].hash);
-                                     })
-                                 != open_files_.end();
-      */
-      bool is_open = false;
-      for (auto it = open_files_.begin(); it != open_files_.end(); ++it) {
-        if (it->Collide(candidates[i].hash)) {
-          is_open = true;
-          break;
-        }
-      }
+      // Avoid evicting open files hoping there are enough more recently used
+      // files to satisfy the cleanup request.  Short hashes are ordered by
+      // their prefix, so the lookup finds the entry colliding with the
+      // candidate's full hash.
+      const bool is_open = open_files_.find(shash::Short(candidates[i].hash))
+                           != open_files_.end();
 
       if (is_pinned) {
         SkipEviction(candidates[i]);
@@ -1399,11 +1388,16 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
 
     // Register a new mountpoint
     if (command_type == kRegisterMountpoint) {
-      const std::string mountpoint(&description_buffer[num_commands*kMaxDescription],
-                             command_buffer[num_commands].desc_length);
-      quota_mgr->mountpoints_.push_back(mountpoint);
-      LogCvmfs(kLogQuota, kLogDebug | kLogSyslog,
-               "Mountpoint %s registered in the group", mountpoint.c_str());
+      const std::string mountpoint(
+          &description_buffer[num_commands * kMaxDescription],
+          command_buffer[num_commands].desc_length);
+      if (quota_mgr->mountpoints_.insert(mountpoint).second) {
+        LogCvmfs(kLogQuota, kLogDebug | kLogSyslog,
+                 "Mountpoint %s registered in the group", mountpoint.c_str());
+      } else {
+        LogCvmfs(kLogQuota, kLogDebug, "Mountpoint %s already registered",
+                 mountpoint.c_str());
+      }
       continue;
     }
 
@@ -1439,7 +1433,7 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
       if (return_pipe < 0)
         continue;
 
-      std::vector<shash::Short> gh = quota_mgr->CollectAllOpenHashes();
+      const std::set<shash::Short> gh = quota_mgr->CollectAllOpenHashes();
       std::string result;
       for (auto it = gh.begin(); it != gh.end(); ++it) {
         result += (*it).ToString() + "\n";
@@ -1897,6 +1891,7 @@ PosixQuotaManager::PosixQuotaManager(const uint64_t limit,
     , fd_lock_cachedb_(-1)
     , async_delete_(true)
     , cachemgr_pid_(0)
+    , cleanup_unused_first_(false)
     , database_(NULL)
     , stmt_touch_(NULL)
     , stmt_unpin_(NULL)
@@ -1912,7 +1907,7 @@ PosixQuotaManager::PosixQuotaManager(const uint64_t limit,
     , stmt_list_catalogs_(NULL)
     , stmt_list_volatile_(NULL)
     , initialized_(false)
-    , cleanup_unused_first_(false) {
+    , lock_open_files_(std::make_shared<OpenHashesLock>()) {
   ParseDirectories(cache_workspace, &cache_dir_, &workspace_dir_);
   pipe_lru_[0] = pipe_lru_[1] = -1;
   cleanup_recorder_.AddRecorder(1, 90);  // last 1.5 min with second resolution
@@ -1922,15 +1917,10 @@ PosixQuotaManager::PosixQuotaManager(const uint64_t limit,
   cleanup_recorder_.AddRecorder(20 * 60, 60 * 60 * 18);
   // last 4 days with hour resolution
   cleanup_recorder_.AddRecorder(60 * 60, 60 * 60 * 24 * 4);
-
-  lock_open_files_ = reinterpret_cast<pthread_mutex_t *>(
-      smalloc(sizeof(pthread_mutex_t)));
 }
 
 
 PosixQuotaManager::~PosixQuotaManager() {
-  free(lock_open_files_);
-
   if (!initialized_)
     return;
 
@@ -2318,18 +2308,29 @@ void PosixQuotaManager::ManagedReadHalfPipe(int fd, void *buf, size_t nbyte) {
 void *PosixQuotaManager::CollectMountpointsHashes(void *data) {
 #ifndef __APPLE__
   pthread_setname_np(pthread_self(), "hash_collector");
-  auto *handler = static_cast<CollectorHandler *>(data);
+  // Take over the reference that CollectAllOpenHashes() created for this
+  // thread; it is released when the thread returns.
+  std::shared_ptr<CollectorHandler>
+      *thread_ref = static_cast<std::shared_ptr<CollectorHandler> *>(data);
+  const std::shared_ptr<CollectorHandler> handler(*thread_ref);
+  delete thread_ref;
 
-  const std::string mountpoint = handler->mp[handler->i];
+  const std::string mountpoint = handler->mp;
   ssize_t n = getxattr(mountpoint.c_str(), "user.list_open_hashes", nullptr, 0);
   if (n < 0) {
-    pthread_exit(nullptr);
+    LogCvmfs(kLogQuota, kLogDebug | kLogSyslogWarn,
+             "hash collector for %s failed to query the open hashes (%s)",
+             mountpoint.c_str(), strerror(errno));
+    return nullptr;
   }
   std::vector<char> buf((size_t)n);
   n = getxattr(mountpoint.c_str(), "user.list_open_hashes", buf.data(),
                buf.size());
   if (n < 0) {
-    pthread_exit(nullptr);
+    LogCvmfs(kLogQuota, kLogDebug | kLogSyslogWarn,
+             "hash collector for %s failed to read the open hashes (%s)",
+             mountpoint.c_str(), strerror(errno));
+    return nullptr;
   }
 
   std::vector<std::string> hash_strs;
@@ -2342,64 +2343,106 @@ void *PosixQuotaManager::CollectMountpointsHashes(void *data) {
       hash_str += c;
     }
   }
-  const MutexLockGuard lock_guard(handler->l);
-  for (auto hash_str : hash_strs) {
-    handler->of.push_back(
-        shash::Short(shash::MkFromHexPtr(shash::HexPtr(hash_str))));
+  const MutexLockGuard lock_guard(handler->l->Get());
+  if (handler->l->epoch() != handler->epoch) {
+    // the round this collector was started for is over, don't touch the
+    // result set that the quota manager has moved on with
+    LogCvmfs(kLogQuota, kLogDebug | kLogSyslogWarn,
+             "hash collector for %s finished late, dropping %lu hashes",
+             mountpoint.c_str(), hash_strs.size());
+    return nullptr;
   }
+  size_t num_malformed = 0;
+  for (auto hash_str : hash_strs) {
+    // the lines carry short hashes as printed by shash::Short::ToString()
+    const shash::Short short_hash((shash::HexPtr(hash_str)));
+    if (short_hash.algorithm == shash::kAny) {
+      LogCvmfs(kLogQuota, kLogDebug,
+               "ignoring malformed open hash '%s' reported by %s",
+               hash_str.c_str(), mountpoint.c_str());
+      num_malformed++;
+      continue;
+    }
+    handler->of.insert(short_hash);
+  }
+  LogCvmfs(kLogQuota, kLogDebug,
+           "hash collector for %s collected %lu open hashes (%lu malformed)",
+           mountpoint.c_str(), hash_strs.size() - num_malformed, num_malformed);
 #endif
-  pthread_exit(nullptr);
+  return nullptr;
 }
 
-std::vector<shash::Short> PosixQuotaManager::CollectAllOpenHashes() {
-  std::vector<CollectorHandler *> handlers;
-  std::vector<pthread_t *> threads;
+std::set<shash::Short> PosixQuotaManager::CollectAllOpenHashes() {
   open_files_.clear();
 #ifndef __APPLE__
-  auto &&a_after_b = [](const struct timespec a, const struct timespec b) {
-    return (a.tv_sec > b.tv_sec) ? true : false;
-  };
+  std::vector<std::shared_ptr<CollectorHandler> > handlers;
+  std::vector<pthread_t> threads(mountpoints_.size());
+  std::vector<bool> joined(mountpoints_.size(), false);
 
-  for (size_t i = 0; i < mountpoints_.size(); ++i) {
-    handlers.push_back(
-        new CollectorHandler{open_files_, mountpoints_, lock_open_files_, i});
-    threads.push_back(new pthread_t);
-  }
+  // The collectors of this round belong to the current epoch.  Late
+  // collectors of previous rounds cannot match it: closing a round on them
+  // moved the epoch on.  Nobody else writes the epoch, so no lock is needed
+  // to read it here.
+  const uint64_t epoch = lock_open_files_->epoch();
 
-  const int retval = pthread_mutex_init(lock_open_files_, NULL);
-  assert(retval == 0);
-
-  for (size_t i = 0; i < mountpoints_.size(); ++i) {
-    pthread_create(threads[i], nullptr, CollectMountpointsHashes, handlers[i]);
-  }
-
-  std::vector<bool> joined(handlers.size(), false);
-  struct timespec reference, current;
-  clock_gettime(CLOCK_REALTIME, &reference);
-  clock_gettime(CLOCK_REALTIME, &current);
-  reference.tv_sec += 10;  // Give 10sec for hash collection
-  size_t i = 0;
-  while (
-      (not std::all_of(joined.begin(), joined.end(), [](bool b) { return b; }))
-      and a_after_b(reference, current)) {
-    // as long as there are still threads that haven't joined yet
-    // and for 10 seconds
-    if (not joined[i]) {
-      const int s = pthread_tryjoin_np(*threads[i], NULL);
-      if (s == 0) {
-        joined[i] = true;
-      }
-    }
-    ++i;
-    i = i % handlers.size();
-    clock_gettime(CLOCK_REALTIME, &current);
+  for (auto it = mountpoints_.begin(); it != mountpoints_.end(); ++it) {
+    // each handler gets its own reference to the lock
+    handlers.push_back(std::make_shared<CollectorHandler>(
+        open_files_, *it, lock_open_files_, epoch));
   }
 
   for (size_t i = 0; i < handlers.size(); ++i) {
-    delete handlers[i];
+    // The thread gets its own reference to the handler and releases it when
+    // it is done.  pthread_create() only takes a raw pointer, hence the
+    // heap-allocated shared_ptr.
+    std::shared_ptr<CollectorHandler>
+        *thread_ref = new std::shared_ptr<CollectorHandler>(handlers[i]);
+    const int retval = pthread_create(&threads[i], nullptr,
+                                      CollectMountpointsHashes, thread_ref);
+    if (retval != 0) {
+      LogCvmfs(kLogQuota, kLogDebug | kLogSyslogWarn,
+               "failed to start hash collector for %s (%d)",
+               handlers[i]->mp.c_str(), retval);
+      delete thread_ref;
+      joined[i] = true;  // nothing to wait for
+    }
   }
 
-  pthread_mutex_destroy(lock_open_files_);
+  // Give 10s for hash collection.  The monotonic clock is immune to wall
+  // clock steps, and the nanosecond deadline makes the budget exactly 10s
+  // instead of "until the wall clock enters the 10th second".
+  const uint64_t deadline = platform_monotonic_time_ns()
+                            + kCollectionTimeoutS * 1000000000ULL;
+  size_t remaining = std::count(joined.begin(), joined.end(), false);
+  while (remaining > 0 && (platform_monotonic_time_ns() < deadline)) {
+    // Sweep over all threads that haven't joined yet, then back off
+    for (size_t i = 0; i < threads.size(); ++i) {
+      if (not joined[i] && (pthread_tryjoin_np(threads[i], NULL) == 0)) {
+        joined[i] = true;
+        --remaining;
+      }
+    }
+    SafeSleepMs(10);
+  }
+
+  // Threads that did not finish in time keep running on their own reference
+  // of the handler.  Close the round by moving on to the next epoch so that
+  // they drop their results instead of writing into open_files_ behind our
+  // back, then detach them so that their resources are released on exit.
+  if (remaining > 0) {
+    {
+      const MutexLockGuard lock_guard(lock_open_files_->Get());
+      lock_open_files_->NextEpoch();
+    }
+    for (size_t i = 0; i < threads.size(); ++i) {
+      if (not joined[i]) {
+        LogCvmfs(kLogQuota, kLogDebug | kLogSyslogWarn,
+                 "hash collector for %s did not finish in time, ignoring it",
+                 handlers[i]->mp.c_str());
+        pthread_detach(threads[i]);
+      }
+    }
+  }
 #endif
   return open_files_;
 }

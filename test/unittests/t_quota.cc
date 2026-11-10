@@ -2,12 +2,17 @@
  * This file is part of the CernVM File System.
  */
 
+#include <errno.h>
 #include <gtest/gtest.h>
 #include <pthread.h>
 #include <signal.h>
+#include <sys/xattr.h>
 
 #include <algorithm>
+#include <memory>
+#include <set>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 #include "cache_posix.h"
@@ -17,6 +22,7 @@
 #include "testutil.h"
 #include "util/algorithm.h"
 #include "util/fs_traversal.h"
+#include "util/mutex.h"
 
 using namespace std;  // NOLINT
 
@@ -594,7 +600,22 @@ TEST_F(T_QuotaManager, RegisterMountpointUsesCorrectDescriptionBuffer) {
   quota_mgr_->List();  // synchronize with the quota manager thread
 
   ASSERT_EQ(1U, quota_mgr_->mountpoints_.size());
-  EXPECT_EQ("rightmountpoint", quota_mgr_->mountpoints_[0]);
+  EXPECT_EQ("rightmountpoint", *quota_mgr_->mountpoints_.begin());
+}
+
+
+TEST_F(T_QuotaManager, RegisterMountpointIgnoresDuplicates) {
+  // every client (re)initialization registers its mountpoint again
+  quota_mgr_->RegisterMountpoint("/cvmfs/a");
+  quota_mgr_->RegisterMountpoint("/cvmfs/b");
+  quota_mgr_->RegisterMountpoint("/cvmfs/a");
+  quota_mgr_->RegisterMountpoint("/cvmfs/b");
+  quota_mgr_->RegisterMountpoint("/cvmfs/a");
+  quota_mgr_->List();  // synchronize with the quota manager thread
+
+  ASSERT_EQ(2U, quota_mgr_->mountpoints_.size());
+  EXPECT_EQ(1U, quota_mgr_->mountpoints_.count("/cvmfs/a"));
+  EXPECT_EQ(1U, quota_mgr_->mountpoints_.count("/cvmfs/b"));
 }
 
 
@@ -613,3 +634,267 @@ TEST_F(T_QuotaManager, SetLimit) {
   EXPECT_EQ(100ul, limit);
 }
 
+
+//------------------------------------------------------------------------------
+
+
+TEST_F(T_QuotaManager, OpenHashesLockInitializedOnConstruction) {
+  ASSERT_TRUE(quota_mgr_not_spawned_->lock_open_files_ != nullptr);
+  EXPECT_EQ(1, quota_mgr_not_spawned_->lock_open_files_.use_count());
+
+  // the mutex is usable right after construction, no cleanup needed first
+  pthread_mutex_t *mutex = quota_mgr_not_spawned_->lock_open_files_->Get();
+  ASSERT_TRUE(mutex != nullptr);
+  EXPECT_EQ(0, pthread_mutex_trylock(mutex));
+  EXPECT_EQ(0, pthread_mutex_unlock(mutex));
+
+  // every quota manager owns its own lock
+  EXPECT_NE(quota_mgr_->lock_open_files_.get(),
+            quota_mgr_not_spawned_->lock_open_files_.get());
+}
+
+
+TEST_F(T_QuotaManager, CollectorHandlerSharesOpenHashesLock) {
+  PosixQuotaManager *qm = quota_mgr_not_spawned_;
+  ASSERT_EQ(1, qm->lock_open_files_.use_count());
+
+  // one handler per collector thread, each with its own reference
+  std::shared_ptr<PosixQuotaManager::CollectorHandler>
+      handler_a = std::make_shared<PosixQuotaManager::CollectorHandler>(
+          qm->open_files_, "/cvmfs/a", qm->lock_open_files_, 1);
+  std::shared_ptr<PosixQuotaManager::CollectorHandler>
+      handler_b = std::make_shared<PosixQuotaManager::CollectorHandler>(
+          qm->open_files_, "/cvmfs/b", qm->lock_open_files_, 1);
+  EXPECT_EQ(3, qm->lock_open_files_.use_count());
+  EXPECT_EQ(qm->lock_open_files_->Get(), handler_a->l->Get());
+  EXPECT_EQ(qm->lock_open_files_->Get(), handler_b->l->Get());
+
+  // a handler's reference survives the manager letting go of the lock
+  pthread_mutex_t *mutex = qm->lock_open_files_->Get();
+  qm->lock_open_files_.reset();
+  EXPECT_EQ(2, handler_a->l.use_count());
+  EXPECT_EQ(mutex, handler_a->l->Get());
+  EXPECT_EQ(0, pthread_mutex_trylock(handler_a->l->Get()));
+  EXPECT_EQ(0, pthread_mutex_unlock(handler_a->l->Get()));
+
+  handler_a.reset();
+  EXPECT_EQ(1, handler_b->l.use_count());
+  handler_b.reset();
+
+  // restore the manager's lock for the fixture's tear down
+  qm->lock_open_files_ = std::make_shared<OpenHashesLock>();
+}
+
+
+#ifndef __APPLE__
+TEST_F(T_QuotaManager, CollectorThreadReleasesHandlerReference) {
+  PosixQuotaManager *qm = quota_mgr_not_spawned_;
+
+  // a plain directory has no user.list_open_hashes xattr, so the collector
+  // thread gives up right after the first getxattr()
+  std::set<shash::Short> open_files;
+  std::shared_ptr<PosixQuotaManager::CollectorHandler>
+      handler = std::make_shared<PosixQuotaManager::CollectorHandler>(
+          open_files, tmp_path_, qm->lock_open_files_, 1);
+  EXPECT_EQ(1, handler.use_count());
+  EXPECT_EQ(2, qm->lock_open_files_.use_count());
+
+  // the thread's reference, as created by CollectAllOpenHashes()
+  std::shared_ptr<PosixQuotaManager::CollectorHandler>
+      *thread_ref = new std::shared_ptr<PosixQuotaManager::CollectorHandler>(
+          handler);
+  EXPECT_EQ(2, handler.use_count());
+
+  pthread_t thread;
+  ASSERT_EQ(0, pthread_create(&thread, NULL,
+                              PosixQuotaManager::CollectMountpointsHashes,
+                              thread_ref));
+  ASSERT_EQ(0, pthread_join(thread, NULL));
+
+  // the thread released its reference, the caller's one is left
+  EXPECT_EQ(1, handler.use_count());
+  EXPECT_EQ(2, qm->lock_open_files_.use_count());
+  EXPECT_TRUE(open_files.empty());
+
+  handler.reset();
+  EXPECT_EQ(1, qm->lock_open_files_.use_count());
+}
+
+
+TEST_F(T_QuotaManager, CollectorThreadWritesOnlyInItsEpoch) {
+  PosixQuotaManager *qm = quota_mgr_not_spawned_;
+
+  // runs one collector thread for the given handler and waits for it
+  auto run_collector =
+      [](const std::shared_ptr<PosixQuotaManager::CollectorHandler> &handler) {
+        std::shared_ptr<PosixQuotaManager::CollectorHandler>
+            *thread_ref = new std::shared_ptr<
+                PosixQuotaManager::CollectorHandler>(handler);
+        pthread_t thread;
+        ASSERT_EQ(0, pthread_create(&thread, NULL,
+                                    PosixQuotaManager::CollectMountpointsHashes,
+                                    thread_ref));
+        ASSERT_EQ(0, pthread_join(thread, NULL));
+      };
+
+  // fake a mounted repository: a directory carrying the magic xattr with
+  // two open files, in the short form the xattr uses
+  const shash::Any hash_a = shash::MkFromHexPtr(
+      shash::HexPtr("0123456789abcdef0123456789abcdef01234567"));
+  const shash::Any hash_b = shash::MkFromHexPtr(
+      shash::HexPtr("fedcba9876543210fedcba9876543210fedcba98"));
+  const std::string hashes = shash::Short(hash_a).ToString() + "\n"
+                             + shash::Short(hash_b).ToString() + "\n";
+  if (setxattr(tmp_path_.c_str(), "user.list_open_hashes", hashes.data(),
+               hashes.size(), 0)
+      != 0) {
+    printf("Warning: user xattrs not supported on %s, skipping test\n",
+           tmp_path_.c_str());
+    return;
+  }
+  std::set<shash::Short> open_files;
+
+  // the round is still open: results are accepted and, as in DoCleanup,
+  // can be looked up with the full hash of an eviction candidate
+  const uint64_t epoch = qm->lock_open_files_->epoch();
+  run_collector(std::make_shared<PosixQuotaManager::CollectorHandler>(
+      open_files, tmp_path_, qm->lock_open_files_, epoch));
+  EXPECT_EQ(2u, open_files.size());
+  EXPECT_TRUE(open_files.find(shash::Short(hash_a)) != open_files.end());
+  EXPECT_TRUE(open_files.find(shash::Short(hash_b)) != open_files.end());
+
+  // the round was closed on this late collector: results dropped
+  open_files.clear();
+  qm->lock_open_files_->NextEpoch();
+  run_collector(std::make_shared<PosixQuotaManager::CollectorHandler>(
+      open_files, tmp_path_, qm->lock_open_files_, epoch));
+  EXPECT_TRUE(open_files.empty());
+
+  // still dropped after further rounds were closed meanwhile
+  qm->lock_open_files_->NextEpoch();
+  run_collector(std::make_shared<PosixQuotaManager::CollectorHandler>(
+      open_files, tmp_path_, qm->lock_open_files_, epoch));
+  EXPECT_TRUE(open_files.empty());
+
+  // collectors of the current epoch are fine
+  run_collector(std::make_shared<PosixQuotaManager::CollectorHandler>(
+      open_files, tmp_path_, qm->lock_open_files_,
+      qm->lock_open_files_->epoch()));
+  EXPECT_EQ(2u, open_files.size());
+}
+
+
+TEST_F(T_QuotaManager, CollectAllOpenHashesKeepsEpochWithoutLateCollectors) {
+  PosixQuotaManager *qm = quota_mgr_not_spawned_;
+  ASSERT_TRUE(qm->mountpoints_.empty());
+  EXPECT_EQ(0u, qm->lock_open_files_->epoch());
+
+  // without mountpoints there are no collectors and hence no late ones to
+  // close a round on: the epoch stays where it is, round after round
+  EXPECT_TRUE(qm->CollectAllOpenHashes().empty());
+  EXPECT_EQ(0u, qm->lock_open_files_->epoch());
+  EXPECT_TRUE(qm->CollectAllOpenHashes().empty());
+  EXPECT_EQ(0u, qm->lock_open_files_->epoch());
+}
+#endif
+
+
+//------------------------------------------------------------------------------
+
+
+TEST(T_OpenHashesLock, NotCopyable) {
+  EXPECT_FALSE(std::is_copy_constructible<OpenHashesLock>::value);
+  EXPECT_FALSE(std::is_copy_assignable<OpenHashesLock>::value);
+}
+
+
+TEST(T_OpenHashesLock, Epoch) {
+  OpenHashesLock lock;
+  EXPECT_EQ(0u, lock.epoch());
+
+  // the epoch only ever moves forward, one step at a time
+  EXPECT_EQ(1u, lock.NextEpoch());
+  EXPECT_EQ(1u, lock.epoch());
+  EXPECT_EQ(2u, lock.NextEpoch());
+  EXPECT_EQ(2u, lock.epoch());
+}
+
+
+TEST(T_OpenHashesLock, LockUnlock) {
+  OpenHashesLock lock;
+  pthread_mutex_t *mutex = lock.Get();
+  ASSERT_TRUE(mutex != nullptr);
+  EXPECT_EQ(mutex, lock.Get());
+
+  EXPECT_EQ(0, pthread_mutex_trylock(mutex));
+  EXPECT_EQ(EBUSY, pthread_mutex_trylock(mutex));
+  EXPECT_EQ(0, pthread_mutex_unlock(mutex));
+  EXPECT_EQ(0, pthread_mutex_trylock(mutex));
+  EXPECT_EQ(0, pthread_mutex_unlock(mutex));
+}
+
+
+TEST(T_OpenHashesLock, WorksWithMutexLockGuard) {
+  OpenHashesLock lock;
+  {
+    const MutexLockGuard guard(lock.Get());
+    EXPECT_EQ(EBUSY, pthread_mutex_trylock(lock.Get()));
+  }
+  EXPECT_EQ(0, pthread_mutex_trylock(lock.Get()));
+  EXPECT_EQ(0, pthread_mutex_unlock(lock.Get()));
+}
+
+
+namespace {
+
+struct TryLockResult {
+  pthread_mutex_t *mutex;
+  int retval;
+};
+
+void *MainTryLock(void *data) {
+  TryLockResult *result = static_cast<TryLockResult *>(data);
+  result->retval = pthread_mutex_trylock(result->mutex);
+  if (result->retval == 0)
+    pthread_mutex_unlock(result->mutex);
+  return NULL;
+}
+
+int TryLockFromOtherThread(pthread_mutex_t *mutex) {
+  TryLockResult result = {mutex, -1};
+  pthread_t thread;
+  EXPECT_EQ(0, pthread_create(&thread, NULL, MainTryLock, &result));
+  EXPECT_EQ(0, pthread_join(thread, NULL));
+  return result.retval;
+}
+
+}  // anonymous namespace
+
+
+TEST(T_OpenHashesLock, ExcludesOtherThreads) {
+  OpenHashesLock lock;
+
+  EXPECT_EQ(0, pthread_mutex_lock(lock.Get()));
+  EXPECT_EQ(EBUSY, TryLockFromOtherThread(lock.Get()));
+  EXPECT_EQ(0, pthread_mutex_unlock(lock.Get()));
+  EXPECT_EQ(0, TryLockFromOtherThread(lock.Get()));
+}
+
+
+TEST(T_OpenHashesLock, SharedOwnershipOutlivesFirstOwner) {
+  std::shared_ptr<OpenHashesLock> owner = std::make_shared<OpenHashesLock>();
+  pthread_mutex_t *mutex = owner->Get();
+
+  // a second owner, as a collector thread would hold it
+  std::shared_ptr<OpenHashesLock> late_user = owner;
+  EXPECT_EQ(2, owner.use_count());
+
+  // the first owner lets go, e.g. the quota manager is destroyed
+  owner.reset();
+  EXPECT_EQ(1, late_user.use_count());
+
+  // the mutex is still the same and still usable for the remaining owner
+  EXPECT_EQ(mutex, late_user->Get());
+  EXPECT_EQ(0, pthread_mutex_trylock(late_user->Get()));
+  EXPECT_EQ(0, pthread_mutex_unlock(late_user->Get()));
+}
