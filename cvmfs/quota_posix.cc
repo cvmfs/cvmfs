@@ -2329,7 +2329,7 @@ void *PosixQuotaManager::CollectMountpointsHashes(void *data) {
     LogCvmfs(kLogQuota, kLogDebug | kLogSyslogWarn,
              "hash collector for %s failed to query the open hashes (%s)",
              mountpoint.c_str(), strerror(errno));
-    pthread_exit(nullptr);
+    return nullptr;
   }
   std::vector<char> buf((size_t)n);
   n = getxattr(mountpoint.c_str(), "user.list_open_hashes", buf.data(),
@@ -2338,7 +2338,7 @@ void *PosixQuotaManager::CollectMountpointsHashes(void *data) {
     LogCvmfs(kLogQuota, kLogDebug | kLogSyslogWarn,
              "hash collector for %s failed to read the open hashes (%s)",
              mountpoint.c_str(), strerror(errno));
-    pthread_exit(nullptr);
+    return nullptr;
   }
 
   std::vector<std::string> hash_strs;
@@ -2358,7 +2358,7 @@ void *PosixQuotaManager::CollectMountpointsHashes(void *data) {
     LogCvmfs(kLogQuota, kLogDebug | kLogSyslogWarn,
              "hash collector for %s finished late, dropping %lu hashes",
              mountpoint.c_str(), hash_strs.size());
-    pthread_exit(nullptr);
+    return nullptr;
   }
   size_t num_malformed = 0;
   for (auto hash_str : hash_strs) {
@@ -2377,7 +2377,7 @@ void *PosixQuotaManager::CollectMountpointsHashes(void *data) {
            "hash collector for %s collected %lu open hashes (%lu malformed)",
            mountpoint.c_str(), hash_strs.size() - num_malformed, num_malformed);
 #endif
-  pthread_exit(nullptr);
+  return nullptr;
 }
 
 std::set<shash::Short> PosixQuotaManager::CollectAllOpenHashes() {
