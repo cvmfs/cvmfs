@@ -2326,12 +2326,18 @@ void *PosixQuotaManager::CollectMountpointsHashes(void *data) {
   const std::string mountpoint = handler->mp[handler->i];
   ssize_t n = getxattr(mountpoint.c_str(), "user.list_open_hashes", nullptr, 0);
   if (n < 0) {
+    LogCvmfs(kLogQuota, kLogDebug | kLogSyslogWarn,
+             "hash collector for %s failed to query the open hashes (%s)",
+             mountpoint.c_str(), strerror(errno));
     pthread_exit(nullptr);
   }
   std::vector<char> buf((size_t)n);
   n = getxattr(mountpoint.c_str(), "user.list_open_hashes", buf.data(),
                buf.size());
   if (n < 0) {
+    LogCvmfs(kLogQuota, kLogDebug | kLogSyslogWarn,
+             "hash collector for %s failed to read the open hashes (%s)",
+             mountpoint.c_str(), strerror(errno));
     pthread_exit(nullptr);
   }
 
@@ -2349,11 +2355,12 @@ void *PosixQuotaManager::CollectMountpointsHashes(void *data) {
   if (handler->l->epoch() != handler->epoch) {
     // the round this collector was started for is over, don't touch the
     // result set that the quota manager has moved on with
-    LogCvmfs(kLogQuota, kLogDebug,
+    LogCvmfs(kLogQuota, kLogDebug | kLogSyslogWarn,
              "hash collector for %s finished late, dropping %lu hashes",
              mountpoint.c_str(), hash_strs.size());
     pthread_exit(nullptr);
   }
+  size_t num_malformed = 0;
   for (auto hash_str : hash_strs) {
     // the lines carry short hashes as printed by shash::Short::ToString()
     const shash::Short short_hash((shash::HexPtr(hash_str)));
@@ -2361,10 +2368,14 @@ void *PosixQuotaManager::CollectMountpointsHashes(void *data) {
       LogCvmfs(kLogQuota, kLogDebug,
                "ignoring malformed open hash '%s' reported by %s",
                hash_str.c_str(), mountpoint.c_str());
+      num_malformed++;
       continue;
     }
     handler->of.insert(short_hash);
   }
+  LogCvmfs(kLogQuota, kLogDebug,
+           "hash collector for %s collected %lu open hashes (%lu malformed)",
+           mountpoint.c_str(), hash_strs.size() - num_malformed, num_malformed);
 #endif
   pthread_exit(nullptr);
 }
