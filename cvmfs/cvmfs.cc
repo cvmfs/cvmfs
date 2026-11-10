@@ -1601,9 +1601,9 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
   }
 #endif
 
-  // Get data chunk (<=128k guaranteed by Fuse, but FSKit worker threads have
-  // small stacks so alloca can overflow; use heap allocation instead)
-#ifdef USE_MACFUSE_FSKIT
+  // Requests can exceed 128k with fuse3 max_pages; FSKit and musl worker
+  // threads (128k default stack) would overflow on alloca, so use the heap
+#if defined(USE_MACFUSE_FSKIT) || !defined(__GLIBC__)
   std::vector<char> data_buf(size);
   char *data = data_buf.data();
 #else
