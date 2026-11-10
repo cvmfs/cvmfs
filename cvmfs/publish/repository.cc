@@ -140,8 +140,31 @@ void Repository::DownloadRootObjects(const std::string &url,
   whitelist_ = new whitelist::Whitelist(fqrn, download_mgr_, signature_mgr_);
   const whitelist::Failures rv_whitelist = whitelist_->LoadUrl(url);
   if (whitelist_->status() != whitelist::Whitelist::kStAvailable) {
-    throw EPublish(std::string("cannot load whitelist [")
-                   + whitelist::Code2Ascii(rv_whitelist) + "]");
+    if (rv_whitelist == whitelist::kFailExpired) {
+      const std::string msg = "repository whitelist of " + fqrn
+                              + " is expired, renew it with "
+                                "'cvmfs_server resign "
+                              + fqrn + "'";
+      throw EPublish(msg, EPublish::kFailWhitelistExpired);
+    }
+    std::string hint;
+    switch (rv_whitelist) {
+      case whitelist::kFailLoad:
+      case whitelist::kFailEmpty:
+        hint = "check that " + url + "/.cvmfswhitelist is reachable";
+        break;
+      case whitelist::kFailBadSignature:
+      case whitelist::kFailBadSignaturePkcs7:
+        hint = "check that the public key(s) in "
+               + settings_.keychain().keychain_dir()
+               + " match the repository master key";
+        break;
+      default:
+        hint = "check the repository status with 'cvmfs_server list'";
+    }
+    throw EPublish(std::string("cannot load whitelist of ") + fqrn + " ["
+                       + whitelist::Code2Ascii(rv_whitelist) + "], " + hint,
+                   EPublish::kFailWhitelistInvalid);
   }
 
   manifest::ManifestEnsemble ensemble;
