@@ -12,7 +12,10 @@
 #include "monitor.h"
 
 #include <errno.h>
+#if defined(__GLIBC__) || defined(__APPLE__)
 #include <execinfo.h>
+#define CVMFS_HAVE_EXECINFO
+#endif
 #include <fcntl.h>
 #include <poll.h>
 #include <pthread.h>
@@ -347,6 +350,7 @@ void Watchdog::SendTrace(int sig, siginfo_t *siginfo, void *context) {
 #if defined(CVMFS_FUSE_MODULE)
       LogCvmfs(kLogCvmfs, kLogSyslogErr, "Signal %d, errno %d", sig,
                send_errno);
+#ifdef CVMFS_HAVE_EXECINFO
       void *addr[kMaxBacktrace];
       // Note: this doesn't work due to the signal stack on OS X (it works on
       // Linux).  Since anyway lldb is supposed to produce the backtrace, we
@@ -358,6 +362,7 @@ void Watchdog::SendTrace(int sig, siginfo_t *siginfo, void *context) {
       for (int i = 0; i < num_addr; ++i)
         backtrace += string(symbols[i]) + "\n";
       LogCvmfs(kLogCvmfs, kLogSyslogErr, "%s", backtrace.c_str());
+#endif
       LogCvmfs(kLogCvmfs, kLogSyslogErr, "address of g_cvmfs_exports: %p",
                &g_cvmfs_exports);
 #endif
