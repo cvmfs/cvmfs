@@ -86,6 +86,7 @@ class PosixQuotaManager : public QuotaManager {
               CollectAllOpenHashesKeepsEpochWithoutLateCollectors);
   FRIEND_TEST(T_QuotaManager, ReadPipeStringUsesExactLength);
   FRIEND_TEST(T_QuotaManager, RegisterMountpointUsesCorrectDescriptionBuffer);
+  FRIEND_TEST(T_QuotaManager, RegisterMountpointIgnoresDuplicates);
   FRIEND_TEST(T_QuotaManager, SetCleanupPolicyUsesCorrectDescriptionBuffer);
 
  public:
@@ -455,11 +456,12 @@ class PosixQuotaManager : public QuotaManager {
    */
   std::set<shash::Short> open_files_;
 
-  /*
-   * Used during the collection of open hashes. Holds all the
-   * mountpoints of the shared Cache Manager.
+  /**
+   * Used during the collection of open hashes. Holds all the mountpoints of
+   * the shared Cache Manager.  A set because every client (re)initialization
+   * registers its mountpoint again, e.g. on reload.
    */
-  std::vector<std::string> mountpoints_;
+  std::set<std::string> mountpoints_;
 
   std::set<shash::Short> CollectAllOpenHashes();
 

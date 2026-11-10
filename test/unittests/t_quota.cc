@@ -600,7 +600,22 @@ TEST_F(T_QuotaManager, RegisterMountpointUsesCorrectDescriptionBuffer) {
   quota_mgr_->List();  // synchronize with the quota manager thread
 
   ASSERT_EQ(1U, quota_mgr_->mountpoints_.size());
-  EXPECT_EQ("rightmountpoint", quota_mgr_->mountpoints_[0]);
+  EXPECT_EQ("rightmountpoint", *quota_mgr_->mountpoints_.begin());
+}
+
+
+TEST_F(T_QuotaManager, RegisterMountpointIgnoresDuplicates) {
+  // every client (re)initialization registers its mountpoint again
+  quota_mgr_->RegisterMountpoint("/cvmfs/a");
+  quota_mgr_->RegisterMountpoint("/cvmfs/b");
+  quota_mgr_->RegisterMountpoint("/cvmfs/a");
+  quota_mgr_->RegisterMountpoint("/cvmfs/b");
+  quota_mgr_->RegisterMountpoint("/cvmfs/a");
+  quota_mgr_->List();  // synchronize with the quota manager thread
+
+  ASSERT_EQ(2U, quota_mgr_->mountpoints_.size());
+  EXPECT_EQ(1U, quota_mgr_->mountpoints_.count("/cvmfs/a"));
+  EXPECT_EQ(1U, quota_mgr_->mountpoints_.count("/cvmfs/b"));
 }
 
 

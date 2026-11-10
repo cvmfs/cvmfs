@@ -1399,9 +1399,13 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
       const std::string mountpoint(
           &description_buffer[num_commands * kMaxDescription],
           command_buffer[num_commands].desc_length);
-      quota_mgr->mountpoints_.push_back(mountpoint);
-      LogCvmfs(kLogQuota, kLogDebug | kLogSyslog,
-               "Mountpoint %s registered in the group", mountpoint.c_str());
+      if (quota_mgr->mountpoints_.insert(mountpoint).second) {
+        LogCvmfs(kLogQuota, kLogDebug | kLogSyslog,
+                 "Mountpoint %s registered in the group", mountpoint.c_str());
+      } else {
+        LogCvmfs(kLogQuota, kLogDebug, "Mountpoint %s already registered",
+                 mountpoint.c_str());
+      }
       continue;
     }
 
@@ -2393,13 +2397,13 @@ std::set<shash::Short> PosixQuotaManager::CollectAllOpenHashes() {
   // to read it here.
   const uint64_t epoch = lock_open_files_->epoch();
 
-  for (size_t i = 0; i < mountpoints_.size(); ++i) {
+  for (auto it = mountpoints_.begin(); it != mountpoints_.end(); ++it) {
     // each handler gets its own reference to the lock
     handlers.push_back(std::make_shared<CollectorHandler>(
-        open_files_, mountpoints_[i], lock_open_files_, epoch));
+        open_files_, *it, lock_open_files_, epoch));
   }
 
-  for (size_t i = 0; i < mountpoints_.size(); ++i) {
+  for (size_t i = 0; i < handlers.size(); ++i) {
     // The thread gets its own reference to the handler and releases it when
     // it is done.  pthread_create() only takes a raw pointer, hence the
     // heap-allocated shared_ptr.
@@ -2410,7 +2414,7 @@ std::set<shash::Short> PosixQuotaManager::CollectAllOpenHashes() {
     if (retval != 0) {
       LogCvmfs(kLogQuota, kLogDebug | kLogSyslogWarn,
                "failed to start hash collector for %s (%d)",
-               mountpoints_[i].c_str(), retval);
+               handlers[i]->mp.c_str(), retval);
       delete thread_ref;
       joined[i] = true;  // nothing to wait for
     }
@@ -2446,7 +2450,7 @@ std::set<shash::Short> PosixQuotaManager::CollectAllOpenHashes() {
       if (not joined[i]) {
         LogCvmfs(kLogQuota, kLogDebug | kLogSyslogWarn,
                  "hash collector for %s did not finish in time, ignoring it",
-                 mountpoints_[i].c_str());
+                 handlers[i]->mp.c_str());
         pthread_detach(threads[i]);
       }
     }
