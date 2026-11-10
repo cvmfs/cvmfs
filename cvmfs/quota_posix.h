@@ -471,20 +471,14 @@ class PosixQuotaManager : public QuotaManager {
    */
   struct CollectorHandler {
     CollectorHandler(std::set<shash::Short> &open_files,
-                     const std::vector<std::string> &mountpoints,
+                     const std::string &mountpoint,
                      const std::shared_ptr<OpenHashesLock> &lock,
-                     size_t index,
                      uint64_t round_epoch)
-        : of(open_files)
-        , mp(mountpoints)
-        , l(lock)
-        , i(index)
-        , epoch(round_epoch) { }
+        : of(open_files), mp(mountpoint), l(lock), epoch(round_epoch) { }
 
     std::set<shash::Short> &of;
-    const std::vector<std::string> &mp;
+    std::string mp;
     std::shared_ptr<OpenHashesLock> l;
-    size_t i;
     uint64_t epoch; /**< the round this collector belongs to */
   };
 

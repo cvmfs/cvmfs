@@ -2323,7 +2323,7 @@ void *PosixQuotaManager::CollectMountpointsHashes(void *data) {
   const std::shared_ptr<CollectorHandler> handler(*thread_ref);
   delete thread_ref;
 
-  const std::string mountpoint = handler->mp[handler->i];
+  const std::string mountpoint = handler->mp;
   ssize_t n = getxattr(mountpoint.c_str(), "user.list_open_hashes", nullptr, 0);
   if (n < 0) {
     LogCvmfs(kLogQuota, kLogDebug | kLogSyslogWarn,
@@ -2396,7 +2396,7 @@ std::set<shash::Short> PosixQuotaManager::CollectAllOpenHashes() {
   for (size_t i = 0; i < mountpoints_.size(); ++i) {
     // each handler gets its own reference to the lock
     handlers.push_back(std::make_shared<CollectorHandler>(
-        open_files_, mountpoints_, lock_open_files_, i, epoch));
+        open_files_, mountpoints_[i], lock_open_files_, epoch));
   }
 
   for (size_t i = 0; i < mountpoints_.size(); ++i) {
