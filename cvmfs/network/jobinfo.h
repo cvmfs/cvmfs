@@ -100,12 +100,14 @@ class JobInfo {
   std::string proxy_;
   std::string link_;
   bool nocache_;
+  bool peer_unresponsive_;
   Failures error_code_;
   int http_code_;
   unsigned char num_used_proxies_;
   unsigned char num_used_metalinks_;
   unsigned char num_used_hosts_;
   unsigned char num_retries_;
+  unsigned char num_withheld_escalations_;
   unsigned backoff_ms_;
   int current_metalink_chain_index_;
   int current_host_chain_index_;
@@ -201,12 +203,22 @@ class JobInfo {
   std::string proxy() const { return proxy_; }
   std::string link() const { return link_; }
   bool nocache() const { return nocache_; }
+  /**
+   * True when the peer never sent a byte of the response: the connect failed
+   * (including ECONNREFUSED) or timed out, or the connection was accepted and
+   * then nothing came back.  A transfer that started and then ran slowly does
+   * not count.
+   */
+  bool peer_unresponsive() const { return peer_unresponsive_; }
   Failures error_code() const { return error_code_; }
   int http_code() const { return http_code_; }
   unsigned char num_used_proxies() const { return num_used_proxies_; }
   unsigned char num_used_metalinks() const { return num_used_metalinks_; }
   unsigned char num_used_hosts() const { return num_used_hosts_; }
   unsigned char num_retries() const { return num_retries_; }
+  unsigned char num_withheld_escalations() const {
+    return num_withheld_escalations_;
+  }
   unsigned backoff_ms() const { return backoff_ms_; }
   int current_metalink_chain_index() const {
     return current_metalink_chain_index_;
@@ -257,6 +269,7 @@ class JobInfo {
   void SetProxy(const std::string &proxy) { proxy_ = proxy; }
   void SetLink(const std::string &link) { link_ = link; }
   void SetNocache(bool nocache) { nocache_ = nocache; }
+  void SetPeerUnresponsive(bool v) { peer_unresponsive_ = v; }
   void SetErrorCode(Failures error_code) { error_code_ = error_code; }
   void SetHttpCode(int http_code) { http_code_ = http_code; }
   void SetNumUsedProxies(unsigned char num_used_proxies) {
@@ -269,6 +282,9 @@ class JobInfo {
     num_used_hosts_ = num_used_hosts;
   }
   void SetNumRetries(unsigned char num_retries) { num_retries_ = num_retries; }
+  void SetNumWithheldEscalations(unsigned char n) {
+    num_withheld_escalations_ = n;
+  }
   void SetBackoffMs(unsigned backoff_ms) { backoff_ms_ = backoff_ms; }
   void SetCurrentMetalinkChainIndex(int current_metalink_chain_index) {
     current_metalink_chain_index_ = current_metalink_chain_index;

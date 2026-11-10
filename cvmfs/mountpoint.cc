@@ -1448,6 +1448,16 @@ bool MountPoint::CreateDownloadManagers() {
   download_mgr_->SetProxyTemplates(file_system_->uuid_cache()->uuid(),
                                    forced_proxy_template);
 
+  // Must precede SetProxyChain(), which reads the proxy policy.
+  if (options_mgr_->GetValue("CVMFS_PROXY_MANDATORY", &optarg)
+      && options_mgr_->IsOn(optarg)) {
+    download_mgr_->EnableMandatoryProxy();
+  }
+  if (options_mgr_->GetValue("CVMFS_PROXY_FAILOVER_ON_SLOW", &optarg)
+      && !options_mgr_->IsOn(optarg)) {
+    download_mgr_->SetProxyFailoverOnSlow(false);
+  }
+
   string proxies;
   if (options_mgr_->GetValue("CVMFS_HTTP_PROXY", &optarg))
     proxies = optarg;
@@ -2315,7 +2325,19 @@ bool MountPoint::SetupExternalDownloadMgr(bool dogeosort) {
     }
   }
 
+  // By default external data goes direct.  Under CVMFS_PROXY_MANDATORY that
+  // would bypass the site proxy, so inherit the regular chain instead; note
+  // this sends external (often uncacheable) data through the site squid.
+  // CVMFS_EXTERNAL_HTTP_PROXY=DIRECT still opts out explicitly.
   string proxies = "DIRECT";
+  string fallback_proxies;
+  if (options_mgr_->GetValue("CVMFS_PROXY_MANDATORY", &optarg)
+      && options_mgr_->IsOn(optarg)) {
+    proxies = download_mgr_->GetProxyList();
+    fallback_proxies = download_mgr_->GetFallbackProxyList();
+    if (proxies == "")
+      proxies = "DIRECT";
+  }
   if (options_mgr_->GetValue("CVMFS_EXTERNAL_HTTP_PROXY", &optarg)) {
     proxies = download::ResolveProxyDescription(
         optarg,
@@ -2326,8 +2348,9 @@ bool MountPoint::SetupExternalDownloadMgr(bool dogeosort) {
       boot_status_ = loader::kFailWpad;
       return false;
     }
+    // An explicit chain replaces the inherited one, fallbacks included.
+    fallback_proxies = "";
   }
-  string fallback_proxies;
   if (options_mgr_->GetValue("CVMFS_EXTERNAL_FALLBACK_PROXY", &optarg))
     fallback_proxies = optarg;
   external_download_mgr_->SetProxyChain(
