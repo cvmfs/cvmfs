@@ -270,6 +270,12 @@ class PosixQuotaManager : public QuotaManager {
   static const unsigned kEvictBatchSize = 1000;
 
   /**
+   * Seconds CollectAllOpenHashes() waits for the collector threads before it
+   * moves on without the results of those still running
+   */
+  static const unsigned kCollectionTimeoutS = 10;
+
+  /**
    * Make sure that the amount of data transferred through the RPC pipe is
    * within the OS's guarantees for atomicity.
    */

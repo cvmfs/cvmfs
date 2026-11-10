@@ -56,6 +56,7 @@
 #include "util/concurrency.h"
 #include "util/exception.h"
 #include "util/logging.h"
+#include "util/platform.h"
 #include "util/posix.h"
 #include "util/string.h"
 
@@ -2374,9 +2375,6 @@ std::set<shash::Short> PosixQuotaManager::CollectAllOpenHashes() {
   std::vector<std::shared_ptr<CollectorHandler> > handlers;
   std::vector<pthread_t> threads(mountpoints_.size());
   std::vector<bool> joined(mountpoints_.size(), false);
-  auto &&a_after_b = [](const struct timespec a, const struct timespec b) {
-    return (a.tv_sec > b.tv_sec) ? true : false;
-  };
 
   // The collectors of this round belong to the current epoch.  Late
   // collectors of previous rounds cannot match it: closing a round on them
@@ -2407,25 +2405,20 @@ std::set<shash::Short> PosixQuotaManager::CollectAllOpenHashes() {
     }
   }
 
-  struct timespec reference, current;
-  clock_gettime(CLOCK_REALTIME, &reference);
-  clock_gettime(CLOCK_REALTIME, &current);
-  reference.tv_sec += 10;  // Give 10sec for hash collection
-  size_t i = 0;
-  while (
-      (not std::all_of(joined.begin(), joined.end(), [](bool b) { return b; }))
-      and a_after_b(reference, current)) {
-    // as long as there are still threads that haven't joined yet
-    // and for 10 seconds
-    if (not joined[i]) {
-      const int s = pthread_tryjoin_np(threads[i], NULL);
-      if (s == 0) {
+  // Give 10s for hash collection.  The monotonic clock is immune to wall
+  // clock steps, and the nanosecond deadline makes the budget exactly 10s
+  // instead of "until the wall clock enters the 10th second".
+  const uint64_t deadline = platform_monotonic_time_ns()
+                            + kCollectionTimeoutS * 1000000000ULL;
+  size_t remaining = std::count(joined.begin(), joined.end(), false);
+  while (remaining > 0 && (platform_monotonic_time_ns() < deadline)) {
+    // Sweep over all threads that haven't joined yet, then back off
+    for (size_t i = 0; i < threads.size(); ++i) {
+      if (not joined[i] && (pthread_tryjoin_np(threads[i], NULL) == 0)) {
         joined[i] = true;
+        --remaining;
       }
     }
-    ++i;
-    i = i % handlers.size();
-    clock_gettime(CLOCK_REALTIME, &current);
     SafeSleepMs(10);
   }
 
@@ -2433,7 +2426,7 @@ std::set<shash::Short> PosixQuotaManager::CollectAllOpenHashes() {
   // of the handler.  Close the round by moving on to the next epoch so that
   // they drop their results instead of writing into open_files_ behind our
   // back, then detach them so that their resources are released on exit.
-  if (not std::all_of(joined.begin(), joined.end(), [](bool b) { return b; })) {
+  if (remaining > 0) {
     {
       const MutexLockGuard lock_guard(lock_open_files_->Get());
       lock_open_files_->NextEpoch();
