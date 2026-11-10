@@ -78,8 +78,7 @@ func main() {
 	}()
 
 	go func() {
-		timeout := services.Config.MaxLeaseTime
-		if err := fe.Start(services, cfg.Port, timeout, fe.WithKeyEndpoint(cfg.EnableKeyEndpoint)); err != nil {
+		if err := fe.Start(services, cfg.Port, cfg.HTTPTimeout, fe.WithKeyEndpoint(cfg.EnableKeyEndpoint)); err != nil {
 			gw.Log("main", gw.LogError).
 				Err(err).
 				Msg("starting the HTTP front-end failed")
