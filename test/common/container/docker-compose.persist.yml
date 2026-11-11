@@ -1,0 +1,11 @@
+# This file is part of the CernVM File System.
+
+services:
+    cvmfs-dev:
+        volumes:
+            - type: volume
+              source: var_spool_cvmfs
+              target: /var/spool/cvmfs
+
+volumes:
+    var_spool_cvmfs:
