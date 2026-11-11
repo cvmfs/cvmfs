@@ -43,8 +43,10 @@ services:
         hostname: cvmfs-garage
         volumes:
             - ./config/garage.toml:/etc/garage.toml:ro
-            - garage-meta:/var/lib/garage/meta
-            - garage-data:/var/lib/garage/data
+            - type: tmpfs
+              target: /var/lib/garage/meta
+            - type: tmpfs
+              target: /var/lib/garage/data
         ports:
             - "3900:3900"   # S3 API
             - "3902:3902"   # Web / website access
@@ -107,8 +109,10 @@ services:
             - ./config/repo.json:/etc/cvmfs/gateway/repo.json:ro
             - etc-cvmfs-repos:/etc/cvmfs/repositories.d
             - etc-cvmfs-keys:/etc/cvmfs/keys
-            - var-spool-cvmfs:/var/spool/cvmfs
-            - var-lib-gateway:/var/lib/cvmfs-gateway
+            - type: tmpfs
+              target: /var/spool/cvmfs
+            - type: tmpfs
+              target: /var/lib/cvmfs-gateway
             - apache-conf:/apache-conf
         ports:
             - "4929:4929"   # Gateway lease API
@@ -133,11 +137,7 @@ services:
             - "80:80"
 
 volumes:
-    garage-meta:
-    garage-data:
     etc-cvmfs-repos:
     etc-cvmfs-keys:
-    var-spool-cvmfs:
-    var-lib-gateway:
     apache-conf:
 
