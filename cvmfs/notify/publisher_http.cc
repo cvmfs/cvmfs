@@ -23,9 +23,10 @@ size_t RecvCB(void *buffer, size_t size, size_t nmemb, void *userp) {
     return 0;
   }
 
-  my_buffer->data = static_cast<char *>(buffer);
+  // curl's buffer is not NUL-terminated and may arrive in several chunks
+  my_buffer->data.append(static_cast<char *>(buffer), size * nmemb);
 
-  return my_buffer->data.size();
+  return size * nmemb;
 }
 
 }  // namespace
