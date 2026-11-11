@@ -610,6 +610,12 @@ fi
 # Port 8000 is also assigned to soundd (CVM-1308)
 /usr/sbin/semanage port -m -t http_port_t -p tcp 8000 2>/dev/null || :
 restorecon -R /var/log/cvmfs
+# Persist the labels cvmfs_server sets via chcon, so a relabel keeps them
+for d in /srv/cvmfs /var/lib/cvmfs-server/geo; do
+  /usr/sbin/semanage fcontext -a -t httpd_sys_content_t "$d(/.*)?" 2>/dev/null || \
+    /usr/sbin/semanage fcontext -m -t httpd_sys_content_t "$d(/.*)?" 2>/dev/null || :
+  [ -d $d ] && restorecon -R $d || :
+done
 %endif
 # remove old-style geoip data
 rm -f /var/lib/cvmfs-server/geo/*.dat
@@ -672,6 +678,8 @@ fi
 %if 0%{?selinux_cvmfs_server}
 if [ $1 -eq 0 ]; then
   /usr/sbin/semanage port -d -t http_port_t -p tcp 8000 2>/dev/null || :
+  /usr/sbin/semanage fcontext -d "/srv/cvmfs(/.*)?" 2>/dev/null || :
+  /usr/sbin/semanage fcontext -d "/var/lib/cvmfs-server/geo(/.*)?" 2>/dev/null || :
 fi
 %endif
 /sbin/ldconfig
