@@ -119,6 +119,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   FRIEND_TEST(T_Download, ValidateGeoReply);
   FRIEND_TEST(T_Download, StripDirect);
   FRIEND_TEST(T_Download, EscapeUrl);
+  FRIEND_TEST(T_Download, NoProxyChainIsNotSelectable);
 
  public:
   // HostInfo is used for both metalink and host

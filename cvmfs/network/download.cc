@@ -1068,12 +1068,20 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
       if (changed) {
         proxy = ChooseProxyUnlocked(info->expected_hash());
       }
-      info->SetProxy(proxy->url);
-      if (proxy->host.status() == dns::kFailOk) {
+      if (!proxy) {
+        // The DNS refresh left nothing selectable.  Fail via the old proxy
+        // rather than going DIRECT, so the failure is a proxy failure.
+        // Note: "0.0.0.0" fails fast only if nothing listens on local port
+        // 1080 (curl's default proxy port); Linux maps 0.0.0.0 to localhost.
+        info->SetProxy(purl);
+        curl_easy_setopt(info->curl_handle(), CURLOPT_PROXY, "0.0.0.0");
+      } else if (proxy->host.status() == dns::kFailOk) {
+        info->SetProxy(proxy->url);
         curl_easy_setopt(info->curl_handle(), CURLOPT_PROXY,
                          info->proxy().c_str());
       } else {
         // We know it can't work, don't even try to download
+        info->SetProxy(proxy->url);
         curl_easy_setopt(info->curl_handle(), CURLOPT_PROXY, "0.0.0.0");
       }
     }
@@ -1169,7 +1177,8 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
         curl_easy_setopt(info->curl_handle(), CURLOPT_PROXY, "");
         replacement = proxy_template_direct_;
       } else {
-        replacement = ChooseProxyUnlocked(info->expected_hash())->host.name();
+        const ProxyInfo *proxy = ChooseProxyUnlocked(info->expected_hash());
+        replacement = proxy ? proxy->host.name() : proxy_template_direct_;
       }
     }
     replacement = (replacement == "") ? proxy_template_direct_ : replacement;
@@ -3109,6 +3118,11 @@ DownloadManager::ProxyInfo *DownloadManager::ChooseProxyUnlocked(
   const uint32_t key = (hash ? hash->Partial32() : 0);
   const map<uint32_t, ProxyInfo *>::iterator it = opt_proxy_map_.lower_bound(
       key);
+  // The map is empty whenever nothing in the current group is selectable, and
+  // lower_bound() then returns end().  Dereferencing it was undefined
+  // behaviour; "nothing to choose" is a state the callers already handle.
+  if (it == opt_proxy_map_.end())
+    return NULL;
   ProxyInfo *proxy = it->second;
 
   return proxy;
@@ -3123,6 +3137,19 @@ void DownloadManager::UpdateProxiesUnlocked(const string &reason) {
 
   // Identify number of non-burned proxies within the current group
   vector<ProxyInfo> *group = current_proxy_group();
+  // Nothing in this group is usable when every proxy in it has been burned,
+  // and -- since the burn count is then 0 -- when the group is empty, which a
+  // DNS refresh that drops every address of a proxy can leave behind.  Either
+  // way the subtraction below would wrap, and the two branches that follow
+  // would run prng_.Next(0) and index (*group)[0] on an empty vector.
+  // Publish "nothing is selectable" instead: the map holds ProxyInfo pointers
+  // into the group, so leaving the previous selection in place would hand
+  // ChooseProxyUnlocked() pointers into entries that have just been erased.
+  if (opt_proxy_groups_current_burned_ >= group->size()) {
+    opt_proxy_map_.clear();
+    opt_proxies_.clear();
+    return;
+  }
   const unsigned num_alive = (group->size() - opt_proxy_groups_current_burned_);
   const string old_proxy = JoinStrings(opt_proxies_, "|");
 
