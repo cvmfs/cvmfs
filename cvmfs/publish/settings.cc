@@ -491,8 +491,10 @@ SettingsRepository SettingsBuilder::CreateSettingsRepository(
     fqrn = arg;
   SettingsRepository settings(fqrn);
 
-  if (options_mgr_->GetValue("CVMFS_PUBLIC_KEY", &arg))
+  if (options_mgr_->GetValue("CVMFS_PUBLIC_KEY", &arg)) {
+    settings.GetKeychain()->SetKeychainDir(arg);
     settings.SetPublicKeyPaths(arg);
+  }
   if (options_mgr_->GetValue("CVMFS_STRATUM0", &arg))
     settings.SetUrl(arg);
   if (options_mgr_->GetValue("CVMFS_SERVER_PROXY", &arg))
