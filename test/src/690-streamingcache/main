@@ -7,6 +7,7 @@ CVMFS_TEST_690_HTTP_PID=
 CVMFS_TEST_690_PRIVATE_MOUNTPOINT=
 cleanup() {
   echo "running cleanup()"
+  cvmfs_abort_openwaitprint_jobs
   if [ ! -z $CVMFS_TEST_690_PRIVATE_MOUNTPOINT ]; then
     echo -n "umounting ${CVMFS_TEST_690_PRIVATE_MOUNTPOINT}... "
     remove_local_mount $CVMFS_TEST_690_PRIVATE_MOUNTPOINT && echo "done" || echo "fail"
@@ -114,13 +115,13 @@ cvmfs_run_test() {
   md5sum $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/external/foo || return 52
 
   gcc -Wall -pthread -o openwaitprint ${src_location}/openwaitprint.c || return 60
-  ./openwaitprint $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/internal/small > small &
+  cvmfs_start_openwaitprint "$CVMFS_TEST_690_PRIVATE_MOUNTPOINT/internal/small" small || return 62
   local pid_helper=$!
+  cvmfs_wait_openwaitprint "$pid_helper" || return 62
 
   cvmfs2 __RELOAD__ $(get_cache_directory $CVMFS_TEST_690_PRIVATE_MOUNTPOINT)/cvmfs.$CVMFS_TEST_REPO \
     --debug || return 61
-  kill -USR1 $pid_helper
-  wait $pid_helper || return 62
+  cvmfs_finish_openwaitprint "$pid_helper" || return 62
   diff small $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/internal/small || return 63
 
   echo "*** test forwarding of download errors"
@@ -139,14 +140,14 @@ cvmfs_run_test() {
     grep ^CVMFS_STREAMING_CACHE | awk '{print $NF}')
   echo "*** config is $config"
   echo "CVMFS_STREAMING_CACHE=no" >> $config
-  ./openwaitprint $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/internal/small > small &
+  cvmfs_start_openwaitprint "$CVMFS_TEST_690_PRIVATE_MOUNTPOINT/internal/small" small || return 71
   pid_helper=$!
+  cvmfs_wait_openwaitprint "$pid_helper" || return 71
   cvmfs2 __RELOAD__ $(get_cache_directory $CVMFS_TEST_690_PRIVATE_MOUNTPOINT)/cvmfs.$CVMFS_TEST_REPO \
     --debug || return 70
   sudo cvmfs_talk -p $talk_socket parameters
   sudo cvmfs_talk -p $talk_socket cache instance
-  kill -USR1 $pid_helper
-  wait $pid_helper || return 71
+  cvmfs_finish_openwaitprint "$pid_helper" || return 71
   diff small $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/internal/small || return 72
   cat $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/internal/bar > /dev/null || return 73
   ls -lR $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/ || return 74
@@ -162,14 +163,14 @@ cvmfs_run_test() {
     grep ^CVMFS_STREAMING_CACHE | awk '{print $NF}')
   echo "*** config is $config"
   echo "CVMFS_STREAMING_CACHE=yes" >> $config
-  ./openwaitprint $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/internal/small > small &
+  cvmfs_start_openwaitprint "$CVMFS_TEST_690_PRIVATE_MOUNTPOINT/internal/small" small || return 83
   pid_helper=$!
+  cvmfs_wait_openwaitprint "$pid_helper" || return 83
   cvmfs2 __RELOAD__ $(get_cache_directory $CVMFS_TEST_690_PRIVATE_MOUNTPOINT)/cvmfs.$CVMFS_TEST_REPO \
     --debug || return 82
   sudo cvmfs_talk -p $talk_socket parameters
   sudo cvmfs_talk -p $talk_socket cache instance
-  kill -USR1 $pid_helper
-  wait $pid_helper || return 83
+  cvmfs_finish_openwaitprint "$pid_helper" || return 83
   diff small $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/internal/small || return 84
   cat $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/internal/bar > /dev/null || return 85
   ls -lR $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/ || return 86
