@@ -61,11 +61,8 @@ Repository::Repository(const SettingsRepository &settings, const bool exists)
   signature_mgr_->Init();
 
   if (exists) {
-    int rvb;
-    const std::string keys = JoinStrings(
-        FindFilesBySuffix(settings.keychain().keychain_dir(), ".pub"), ":");
-    rvb = signature_mgr_->LoadPublicRsaKeys(keys);
-    if (!rvb) {
+    const std::string keys = settings.ResolvePublicKeyPaths();
+    if (keys.empty() || !signature_mgr_->LoadPublicRsaKeys(keys)) {
       signature_mgr_->Fini();
       delete signature_mgr_;
       delete statistics_;
