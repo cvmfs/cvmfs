@@ -1496,6 +1496,7 @@ S3FanoutManager::~S3FanoutManager() {
   delete statistics_;
 
   delete available_jobs_;
+  delete resolver_;
 
   curl_global_cleanup();
 }
