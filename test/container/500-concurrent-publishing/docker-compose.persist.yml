@@ -1,0 +1,22 @@
+services:
+    cvmfs-test-gw1:
+        volumes:
+            - var_spool_cvmfs1:/var/spool/cvmfs
+
+    cvmfs-test-pub1:
+        volumes:
+            - var_spool_cvmfs2:/var/spool/cvmfs
+
+    cvmfs-test-pub2:
+        volumes:
+            - var_spool_cvmfs3:/var/spool/cvmfs
+
+    cvmfs-test-s3:
+        volumes:
+            - minio-data:/data
+
+volumes:
+    var_spool_cvmfs1:
+    var_spool_cvmfs2:
+    var_spool_cvmfs3:
+    minio-data:

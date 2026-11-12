@@ -1,0 +1,19 @@
+services:
+    garage:
+        volumes:
+            - type: volume
+              source: garage-meta
+              target: /var/lib/garage/meta
+            - type: volume
+              source: garage-data
+              target: /var/lib/garage/data
+
+    gateway:
+        volumes:
+            - type: volume
+              source: var-lib-gateway
+              target: /var/lib/cvmfs-gateway
+
+volume:
+    garage-meta:
+    garage-data:
