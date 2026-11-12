@@ -35,6 +35,8 @@ const int kDefaultDirMode = S_IXUSR | S_IWUSR | S_IRUSR | S_IRGRP | S_IXGRP
 const int kPrivateFileMode = S_IWUSR | S_IRUSR;
 const int kPrivateDirMode = S_IXUSR | S_IWUSR | S_IRUSR;
 
+constexpr unsigned NOFILE_STEP = 100;
+
 /**
  * The magic numbers that identify a file system in statfs()
  * Adjust GetFileSystemInfo() when new file systems are added
@@ -157,6 +159,7 @@ CVMFS_EXPORT std::string GetHomeDirectory();
 
 CVMFS_EXPORT std::string GetArch();
 
+CVMFS_EXPORT int IncreaseNoFileSoft(size_t value);
 CVMFS_EXPORT int SetLimitNoFile(unsigned limit_nofile);
 CVMFS_EXPORT void GetLimitNoFile(unsigned *soft_limit, unsigned *hard_limit);
 CVMFS_EXPORT bool SetLimitCore(unsigned limit_core);
@@ -210,3 +213,4 @@ CVMFS_EXPORT bool SafeWriteToFile(const std::string &content,
 #endif
 
 #endif  // CVMFS_UTIL_POSIX_H_
+
