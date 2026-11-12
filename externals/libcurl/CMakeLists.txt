@@ -93,6 +93,11 @@ if (APPLE AND NOT DEFINED OPENSSL_ROOT_DIR)
 endif()
 
 setup_external_build_mode(CURL)
+# The macOS system libcurl has the same select() limitation, so build our own
+# unless the system one is requested explicitly via BUILTIN_EXTERNALS_EXCLUDE.
+if(APPLE AND NOT FETCHCONTENT_TRY_FIND_PACKAGE_MODE STREQUAL "ALWAYS")
+  set(FETCHCONTENT_TRY_FIND_PACKAGE_MODE NEVER)
+endif()
 
 FetchContent_Declare(
   CURL

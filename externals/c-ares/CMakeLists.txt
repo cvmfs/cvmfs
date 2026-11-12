@@ -38,6 +38,11 @@ set(CARES_BUILD_TOOLS           OFF)
 set(CARES_INSTALL               OFF)
 
 setup_external_build_mode(c-ares)
+# On macOS, a Homebrew c-ares is a runtime dependency the package can't ship,
+# and its include path exposes Homebrew's default OpenSSL headers to libcurl.
+if(APPLE AND NOT FETCHCONTENT_TRY_FIND_PACKAGE_MODE STREQUAL "ALWAYS")
+  set(FETCHCONTENT_TRY_FIND_PACKAGE_MODE NEVER)
+endif()
 
 FetchContent_Declare(
   c-ares
