@@ -264,9 +264,11 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
 
   if (!mediator.Commit(manifest.get())) {
     PrintError("Swissknife Ingest: something went wrong during sync");
-    stats_db->StorePublishStatistics(this->statistics(), start_time, false);
-    if (upload_statsdb) {
-      stats_db->UploadStatistics(params.spooler);
+    if (stats_db != NULL) {
+      stats_db->StorePublishStatistics(this->statistics(), start_time, false);
+      if (upload_statsdb) {
+        stats_db->UploadStatistics(params.spooler);
+      }
     }
     return 5;
   }
@@ -294,16 +296,20 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
   if (!spooler_catalogs->FinalizeSession(true, old_root_hash, new_root_hash,
                                          params.repo_tag)) {
     PrintError("Swissknife Ingest: Failed to commit the transaction.");
-    stats_db->StorePublishStatistics(this->statistics(), start_time, false);
-    if (upload_statsdb) {
-      stats_db->UploadStatistics(params.spooler);
+    if (stats_db != NULL) {
+      stats_db->StorePublishStatistics(this->statistics(), start_time, false);
+      if (upload_statsdb) {
+        stats_db->UploadStatistics(params.spooler);
+      }
     }
     return 9;
   }
 
-  stats_db->StorePublishStatistics(this->statistics(), start_time, true);
-  if (upload_statsdb) {
-    stats_db->UploadStatistics(params.spooler);
+  if (stats_db != NULL) {
+    stats_db->StorePublishStatistics(this->statistics(), start_time, true);
+    if (upload_statsdb) {
+      stats_db->UploadStatistics(params.spooler);
+    }
   }
 
   delete params.spooler;

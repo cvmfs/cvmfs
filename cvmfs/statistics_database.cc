@@ -422,6 +422,9 @@ StatisticsDatabase::~StatisticsDatabase() { --StatisticsDatabase::instances; }
 
 StatisticsDatabase *StatisticsDatabase::OpenStandardDB(
     const std::string repo_name) {
+  if (IsDisabled(repo_name))
+    return NULL;
+
   StatisticsDatabase *db;
   std::string db_file_path;
   uint32_t days_to_keep;
@@ -605,8 +608,8 @@ void StatisticsDatabase::GetDBParams(const std::string &repo_name,
     }
   }
 
-  const std::string days_to_keep_str = "";
-  if (!parser.GetValue("CVMFS_STATS_DB_DAYS_TO_KEEP", &statistics_db)) {
+  std::string days_to_keep_str = "";
+  if (!parser.GetValue("CVMFS_STATS_DB_DAYS_TO_KEEP", &days_to_keep_str)) {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
              "Parameter %s was not set in the repository configuration file. "
              "Using default value: %s",
@@ -616,6 +619,18 @@ void StatisticsDatabase::GetDBParams(const std::string &repo_name,
   } else {
     *days_to_keep = static_cast<uint32_t>(String2Uint64(days_to_keep_str));
   }
+}
+
+
+bool StatisticsDatabase::IsDisabled(const std::string &repo_name) {
+  SimpleOptionsParser parser;
+  std::string param_value = "";
+  const std::string repo_config_file = "/etc/cvmfs/repositories.d/" + repo_name
+                                       + "/server.conf";
+  if (!parser.TryParsePath(repo_config_file))
+    return false;
+  return parser.GetValue("CVMFS_DISABLE_STATS_DB", &param_value)
+         && parser.IsOn(param_value);
 }
 
 

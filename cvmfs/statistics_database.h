@@ -56,7 +56,8 @@ class StatisticsDatabase : public sqlite::Database<StatisticsDatabase> {
    * Opens or creates a statistics DB in standard path
    * for repo_name repository
    *
-   * @return StatisticsDatabase pointer on success, NULL otherwise
+   * @return StatisticsDatabase pointer on success, NULL if
+   *         CVMFS_DISABLE_STATS_DB is set or on failure
    */
   static StatisticsDatabase *OpenStandardDB(const std::string repo_name);
 
@@ -115,6 +116,11 @@ class StatisticsDatabase : public sqlite::Database<StatisticsDatabase> {
   static void GetDBParams(const std::string &repo_name,
                           std::string *path,
                           uint32_t *days_to_keep);
+
+  /**
+   * Check if CVMFS_DISABLE_STATS_DB is ON in the repository's server.conf
+   */
+  static bool IsDisabled(const std::string &repo_name);
 
   /**
    * Check if the CVMFS_EXTENDED_GC_STATS is ON or not
