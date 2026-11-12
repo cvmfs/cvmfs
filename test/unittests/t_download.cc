@@ -2,10 +2,14 @@
  * This file is part of the CernVM File System.
  */
 
+#include <fcntl.h>
+#include <sys/resource.h>
+#include <sys/select.h>
 #include <unistd.h>
 
 #include <cassert>
 #include <cstdio>
+#include <vector>
 
 #include "c_file_sandbox.h"
 #include "c_http_server.h"
@@ -219,6 +223,48 @@ TEST_F(T_Download, Multiple) {
   EXPECT_EQ(info.error_code(), kFailOk);
   EXPECT_EQ(info2.error_code(), kFailOk);
   fclose(fdest);
+}
+
+
+TEST_F(T_Download, RemoteFileHighFd) {
+  // Without a working poll(), libcurl falls back to select() and rejects
+  // sockets >= FD_SETSIZE, which shows up as kFailHostConnection.
+  const int kNumFds = FD_SETSIZE + 64;
+  struct rlimit rl;
+  ASSERT_EQ(0, getrlimit(RLIMIT_NOFILE, &rl));
+  const rlim_t orig_soft = rl.rlim_cur;
+  if (rl.rlim_cur < static_cast<rlim_t>(2 * kNumFds)) {
+    if (rl.rlim_max < static_cast<rlim_t>(2 * kNumFds))
+      GTEST_SKIP() << "RLIMIT_NOFILE hard limit too low";
+    rl.rlim_cur = 2 * kNumFds;
+    ASSERT_EQ(0, setrlimit(RLIMIT_NOFILE, &rl));
+  }
+
+  MockFileServer file_server(8082, sandbox_path_);
+  const string src_path = GetSmallFile();
+  string url = "http://127.0.0.1:8082/" + GetFileName(src_path);
+
+  std::vector<int> fds;
+  const int fd_null = open("/dev/null", O_RDONLY);
+  ASSERT_GE(fd_null, 0);
+  fds.push_back(fd_null);
+  while (fds.back() < kNumFds) {
+    const int fd = dup(fd_null);
+    ASSERT_GE(fd, 0);
+    fds.push_back(fd);
+  }
+
+  cvmfs::MemSink memsink;
+  JobInfo info(&url, false, false, NULL, &memsink);
+  download_mgr.Fetch(&info);
+
+  for (unsigned i = 0; i < fds.size(); ++i)
+    close(fds[i]);
+  rl.rlim_cur = orig_soft;
+  setrlimit(RLIMIT_NOFILE, &rl);
+
+  EXPECT_EQ(kFailOk, info.error_code());
+  EXPECT_EQ(1, file_server.num_processed_requests());
 }
 
 
