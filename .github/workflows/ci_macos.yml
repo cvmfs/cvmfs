@@ -7,8 +7,8 @@ on:
     branches: ['devel', 'cvmfs*']
   workflow_dispatch:
 jobs:
-  macos_build_and_test:
-    name: "macos_build_and_test"
+  macos_build:
+    name: "macos_build"
     # Build-only: hosted runners cannot load macFUSE (no headless way to
     # approve it), so mounts and integration tests run in CI_MacOS_NFS_Tests.
     runs-on: macos-26
