@@ -17,7 +17,8 @@ on:
 
 jobs:
   vng_tests:
-    runs-on: ubuntu-latest
+    # v5.12 kernel doesn't build with GCC >= 15 (C23 default makes bool/false keywords)
+    runs-on: ubuntu-24.04
     steps:
       - id: lsb-release
         run: |

@@ -109,6 +109,7 @@ catalog::InclusionSpec *inclusion_spec = NULL;
 std::atomic<int64_t> overall_chunks;
 std::atomic<int64_t> overall_new;
 std::atomic<int64_t> chunk_queue;
+std::atomic<int64_t> failed_chunks;
 bool preload_cache = false;
 string *preload_cachedir = NULL;
 bool inspect_existing_catalogs = false;
@@ -167,8 +168,13 @@ static void ReportDownloadError(const download::JobInfo &download_job) {
       break;
 
     default:
-      if (download::IsProxyTransferError(error_code)
-          || download::IsHostTransferError(error_code)) {
+      if ((error_code == download::kFailHostConnection) && (http_code >= 400)) {
+        LogCvmfs(kLogCvmfs, kLogStderr,
+                 "last HTTP error code %d - "
+                 "please check the stratum 0 health",
+                 http_code);
+      } else if (download::IsProxyTransferError(error_code)
+                 || download::IsHostTransferError(error_code)) {
         LogCvmfs(kLogCvmfs, kLogStderr,
                  "couldn't reach Stratum 0 - "
                  "please check the network connection");
@@ -282,14 +288,16 @@ static void *MainWorker(void *data) {
 
       const download::Failures download_result = download_manager->Fetch(
           &download_chunk);
+      fclose(fchunk);
       if (download_result != download::kFailOk) {
         ReportDownloadError(download_chunk);
-        PANIC(kLogStderr, "Download error");
+        unlink(tmp_file.c_str());
+        failed_chunks.fetch_add(1);
+      } else {
+        Store(tmp_file, chunk_hash,
+              (compression_alg == zlib::kZlibDefault) ? true : false);
+        overall_new.fetch_add(1);
       }
-      fclose(fchunk);
-      Store(tmp_file, chunk_hash,
-            (compression_alg == zlib::kZlibDefault) ? true : false);
-      overall_new.fetch_add(1);
     }
     if (overall_chunks.fetch_add(1) % 1000 == 0)
       LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, ".");
@@ -392,6 +400,7 @@ bool CommandPull::Pull(const shash::Any &catalog_hash,
 
   const int64_t gauge_chunks = overall_chunks.load();
   const int64_t gauge_new = overall_new.load();
+  const int64_t gauge_failed = failed_chunks.load();
 
   // Download and uncompress catalog
   shash::Any chunk_hash;
@@ -508,6 +517,14 @@ bool CommandPull::Pull(const shash::Any &catalog_hash,
              "%" PRId64 " unique chunks",
              overall_new.load() - gauge_new,
              overall_chunks.load() - gauge_chunks);
+    const int64_t num_failed = failed_chunks.load() - gauge_failed;
+    if (num_failed > 0) {
+      // The catalog is not stored, so a rerun picks up its missing chunks
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "failed to download %" PRId64 " chunks of catalog %s",
+               num_failed, catalog_hash.ToString().c_str());
+      goto pull_cleanup;
+    }
   }
 
   retval = PullRecursion(catalog, path);
@@ -641,6 +658,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   // Initialization
   overall_chunks.store(0);
   overall_new.store(0);
+  failed_chunks.store(0);
   chunk_queue.store(0);
 
   const bool follow_redirects = false;
@@ -871,6 +889,10 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
                                  iend = historic_tags.end();
        i != iend;
        ++i) {
+    // Tags mostly share objects with the trunk; retrying the same failing
+    // chunks for every tag only delays the error
+    if (failed_chunks.load() > 0)
+      break;
     if (Peek(i->root_hash) && !inspect_existing_catalogs)
       continue;
     LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from %s repository tag",
@@ -905,6 +927,12 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   }
   ClosePipe(pipe_chunks);
 
+  if (failed_chunks.load() > 0) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "%" PRId64 " chunks failed to download, not publishing the "
+             "revision; a rerun resumes from the catalogs already stored",
+             failed_chunks.load());
+  }
   if (!retval)
     goto fini;
 
