@@ -1,0 +1,193 @@
+name: CI_MacOS_NFS_DD4hep
+
+# Builds DD4hep against an LCG view mounted over the macOS NFS frontend, as in
+# AIDASoft/DD4hep's macOS workflow, and records what the cvmfs2 instances do
+# while the build hits Input/output errors.
+#   plain:    the released package exactly as DD4hep uses it
+#   debuglog: same, with CVMFS_DEBUGLOG on sft-nightlies and sft (changes
+#             timing, but shows why a request fails)
+
+on:
+  push:
+    branches: [ 'ci-macos-nfs-dd4hep-debug' ]
+  workflow_dispatch:
+    inputs:
+      pkg:
+        description: macOS package URL
+        default: https://ecsft.cern.ch/dist/cvmfs/prerelease/cvmfs-2.15.0-pre4/cvmfs-2.15.0~pre4.pkg
+
+env:
+  PKG: ${{ inputs.pkg || 'https://ecsft.cern.ch/dist/cvmfs/prerelease/cvmfs-2.15.0-pre4/cvmfs-2.15.0~pre4.pkg' }}
+  REPOS: sft.cern.ch sft-nightlies.cern.ch geant4.cern.ch cvmfs-config.cern.ch
+  DD4HEP_SHA: d4369a101635bd8aa7895b0cefe020f8d066940c
+
+jobs:
+  dd4hep:
+    runs-on: macos-15
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { LCG: dev3/arm64-mac15-clang170-opt, variant: plain }
+          - { LCG: dev3/arm64-mac15-clang170-opt, variant: debuglog }
+          - { LCG: dev4/arm64-mac15-clang170-opt, variant: plain }
+          - { LCG: LCG_110/arm64-mac15-clang170-opt, variant: plain }
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+      LOGS: ${{ github.workspace }}/logs
+    steps:
+      - name: Start log stream
+        run: |
+          mkdir -p "$LOGS"
+          sw_vers; uname -a; sysctl -n hw.ncpu; ulimit -a
+          sysctl kern.maxfiles kern.maxfilesperproc
+          # Started before mounting so mount-time and kernel NFS messages
+          # ("not responding", "is alive again") are not lost to log rotation.
+          sudo sh -c "nohup log stream --style compact --level debug \
+            --predicate 'process == \"cvmfs2\" OR process == \"mount_nfs\" OR (process == \"kernel\" AND eventMessage CONTAINS[c] \"nfs\")' \
+            > $LOGS/logstream.txt 2>&1 &"
+
+      - uses: cvmfs-contrib/github-action-cvmfs@8961275e6afff1d4728dc99db034d6dc01800ccc
+        with:
+          cvmfs_repositories: sft.cern.ch,sft-nightlies.cern.ch,geant4.cern.ch
+          cvmfs_macos_pkg_location: ${{ env.PKG }}
+
+      - name: Remount with debug log
+        if: matrix.variant == 'debuglog'
+        run: |
+          sudo mkdir -p /Users/Shared/cvmfs-debug
+          sudo chmod 1777 /Users/Shared/cvmfs-debug
+          for r in sft.cern.ch sft-nightlies.cern.ch; do
+            echo "CVMFS_DEBUGLOG=/Users/Shared/cvmfs-debug/$r.log" \
+              | sudo tee /etc/cvmfs/config.d/$r.local
+            sudo umount /Volumes/cvmfs/$r
+          done
+          for r in sft.cern.ch sft-nightlies.cern.ch; do
+            sudo mount -t cvmfs $r /Volumes/cvmfs/$r
+          done
+          mount | grep cvmfs
+
+      - name: Instance info and monitor
+        run: |
+          mount | grep cvmfs | tee "$LOGS/mounts-start.txt"
+          for r in $REPOS; do
+            echo "=== $r"
+            cvmfs_config showconfig $r 2>&1 | grep -E "CACHE_BASE|SHARED_CACHE|QUOTA|DEBUGLOG|NFILES|MAX_RETRIES|TIMEOUT|SERVER_URL|USE_CDN|HTTP_PROXY|MEMCACHE|NFS"
+          done | tee "$LOGS/config.txt"
+          cat > "$RUNNER_TEMP/monitor.sh" << 'EOF'
+          #!/bin/bash
+          # cvmfs_talk can block on a wedged instance: cap every call.
+          t() { perl -e 'alarm shift; exec @ARGV' "$@"; }
+          while true; do
+            echo "##### $(date -u +%FT%TZ)"
+            pgrep -fl cvmfs2
+            for r in $REPOS; do
+              pid=$(t 5 cvmfs_talk -i $r pid 2>/dev/null)
+              nfd=$( [ -n "$pid" ] && sudo lsof -p "$pid" 2>/dev/null | wc -l)
+              echo "--- $r pid=$pid fds=$nfd"
+              # Nonzero counters only, as name|value.
+              t 10 cvmfs_talk -i $r internal affairs 2>&1 \
+                | grep -E '^[A-Za-z0-9_.-]+\|[1-9-]' | cut -d'|' -f1,2 | tr '\n' ' '
+              echo
+              t 5 cvmfs_talk -i $r host info 2>&1 | grep -E "Active|^  \[" | head -5
+            done
+            nfsstat -c 2>/dev/null | head -30
+            sleep 20
+          done
+          EOF
+          chmod +x "$RUNNER_TEMP/monitor.sh"
+          nohup "$RUNNER_TEMP/monitor.sh" > "$LOGS/monitor.txt" 2>&1 &
+
+      - name: Checkout DD4hep
+        uses: actions/checkout@v4
+        timeout-minutes: 10
+        with:
+          repository: wdconinc/DD4hep
+          ref: ${{ env.DD4HEP_SHA }}
+          path: DD4hep
+
+      - uses: aidasoft/run-lcg-view@d8db17c61216548c9192889942d46ff2d7c3a3b6
+        timeout-minutes: 120
+        with:
+          release-platform: ${{ matrix.LCG }}
+          run: |
+            cd DD4hep
+            mkdir build
+            cd build
+            unset CPATH
+            source ../.github/scripts/common_cmake_opts.sh
+            {
+              echo "::group::CMakeConfig"
+              cmake $=COMMON_CMAKE_OPTS -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_STANDARD=20 .. &&
+              if [[ ${{ matrix.LCG }} =~ dev[34] ]]; then
+                cmake -DDD4HEP_HEPMC3_COMPRESSION_SUPPORT=ON -DDD4HEP_USE_G4HEPEM=ON ..
+              fi &&
+              echo "::endgroup::" &&
+              ninja -k 0 install &&
+              . ../bin/thisdd4hep.sh &&
+              ctest --output-on-failure -j"$(getconf _NPROCESSORS_ONLN)"
+            } 2>&1 | tee $LOGS/build.log
+            rc=${pipestatus[1]}
+            echo "::group::cvmfs-looking errors"
+            grep -nE "Input/output error|Bus error|bus error|Device not configured|code=13[89]|Stale NFS|Operation timed out" $LOGS/build.log | head -50
+            echo "::endgroup::"
+            exit $rc
+
+      - name: Recheck failed paths
+        if: always()
+        timeout-minutes: 5
+        run: |
+          # Distinguishes a transient EIO from one that sticks to the inode.
+          grep -oE "'/(Volumes|Users/Shared|cvmfs)/[^']+': Input/output error" "$LOGS/build.log" 2>/dev/null \
+            | sed -e "s/^'//" -e "s/': Input.*//" | sort -u | head -20 > "$LOGS/eio-paths.txt" || true
+          while read -r p; do
+            echo "=== $p"
+            perl -e 'alarm 20; exec @ARGV' stat "$p" || echo "stat rc=$?"
+            perl -e 'alarm 20; exec @ARGV' sh -c "cat '$p' | wc -c" || echo "cat rc=$?"
+          done < "$LOGS/eio-paths.txt" | tee "$LOGS/eio-recheck.txt"
+
+      - name: Collect logs
+        if: always()
+        timeout-minutes: 10
+        run: |
+          t() { perl -e 'alarm shift; exec @ARGV' "$@"; }
+          pkill -f monitor.sh || true
+          mount | grep cvmfs > "$LOGS/mounts-end.txt" || true
+          pgrep -fl cvmfs2 > "$LOGS/processes-end.txt" || true
+          for r in $REPOS; do
+            {
+              echo "=== $r"
+              t 10 cvmfs_talk -i $r internal affairs
+              t 10 cvmfs_talk -i $r host info
+              t 10 cvmfs_talk -i $r proxy info
+              t 10 cvmfs_talk -i $r cache size
+            } >> "$LOGS/talk-end.txt" 2>&1
+          done
+          # Never walk the cvmfs mounts: a dead NFS mount blocks.
+          for base in ~runner/Library/Caches/cvmfs /Users/Shared/cvmfs-cache /var/lib/cvmfs; do
+            sudo sh -c "find $base -maxdepth 3 -name 'stacktrace.*' -exec cp {} $LOGS/ \;" 2>/dev/null || true
+          done
+          sudo pkill -f "log stream" || true
+          sudo log show --last 180m --style compact \
+            --predicate 'process == "cvmfs2" OR process == "mount_nfs" OR (process == "kernel" AND eventMessage CONTAINS[c] "nfs")' \
+            > "$LOGS/system.log" 2>/dev/null || true
+          sudo sh -c "ls -la /Library/Logs/DiagnosticReports/ | grep -iE 'cvmfs|root|clang|cling'; cp /Library/Logs/DiagnosticReports/cvmfs2* $LOGS/ 2>/dev/null; cp ~runner/Library/Logs/DiagnosticReports/cvmfs2* $LOGS/ 2>/dev/null" || true
+          if [ -d /Users/Shared/cvmfs-debug ]; then
+            sudo sh -c "cd /Users/Shared/cvmfs-debug && for f in *.log; do gzip -c \$f > $LOGS/debug-\$f.gz; done"
+          fi
+          sudo chmod -R a+r "$LOGS"
+          ls -la "$LOGS"
+          for f in "$LOGS"/stacktrace.*; do [ -f "$f" ] && head -30 "$f"; done || true
+          echo "::group::kernel nfs"
+          grep -iE "nfs server|not responding|alive again|dead|unmount" "$LOGS/logstream.txt" | head -50 || true
+          echo "::endgroup::"
+          echo "::group::cvmfs2 syslog"
+          grep -E "cvmfs2" "$LOGS/logstream.txt" | grep -viE "debug" | head -100 || true
+          echo "::endgroup::"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dd4hep-nfs-${{ matrix.variant }}-${{ strategy.job-index }}
+          path: logs
