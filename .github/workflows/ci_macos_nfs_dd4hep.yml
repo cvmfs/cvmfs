@@ -16,6 +16,9 @@ on:
       pkg:
         description: macOS package URL
         default: https://ecsft.cern.ch/dist/cvmfs/prerelease/cvmfs-2.15.0-pre4/cvmfs-2.15.0~pre4.pkg
+      matrix:
+        description: JSON list of {LCG, variant}; empty runs the full matrix
+        default: ''
 
 env:
   PKG: ${{ inputs.pkg || 'https://ecsft.cern.ch/dist/cvmfs/prerelease/cvmfs-2.15.0-pre4/cvmfs-2.15.0~pre4.pkg' }}
@@ -29,12 +32,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - { LCG: dev3/arm64-mac15-clang170-opt, variant: plain }
-          - { LCG: dev3/arm64-mac15-clang170-opt, variant: debuglog }
-          - { LCG: dev3/arm64-mac15-clang170-opt, variant: patched }
-          - { LCG: dev4/arm64-mac15-clang170-opt, variant: plain }
-          - { LCG: LCG_110/arm64-mac15-clang170-opt, variant: plain }
+        include: ${{ fromJSON(inputs.matrix || '[{"LCG":"dev3/arm64-mac15-clang170-opt","variant":"plain"},{"LCG":"dev3/arm64-mac15-clang170-opt","variant":"debuglog"},{"LCG":"dev3/arm64-mac15-clang170-opt","variant":"patched"},{"LCG":"dev4/arm64-mac15-clang170-opt","variant":"plain"},{"LCG":"LCG_110/arm64-mac15-clang170-opt","variant":"plain"}]') }}
     env:
       DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
       LOGS: ${{ github.workspace }}/logs
