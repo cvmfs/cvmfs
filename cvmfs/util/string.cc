@@ -233,11 +233,9 @@ time_t IsoTimestamp2UtcTime(const std::string &iso8601) {
 }
 
 int64_t String2Int64(const string &value) {
-  int64_t result;
-  if (sscanf(value.c_str(), "%" SCNd64, &result) == 1) {
-    return result;
-  }
-  return 0;
+  int64_t result = 0;
+  sscanf(value.c_str(), "%" SCNd64, &result);
+  return result;
 }
 
 uint64_t String2Uint64(const string &value) {
