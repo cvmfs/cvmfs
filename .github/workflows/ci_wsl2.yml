@@ -1,0 +1,144 @@
+name: CI_WSL2
+
+# Tests cvmfs_config setup / autofs handling inside WSL2 on a Windows runner,
+# both with systemd enabled (autofs.service) and without (cvmfs_config wsl2_start).
+# The released CernVM-FS package is installed and cvmfs_config is then replaced
+# with the version from this checkout, so only the script is under test.
+
+on:
+  push:
+    # TEMP: feat-use-wsl2-systemd only for testing on the fork; remove before PR
+    branches: ['devel', 'cvmfs*', 'feat-use-wsl2-systemd']
+    paths:
+      - 'cvmfs/cvmfs_config'
+      - '.github/workflows/ci_wsl2.yml'
+  pull_request:
+    branches: ['devel', 'cvmfs*']
+    paths:
+      - 'cvmfs/cvmfs_config'
+      - '.github/workflows/ci_wsl2.yml'
+  workflow_dispatch:
+
+jobs:
+  wsl2:
+    name: "wsl2 (systemd=${{ matrix.systemd }})"
+    runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        systemd: [true, false]
+
+    steps:
+      # Keep LF line endings: cvmfs_config is copied into the Linux guest
+      - name: Disable CRLF conversion
+        shell: pwsh
+        run: git config --global core.autocrlf false
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up WSL2 (Ubuntu 24.04)
+        uses: Vampire/setup-wsl@v5
+        with:
+          distribution: Ubuntu-24.04
+          use-cache: 'true'
+          wsl-conf: |
+            [boot]
+            systemd=${{ matrix.systemd }}
+          additional-packages:
+            autofs
+            curl
+            ca-certificates
+            lsb-release
+
+      - name: Verify WSL2 environment
+        shell: wsl-bash {0}
+        run: |
+          set -x
+          grep -q microsoft-standard /proc/version
+          if [ "${{ matrix.systemd }}" = "true" ]; then
+            test -d /run/systemd/system
+            systemctl is-system-running --wait || true
+          else
+            ! test -d /run/systemd/system
+          fi
+
+      - name: Install CernVM-FS
+        shell: wsl-bash {0}
+        run: |
+          set -ex
+          curl -fsSLO https://ecsft.cern.ch/dist/cvmfs/cvmfs-release/cvmfs-release-latest_all.deb
+          dpkg -i cvmfs-release-latest_all.deb
+          apt-get update
+          apt-get install -y cvmfs
+          cvmfs2 --version
+
+      - name: Install cvmfs_config from this checkout
+        shell: wsl-bash {0}
+        run: |
+          set -ex
+          src="$(wslpath -u '${{ github.workspace }}')/cvmfs/cvmfs_config"
+          install -m 0755 "$src" /usr/bin/cvmfs_config
+          sed -i 's/\r$//' /usr/bin/cvmfs_config
+          grep -q wsl2_without_systemd /usr/bin/cvmfs_config
+
+      - name: cvmfs_config setup
+        shell: wsl-bash {0}
+        run: |
+          set -ex
+          cat > /etc/cvmfs/default.local <<EOF
+          CVMFS_CLIENT_PROFILE=single
+          CVMFS_HTTP_PROXY=DIRECT
+          EOF
+          cvmfs_config setup
+          if [ "${{ matrix.systemd }}" = "true" ]; then
+            # no manual step expected: setup must have activated autofs
+            systemctl is-active autofs.service
+          else
+            # setup must skip activation and tell the user what to do
+            ! pidof automount
+            cvmfs_config wsl2_start
+          fi
+          pidof automount
+
+      - name: cvmfs_config chksetup
+        shell: wsl-bash {0}
+        run: |
+          set -ex
+          cvmfs_config chksetup 2>&1 | tee chksetup.log
+          # the autofs kill mode warning must not fire on WSL2
+          ! grep -q "kill mode" chksetup.log
+
+      - name: Idempotent wsl2_start
+        shell: wsl-bash {0}
+        run: |
+          set -ex
+          cvmfs_config wsl2_start
+          pidof automount
+
+      - name: Mount via autofs and probe
+        shell: wsl-bash {0}
+        run: |
+          set -ex
+          cvmfs_config probe
+          ls /cvmfs/cvmfs-config.cern.ch
+          ls /cvmfs/atlas.cern.ch | head
+          cvmfs_config stat -v cvmfs-config.cern.ch
+
+      - name: Reload autofs
+        shell: wsl-bash {0}
+        run: |
+          set -ex
+          cvmfs_config reload
+          cvmfs_config probe
+
+      - name: Diagnostics
+        if: failure()
+        shell: wsl-bash {0}
+        run: |
+          cat /proc/version || true
+          ps aux | grep -E 'automount|cvmfs' || true
+          systemctl status autofs.service --no-pager || true
+          cat /etc/auto.master.d/cvmfs.autofs || true
+          cat /etc/wsl.conf || true
+          mount | grep -E 'cvmfs|autofs' || true
