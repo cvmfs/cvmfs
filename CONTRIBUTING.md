@@ -53,3 +53,4 @@ We typically participate in the GSoC programme for which project ideas will be p
 As the team developing CernVM is quite small, unfortunately our capacity is limited.
 Please keep this in mind when contacting the developers, and look out for published opportunities.
 In particular, please do not ask for issues to be assigned to you, or submit purely AI-generated contributions, this will not factor positively into an evaluation for GSoC.
+Also, it is discouraged to open more than two pull requests.
