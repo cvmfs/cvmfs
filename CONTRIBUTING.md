@@ -4,16 +4,19 @@ We welcome code contributions!
 
 If you are about to develop a bug fix or a new feature, it could be helpful to let us know about it beforehand, for instance on the cvmfs-devel@cern.ch mailing list or by private mail or through our [ticket tracker](https://github.com/cvmfs/cvmfs/issues).  This can avoid duplicated work and allows us to coordinate the development.
 
+Please take note of our mandatory AI policy in AI-POLICY.md.
+
 
 # Source Code Workflow
 
-We use git and github to merge code changes.  We roughly follow [Driessen's workflow](http://nvie.com/posts/a-successful-git-branching-model).  The current development head is in the devel branch, the latest stable release is in the master branch.  In order to contribute, please
+We use git and github to merge code changes.  We roughly follow [Driessen's workflow](http://nvie.com/posts/a-successful-git-branching-model).  The current development head is in the devel branch, release branches are named cvmfs-XX.  In order to contribute, please
   - Fork the cvmfs repository
-  - Create a new branch from devel, named either feature-..., or fix-... or CVM-... (referring to JIRA)
+  - Create a new branch from devel, named either feature-..., or fix-... or prefix them by topic (client/..., ci/..., gw/...)
   - Make changes, commit, and push the branch to your github space
   - and send a pull request to us on github
 
-If possible, commits should be done in such a way that the code remains compilable.  That can help to find problems with `git bisect`.
+Commits should be done in such a way that the code remains compilable.  That can help to find problems with `git bisect`. Mostly PRs will be squashed though, so
+try to break up PRs into sets of smaller, self-contained changes if possible.
 
 
 # Code Conventions
@@ -28,11 +31,10 @@ We have the following exceptions/adjustments:
   - We currently do not include files with project-relative paths.  The vast majority of source files are in ./cvmfs (although that might change).
   - `using namespace std;` in a .cc file is allowed. In order to keep the style checker quiet, we use `using namespace std;  // NOLINT`.
   - We do a line break before the opening curly bracket ({), if the bracket is at the end of a multi-line statement (e.g. a multi-line if or a multi-line function definition).
-  - We use C++03 (not C++11) in order to stay compatible to old system compilers.
+  - We use C++11 in order to stay compatible to old system compilers.
 
-The code repository contains a style checker which can be invoked like that:
+The code repository contains a .clang-format file that expresses most of the conventions.
 
-    python cpplint.py cvmfs/uuid.cc
 
 
 # Testing
@@ -43,3 +45,12 @@ If possible, please add tests to any new code.  Preferably add tests as unit tes
 # Documentation
 
 The sources of our [technical documentation](https://cvmfs.readthedocs.io) are at [https://github.com/cvmfs/doc-cvmfs](https://github.com/cvmfs/doc-cvmfs).  We are happy to merge contributions to this document, in particular if they describe user-visible changes in the software!
+
+# A note for Students and early-career developers
+
+The CernVM project tries to provide opportunities for junior engineers.
+We typically participate in the GSoC programme for which project ideas will be published on the HSF website, and in various training programmes at CERN.
+As the team developing CernVM is quite small, unfortunately our capacity is limited.
+Please keep this in mind when contacting the developers, and look out for published opportunities.
+In particular, please do not ask for issues to be assigned to you, or submit purely AI-generated contributions, this will not factor positively into an evaluation for GSoC.
+Also, it is discouraged to open more than two pull requests.
