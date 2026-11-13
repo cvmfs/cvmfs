@@ -1509,10 +1509,10 @@ void Nfs4Server::MonitorLoop() {
     }
     Log(kLogLevelInfo, "sent %zu recalls in %lds, %zu failed", recalls.size(),
         static_cast<long>(time(NULL) - recall_start), failed.size());  // NOLINT
+    // Failed recalls stay recalled and are revoked after a lease period, like
+    // unreturned ones.  Dropping them at once makes the holder's next READ
+    // fail with BAD_STATEID although it never learned about the recall.
     lock.lock();
-    for (unsigned i = 0; i < failed.size(); ++i)
-      delegations_.erase(failed[i]);
-    UpdateFrozenAttrs();
   }
 }
 
