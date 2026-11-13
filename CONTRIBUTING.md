@@ -1,8 +1,10 @@
-# How to Contribute Code to CernVM-FS
+z How to Contribute Code to CernVM-FS
 
 We welcome code contributions!
 
 If you are about to develop a bug fix or a new feature, it could be helpful to let us know about it beforehand, for instance on the cvmfs-devel@cern.ch mailing list or by private mail or through our [ticket tracker](https://github.com/cvmfs/cvmfs/issues).  This can avoid duplicated work and allows us to coordinate the development.
+
+Please take note of our mandatory AI policy in AI-POLICY.md.
 
 
 # Source Code Workflow
@@ -43,3 +45,11 @@ If possible, please add tests to any new code.  Preferably add tests as unit tes
 # Documentation
 
 The sources of our [technical documentation](https://cvmfs.readthedocs.io) are at [https://github.com/cvmfs/doc-cvmfs](https://github.com/cvmfs/doc-cvmfs).  We are happy to merge contributions to this document, in particular if they describe user-visible changes in the software!
+
+# A note for Students and early-career developers
+
+The CernVM project tries to provide opportunities for junior engineers.
+We typically participate in the GSoC programme for which project ideas will be published on the HSF website, and in various training programmes at CERN.
+As the team developing CernVM is quite small, unfortunately our capacity is limited.
+Please keep this in mind when contacting the developers, and look out for published opportunities.
+In particular, please do not ask for issues to be assigned to you, or submit purely AI-generated contributions, this will not factor positively into an evaluation for GSoC.
