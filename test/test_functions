@@ -452,6 +452,85 @@ wait_for_umount() {
   return 0
 }
 
+# Track a separate status file for every child, even when their stdout is
+# redirected to the same path or to /dev/null.
+cvmfs_openwaitprint_status_files=()
+
+cvmfs_start_openwaitprint() {
+  local status_file
+  status_file=$(mktemp "$PWD/.openwaitprint-status.XXXXXX") || return 1
+  ./openwaitprint "$1" --notify > "$2" 3> "$status_file" &
+  cvmfs_openwaitprint_status_files[$!]=$status_file
+}
+
+# The helper reports only after blocking SIGUSR1 and attempting the open.
+# Return 1 only for a reported open failure, or 2 for a protocol failure.
+cvmfs_wait_openwaitprint() {
+  local pid=$1
+  local status_file=${cvmfs_openwaitprint_status_files[$pid]:-}
+  local deadline=$((SECONDS + 30))
+  local state
+  local exited=0
+
+  while [ -n "$status_file" ] && state=$(<"$status_file"); do
+    case $state in
+      O) return 0 ;;
+      F) return 1 ;;
+      '') ;;
+      *) break ;;
+    esac
+    if [ "$exited" -eq 1 ] || [ "$SECONDS" -ge "$deadline" ]; then
+      break
+    fi
+    if ! kill -0 "$pid" 2>/dev/null; then
+      # The child may have reported its outcome between the read and kill.
+      exited=1
+    else
+      sleep 0.05
+    fi
+  done
+  echo "openwaitprint ($pid): did not report an open outcome" >&2
+  return 2
+}
+
+cvmfs_reap_openwaitprint() {
+  local pid=$1
+  local result=0
+  local status_file=${cvmfs_openwaitprint_status_files[$pid]:-}
+  [ -n "$status_file" ] || return 2
+  wait "$pid" || result=$?
+  rm -f "$status_file"
+  unset 'cvmfs_openwaitprint_status_files[pid]'
+  return "$result"
+}
+
+cvmfs_finish_openwaitprint() {
+  local pid=$1
+  local result=0
+  local child_result=0
+  [ -n "${cvmfs_openwaitprint_status_files[$pid]:-}" ] || return 2
+  cvmfs_wait_openwaitprint "$pid" || result=$?
+  case $result in
+    0) kill -USR1 "$pid" || result=2 ;;
+    2) kill -TERM "$pid" 2>/dev/null || true ;;
+  esac
+  cvmfs_reap_openwaitprint "$pid" || child_result=$?
+  [ "$result" -ne 2 ] || return 2
+  return "$child_result"
+}
+
+cvmfs_abort_openwaitprint_jobs() {
+  local pid
+  while read -r pid; do
+    if [ -n "${cvmfs_openwaitprint_status_files[$pid]:-}" ]; then
+      kill -TERM "$pid" 2>/dev/null || true
+    fi
+  done < <(jobs -p)
+  for pid in "${!cvmfs_openwaitprint_status_files[@]}"; do
+    cvmfs_reap_openwaitprint "$pid" || true
+  done
+}
+
 cvmfs_clean() {
   pkill   openwaitprint || true
   pidwait openwaitprint || true

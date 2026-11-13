@@ -3,11 +3,47 @@
 cvmfs_test_name="Check that open cache file descriptors from different processes are not duplicated in cvmfs"
 cvmfs_test_suites="quick"
 
+check_cache_fd_limit() {
+  local testfile=$1
+  local expect_open_failure=$2
+  local -a job_pids=() opened_pids=()
+  local got_open_failure=0
+  local i pid status
+
+  for ((i = 0; i < 64; ++i)); do
+    cvmfs_start_openwaitprint "$testfile" /dev/null || return 1
+    job_pids+=("$!")
+  done
+
+  # Collect all open outcomes before releasing any descriptors, so the
+  # successful opens still count toward the limit while the others run.
+  for pid in "${job_pids[@]}"; do
+    status=0
+    cvmfs_wait_openwaitprint "$pid" || status=$?
+    case $status in
+      0) opened_pids+=("$pid") ;;
+      1)
+        status=0
+        cvmfs_reap_openwaitprint "$pid" || status=$?
+        [ "$status" -eq 1 ] || return 1
+        got_open_failure=1
+        ;;
+      *) return 1 ;;
+    esac
+  done
+
+  for pid in "${opened_pids[@]}"; do
+    cvmfs_finish_openwaitprint "$pid" || return 1
+  done
+  [ "$got_open_failure" -eq "$expect_open_failure" ]
+}
+
 
 cvmfs_run_test() {
   logfile=$1
   src_location=$2
 
+  trap cvmfs_abort_openwaitprint_jobs EXIT
 
   ############### 1) Check that the normal cache manager
   ############### creates new fds for the same object
@@ -23,13 +59,16 @@ cvmfs_run_test() {
   local testfile_hash=$(get_xattr hash $testfile)
 
    gcc -Wall -pthread -o openwaitprint $src_location/openwaitprint.c || return 60
-  ./openwaitprint $testfile > test &
+  cvmfs_start_openwaitprint "$testfile" test || return 62
   local pid_helper1=$!
-  ./openwaitprint $testfile > test &
+  cvmfs_start_openwaitprint "$testfile" test || return 63
   local pid_helper2=$!
-  ./openwaitprint $testfile > test &
+  cvmfs_start_openwaitprint "$testfile" test || return 64
   local pid_helper3=$!
 
+  cvmfs_wait_openwaitprint "$pid_helper1" || return 62
+  cvmfs_wait_openwaitprint "$pid_helper2" || return 63
+  cvmfs_wait_openwaitprint "$pid_helper3" || return 64
 
   ###########
   # check the open file descriptors of the cvmfs2 process
@@ -45,12 +84,9 @@ cvmfs_run_test() {
     return 21
   fi
 
-  kill -USR1 $pid_helper1
-  wait $pid_helper1 || return 62
-  kill -USR1 $pid_helper2
-  wait $pid_helper2 || return 63
-  kill -USR1 $pid_helper3
-  wait $pid_helper3 || return 64
+  cvmfs_finish_openwaitprint "$pid_helper1" || return 62
+  cvmfs_finish_openwaitprint "$pid_helper2" || return 63
+  cvmfs_finish_openwaitprint "$pid_helper3" || return 64
   sleep 1;
 
   cvmfs_umount atlas.cern.ch || return 22
@@ -64,25 +100,25 @@ cvmfs_run_test() {
   # open some test file in several simultaneously in different processes
 
 
-  ./openwaitprint $testfile > testfile1 &
+  cvmfs_start_openwaitprint "$testfile" testfile1 || return 65
   local pid_helper1=$!
-  ./openwaitprint $testfile > testfile2 &
+  cvmfs_start_openwaitprint "$testfile" testfile2 || return 66
   local pid_helper2=$!
-  ./openwaitprint $testfile > testfile3 &
+  cvmfs_start_openwaitprint "$testfile" testfile3 || return 67
   local pid_helper3=$!
 
+  cvmfs_wait_openwaitprint "$pid_helper1" || return 65
+  cvmfs_wait_openwaitprint "$pid_helper2" || return 66
+  cvmfs_wait_openwaitprint "$pid_helper3" || return 67
 
   ###########
   # check the open file descriptors of the cvmfs2 process
   atlas_pid=$(sudo cvmfs_talk -i atlas.cern.ch pid)
   local num_open_fds=$(sudo ls -l /proc/$atlas_pid/fd/ | grep "$(get_cvmfs_cachedir atlas.cern.ch)/${testfile_hash:0:2}/${testfile_hash:2}" | wc -l)
 
-  kill -USR1 $pid_helper1
-  wait $pid_helper1 || return 65
-  kill -USR1 $pid_helper2
-  wait $pid_helper2 || return 66
-  kill -USR1 $pid_helper3
-  wait $pid_helper3 || return 67
+  cvmfs_finish_openwaitprint "$pid_helper1" || return 65
+  cvmfs_finish_openwaitprint "$pid_helper2" || return 66
+  cvmfs_finish_openwaitprint "$pid_helper3" || return 67
 
   echo "The refcount cache manager has $num_open_fds open file descriptors for the same open test file"
   if [ "$num_open_fds" -gt "1" ]; then
@@ -98,38 +134,12 @@ cvmfs_run_test() {
   sudo cat /proc/$atlas_pid/limits
 
   echo "Non-refcounted manager: should fail"
-  local job_pids=""
-  for i in $(seq 1 64); do
-    ./openwaitprint $testfile >/dev/null &
-    job_pids="$job_pids $!"
-  done
-  sleep 1
-  local got_emfile=0
-  for p in $job_pids; do
-    kill -USR1 $p || true
-    if ! wait $p; then
-      got_emfile=1
-    fi
-  done
-  [ $got_emfile -eq 1 ] || return 51
+  check_cache_fd_limit "$testfile" 1 || return 51
 
   cvmfs_umount atlas.cern.ch || return 55
   cvmfs_mount atlas.cern.ch CVMFS_NFILES=550 CVMFS_CACHE_REFCOUNT=yes || return 56
   echo "Refcounted manager: should succeed"
-  job_pids=""
-  for i in $(seq 1 64); do
-    ./openwaitprint $testfile >/dev/null &
-    job_pids="$job_pids $!"
-  done
-  sleep 1
-  got_emfile=0
-  for p in $job_pids; do
-    kill -USR1 $p || true
-    if ! wait $p; then
-      got_emfile=1
-    fi
-  done
-  [ $got_emfile -eq 1 ] && return 57
+  check_cache_fd_limit "$testfile" 0 || return 57
 
   return 0
 }
