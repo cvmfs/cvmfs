@@ -6,7 +6,7 @@ cvmfs_test_suites="quick"
 # ref to https://sft.its.cern.ch/jira/browse/CVM-1927
 
 cvmfs_run_test() {
-    set_up_repository_gateway || return 1
+    set_up_repository_gateway test.repo.org || return 1
 
     ## Transaction 1, create directory with catalog inside
     echo "***  Starting transaction 1"

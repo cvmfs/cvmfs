@@ -10,7 +10,11 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <atomic>
+#include <cassert>
 #include <map>
+#include <memory>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -26,6 +30,42 @@ class Recorder;
 }
 
 /**
+ * Owns a pthread mutex that is initialized on construction and destroyed on
+ * destruction.  Not copyable; meant to be shared via std::shared_ptr so that
+ * the mutex lives as long as its last user.
+ *
+ * Also carries the epoch of the current round of open hash collection.  The
+ * epoch is a counter that only ever moves forward.  It is advanced when a
+ * round is closed early because collectors ran late; collector threads compare
+ * it against the epoch they were started with and drop their results if the
+ * round has moved on.  A round whose collectors all finished leaves none of
+ * them running, so the next round can safely reuse its epoch.  The epoch is
+ * written only while holding the mutex, so that a check followed by an insert
+ * cannot interleave with the closing of the round.
+ */
+class OpenHashesLock : SingleCopy {
+ public:
+  OpenHashesLock() : epoch_(0) {
+    const int retval = pthread_mutex_init(&mutex_, NULL);
+    assert(retval == 0);
+  }
+  ~OpenHashesLock() { pthread_mutex_destroy(&mutex_); }
+
+  pthread_mutex_t *Get() { return &mutex_; }
+
+  uint64_t epoch() const { return epoch_.load(); }
+  /**
+   * Moves on to the next epoch and returns it.  Collectors started with the
+   * previous epoch are thereby cut off from the result set.
+   */
+  uint64_t NextEpoch() { return ++epoch_; }
+
+ private:
+  pthread_mutex_t mutex_;
+  std::atomic<uint64_t> epoch_;
+};
+
+/**
  * Works with the PosixCacheManager.  Uses an SQlite database for cache contents
  * tracking.  Tracking is asynchronously.
  *
@@ -38,8 +78,15 @@ class PosixQuotaManager : public QuotaManager {
   FRIEND_TEST(T_QuotaManager, Contains);
   FRIEND_TEST(T_QuotaManager, InitDatabase);
   FRIEND_TEST(T_QuotaManager, MakeReturnPipe);
+  FRIEND_TEST(T_QuotaManager, OpenHashesLockInitializedOnConstruction);
+  FRIEND_TEST(T_QuotaManager, CollectorHandlerSharesOpenHashesLock);
+  FRIEND_TEST(T_QuotaManager, CollectorThreadReleasesHandlerReference);
+  FRIEND_TEST(T_QuotaManager, CollectorThreadWritesOnlyInItsEpoch);
+  FRIEND_TEST(T_QuotaManager,
+              CollectAllOpenHashesKeepsEpochWithoutLateCollectors);
   FRIEND_TEST(T_QuotaManager, ReadPipeStringUsesExactLength);
   FRIEND_TEST(T_QuotaManager, RegisterMountpointUsesCorrectDescriptionBuffer);
+  FRIEND_TEST(T_QuotaManager, RegisterMountpointIgnoresDuplicates);
   FRIEND_TEST(T_QuotaManager, SetCleanupPolicyUsesCorrectDescriptionBuffer);
 
  public:
@@ -224,6 +271,12 @@ class PosixQuotaManager : public QuotaManager {
   static const unsigned kEvictBatchSize = 1000;
 
   /**
+   * Seconds CollectAllOpenHashes() waits for the collector threads before it
+   * moves on without the results of those still running
+   */
+  static const unsigned kCollectionTimeoutS = 10;
+
+  /**
    * Make sure that the amount of data transferred through the RPC pipe is
    * within the OS's guarantees for atomicity.
    */
@@ -367,6 +420,12 @@ class PosixQuotaManager : public QuotaManager {
    */
   perf::MultiRecorder cleanup_recorder_;
 
+  /**
+   * Allows the QuotaManager to know if an open files aware cleanup policy is
+   * employed.
+   */
+  bool cleanup_unused_first_;
+
   sqlite3 *database_;
   sqlite3_stmt *stmt_touch_;
   sqlite3_stmt *stmt_unpin_;
@@ -390,21 +449,39 @@ class PosixQuotaManager : public QuotaManager {
   /**
    * Used in DoCleanup to exclude currently used files from eviction
    */
-  // TODO(gchr): it would be faster if it was a std::set. Needs a comparison
-  // operator for shash::Any
-  pthread_mutex_t *lock_open_files_;
-  std::vector<shash::Short> open_files_;
+  std::shared_ptr<OpenHashesLock> lock_open_files_;
 
-  bool cleanup_unused_first_;
-  std::vector<std::string> mountpoints_;
+  /**
+   * Used in DoCleanup as the source of truth for open hashes
+   */
+  std::set<shash::Short> open_files_;
 
-  std::vector<shash::Short> CollectAllOpenHashes();
+  /**
+   * Used during the collection of open hashes. Holds all the mountpoints of
+   * the shared Cache Manager.  A set because every client (re)initialization
+   * registers its mountpoint again, e.g. on reload.
+   */
+  std::set<std::string> mountpoints_;
 
+  std::set<shash::Short> CollectAllOpenHashes();
+
+  /**
+   * Per collector thread context, shared between CollectAllOpenHashes() and
+   * the collector thread.  The thread holds its own reference, so the handler
+   * (and through it the lock) stays alive until the thread is done, even if
+   * CollectAllOpenHashes() gave up waiting for it.
+   */
   struct CollectorHandler {
-    std::vector<shash::Short> &of;
-    const std::vector<std::string> &mp;
-    pthread_mutex_t *l;
-    size_t i;
+    CollectorHandler(std::set<shash::Short> &open_files,
+                     const std::string &mountpoint,
+                     const std::shared_ptr<OpenHashesLock> &lock,
+                     uint64_t round_epoch)
+        : of(open_files), mp(mountpoint), l(lock), epoch(round_epoch) { }
+
+    std::set<shash::Short> &of;
+    std::string mp;
+    std::shared_ptr<OpenHashesLock> l;
+    uint64_t epoch; /**< the round this collector belongs to */
   };
 
   static void *CollectMountpointsHashes(void *data);

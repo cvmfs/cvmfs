@@ -75,55 +75,55 @@ cvmfs-release (3.3-1) lucid; urgency=low
 
   * Add Debian 11 "bullseye" platform
 
- -- Jakob Blomer <jblomer@cern.ch>  Wed, 25 August 2021 17:25:00 +0200
+ -- Jakob Blomer <jblomer@cern.ch>  Wed, 25 Aug 2021 17:25:00 +0200
 
 cvmfs-release (3.2-1) lucid; urgency=low
 
   * Add Ubuntu 20.04 "focal" platform
 
- -- Jakob Blomer <jblomer@cern.ch>  Tue, 23 June 2020 15:37:00 +0200
+ -- Jakob Blomer <jblomer@cern.ch>  Tue, 23 Jun 2020 15:37:00 +0200
 
 cvmfs-release (3.1-1) lucid; urgency=low
 
   * Add Debian 10 "buster" platform
 
- -- Jakob Blomer <jblomer@cern.ch>  Tue, 01 October 2019 14:00:00 +0000
+ -- Jakob Blomer <jblomer@cern.ch>  Tue, 01 Oct 2019 14:00:00 +0000
 
 cvmfs-release (3.0-1) lucid; urgency=low
 
   * Fall back to Ubuntu 16.04 on non-LTS platforms
 
- -- Jakob Blomer <jblomer@cern.ch>  Wed, 03 July 2019 11:00:00 +0000
+ -- Jakob Blomer <jblomer@cern.ch>  Wed, 03 Jul 2019 11:00:00 +0000
 
 cvmfs-release (2.1-2) lucid; urgency=low
 
   * Properly handle package removal and upgrades
 
- -- Jakob Blomer <jblomer@cern.ch>  Wed, 05 December 2018 13:00:00 +0000
+ -- Jakob Blomer <jblomer@cern.ch>  Wed, 05 Dec 2018 13:00:00 +0000
 
 cvmfs-release (2.1-1) lucid; urgency=low
 
   * Add Ubuntu 18.04 Bionic repository
 
- -- Jakob Blomer <jblomer@cern.ch>  Wed, 05 December 2018 12:00:00 +0000
+ -- Jakob Blomer <jblomer@cern.ch>  Wed, 05 Dec 2018 12:00:00 +0000
 
 cvmfs-release (2.0-3) lucid; urgency=low
 
   * Disable testing repositories by default
 
- -- Jakob Blomer <jblomer@cern.ch>  Tue, 26 September 2017 08:00:00 +0000
+ -- Jakob Blomer <jblomer@cern.ch>  Tue, 26 Sep 2017 08:00:00 +0000
 
 cvmfs-release (2.0-2) lucid; urgency=low
 
   * Fix package control file
 
- -- Jakob Blomer <jblomer@cern.ch>  Mon, 18 September 2017 12:00:00 +0000
+ -- Jakob Blomer <jblomer@cern.ch>  Mon, 18 Sep 2017 12:00:00 +0000
 
 cvmfs-release (2.0-1) lucid; urgency=low
 
   * Switch to using packages build for the host distribution
 
- -- Jakob Blomer <jblomer@cern.ch>  Wed, 28 June 2017 09:00:00 +0000
+ -- Jakob Blomer <jblomer@cern.ch>  Wed, 28 Jun 2017 09:00:00 +0000
 
 cvmfs-release (1.0-2) lucid; urgency=low
 

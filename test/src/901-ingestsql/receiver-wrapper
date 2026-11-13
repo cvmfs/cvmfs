@@ -1,0 +1,9 @@
+#!/bin/bash
+set -euo pipefail
+
+TIMESTAMP=$(date "+%F_%T.%N")
+DEBUG_LOG=/var/log/receiver."$TIMESTAMP".debug.log
+STDOUT_LOG=/var/log/receiver."$TIMESTAMP".stdout.log
+
+#exec rr /usr/bin/cvmfs_receiver_debug "$@" -d "$DEBUG_LOG" &> "$STDOUT_LOG"
+exec /usr/bin/cvmfs_receiver_debug "$@" -d "$DEBUG_LOG" &> "$STDOUT_LOG"

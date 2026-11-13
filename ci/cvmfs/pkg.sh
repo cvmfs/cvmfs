@@ -55,8 +55,19 @@ echo "detected upstream version: $cvmfs_version"
 echo "building CernVM-FS $cvmfs_version in '$CVMFS_RESULT_LOCATION' from '$CVMFS_SOURCE_LOCATION'"
 cd $CVMFS_RESULT_LOCATION
 
+# Every external is either vendored or explicitly taken from the system.  The
+# default mode tries find_package() first, so whatever the build host has in
+# the SDK or in Homebrew would end up as a runtime dependency of the package
+# (Homebrew nettle, c-ares, the select()-based system libcurl, the system
+# libsqlite3 that cvmfs would reconfigure process-wide).  Only zlib comes from
+# the system: libz ships with macOS.
+CVMFS_EXTERNALS_VENDORED="libcrypto;c-ares;curl;nettle;sqlite3;leveldb;pacparser;sparsehash;json;protobuf;libarchive"
+CVMFS_EXTERNALS_EXCLUDE="${CVMFS_EXTERNALS_EXCLUDE-zlib}"
+
 cmake -DCMAKE_INSTALL_PREFIX:PATH=$CVMFS_INSTALL_PREFIX          \
-      -DBUILTIN_EXTERNALS_EXCLUDE=${CVMFS_EXTERNALS_EXCLUDE:-""} \
+      -DBUILTIN_EXTERNALS=ON                            \
+      -DBUILTIN_EXTERNALS_LIST="$CVMFS_EXTERNALS_VENDORED" \
+      -DBUILTIN_EXTERNALS_EXCLUDE="$CVMFS_EXTERNALS_EXCLUDE" \
       -DCMAKE_CXX_STANDARD=11                           \
       -DBUILD_SERVER=no                                 \
       -DBUILD_SERVER_DEBUG=no                           \
@@ -65,6 +76,19 @@ cmake -DCMAKE_INSTALL_PREFIX:PATH=$CVMFS_INSTALL_PREFIX          \
       $OPENSSL_INCLUDE                                  \
       $CVMFS_SOURCE_LOCATION
 make -j $(get_number_of_cpu_cores)
+
+# Allowed: macFUSE, which the user installs, and OpenSSL, which is still found
+# on the build host (find_package(OpenSSL))
+for f in cvmfs/cvmfs2 cvmfs/libcvmfs_*.dylib; do
+  [ -L $f ] && continue
+  deps=$(otool -L $f | awk 'NR > 1 {print $1}' \
+         | grep -v -e '^/usr/lib/' -e '^/System/' -e '^@rpath/libcvmfs_' \
+                   -e '^/usr/local/lib/libcvmfs_' -e '^/usr/local/lib/libfuse' \
+                   -e '/openssl' || true)
+  [ -z "$deps" ] || die "$f has unexpected runtime dependencies: $deps"
+  ! otool -L $f | grep -q -e '/usr/lib/libcurl' -e '/usr/lib/libsqlite3' \
+    || die "$f links the system libcurl or libsqlite3"
+done
 
 cvmfs_build_tag="cvmfs-${cvmfs_version}"
 echo "creating package: $cvmfs_build_tag"

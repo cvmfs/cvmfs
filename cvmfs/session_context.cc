@@ -68,9 +68,10 @@ size_t RecvCB(void *buffer, size_t size, size_t nmemb, void *userp) {
     return 0;
   }
 
-  *my_buffer = static_cast<char *>(buffer);
+  // curl's buffer is not NUL-terminated and may arrive in several chunks
+  my_buffer->append(static_cast<char *>(buffer), size * nmemb);
 
-  return my_buffer->size();
+  return size * nmemb;
 }
 
 SessionContextBase::SessionContextBase()
@@ -235,6 +236,9 @@ bool SessionContextBase::CommitBucket(const ObjectPack::BucketContentType type,
 
     if (current_pack_->GetNoObjects() > 0) {
       Dispatch();
+    } else {
+      // Nothing to upload, the pack is superseded by new_pack
+      delete current_pack_;
     }
     current_pack_ = new_pack;
 

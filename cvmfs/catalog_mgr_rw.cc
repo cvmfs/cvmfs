@@ -14,6 +14,7 @@
 
 #include "catalog_balancer.h"
 #include "catalog_rw.h"
+#include "file_bundle.h"
 #include "manifest.h"
 #include "statistics.h"
 #include "upload.h"
@@ -61,6 +62,14 @@ WritableCatalogManager::WritableCatalogManager(
       smalloc(sizeof(pthread_mutex_t)));
   retval = pthread_mutex_init(catalog_processing_lock_, NULL);
   assert(retval == 0);
+  catalog_download_lock_ = reinterpret_cast<pthread_mutex_t *>(
+      smalloc(sizeof(pthread_mutex_t)));
+  retval = pthread_mutex_init(catalog_download_lock_, NULL);
+  assert(retval == 0);
+  catalog_hash_lock_ = reinterpret_cast<pthread_mutex_t *>(
+      smalloc(sizeof(pthread_mutex_t)));
+  retval = pthread_mutex_init(catalog_hash_lock_, NULL);
+  assert(retval == 0);
 }
 
 
@@ -69,6 +78,10 @@ WritableCatalogManager::~WritableCatalogManager() {
   free(sync_lock_);
   pthread_mutex_destroy(catalog_processing_lock_);
   free(catalog_processing_lock_);
+  pthread_mutex_destroy(catalog_download_lock_);
+  free(catalog_download_lock_);
+  pthread_mutex_destroy(catalog_hash_lock_);
+  free(catalog_hash_lock_);
 }
 
 
@@ -238,8 +251,15 @@ void WritableCatalogManager::RemoveFile(const std::string &path) {
   DirectoryEntry entry;
   if (FindCatalog(file_path, &catalog, &entry)) {
     if (entry.IsBundleTrigger()) {
-      catalog->RemoveEntry(GetParentPath(file_path) + "/.cvmfsbundle-"
-                           + GetFileName(file_path));
+      const string parent = GetParentPath(file_path) + "/";
+      const string specs[] = {
+          parent + bundle::SuffixedSpecName(GetFileName(file_path)),
+          parent + bundle::PlainSpecName(GetFileName(file_path))};
+      for (const string &spec : specs) {
+        DirectoryEntry spec_entry;
+        if (catalog->LookupPath(PathString(spec), &spec_entry))
+          catalog->RemoveEntry(spec);
+      }
     }
     catalog->RemoveEntry(file_path);
   }
@@ -613,6 +633,22 @@ void WritableCatalogManager::UpdateBundleTrigger(const std::string &file_path,
     SyncUnlock();
     PANIC(kLogStderr, "failed to set bundle trigger on non-regular file %s",
           file_path.c_str());
+  }
+
+  if (new_value) {
+    const string parent = GetParentPath(file_path) + "/";
+    const string trigger = GetFileName(file_path);
+    DirectoryEntry spec_entry;
+    if (catalog->LookupPath(
+            PathString(parent + bundle::SuffixedSpecName(trigger)), &spec_entry)
+        && catalog->LookupPath(
+            PathString(parent + bundle::PlainSpecName(trigger)), &spec_entry)) {
+      SyncUnlock();
+      PANIC(kLogStderr,
+            "conflicting bundle specifications for %s: both %s and %s exist",
+            file_path.c_str(), bundle::PlainSpecName(trigger).c_str(),
+            bundle::SuffixedSpecName(trigger).c_str());
+    }
   }
 
   entry.set_is_bundle_trigger(new_value);
@@ -1690,6 +1726,9 @@ void WritableCatalogManager::SetupSingleCatalogUploadCallback() {
 void WritableCatalogManager::RemoveSingleCatalogUploadCallback() {
   spooler_->WaitForUpload();  // wait for all outstanding jobs to finish before
                               // tearing it down
+  // parents that were waiting on children can be uploaded now
+  ScheduleReadyCatalogs();
+  spooler_->WaitForUpload();
   spooler_->UnregisterListeners();
   pending_catalogs_ =
       {};  // whatever we couldn't process, leave it to the Commit
@@ -1702,6 +1741,10 @@ void WritableCatalogManager::AddCatalogToQueue(const std::string &path) {
   assert(retval);
   assert(catalog);
   catalog->SetDirty();  // ensure it's dirty so its parent will wait for it
+  // the parent must not be finalized before this catalog's upload callback
+  // has written the new nested catalog link into it
+  if (catalog->HasParent())
+    catalog->GetWritableParent()->IncrementDirtyChildren();
   SyncUnlock();
   pending_catalogs_.push_back(catalog);
 }
@@ -1831,6 +1874,9 @@ void WritableCatalogManager::CatalogDownloadCallback(
     delete downloaded_catalog;
     return;
   }
+  // the temp copy is only used to find nested catalogs; the download itself
+  // warmed the local cache, so drop the copy together with the object
+  downloaded_catalog->TakeDatabaseFileOwnership();
 
   Catalog::NestedCatalogList nested_catalogs = downloaded_catalog
                                                    ->ListNestedCatalogs();

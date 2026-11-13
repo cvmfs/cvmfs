@@ -66,7 +66,7 @@ class DirectoryEntryTestFactory {
                                          unsigned size = 4096,
                                          const string &symlink_path = "");
   static catalog::DirectoryEntry ChunkedFile(
-      shash::Any content_hash = shash::Any());
+      shash::Any content_hash = shash::Any(), bool is_direct_io = false);
   static catalog::DirectoryEntry ExternalFile();
   static catalog::DirectoryEntry SpecialFile();
   static catalog::DirectoryEntry Make(const Metadata &metadata);

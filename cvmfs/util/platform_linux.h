@@ -18,6 +18,7 @@
 #include <fcntl.h>
 #include <limits.h>
 #include <mntent.h>
+#include <paths.h>
 #include <pthread.h>
 #include <signal.h>
 #include <sys/file.h>
@@ -38,6 +39,15 @@
 #include <vector>
 
 #include "util/smalloc.h"
+
+#ifndef __GLIBC__
+// musl's strdupa passes alloca()'s void * to strcpy, which C++ rejects
+#include <alloca.h>
+#undef strdupa
+#define strdupa(s)                    \
+  strcpy(/* NOLINT(runtime/printf) */ \
+         static_cast<char *>(alloca(strlen((s)) + 1)), (s))
+#endif
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {

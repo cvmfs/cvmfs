@@ -109,9 +109,15 @@ catalog::InclusionSpec *inclusion_spec = NULL;
 std::atomic<int64_t> overall_chunks;
 std::atomic<int64_t> overall_new;
 std::atomic<int64_t> chunk_queue;
+std::atomic<int64_t> failed_chunks;
 bool preload_cache = false;
 string *preload_cachedir = NULL;
 bool inspect_existing_catalogs = false;
+// Set once a revisited history chain reaches a catalog that is already
+// present. Older revisions missing locally were removed by the replica's gc.
+bool reached_existing_history = false;
+// Upstream path of a local backend; empty for other backends
+string local_upstream_path;
 manifest::Reflog *reflog = NULL;
 
 }  // anonymous namespace
@@ -162,8 +168,13 @@ static void ReportDownloadError(const download::JobInfo &download_job) {
       break;
 
     default:
-      if (download::IsProxyTransferError(error_code)
-          || download::IsHostTransferError(error_code)) {
+      if ((error_code == download::kFailHostConnection) && (http_code >= 400)) {
+        LogCvmfs(kLogCvmfs, kLogStderr,
+                 "last HTTP error code %d - "
+                 "please check the stratum 0 health",
+                 http_code);
+      } else if (download::IsProxyTransferError(error_code)
+                 || download::IsHostTransferError(error_code)) {
         LogCvmfs(kLogCvmfs, kLogStderr,
                  "couldn't reach Stratum 0 - "
                  "please check the network connection");
@@ -277,14 +288,16 @@ static void *MainWorker(void *data) {
 
       const download::Failures download_result = download_manager->Fetch(
           &download_chunk);
+      fclose(fchunk);
       if (download_result != download::kFailOk) {
         ReportDownloadError(download_chunk);
-        PANIC(kLogStderr, "Download error");
+        unlink(tmp_file.c_str());
+        failed_chunks.fetch_add(1);
+      } else {
+        Store(tmp_file, chunk_hash,
+              (compression_alg == zlib::kZlibDefault) ? true : false);
+        overall_new.fetch_add(1);
       }
-      fclose(fchunk);
-      Store(tmp_file, chunk_hash,
-            (compression_alg == zlib::kZlibDefault) ? true : false);
-      overall_new.fetch_add(1);
     }
     if (overall_chunks.fetch_add(1) % 1000 == 0)
       LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, ".");
@@ -343,13 +356,22 @@ bool CommandPull::Pull(const shash::Any &catalog_hash,
   assert(shash::kSuffixCatalog == catalog_hash.suffix);
   previous_catalog.SetNull();
 
-  // Check if the catalog already exists
-  if (Peek(catalog_hash)) {
-    // Preload: dirtab changed
+  // With a changed inclusion spec, existing catalogs may contain objects
+  // that were previously excluded. Revisit them and fetch missing chunks.
+  const bool catalog_exists = Peek(catalog_hash);
+  const bool revisit = inspect_existing_catalogs && !preload_cache;
+  if (revisit && path.empty()) {
+    if (catalog_exists) {
+      reached_existing_history = true;
+    } else if (is_historic_catalog && reached_existing_history) {
+      LogCvmfs(kLogCvmfs, kLogStdout,
+               "  Not restoring collected historic catalog %s",
+               catalog_hash.ToString().c_str());
+      return true;
+    }
+  }
+  if (catalog_exists && !revisit) {
     if (inspect_existing_catalogs) {
-      if (!preload_cache) {
-        PANIC(kLogStderr, "to be implemented: -t without -c");
-      }
       catalog::Catalog *catalog = catalog::Catalog::AttachFreely(
           path, MakePath(catalog_hash), catalog_hash);
       if (catalog == NULL) {
@@ -378,6 +400,7 @@ bool CommandPull::Pull(const shash::Any &catalog_hash,
 
   const int64_t gauge_chunks = overall_chunks.load();
   const int64_t gauge_new = overall_new.load();
+  const int64_t gauge_failed = failed_chunks.load();
 
   // Download and uncompress catalog
   shash::Any chunk_hash;
@@ -399,16 +422,32 @@ bool CommandPull::Pull(const shash::Any &catalog_hash,
     unlink(file_catalog.c_str());
     return false;
   }
-  const string url_catalog = *stratum0_url + "/data/" + catalog_hash.MakePath();
+  // Historic catalogs retained locally may already have been collected on
+  // Stratum 0, so revisited catalogs are read from the replica's backend.
+  // Without direct access (S3), fall back to the replica's own URL.
+  const string &catalog_url = catalog_exists ? *stratum1_url : *stratum0_url;
+  const string url_catalog = catalog_url + "/data/" + catalog_hash.MakePath();
   cvmfs::FileSink filesink(fcatalog_vanilla);
   download::JobInfo download_catalog(&url_catalog, false, false, &catalog_hash,
                                      &filesink);
-  dl_retval = download_manager()->Fetch(&download_catalog);
-  fclose(fcatalog_vanilla);
+  if (catalog_exists && !local_upstream_path.empty()) {
+    fclose(fcatalog_vanilla);
+    if (!CopyPath2Path(local_upstream_path + "/data/" + catalog_hash.MakePath(),
+                       file_catalog_vanilla)) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to read local catalog %s",
+               catalog_hash.ToString().c_str());
+      goto pull_cleanup;
+    }
+    dl_retval = download::kFailOk;
+  } else {
+    dl_retval = download_manager()->Fetch(&download_catalog);
+    fclose(fcatalog_vanilla);
+  }
   if (dl_retval != download::kFailOk) {
     const bool genuinely_missing = (dl_retval == download::kFailHostHttp)
                                    && (download_catalog.http_code() == 404);
-    if (is_historic_catalog && is_garbage_collectable && genuinely_missing) {
+    if (is_historic_catalog && is_garbage_collectable && genuinely_missing
+        && !catalog_exists) {
       LogCvmfs(kLogCvmfs, kLogStdout,
                "skipping missing catalog %s - "
                "probably swept by garbage collection",
@@ -478,6 +517,14 @@ bool CommandPull::Pull(const shash::Any &catalog_hash,
              "%" PRId64 " unique chunks",
              overall_new.load() - gauge_new,
              overall_chunks.load() - gauge_chunks);
+    const int64_t num_failed = failed_chunks.load() - gauge_failed;
+    if (num_failed > 0) {
+      // The catalog is not stored, so a rerun picks up its missing chunks
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "failed to download %" PRId64 " chunks of catalog %s",
+               num_failed, catalog_hash.ToString().c_str());
+      goto pull_cleanup;
+    }
   }
 
   retval = PullRecursion(catalog, path);
@@ -489,7 +536,11 @@ bool CommandPull::Pull(const shash::Any &catalog_hash,
   WaitForStorage();
   if (!retval)
     return false;
-  Store(file_catalog_vanilla, catalog_hash);
+  if (catalog_exists) {
+    unlink(file_catalog_vanilla.c_str());
+  } else {
+    Store(file_catalog_vanilla, catalog_hash);
+  }
   return true;
 
 pull_cleanup:
@@ -607,6 +658,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   // Initialization
   overall_chunks.store(0);
   overall_new.store(0);
+  failed_chunks.store(0);
   chunk_queue.store(0);
 
   const bool follow_redirects = false;
@@ -706,6 +758,8 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
         spooler_definition_str, ensemble.manifest->GetHashAlgorithm());
     spooler = upload::Spooler::Construct(spooler_definition);
     assert(spooler);
+    if (spooler_definition.driver_type == upload::SpoolerDefinition::Local)
+      local_upstream_path = spooler_definition.spooler_configuration;
     spooler->RegisterListener(&SpoolerOnUpload);
   }
 
@@ -814,6 +868,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   retval = 1;
   {
     bool is_historic = false;
+    reached_existing_history = false;
     do {
       retval = static_cast<int>(
           Pull(current_catalog_hash, "", previous_catalog_hash, is_historic)
@@ -834,7 +889,11 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
                                  iend = historic_tags.end();
        i != iend;
        ++i) {
-    if (Peek(i->root_hash))
+    // Tags mostly share objects with the trunk; retrying the same failing
+    // chunks for every tag only delays the error
+    if (failed_chunks.load() > 0)
+      break;
+    if (Peek(i->root_hash) && !inspect_existing_catalogs)
       continue;
     LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from %s repository tag",
              i->name.c_str());
@@ -842,6 +901,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
 
     bool retval2 = true;
     current_catalog_hash = i->root_hash;
+    reached_existing_history = false;
     do {
       retval2 = Pull(current_catalog_hash, "", previous_catalog_hash,
                      true /* is_historic_catalog */)
@@ -867,6 +927,12 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   }
   ClosePipe(pipe_chunks);
 
+  if (failed_chunks.load() > 0) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "%" PRId64 " chunks failed to download, not publishing the "
+             "revision; a rerun resumes from the catalogs already stored",
+             failed_chunks.load());
+  }
   if (!retval)
     goto fini;
 

@@ -98,7 +98,7 @@ parm_list="CVMFS_USER CVMFS_NFILES CVMFS_CACHE_BASE CVMFS_CACHE_DIR CVMFS_MOUNT_
           CERNVM_GRID_UI_VERSION CVMFS_SYSLOG_LEVEL CVMFS_SYSLOG_FACILITY CVMFS_TRACEFILE \
           CVMFS_TIMEOUT CVMFS_TIMEOUT_DIRECT CVMFS_PUBLIC_KEY CVMFS_KEYS_DIR \
           CVMFS_MAX_TTL CVMFS_RELOAD_SOCKETS CVMFS_DEFAULT_DOMAIN CVMFS_OOM_SCORE_ADJ \
-          CVMFS_MEMCACHE_SIZE CVMFS_KCACHE_TIMEOUT CVMFS_ROOT_HASH CVMFS_REPOSITORY_TAG CVMFS_REPOSITORY_DATE CVMFS_REPOSITORIES \
+          CVMFS_OOM_SCORE_WATCHDOG CVMFS_MEMCACHE_SIZE CVMFS_KCACHE_TIMEOUT CVMFS_ROOT_HASH CVMFS_REPOSITORY_TAG CVMFS_REPOSITORY_DATE CVMFS_REPOSITORIES \
           CVMFS_PROXY_RESET_AFTER CVMFS_MAX_RETRIES CVMFS_BACKOFF_INIT CVMFS_BACKOFF_MAX \
           CVMFS_ALIEN_CACHE CVMFS_TRUSTED_CERTS CVMFS_INITIAL_GENERATION \
           CVMFS_CONFIG_REPOSITORY CVMFS_LOW_SPEED_LIMIT CVMFS_FALLBACK_PROXY CVMFS_PROXY_TEMPLATE \
@@ -1592,7 +1592,11 @@ cvmfs_reload() {
 
   if [ "x$CVMFS_CONFIG_REPOSITORY" != "x" ]; then
     # Ensure that we capture the config repository as well
-    cd "${CVMFS_MOUNT_DIR}/${CVMFS_CONFIG_REPOSITORY}" 2>/dev/null
+    if ! cd "${CVMFS_MOUNT_DIR}/${CVMFS_CONFIG_REPOSITORY}" 2>/dev/null; then
+      # Not fatal: the config repo is paused separately at the end
+      echo "WARNING: cannot access config repository" \
+           "${CVMFS_MOUNT_DIR}/${CVMFS_CONFIG_REPOSITORY}" 1>&2
+    fi
   fi
   # TODO(jblomer): here is a pretty big race: fuse clients could have passed
   # the check for this directory in their mount helper but are not yet fully
@@ -1608,7 +1612,14 @@ cvmfs_reload() {
 
   RETVAL=0
   local mount_list
+  local config_mnt=""
   mount_list=`list_mounts | awk '{print $3}'`
+  if [ "x$CVMFS_CONFIG_REPOSITORY" != "x" ]; then
+    config_mnt=$(canonicalize_path ${CVMFS_MOUNT_DIR}/${CVMFS_CONFIG_REPOSITORY})
+    # The config repo may not be mounted yet, and reading any repository's
+    # configuration below can automount it.
+    mount_list="$mount_list $config_mnt"
+  fi
   # Make sure that if autofs unmounts any of these guys, they (but only they)
   # can be remounted
   for m in $mount_list
@@ -1624,7 +1635,9 @@ cvmfs_reload() {
   local m
   for m in $mount_list
   do
-    if [ x"$m" = x"$(canonicalize_path ${CVMFS_MOUNT_DIR}/${CVMFS_CONFIG_REPOSITORY})" ]; then
+    # Compare canonical paths: on macOS, list_mounts reports mounts under
+    # CVMFS_MOUNT_DIR, which may be a symlink to the real mount root.
+    if [ -n "$config_mnt" ] && [ x"$(canonicalize_path "$m")" = x"$config_mnt" ]; then
       # We need to finish pausing the other repositories first because they
       # might try to load the blacklist from the config repository as part of
       # their reload
@@ -1677,6 +1690,9 @@ cvmfs_reload() {
 
   if stat ${CVMFS_RELOAD_SOCKETS}/pid.* >/dev/null 2>&1; then
     if [ "x$CVMFS_CONFIG_REPOSITORY" != "x" ]; then
+      # This is for the unlikely case that the config repo got
+      # unmounted by the automounter between the time that the
+      # _cvmfs_reload_pause above deleted this file and now.
       touch ${CVMFS_RELOAD_SOCKETS}/cvmfs.pause/$(echo -n "${CVMFS_MOUNT_DIR}/${CVMFS_CONFIG_REPOSITORY}" | base64_nowrap)
     fi
     for pidfile in ${CVMFS_RELOAD_SOCKETS}/pid.*; do

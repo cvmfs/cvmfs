@@ -2,10 +2,14 @@
  * This file is part of the CernVM File System.
  */
 
+#include <fcntl.h>
+#include <sys/resource.h>
+#include <sys/select.h>
 #include <unistd.h>
 
 #include <cassert>
 #include <cstdio>
+#include <vector>
 
 #include "c_file_sandbox.h"
 #include "c_http_server.h"
@@ -30,6 +34,26 @@ class TestInterruptCue : public InterruptCue {
  public:
   virtual bool IsCanceled() { return true; }
 };
+
+struct FlakyServerState {
+  FlakyServerState(int code, int num_failures)
+      : code(code), num_failures(num_failures), num_requests(0) { }
+  int code;
+  int num_failures;
+  int num_requests;
+};
+
+HTTPResponse FlakyServerHandler(const HTTPRequest & /*req*/, void *data) {
+  FlakyServerState *state = static_cast<FlakyServerState *>(data);
+  HTTPResponse response;
+  if (state->num_requests++ < state->num_failures) {
+    response.code = state->code;
+    response.reason = "Error";
+  } else {
+    response.body = "payload";
+  }
+  return response;
+}
 
 }  // anonymous namespace
 
@@ -199,6 +223,48 @@ TEST_F(T_Download, Multiple) {
   EXPECT_EQ(info.error_code(), kFailOk);
   EXPECT_EQ(info2.error_code(), kFailOk);
   fclose(fdest);
+}
+
+
+TEST_F(T_Download, RemoteFileHighFd) {
+  // Without a working poll(), libcurl falls back to select() and rejects
+  // sockets >= FD_SETSIZE, which shows up as kFailHostConnection.
+  const int kNumFds = FD_SETSIZE + 64;
+  struct rlimit rl;
+  ASSERT_EQ(0, getrlimit(RLIMIT_NOFILE, &rl));
+  const rlim_t orig_soft = rl.rlim_cur;
+  if (rl.rlim_cur < static_cast<rlim_t>(2 * kNumFds)) {
+    if (rl.rlim_max < static_cast<rlim_t>(2 * kNumFds))
+      GTEST_SKIP() << "RLIMIT_NOFILE hard limit too low";
+    rl.rlim_cur = 2 * kNumFds;
+    ASSERT_EQ(0, setrlimit(RLIMIT_NOFILE, &rl));
+  }
+
+  MockFileServer file_server(8082, sandbox_path_);
+  const string src_path = GetSmallFile();
+  string url = "http://127.0.0.1:8082/" + GetFileName(src_path);
+
+  std::vector<int> fds;
+  const int fd_null = open("/dev/null", O_RDONLY);
+  ASSERT_GE(fd_null, 0);
+  fds.push_back(fd_null);
+  while (fds.back() < kNumFds) {
+    const int fd = dup(fd_null);
+    ASSERT_GE(fd, 0);
+    fds.push_back(fd);
+  }
+
+  cvmfs::MemSink memsink;
+  JobInfo info(&url, false, false, NULL, &memsink);
+  download_mgr.Fetch(&info);
+
+  for (unsigned i = 0; i < fds.size(); ++i)
+    close(fds[i]);
+  rl.rlim_cur = orig_soft;
+  setrlimit(RLIMIT_NOFILE, &rl);
+
+  EXPECT_EQ(kFailOk, info.error_code());
+  EXPECT_EQ(1, file_server.num_processed_requests());
 }
 
 
@@ -380,6 +446,60 @@ TEST_F(T_Download, RemoteFileSwitchProxies) {
   ASSERT_EQ(info.error_code(), kFailOk);
   ASSERT_EQ(memsink.pos(), src_content.length());
   EXPECT_STREQ(reinterpret_cast<char *>(memsink.data()), src_content.c_str());
+}
+
+TEST_F(T_Download, RemoteFileRetryGatewayError) {
+  const int codes[] = {502, 503, 504};
+  for (unsigned i = 0; i < sizeof(codes) / sizeof(codes[0]); ++i) {
+    FlakyServerState state(codes[i], 1);
+    const int port = 8085 + i;
+    MockHTTPServer server(port);
+    server.SetResponseCallback(FlakyServerHandler, &state);
+    ASSERT_TRUE(server.Start());
+
+    download_mgr.SetRetryParameters(1, 1, 2);
+    string url = "http://127.0.0.1:" + StringifyInt(port) + "/foo";
+    cvmfs::MemSink memsink;
+    JobInfo info(&url, false /* compressed */, false /* probe hosts */, NULL,
+                 &memsink);
+    download_mgr.Fetch(&info);
+    EXPECT_EQ(kFailOk, info.error_code()) << codes[i];
+    EXPECT_EQ(2, state.num_requests) << codes[i];
+    EXPECT_EQ(1U, info.num_retries()) << codes[i];
+  }
+}
+
+TEST_F(T_Download, RemoteFileGatewayErrorExhaustsRetries) {
+  FlakyServerState state(502, 100);
+  MockHTTPServer server(8085);
+  server.SetResponseCallback(FlakyServerHandler, &state);
+  ASSERT_TRUE(server.Start());
+
+  download_mgr.SetRetryParameters(2, 1, 2);
+  string url = "http://127.0.0.1:8085/foo";
+  cvmfs::MemSink memsink;
+  JobInfo info(&url, false /* compressed */, false /* probe hosts */, NULL,
+               &memsink);
+  download_mgr.Fetch(&info);
+  EXPECT_EQ(kFailHostConnection, info.error_code());
+  EXPECT_EQ(502, info.http_code());
+  EXPECT_EQ(3, state.num_requests);
+}
+
+TEST_F(T_Download, RemoteFileNoRetryInternalServerError) {
+  FlakyServerState state(500, 1);
+  MockHTTPServer server(8085);
+  server.SetResponseCallback(FlakyServerHandler, &state);
+  ASSERT_TRUE(server.Start());
+
+  download_mgr.SetRetryParameters(1, 1, 2);
+  string url = "http://127.0.0.1:8085/foo";
+  cvmfs::MemSink memsink;
+  JobInfo info(&url, false /* compressed */, false /* probe hosts */, NULL,
+               &memsink);
+  download_mgr.Fetch(&info);
+  EXPECT_EQ(kFailHostHttp, info.error_code());
+  EXPECT_EQ(1, state.num_requests);
 }
 
 TEST_F(T_Download, RemoteFileEmpty) {

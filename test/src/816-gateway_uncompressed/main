@@ -10,7 +10,7 @@ cvmfs_test_suites="quick"
 
 
 cvmfs_run_test() {
-    set_up_repository_gateway || return 1
+    set_up_repository_gateway test.repo.org || return 1
 
     echo "CVMFS_COMPRESSION_ALGORITHM=none" | sudo tee -a \
         /etc/cvmfs/repositories.d/test.repo.org/server.conf || return 10

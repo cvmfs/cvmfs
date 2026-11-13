@@ -7,8 +7,8 @@ on:
     branches: ['devel', 'cvmfs*']
   workflow_dispatch:
 jobs:
-  macos_build_and_test:
-    name: "macos_build_and_test"
+  macos_build:
+    name: "macos_build"
     # Build-only: hosted runners cannot load macFUSE (no headless way to
     # approve it), so mounts and integration tests run in CI_MacOS_NFS_Tests.
     runs-on: macos-26
@@ -64,3 +64,7 @@ jobs:
           export CVMFS_PACKAGE=$(ls ${GITHUB_WORKSPACE}/build/pkg_result/cvmfs-*.pkg)
           sudo installer -pkg ${CVMFS_PACKAGE} -target /
           cvmfs2 --version
+          # The system libcurl uses select() and fails on fds >= FD_SETSIZE
+          if otool -L /usr/local/lib/libcvmfs_*.dylib | grep /usr/lib/libcurl; then
+            echo "::error::client libraries link the system libcurl"; exit 1
+          fi

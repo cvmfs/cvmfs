@@ -503,6 +503,79 @@ TYPED_TEST(T_GarbageCollector, KeepEverything) {
   EXPECT_EQ(static_cast<unsigned>(t(27, 11, 1987)), gc.oldest_trunk_catalog());
 }
 
+TYPED_TEST(T_GarbageCollector, PruneFullReplicaWithPartialSpec) {
+  catalog::InclusionSpec spec;
+  ASSERT_TRUE(spec.Parse("version 1\n/00/10\n!/00/10/20\n"));
+
+  typename TestFixture::GcConfiguration
+      config = this->GetStandardGarbageCollectorConfiguration();
+  config.keep_history_depth = TraversalParams::kFullHistory;
+  config.inclusion_spec = &spec;
+  config.prune_partial_replica = true;
+
+  typename TestFixture::MyGarbageCollector gc(config);
+  EXPECT_TRUE(gc.Collect());
+  GC_MockUploader *upl = static_cast<GC_MockUploader *>(config.uploader);
+  // Excluded catalogs in HEAD and named snapshots, and their unique objects.
+  EXPECT_TRUE(upl->HasDeleted(this->GetCatalog(5, "11")->hash()));
+  EXPECT_TRUE(upl->HasDeleted(this->GetCatalog(5, "20")->hash()));
+  EXPECT_TRUE(upl->HasDeleted(h("50c44954ab4348a6a3772ee5bd30ab7a1494c692")));
+  EXPECT_TRUE(upl->HasDeleted(h("2dc2b87b8ac840e4fb1cad25c806395c931f7b31")));
+  EXPECT_TRUE(upl->HasDeleted(this->GetCatalog(2, "11")->hash()));
+  // Objects shared with included catalogs must not be removed.
+  EXPECT_FALSE(upl->HasDeleted(h("c308c87d518c86130d9b9d34723b2a7d4e232ce9")));
+  EXPECT_FALSE(upl->HasDeleted(this->GetCatalog(5, "00")->hash()));
+  EXPECT_FALSE(upl->HasDeleted(this->GetCatalog(5, "10")->hash()));
+  EXPECT_FALSE(upl->HasDeleted(h("4083d30ba1f72e1dfad4cdbfc60ea3c38bfa600d")));
+}
+
+TYPED_TEST(T_GarbageCollector, PruningRequiresValidSpec) {
+  typename TestFixture::GcConfiguration
+      config = this->GetStandardGarbageCollectorConfiguration();
+  config.prune_partial_replica = true;
+  typename TestFixture::MyGarbageCollector gc(config);
+  EXPECT_FALSE(gc.Collect());
+  GC_MockUploader *upl = static_cast<GC_MockUploader *>(config.uploader);
+  EXPECT_TRUE(upl->deleted_hashes.empty());
+}
+
+TYPED_TEST(T_GarbageCollector, PrunePartialReplicaDryRun) {
+  catalog::InclusionSpec spec;
+  ASSERT_TRUE(spec.Parse("version 1\n/00/10\n"));
+  typename TestFixture::GcConfiguration
+      config = this->GetStandardGarbageCollectorConfiguration();
+  config.keep_history_depth = TraversalParams::kFullHistory;
+  config.inclusion_spec = &spec;
+  config.prune_partial_replica = true;
+  config.dry_run = true;
+  typename TestFixture::MyGarbageCollector gc(config);
+  EXPECT_TRUE(gc.Collect());
+  EXPECT_GT(gc.condemned_objects_count(), 0u);
+  GC_MockUploader *upl = static_cast<GC_MockUploader *>(config.uploader);
+  EXPECT_TRUE(upl->deleted_hashes.empty());
+
+  // A dry run must condemn exactly what a real run deletes.
+  config.dry_run = false;
+  typename TestFixture::MyGarbageCollector gc_real(config);
+  EXPECT_TRUE(gc_real.Collect());
+  EXPECT_EQ(gc.condemned_objects_count(), gc_real.condemned_objects_count());
+  EXPECT_EQ(gc.condemned_objects_count(), upl->deleted_hashes.size());
+}
+
+TYPED_TEST(T_GarbageCollector, PartialSpecDoesNotPruneByDefault) {
+  catalog::InclusionSpec spec;
+  ASSERT_TRUE(spec.Parse("version 1\n/00/10\n"));
+  typename TestFixture::GcConfiguration
+      config = this->GetStandardGarbageCollectorConfiguration();
+  config.keep_history_depth = TraversalParams::kFullHistory;
+  config.inclusion_spec = &spec;
+  typename TestFixture::MyGarbageCollector gc(config);
+  EXPECT_TRUE(gc.Collect());
+  GC_MockUploader *upl = static_cast<GC_MockUploader *>(config.uploader);
+  EXPECT_FALSE(upl->HasDeleted(this->GetCatalog(5, "11")->hash()));
+  EXPECT_FALSE(upl->HasDeleted(h("50c44954ab4348a6a3772ee5bd30ab7a1494c692")));
+}
+
 TYPED_TEST(T_GarbageCollector, KeepLastRevision) {
   typename TestFixture::GcConfiguration
       config = this->GetStandardGarbageCollectorConfiguration();

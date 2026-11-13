@@ -136,6 +136,7 @@ class WritableCatalog : public Catalog {
   int dirty_children() const { return dirty_children_.load(); }
   void set_dirty_children(const int count) { dirty_children_.store(count); }
   int DecrementDirtyChildren() { return dirty_children_.fetch_add(-1) - 1; }
+  int IncrementDirtyChildren() { return dirty_children_.fetch_add(1) + 1; }
 
  private:
   SqlDirentInsert *sql_insert_;

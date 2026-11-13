@@ -28,8 +28,9 @@ mkdir -p $stage_dir $result_dir
 cvmfs_version="$(get_cvmfs_version "$SOURCE_DIR")-nfs.${VERSION_SUFFIX}"
 echo "building $cvmfs_version"
 
-# The vendored sqlite: cvmfs reconfigures sqlite globally, which crashes
-# frameworks sharing the system libsqlite3
+# Every external is vendored except zlib, see ci/cvmfs/pkg.sh.  In particular
+# sqlite: cvmfs reconfigures sqlite globally, which crashes frameworks sharing
+# the system libsqlite3.
 cmake -S $SOURCE_DIR -B $BUILD_DIR -G Ninja \
   -DCMAKE_INSTALL_PREFIX=$PREFIX \
   -DBUILTIN_EXTERNALS=ON \
@@ -37,8 +38,8 @@ cmake -S $SOURCE_DIR -B $BUILD_DIR -G Ninja \
   -DBUILD_SERVER=OFF -DBUILD_RECEIVER=OFF -DBUILD_GEOAPI=OFF \
   -DBUILD_UNITTESTS=OFF -DBUILD_MANPAGES=OFF \
   -DCVMFS_MACFUSE=OFF -DBUILD_NFS_FRONTEND=ON \
-  -DBUILTIN_EXTERNALS_EXCLUDE=zlib -DBUILTIN_EXTERNALS_LIST="c-ares;nettle" \
-  -DCMAKE_DISABLE_FIND_PACKAGE_sqlite3=TRUE
+  -DBUILTIN_EXTERNALS_EXCLUDE=zlib \
+  -DBUILTIN_EXTERNALS_LIST="libcrypto;c-ares;curl;nettle;sqlite3;leveldb;pacparser;sparsehash;json;protobuf;libarchive"
 cmake --build $BUILD_DIR --target \
   cvmfs2 cvmfs_fsck cvmfs_talk cvmfs_nfsfuse cvmfs_nfs_stub cvmfs_nfs cvmfs_nfs_debug \
   mount_cvmfs

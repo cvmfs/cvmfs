@@ -38,6 +38,7 @@
 
 #include "catalog_traversal_parallel.h"
 #include "garbage_collection/hash_filter.h"
+#include "path_filters/inclusion_spec.h"
 #include "statistics.h"
 #include "upload_facility.h"
 
@@ -70,7 +71,9 @@ class GarbageCollector {
         , deleted_objects_logfile(NULL)
         , statistics(NULL)
         , extended_stats(false)
-        , num_threads(8) { }
+        , num_threads(8)
+        , prune_partial_replica(false)
+        , inclusion_spec(NULL) { }
 
     bool has_deletion_log() const { return deleted_objects_logfile != NULL; }
 
@@ -85,6 +88,8 @@ class GarbageCollector {
     perf::Statistics *statistics;
     bool extended_stats;
     unsigned int num_threads;
+    bool prune_partial_replica;
+    const catalog::InclusionSpec *inclusion_spec;
   };
 
  public:
@@ -107,10 +112,12 @@ class GarbageCollector {
 
   void PreserveDataObjects(const TraversalCallbackDataTN &data);
   void SweepDataObjects(const TraversalCallbackDataTN &data);
+  void SweepExcludedDataObjects(const TraversalCallbackDataTN &data);
 
   bool AnalyzePreservedCatalogTree();
   bool CheckPreservedRevisions();
   bool SweepReflog();
+  bool SweepExcludedCatalogs();
 
   void CheckAndSweep(const shash::Any &hash);
   void Sweep(const shash::Any &hash);

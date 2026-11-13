@@ -127,7 +127,7 @@ fi
 # Platform detection
 ########################
 PKG_MGR=""
-OS_FAMILY=""   # deb|rhel|suse
+OS_FAMILY=""   # deb|rhel|suse|alpine
 
 detect_platform() {
   local id="" id_like=""
@@ -138,6 +138,9 @@ detect_platform() {
     id_like="${ID_LIKE:-}"
   fi
   local like_all="$id $id_like"
+  if echo "$like_all" | grep -Eq 'alpine'; then
+    PKG_MGR="apk"; OS_FAMILY="alpine"; return 0
+  fi
   if echo "$like_all" | grep -Eq '(debian|ubuntu)'; then
     PKG_MGR="apt-get"; OS_FAMILY="deb"; return 0
   fi
@@ -151,6 +154,7 @@ detect_platform() {
   if check_available apt-get; then PKG_MGR="apt-get"; OS_FAMILY="deb"; return 0; fi
   if check_available dnf; then PKG_MGR="dnf"; OS_FAMILY="rhel"; return 0; fi
   if check_available zypper; then PKG_MGR="zypper"; OS_FAMILY="suse"; return 0; fi
+  if check_available apk; then PKG_MGR="apk"; OS_FAMILY="alpine"; return 0; fi
   return 1
 }
 
@@ -234,6 +238,22 @@ list_deps_rpm() {
   extract_rpm_deps "$spec" --requires "Requires" | grep -v '^cvmfs'
 }
 
+# Alpine has no cvmfs package spec to derive dependencies from; this mirrors
+# the Build-Depends of packaging/debian/cvmfs/control.
+ALPINE_BUILD_DEPS="attr-dev bash build-base cmake cpio curl fuse3-dev git help2man
+  libarchive-dev libcap-dev linux-headers m4 nettle-dev nlohmann-json
+  openssl-dev patch pkgconf protobuf-dev py3-setuptools python3-dev unzip
+  util-linux-dev zlib-dev"
+ALPINE_RUNTIME_DEPS="attr fuse3 gawk psmisc util-linux"
+
+list_deps_alpine() {
+  echo "# Build Dependencies:"
+  echo $ALPINE_BUILD_DEPS | tr ' ' '\n'
+  echo ""
+  echo "# Runtime Dependencies:"
+  echo $ALPINE_RUNTIME_DEPS | tr ' ' '\n'
+}
+
 ########################
 # Installers per platform
 ########################
@@ -274,6 +294,10 @@ install_deps_suse() {
   $SUDO zypper -n install $pkgs
 }
 
+install_deps_alpine() {
+  $SUDO apk add --no-cache $ALPINE_BUILD_DEPS
+}
+
 install_test_deps() {
   log "Installing integration test dependencies"
   case "$OS_FAMILY" in
@@ -284,6 +308,7 @@ install_test_deps() {
       ;;
     rhel) $SUDO dnf -y install gcc-c++;;
     suse) $SUDO zypper -n install gcc-c++;;
+    alpine) $SUDO apk add --no-cache g++;;
     *) die "Unsupported OS family for test dependencies: $OS_FAMILY";;
   esac
 }
@@ -299,6 +324,8 @@ case "$MODE" in
       list_deps_rpm "$RPM_SPEC"
     elif [[ "$OS_FAMILY" = "suse" ]]; then
       list_deps_rpm "$RPM_SPEC"
+    elif [[ "$OS_FAMILY" = "alpine" ]]; then
+      list_deps_alpine
     else
       die "Unsupported OS family for listing: $OS_FAMILY"
     fi
@@ -310,6 +337,8 @@ case "$MODE" in
       install_deps_rhel
     elif [[ "$OS_FAMILY" = "suse" ]]; then
       install_deps_suse
+    elif [[ "$OS_FAMILY" = "alpine" ]]; then
+      install_deps_alpine
     else
       die "Unsupported OS family for install: $OS_FAMILY"
     fi

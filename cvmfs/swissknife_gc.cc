@@ -47,6 +47,8 @@ ParameterList CommandGc::GetParams() const {
   r.push_back(Parameter::Switch('d', "dry run"));
   r.push_back(Parameter::Switch('l', "list objects to be removed"));
   r.push_back(Parameter::Switch('I', "upload updated statistics DB file"));
+  r.push_back(Parameter::Switch(
+      'p', "prune excluded objects on a partial replica (requires -E)"));
   r.push_back(
       Parameter::Optional('E', "inclusion spec for partial replication"));
   return r;
@@ -89,26 +91,20 @@ int CommandGc::Main(const ArgumentList &args) {
                                        ? String2Uint64(*args.find('N')->second)
                                        : 8;
 
-  // Partial replication: no functional changes needed.  Excluded subtrees are
-  // pruned during snapshot, so both their catalogs and their objects are
-  // absent.  The catalog traversal already runs with ignore_load_failure=true
-  // (see GarbageCollector::GetTraversalParams), so pruned nested catalogs are
-  // silently skipped along with their entire subtree; and the sweep phase is a
-  // no-op for objects that were never downloaded.
+  const bool prune_partial_replica = (args.count('p') > 0);
+  if (prune_partial_replica && args.count('E') == 0) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "pruning requires an inclusion spec (-E)");
+    return 1;
+  }
+  std::unique_ptr<catalog::InclusionSpec> inclusion_spec;
   if (args.count('E') > 0) {
-    catalog::InclusionSpec *inclusion_spec = catalog::InclusionSpec::Create(
-        *args.find('E')->second);
-    if (inclusion_spec != NULL && inclusion_spec->IsValid()) {
-      LogCvmfs(kLogCvmfs, kLogStdout,
-               "Partial replication mode: GC will skip pruned (excluded) "
-               "catalogs and their objects");
-    } else {
+    inclusion_spec.reset(
+        catalog::InclusionSpec::Create(*args.find('E')->second));
+    if (!inclusion_spec || !inclusion_spec->IsValid()) {
       LogCvmfs(kLogCvmfs, kLogStderr,
-               "Warning: could not parse inclusion spec '%s', "
-               "continuing without partial replication awareness",
-               args.find('E')->second->c_str());
+               "invalid partial replication inclusion spec");
+      return 1;
     }
-    delete inclusion_spec;
   }
 
   if (timestamp == GcConfig::kNoTimestamp
@@ -196,6 +192,8 @@ int CommandGc::Main(const ArgumentList &args) {
   config.statistics = statistics();
   config.extended_stats = extended_stats;
   config.num_threads = num_threads;
+  config.prune_partial_replica = prune_partial_replica;
+  config.inclusion_spec = inclusion_spec.get();
 
   if (deletion_log_file != NULL) {
     const int bytes_written = fprintf(deletion_log_file,

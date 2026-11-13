@@ -100,6 +100,7 @@ TEST_F(T_RamCacheManager, OpenFromTxn) {
   EXPECT_EQ(alloc_size, ramcache_.Write(buf, alloc_size, txn));
 
   EXPECT_GE((fd = ramcache_.OpenFromTxn(txn)), 0);
+  EXPECT_EQ(0, ramcache_.CommitTxn(txn));
   EXPECT_EQ(alloc_size, ramcache_.GetSize(fd));
 
   EXPECT_EQ(0, ramcache_.Close(fd));
@@ -117,6 +118,7 @@ TEST_F(T_RamCacheManager, Dup) {
   EXPECT_EQ(-EBADF, ramcache_.Dup(fd));
 
   EXPECT_GE((fd = ramcache_.OpenFromTxn(txn)), 0);
+  EXPECT_EQ(0, ramcache_.CommitTxn(txn));
   EXPECT_EQ(alloc_size, ramcache_.GetSize(fd));
   EXPECT_GE((dupfd = ramcache_.Dup(fd)), 0);
   EXPECT_EQ(0, ramcache_.Close(fd));
@@ -194,6 +196,10 @@ TEST_F(T_RamCacheManager, OpenEntries) {
   EXPECT_GE(ramcache_.OpenFromTxn(txn4), 0);
   EXPECT_LT(ramcache_.OpenFromTxn(txn5), 0);
 
+  EXPECT_EQ(0, ramcache_.AbortTxn(txn1));
+  EXPECT_EQ(0, ramcache_.AbortTxn(txn2));
+  EXPECT_EQ(0, ramcache_.AbortTxn(txn3));
+  EXPECT_EQ(0, ramcache_.AbortTxn(txn4));
   EXPECT_EQ(0, ramcache_.AbortTxn(txn5));
 }
 
@@ -311,6 +317,7 @@ TEST_F(T_RamCacheManager, LargeCommit) {
   a_.digest[1] = 2;
   EXPECT_EQ(0, ramcache_.Close(fd));
   EXPECT_EQ(0, ramcache_.CommitTxn(txn3));
+  EXPECT_EQ(0, ramcache_.AbortTxn(txn2));
 }
 
 

@@ -421,8 +421,8 @@ cvmfs_run_test() {
   cvmfs_server tag -l $CVMFS_TEST_REPO
 
   echo "*** {11} check tag existence (especially $prev_trunk_tag)"
-  cvmfs_server tag -l $CVMFS_TEST_REPO | grep -q "$trunk_tag"
-  cvmfs_server tag -l $CVMFS_TEST_REPO | grep -q "$prev_trunk_tag"
+  cvmfs_server tag -l $CVMFS_TEST_REPO | grep "$trunk_tag" >/dev/null
+  cvmfs_server tag -l $CVMFS_TEST_REPO | grep "$prev_trunk_tag" >/dev/null
 
   ! cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep "$first_tag"
   ! cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep "$first_tag_desc"

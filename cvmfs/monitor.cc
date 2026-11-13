@@ -12,7 +12,11 @@
 #include "monitor.h"
 
 #include <errno.h>
+#if defined(__GLIBC__) || defined(__APPLE__)
 #include <execinfo.h>
+#define CVMFS_HAVE_EXECINFO
+#endif
+#include <fcntl.h>
 #include <poll.h>
 #include <pthread.h>
 #include <signal.h>
@@ -66,13 +70,15 @@ int Watchdog::g_crash_signals[] = {SIGQUIT, SIGILL, SIGABRT, SIGFPE,
 
 Watchdog *Watchdog::Create(FnOnExit on_exit,
                            bool needs_read_environ,
-                           WatchdogState *saved_state) {
+                           WatchdogState *saved_state,
+                           const std::string &oom_score_adj,
+                           bool retain_root) {
   assert(instance_ == NULL);
-  instance_ = new Watchdog(on_exit);
+  instance_ = new Watchdog(on_exit, oom_score_adj);
   if (saved_state != NULL)
     instance_->RestoreState(saved_state);
   else
-    instance_->Fork(needs_read_environ);
+    instance_->Fork(needs_read_environ, retain_root);
   return instance_;
 }
 
@@ -85,10 +91,14 @@ string Watchdog::GenerateStackTrace(pid_t pid) {
   int retval;
   string result = "";
 
-  // Get capability to ptrace the dead main cvmfs2 process.
-  // This is often necessary because the main process can have its own
-  // elevated capability which would otherwise block ptrace.
-  if (!ObtainSysPtraceCapability()) {
+  if (retain_root_) {
+    if (!SwitchCredentials(0, getgid(), true /* temporarily */, true)) {
+      result += "failed to re-gain root permissions... still give it a try\n";
+    }
+  } else if (!ObtainSysPtraceCapability()) {
+    // Get capability to ptrace the dead main cvmfs2 process.
+    // This is often necessary because the main process can have its own
+    // elevated capability which would otherwise block ptrace.
     result += "failed to gain ptrace capability... still give it a try\n";
   }
 
@@ -340,6 +350,7 @@ void Watchdog::SendTrace(int sig, siginfo_t *siginfo, void *context) {
 #if defined(CVMFS_FUSE_MODULE)
       LogCvmfs(kLogCvmfs, kLogSyslogErr, "Signal %d, errno %d", sig,
                send_errno);
+#ifdef CVMFS_HAVE_EXECINFO
       void *addr[kMaxBacktrace];
       // Note: this doesn't work due to the signal stack on OS X (it works on
       // Linux).  Since anyway lldb is supposed to produce the backtrace, we
@@ -351,6 +362,7 @@ void Watchdog::SendTrace(int sig, siginfo_t *siginfo, void *context) {
       for (int i = 0; i < num_addr; ++i)
         backtrace += string(symbols[i]) + "\n";
       LogCvmfs(kLogCvmfs, kLogSyslogErr, "%s", backtrace.c_str());
+#endif
       LogCvmfs(kLogCvmfs, kLogSyslogErr, "address of g_cvmfs_exports: %p",
                &g_cvmfs_exports);
 #endif
@@ -390,7 +402,8 @@ Watchdog::SigactionMap Watchdog::SetSignalHandlers(
 /**
  * Fork the watchdog process and put it on hold until Spawn() is called.
  */
-void Watchdog::Fork(bool needs_read_environ) {
+void Watchdog::Fork(bool needs_read_environ, bool retain_root) {
+  retain_root_ = retain_root;
   Pipe<kPipeWatchdogPid> pipe_pid;
   pipe_watchdog_ = std::unique_ptr<Pipe<kPipeWatchdog> >(
       new Pipe<kPipeWatchdog>());
@@ -410,7 +423,35 @@ void Watchdog::Fork(bool needs_read_environ) {
         case 0: {
           pipe_watchdog_->CloseWriteFd();
           Daemonize();
-          if ((geteuid() != 0) && SetuidCapabilityPermitted()) {
+#ifndef __APPLE__
+          if (!oom_score_adj_.empty()) {
+            // After seteuid() the process is non-dumpable and its /proc
+            // entries are owned by root, so temporarily regain root if possible
+            const uid_t euid = geteuid();
+            const gid_t egid = getegid();
+            const bool regain_root = (euid != 0) && (getuid() == 0);
+            if (regain_root)
+              SwitchCredentials(0, egid, true /* temporarily */);
+            const int fd_oom = open("/proc/self/oom_score_adj", O_WRONLY);
+            // Lowering the score requires CAP_SYS_RESOURCE, so failure is
+            // expected for unprivileged mounts
+            if ((fd_oom < 0)
+                || !SafeWrite(fd_oom, oom_score_adj_.data(),
+                              oom_score_adj_.length())) {
+              LogCvmfs(kLogMonitor, kLogDebug,
+                       "watchdog: failed to set oom_score_adj to %s",
+                       oom_score_adj_.c_str());
+            }
+            if (fd_oom >= 0)
+              close(fd_oom);
+            if (regain_root && !SwitchCredentials(euid, egid, true)) {
+              PANIC(kLogStderr | kLogSyslogErr,
+                    "Failed to drop watchdog credentials");
+            }
+          }
+#endif
+          if (!retain_root_ && (geteuid() != 0)
+              && SetuidCapabilityPermitted()) {
             const std::vector<cap_value_t> nocaps;
             if (on_exit_) {
               // Reduce to minimum capabilities, which unfortunately is
@@ -718,11 +759,13 @@ void Watchdog::RestoreState(WatchdogState *saved_state) {
 }
 
 
-Watchdog::Watchdog(FnOnExit on_exit)
+Watchdog::Watchdog(FnOnExit on_exit, const std::string &oom_score_adj)
     : spawned_(false)
     , maintenance_mode_(false)
     , exe_path_(string(platform_getexepath()))
+    , oom_score_adj_(oom_score_adj)
     , watchdog_pid_(0)
+    , retain_root_(false)
     , on_exit_(on_exit) {
   const int retval = platform_spinlock_init(&lock_handler_, 0);
   assert(retval == 0);

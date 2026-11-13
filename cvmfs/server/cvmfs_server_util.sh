@@ -1344,6 +1344,8 @@ Supported Commands:
                   [-t time stamp after which revisions are preserved]
                   [-l print deleted objects] [-L log of deleted objects]
                   [-f force] [-d dry run]
+                  [-p prune excluded objects from a partial replica;
+                   granularity is nested catalogs]
                   {-A collect all garbage-collectable repos, log to gc.log |
                    -a collect all but replicas not collected upstream |
                     <fully qualified name>}

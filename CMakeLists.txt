@@ -94,6 +94,9 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
   if (EXISTS /etc/arch-release OR EXISTS /etc/manjaro-release)
     set (ARCHLINUX TRUE)
   endif ()
+  if (EXISTS /etc/alpine-release)
+    set (ALPINE TRUE)
+  endif ()
   if(EXISTS "/etc/os-release")
     file(STRINGS "/etc/os-release" OS_RELEASE_LINES)
     foreach(line ${OS_RELEASE_LINES})
@@ -189,7 +192,7 @@ if (MACOSX)
   set (CMAKE_MACOSX_RPATH true)
   list( APPEND CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/lib )
 else (MACOSX) # --> Linux
-  if (DEBIAN OR ARCHLINUX)
+  if (DEBIAN OR ARCHLINUX OR ALPINE)
     if (ARCHLINUX)
       set (CMAKE_MOUNT_INSTALL_BINDIR "/usr/bin")
       set (CVMFS_LIBEXEC_DIR "lib/cvmfs")
@@ -198,7 +201,7 @@ else (MACOSX) # --> Linux
       set (CVMFS_LIBEXEC_DIR "libexec/cvmfs")
     endif (ARCHLINUX)
     set (CMAKE_INSTALL_LIBDIR "lib" CACHE STRING "library installation directory")
-  else (DEBIAN OR ARCHLINUX) # --> RedHat, Fedora, CentOS, SuSE
+  else (DEBIAN OR ARCHLINUX OR ALPINE) # --> RedHat, Fedora, CentOS, SuSE
     set (CMAKE_MOUNT_INSTALL_BINDIR "/sbin")
     set (CVMFS_LIBEXEC_DIR "libexec/cvmfs")
     if (IS_64_BIT)
@@ -206,7 +209,7 @@ else (MACOSX) # --> Linux
     else (IS_64_BIT) # --> 32 Bit
       set (CMAKE_INSTALL_LIBDIR "lib" CACHE STRING "library installation directory")
     endif (IS_64_BIT)
-  endif (DEBIAN OR ARCHLINUX)
+  endif (DEBIAN OR ARCHLINUX OR ALPINE)
 endif (MACOSX)
 message ("Installing shared libraries to: ${CMAKE_INSTALL_LIBDIR}")
 

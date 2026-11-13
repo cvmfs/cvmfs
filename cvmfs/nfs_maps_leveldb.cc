@@ -35,6 +35,36 @@
 using namespace std;  // NOLINT
 
 
+namespace {
+
+/**
+ * A previous instance of the same repository may still be shutting down after
+ * umount returned and hold the LOCK file, so give it some time to release it.
+ * Workaround: umount should rather wait for the old cvmfs2 to exit.
+ */
+leveldb::Status OpenDbWithRetry(const leveldb::Options &options,
+                                const string &path, leveldb::DB **db) {
+  const unsigned kRetryIntervalMs = 100;
+  const unsigned kMaxRetries = 300;
+  leveldb::Status status;
+  for (unsigned i = 0; i <= kMaxRetries; ++i) {
+    status = leveldb::DB::Open(options, path, db);
+    if (status.ok() || !status.IsIOError()
+        || (status.ToString().find("/LOCK") == string::npos)) {
+      break;
+    }
+    if (i == 0) {
+      LogCvmfs(kLogNfsMaps, kLogDebug, "%s locked, waiting: %s", path.c_str(),
+               status.ToString().c_str());
+    }
+    SafeSleepMs(kRetryIntervalMs);
+  }
+  return status;
+}
+
+}  // anonymous namespace
+
+
 NfsMapsLeveldb::ForkAwareEnv::ForkAwareEnv(NfsMapsLeveldb *maps)
     : leveldb::EnvWrapper(leveldb::Env::Default()), maps_(maps) {
   num_bg_threads_.store(0);
@@ -131,8 +161,8 @@ NfsMapsLeveldb *NfsMapsLeveldb::Create(const string &leveldb_dir,
   leveldb_options.block_cache = maps->cache_inode2path_;
   maps->filter_inode2path_ = leveldb::NewBloomFilterPolicy(10);
   leveldb_options.filter_policy = maps->filter_inode2path_;
-  status = leveldb::DB::Open(leveldb_options, leveldb_dir + "/inode2path",
-                             &maps->db_inode2path_);
+  status = OpenDbWithRetry(leveldb_options, leveldb_dir + "/inode2path",
+                           &maps->db_inode2path_);
   if (!status.ok()) {
     LogCvmfs(kLogNfsMaps, kLogDebug, "failed to create inode2path db: %s",
              status.ToString().c_str());
@@ -148,8 +178,8 @@ NfsMapsLeveldb *NfsMapsLeveldb::Create(const string &leveldb_dir,
   leveldb_options.block_cache = maps->cache_path2inode_;
   maps->filter_path2inode_ = leveldb::NewBloomFilterPolicy(10);
   leveldb_options.filter_policy = maps->filter_path2inode_;
-  status = leveldb::DB::Open(leveldb_options, leveldb_dir + "/path2inode",
-                             &maps->db_path2inode_);
+  status = OpenDbWithRetry(leveldb_options, leveldb_dir + "/path2inode",
+                           &maps->db_path2inode_);
   if (!status.ok()) {
     LogCvmfs(kLogNfsMaps, kLogDebug, "failed to create path2inode db: %s",
              status.ToString().c_str());
@@ -304,7 +334,9 @@ NfsMapsLeveldb::NfsMapsLeveldb()
 
 
 NfsMapsLeveldb::~NfsMapsLeveldb() {
-  PutPath2Inode(shash::Md5(shash::AsciiPtr("?seq")), seq_);
+  // NULL if Create() failed to open the database
+  if (db_path2inode_ != NULL)
+    PutPath2Inode(shash::Md5(shash::AsciiPtr("?seq")), seq_);
 
   delete db_path2inode_;
   delete cache_path2inode_;
