@@ -29,18 +29,21 @@ jobs:
         systemd: [true, false]
 
     steps:
-      # Keep LF line endings: cvmfs_config is copied into the Linux guest
-      - name: Disable CRLF conversion
-        shell: pwsh
-        run: git config --global core.autocrlf false
-
-      # Only cvmfs_config is needed. A full checkout fails on Windows because
-      # the tree contains reserved names (test/unittests/aux/) and symlinks.
-      - name: Checkout cvmfs_config
-        uses: actions/checkout@v4
-        with:
-          sparse-checkout: cvmfs/cvmfs_config
-          sparse-checkout-cone-mode: false
+      # Only cvmfs_config is needed. actions/checkout cannot be used on Windows:
+      # git refuses the reserved name test/unittests/aux/ even with a sparse
+      # checkout. The raw file is fetched through the API (no line-ending
+      # conversion, works for private forks too).
+      - name: Fetch cvmfs_config
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          curl -fsSL \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github.raw" \
+            -o cvmfs_config \
+            "https://api.github.com/repos/${{ github.repository }}/contents/cvmfs/cvmfs_config?ref=${{ github.sha }}"
+          head -n1 cvmfs_config
 
       - name: Set up WSL2 (Ubuntu 24.04)
         uses: Vampire/setup-wsl@v5
@@ -82,7 +85,7 @@ jobs:
         shell: wsl-bash {0}
         run: |
           set -ex
-          src="$(wslpath -u '${{ github.workspace }}')/cvmfs/cvmfs_config"
+          src="$(wslpath -u '${{ github.workspace }}')/cvmfs_config"
           install -m 0755 "$src" /usr/bin/cvmfs_config
           sed -i 's/\r$//' /usr/bin/cvmfs_config
           grep -q wsl2_without_systemd /usr/bin/cvmfs_config
