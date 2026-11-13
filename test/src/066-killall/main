@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 cvmfs_test_name="Killing all cvmfs2 instances"
 cvmfs_test_suites="quick"

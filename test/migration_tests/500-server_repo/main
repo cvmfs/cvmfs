@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 cvmfs_test_name="Migrate repository to newer version"
 cvmfs_test_autofs_on_startup=false
 MIGRATIONTEST_500_REPO="migrationtest.cern.ch"

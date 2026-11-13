@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 cvmfs_test_name="Page cache tracker corner case #3520"
 cvmfs_test_autofs_on_startup=false
 cvmfs_test_suites="quick"

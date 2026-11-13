@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # entrypoint-publisher.sh – start-up script for the cvmfs publisher container.
 #
 # This container connects to the gateway as a mountless publisher

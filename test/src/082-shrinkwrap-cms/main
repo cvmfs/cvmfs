@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 cvmfs_test_name="shrinkwrap as a normal user"
 cvmfs_test_suites="quick"
 

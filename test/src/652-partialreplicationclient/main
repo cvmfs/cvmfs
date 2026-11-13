@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 cvmfs_test_name="Client Failover from Partial to Full Stratum-1"
 cvmfs_test_autofs_on_startup=false
 

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -e
 
 usage() {
@@ -104,7 +104,7 @@ create_and_run_vm() {
     guest_script=$(mktemp "$SCRIPT_DIR/guest-script.XXXXXX.sh")
     chmod +x "$guest_script"
     cat > "$guest_script" <<GUEST_EOF
-#!/bin/bash
+#!/usr/bin/env bash
 # VM-specific mounts: / is read-only in virtme, so use tmpfs for /cvmfs
 sudo mount -t tmpfs -o size=512M cvmfs_root /cvmfs
 sudo mount /dev/vda /var/lib/cvmfs

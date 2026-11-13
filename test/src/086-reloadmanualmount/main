@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 cvmfs_test_name="Repository reload with config repository and manual mount"
 cvmfs_test_suites="quick"

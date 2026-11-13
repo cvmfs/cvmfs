@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 cvmfs_test_name="Mounting repo with http redirects"
 
 cvmfs_run_test() {
