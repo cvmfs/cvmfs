@@ -64,10 +64,14 @@ bool SendAll(int fd, const char *p, size_t len) {
   return true;
 }
 
-bool RecvAll(int fd, char *p, size_t len, unsigned timeout_ms) {
+bool RecvAll(int fd, char *p, size_t len, unsigned timeout_ms,
+             bool *timed_out = NULL) {
   while (len > 0) {
-    if (!WaitFd(fd, POLLIN, timeout_ms))
+    if (!WaitFd(fd, POLLIN, timeout_ms)) {
+      if (timed_out)
+        *timed_out = true;
       return false;
+    }
     const ssize_t n = recv(fd, p, len, 0);
     if (n == 0)
       return false;
@@ -80,6 +84,18 @@ bool RecvAll(int fd, char *p, size_t len, unsigned timeout_ms) {
     len -= n;
   }
   return true;
+}
+
+/**
+ * True if an idle connection has pending input: EOF or reset by the peer, or
+ * a stray record that would desynchronize the stream anyway
+ */
+bool PeerClosed(int fd) {
+  struct pollfd pfd;
+  pfd.fd = fd;
+  pfd.events = POLLIN;
+  pfd.revents = 0;
+  return poll(&pfd, 1, 0) > 0;
 }
 
 }  // anonymous namespace
@@ -168,6 +184,11 @@ bool CallbackClient::Call(uint32_t procedure, const std::string &args,
 
   // A broken connection is reestablished once
   for (unsigned attempt = 0; attempt < 2; ++attempt) {
+    // A client may close the idle callback connection.  Sending into such a
+    // socket succeeds and only the reply read fails, so check before reuse.
+    if (fd_ >= 0 && PeerClosed(fd_))
+      Disconnect();
+    const bool reused = (fd_ >= 0);
     if (!Connect(timeout_ms))
       return false;
     const uint32_t xid = next_xid_++;
@@ -201,8 +222,16 @@ bool CallbackClient::Call(uint32_t procedure, const std::string &args,
     // Read records until the reply to our xid arrives
     while (true) {
       uint32_t marker;
-      if (!RecvAll(fd_, reinterpret_cast<char *>(&marker), 4, timeout_ms)) {
+      bool timed_out = false;
+      if (!RecvAll(fd_, reinterpret_cast<char *>(&marker), 4, timeout_ms,
+                   &timed_out)) {
         Disconnect();
+        // The peer may have closed a reused connection while the call was
+        // in flight.  CB_RECALL and CB_NULL are safe to repeat.
+        if (reused && !timed_out)
+          break;
+        Log(kLogLevelDebug, "callback xid %u: %s", xid,
+            timed_out ? "no reply in time" : "connection closed");
         return false;
       }
       marker = ntohl(marker);
@@ -218,7 +247,8 @@ bool CallbackClient::Call(uint32_t procedure, const std::string &args,
       }
       XdrReader r(reinterpret_cast<const unsigned char *>(record.data()),
                   record.size());
-      uint32_t reply_xid, type, reply_stat, verf_flavor, accept;
+      uint32_t reply_xid, type;
+      uint32_t reply_stat = 0, verf_flavor = 0, accept = 0;
       std::string verf;
       r.GetU32(&reply_xid);
       r.GetU32(&type);
@@ -228,8 +258,11 @@ bool CallbackClient::Call(uint32_t procedure, const std::string &args,
       r.GetU32(&verf_flavor);
       r.GetOpaque(&verf, 400);
       r.GetU32(&accept);
-      if (!r.ok() || reply_stat != kMsgAccepted || accept != kAcceptSuccess)
+      if (!r.ok() || reply_stat != kMsgAccepted || accept != kAcceptSuccess) {
+        Log(kLogLevelDebug, "callback xid %u rejected (reply %u, accept %u)",
+            xid, reply_stat, accept);
         return false;
+      }
       result->assign(reinterpret_cast<const char *>(r.cursor()),
                      r.remaining());
       return true;

@@ -1256,6 +1256,11 @@ TEST_F(T_Nfs4Server, Delegations) {
   Run(rd, &r);
   EXPECT_EQ(static_cast<uint32_t>(NFS4_OK), r.status);
 
+  // The client closes the idle callback connection; the recall must still get
+  // through
+  callback_server.Stop();
+  callback_server.Start();
+
   // A new generation of the exported tree recalls the delegation
   backend_.node(file_)->attr.mtime.sec = 1800000000;
   backend_.generation_++;
