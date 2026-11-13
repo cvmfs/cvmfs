@@ -97,7 +97,7 @@ jobs:
       - name: Measure Network usage before tests
         id: network-usage-before
         run: |
-          interface="eth0"
+          interface=$(ip -o route show default | awk '{print $5; exit}')
           initial_rx=$(awk -v iface="$interface:" '$1 == iface {print $2}' /proc/net/dev)
           initial_tx=$(awk -v iface="$interface:" '$1 == iface {print $10}' /proc/net/dev)
           echo "initial_rx=${initial_rx}" >> $GITHUB_OUTPUT
@@ -144,8 +144,9 @@ jobs:
 
       - name: Measure Network usage after tests
         id: network-usage-after
+        continue-on-error: true
         run: |
-          interface="eth0"
+          interface=$(ip -o route show default | awk '{print $5; exit}')
           initial_rx=${{ steps.network-usage-before.outputs.initial_rx }}
           initial_tx=${{ steps.network-usage-before.outputs.initial_tx }}
           # Get final values
