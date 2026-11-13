@@ -6,12 +6,6 @@ name: CI_WSL2
 # with the version from this checkout, so only the script is under test.
 
 on:
-  push:
-    # TEMP: feat-use-wsl2-systemd only for testing on the fork; remove before PR
-    branches: ['devel', 'cvmfs*', 'feat-use-wsl2-systemd']
-    paths:
-      - 'cvmfs/cvmfs_config'
-      - '.github/workflows/ci_wsl2.yml'
   pull_request:
     branches: ['devel', 'cvmfs*']
     paths:
