@@ -46,7 +46,7 @@ jobs:
           head -n1 cvmfs_config
 
       - name: Set up WSL2 (Ubuntu 24.04)
-        uses: Vampire/setup-wsl@v5
+        uses: Vampire/setup-wsl@v7
         with:
           distribution: Ubuntu-24.04
           use-cache: 'true'
