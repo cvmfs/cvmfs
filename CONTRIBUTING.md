@@ -1,4 +1,4 @@
-z How to Contribute Code to CernVM-FS
+# How to Contribute Code to CernVM-FS
 
 We welcome code contributions!
 
