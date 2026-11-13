@@ -193,7 +193,7 @@ func createMultiarchAliasSymlinksWithLogger(logger *log.Entry, repo string) {
 
 		aliasPath := filepath.Join(".multiarch", alias)
 		targetPath := filepath.Join(".multiarch", target)
-		if err := cvmfs.CreateSymlinkIntoCVMFSWithLogger(logger, repo, aliasPath, targetPath); err != nil {
+		if err := cvmfs.CreateSymlinkIntoCVMFSWithLogger(logger, repo, aliasPath, targetPath, false); err != nil {
 			l.Ensure(logger).WithFields(log.Fields{
 				"alias":  aliasPath,
 				"target": targetPath,
@@ -224,7 +224,7 @@ func createImageDigestSymlink(logger *log.Entry, repo, manifestDigest, flatPath 
 	if err != nil {
 		return err
 	}
-	return cvmfs.CreateSymlinkIntoCVMFSWithLogger(logger, repo, linkPath, targetPath)
+	return cvmfs.CreateSymlinkIntoCVMFSWithLogger(logger, repo, linkPath, targetPath, true)
 }
 
 // filterManifestList returns the subset of manifests to process.
@@ -374,7 +374,7 @@ func ConvertWishFlat(wish WishFriendly, multiArch bool) error {
 				// make a new Link to the privatePaht
 				// after that skip and continue
 				imageLogger.Trace("Updating singularity image symlink")
-				err = cvmfs.CreateSymlinkIntoCVMFSWithLogger(imageLogger, wish.CvmfsRepo, publicSymlinkPath, singularityPrivatePath)
+				err = cvmfs.CreateSymlinkIntoCVMFSWithLogger(imageLogger, wish.CvmfsRepo, publicSymlinkPath, singularityPrivatePath, false)
 				if err != nil {
 					errF := fmt.Errorf("Error in updating symlink for singularity image: %s", inputImage.GetSimpleName())
 					imageLogger.WithField("error", errF).WithFields(
@@ -398,7 +398,7 @@ func ConvertWishFlat(wish WishFriendly, multiArch bool) error {
 			// we simply create the public directory
 			if errPri == nil && os.IsNotExist(errPub) {
 				imageLogger.Trace("Creating singularity image symlink")
-				err = cvmfs.CreateSymlinkIntoCVMFSWithLogger(imageLogger, wish.CvmfsRepo, publicSymlinkPath, singularityPrivatePath)
+				err = cvmfs.CreateSymlinkIntoCVMFSWithLogger(imageLogger, wish.CvmfsRepo, publicSymlinkPath, singularityPrivatePath, false)
 				if err != nil {
 					errF := fmt.Errorf("Error in creating symlink for singularity image: %s", publicSymlinkPath)
 					imageLogger.WithField("error", errF).WithFields(
@@ -479,7 +479,7 @@ func ConvertWishFlat(wish WishFriendly, multiArch bool) error {
 			}
 			// we create the public link
 
-			err = cvmfs.CreateSymlinkIntoCVMFSWithLogger(imageLogger, wish.CvmfsRepo, publicSymlinkPath, singularityPrivatePath)
+			err = cvmfs.CreateSymlinkIntoCVMFSWithLogger(imageLogger, wish.CvmfsRepo, publicSymlinkPath, singularityPrivatePath, false)
 			if err != nil {
 				errF := fmt.Errorf("Error in creating symlink for singularity image: %s", inputImage.GetSimpleName())
 				imageLogger.WithField("error", errF).WithFields(
