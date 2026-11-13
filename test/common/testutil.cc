@@ -298,10 +298,12 @@ DirectoryEntry DirectoryEntryTestFactory::Symlink(const string &name,
 }
 
 
-DirectoryEntry DirectoryEntryTestFactory::ChunkedFile(shash::Any content_hash) {
+DirectoryEntry DirectoryEntryTestFactory::ChunkedFile(shash::Any content_hash,
+                                                      bool is_direct_io) {
   DirectoryEntry dirent;
   dirent.mode_ = 33188;
   dirent.is_chunked_file_ = true;
+  dirent.is_direct_io_ = is_direct_io;
   dirent.checksum_ = content_hash;
   return dirent;
 }

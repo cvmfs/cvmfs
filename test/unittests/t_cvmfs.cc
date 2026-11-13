@@ -187,12 +187,34 @@ class T_Cvmfs : public ::testing::Test {
   }
 
   catalog::DirectoryEntry PublishChunkedFile(fuse_ino_t ino,
-                                             const std::string &path) {
+                                             const std::string &path,
+                                             bool is_direct_io = false) {
     catalog::DirectoryEntry dirent =
-        catalog::DirectoryEntryTestFactory::ChunkedFile(TestHash(0x02));
+        catalog::DirectoryEntryTestFactory::ChunkedFile(TestHash(0x02),
+                                                        is_direct_io);
     dirent.set_inode(ino);
     RegisterDirent(ino, path, dirent);
     return dirent;
+  }
+
+  /**
+   * A chunked open looks the path up again and loads a single-chunk list.
+   * Its page cache tracker hash is derived from the chunk list, so it differs
+   * from dirent.checksum().
+   */
+  void ExpectChunkListLookup(const catalog::DirectoryEntry &dirent) {
+    NiceMock<MockCatalogManager> *catalog_mgr =
+        cvmfs::mount_point_->mock_catalog_mgr();
+    EXPECT_CALL(*catalog_mgr, LookupPath(_, _, _))
+        .WillOnce(DoAll(SetArgPointee<2>(dirent), Return(true)));
+    EXPECT_CALL(*catalog_mgr, ListFileChunks(_, _, _))
+        .WillOnce(DoAll(
+            testing::Invoke([](const PathString & /*path*/,
+                               const shash::Algorithms /*algorithm*/,
+                               FileChunkList *chunks) {
+              chunks->PushBack(FileChunk(TestHash(0x03), 0, 4096));
+            }),
+            Return(true)));
   }
 
   /**
@@ -303,18 +325,7 @@ TEST_F(T_Cvmfs, OpenFailedFetchReportsErrorAndReleasesPageCacheEntry) {
 TEST_F(T_Cvmfs, OpenChunkedFile) {
   const catalog::DirectoryEntry dirent = PublishChunkedFile(kTestInode,
                                                             kTestPath);
-  NiceMock<MockCatalogManager> *catalog_mgr =
-      cvmfs::mount_point_->mock_catalog_mgr();
-  EXPECT_CALL(*catalog_mgr, LookupPath(_, _, _))
-      .WillOnce(DoAll(SetArgPointee<2>(dirent), Return(true)));
-  EXPECT_CALL(*catalog_mgr, ListFileChunks(_, _, _))
-      .WillOnce(DoAll(
-          testing::Invoke([](const PathString & /*path*/,
-                             const shash::Algorithms /*algorithm*/,
-                             FileChunkList *chunks) {
-            chunks->PushBack(FileChunk(TestHash(0x03), 0, 4096));
-          }),
-          Return(true)));
+  ExpectChunkListLookup(dirent);
   // A chunked open defers all downloading to read().
   EXPECT_CALL(*cvmfs::mount_point_->mock_fetcher(), Fetch(_, _)).Times(0);
 
@@ -336,6 +347,73 @@ TEST_F(T_Cvmfs, OpenChunkedFile) {
   cvmfs::cvmfs_release(&release_req, kTestInode, &req.fi);
   ASSERT_EQ(fuse_req::kReplyErr, release_req.kind);
   ASSERT_EQ(0, release_req.err);
+}
+
+
+/**
+ * A direct I/O open takes no page cache tracker reference, so the handle has
+ * to carry kBitDirectIo for cvmfs_release() to skip Close().  On a chunked
+ * handle the bit must survive the conversion to a negative handle; otherwise
+ * release drops a reference held by another open and the tracker's open count
+ * goes out of sync (assert in PageCacheTracker::Close()).
+ */
+TEST_F(T_Cvmfs, OpenChunkedFileWithStaleTrackerEntryUsesDirectIo) {
+  const catalog::DirectoryEntry dirent = PublishChunkedFile(kTestInode,
+                                                            kTestPath);
+  // An earlier open of different content is still around.
+  TrackOpen(dirent);
+  ASSERT_TRUE(IsTrackedOpen(kTestInode));
+  ExpectChunkListLookup(dirent);
+
+  fuse_req open_req;
+  struct fuse_file_info fi = {};
+  fi.flags = O_RDONLY;
+  cvmfs::cvmfs_open(&open_req, kTestInode, &fi);
+
+  ASSERT_EQ(fuse_req::kReplyOpen, open_req.kind);
+  EXPECT_TRUE(open_req.fi.direct_io);
+  const int64_t fh = static_cast<int64_t>(open_req.fi.fh);
+  ASSERT_LT(fh, 0);
+  EXPECT_TRUE(TestBit(glue::PageCacheTracker::kBitDirectIo,
+                      static_cast<uint64_t>(-fh)));
+
+  fuse_req release_req;
+  cvmfs::cvmfs_release(&release_req, kTestInode, &open_req.fi);
+  ASSERT_EQ(fuse_req::kReplyErr, release_req.kind);
+  EXPECT_EQ(0, release_req.err);
+  EXPECT_EQ(0, cvmfs::file_system_->no_open_files()->Get());
+  // The reference belongs to the earlier open.
+  EXPECT_TRUE(IsTrackedOpen(kTestInode));
+  EXPECT_FALSE(cvmfs::mount_point_->chunk_tables()->inode2chunks.Contains(
+      kTestInode));
+}
+
+
+TEST_F(T_Cvmfs, OpenChunkedDirectIoFileKeepsDirectIoBit) {
+  const catalog::DirectoryEntry dirent = PublishChunkedFile(
+      kTestInode, kTestPath, true /* is_direct_io */);
+  // Without a tracker entry a stray Close() would assert instead of failing
+  // the expectation below.
+  TrackOpen(dirent);
+  ExpectChunkListLookup(dirent);
+
+  fuse_req open_req;
+  struct fuse_file_info fi = {};
+  fi.flags = O_RDONLY;
+  cvmfs::cvmfs_open(&open_req, kTestInode, &fi);
+
+  ASSERT_EQ(fuse_req::kReplyOpen, open_req.kind);
+  EXPECT_TRUE(open_req.fi.direct_io);
+  const int64_t fh = static_cast<int64_t>(open_req.fi.fh);
+  ASSERT_LT(fh, 0);
+  EXPECT_TRUE(TestBit(glue::PageCacheTracker::kBitDirectIo,
+                      static_cast<uint64_t>(-fh)));
+
+  fuse_req release_req;
+  cvmfs::cvmfs_release(&release_req, kTestInode, &open_req.fi);
+  ASSERT_EQ(fuse_req::kReplyErr, release_req.kind);
+  EXPECT_EQ(0, release_req.err);
+  EXPECT_TRUE(IsTrackedOpen(kTestInode));
 }
 
 
