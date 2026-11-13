@@ -146,30 +146,8 @@ get_editor() {
 }
 
 
-has_jq() {
-  which jq > /dev/null 2>&1
-}
-
-check_jq() {
-  local hasjq=1
-  if ! has_jq; then
-    hasjq=0
-    echo 1>&2
-    echo "Warning: Didn't find 'jq' on your system. It is your responsibility" 1>&2
-    echo "         to produce a valid JSON file." 1>&2
-    echo 1>&2
-    read -p "  Press any key to continue..." nirvana
-  fi
-  echo $hasjq
-}
-
-
 validate_json() {
   local json_file="$1"
-
-  if ! which jq > /dev/null 2>&1; then
-    return 0 # no jq -> assume JSON is valid
-  fi
 
   jq '.' $json_file 2>&1
 }
@@ -178,12 +156,10 @@ validate_json() {
 edit_json_until_valid() {
   local json_file="$1"
   local editor=$(get_editor)
-  local has_jq=$(check_jq)
 
   local retval=0
   while true; do
     $editor $json_file < $(tty) > $(tty) 2>&1
-    [ $has_jq -eq 1 ] || break
 
     local jq_output=""
     local retry=""
@@ -212,11 +188,6 @@ edit_json_until_valid() {
 # @param variable  the status variable to update
 # @param value     the value to set the variable to
 update_repo_status() {
-  if ! has_jq; then
-    # silently do nothing if there is no jq
-    return
-  fi
-
   local name="$1"
   local variable="$2"
   local value="$3"
@@ -239,8 +210,6 @@ update_repo_status() {
 
 
 get_json_field() {
-  has_jq || return ""
-
   local snippet="$1"
   local field="$2"
   echo "$snippet" | jq -r ".$field // empty"
