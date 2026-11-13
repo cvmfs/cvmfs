@@ -34,8 +34,13 @@ jobs:
         shell: pwsh
         run: git config --global core.autocrlf false
 
-      - name: Checkout repository
+      # Only cvmfs_config is needed. A full checkout fails on Windows because
+      # the tree contains reserved names (test/unittests/aux/) and symlinks.
+      - name: Checkout cvmfs_config
         uses: actions/checkout@v4
+        with:
+          sparse-checkout: cvmfs/cvmfs_config
+          sparse-checkout-cone-mode: false
 
       - name: Set up WSL2 (Ubuntu 24.04)
         uses: Vampire/setup-wsl@v5
