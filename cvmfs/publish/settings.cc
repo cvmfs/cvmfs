@@ -17,6 +17,7 @@
 #include "publish/except.h"
 #include "publish/repository.h"
 #include "sanitizer.h"
+#include "util/platform.h"
 #include "util/posix.h"
 #include "util/string.h"
 
@@ -298,6 +299,47 @@ void SettingsRepository::SetUrl(const std::string &url) {
 void SettingsRepository::SetProxy(const std::string &proxy) { proxy_ = proxy; }
 
 
+void SettingsRepository::SetPublicKeyPaths(const std::string &paths) {
+  public_key_paths_ = paths;
+}
+
+
+std::string SettingsRepository::ResolvePublicKeyPaths() const {
+  const std::string path_list = public_key_paths_.is_default()
+                                    ? keychain_.keychain_dir()
+                                    : public_key_paths_();
+  const std::vector<std::string> paths = SplitString(path_list, ':');
+  std::vector<std::string> keys;
+  for (unsigned i = 0; i < paths.size(); ++i) {
+    platform_stat64 info;
+    if ((platform_stat(paths[i].c_str(), &info) == 0)
+        && S_ISDIR(info.st_mode)) {
+      const std::vector<std::string> found = FindFilesBySuffix(paths[i],
+                                                              ".pub");
+      keys.insert(keys.end(), found.begin(), found.end());
+    } else {
+      keys.push_back(paths[i]);
+    }
+  }
+  return JoinStrings(keys, ":");
+}
+
+
+std::string SettingsRepository::GetClientPublicKeyPaths() const {
+  if (public_key_paths_.is_default())
+    return keychain_.master_public_key_path();
+
+  platform_stat64 info;
+  if ((platform_stat(public_key_paths_().c_str(), &info) == 0)
+      && S_ISDIR(info.st_mode)) {
+    const std::string master_key = public_key_paths_() + "/" + fqrn() + ".pub";
+    if (FileExists(master_key))
+      return master_key;
+  }
+  return ResolvePublicKeyPaths();
+}
+
+
 void SettingsRepository::SetTmpDir(const std::string &tmp_dir) {
   tmp_dir_ = tmp_dir;
 }
@@ -449,8 +491,10 @@ SettingsRepository SettingsBuilder::CreateSettingsRepository(
     fqrn = arg;
   SettingsRepository settings(fqrn);
 
-  if (options_mgr_->GetValue("CVMFS_PUBLIC_KEY", &arg))
+  if (options_mgr_->GetValue("CVMFS_PUBLIC_KEY", &arg)) {
     settings.GetKeychain()->SetKeychainDir(arg);
+    settings.SetPublicKeyPaths(arg);
+  }
   if (options_mgr_->GetValue("CVMFS_STRATUM0", &arg))
     settings.SetUrl(arg);
   if (options_mgr_->GetValue("CVMFS_SERVER_PROXY", &arg))

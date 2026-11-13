@@ -244,7 +244,7 @@ int CmdDiff::Main(const Options &options) {
   const std::string to = options.GetStringDefault("to", "trunk");
 
   if (options.Has("keychain")) {
-    settings.GetKeychain()->SetKeychainDir(options.GetString("keychain"));
+    settings.SetPublicKeyPaths(options.GetString("keychain"));
   }
   Repository repository(settings);
 
