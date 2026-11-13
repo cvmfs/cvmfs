@@ -3,9 +3,11 @@ set -e
 
 usage() {
     echo "Usage: $0 <linux-source-path> [<git-tag-or-commit>]"
-    echo "    <linux-source-path> - Path to the Linux kernel source directory."
+    echo "    <linux-source-path> - Path to the Linux kernel source directory (git"
+    echo "                          checkout or unpacked release tarball)."
     echo "    <git-tag-or-commit> - Optional git tag or commit to checkout (e.g., v5.12)."
     echo "                          If omitted, you will be prompted interactively."
+    echo "                          For a tarball, only used as kernel/ subdirectory name."
     echo "    The script will build the bzImage and place it in kernel/vx.xx/ directory."
     echo "    It also provides options to add/remove kernel config options and select a git tag or commit."
     exit 0
@@ -25,19 +27,22 @@ if [ ! -d "$LINUX_SRC_PATH" ]; then
 fi
 
 cd "$LINUX_SRC_PATH" || exit 1
-if [ ! -d ".git" ]; then
-    echo "Error: The directory '$LINUX_SRC_PATH' is not a valid git repository."
+if [ -d ".git" ]; then
+    # Accept tag from argument or prompt interactively
+    if [ -n "${2:-}" ]; then
+        GIT_TAG_COMMIT="$2"
+    else
+        echo "Enter the git tag or commit hash to checkout (e.g., v5.10 or a commit hash):"
+        read -r GIT_TAG_COMMIT
+    fi
+    git checkout "$GIT_TAG_COMMIT" || { echo "Error: Git checkout failed"; exit 1; }
+elif [ -f "Makefile" ] && [ -f "Kconfig" ]; then
+    echo "No git repository in '$LINUX_SRC_PATH', building the source tree as is."
+    GIT_TAG_COMMIT="${2:-}"
+else
+    echo "Error: '$LINUX_SRC_PATH' is neither a git repository nor a kernel source tree."
     exit 1
 fi
-
-# Accept tag from argument or prompt interactively
-if [ -n "${2:-}" ]; then
-    GIT_TAG_COMMIT="$2"
-else
-    echo "Enter the git tag or commit hash to checkout (e.g., v5.10 or a commit hash):"
-    read -r GIT_TAG_COMMIT
-fi
-git checkout "$GIT_TAG_COMMIT" || { echo "Error: Git checkout failed"; exit 1; }
 
 # Build the kernel using vng --build.  It generates a minimal .config
 # automatically (via vng --kconfig) and compiles bzImage.

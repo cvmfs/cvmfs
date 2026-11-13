@@ -81,8 +81,14 @@ jobs:
         if: steps.kernel-cache.outputs.cache-hit != 'true'
         run: |
           sudo apt-get install -y flex bison libelf-dev libssl-dev bc dwarves
-          git clone --depth 1 --branch v5.12 \
-            https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git /tmp/linux-src
+          # Mirror of cdn.kernel.org/pub/linux/kernel/v5.x/linux-5.12.tar.xz,
+          # to avoid loading kernel.org from CI
+          curl -fsSL --retry 3 -o /tmp/linux-5.12.tar.xz \
+            https://ecsft.cern.ch/dist/cvmfs/caches/kernel/src/linux-5.12.tar.xz
+          echo "7d0df6f2bf2384d68d0bd8e1fe3e071d64364dcdc6002e7b5c87c92d48fac366  /tmp/linux-5.12.tar.xz" \
+            | sha256sum -c -
+          mkdir /tmp/linux-src
+          tar -xJf /tmp/linux-5.12.tar.xz -C /tmp/linux-src --strip-components=1
           ./test/vng_testing/build_kernel.sh /tmp/linux-src v5.12
 
       - name: Check for builddep package
