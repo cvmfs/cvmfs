@@ -117,12 +117,24 @@ jobs:
           # the autofs kill mode warning must not fire on WSL2
           ! grep -q "kill mode" chksetup.log
 
+      # Without systemd: starting the automounter twice must be harmless
       - name: Idempotent wsl2_start
+        if: ${{ !matrix.systemd }}
         shell: wsl-bash {0}
         run: |
           set -ex
           cvmfs_config wsl2_start
           pidof automount
+
+      # With systemd: wsl2_start must NOT be needed. autofs has to be running
+      # (and enabled for the next boot) purely as a result of cvmfs_config setup.
+      - name: autofs managed by systemd, no wsl2_start needed
+        if: ${{ matrix.systemd }}
+        shell: wsl-bash {0}
+        run: |
+          set -ex
+          systemctl is-enabled autofs.service
+          systemctl is-active autofs.service
 
       - name: Mount via autofs and probe
         shell: wsl-bash {0}
