@@ -2,10 +2,32 @@ package lib
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 
 	da "github.com/cvmfs/ducc/docker-api"
 )
+
+func TestImageDigestSymlinkPaths(t *testing.T) {
+	manifestDigest := "sha256:" + strings.Repeat("a", 2) + strings.Repeat("b", 62)
+	linkPath, targetPath, err := imageDigestSymlinkPaths(manifestDigest, ".flat/cc/"+strings.Repeat("c", 64))
+	if err != nil {
+		t.Fatalf("imageDigestSymlinkPaths returned an error: %v", err)
+	}
+	wantLinkPath := filepath.Join(".images", "sha256:aa", strings.Repeat("b", 62))
+	if linkPath != wantLinkPath {
+		t.Errorf("expected link path %q, got %q", wantLinkPath, linkPath)
+	}
+	if targetPath != ".flat/cc/"+strings.Repeat("c", 64) {
+		t.Errorf("expected target path to be preserved, got %q", targetPath)
+	}
+}
+
+func TestImageDigestSymlinkPathsRejectsInvalidDigest(t *testing.T) {
+	if _, _, err := imageDigestSymlinkPaths("sha256:abc", ".flat/ab/abc"); err == nil {
+		t.Fatal("expected an error for an invalid digest")
+	}
+}
 
 func TestOutputImageForExpandedTagWildcard(t *testing.T) {
 	input := &Image{TagWildcard: true}

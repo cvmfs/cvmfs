@@ -31,12 +31,13 @@ type ManifestList struct {
 	SchemaVersion int
 	MediaType     string
 	Manifests     []ManifestListItem
+	Digest        string `json:"-"`
 }
 
 type ManifestListItem struct {
 	MediaType string
 	Size      int
-	Digest    string
+	Digest    string `json:"digest"`
 	Platform  struct {
 		Architecture string
 		OS           string

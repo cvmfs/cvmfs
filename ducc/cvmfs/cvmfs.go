@@ -106,10 +106,10 @@ func PublishToCVMFSWithLogger(logger *log.Entry, CVMFSRepo string, path string, 
 // newLinkName: comes without the /cvmfs/$REPO/ prefix
 // toLinkPath: comes without the /cvmfs/$REPO/ prefix
 func CreateSymlinkIntoCVMFS(CVMFSRepo, newLinkName, toLinkPath string) (err error) {
-	return CreateSymlinkIntoCVMFSWithLogger(nil, CVMFSRepo, newLinkName, toLinkPath)
+	return CreateSymlinkIntoCVMFSWithLogger(nil, CVMFSRepo, newLinkName, toLinkPath, false)
 }
 
-func CreateSymlinkIntoCVMFSWithLogger(logger *log.Entry, CVMFSRepo, newLinkName, toLinkPath string) (err error) {
+func CreateSymlinkIntoCVMFSWithLogger(logger *log.Entry, CVMFSRepo, newLinkName, toLinkPath string, notIfExisting bool) (err error) {
 	logger = l.Ensure(logger)
 	// repository-relative link path (kept for the mountless ingest path)
 	repoRelLink := newLinkName
@@ -134,6 +134,12 @@ func CreateSymlinkIntoCVMFSWithLogger(logger *log.Entry, CVMFSRepo, newLinkName,
 	// The part we remove represents the same directory where is the target.
 	linkChunks := strings.Split(relativePath, string(os.PathSeparator))
 	link := filepath.Join(linkChunks[1:]...)
+	if notIfExisting {
+		if existing, readErr := os.Readlink(newLinkName); readErr == nil && existing == link {
+			llog(logger).Trace("Symlink already has the requested target, skipping")
+			return nil
+		}
+	}
 
 	if MountlessPublishing() {
 		// No mount to stat the target against; create the link via ingest.
