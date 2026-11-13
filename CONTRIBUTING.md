@@ -7,13 +7,14 @@ If you are about to develop a bug fix or a new feature, it could be helpful to l
 
 # Source Code Workflow
 
-We use git and github to merge code changes.  We roughly follow [Driessen's workflow](http://nvie.com/posts/a-successful-git-branching-model).  The current development head is in the devel branch, the latest stable release is in the master branch.  In order to contribute, please
+We use git and github to merge code changes.  We roughly follow [Driessen's workflow](http://nvie.com/posts/a-successful-git-branching-model).  The current development head is in the devel branch, release branches are named cvmfs-XX.  In order to contribute, please
   - Fork the cvmfs repository
-  - Create a new branch from devel, named either feature-..., or fix-... or CVM-... (referring to JIRA)
+  - Create a new branch from devel, named either feature-..., or fix-... or prefix them by topic (client/..., ci/..., gw/...)
   - Make changes, commit, and push the branch to your github space
   - and send a pull request to us on github
 
-If possible, commits should be done in such a way that the code remains compilable.  That can help to find problems with `git bisect`.
+Commits should be done in such a way that the code remains compilable.  That can help to find problems with `git bisect`. Mostly PRs will be squashed though, so
+try to break up PRs into sets of smaller, self-contained changes if possible.
 
 
 # Code Conventions
@@ -28,11 +29,10 @@ We have the following exceptions/adjustments:
   - We currently do not include files with project-relative paths.  The vast majority of source files are in ./cvmfs (although that might change).
   - `using namespace std;` in a .cc file is allowed. In order to keep the style checker quiet, we use `using namespace std;  // NOLINT`.
   - We do a line break before the opening curly bracket ({), if the bracket is at the end of a multi-line statement (e.g. a multi-line if or a multi-line function definition).
-  - We use C++03 (not C++11) in order to stay compatible to old system compilers.
+  - We use C++11 in order to stay compatible to old system compilers.
 
-The code repository contains a style checker which can be invoked like that:
+The code repository contains a .clang-format file that expresses most of the conventions.
 
-    python cpplint.py cvmfs/uuid.cc
 
 
 # Testing
