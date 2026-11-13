@@ -8,9 +8,27 @@ name: CI_MacOS_NFS_DD4hep
 #             timing, but shows why a request fails)
 #   patched:  the package with libcvmfs_nfs built from this tree
 
+# Two hours on five macOS runners: only for changes to the NFS frontend or the
+# macOS packaging, and on request
 on:
   push:
-    branches: [ 'ci-macos-nfs-dd4hep-debug' ]
+    branches: [ 'devel', 'cvmfs*' ]
+    paths:
+      - 'cvmfs/nfs4/**'
+      - 'cvmfs/nfs_maps*'
+      - 'packaging/mac/**'
+      - 'ci/cvmfs/pkg.sh'
+      - 'ci/nfs4/**'
+      - '.github/workflows/ci_macos_nfs_dd4hep.yml'
+  pull_request:
+    branches: [ 'devel', 'cvmfs*' ]
+    paths:
+      - 'cvmfs/nfs4/**'
+      - 'cvmfs/nfs_maps*'
+      - 'packaging/mac/**'
+      - 'ci/cvmfs/pkg.sh'
+      - 'ci/nfs4/**'
+      - '.github/workflows/ci_macos_nfs_dd4hep.yml'
   workflow_dispatch:
     inputs:
       pkg:
@@ -78,8 +96,12 @@ jobs:
         run: |
           sudo mkdir -p /Users/Shared/cvmfs-debug
           sudo chmod 1777 /Users/Shared/cvmfs-debug
+          # CVMFS_NFS4_DEBUG traces every NFS operation and callback, e.g.
+          # why a delegation recall failed
           for r in sft.cern.ch sft-nightlies.cern.ch; do
-            echo "CVMFS_DEBUGLOG=/Users/Shared/cvmfs-debug/$r.log" \
+            printf '%s\n' \
+              "CVMFS_DEBUGLOG=/Users/Shared/cvmfs-debug/$r.log" \
+              "CVMFS_NFS4_DEBUG=/Users/Shared/cvmfs-debug/$r.nfs4.log" \
               | sudo tee /etc/cvmfs/config.d/$r.local
             sudo umount /Volumes/cvmfs/$r
           done
