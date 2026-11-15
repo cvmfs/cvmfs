@@ -7,12 +7,14 @@
 #include <fcntl.h>
 #include <gtest/gtest.h>
 #include <netinet/in.h>
+#include <poll.h>
 #include <sys/resource.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <atomic>
 #include <cstring>
 #include <map>
@@ -1704,4 +1706,202 @@ TEST_F(T_Nfs4Server, Delegations) {
   EXPECT_EQ(static_cast<uint32_t>(NFS4ERR_BAD_STATEID), r.status);
 
   callback_server.Stop();
+}
+
+
+namespace {
+
+/** NFS NULL procedure that takes delay_ms and counts its calls */
+class SlowNull : public RpcProgram {
+ public:
+  explicit SlowNull(unsigned delay_ms) : delay_ms_(delay_ms), calls_(0) { }
+  virtual uint32_t program() const { return kNfsProgram; }
+  virtual uint32_t min_version() const { return kNfsVersion4; }
+  virtual uint32_t max_version() const { return kNfsVersion4; }
+  virtual AcceptStat Dispatch(const RpcCall & /* call */,
+                              XdrReader * /* args */, XdrWriter * /* res */) {
+    calls_++;
+    usleep(delay_ms_ * 1000);
+    return kAcceptSuccess;
+  }
+  unsigned calls() const { return calls_; }
+
+ private:
+  unsigned delay_ms_;
+  std::atomic<unsigned> calls_;
+};
+
+bool WaitForConnections(RpcServer *rpc, unsigned expected) {
+  for (unsigned i = 0; i < 200; ++i) {
+    if (rpc->NumConnections() == expected)
+      return true;
+    usleep(10 * 1000);
+  }
+  return false;
+}
+
+bool Readable(int fd, unsigned timeout_ms) {
+  struct pollfd pfd;
+  pfd.fd = fd;
+  pfd.events = POLLIN;
+  pfd.revents = 0;
+  return poll(&pfd, 1, static_cast<int>(timeout_ms)) > 0;
+}
+
+}  // anonymous namespace
+
+
+TEST_F(T_Nfs4Server, TransportTinyWrites) {
+  SlowNull program(0);
+  RpcServer rpc(&program, RpcServer::Options());
+  ASSERT_TRUE(rpc.Listen("127.0.0.1", 0));
+  rpc.Start();
+  const int fd = ConnectLoopback(rpc.port());
+  ASSERT_GE(fd, 0);
+  SetRecvTimeout(fd, 5);
+
+  // Marker and body one byte at a time
+  const std::string call = NullCall(11);
+  for (unsigned i = 0; i < call.size(); ++i) {
+    ASSERT_EQ(1, write(fd, &call[i], 1));
+    usleep(1000);
+  }
+  EXPECT_EQ(11u, ReadReplyXid(fd));
+
+  // Several records in a single write
+  const std::string calls = NullCall(21) + NullCall(22) + NullCall(23);
+  ASSERT_EQ(static_cast<ssize_t>(calls.size()),
+            write(fd, calls.data(), calls.size()));
+  std::vector<uint32_t> xids;
+  for (unsigned i = 0; i < 3; ++i)
+    xids.push_back(ReadReplyXid(fd));
+  std::sort(xids.begin(), xids.end());
+  EXPECT_EQ(21u, xids[0]);
+  EXPECT_EQ(22u, xids[1]);
+  EXPECT_EQ(23u, xids[2]);
+  close(fd);
+  rpc.Stop();
+}
+
+
+TEST_F(T_Nfs4Server, TransportUnfinishedFragment) {
+  SlowNull program(0);
+  RpcServer rpc(&program, RpcServer::Options());
+  ASSERT_TRUE(rpc.Listen("127.0.0.1", 0));
+  rpc.Start();
+  const int fd = ConnectLoopback(rpc.port());
+  ASSERT_GE(fd, 0);
+  SetRecvTimeout(fd, 5);
+
+  // A non-final fragment is not dispatched until the record is complete
+  const std::string body = NullCall(31).substr(4);
+  const size_t split = 12;
+  uint32_t marker = htonl(split);
+  ASSERT_EQ(4, write(fd, &marker, 4));
+  ASSERT_EQ(static_cast<ssize_t>(split), write(fd, body.data(), split));
+  EXPECT_FALSE(Readable(fd, 300));
+  EXPECT_EQ(0u, program.calls());
+  marker = htonl(0x80000000u | (body.size() - split));
+  ASSERT_EQ(4, write(fd, &marker, 4));
+  ASSERT_EQ(static_cast<ssize_t>(body.size() - split),
+            write(fd, body.data() + split, body.size() - split));
+  EXPECT_EQ(31u, ReadReplyXid(fd));
+  close(fd);
+  rpc.Stop();
+}
+
+
+TEST_F(T_Nfs4Server, TransportEofReleasesConnection) {
+  SlowNull program(0);
+  RpcServer rpc(&program, RpcServer::Options());
+  ASSERT_TRUE(rpc.Listen("127.0.0.1", 0));
+  rpc.Start();
+  const std::string call = NullCall(41);
+
+  // EOF in the middle of the marker, of the body, and after a full exchange
+  const size_t cut[] = {2, 4 + 10, call.size()};
+  for (unsigned i = 0; i < 3; ++i) {
+    const int fd = ConnectLoopback(rpc.port());
+    ASSERT_GE(fd, 0);
+    ASSERT_TRUE(WaitForConnections(&rpc, 1));
+    ASSERT_EQ(static_cast<ssize_t>(cut[i]), write(fd, call.data(), cut[i]));
+    if (cut[i] == call.size()) {
+      SetRecvTimeout(fd, 5);
+      EXPECT_EQ(41u, ReadReplyXid(fd));
+    }
+    // Half-close: the server must see EOF, shut its side down and drop the
+    // connection, i.e. not leave it in CLOSE_WAIT
+    ASSERT_EQ(0, shutdown(fd, SHUT_WR));
+    SetRecvTimeout(fd, 5);
+    char c;
+    EXPECT_EQ(0, read(fd, &c, 1)) << "cut " << cut[i];
+    EXPECT_TRUE(WaitForConnections(&rpc, 0)) << "cut " << cut[i];
+    close(fd);
+  }
+  rpc.Stop();
+}
+
+
+TEST_F(T_Nfs4Server, TransportEofWhileCallInFlight) {
+  SlowNull program(300);
+  RpcServer rpc(&program, RpcServer::Options());
+  ASSERT_TRUE(rpc.Listen("127.0.0.1", 0));
+  rpc.Start();
+  const int fd = ConnectLoopback(rpc.port());
+  ASSERT_GE(fd, 0);
+  const std::string call = NullCall(51);
+  ASSERT_EQ(static_cast<ssize_t>(call.size()),
+            write(fd, call.data(), call.size()));
+  usleep(50 * 1000);
+  ASSERT_EQ(0, shutdown(fd, SHUT_WR));
+  // The pending reply still arrives, then the connection is gone
+  SetRecvTimeout(fd, 5);
+  EXPECT_EQ(51u, ReadReplyXid(fd));
+  char c;
+  EXPECT_EQ(0, read(fd, &c, 1));
+  EXPECT_TRUE(WaitForConnections(&rpc, 0));
+  close(fd);
+  rpc.Stop();
+}
+
+
+TEST_F(T_Nfs4Server, TransportRetransmissionInFlight) {
+  SlowNull program(300);
+  RpcServer rpc(&program, RpcServer::Options());
+  ASSERT_TRUE(rpc.Listen("127.0.0.1", 0));
+  rpc.Start();
+  const int fd = ConnectLoopback(rpc.port());
+  ASSERT_GE(fd, 0);
+  SetRecvTimeout(fd, 5);
+
+  // The retransmission of a call in progress is answered once
+  const std::string call = NullCall(61);
+  ASSERT_EQ(static_cast<ssize_t>(call.size()),
+            write(fd, call.data(), call.size()));
+  usleep(50 * 1000);
+  ASSERT_EQ(static_cast<ssize_t>(call.size()),
+            write(fd, call.data(), call.size()));
+  EXPECT_EQ(61u, ReadReplyXid(fd));
+  EXPECT_FALSE(Readable(fd, 500));
+  EXPECT_EQ(1u, program.calls());
+
+  // Once answered, the same xid is a new call again
+  ASSERT_EQ(static_cast<ssize_t>(call.size()),
+            write(fd, call.data(), call.size()));
+  EXPECT_EQ(61u, ReadReplyXid(fd));
+  EXPECT_EQ(2u, program.calls());
+
+  // A new connection does not inherit the xids in flight on the old one
+  ASSERT_EQ(static_cast<ssize_t>(call.size()),
+            write(fd, call.data(), call.size()));
+  const int fd2 = ConnectLoopback(rpc.port());
+  ASSERT_GE(fd2, 0);
+  SetRecvTimeout(fd2, 5);
+  ASSERT_EQ(static_cast<ssize_t>(call.size()),
+            write(fd2, call.data(), call.size()));
+  EXPECT_EQ(61u, ReadReplyXid(fd));
+  EXPECT_EQ(61u, ReadReplyXid(fd2));
+  close(fd2);
+  close(fd);
+  rpc.Stop();
 }
