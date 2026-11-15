@@ -6,6 +6,7 @@
 
 #include <arpa/inet.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <poll.h>
@@ -25,6 +26,16 @@ namespace {
 const uint32_t kMaxAuthBody = 400;
 const uint32_t kMaxAuthSysGids = 16;
 const uint32_t kLastFragment = 0x80000000u;
+
+/**
+ * Child processes (mount_nfs, helpers of the cvmfs core) must not keep NFS
+ * sockets open: an inherited copy of a connection outlives its close here.
+ */
+void SetCloexec(int fd) {
+  const int flags = fcntl(fd, F_GETFD);
+  if (flags >= 0)
+    fcntl(fd, F_SETFD, flags | FD_CLOEXEC);
+}
 
 void PutReplyHeader(uint32_t xid, XdrWriter *w) {
   w->PutU32(xid);
@@ -246,6 +257,7 @@ bool RpcServer::Listen(const std::string &address, uint16_t port) {
   listen_fd_ = socket(AF_INET, SOCK_STREAM, 0);
   if (listen_fd_ < 0)
     return false;
+  SetCloexec(listen_fd_);
   const int on = 1;
   setsockopt(listen_fd_, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
   if (bind(listen_fd_, reinterpret_cast<struct sockaddr *>(&addr), sizeof(addr))
@@ -342,6 +354,7 @@ void RpcServer::AcceptLoop() {
         listen_fd_, reinterpret_cast<struct sockaddr *>(&peer), &peer_len);
     if (fd < 0)
       continue;
+    SetCloexec(fd);
     if (!options_.allow_remote && !IsLoopback(peer)) {
       Log(kLogLevelWarn, "rejected NFS connection from non-loopback peer");
       close(fd);

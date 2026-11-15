@@ -223,6 +223,8 @@ void SpawnGuardian(struct fuse_session *se) {
       if (fd != listen_fd && fd != control[0])
         close(fd);
     }
+    // The listening socket is close-on-exec, see RpcServer::Listen()
+    fcntl(listen_fd, F_SETFD, 0);
     setsid();
     execv(argv[0], const_cast<char *const *>(argv));
     _exit(127);

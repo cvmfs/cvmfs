@@ -4,6 +4,7 @@
 
 #include <arpa/inet.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <gtest/gtest.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
@@ -1030,6 +1031,7 @@ TEST_F(T_Nfs4Server, TcpServer) {
   RpcServer rpc(server_, options);
   ASSERT_TRUE(rpc.Listen("127.0.0.1", 0));
   ASSERT_NE(0, rpc.port());
+  EXPECT_TRUE(fcntl(rpc.listen_fd(), F_GETFD) & FD_CLOEXEC);
   rpc.Start();
 
   const int fd = socket(AF_INET, SOCK_STREAM, 0);
