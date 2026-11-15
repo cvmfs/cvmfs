@@ -339,6 +339,7 @@ unsigned RpcServer::NumConnections() {
 
 
 void RpcServer::AcceptLoop() {
+  int last_errno = 0;
   while (!stopping_) {
     struct pollfd pfd;
     pfd.fd = listen_fd_;
@@ -352,8 +353,23 @@ void RpcServer::AcceptLoop() {
     socklen_t peer_len = sizeof(peer);
     const int fd = accept(
         listen_fd_, reinterpret_cast<struct sockaddr *>(&peer), &peer_len);
-    if (fd < 0)
+    if (fd < 0) {
+      const int error = errno;
+      // Logged once per error kind, the loop retries every poll()
+      if (error != last_errno) {
+        Log(kLogLevelError, "cannot accept NFS connection (%d)", error);
+        last_errno = error;
+      }
+      // Linux keeps the connection queued, so poll() returns at once; pause
+      // instead of spinning until descriptors are freed
+      if (error == EMFILE || error == ENFILE)
+        usleep(100 * 1000);
       continue;
+    }
+    if (last_errno != 0) {
+      Log(kLogLevelInfo, "accepting NFS connections again");
+      last_errno = 0;
+    }
     SetCloexec(fd);
     if (!options_.allow_remote && !IsLoopback(peer)) {
       Log(kLogLevelWarn, "rejected NFS connection from non-loopback peer");

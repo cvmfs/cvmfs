@@ -7,8 +7,10 @@
 #include <fcntl.h>
 #include <gtest/gtest.h>
 #include <netinet/in.h>
+#include <sys/resource.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <unistd.h>
 
 #include <atomic>
@@ -1242,6 +1244,118 @@ TEST_F(T_Nfs4Server, TcpServerStaleCall) {
   EXPECT_EQ(1u, silent.GetWorkerStats().stale_after_timeout);
   close(fd2);
   silent.Stop();
+}
+
+
+namespace {
+
+int ConnectLoopback(uint16_t port) {
+  const int fd = socket(AF_INET, SOCK_STREAM, 0);
+  if (fd < 0)
+    return -1;
+  struct sockaddr_in addr;
+  memset(&addr, 0, sizeof(addr));
+  addr.sin_family = AF_INET;
+  addr.sin_port = htons(port);
+  addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+  if (connect(fd, reinterpret_cast<struct sockaddr *>(&addr), sizeof(addr))
+      != 0) {
+    close(fd);
+    return -1;
+  }
+  return fd;
+}
+
+void SetRecvTimeout(int fd, unsigned seconds) {
+  struct timeval tv;
+  tv.tv_sec = seconds;
+  tv.tv_usec = 0;
+  setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+}
+
+std::string NullCall(uint32_t xid) {
+  XdrWriter call;
+  call.PutU32(0x80000000u | 40);
+  call.PutU32(xid);
+  call.PutU32(kRpcCall);
+  call.PutU32(kRpcVersion);
+  call.PutU32(kNfsProgram);
+  call.PutU32(kNfsVersion4);
+  call.PutU32(kNfsProcNull);
+  call.PutU32(kAuthNone);
+  call.PutU32(0);
+  call.PutU32(kAuthNone);
+  call.PutU32(0);
+  return call.buffer();
+}
+
+/** Reads one reply record and returns its xid, 0 on timeout or EOF */
+uint32_t ReadReplyXid(int fd) {
+  uint32_t marker;
+  if (read(fd, &marker, 4) != 4)
+    return 0;
+  std::string reply(ntohl(marker) & 0x7fffffffu, '\0');
+  size_t got = 0;
+  while (got < reply.size()) {
+    const ssize_t n = read(fd, &reply[got], reply.size() - got);
+    if (n <= 0)
+      return 0;
+    got += n;
+  }
+  uint32_t xid = 0;
+  if (reply.size() >= 4) {
+    memcpy(&xid, reply.data(), 4);
+    xid = ntohl(xid);
+  }
+  return xid;
+}
+
+}  // anonymous namespace
+
+
+TEST_F(T_Nfs4Server, AcceptAfterEmfile) {
+  RpcServer::Options options;
+  options.workers = 1;
+  RpcServer rpc(server_, options);
+  ASSERT_TRUE(rpc.Listen("127.0.0.1", 0));
+  rpc.Start();
+
+  // Exhaust the descriptor table, then connect: the server cannot accept.
+  // Linux keeps the connection queued, macOS drops it.
+  struct rlimit saved;
+  ASSERT_EQ(0, getrlimit(RLIMIT_NOFILE, &saved));
+  const int probe = dup(0);
+  ASSERT_GE(probe, 0);
+  close(probe);
+  struct rlimit low = saved;
+  low.rlim_cur = probe + 32;
+  ASSERT_EQ(0, setrlimit(RLIMIT_NOFILE, &low));
+  const int blocked = ConnectLoopback(rpc.port());
+  std::vector<int> fillers;
+  int fd;
+  while ((fd = dup(0)) >= 0)
+    fillers.push_back(fd);
+  const int fill_errno = errno;
+  const int refused = ConnectLoopback(rpc.port());
+  usleep(500 * 1000);
+  for (unsigned i = 0; i < fillers.size(); ++i)
+    close(fillers[i]);
+  setrlimit(RLIMIT_NOFILE, &saved);
+  EXPECT_EQ(EMFILE, fill_errno);
+  if (blocked >= 0)
+    close(blocked);
+  EXPECT_EQ(-1, refused);  // no descriptor left for the client socket
+
+  // New connections are served once descriptors are available again
+  const int client = ConnectLoopback(rpc.port());
+  ASSERT_GE(client, 0);
+  SetRecvTimeout(client, 5);
+  const std::string call = NullCall(42);
+  ASSERT_EQ(static_cast<ssize_t>(call.size()),
+            write(client, call.data(), call.size()));
+  EXPECT_EQ(42u, ReadReplyXid(client));
+  close(client);
+  rpc.Stop();
 }
 
 
