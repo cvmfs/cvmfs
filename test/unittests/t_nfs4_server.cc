@@ -1359,6 +1359,62 @@ TEST_F(T_Nfs4Server, AcceptAfterEmfile) {
 }
 
 
+TEST_F(T_Nfs4Server, SendTimeout) {
+  RpcServer::Options options;
+  options.workers = 1;
+  options.send_timeout_ms = 200;
+  RpcServer rpc(server_, options);
+  ASSERT_TRUE(rpc.Listen("127.0.0.1", 0));
+  rpc.Start();
+
+  const int client = socket(AF_INET, SOCK_STREAM, 0);
+  ASSERT_GE(client, 0);
+  const int rcvbuf = 4096;
+  setsockopt(client, SOL_SOCKET, SO_RCVBUF, &rcvbuf, sizeof(rcvbuf));
+#ifdef SO_NOSIGPIPE
+  const int on = 1;
+  setsockopt(client, SOL_SOCKET, SO_NOSIGPIPE, &on, sizeof(on));
+#endif
+  struct sockaddr_in addr;
+  memset(&addr, 0, sizeof(addr));
+  addr.sin_family = AF_INET;
+  addr.sin_port = htons(rpc.port());
+  addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+  ASSERT_EQ(0, connect(client, reinterpret_cast<struct sockaddr *>(&addr),
+                       sizeof(addr)));
+
+  // Far more replies than fit into the socket buffers, none of them read
+  std::string calls;
+  for (uint32_t xid = 1; xid <= 50000; ++xid)
+    calls += NullCall(xid);
+  int flags = 0;
+#ifdef MSG_NOSIGNAL
+  flags = MSG_NOSIGNAL;
+#endif
+  size_t sent = 0;
+  while (sent < calls.size()) {
+    const ssize_t n = send(client, calls.data() + sent, calls.size() - sent,
+                           flags);
+    if (n <= 0)
+      break;
+    sent += n;
+  }
+  usleep(1000 * 1000);
+
+  // The server gave up on the stuck worker and closed the connection: the
+  // buffered replies end in EOF (or a reset) instead of a read timeout
+  SetRecvTimeout(client, 5);
+  char buf[4096];
+  ssize_t n;
+  do {
+    n = read(client, buf, sizeof(buf));
+  } while (n > 0);
+  EXPECT_TRUE(n == 0 || errno != EAGAIN);
+  close(client);
+  rpc.Stop();
+}
+
+
 TEST_F(T_Nfs4Server, DelaySlowCompound) {
   Nfs4Server::Options options;
   options.delay_after_ms = 50;

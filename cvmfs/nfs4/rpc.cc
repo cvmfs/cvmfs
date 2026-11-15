@@ -11,6 +11,7 @@
 #include <netinet/tcp.h>
 #include <poll.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <sys/uio.h>
 #include <unistd.h>
 
@@ -378,6 +379,12 @@ void RpcServer::AcceptLoop() {
     }
     const int on = 1;
     setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &on, sizeof(on));
+    if (options_.send_timeout_ms > 0) {
+      struct timeval tv;
+      tv.tv_sec = options_.send_timeout_ms / 1000;
+      tv.tv_usec = (options_.send_timeout_ms % 1000) * 1000;
+      setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+    }
 #ifdef SO_NOSIGPIPE
     setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &on, sizeof(on));
 #endif
