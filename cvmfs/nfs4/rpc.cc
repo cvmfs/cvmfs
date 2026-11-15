@@ -13,6 +13,7 @@
 #include <sys/uio.h>
 #include <unistd.h>
 
+#include <chrono>
 #include <cstring>
 
 #include "nfs4/logging.h"
@@ -308,6 +309,12 @@ void RpcServer::Stop() {
 }
 
 
+RpcServer::WorkerStats RpcServer::GetWorkerStats() {
+  std::lock_guard<std::mutex> const lock(queue_lock_);
+  return worker_stats_;
+}
+
+
 unsigned RpcServer::NumConnections() {
   std::lock_guard<std::mutex> const lock(connections_lock_);
   unsigned n = 0;
@@ -408,7 +415,8 @@ void RpcServer::ReadLoop(ConnectionPtr connection) {
       queue_.back().xid = job.xid;
       queue_.back().record.swap(job.record);
     }
-    queue_cond_.notify_one();
+    if (options_.notify_workers)
+      queue_cond_.notify_one();
   }
 
   shutdown(connection->fd, SHUT_RDWR);
@@ -423,7 +431,27 @@ void RpcServer::WorkerLoop() {
     Job job;
     {
       std::unique_lock<std::mutex> lock(queue_lock_);
-      queue_cond_.wait(lock, [this] { return stopping_ || !queue_.empty(); });
+      while (!stopping_ && queue_.empty()) {
+        const std::cv_status status = queue_cond_.wait_for(
+            lock, std::chrono::milliseconds(options_.idle_recheck_ms));
+        if (status != std::cv_status::timeout)
+          continue;
+        if (queue_.empty()) {
+          worker_stats_.idle_timeouts++;
+          continue;
+        }
+        // Also happens when a call arrives right at the deadline; a steady
+        // count while busy points to lost notifications.  Rate limited, a
+        // stuck condition variable would log for every call otherwise.
+        if ((worker_stats_.queued_after_timeout++ % 1000) == 0) {
+          Log(kLogLevelWarn,
+              "worker found %zu queued calls after its wait timed out "
+              "(%llu times)",
+              queue_.size(),
+              static_cast<unsigned long long>(
+                  worker_stats_.queued_after_timeout));
+        }
+      }
       if (queue_.empty())
         return;
       job.connection.swap(queue_.front().connection);

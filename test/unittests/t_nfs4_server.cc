@@ -1089,6 +1089,97 @@ TEST_F(T_Nfs4Server, TcpServer) {
 }
 
 
+namespace {
+
+// Sends a NULL call and returns the xid of the reply, 0 on failure
+uint32_t NullCall(int fd, uint32_t xid) {
+  XdrWriter call;
+  call.PutU32(xid);
+  call.PutU32(kRpcCall);
+  call.PutU32(kRpcVersion);
+  call.PutU32(kNfsProgram);
+  call.PutU32(kNfsVersion4);
+  call.PutU32(kNfsProcNull);
+  call.PutU32(kAuthNone);
+  call.PutU32(0);
+  call.PutU32(kAuthNone);
+  call.PutU32(0);
+  const std::string &msg = call.buffer();
+  const uint32_t marker = htonl(0x80000000u | msg.size());
+  if (write(fd, &marker, 4) != 4
+      || write(fd, msg.data(), msg.size()) != static_cast<ssize_t>(msg.size()))
+  {
+    return 0;
+  }
+  uint32_t reply_marker;
+  if (read(fd, &reply_marker, 4) != 4)
+    return 0;
+  std::string reply(ntohl(reply_marker) & 0x7fffffffu, '\0');
+  size_t got = 0;
+  while (got < reply.size()) {
+    const ssize_t n = read(fd, &reply[got], reply.size() - got);
+    if (n <= 0)
+      return 0;
+    got += n;
+  }
+  XdrReader r(reinterpret_cast<const unsigned char *>(reply.data()),
+              reply.size());
+  uint32_t reply_xid = 0;
+  r.GetU32(&reply_xid);
+  return reply_xid;
+}
+
+bool WaitForIdleTimeouts(RpcServer *rpc, uint64_t n) {
+  for (unsigned i = 0; i < 500; ++i) {
+    if (rpc->GetWorkerStats().idle_timeouts >= n)
+      return true;
+    usleep(10 * 1000);
+  }
+  return false;
+}
+
+}  // anonymous namespace
+
+
+// Queued calls are served even if no notify reaches a worker
+TEST_F(T_Nfs4Server, TcpServerMissedWakeup) {
+  RpcServer::Options options;
+  options.workers = 2;
+  options.idle_recheck_ms = 100;
+  options.notify_workers = false;
+  RpcServer rpc(server_, options);
+  ASSERT_TRUE(rpc.Listen("127.0.0.1", 0));
+  rpc.Start();
+
+  const int fd = socket(AF_INET, SOCK_STREAM, 0);
+  ASSERT_GE(fd, 0);
+  struct sockaddr_in addr;
+  memset(&addr, 0, sizeof(addr));
+  addr.sin_family = AF_INET;
+  addr.sin_port = htons(rpc.port());
+  addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+  ASSERT_EQ(
+      0, connect(fd, reinterpret_cast<struct sockaddr *>(&addr), sizeof(addr)));
+  struct timeval timeout = {5, 0};
+  setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+
+  // Every worker has been through an empty wait, so the call can only be
+  // picked up by a timed-out wait
+  ASSERT_TRUE(WaitForIdleTimeouts(&rpc, options.workers));
+  EXPECT_EQ(4321u, NullCall(fd, 4321));
+  EXPECT_EQ(1u, rpc.GetWorkerStats().queued_after_timeout);
+
+  // Workers keep serving after several idle periods
+  const uint64_t idle = rpc.GetWorkerStats().idle_timeouts;
+  ASSERT_TRUE(WaitForIdleTimeouts(&rpc, idle + 3 * options.workers));
+  EXPECT_EQ(4322u, NullCall(fd, 4322));
+  EXPECT_EQ(2u, rpc.GetWorkerStats().queued_after_timeout);
+
+  close(fd);
+  rpc.Stop();
+}
+
+
 TEST_F(T_Nfs4Server, DelaySlowCompound) {
   Nfs4Server::Options options;
   options.delay_after_ms = 50;
