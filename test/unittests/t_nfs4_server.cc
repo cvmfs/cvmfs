@@ -38,7 +38,11 @@ class MemoryBackend : public Backend {
   };
 
   MemoryBackend()
-      : generation_(1), num_forgets_(0), read_delay_ms_(0), next_ino_(100) {
+      : generation_(1)
+      , num_generation_calls_(0)
+      , num_forgets_(0)
+      , read_delay_ms_(0)
+      , next_ino_(100) {
     Node &root = nodes_[kRoot];
     root.attr.ino = kRoot;
     root.attr.mode = S_IFDIR | 0755;
@@ -61,7 +65,11 @@ class MemoryBackend : public Backend {
 
   virtual uint64_t RootInode() { return kRoot; }
   virtual uint64_t FsId() { return 42; }
-  virtual uint64_t Generation() { return generation_; }
+  virtual uint64_t Generation() {
+    num_generation_calls_++;
+    return generation_;
+  }
+  unsigned num_generation_calls() const { return num_generation_calls_; }
 
   virtual int GetAttr(uint64_t ino, Attr *attr) {
     if (nodes_.count(ino) == 0)
@@ -132,6 +140,7 @@ class MemoryBackend : public Backend {
 
   static const uint64_t kRoot = 1;
   uint64_t generation_;
+  std::atomic<unsigned> num_generation_calls_;
   unsigned num_forgets_;
   unsigned read_delay_ms_;
 
@@ -1168,6 +1177,65 @@ class FakeCallback : public RpcProgram {
 };
 
 }  // anonymous namespace
+
+
+TEST_F(T_Nfs4Server, ShutdownStopsMonitor) {
+  Nfs4Server::Options options;
+  options.delegations = true;
+  delete server_;
+  server_ = new Nfs4Server(&backend_, options);
+
+  // A client with a callback path starts the monitor, which polls the
+  // backend's generation every second
+  const uint32_t kCbProgram = 0x40000001;
+  FakeCallback callback(kCbProgram);
+  RpcServer callback_server(&callback, RpcServer::Options());
+  ASSERT_TRUE(callback_server.Listen("127.0.0.1", 0));
+  callback_server.Start();
+  const uint16_t port = callback_server.port();
+  char uaddr[64];
+  snprintf(uaddr, sizeof(uaddr), "127.0.0.1.%u.%u", port >> 8, port & 0xff);
+  for (unsigned i = 0; i < 2; ++i) {
+    Compound c;
+    XdrWriter *w = c.Op(OP_SETCLIENTID);
+    w->PutFixedOpaque("verifier", kNfs4VerifierSize);
+    w->PutOpaque(std::string(i == 0 ? "client-a" : "client-b"));
+    w->PutU32(kCbProgram);
+    w->PutString("tcp");
+    w->PutString(uaddr);
+    w->PutU32(7);
+    Reply r;
+    Run(c, &r);
+    ASSERT_EQ(static_cast<uint32_t>(NFS4_OK), r.NextOp(OP_SETCLIENTID));
+    uint64_t clientid;
+    unsigned char confirm[kNfs4VerifierSize];
+    r.reader.GetU64(&clientid);
+    r.reader.GetFixedOpaque(confirm, kNfs4VerifierSize);
+    Compound c2;
+    w = c2.Op(OP_SETCLIENTID_CONFIRM);
+    w->PutU64(clientid);
+    w->PutFixedOpaque(confirm, kNfs4VerifierSize);
+    Run(c2, &r);
+    ASSERT_EQ(static_cast<uint32_t>(NFS4_OK), r.status);
+
+    if (i == 0) {
+      const unsigned before = backend_.num_generation_calls();
+      for (unsigned j = 0; j < 30 && backend_.num_generation_calls() == before;
+           ++j) {
+        usleep(100 * 1000);
+      }
+      ASSERT_GT(backend_.num_generation_calls(), before);
+      server_->Shutdown();
+    }
+  }
+
+  // Neither the running monitor nor the client confirmed after Shutdown()
+  // touch the backend anymore
+  const unsigned calls = backend_.num_generation_calls();
+  usleep(2500 * 1000);
+  EXPECT_EQ(calls, backend_.num_generation_calls());
+  callback_server.Stop();
+}
 
 
 TEST_F(T_Nfs4Server, Delegations) {
