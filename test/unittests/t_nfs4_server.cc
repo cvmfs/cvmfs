@@ -1180,6 +1180,60 @@ TEST_F(T_Nfs4Server, TcpServerMissedWakeup) {
 }
 
 
+// Only calls left in the queue for a large part of the recheck interval
+// count as lost notifications
+TEST_F(T_Nfs4Server, TcpServerStaleCall) {
+  RpcServer::Options options;
+  options.workers = 1;
+  options.idle_recheck_ms = 400;
+  RpcServer rpc(server_, options);
+  ASSERT_TRUE(rpc.Listen("127.0.0.1", 0));
+  rpc.Start();
+
+  const int fd = socket(AF_INET, SOCK_STREAM, 0);
+  ASSERT_GE(fd, 0);
+  struct sockaddr_in addr;
+  memset(&addr, 0, sizeof(addr));
+  addr.sin_family = AF_INET;
+  addr.sin_port = htons(rpc.port());
+  addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+  ASSERT_EQ(
+      0, connect(fd, reinterpret_cast<struct sockaddr *>(&addr), sizeof(addr)));
+  struct timeval timeout = {5, 0};
+  setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+
+  // Notified calls are not counted, however close to a deadline they arrive
+  for (uint32_t xid = 100; xid < 200; ++xid) {
+    EXPECT_EQ(xid, NullCall(fd, xid));
+    usleep(7 * 1000);
+  }
+  EXPECT_EQ(0u, rpc.GetWorkerStats().stale_after_timeout);
+  rpc.Stop();
+  close(fd);
+
+  // Without notifications, a call sent right after a timeout waits for most
+  // of the next interval
+  options.notify_workers = false;
+  RpcServer silent(server_, options);
+  ASSERT_TRUE(silent.Listen("127.0.0.1", 0));
+  silent.Start();
+  const int fd2 = socket(AF_INET, SOCK_STREAM, 0);
+  ASSERT_GE(fd2, 0);
+  addr.sin_port = htons(silent.port());
+  ASSERT_EQ(0, connect(fd2, reinterpret_cast<struct sockaddr *>(&addr),
+                       sizeof(addr)));
+  setsockopt(fd2, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+  ASSERT_TRUE(WaitForIdleTimeouts(&silent, 1));
+  const uint64_t idle = silent.GetWorkerStats().idle_timeouts;
+  ASSERT_TRUE(WaitForIdleTimeouts(&silent, idle + 1));
+  EXPECT_EQ(4323u, NullCall(fd2, 4323));
+  EXPECT_EQ(1u, silent.GetWorkerStats().queued_after_timeout);
+  EXPECT_EQ(1u, silent.GetWorkerStats().stale_after_timeout);
+  close(fd2);
+  silent.Stop();
+}
+
+
 TEST_F(T_Nfs4Server, DelaySlowCompound) {
   Nfs4Server::Options options;
   options.delay_after_ms = 50;

@@ -10,6 +10,7 @@
 #include <stdint.h>
 
 #include <atomic>
+#include <chrono>
 #include <condition_variable>
 #include <deque>
 #include <memory>
@@ -117,11 +118,18 @@ class RpcServer {
   unsigned NumConnections();
 
   struct WorkerStats {
-    WorkerStats() : idle_timeouts(0), queued_after_timeout(0) { }
+    WorkerStats()
+        : idle_timeouts(0), queued_after_timeout(0), stale_after_timeout(0) { }
     /** Waits that timed out with nothing queued */
     uint64_t idle_timeouts;
     /** Waits that timed out with calls queued */
     uint64_t queued_after_timeout;
+    /**
+     * Of those, the oldest call had been queued for at least half the
+     * recheck interval: its notification did not wake a worker.  A call
+     * that merely arrives at the deadline has been queued for microseconds.
+     */
+    uint64_t stale_after_timeout;
   };
   WorkerStats GetWorkerStats();
 
@@ -140,6 +148,7 @@ class RpcServer {
     ConnectionPtr connection;
     uint32_t xid;
     std::string record;
+    std::chrono::steady_clock::time_point queued_at;
   };
 
   void AcceptLoop();

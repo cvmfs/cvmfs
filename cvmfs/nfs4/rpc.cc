@@ -414,6 +414,7 @@ void RpcServer::ReadLoop(ConnectionPtr connection) {
       queue_.back().connection.swap(job.connection);
       queue_.back().xid = job.xid;
       queue_.back().record.swap(job.record);
+      queue_.back().queued_at = std::chrono::steady_clock::now();
     }
     if (options_.notify_workers)
       queue_cond_.notify_one();
@@ -431,29 +432,35 @@ void RpcServer::WorkerLoop() {
     Job job;
     {
       std::unique_lock<std::mutex> lock(queue_lock_);
+      bool timed_out = false;
       while (!stopping_ && queue_.empty()) {
-        const std::cv_status status = queue_cond_.wait_for(
-            lock, std::chrono::milliseconds(options_.idle_recheck_ms));
-        if (status != std::cv_status::timeout)
-          continue;
-        if (queue_.empty()) {
+        timed_out = queue_cond_.wait_for(
+                        lock, std::chrono::milliseconds(options_.idle_recheck_ms))
+                    == std::cv_status::timeout;
+        if (timed_out && queue_.empty())
           worker_stats_.idle_timeouts++;
-          continue;
-        }
-        // Also happens when a call arrives right at the deadline; a steady
-        // count while busy points to lost notifications.  Rate limited, a
-        // stuck condition variable would log for every call otherwise.
-        if ((worker_stats_.queued_after_timeout++ % 1000) == 0) {
-          Log(kLogLevelWarn,
-              "worker found %zu queued calls after its wait timed out "
-              "(%llu times)",
-              queue_.size(),
-              static_cast<unsigned long long>(
-                  worker_stats_.queued_after_timeout));
-        }
       }
       if (queue_.empty())
         return;
+      if (timed_out) {
+        worker_stats_.queued_after_timeout++;
+        const int64_t waited_ms =
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - queue_.front().queued_at)
+                .count();
+        if (waited_ms >= static_cast<int64_t>(options_.idle_recheck_ms / 2)) {
+          // Rate limited, a stuck condition variable would log for every
+          // call otherwise
+          if ((worker_stats_.stale_after_timeout++ % 100) == 0) {
+            Log(kLogLevelWarn,
+                "call waited %lld ms in the queue until a worker's wait "
+                "timed out, a notification was lost (%llu times)",
+                static_cast<long long>(waited_ms),
+                static_cast<unsigned long long>(
+                    worker_stats_.stale_after_timeout));
+          }
+        }
+      }
       job.connection.swap(queue_.front().connection);
       job.xid = queue_.front().xid;
       job.record.swap(queue_.front().record);
