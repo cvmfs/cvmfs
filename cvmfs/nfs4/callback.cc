@@ -146,6 +146,7 @@ bool CallbackClient::Connect(unsigned timeout_ms) {
   fd_ = socket(AF_INET, SOCK_STREAM, 0);
   if (fd_ < 0)
     return false;
+  fcntl(fd_, F_SETFD, FD_CLOEXEC);
 #ifdef SO_NOSIGPIPE
   const int on = 1;
   setsockopt(fd_, SOL_SOCKET, SO_NOSIGPIPE, &on, sizeof(on));

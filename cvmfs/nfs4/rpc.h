@@ -83,7 +83,8 @@ class RpcServer {
         , allow_remote(false)
         , max_record(4u << 20)
         , idle_recheck_ms(1000)
-        , notify_workers(true) { }
+        , notify_workers(true)
+        , send_timeout_ms(60 * 1000) { }
     unsigned workers;
     /** Accept connections from non-loopback peers (testing only) */
     bool allow_remote;
@@ -97,6 +98,12 @@ class RpcServer {
     unsigned idle_recheck_ms;
     /** Wake a worker for each queued call (disabled only by tests) */
     bool notify_workers;
+    /**
+     * A client that reads no reply for this long gets disconnected; it
+     * reconnects and retransmits.  Otherwise each pending reply would block a
+     * worker indefinitely.  0 waits forever.
+     */
+    unsigned send_timeout_ms;
   };
 
   RpcServer(RpcProgram *program, const Options &options);
