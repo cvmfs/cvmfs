@@ -191,7 +191,14 @@ DirectoryHandles *directory_handles_ = NULL;
 typedef google::dense_hash_map<uint64_t, std::string, hash_murmur<uint64_t> >
     PendingDirListings;
 PendingDirListings *pending_dir_listings_ = NULL;
-// Protects directory_handles_ and pending_dir_listings_
+// Directory inode -> catalog revision at its last opendir.  The kernel may keep
+// its readdir cache of a directory only if the catalogs did not change since,
+// because cache invalidation on remount is best-effort.
+typedef google::dense_hash_map<uint64_t, uint64_t, hash_murmur<uint64_t> >
+    DirRevisions;
+DirRevisions *dir_revisions_ = NULL;
+const unsigned kMaxDirRevisions = 100000;
+// Protects directory_handles_, pending_dir_listings_, and dir_revisions_
 pthread_mutex_t lock_directory_handles_ = PTHREAD_MUTEX_INITIALIZER;
 uint64_t next_directory_handle_ = 0;
 
@@ -1122,6 +1129,7 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
     ReplyNegative(d, req);
     return;
   }
+  const uint64_t catalog_revision = catalog_mgr->GetRevision();
   fuse_remounter_->fence()->Leave();
   if (!d.IsDirectory()) {
     fuse_reply_err(req, ENOTDIR);
@@ -1131,6 +1139,7 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_opendir on inode: %" PRIu64 ", path %s",
            uint64_t(ino), path.c_str());
 
+  bool keep_dir_cache = false;
   {
     const MutexLockGuard m(&lock_directory_handles_);
     LogCvmfs(kLogCvmfs, kLogDebug,
@@ -1139,6 +1148,19 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
     (*pending_dir_listings_)[next_directory_handle_] = path.ToString();
     fi->fh = next_directory_handle_;
     ++next_directory_handle_;
+
+    if (mount_point_->fuse_keep_dir_cache()) {
+      const DirRevisions::iterator iter_rev = dir_revisions_->find(ino);
+      if (iter_rev != dir_revisions_->end()) {
+        keep_dir_cache = (iter_rev->second == catalog_revision);
+        iter_rev->second = catalog_revision;
+      } else {
+        // Forgetting revisions only costs extra kernel cache invalidations
+        if (dir_revisions_->size() >= kMaxDirRevisions)
+          dir_revisions_->clear();
+        (*dir_revisions_)[ino] = catalog_revision;
+      }
+    }
   }
   perf::Inc(file_system_->n_fs_dir_open());
   perf::Inc(file_system_->no_open_dirs());
@@ -1150,7 +1172,9 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
   fi->cache_readdir = mount_point_->fuse_dir_cache();
 
   // Whether to let the cached data survive fd closing.
-  fi->keep_cache = mount_point_->fuse_keep_dir_cache();
+  fi->keep_cache = keep_dir_cache;
+#else
+  (void)keep_dir_cache;
 #endif
   fuse_reply_open(req, fi);
 }
@@ -2785,6 +2809,9 @@ static int Init(const loader::LoaderExports *loader_exports) {
   cvmfs::pending_dir_listings_ = new cvmfs::PendingDirListings();
   cvmfs::pending_dir_listings_->set_empty_key((uint64_t)(-1));
   cvmfs::pending_dir_listings_->set_deleted_key((uint64_t)(-2));
+  cvmfs::dir_revisions_ = new cvmfs::DirRevisions();
+  cvmfs::dir_revisions_->set_empty_key((uint64_t)(-1));
+  cvmfs::dir_revisions_->set_deleted_key((uint64_t)(-2));
 
   LogCvmfs(kLogCvmfs, kLogDebug, "fuse inode size is %lu bits",
            sizeof(fuse_ino_t) * 8);
@@ -2985,9 +3012,11 @@ static void ShutdownMountpoint() {
 
   delete cvmfs::directory_handles_;
   delete cvmfs::pending_dir_listings_;
+  delete cvmfs::dir_revisions_;
   delete cvmfs::mount_point_;
   cvmfs::directory_handles_ = NULL;
   cvmfs::pending_dir_listings_ = NULL;
+  cvmfs::dir_revisions_ = NULL;
   cvmfs::mount_point_ = NULL;
 }
 
