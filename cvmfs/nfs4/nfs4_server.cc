@@ -265,7 +265,10 @@ Nfs4Server::Nfs4Server(Backend *backend, const Options &options)
     , executors_stopping_(false) { }
 
 
-Nfs4Server::~Nfs4Server() {
+Nfs4Server::~Nfs4Server() { Shutdown(); }
+
+
+void Nfs4Server::Shutdown() {
   {
     std::lock_guard<std::mutex> const lock(state_lock_);
     monitor_stopping_ = true;
@@ -273,13 +276,15 @@ Nfs4Server::~Nfs4Server() {
   monitor_cond_.notify_all();
   if (monitor_.joinable())
     monitor_.join();
+  std::vector<std::thread> executors;
   {
     std::lock_guard<std::mutex> const lock(executor_lock_);
     executors_stopping_ = true;
+    executors.swap(executors_);
   }
   executor_cond_.notify_all();
-  for (unsigned i = 0; i < executors_.size(); ++i)
-    executors_[i].join();
+  for (unsigned i = 0; i < executors.size(); ++i)
+    executors[i].join();
 }
 
 
@@ -317,7 +322,7 @@ void Nfs4Server::RunWithDeadline(const RpcCall &call, XdrReader *args,
   task->call.args_size = 0;
 
   std::unique_lock<std::mutex> lock(executor_lock_);
-  if (executors_.empty()) {
+  if (executors_.empty() && !executors_stopping_) {
     for (unsigned i = 0; i < options_.executor_threads; ++i)
       executors_.push_back(std::thread(&Nfs4Server::ExecutorLoop, this));
   }
@@ -1415,7 +1420,7 @@ uint32_t Nfs4Server::OpDelegreturn(XdrReader *args) {
 
 
 void Nfs4Server::StartMonitor() {
-  if (!monitor_.joinable())
+  if (!monitor_.joinable() && !monitor_stopping_)
     monitor_ = std::thread(&Nfs4Server::MonitorLoop, this);
 }
 

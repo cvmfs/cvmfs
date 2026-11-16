@@ -70,6 +70,13 @@ class Nfs4Server : public RpcProgram {
   Nfs4Server(Backend *backend, const Options &options);
   virtual ~Nfs4Server();
 
+  /**
+   * Joins the background threads (callback monitor, deadline executors);
+   * afterwards the backend is not used anymore.  Call it once no more
+   * requests arrive and before the backend's file system is torn down.
+   */
+  void Shutdown();
+
   virtual uint32_t program() const { return kNfsProgram; }
   virtual uint32_t min_version() const { return kNfsVersion4; }
   virtual uint32_t max_version() const { return kNfsVersion4; }
