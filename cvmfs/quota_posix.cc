@@ -1922,6 +1922,10 @@ PosixQuotaManager::PosixQuotaManager(const uint64_t limit,
     , lock_open_files_(std::make_shared<OpenHashesLock>()) {
   ParseDirectories(cache_workspace, &cache_dir_, &workspace_dir_);
   pipe_lru_[0] = pipe_lru_[1] = -1;
+  for (unsigned i = 0; i < kTouchFilterSize; ++i) {
+    touch_filter_[i].tag.store(0, std::memory_order_relaxed);
+    touch_filter_[i].timestamp.store(0, std::memory_order_relaxed);
+  }
   cleanup_recorder_.AddRecorder(1, 90);  // last 1.5 min with second resolution
   // last 1.5 h with minute resolution
   cleanup_recorder_.AddRecorder(60, 90 * 60);
@@ -2254,9 +2258,31 @@ void PosixQuotaManager::Spawn() {
 
 
 /**
+ * Records the touch of hash in the touch filter and returns true if hash was
+ * already touched within the last kTouchFilterWindowSec seconds.
+ */
+bool PosixQuotaManager::IsRecentlyTouched(const shash::Any &hash) {
+  uint64_t tag;
+  memcpy(&tag, hash.digest, sizeof(tag));
+  const uint64_t now = platform_monotonic_time();
+  TouchFilterSlot *slot = &touch_filter_[tag & (kTouchFilterSize - 1)];
+  if ((slot->tag.load(std::memory_order_relaxed) == tag)
+      && (now - slot->timestamp.load(std::memory_order_relaxed)
+          < kTouchFilterWindowSec)) {
+    return true;
+  }
+  slot->tag.store(tag, std::memory_order_relaxed);
+  slot->timestamp.store(now, std::memory_order_relaxed);
+  return false;
+}
+
+
+/**
  * Updates the sequence number of the file specified by the hash.
  */
 void PosixQuotaManager::Touch(const shash::Any &hash) {
+  if (IsRecentlyTouched(hash))
+    return;
   LruCommand cmd;
   cmd.command_type = kTouch;
   cmd.StoreHash(hash);
