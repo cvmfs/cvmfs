@@ -13,6 +13,7 @@
 #include <sys/uio.h>
 #include <unistd.h>
 
+#include <chrono>
 #include <cstring>
 
 #include "nfs4/logging.h"
@@ -308,6 +309,12 @@ void RpcServer::Stop() {
 }
 
 
+RpcServer::WorkerStats RpcServer::GetWorkerStats() {
+  std::lock_guard<std::mutex> const lock(queue_lock_);
+  return worker_stats_;
+}
+
+
 unsigned RpcServer::NumConnections() {
   std::lock_guard<std::mutex> const lock(connections_lock_);
   unsigned n = 0;
@@ -407,8 +414,10 @@ void RpcServer::ReadLoop(ConnectionPtr connection) {
       queue_.back().connection.swap(job.connection);
       queue_.back().xid = job.xid;
       queue_.back().record.swap(job.record);
+      queue_.back().queued_at = std::chrono::steady_clock::now();
     }
-    queue_cond_.notify_one();
+    if (options_.notify_workers)
+      queue_cond_.notify_one();
   }
 
   shutdown(connection->fd, SHUT_RDWR);
@@ -423,9 +432,35 @@ void RpcServer::WorkerLoop() {
     Job job;
     {
       std::unique_lock<std::mutex> lock(queue_lock_);
-      queue_cond_.wait(lock, [this] { return stopping_ || !queue_.empty(); });
+      bool timed_out = false;
+      while (!stopping_ && queue_.empty()) {
+        timed_out = queue_cond_.wait_for(
+                        lock, std::chrono::milliseconds(options_.idle_recheck_ms))
+                    == std::cv_status::timeout;
+        if (timed_out && queue_.empty())
+          worker_stats_.idle_timeouts++;
+      }
       if (queue_.empty())
         return;
+      if (timed_out) {
+        worker_stats_.queued_after_timeout++;
+        const int64_t waited_ms =
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - queue_.front().queued_at)
+                .count();
+        if (waited_ms >= static_cast<int64_t>(options_.idle_recheck_ms / 2)) {
+          // Rate limited, a stuck condition variable would log for every
+          // call otherwise
+          if ((worker_stats_.stale_after_timeout++ % 100) == 0) {
+            Log(kLogLevelWarn,
+                "call waited %lld ms in the queue until a worker's wait "
+                "timed out, a notification was lost (%llu times)",
+                static_cast<long long>(waited_ms),
+                static_cast<unsigned long long>(
+                    worker_stats_.stale_after_timeout));
+          }
+        }
+      }
       job.connection.swap(queue_.front().connection);
       job.xid = queue_.front().xid;
       job.record.swap(queue_.front().record);
