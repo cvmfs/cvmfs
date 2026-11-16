@@ -70,7 +70,6 @@ PROFILE_EXCLUSIONS="\
   src/672-publish_stats_hardlinks \
   src/673-acl \
   src/675-statsupload \
-  src/682-enter \
   src/684-https_s3 \
   src/686-azureblob_s3 \
   src/687-import_s3 \
@@ -79,9 +78,10 @@ PROFILE_EXCLUSIONS="\
   src/693-resetafter \
   src/699-servermount \
   src/702-symlink_caching \
+  src/711-enter \
   src/800-repository_gateway \
   src/803-repository_gateway_large_files \
-  src/811-commit-gateway \
+  src/820-commit-gateway \
   src/900-notification_system \
 "
 
