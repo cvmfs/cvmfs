@@ -1361,11 +1361,36 @@ TEST_F(T_Nfs4Server, AcceptAfterEmfile) {
 }
 
 
+namespace {
+
+/** NFS NULL procedure with a large reply */
+class BigReply : public RpcProgram {
+ public:
+  explicit BigReply(size_t size) : payload_(size, 'x') { }
+  virtual uint32_t program() const { return kNfsProgram; }
+  virtual uint32_t min_version() const { return kNfsVersion4; }
+  virtual uint32_t max_version() const { return kNfsVersion4; }
+  virtual AcceptStat Dispatch(const RpcCall & /* call */,
+                              XdrReader * /* args */, XdrWriter *res) {
+    res->PutOpaque(payload_);
+    return kAcceptSuccess;
+  }
+
+ private:
+  std::string payload_;
+};
+
+}  // anonymous namespace
+
+
 TEST_F(T_Nfs4Server, SendTimeout) {
+  // 32 MiB of replies exceed the socket buffers even with Linux send buffer
+  // autotuning (tcp_wmem max 4 MiB by default)
+  BigReply program(512 * 1024);
   RpcServer::Options options;
   options.workers = 1;
   options.send_timeout_ms = 200;
-  RpcServer rpc(server_, options);
+  RpcServer rpc(&program, options);
   ASSERT_TRUE(rpc.Listen("127.0.0.1", 0));
   rpc.Start();
 
@@ -1385,33 +1410,27 @@ TEST_F(T_Nfs4Server, SendTimeout) {
   ASSERT_EQ(0, connect(client, reinterpret_cast<struct sockaddr *>(&addr),
                        sizeof(addr)));
 
-  // Far more replies than fit into the socket buffers, none of them read
+  // None of the replies is read
   std::string calls;
-  for (uint32_t xid = 1; xid <= 50000; ++xid)
+  for (uint32_t xid = 1; xid <= 64; ++xid)
     calls += NullCall(xid);
-  int flags = 0;
-#ifdef MSG_NOSIGNAL
-  flags = MSG_NOSIGNAL;
-#endif
-  size_t sent = 0;
-  while (sent < calls.size()) {
-    const ssize_t n = send(client, calls.data() + sent, calls.size() - sent,
-                           flags);
-    if (n <= 0)
-      break;
-    sent += n;
-  }
+  ASSERT_EQ(static_cast<ssize_t>(calls.size()),
+            write(client, calls.data(), calls.size()));
   usleep(1000 * 1000);
 
   // The server gave up on the stuck worker and closed the connection: the
   // buffered replies end in EOF (or a reset) instead of a read timeout
   SetRecvTimeout(client, 5);
-  char buf[4096];
+  std::vector<char> buf(64 * 1024);
+  size_t received = 0;
   ssize_t n;
   do {
-    n = read(client, buf, sizeof(buf));
+    n = read(client, buf.data(), buf.size());
+    if (n > 0)
+      received += n;
   } while (n > 0);
   EXPECT_TRUE(n == 0 || errno != EAGAIN);
+  EXPECT_LT(received, 64u * 512 * 1024);
   close(client);
   rpc.Stop();
 }

@@ -69,12 +69,14 @@ bool ParseAuthSys(const std::string &body, Credentials *creds) {
   return r.ok();
 }
 
-bool ReadFull(int fd, void *buf, size_t len) {
+bool ReadFull(int fd, void *buf, size_t len, bool *eof) {
   char *p = static_cast<char *>(buf);
   while (len > 0) {
     const ssize_t n = read(fd, p, len);
-    if (n == 0)
+    if (n == 0) {
+      *eof = true;
       return false;
+    }
     if (n < 0) {
       if (errno == EINTR)
         continue;
@@ -407,9 +409,10 @@ void RpcServer::AcceptLoop() {
 
 void RpcServer::ReadLoop(ConnectionPtr connection) {
   std::string record;
+  bool eof = false;
   while (!stopping_) {
     uint32_t marker;
-    if (!ReadFull(connection->fd, &marker, sizeof(marker)))
+    if (!ReadFull(connection->fd, &marker, sizeof(marker), &eof))
       break;
     marker = ntohl(marker);
     const uint32_t len = marker & ~kLastFragment;
@@ -420,7 +423,7 @@ void RpcServer::ReadLoop(ConnectionPtr connection) {
     }
     const size_t offset = record.size();
     record.resize(offset + len);
-    if (len > 0 && !ReadFull(connection->fd, &record[offset], len))
+    if (len > 0 && !ReadFull(connection->fd, &record[offset], len, &eof))
       break;
     if (!(marker & kLastFragment))
       continue;
@@ -456,7 +459,10 @@ void RpcServer::ReadLoop(ConnectionPtr connection) {
       queue_cond_.notify_one();
   }
 
-  shutdown(connection->fd, SHUT_RDWR);
+  // After EOF, replies of calls in flight are still delivered; the last
+  // reference to the connection closes it
+  if (!eof)
+    shutdown(connection->fd, SHUT_RDWR);
   std::lock_guard<std::mutex> const lock(connections_lock_);
   active_readers_--;
   readers_cond_.notify_all();
