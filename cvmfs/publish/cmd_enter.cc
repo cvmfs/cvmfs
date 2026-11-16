@@ -651,8 +651,13 @@ int CmdEnter::Main(const Options &options) {
     rvb = ManagedExec(cmdline, preserved_fds, std::map<int, int>(),
                       false /* drop_credentials */, false /* clear_env */,
                       false /* double_fork */, &pid_child);
-    const std::string s = StringifyInt(pid_child);
-    SafeWriteToFile(s, session_dir_ + "/session_pid", 0600);
+    // Publisher::ExitShell() polls for this file; it must never see it partial
+    const std::string session_pid = session_dir_ + "/session_pid";
+    if (!SafeWriteToFile(StringifyInt(pid_child), session_pid + ".tmp", 0600)
+        || rename((session_pid + ".tmp").c_str(), session_pid.c_str()) != 0) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Warning: cannot write %s",
+               session_pid.c_str());
+    }
 
     std::vector<int> sigs;
     sigs.push_back(SIGUSR1);
