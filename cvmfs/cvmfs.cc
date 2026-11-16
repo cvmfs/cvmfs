@@ -185,6 +185,13 @@ typedef google::dense_hash_map<uint64_t, DirectoryListing,
                                hash_murmur<uint64_t> >
     DirectoryHandles;
 DirectoryHandles *directory_handles_ = NULL;
+// Handles whose listing is built only on the first readdir, mapped to the
+// directory path.  Many opendir calls are never followed by readdir (e.g.
+// O_DIRECTORY opens, or listings served from the kernel readdir cache).
+typedef google::dense_hash_map<uint64_t, std::string, hash_murmur<uint64_t> >
+    PendingDirListings;
+PendingDirListings *pending_dir_listings_ = NULL;
+// Protects directory_handles_ and pending_dir_listings_
 pthread_mutex_t lock_directory_handles_ = PTHREAD_MUTEX_INITIALIZER;
 uint64_t next_directory_handle_ = 0;
 
@@ -987,7 +994,96 @@ static void AddToDirListing(const fuse_req_t req, const char *name,
 
 
 /**
- * Open a directory for listing.
+ * Builds the fuse directory listing of path.  The caller must hold the remount
+ * fence.  Returns false if the catalog listing fails.  req may be NULL, it is
+ * only passed through to fuse_add_direntry().
+ */
+static bool BuildDirListing(const fuse_req_t req, const PathString &path,
+                            DirectoryListing *result) {
+  catalog::ClientCatalogManager *catalog_mgr = mount_point_->catalog_mgr();
+  BigVector<char> fuse_listing(512);
+
+  catalog::DirectoryEntry d;
+  if (!GetDirentForPath(path, &d)) {
+    fuse_listing.Clear();  // Buffer is shared, empty manually
+    return false;
+  }
+
+  // Add current directory link
+  struct stat info;
+  info = d.GetStatStructure();
+  AddToDirListing(req, ".", &info, &fuse_listing);
+
+  // Add parent directory link
+  catalog::DirectoryEntry p;
+  if (d.inode() != catalog_mgr->GetRootInode()
+      && (GetDirentForPath(GetParentPath(path), &p) > 0)) {
+    info = p.GetStatStructure();
+    AddToDirListing(req, "..", &info, &fuse_listing);
+  }
+
+  // Add all names
+  catalog::StatEntryList listing_from_catalog;
+  const bool retval = catalog_mgr->ListingStat(path, &listing_from_catalog);
+  if (!retval) {
+    fuse_listing.Clear();
+    return false;
+  }
+  for (unsigned i = 0; i < listing_from_catalog.size(); ++i) {
+    // Fix inodes
+    PathString entry_path;
+    entry_path.Assign(path);
+    entry_path.Append("/", 1);
+    entry_path.Append(listing_from_catalog.AtPtr(i)->name.GetChars(),
+                      listing_from_catalog.AtPtr(i)->name.GetLength());
+
+    catalog::DirectoryEntry entry_dirent;
+    if (!GetDirentForPath(entry_path, &entry_dirent)) {
+      LogCvmfs(kLogCvmfs, kLogDebug, "listing entry %s vanished, skipping",
+               entry_path.c_str());
+      continue;
+    }
+
+    struct stat fixed_info = listing_from_catalog.AtPtr(i)->info;
+    fixed_info.st_ino = entry_dirent.inode();
+
+#ifdef USE_MACFUSE_FSKIT
+    // Register inode in tracker so that subsequent GETATTR calls can
+    // resolve inode -> path.  This is normally done in cvmfs_lookup(),
+    // but the macFUSE FSKit backend skips LOOKUP after READDIR and
+    // goes straight to GETATTR using the inodes from the listing.
+    if (!file_system_->IsNfsSource()) {
+      mount_point_->inode_tracker()->VfsGet(
+          glue::InodeEx(entry_dirent.inode(), entry_dirent.mode()),
+          entry_path);
+    }
+#endif
+
+    AddToDirListing(req, listing_from_catalog.AtPtr(i)->name.c_str(),
+                    &fixed_info, &fuse_listing);
+  }
+
+  result->size = fuse_listing.size();
+  result->capacity = fuse_listing.capacity();
+  bool large_alloc;
+  fuse_listing.ShareBuffer(&result->buffer, &large_alloc);
+  if (large_alloc)
+    result->capacity = 0;
+  return true;
+}
+
+
+static void FreeDirListing(const DirectoryListing &listing) {
+  if (listing.capacity == 0)
+    smunmap(listing.buffer);
+  else
+    free(listing.buffer);
+}
+
+
+/**
+ * Open a directory for listing.  The listing itself is built lazily on the
+ * first readdir.
  */
 static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
                           struct fuse_file_info *fi) {
@@ -1026,8 +1122,8 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
     ReplyNegative(d, req);
     return;
   }
+  fuse_remounter_->fence()->Leave();
   if (!d.IsDirectory()) {
-    fuse_remounter_->fence()->Leave();
     fuse_reply_err(req, ENOTDIR);
     return;
   }
@@ -1035,87 +1131,12 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_opendir on inode: %" PRIu64 ", path %s",
            uint64_t(ino), path.c_str());
 
-  // Build listing
-  BigVector<char> fuse_listing(512);
-
-  // Add current directory link
-  struct stat info;
-  info = d.GetStatStructure();
-  AddToDirListing(req, ".", &info, &fuse_listing);
-
-  // Add parent directory link
-  catalog::DirectoryEntry p;
-  if (d.inode() != catalog_mgr->GetRootInode()
-      && (GetDirentForPath(GetParentPath(path), &p) > 0)) {
-    info = p.GetStatStructure();
-    AddToDirListing(req, "..", &info, &fuse_listing);
-  }
-
-  // Add all names
-  catalog::StatEntryList listing_from_catalog;
-  const bool retval = catalog_mgr->ListingStat(path, &listing_from_catalog);
-
-  if (!retval) {
-    fuse_remounter_->fence()->Leave();
-    fuse_listing.Clear();  // Buffer is shared, empty manually
-
-    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
-             "EIO (03): failed to open directory at %s", path.c_str());
-    perf::Inc(file_system_->n_eio_total());
-    perf::Inc(file_system_->n_eio_03());
-    fuse_reply_err(req, EIO);
-    return;
-  }
-  for (unsigned i = 0; i < listing_from_catalog.size(); ++i) {
-    // Fix inodes
-    PathString entry_path;
-    entry_path.Assign(path);
-    entry_path.Append("/", 1);
-    entry_path.Append(listing_from_catalog.AtPtr(i)->name.GetChars(),
-                      listing_from_catalog.AtPtr(i)->name.GetLength());
-
-    catalog::DirectoryEntry entry_dirent;
-    if (!GetDirentForPath(entry_path, &entry_dirent)) {
-      LogCvmfs(kLogCvmfs, kLogDebug, "listing entry %s vanished, skipping",
-               entry_path.c_str());
-      continue;
-    }
-
-    struct stat fixed_info = listing_from_catalog.AtPtr(i)->info;
-    fixed_info.st_ino = entry_dirent.inode();
-
-#ifdef USE_MACFUSE_FSKIT
-    // Register inode in tracker so that subsequent GETATTR calls can
-    // resolve inode -> path.  This is normally done in cvmfs_lookup(),
-    // but the macFUSE FSKit backend skips LOOKUP after READDIR and
-    // goes straight to GETATTR using the inodes from the listing.
-    if (!file_system_->IsNfsSource()) {
-      mount_point_->inode_tracker()->VfsGet(
-          glue::InodeEx(entry_dirent.inode(), entry_dirent.mode()),
-          entry_path);
-    }
-#endif
-
-    AddToDirListing(req, listing_from_catalog.AtPtr(i)->name.c_str(),
-                    &fixed_info, &fuse_listing);
-  }
-  fuse_remounter_->fence()->Leave();
-
-  DirectoryListing stream_listing;
-  stream_listing.size = fuse_listing.size();
-  stream_listing.capacity = fuse_listing.capacity();
-  bool large_alloc;
-  fuse_listing.ShareBuffer(&stream_listing.buffer, &large_alloc);
-  if (large_alloc)
-    stream_listing.capacity = 0;
-
-  // Save the directory listing and return a handle to the listing
   {
     const MutexLockGuard m(&lock_directory_handles_);
     LogCvmfs(kLogCvmfs, kLogDebug,
              "linking directory handle %lu to dir inode: %" PRIu64,
              next_directory_handle_, uint64_t(ino));
-    (*directory_handles_)[next_directory_handle_] = stream_listing;
+    (*pending_dir_listings_)[next_directory_handle_] = path.ToString();
     fi->fh = next_directory_handle_;
     ++next_directory_handle_;
   }
@@ -1154,11 +1175,10 @@ static void cvmfs_releasedir(fuse_req_t req, fuse_ino_t ino,
     const DirectoryHandles::iterator iter_handle = directory_handles_->find(
         fi->fh);
     if (iter_handle != directory_handles_->end()) {
-      if (iter_handle->second.capacity == 0)
-        smunmap(iter_handle->second.buffer);
-      else
-        free(iter_handle->second.buffer);
+      FreeDirListing(iter_handle->second);
       directory_handles_->erase(iter_handle);
+      perf::Dec(file_system_->no_open_dirs());
+    } else if (pending_dir_listings_->erase(fi->fh) > 0) {
       perf::Dec(file_system_->no_open_dirs());
     } else {
       reply = EINVAL;
@@ -1190,6 +1210,38 @@ static void ReplyBufferSlice(const fuse_req_t req, const char *buffer,
 
 
 /**
+ * Replies with the slice of listing starting at off.  Caller holds
+ * lock_directory_handles_ so that the buffer cannot be released concurrently.
+ */
+static void ReplyDirListing(const fuse_req_t req,
+                            const DirectoryListing &listing, size_t size,
+                            const off_t off) {
+#ifdef __APPLE__
+  // Cut the reply at a directory entry boundary.  The Linux kernel drops a
+  // truncated trailing entry and re-requests it, but the macFUSE FSKit
+  // module does not cope with partial entries.  Layout of struct
+  // fuse_dirent: ino(8) off(8) namelen(4) type(4) name, 8-byte aligned.
+  if ((off >= 0) && (static_cast<size_t>(off) < listing.size)) {
+    const char *cursor = listing.buffer + off;
+    size_t whole_entries = 0;
+    while (whole_entries < listing.size - off) {
+      uint32_t namelen;
+      memcpy(&namelen, cursor + whole_entries + 16, sizeof(namelen));
+      const size_t entry_size = (24 + namelen + 7) & ~static_cast<size_t>(7);
+      if (whole_entries + entry_size > size)
+        break;
+      whole_entries += entry_size;
+    }
+    if (whole_entries > 0)
+      size = whole_entries;
+  }
+#endif
+
+  ReplyBufferSlice(req, listing.buffer, listing.size, off, size);
+}
+
+
+/**
  * Read the directory listing.
  */
 static void cvmfs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
@@ -1202,41 +1254,49 @@ static void cvmfs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
            static_cast<uint64_t>(mount_point_->catalog_mgr()->MangleInode(ino)),
            size, off);
 
-  DirectoryListing listing;
-
-  const MutexLockGuard m(&lock_directory_handles_);
-  const DirectoryHandles::const_iterator iter_handle = directory_handles_->find(
-      fi->fh);
-  if (iter_handle != directory_handles_->end()) {
-    listing = iter_handle->second;
-
-#ifdef __APPLE__
-    // Cut the reply at a directory entry boundary.  The Linux kernel drops a
-    // truncated trailing entry and re-requests it, but the macFUSE FSKit
-    // module does not cope with partial entries.  Layout of struct
-    // fuse_dirent: ino(8) off(8) namelen(4) type(4) name, 8-byte aligned.
-    if ((off >= 0) && (static_cast<size_t>(off) < listing.size)) {
-      const char *cursor = listing.buffer + off;
-      size_t whole_entries = 0;
-      while (whole_entries < listing.size - off) {
-        uint32_t namelen;
-        memcpy(&namelen, cursor + whole_entries + 16, sizeof(namelen));
-        const size_t entry_size = (24 + namelen + 7) & ~static_cast<size_t>(7);
-        if (whole_entries + entry_size > size)
-          break;
-        whole_entries += entry_size;
-      }
-      if (whole_entries > 0)
-        size = whole_entries;
+  std::string pending_path;
+  {
+    const MutexLockGuard m(&lock_directory_handles_);
+    const DirectoryHandles::const_iterator iter_handle =
+        directory_handles_->find(fi->fh);
+    if (iter_handle != directory_handles_->end()) {
+      ReplyDirListing(req, iter_handle->second, size, off);
+      return;
     }
-#endif
+    const PendingDirListings::const_iterator iter_pending =
+        pending_dir_listings_->find(fi->fh);
+    if (iter_pending == pending_dir_listings_->end()) {
+      fuse_reply_err(req, EINVAL);
+      perf::Inc(file_system_->n_fs_readdir_einval());
+      return;
+    }
+    pending_path = iter_pending->second;
+  }
 
-    ReplyBufferSlice(req, listing.buffer, listing.size, off, size);
+  // The kernel serializes readdir calls on the same file handle, so only one
+  // thread builds the listing of a given handle.
+  const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
+  FuseInterruptCue ic(&req);
+  const ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid,
+                                 &ic);
+  PathString path(pending_path);
+  DirectoryListing listing;
+  fuse_remounter_->fence()->Enter();
+  const bool retval = BuildDirListing(req, path, &listing);
+  fuse_remounter_->fence()->Leave();
+  if (!retval) {
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+             "EIO (03): failed to open directory at %s", path.c_str());
+    perf::Inc(file_system_->n_eio_total());
+    perf::Inc(file_system_->n_eio_03());
+    fuse_reply_err(req, EIO);
     return;
   }
 
-  fuse_reply_err(req, EINVAL);
-  perf::Inc(file_system_->n_fs_readdir_einval());
+  const MutexLockGuard m(&lock_directory_handles_);
+  pending_dir_listings_->erase(fi->fh);
+  (*directory_handles_)[fi->fh] = listing;
+  ReplyDirListing(req, listing, size, off);
 }
 
 static void FillOpenFlags(const glue::PageCacheTracker::OpenDirectives od,
@@ -2722,6 +2782,9 @@ static int Init(const loader::LoaderExports *loader_exports) {
   cvmfs::directory_handles_ = new cvmfs::DirectoryHandles();
   cvmfs::directory_handles_->set_empty_key((uint64_t)(-1));
   cvmfs::directory_handles_->set_deleted_key((uint64_t)(-2));
+  cvmfs::pending_dir_listings_ = new cvmfs::PendingDirListings();
+  cvmfs::pending_dir_listings_->set_empty_key((uint64_t)(-1));
+  cvmfs::pending_dir_listings_->set_deleted_key((uint64_t)(-2));
 
   LogCvmfs(kLogCvmfs, kLogDebug, "fuse inode size is %lu bits",
            sizeof(fuse_ino_t) * 8);
@@ -2921,8 +2984,10 @@ static void ShutdownMountpoint() {
   }
 
   delete cvmfs::directory_handles_;
+  delete cvmfs::pending_dir_listings_;
   delete cvmfs::mount_point_;
   cvmfs::directory_handles_ = NULL;
+  cvmfs::pending_dir_listings_ = NULL;
   cvmfs::mount_point_ = NULL;
 }
 
@@ -2986,6 +3051,23 @@ static bool MaintenanceMode(const int fd_progress) {
 #ifndef __TEST_CVMFS_MOCKFUSE
 static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
   string msg_progress;
+
+  // The saved state format only knows complete listings
+  for (cvmfs::PendingDirListings::const_iterator
+           i = cvmfs::pending_dir_listings_->begin(),
+           iEnd = cvmfs::pending_dir_listings_->end();
+       i != iEnd;
+       ++i) {
+    cvmfs::DirectoryListing listing;
+    if (!cvmfs::BuildDirListing(NULL, PathString(i->second), &listing)) {
+      // Leaves an empty listing for a directory that cannot be read anymore
+      listing.buffer = static_cast<char *>(smalloc(1));
+      listing.size = 0;
+      listing.capacity = 1;
+    }
+    (*cvmfs::directory_handles_)[i->first] = listing;
+  }
+  cvmfs::pending_dir_listings_->clear();
 
   const unsigned num_open_dirs = cvmfs::directory_handles_->size();
   if (num_open_dirs != 0) {
