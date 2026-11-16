@@ -51,6 +51,7 @@ RUN dnf install -y epel-release && dnf install -y \
     e2fsprogs \
     fuse \
     fuse3 \
+    fuse-overlayfs \
     gcc \
     httpd \
     iproute \
