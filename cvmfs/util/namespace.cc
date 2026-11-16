@@ -6,7 +6,6 @@
 #include "namespace.h"
 
 #include <fcntl.h>
-#include <signal.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <cstdlib>
@@ -16,8 +15,6 @@
 #include <sys/mount.h>
 #endif
 #include <sys/wait.h>
-
-#include <cstring>
 
 #include "util/posix.h"
 #include "util/string.h"
@@ -184,25 +181,15 @@ bool CreateMountNamespace() {
 }
 
 
-#ifdef CVMFS_HAS_UNSHARE
-namespace {
-
-static void Reaper(int /*sig*/, siginfo_t * /*siginfo*/, void * /*context*/) {
-  while (true) {
-    const pid_t retval = waitpid(-1, NULL, WNOHANG);
-    if (retval <= 0)
-      return;
-  }
-}
-
-}  // anonymous namespace
-#endif
-
-
 /**
  * The fd_parent file descriptor, if passed, is the read end of a pipe whose
  * write end is connected to the parent process.  This gives the namespace's
  * init process a means to know its pid in the context of the parent namespace.
+ *
+ * The calling process becomes the namespace's init and inherits all orphans.
+ * It must reap them itself, e.g. with WaitForChildAndReap() and ReapZombies().
+ * A SIGCHLD handler calling waitpid(-1) would race with waiting for specific
+ * children, in the init and in every child forked without exec.
  */
 bool CreatePidNamespace(int *fd_parent) {
 #ifdef CVMFS_HAS_UNSHARE
@@ -250,16 +237,6 @@ bool CreatePidNamespace(int *fd_parent) {
   close(pipe_parent[1]);
   if (fd_parent != NULL)
     *fd_parent = pipe_parent[0];
-
-  // Note: only signals for which signal handlers are established can be sent
-  // by other processes of this pid namespace to the init process
-  struct sigaction sa;
-  memset(&sa, 0, sizeof(sa));
-  sa.sa_sigaction = Reaper;
-  sa.sa_flags = SA_SIGINFO;
-  sigfillset(&sa.sa_mask);
-  rvi = sigaction(SIGCHLD, &sa, NULL);
-  assert(rvi == 0);
 
   rvi = mount("", "/proc", "proc", 0, NULL);
   return rvi == 0;

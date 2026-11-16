@@ -1634,6 +1634,16 @@ void WaitForSignal(int signum) {
  * @param sig_ok List of signals that are still considered a successful
  * termination.
  */
+static int DecodeChildStatus(int statloc, const std::vector<int> &sig_ok) {
+  if (WIFEXITED(statloc))
+    return WEXITSTATUS(statloc);
+  if (WIFSIGNALED(statloc)
+      && (std::find(sig_ok.begin(), sig_ok.end(), WTERMSIG(statloc))
+          != sig_ok.end()))
+    return 0;
+  return -1;
+}
+
 int WaitForChild(pid_t pid, const std::vector<int> &sig_ok) {
   assert(pid > 0);
   int statloc;
@@ -1647,13 +1657,32 @@ int WaitForChild(pid_t pid, const std::vector<int> &sig_ok) {
     assert(retval == pid);
     break;
   }
-  if (WIFEXITED(statloc))
-    return WEXITSTATUS(statloc);
-  if (WIFSIGNALED(statloc)
-      && (std::find(sig_ok.begin(), sig_ok.end(), WTERMSIG(statloc))
-          != sig_ok.end()))
-    return 0;
-  return -1;
+  return DecodeChildStatus(statloc, sig_ok);
+}
+
+/**
+ * Like WaitForChild() but also reaps any other terminated child on the way.
+ * Meant for the init process of a pid namespace, which inherits orphans.
+ */
+int WaitForChildAndReap(pid_t pid, const std::vector<int> &sig_ok) {
+  assert(pid > 0);
+  int statloc;
+  while (true) {
+    const pid_t retval = waitpid(-1, &statloc, 0);
+    if (retval == -1) {
+      if (errno == EINTR)
+        continue;
+      PANIC(kLogSyslogErr | kLogDebug, "waitpid failed with errno %d", errno);
+    }
+    if (retval == pid)
+      break;
+  }
+  return DecodeChildStatus(statloc, sig_ok);
+}
+
+void ReapZombies() {
+  while (waitpid(-1, NULL, WNOHANG) > 0) {
+  }
 }
 
 /**

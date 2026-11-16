@@ -368,7 +368,7 @@ void CmdEnter::MountOverlayfs() {
     close(fd_stderr);
     throw EPublish("cannot run " + overlayfs_binary_);
   }
-  const int exit_code = WaitForChild(pid_child);
+  const int exit_code = WaitForChildAndReap(pid_child);
   close(fd_stdout);
   close(fd_stderr);
   if (exit_code != 0) {
@@ -419,8 +419,10 @@ void CmdEnter::CleanupSession(bool keep_logs,
                    + settings_spool_area_.readonly_mnt());
   }
 
+  // The cvmfs2 process is an orphan of ours; until reaped, it stays a zombie
   BackoffThrottle backoff;
   while (ProcessExists(pid_cvmfs)) {
+    ReapZombies();
     backoff.Throttle();
   }
 
@@ -536,7 +538,7 @@ int CmdEnter::Main(const Options &options) {
     MountCvmfs();
     _exit(0);
   }
-  int exit_code = WaitForChild(pid);
+  int exit_code = WaitForChildAndReap(pid);
   if (exit_code != 0)
     _exit(exit_code);
   LogCvmfs(kLogCvmfs, kLogStdout, "done");
@@ -665,7 +667,7 @@ int CmdEnter::Main(const Options &options) {
     return exit_code;
   }
 
-  exit_code = WaitForChild(pid);
+  exit_code = WaitForChildAndReap(pid);
   LogCvmfs(kLogCvmfs, kLogStdout, "Leaving CernVM-FS shell...");
 
   if (!options.Has("keep-session"))
