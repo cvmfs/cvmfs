@@ -98,7 +98,7 @@ jobs:
             systemctl is-active autofs.service
           else
             # setup must skip activation and tell the user what to do
-            ! pidof automount
+            if pidof automount; then exit 1; fi
             cvmfs_config wsl2_start
           fi
           pidof automount
