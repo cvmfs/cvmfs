@@ -91,6 +91,7 @@ jobs:
           cat > /etc/cvmfs/default.local <<EOF
           CVMFS_CLIENT_PROFILE=single
           CVMFS_HTTP_PROXY=DIRECT
+          CVMFS_REPOSITORIES=cvmfs-config.cern.ch,atlas.cern.ch
           EOF
           cvmfs_config setup
           if [ "${{ matrix.systemd }}" = "true" ]; then
