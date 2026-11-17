@@ -94,6 +94,11 @@ jobs:
       - name: Check CCache Hits
         run: |
           ccache -s
+      # cvmfs_server enter needs unprivileged user namespaces, which Ubuntu
+      # restricts via AppArmor by default
+      - name: Allow unprivileged user namespaces
+        run: |
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - name: Measure Network usage before tests
         id: network-usage-before
         run: |
@@ -131,14 +136,12 @@ jobs:
                       src/647-bearercvmfs                          \
                       src/672-publish_stats_hardlinks              \
                       src/673-acl                                  \
-                      src/682-enter                                \
                       src/684-https_s3                             \
                       src/686-azureblob_s3                         \
                       src/687-import_s3                            \
                       src/692-https_azureblob_s3                   \
                       src/702-symlink_caching                      \
                       src/803-repository_gateway_large_files       \
-                      src/811-commit-gateway                       \
                     --                                             \
                    "${CVMFS_TESTCASES}"      || exit 1
 

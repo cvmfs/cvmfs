@@ -61,7 +61,6 @@ CVMFS_TEST_UNIONFS=overlayfs                                                  \
                                  src/667-ingestnested                         \
                                  src/671-stats_db_upgrade                     \
                                  src/672-publish_stats_hardlinks              \
-                                 src/682-enter                                \
                                  src/684-https_s3                             \
                                  src/686-azureblob_s3                         \
                                  src/687-import_s3                            \

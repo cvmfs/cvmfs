@@ -368,7 +368,7 @@ void CmdEnter::MountOverlayfs() {
     close(fd_stderr);
     throw EPublish("cannot run " + overlayfs_binary_);
   }
-  const int exit_code = WaitForChild(pid_child);
+  const int exit_code = WaitForChildAndReap(pid_child);
   close(fd_stdout);
   close(fd_stderr);
   if (exit_code != 0) {
@@ -419,8 +419,10 @@ void CmdEnter::CleanupSession(bool keep_logs,
                    + settings_spool_area_.readonly_mnt());
   }
 
+  // The cvmfs2 process is an orphan of ours; until reaped, it stays a zombie
   BackoffThrottle backoff;
   while (ProcessExists(pid_cvmfs)) {
+    ReapZombies();
     backoff.Throttle();
   }
 
@@ -454,6 +456,7 @@ void CmdEnter::CleanupSession(bool keep_logs,
   RemoveSingle(session_dir_ + "/session_token");
   RemoveSingle(session_dir_ + "/session_token.api_version");
   RemoveSingle(session_dir_ + "/in_transaction.lock");
+  RemoveSingle(session_dir_ + "/is_publishing.lock");
   RemoveSingle(session_dir_ + "/shellaction.marker");
   RemoveSingle(session_dir_);
   LogCvmfs(kLogCvmfs, kLogStdout, "[done]");
@@ -536,7 +539,7 @@ int CmdEnter::Main(const Options &options) {
     MountCvmfs();
     _exit(0);
   }
-  int exit_code = WaitForChild(pid);
+  int exit_code = WaitForChildAndReap(pid);
   if (exit_code != 0)
     _exit(exit_code);
   LogCvmfs(kLogCvmfs, kLogStdout, "done");
@@ -648,8 +651,13 @@ int CmdEnter::Main(const Options &options) {
     rvb = ManagedExec(cmdline, preserved_fds, std::map<int, int>(),
                       false /* drop_credentials */, false /* clear_env */,
                       false /* double_fork */, &pid_child);
-    const std::string s = StringifyInt(pid_child);
-    SafeWriteToFile(s, session_dir_ + "/session_pid", 0600);
+    // Publisher::ExitShell() polls for this file; it must never see it partial
+    const std::string session_pid = session_dir_ + "/session_pid";
+    if (!SafeWriteToFile(StringifyInt(pid_child), session_pid + ".tmp", 0600)
+        || rename((session_pid + ".tmp").c_str(), session_pid.c_str()) != 0) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Warning: cannot write %s",
+               session_pid.c_str());
+    }
 
     std::vector<int> sigs;
     sigs.push_back(SIGUSR1);
@@ -665,7 +673,7 @@ int CmdEnter::Main(const Options &options) {
     return exit_code;
   }
 
-  exit_code = WaitForChild(pid);
+  exit_code = WaitForChildAndReap(pid);
   LogCvmfs(kLogCvmfs, kLogStdout, "Leaving CernVM-FS shell...");
 
   if (!options.Has("keep-session"))
