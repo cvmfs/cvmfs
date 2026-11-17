@@ -65,7 +65,7 @@ services:
     # Garage – S3-compatible object storage (v2)
     # -----------------------------------------------------------------------
     garage:
-        image: docker.io/dxflrs/garage:v2.2.0
+        image: docker.io/dxflrs/garage:v2.5.0
         hostname: cvmfs-garage
         networks:
             default:

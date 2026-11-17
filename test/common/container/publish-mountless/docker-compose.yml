@@ -61,7 +61,7 @@ services:
     # to this container.
     # -----------------------------------------------------------------------
     garage:
-        image: docker.io/dxflrs/garage:v2.2.0
+        image: docker.io/dxflrs/garage:v2.5.0
         container_name: cvmfs-garage
         hostname: cvmfs-garage
         networks:
