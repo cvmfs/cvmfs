@@ -425,6 +425,10 @@ cvmfs_wsl2_start() {
   is_wsl2 || die "WSL2 not detected, exiting"
   [ $(id -u) -eq 0 ] || die "root privileges required"
   if wsl2_has_systemd; then
+    if ! /usr/bin/systemctl is-active -q autofs.service && \
+       $pidof automount >/dev/null; then
+      die "[WSL2] an automounter not managed by systemd is running (pid $($pidof automount)); stop it before starting autofs.service"
+    fi
     echo "[WSL2] systemd detected, starting autofs.service"
     /usr/bin/systemctl enable --now -q autofs.service
     exit $?
