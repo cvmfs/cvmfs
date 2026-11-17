@@ -106,7 +106,7 @@ jobs:
       - name: cvmfs_config chksetup
         shell: wsl-bash {0}
         run: |
-          set -ex
+          set -exo pipefail
           cvmfs_config chksetup 2>&1 | tee chksetup.log
           # the autofs kill mode warning must not fire on WSL2
           ! grep -q "kill mode" chksetup.log
