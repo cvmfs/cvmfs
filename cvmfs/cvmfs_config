@@ -699,7 +699,7 @@ cvmfs_chksetup() {
     fi
 
     # Check autofs' kill mode when systemd managed
-    if [ -e /usr/bin/systemctl ] && ! wsl2_without_systemd; then
+    if [ -e /usr/bin/systemctl -a ! is_wsl2 ]; then
       if ! /usr/bin/systemctl show -p KillMode autofs.service | grep -q process;
       then
         echo "Warning: autofs kill mode is not 'process', busy CernVM-FS mount points are likely to be forcefully killed when autofs is restarted"
@@ -2541,7 +2541,7 @@ configure_autofs() {
         fi
       done
       # Fix 'systemctl restart autofs' on CentOS 7 (CVM-1200)
-      if [ -e /usr/bin/systemctl ] && ! wsl2_without_systemd; then
+      if [ -e /usr/bin/systemctl -a ! is_wsl2 ]; then
         if /usr/bin/systemctl show -p KillMode autofs.service | \
            grep -q control-group;
         then
