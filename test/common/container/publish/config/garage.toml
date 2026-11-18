@@ -19,11 +19,11 @@ api_bind_addr = "0.0.0.0:3900"
 # Disable virtual-hosted-style bucket addressing so that path-style
 # (http://host:port/bucket/key) works – required by the CVMFS S3 uploader
 # when CVMFS_S3_DNS_BUCKETS=false
-root_domain  = ".s3.garage.localhost"
+root_domain  = ".s3.garage.internal"
 
 [s3_web]
 bind_addr   = "0.0.0.0:3902"
-root_domain = ".web.garage.localhost"
+root_domain = ".web.garage.internal"
 index       = "index.html"
 
 [admin]
