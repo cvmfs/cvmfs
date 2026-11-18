@@ -279,7 +279,7 @@ cvmfs_config_usage() {
   echo "Commands:"
   echo "  setup [nouser] [nocfgmod] [nostart] [noautofs]"
   echo ""
-  if is_wsl2; then
+  if wsl2_without_systemd; then
     echo "  wsl2_start"
     echo ""
   fi
@@ -408,9 +408,33 @@ is_wsl2() {
   grep -q microsoft-standard /proc/version 2>/dev/null
 }
 
+# WSL2 can run systemd as PID 1 when /etc/wsl.conf contains
+#   [boot]
+#   systemd=true
+# In that case autofs is managed like on any other Linux host.
+wsl2_has_systemd() {
+  [ -d /run/systemd/system ]
+}
+
+# True only for WSL2 instances that need the manual automounter handling
+wsl2_without_systemd() {
+  is_wsl2 && ! wsl2_has_systemd
+}
+
 cvmfs_wsl2_start() {
   is_wsl2 || die "WSL2 not detected, exiting"
   [ $(id -u) -eq 0 ] || die "root privileges required"
+  if wsl2_has_systemd; then
+    if ! /usr/bin/systemctl is-active -q autofs.service && \
+       $pidof automount >/dev/null; then
+      die "[WSL2] an automounter not managed by systemd is running (pid $($pidof automount)); stop it before starting autofs.service"
+    fi
+    echo "[WSL2] systemd detected, starting autofs.service"
+    /usr/bin/systemctl enable --now -q autofs.service
+    exit $?
+  fi
+  echo "[WSL2] systemd not enabled; consider adding" \
+       "'[boot]' 'systemd=true' to /etc/wsl.conf"
   if $pidof automount >/dev/null; then
     echo "[WSL2] automounter already running"
     exit 0
@@ -2420,7 +2444,7 @@ activate_service() {
 
   case $sys_arch in
     Linux )
-      if is_wsl2; then
+      if wsl2_without_systemd; then
         echo "[WSL2] skipping activation of $1"
 	echo "[WSL2] start CernVM-FS with 'sudo cvmfs_config wsl2_start'"
         exit 0
@@ -2467,7 +2491,7 @@ reload_service() {
 
   case $sys_arch in
     Linux )
-      if is_wsl2; then
+      if wsl2_without_systemd; then
         [ "$svc" == "autofs" ] || die "[WSL2] internal error, expected autofs service ('$svc')"
 	echo -n "WSL2 automounter "
 	local autofs_pid=$(cat /var/run/autofs.pid)
