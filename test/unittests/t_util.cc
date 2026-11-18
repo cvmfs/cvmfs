@@ -2255,6 +2255,59 @@ TEST(Log2Histogram, 3Bins) {
   }
 }
 
+TEST(Log2Histogram, QuantileOfEmptyHistogram) {
+  Log2Histogram log2hist(30);
+
+  EXPECT_EQ(0U, log2hist.N());
+  // A histogram without samples has no element to interpolate, so every
+  // quantile has to be defined without dividing by an empty bin.
+  EXPECT_EQ(0U, log2hist.GetQuantile(0.0));
+  EXPECT_EQ(0U, log2hist.GetQuantile(0.1));
+  EXPECT_EQ(0U, log2hist.GetQuantile(0.5));
+  EXPECT_EQ(0U, log2hist.GetQuantile(0.9999));
+}
+
+TEST(Log2Histogram, QuantileSkipsEmptyLeadingBins) {
+  Log2Histogram log2hist(30);
+  // Every sample lands in the bin bounded by 32 and 64, so bins 1 to 5 stay
+  // empty and must not be mistaken for the bin holding the pivot.
+  for (unsigned int i = 0; i < 100; i++) {
+    log2hist.Add(32 + (i % 32));
+  }
+
+  EXPECT_EQ(100U, log2hist.N());
+  EXPECT_EQ(32U, log2hist.GetQuantile(0.0));
+  EXPECT_EQ(64U, log2hist.GetQuantile(1.0));
+  EXPECT_GE(log2hist.GetQuantile(0.5), 32U);
+  EXPECT_LE(log2hist.GetQuantile(0.5), 64U);
+}
+
+TEST(Log2Histogram, QuantileOfSingleSample) {
+  // A single sample above the first bin leaves the first bin empty.
+  Log2Histogram above(30);
+  above.Add(40);
+  EXPECT_EQ(1U, above.N());
+  EXPECT_EQ(32U, above.GetQuantile(0.5));
+
+  // A single sample in the first bin keeps that bin occupied, which was
+  // already well defined and has to stay unchanged.
+  Log2Histogram first(30);
+  first.Add(1);
+  EXPECT_EQ(1U, first.N());
+  EXPECT_EQ(0U, first.GetQuantile(0.5));
+}
+
+TEST(Log2Histogram, ZeroQuantileOfPopulatedHistogram) {
+  Log2Histogram log2hist(3);
+  log2hist.Add(0);
+  log2hist.Add(1);
+  log2hist.Add(5);
+
+  // The first bin is occupied here, so the zero quantile is its lower bound.
+  EXPECT_EQ(3U, log2hist.N());
+  EXPECT_EQ(0U, log2hist.GetQuantile(0.0));
+}
+
 TEST(Log2Histogram, Quantiles) {
   int N = 16;
   int64_t max = 1 << N;
