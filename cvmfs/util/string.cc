@@ -233,8 +233,8 @@ time_t IsoTimestamp2UtcTime(const std::string &iso8601) {
 }
 
 int64_t String2Int64(const string &value) {
-  int64_t result;
-  sscanf(value.c_str(), "%" PRId64, &result);
+  int64_t result = 0;
+  sscanf(value.c_str(), "%" SCNd64, &result);
   return result;
 }
 

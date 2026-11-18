@@ -1357,6 +1357,14 @@ TEST_F(T_Util, String2Int64) {
   EXPECT_EQ(static_cast<int64_t>(-234), String2Int64("-234.034"));
   EXPECT_EQ(static_cast<int64_t>(234), String2Int64("234.999"));
   EXPECT_EQ(static_cast<int64_t>(234), String2Int64("0234"));
+  EXPECT_EQ(static_cast<int64_t>(20), String2Int64("20G"));
+  EXPECT_EQ(static_cast<int64_t>(42), String2Int64("  42"));
+  EXPECT_EQ(static_cast<int64_t>(7), String2Int64("+7"));
+  // Failed conversions return 0, like String2Uint64
+  EXPECT_EQ(static_cast<int64_t>(0), String2Int64(""));
+  EXPECT_EQ(static_cast<int64_t>(0), String2Int64(" "));
+  EXPECT_EQ(static_cast<int64_t>(0), String2Int64("abc"));
+  EXPECT_EQ(static_cast<int64_t>(0), String2Int64("unlimited"));
 }
 
 TEST_F(T_Util, String2Uint64Parse) {
