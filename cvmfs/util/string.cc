@@ -518,12 +518,14 @@ string ReplaceAll(const string &haystack, const string &needle,
                   const string &replace_by) {
   string result(haystack);
   size_t pos = 0;
-  const unsigned needle_size = needle.size();
+  const size_t needle_size = needle.size();
   if (needle == "")
     return result;
 
-  while ((pos = result.find(needle, pos)) != string::npos)
+  while ((pos = result.find(needle, pos)) != string::npos) {
     result.replace(pos, needle_size, replace_by);
+    pos += replace_by.size();
+  }
   return result;
 }
 
