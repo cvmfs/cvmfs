@@ -91,4 +91,3 @@ CVMFS_EXPORT std::string GetGMTimestamp(
 #endif
 
 #endif  // CVMFS_UTIL_STRING_H_
-
