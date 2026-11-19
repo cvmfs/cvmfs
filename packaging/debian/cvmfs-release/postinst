@@ -92,6 +92,9 @@ case "$1" in
 	[ -n "$suite" ] || suite="$codename"
 
 	mkdir -p /etc/apt/sources.list.d
+	# Up to 4.9 this was a symlink into /usr/share/cvmfs-release; writing
+	# through it would modify (or, once gone, recreate) a packaged file.
+	rm -f "$dest"
 	cat > "$dest" <<EOF
 deb $base_url ${suite}-prod main
 # deb $base_url ${suite}-testing main
