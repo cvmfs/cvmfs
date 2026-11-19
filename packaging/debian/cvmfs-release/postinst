@@ -56,9 +56,12 @@ case "$1" in
 	        return 2
 	    elif [ -x /usr/lib/apt/apt-helper ]; then
 	        _tmp=$(mktemp)
-	        /usr/lib/apt/apt-helper download-file "$_url" "$_tmp" >/dev/null 2>&1
+	        # apt-helper exits 100 on any failure; only its message tells a
+	        # 404 apart. LC_ALL=C because apt translates that message.
+	        _out=$(LC_ALL=C /usr/lib/apt/apt-helper download-file "$_url" "$_tmp" 2>&1)
 	        _rc=$?; rm -f "$_tmp"
 	        [ $_rc -eq 0 ] && return 0
+	        printf '%s\n' "$_out" | grep -q ' 404  *Not Found' && return 1
 	        return 2
 	    else
 	        return 2
