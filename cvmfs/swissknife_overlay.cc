@@ -500,9 +500,9 @@ static const char * const kSingStartscript = "#!/bin/sh\n";
 
 string CommandOverlay::ShellEscape(const string &s) {
   string escaped = ReplaceAll(s, "\\", "\\\\");
-  escaped = ReplaceAll(escaped, "\"", "\\\"");
-  escaped = ReplaceAll(escaped, "`", "\\`");
-  escaped = ReplaceAll(escaped, "$", "\\$");
+  escaped = ReplaceAll(std::move( escaped ), "\"", "\\\"");
+  escaped = ReplaceAll(std::move( escaped ), "`", "\\`");
+  escaped = ReplaceAll(std::move( escaped ), "$", "\\$");
   return escaped;
 }
 

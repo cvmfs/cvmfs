@@ -514,9 +514,10 @@ string ToUpper(const string &mixed_case) {
   return result;
 }
 
-string ReplaceAll(const string &haystack, const string &needle,
+string ReplaceAll(string haystack, const string &needle,
                   const string &replace_by) {
-  string result(haystack);
+  if (needle == "")
+    return haystack;
   size_t pos = 0;
   const size_t needle_size = needle.size();
   if (needle == "")
