@@ -18,6 +18,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "catalog.h"
@@ -1364,3 +1365,4 @@ int CommandOverlay::Main(const ArgumentList &args) {
 }
 
 }  // namespace swissknife
+

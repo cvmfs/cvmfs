@@ -4,6 +4,8 @@
 
 #include <gtest/gtest.h>
 
+#include <utility>
+
 #include "catalog_counters.h"
 #include "catalog_sql.h"
 #include "util/posix.h"
@@ -322,3 +324,4 @@ TEST_F(T_CatalogSql, SchemaMigration) {
     EXPECT_EQ(0, sql12.RetrieveInt(0));
   }
 }
+
