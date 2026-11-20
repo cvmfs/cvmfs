@@ -705,17 +705,23 @@ Measured on cvm-perf10, with the gateway and the publisher on one host as in
   - A gateway lease needs an existing parent directory. ducc therefore
     creates `.flat/<xx>` as a nested catalog before the ingest, as layer
     ingestion does for `.layers/<xx>`.
-- **Mountless gateway publisher (`sifgw.example.org`): blocked by two
-  cvmfs bugs.** Both occur with the system build and with current devel.
-  1. With any base below an existing directory (`-b s3/s4`), swissknife
-     panics: "failed to add '/s3' ... UNIQUE constraint failed". Without the
-     read-only mount, the tarball engine thinks existing parents are
-     missing and adds them again. Only top-level bases work.
-  2. With a base whose parent does not exist, the receiver panics at commit
-     ("catalog for directory ... cannot be found"). The mounted path refuses
-     this up front; ducc no longer triggers it.
+- **Mountless gateway publisher (`sifgw.example.org`): works with
+  `ingest-spool-usage`.** `oras://` → mountless gateway, name
+  `sif/127.0.0.1:5005/test/alma:9`, provenance written. Read through a
+  client mount, the content is identical to `unsquashfs` and the image runs.
+  Two cvmfs bugs had to be fixed on that branch:
+  1. Existing parents of the base directory were re-added, giving a
+     "UNIQUE constraint failed" panic. Without the read-only mount, the
+     tarball engine checked existence with `lstat`. Fixed in `bab148e6c`:
+     the check now uses the published catalogs (swissknife `-M`).
+  2. A base directory with a missing parent failed only at gateway commit,
+     as a receiver panic, with gateways older than #4316. Mountless ingest
+     now refuses it up front like the mounted path (`c6f7ad216`; opt-in
+     `--allow-nonexistent-path`).
 
-  Both are being fixed on `ingest-spool-usage`.
+  ducc avoids missing parents itself. It creates `.flat/<xx>` before the
+  ingest, and its mountless file, symlink and tree writes ingest at the
+  top-level directory, letting the engine create the levels below.
 - **Mountless existence check:** without a mount, the existence checks
   (`flatComplete`, `symlinkPointsTo`) always report false. Every run then
   re-ingests, unless the repository is also mounted as a client at
