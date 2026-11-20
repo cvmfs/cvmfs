@@ -56,8 +56,8 @@ bool GatewayUploader::ParseSpoolerDefinition(
 
 GatewayUploader::GatewayUploader(const SpoolerDefinition &spooler_definition)
     : AbstractUploader(spooler_definition)
-    , config_()
-    , session_context_(new SessionContext()) {
+    , session_context_(new SessionContext())
+    , config_() {
   assert(spooler_definition.IsValid()
          && spooler_definition.driver_type == SpoolerDefinition::Gateway);
 

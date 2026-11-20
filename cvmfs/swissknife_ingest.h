@@ -30,6 +30,9 @@ class Ingest : public Command {
     r.push_back(Parameter::Mandatory('N', "fully qualified repository name"));
 
     r.push_back(Parameter::Optional('T', "tar file to extract"));
+    // Path (regular file or FIFO) receiving one line per data object
+    // confirmed into S3.  Absent => not opened, nothing written.
+    r.push_back(Parameter::Optional('S', "object list output"));
     r.push_back(Parameter::Optional(
         'B', "base directory where to extract the tarfile"));
     r.push_back(
@@ -41,6 +44,9 @@ class Ingest : public Command {
     r.push_back(Parameter::Optional('H', "key file for HTTP API"));
     r.push_back(Parameter::Optional('@', "proxy url"));
     r.push_back(Parameter::Switch('I', "upload updated statistics DB file"));
+    r.push_back(Parameter::Switch(
+        'n', "do not open or create the statistics database "
+             "(incompatible with -I)"));
     r.push_back(Parameter::Optional(
         'U',
         "uid of new owner of the ingested data (-1 for keep tarball owner)"));
@@ -56,6 +62,8 @@ class Ingest : public Command {
         'Q', "GC SQLite database: read pending paths and delete them"));
     r.push_back(Parameter::Optional(
         'X', "GC database batch size (rows per invocation, 0 = all)"));
+    r.push_back(Parameter::Optional(
+        '3', "S3 config file for direct-to-S3 data upload (gateway mode)"));
 
     return r;
   }

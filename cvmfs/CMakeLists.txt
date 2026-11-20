@@ -733,6 +733,7 @@ if (BUILD_SERVER)
        upload.cc
        upload_facility.cc
        upload_gateway.cc
+       upload_gateway_s3.cc
        upload_local.cc
        upload_s3.cc
        upload_spooler_definition.cc
@@ -847,6 +848,7 @@ if (BUILD_SERVER)
        upload.cc
        upload_facility.cc
        upload_gateway.cc
+       upload_gateway_s3.cc
        upload_local.cc
        upload_s3.cc
        upload_spooler_definition.cc
@@ -1135,6 +1137,7 @@ if(BUILD_RECEIVER)
        upload.cc
        upload_facility.cc
        upload_gateway.cc
+       upload_gateway_s3.cc
        upload_local.cc
        upload_s3.cc
        upload_spooler_definition.cc
@@ -1315,6 +1318,7 @@ if (BUILD_PRELOADER)
                   upload.cc
                   upload_facility.cc
                   upload_gateway.cc
+                  upload_gateway_s3.cc
                   upload_local.cc
                   upload_s3.cc
                   upload_spooler_definition.cc

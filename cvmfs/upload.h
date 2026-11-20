@@ -143,6 +143,15 @@ class Spooler : public Observable<SpoolerResult> {
  public:
   static Spooler *Construct(const SpoolerDefinition &spooler_definition,
                             perf::StatisticsTemplate *statistics = NULL);
+
+  /**
+   * Construct a Spooler with a pre-initialized uploader.  This is used by
+   * the GatewayS3 prototype where the uploader is built outside the normal
+   * plugin discovery mechanism.  Ownership of uploader is transferred.
+   */
+  static Spooler *Construct(const SpoolerDefinition &spooler_definition,
+                            AbstractUploader *uploader,
+                            perf::StatisticsTemplate *statistics);
   virtual ~Spooler();
 
   /**
