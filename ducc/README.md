@@ -138,6 +138,31 @@ loop recipe.yaml
 This command is equivalent to call `convert` in an infinite loop, useful to
 make sure that all the images are up to date.
 
+### convert-sif
+
+```
+convert-sif <sif file or http(s) URL> <cvmfs repository> --name <name>
+```
+
+Publishes the root filesystem of an Apptainer SIF image (or a bare squashfs
+image with `--digest`) as a flat image. The squashfs partition is streamed
+into `cvmfs_server ingest` as a tar archive: nothing is unpacked or
+downloaded to local disk, and a remote image only needs to be served with
+HTTP range-request support. The image is stored at `.flat/<xx>/<id>` and
+linked from `sif/<name>`, so it runs with
+`apptainer exec /cvmfs/<repo>/sif/<name> ...`.
+
+- `<id>` is a hash of the SIF header and descriptor table, which changes
+  on every rebuild; `--digest sha256:...` overrides it.
+- Running again with an unchanged image publishes nothing.
+- File ownership from the image is kept (`cvmfs_server ingest
+  --keep-ownership`). Extended attributes are dropped, since the tarball
+  ingest does not support them.
+- `--dry-run` prints the image metadata and `--emit-tar FILE` writes the
+  tar stream, both without touching a repository.
+- With a local storage backend the published objects still use disk on the
+  publisher; the small-disk benefit applies to gateway and S3 upstreams.
+
 ## convert workflow
 
 The goal of convert is to actually create the thin images starting from the
