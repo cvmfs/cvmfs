@@ -329,3 +329,20 @@ TEST_F(T_ConfigRepo, LoadPublicRsaKeysMem) {
   loader.Fini();
   generator.Fini();
 }
+
+
+TEST_F(T_ConfigRepo, LoadBlacklistMem) {
+  signature::SignatureManager sig;
+  sig.Init();
+  EXPECT_TRUE(sig.LoadBlacklistMem("AA:BB\n<repo 3\n", false));
+  vector<string> blacklist = sig.GetBlacklist();
+  ASSERT_EQ(2U, blacklist.size());
+  EXPECT_EQ("AA:BB", blacklist[0]);
+  EXPECT_EQ("<repo 3", blacklist[1]);
+
+  EXPECT_TRUE(sig.LoadBlacklistMem("CC:DD", true));
+  EXPECT_EQ(3U, sig.GetBlacklist().size());
+  EXPECT_TRUE(sig.LoadBlacklistMem("", false));
+  EXPECT_TRUE(sig.GetBlacklist().empty());
+  sig.Fini();
+}
