@@ -549,7 +549,7 @@ CommitProcessor::Result CommitProcessor::Process(
     }
     delete stats_db;
 
-  } else {
+  } else if (!StatisticsDatabase::IsDisabled(repo_name)) {
     LogCvmfs(kLogReceiver, kLogSyslogErr, "Could not open statistics DB");
   }
 
