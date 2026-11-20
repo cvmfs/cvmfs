@@ -690,14 +690,36 @@ integration test 410). When a link moves to a new ID or is removed, the old
   `prune-images --prune-not-in-wishlist` reads only `input:`; a wish list
   with only `sif_input` makes it refuse ("no images could be loaded").
 
-## 11. Mountless publishers
+## 11. Gateway and mountless publishers
 
-Every repository write in §8.2 already has a mountless path: ingest, symlink
-via ingest, data file via ingest. The one gap is the existence check in step 2,
-which today stats `/cvmfs/<repo>`. In mountless mode, use whatever the
-flat-image path uses there. If nothing is available, use `--force`-like
-behaviour plus a provenance check through the client mount when one exists.
-Integration-test this explicitly (§13).
+Measured on cvm-perf10, with the gateway and the publisher on one host as in
+`set_up_repository_gateway`.
+
+- **Mounted gateway publisher (`sifgwm.example.org`): works.**
+  - alma9: content identical to `unsquashfs`, a no-op rerun publishes no
+    revision.
+  - PyTorch: identical content. 100 s, peak spool tmp 37.9 MB, swissknife
+    RSS 2.8 GB with the system build. 92 s, 7.7 MB and 2.1 GB with the
+    `ingest-spool-usage` build and `--contiguous-catalogs`. The RSS is the
+    gateway uploader's in-memory object packs.
+  - A gateway lease needs an existing parent directory. ducc therefore
+    creates `.flat/<xx>` as a nested catalog before the ingest, as layer
+    ingestion does for `.layers/<xx>`.
+- **Mountless gateway publisher (`sifgw.example.org`): blocked by two
+  cvmfs bugs.** Both occur with the system build and with current devel.
+  1. With any base below an existing directory (`-b s3/s4`), swissknife
+     panics: "failed to add '/s3' ... UNIQUE constraint failed". Without the
+     read-only mount, the tarball engine thinks existing parents are
+     missing and adds them again. Only top-level bases work.
+  2. With a base whose parent does not exist, the receiver panics at commit
+     ("catalog for directory ... cannot be found"). The mounted path refuses
+     this up front; ducc no longer triggers it.
+
+  Both are being fixed on `ingest-spool-usage`.
+- **Mountless existence check:** without a mount, the existence checks
+  (`flatComplete`, `symlinkPointsTo`) always report false. Every run then
+  re-ingests, unless the repository is also mounted as a client at
+  `/cvmfs/<repo>`.
 
 ## 12. OCI-SIF (later phase)
 
@@ -813,8 +835,15 @@ sections above are noted there (§5.2 validators, §7.2 ownership, §8.2
   - Ingest glue, layout, image ID, `--digest`.
   - Idempotency: an unchanged rerun publishes no revision.
   - `--force`, provenance file.
-- **M3 partly done.** The HTTP range source has a chunk cache, readahead,
-  retries and change detection. oras:// and `--spool-dir` are not done.
+- **M3 complete.**
+  - The HTTP range source has a chunk cache, readahead, retries and change
+    detection.
+  - `oras://` resolves the manifest's SIF layer and reads the blob with
+    range requests. Bearer tokens are refreshed on 401; Authorization is
+    dropped on redirects to another host:port. Credentials come from
+    `DUCC_AUTH_REGISTRIES`.
+  - `--spool-dir` downloads first when the server ignores ranges.
+  - `--verify-digest` hashes the source after ingest.
 - **M4 complete** for HTTP and file sources (§10.2, §10.3): `sif_input`
   and `sif_options` in recipes, `convert` / `loop` integration with
   summary and per-entry failure handling, change detection by image ID,
