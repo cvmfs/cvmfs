@@ -17,6 +17,7 @@ import (
 	l "github.com/cvmfs/ducc/log"
 	"github.com/cvmfs/ducc/notification"
 	"github.com/cvmfs/ducc/sif/squashfs"
+	"github.com/cvmfs/ducc/singularity"
 )
 
 const PublicPrefix = "sif"
@@ -56,7 +57,9 @@ type Provenance struct {
 	ImageID        string       `json:"image_id"`
 	IDKind         string       `json:"id_kind"`
 	SIF            *sifInfo     `json:"sif,omitempty"`
-	Squashfs       squashInfo   `json:"squashfs"`
+	OCI            *OCIImage    `json:"oci,omitempty"`
+	Merge          *MergeStats  `json:"merge,omitempty"`
+	Squashfs       squashInfo   `json:"squashfs"` // lowest layer of an OCI-SIF
 	Stats          StreamStats  `json:"stats"`
 	Fetch          *SourceStats `json:"fetch,omitempty"`
 	IngestedAt     time.Time    `json:"ingested_at"`
@@ -110,12 +113,26 @@ func PublicPath(name string) string { return filepath.Join(PublicPrefix, name) }
 // Inspect opens the source and builds the index without touching any
 // repository; used by --dry-run and --emit-tar as well.
 type Inspected struct {
-	Src    Source
-	Image  *Image
-	FS     *squashfs.FS
-	Index  *squashfs.Index
-	ID     string
+	Src   Source
+	Image *Image
+	OCI   *OCIImage // OCI-SIF only
+	Tree  *Tree
+	Merge *MergeStats // OCI-SIF only
+	ID    string
+	// IDKind is user-digest, oci-config, source-digest or sif-descriptors.
 	IDKind string
+}
+
+// DataSize is the size of the squashfs data the image is read from.
+func (in *Inspected) DataSize() int64 {
+	if in.OCI == nil {
+		return in.Image.PartSize
+	}
+	var n int64
+	for _, l := range in.OCI.Layers {
+		n += l.Size
+	}
+	return n
 }
 
 func Inspect(ctx context.Context, source, digest string, maxEntries int, sopts SourceOptions) (*Inspected, error) {
@@ -146,12 +163,25 @@ func Identify(ctx context.Context, source, digest string, sopts SourceOptions) (
 	if in.Image, err = Parse(src, src.Size()); err != nil {
 		return fail(err)
 	}
+	if in.Image.OCI {
+		if in.OCI, err = in.Image.ReadOCI(src); err != nil {
+			return fail(err)
+		}
+		in.Image.Arch = in.OCI.Config.Architecture
+	}
 	switch {
 	case digest != "":
 		if in.ID, err = normalizeDigest(digest); err != nil {
 			return fail(err)
 		}
 		in.IDKind = "user-digest"
+	case in.OCI != nil:
+		// Same ID as a registry conversion of this image (GetSingularityPath),
+		// so both share one .flat tree.
+		if in.ID, err = normalizeDigest(in.OCI.ConfigDigest); err != nil {
+			return fail(err)
+		}
+		in.IDKind = "oci-config"
 	case src.KnownDigest() != "":
 		in.ID, in.IDKind = src.KnownDigest(), "source-digest"
 	case in.Image.Bare:
@@ -162,19 +192,67 @@ func Identify(ctx context.Context, source, digest string, sopts SourceOptions) (
 	return in, nil
 }
 
-// BuildIndex opens the squashfs partition and reads its directory tree.
-func (in *Inspected) BuildIndex(maxEntries int) (err error) {
-	if in.FS, err = squashfs.Open(in.Image.Partition(in.Src), in.Image.PartSize); err != nil {
-		return err
-	}
+// BuildIndex opens the squashfs partition, or the layers of an OCI-SIF,
+// and reads the directory tree.
+func (in *Inspected) BuildIndex(maxEntries int) error {
 	if maxEntries <= 0 {
 		maxEntries = 10_000_000
 	}
-	if in.Index, err = in.FS.BuildIndex(maxEntries); err != nil {
+	if in.OCI != nil {
+		var err error
+		in.Tree, in.Merge, err = BuildOCITree(in.Src, in.OCI, maxEntries)
 		return err
 	}
-	in.FS.DropMetadataCache()
+	fs, err := squashfs.Open(in.Image.Partition(in.Src), in.Image.PartSize)
+	if err != nil {
+		return err
+	}
+	ix, err := fs.BuildIndex(maxEntries)
+	if err != nil {
+		return err
+	}
+	fs.DropMetadataCache()
+	in.Tree = SingleTree(fs, ix)
 	return nil
+}
+
+// BuildOCITree merges the layers of an OCI-SIF and adds the Singularity
+// environment that registry conversions get from `cvmfs_server overlay -c`.
+func BuildOCITree(r io.ReaderAt, o *OCIImage, maxEntries int) (*Tree, *MergeStats, error) {
+	var layers []*squashfs.FS
+	var ixs []*squashfs.Index
+	total := 0
+	for i, l := range o.Layers {
+		fs, err := squashfs.Open(o.Layer(r, i), l.Size)
+		if err != nil {
+			return nil, nil, fmt.Errorf("layer %s: %w", l.Digest, err)
+		}
+		ix, err := fs.BuildIndex(maxEntries - total)
+		if err != nil {
+			return nil, nil, fmt.Errorf("layer %s: %w", l.Digest, err)
+		}
+		total += len(ix.Entries)
+		layers, ixs = append(layers, fs), append(ixs, ix)
+	}
+	b, err := merge(layers, ixs)
+	if err != nil {
+		return nil, nil, err
+	}
+	for _, fs := range layers {
+		fs.DropMetadataCache()
+	}
+	mtime := time.Now()
+	if c := o.Config.Created; c != nil && c.Unix() > 0 {
+		mtime = *c
+	}
+	if err := b.addFiles(singularity.Files(o.Config), uint32(mtime.Unix())); err != nil {
+		return nil, nil, err
+	}
+	t, st, err := b.build(layers)
+	if err != nil {
+		return nil, nil, err
+	}
+	return t, &st, nil
 }
 
 func hasSingularityDir(ix *squashfs.Index) bool {
@@ -249,8 +327,12 @@ func Convert(ctx context.Context, o ConvertOptions) (res Result, err error) {
 		if err = in.BuildIndex(o.MaxEntries); err != nil {
 			return
 		}
-		logger.WithFields(log.Fields{"entries": len(in.Index.Entries), "id_kind": in.IDKind}).Info("SIF image indexed")
-		if !hasSingularityDir(in.Index) && !o.AllowMissingSingularityDir {
+		fields := log.Fields{"entries": len(in.Tree.Index.Entries), "id_kind": in.IDKind}
+		if in.Merge != nil {
+			fields["layers"], fields["whiteouts"], fields["hidden"] = in.Merge.Layers, in.Merge.Whiteouts, in.Merge.Hidden
+		}
+		logger.WithFields(fields).Info("SIF image indexed")
+		if !hasSingularityDir(in.Tree.Index) && !o.AllowMissingSingularityDir {
 			err = fmt.Errorf("image has no /.singularity.d; not an Apptainer image? (override with --allow-missing-singularity-d)")
 			return
 		}
@@ -295,7 +377,7 @@ func ingest(ctx context.Context, logger *log.Entry, o ConvertOptions, in *Inspec
 	sopts := o.Stream
 	sopts.Logger = logger
 	go func() {
-		st, err := Stream(ctx, pw, in.FS, in.Index, sopts)
+		st, err := StreamTree(ctx, pw, in.Tree, sopts)
 		res.Stream = st
 		// Closing with the error makes ingest see a truncated archive and
 		// abort instead of committing a partial tree.
@@ -331,8 +413,8 @@ func ingest(ctx context.Context, logger *log.Entry, o ConvertOptions, in *Inspec
 	st := res.Stream
 	src := in.Src.Stats()
 	ratio := 0.0
-	if in.Image.PartSize > 0 {
-		ratio = float64(src.BytesFetched) / float64(in.Image.PartSize)
+	if n := in.DataSize(); n > 0 {
+		ratio = float64(src.BytesFetched) / float64(n)
 	}
 	logger.WithFields(log.Fields{
 		"entries": st.Entries, "files": st.Files, "hardlinks": st.Hardlinks,
@@ -348,10 +430,10 @@ func ingest(ctx context.Context, logger *log.Entry, o ConvertOptions, in *Inspec
 }
 
 func NewProvenance(o ConvertOptions, in *Inspected, res *Result) Provenance {
-	sb := in.FS.Superblock()
+	sb := in.Tree.Layers[0].Superblock()
 	p := Provenance{
 		Schema: 1, Source: o.Source, SourceIdentity: in.Src.Identity(),
-		ImageID: in.ID, IDKind: in.IDKind,
+		ImageID: in.ID, IDKind: in.IDKind, OCI: in.OCI, Merge: in.Merge,
 		Squashfs: squashInfo{sb.Compressor.String(), sb.BlockSize, sb.InodeCount, sb.BytesUsed},
 		Stats:    res.Stream, IngestedAt: time.Now().UTC(),
 	}

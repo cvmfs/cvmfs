@@ -371,7 +371,7 @@ func TestStreamOrderIsByDataPosition(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	order, _ := Order(fs, ix, nil, nil)
+	order, _ := Order(SingleTree(fs, ix), nil, nil)
 	if len(order) != len(ix.Entries)-1 {
 		t.Fatalf("order has %d entries, index %d", len(order), len(ix.Entries))
 	}
@@ -525,16 +525,19 @@ func TestParseSIF(t *testing.T) {
 		"ext3":       func() { writeSIF(t, img, sifPath, FsExt3, PartPrimSys) },
 		"encrypted":  func() { writeSIF(t, img, sifPath, FsEncryptedSquashfs, PartPrimSys) },
 		"no primary": func() { writeSIF(t, img, sifPath, FsSquash, PartData) },
-		"oci":        func() { writeSIF(t, img, sifPath, FsSquash, PartData, DataOCIRootIndex) },
+		"oci":        func() { writeSIF(t, img, sifPath, FsSquash, PartData, DataOCIRootIndex, DataOCIRootIndex) },
 	}
 	wantErr := map[string]string{
-		"ext3": "ext3", "encrypted": "encrypted", "no primary": "no primary", "oci": "OCI-SIF",
+		"ext3": "ext3", "encrypted": "encrypted", "no primary": "no primary", "oci": "more than one root index",
 	}
 	for name, mk := range bad {
 		mk()
 		f, _ := os.Open(sifPath)
 		fi, _ := f.Stat()
-		_, err := Parse(f, fi.Size())
+		im, err := Parse(f, fi.Size())
+		if err == nil && im.OCI {
+			_, err = im.ReadOCI(f)
+		}
 		f.Close()
 		if err == nil || !strings.Contains(err.Error(), wantErr[name]) {
 			t.Errorf("%s: got error %v", name, err)
