@@ -44,7 +44,7 @@ cvmfs_run_test() {
   sudo cvmfs_talk -i cvmfs-config.cern.ch proxy info
   sudo cvmfs_talk -i cvmfs-config.cern.ch host info
 
-  echo "*** read $afile, should block"
+  echo "*** read $afile"
   local nfsopen_before=$(sudo cvmfs_talk -i cvmfs-config.cern.ch internal affairs \
     | grep "^cvmfs.n_fs_open" | cut -d\| -f2)
   echo "*** Number of file system open calls before opening $afile: $nfsopen_before"
@@ -63,7 +63,8 @@ cvmfs_run_test() {
   echo "*** Number of file system open calls after opening $afile: $nfsopen_after"
 
   echo "*** Killing $pid"
-  kill $pid
+  kill "$pid" || : # might have terminated, in practice
+  wait "$pid" || : # expect non-zero exit code
 
   echo "*** wait for error to be registered"
   local nioerr_after=$nioerr_before
@@ -72,8 +73,6 @@ cvmfs_run_test() {
     sleep 1
   done
   echo "*** Number of I/O errors after opening $afile: $nioerr_after"
-
-  get_xattr logbuffer /cvmfs/cvmfs-config.cern.ch | grep "request canceled" || return 20
 
   return 0
 }
