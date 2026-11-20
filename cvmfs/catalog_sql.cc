@@ -711,78 +711,13 @@ shash::Any SqlListContentHashes::GetHash() const {
 
 //------------------------------------------------------------------------------
 
-namespace {
-
-/**
- * The set of directory entry columns that can be selected depends on the
- * catalog schema.  Each entry pairs the minimum schema version and revision
- * with the column list usable from there on.
- */
-struct DirentFields {
-  double min_schema_version;
-  unsigned min_schema_revision;
-  const char *columns;
-};
-
-/**
- * Ordered from newest to oldest schema; the first entry the catalog satisfies
- * is used.  The last entry must accept any catalog.
- */
-constexpr DirentFields kDirentFields[] = {
-    {2.1, 7,
-     "catalog.hash,       catalog.hardlinks,  catalog.size, "
-     "catalog.mode,       catalog.mtime,      catalog.flags, "
-     "catalog.name,       catalog.symlink,    catalog.md5path_1, "
-     "catalog.md5path_2,  catalog.parent_1,   catalog.parent_2, "
-     "catalog.rowid,      catalog.uid,        catalog.gid, "
-     "catalog.xattr IS NOT NULL, catalog.mtimens"},
-    {2.1, 2,
-     "catalog.hash,       catalog.hardlinks,  catalog.size, "
-     "catalog.mode,       catalog.mtime,      catalog.flags, "
-     "catalog.name,       catalog.symlink,    catalog.md5path_1, "
-     "catalog.md5path_2,  catalog.parent_1,   catalog.parent_2, "
-     "catalog.rowid,      catalog.uid,        catalog.gid, "
-     "catalog.xattr IS NOT NULL, NULL"},
-    {2.1, 0,
-     "catalog.hash,       catalog.hardlinks,  catalog.size, "
-     "catalog.mode,       catalog.mtime,      catalog.flags, "
-     "catalog.name,       catalog.symlink,    catalog.md5path_1, "
-     "catalog.md5path_2,  catalog.parent_1,   catalog.parent_2, "
-     "catalog.rowid,      catalog.uid,        catalog.gid, "
-     "0, NULL"},
-    {0.0, 0,
-     "catalog.hash,       catalog.inode,      catalog.size, "
-     "catalog.mode,       catalog.mtime,      catalog.flags, "
-     "catalog.name,       catalog.symlink,    catalog.md5path_1, "
-     "catalog.md5path_2,  catalog.parent_1,   catalog.parent_2, "
-     "catalog.rowid"},
-};
-
-constexpr unsigned kNumDirentFields = sizeof(kDirentFields)
-                                      / sizeof(kDirentFields[0]);
-
-static_assert(kDirentFields[kNumDirentFields - 1].min_schema_version == 0.0
-                  && kDirentFields[kNumDirentFields - 1].min_schema_revision
-                         == 0,
-              "the last kDirentFields entry must accept any catalog");
-
-unsigned SelectDirentFields(const CatalogDatabase &database) {
-  for (unsigned i = 0; i < kNumDirentFields; ++i) {
-    const DirentFields &fields = kDirentFields[i];
-    if ((database.schema_version()
-         >= fields.min_schema_version - CatalogDatabase::kSchemaEpsilon)
-        && (database.schema_revision() >= fields.min_schema_revision)) {
-      return i;
-    }
-  }
-  return kNumDirentFields - 1;  // unreachable, see static_assert above
-}
-
 /**
  * Expands the @DB_FIELDS@ placeholder of a statement template once for every
- * schema revision.  Sql::DeferredInit() keeps only the raw pointer to the
- * query string, so instances must outlive the statements using them; declare
- * them as function-local statics.
+ * catalog schema, and returns the expansion matching a given catalog.
+ *
+ * Sql::DeferredInit() keeps only the raw pointer to the query string, so
+ * instances must outlive the statements using them; declare them as
+ * function-local statics.
  */
 class DirentStatements {
  public:
@@ -794,14 +729,84 @@ class DirentStatements {
   }
 
   const char *Get(const CatalogDatabase &database) const {
-    return statements_[SelectDirentFields(database)].c_str();
+    return statements_[Select(database)].c_str();
   }
 
  private:
+  /**
+   * The set of directory entry columns that can be selected depends on the
+   * catalog schema.  Each entry pairs the minimum schema version and revision
+   * with the column list usable from there on.
+   */
+  struct DirentFields {
+    double min_schema_version;
+    unsigned min_schema_revision;
+    const char *columns;
+  };
+
+  /**
+   * Ordered from newest to oldest schema; the first entry the catalog
+   * satisfies is used.  The last entry must accept any catalog.
+   */
+  static constexpr DirentFields kDirentFields[] = {
+      {2.1, 7,
+       "catalog.hash,       catalog.hardlinks,  catalog.size, "
+       "catalog.mode,       catalog.mtime,      catalog.flags, "
+       "catalog.name,       catalog.symlink,    catalog.md5path_1, "
+       "catalog.md5path_2,  catalog.parent_1,   catalog.parent_2, "
+       "catalog.rowid,      catalog.uid,        catalog.gid, "
+       "catalog.xattr IS NOT NULL, catalog.mtimens"},
+      {2.1, 2,
+       "catalog.hash,       catalog.hardlinks,  catalog.size, "
+       "catalog.mode,       catalog.mtime,      catalog.flags, "
+       "catalog.name,       catalog.symlink,    catalog.md5path_1, "
+       "catalog.md5path_2,  catalog.parent_1,   catalog.parent_2, "
+       "catalog.rowid,      catalog.uid,        catalog.gid, "
+       "catalog.xattr IS NOT NULL, NULL"},
+      {2.1, 0,
+       "catalog.hash,       catalog.hardlinks,  catalog.size, "
+       "catalog.mode,       catalog.mtime,      catalog.flags, "
+       "catalog.name,       catalog.symlink,    catalog.md5path_1, "
+       "catalog.md5path_2,  catalog.parent_1,   catalog.parent_2, "
+       "catalog.rowid,      catalog.uid,        catalog.gid, "
+       "0, NULL"},
+      {0.0, 0,
+       "catalog.hash,       catalog.inode,      catalog.size, "
+       "catalog.mode,       catalog.mtime,      catalog.flags, "
+       "catalog.name,       catalog.symlink,    catalog.md5path_1, "
+       "catalog.md5path_2,  catalog.parent_1,   catalog.parent_2, "
+       "catalog.rowid"},
+  };
+
+  static constexpr unsigned kNumDirentFields = sizeof(kDirentFields)
+                                               / sizeof(kDirentFields[0]);
+
+  static_assert(kDirentFields[kNumDirentFields - 1].min_schema_version == 0.0
+                    && kDirentFields[kNumDirentFields - 1].min_schema_revision
+                           == 0,
+                "the last kDirentFields entry must accept any catalog");
+
+  /**
+   * Returns the index of the kDirentFields entry to use for the catalog.
+   */
+  static unsigned Select(const CatalogDatabase &database) {
+    for (unsigned i = 0; i < kNumDirentFields; ++i) {
+      const DirentFields &fields = kDirentFields[i];
+      if ((database.schema_version()
+           >= fields.min_schema_version - CatalogDatabase::kSchemaEpsilon)
+          && (database.schema_revision() >= fields.min_schema_revision)) {
+        return i;
+      }
+    }
+    return kNumDirentFields - 1;  // unreachable, see static_assert above
+  }
+
   std::string statements_[kNumDirentFields];
 };
 
-}  // anonymous namespace
+// Indexing kDirentFields at runtime odr-uses it, which in C++11 requires a
+// namespace-scope definition
+constexpr DirentStatements::DirentFields DirentStatements::kDirentFields[];
 
 
 shash::Md5 SqlLookup::GetPathHash() const { return RetrieveMd5(8, 9); }
