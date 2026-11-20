@@ -108,6 +108,12 @@ func ValidateName(name string) error {
 	return nil
 }
 
+// ValidateDigest checks an image ID override.
+func ValidateDigest(d string) error {
+	_, err := normalizeDigest(d)
+	return err
+}
+
 func FlatPath(id string) string     { return filepath.Join(".flat", id[:2], id) }
 func InfoPath(id string) string     { return filepath.Join(".sifinfo", id[:2], id+".json") }
 func PublicPath(name string) string { return filepath.Join(PublicPrefix, name) }
@@ -209,6 +215,12 @@ func symlinkPointsTo(repo, link, flat string) bool {
 func flatComplete(repo, flat string) bool {
 	_, err := os.Stat(filepath.Join("/", "cvmfs", repo, flat, ".singularity.d"))
 	return err == nil
+}
+
+// Published reports whether image id is complete in the mounted repository
+// and sif/<name> points at it, i.e. whether Convert would be a no-op.
+func Published(repo, name, id string) bool {
+	return flatComplete(repo, FlatPath(id)) && symlinkPointsTo(repo, PublicPath(name), FlatPath(id))
 }
 
 // Convert publishes the image's root filesystem at .flat/<xx>/<id> with a

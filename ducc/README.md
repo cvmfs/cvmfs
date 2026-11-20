@@ -119,6 +119,28 @@ reference to the input image.
 This recipe format allow to specify only some wish, specifically all the images
 need to be stored in the same CVMFS repository and have the same format.
 
+**sif_input** (optional): Apptainer SIF images to publish as with
+`convert-sif`. Each entry needs a `source` (a local path or an http(s) URL
+with range support) and a `name`, published as `sif/<name>`; `digest:
+sha256:...` pins the image ID. Names must be unique within the recipe.
+**sif_options** (optional) apply to all entries: `contiguous_catalogs`,
+`catalog_max_weight`, `catalog_min_weight`, `workers`, `cache_size_mib`.
+
+``` yaml
+version: 1
+cvmfs_repo: unpacked.cern.ch
+sif_input:
+  - source: https://images.example.org/sif/sim-2026.sif
+    name: example/sim:2026
+  - source: /data/analysis.sif
+    name: lhcb/analysis:v3
+    digest: sha256:...
+sif_options:
+  contiguous_catalogs: true
+```
+
+A recipe with only `sif_input` needs no registry password.
+
 ## Commands
 
 ### convert
@@ -162,6 +184,16 @@ linked from `sif/<name>`, so it runs with
   tar stream, both without touching a repository.
 - With a local storage backend the published objects still use disk on the
   publisher; the small-disk benefit applies to gateway and S3 upstreams.
+
+### delete-sif
+
+```
+delete-sif <cvmfs repository> <name> [--dry-run]
+```
+
+Removes the link `sif/<name>`. The next `garbage-collection` run removes the
+image and its `.sifinfo` provenance file once no link points to the image.
+Remove the entry from the recipe first, or the next conversion recreates it.
 
 ## convert workflow
 

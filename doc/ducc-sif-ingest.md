@@ -481,8 +481,8 @@ SIF images never collide with registry-sourced ones:
 }
 ```
 
-The daemon uses this for change detection (§10.2). Operators use it for
-debugging.
+Operators use it for debugging; GC removes it together with the image
+(§10.3). Change detection does not read it (§10.2).
 
 ### 8.5 Optional content verification
 
@@ -586,7 +586,7 @@ The command respects the existing global `--mountless` /
 
 ### 10.2 Wish list
 
-Extend `YamlRecipeV1` with an optional section. Existing recipes stay valid:
+`YamlRecipeV1` has two optional keys. Existing recipes stay valid:
 
 ```yaml
 version: 1
@@ -595,24 +595,100 @@ cvmfs_repo: unpacked.example.org
 input:
   - https://registry.hub.docker.com/library/ubuntu:24.04
 sif_input:
-  - source: oras://ghcr.io/org/analysis:v3
   - source: https://images.example.org/sif/sim-2026.sif
     name: example/sim:2026      # published as sif/example/sim:2026
+  - source: /data/analysis.sif
+    name: lhcb/analysis:v3
     digest: sha256:…            # optional image ID override
+sif_options:                    # optional, for all entries
+  contiguous_catalogs: true     # convert-sif --contiguous-catalogs
+  catalog_max_weight: 100000
+  catalog_min_weight: 1000
+  workers: 0                    # 0: number of CPUs
+  cache_size_mib: 64
 ```
 
-The daemon loop (`cmd/loop.go`) re-resolves each `sif_input` on every
-iteration: oras digest, or HTTP `ETag`/`Last-Modified`/size. It re-ingests
-only when the identity differs from `.sifinfo/.../<id>.json` for the image the
-public symlink currently points to. An unchanged source costs one `HEAD` (or
-one manifest GET).
+Parsing (`lib/recipe.go`, `lib/sif_wish.go`) rejects the whole recipe, with
+every problem listed, if an entry has no `source`, an invalid `name`
+(`sif.ValidateName`) or `digest`, a name used twice, or an unknown key. A
+misspelt `digest` would otherwise silently drop the pin, and two entries
+with one name would relink it on every run. `name` is required for every
+source until oras:// exists.
+
+`convert` and `loop` handle `sif_input` after the docker inputs, one entry
+after the other (`lib.ConvertSIFWishes`):
+
+- Per entry, `sif.Identify` reads the header with a 64 KiB chunk size (the
+  header and an apptainer-default descriptor table of 48 × 585 bytes fit in
+  one request). If `.flat/<xx>/<id>/.singularity.d` exists and `sif/<name>`
+  already points there (`sif.Published`), the entry is done. Otherwise
+  `sif.Convert` runs with the recipe's options.
+- `--convert-again` maps to `Force`. `--skip-flat` skips `sif_input`.
+- Results go into the conversion summary under the public path:
+  `added` (no link before), `updated` (new image or relink),
+  `already converted`, and the new `failed` list, which docker inputs now
+  fill as well. A failing entry is logged, appended to the error list (the
+  command exits non-zero) and does not stop the others. `ignoreErrors`
+  patterns are matched against `source`.
+- A recipe with only `sif_input` needs no registry password.
+- Notifications are the `start_sif_ingest` / `end_sif_ingest` of
+  `sif.Convert`; an unchanged entry sends none.
+
+Change detection is by image ID, not by HTTP validators as first planned:
+
+- Default ID: the hash of the SIF header and descriptor table. Every
+  `apptainer build` gets a new UUID and creation time, so a rebuilt image
+  gets a new ID: it is ingested to a new `.flat` path and the link moves.
+  The old path is left for GC (§10.3).
+- `digest:` pin: the pin is the ID. A changed source under an unchanged
+  pin is not picked up; change the pin to publish it. The pin is a label,
+  not verified against the content (§8.5 is not implemented).
+- Same header, different bytes: only possible if the squashfs partition is
+  edited in place with its size unchanged, which neither `apptainer build`
+  nor the `sif` tools do (adding or removing objects, e.g. signing, changes
+  the descriptor table). ducc does not notice such an edit. The provenance
+  file records the HTTP identity (size, ETag, Last-Modified), so a check
+  could compare it, but a moved or re-copied file also changes these and
+  would trigger a full re-ingest; it was left out. Remedy: run `convert
+  --convert-again`, or pin a content digest.
+- Mountless publishers have no mount to check, so `sif.Published` is false
+  and every run goes through `sif.Convert`, which then re-ingests (§11).
+
+Measured on cvm-perf10 (local httpd, 70 MB alma9 SIF, 20 entries that are
+all unchanged):
+
+| | per entry |
+|---|---:|
+| HTTP requests | 2 (1-byte probe, one 64 KiB range) |
+| bytes fetched | 65,537 (8,388,609 with `convert-sif`'s 8 MiB chunk) |
+| repository calls | 1 stat, 1 readlink |
+| time | 1.7 ms (under strace) |
+| revisions | 0 |
+
+A whole `convert` run of a SIF-only recipe takes 1.3 s, almost all of it
+`cvmfs_server list` from the repository check, independent of the number
+of entries.
 
 ### 10.3 Garbage collection
 
-No new GC logic is needed. When a `sif_input` is removed, or its symlink moves
-to a new ID, the old `.flat/<xx>/<id>` is no longer a symlink target and the
-existing flat GC removes it. Extend that GC to also delete the matching
-`.sifinfo/<xx>/<id>.json`.
+No new reference tracking was needed. `FindAllUsedFlatImages` walks all
+non-hidden top-level directories, `sif/` included, and resolves each
+symlink, so a linked SIF image is kept (unit test with the mock repository;
+integration test 410). When a link moves to a new ID or is removed, the old
+`.flat/<xx>/<id>` is collected as before.
+
+- `lib.FindSifInfoToDelete` maps each flat image that GC deletes (after the
+  grace period) to `.sifinfo/<xx>/<id>.json`, if that file exists. These
+  paths go into the GC database as category `sifinfo` and are deleted in
+  the same `cvmfs_server ingest --gc-db` transaction. Docker-sourced flat
+  images have no provenance file and are unaffected.
+- Removing a `sif_input` entry does not remove its link. `cvmfs_ducc
+  delete-sif <repo> <name>` (`--dry-run`) deletes `sif/<name>` via
+  `cvmfs_server ingest --delete`; the next GC collects the image.
+- `delete-image` and `prune-images` find images through `.metadata/`, which
+  SIF images do not have, so they neither see nor touch `sif/` links.
+  `prune-images --prune-not-in-wishlist` reads only `input:`; a wish list
+  with only `sif_input` makes it refuse ("no images could be loaded").
 
 ## 11. Mountless publishers
 
@@ -739,7 +815,11 @@ sections above are noted there (§5.2 validators, §7.2 ownership, §8.2
   - `--force`, provenance file.
 - **M3 partly done.** The HTTP range source has a chunk cache, readahead,
   retries and change detection. oras:// and `--spool-dir` are not done.
-- **M4, M5:** not started.
+- **M4 complete** for HTTP and file sources (§10.2, §10.3): `sif_input`
+  and `sif_options` in recipes, `convert` / `loop` integration with
+  summary and per-entry failure handling, change detection by image ID,
+  `.sifinfo` GC, `delete-sif`.
+- **M5:** not started.
 
 ### 16.1 Ordering for early catalog upload
 
@@ -816,3 +896,12 @@ pending on that branch.
   content), runs apptainer, checks that a no-op rerun publishes no
   revision and that a changed SIF is relinked, and checks that stdin is
   rejected.
+- `go test ./lib`: `sif_input` parsing and its errors, option mapping, and
+  `ConvertSIFWishes` through the mock `cvmfs_server` with bare squashfs
+  images and pins (add, failing entry, no-op, re-pin, `--convert-again`),
+  GC candidates and `.sifinfo` mapping, `delete-sif`.
+- `test/src/410-ducc-sif-wishlist`: passes on cvm-perf10. A recipe with a
+  404 entry exits non-zero but publishes the others; a rerun publishes no
+  revision; a rebuilt SIF is relinked while a pinned entry for the same
+  source stays; GC removes the replaced image and its `.sifinfo`; after
+  `delete-sif`, GC removes the last image of the removed entry.

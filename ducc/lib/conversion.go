@@ -42,6 +42,9 @@ type ConversionSummary struct {
 	Added            []string
 	Updated          []string
 	AlreadyConverted []string
+	// Failed is kept apart from the other states: an image can fail in one
+	// stage (e.g. the thin image) after its layers were added.
+	Failed []string
 }
 
 func removeImage(images []string, image string) []string {
@@ -95,7 +98,14 @@ func (s *ConversionSummary) Add(result ConversionResult, image string) {
 	}
 }
 
+func (s *ConversionSummary) AddFailed(image string) {
+	s.addUnique(&s.Failed, image)
+}
+
 func (s *ConversionSummary) Merge(other ConversionSummary) {
+	for _, image := range other.Failed {
+		s.AddFailed(image)
+	}
 	for _, image := range other.Added {
 		s.Add(ConversionNotFound, image)
 	}

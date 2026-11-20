@@ -20,5 +20,6 @@ func logConversionSummary(message string, summary lib.ConversionSummary) {
 		"added":             sortedImageList(summary.Added),
 		"updated":           sortedImageList(summary.Updated),
 		"already converted": sortedImageList(summary.AlreadyConverted),
+		"failed":            sortedImageList(summary.Failed),
 	}).Info(message)
 }
