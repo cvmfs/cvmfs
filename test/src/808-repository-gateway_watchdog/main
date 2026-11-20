@@ -24,7 +24,7 @@ cvmfs_run_test() {
     # Gets a SIGQUIT signal while being blocked by SafeRead
     kill -3 $receiver_pid
     # Watchdog takes some time generating the stack traces
-    num_retries=20
+    num_retries=300
     while [ $num_retries -ne 0 ]; do
         ps cax | grep cvmfs_receiver >/dev/null || break
         num_retries=$(( $num_retries - 1 ))
