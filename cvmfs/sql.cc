@@ -167,4 +167,14 @@ std::string Sql::GetLastErrorMsg() const {
   return msg;
 }
 
+static void ErrorLogCallback(void *pArg, int iErrCode, const char *zMsg) {
+  LogCvmfs(kLogSql, kLogStderr | kLogSyslogErr, "(%d) %s\n", iErrCode, zMsg);
+}
+
+bool Sql::SetupGlobalLogging() {
+  int ret;
+  ret = sqlite3_config(SQLITE_CONFIG_LOG, ErrorLogCallback, NULL);
+  return !ret;
+}
+
 }  // namespace sqlite
