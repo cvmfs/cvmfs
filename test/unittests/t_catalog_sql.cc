@@ -4,6 +4,8 @@
 
 #include <gtest/gtest.h>
 
+#include <utility>
+
 #include "catalog_counters.h"
 #include "catalog_sql.h"
 #include "util/posix.h"
@@ -136,9 +138,10 @@ static void RevertToRevision1(catalog::CatalogDatabase *db) {
   }
   string table_sql_r1 = ReplaceAll(table_sql, "xattr BLOB,", "");
   ASSERT_NE(table_sql_r1, table_sql);
-  table_sql_r1 = ReplaceAll(table_sql_r1, "CREATE TABLE catalog ",
+  table_sql_r1 = ReplaceAll(std::move(table_sql_r1), "CREATE TABLE catalog ",
                             "CREATE TABLE catalog_r1 ");
-  table_sql_r1 = ReplaceAll(table_sql_r1, "CREATE TABLE \"catalog\" ",
+  table_sql_r1 = ReplaceAll(std::move(table_sql_r1),
+                            "CREATE TABLE \"catalog\" ",
                             "CREATE TABLE catalog_r1 ");
 
   ASSERT_TRUE(sqlite::Sql(db->sqlite_db(), table_sql_r1).Execute());
@@ -178,9 +181,11 @@ static void RevertToRevision0(catalog::CatalogDatabase *db) {
   }
   string table_sql_r1 = ReplaceAll(table_sql, "size INTEGER,", "");
   ASSERT_NE(table_sql_r1, table_sql);
-  table_sql_r1 = ReplaceAll(table_sql_r1, "CREATE TABLE nested_catalogs ",
+  table_sql_r1 = ReplaceAll(std::move(table_sql_r1),
+                            "CREATE TABLE nested_catalogs ",
                             "CREATE TABLE nested_catalogs_r0 ");
-  table_sql_r1 = ReplaceAll(table_sql_r1, "CREATE TABLE \"nested_catalogs\" ",
+  table_sql_r1 = ReplaceAll(std::move(table_sql_r1),
+                            "CREATE TABLE \"nested_catalogs\" ",
                             "CREATE TABLE nested_catalogs_r0 ");
 
   ASSERT_TRUE(sqlite::Sql(db->sqlite_db(), table_sql_r1).Execute());
@@ -319,3 +324,4 @@ TEST_F(T_CatalogSql, SchemaMigration) {
     EXPECT_EQ(0, sql12.RetrieveInt(0));
   }
 }
+
