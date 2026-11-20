@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -350,7 +351,8 @@ func ingest(ctx context.Context, logger *log.Entry, o ConvertOptions, in *Inspec
 		ingestErr = fmt.Errorf("tar stream failed after ingest succeeded: %w", serr)
 	}
 	if ingestErr != nil {
-		if serr != nil && serr != context.Canceled {
+		// The stream only sees a closed pipe when ingest gives up first.
+		if serr != nil && serr != context.Canceled && !errors.Is(serr, io.ErrClosedPipe) {
 			ingestErr = fmt.Errorf("%w (stream: %v)", ingestErr, serr)
 		}
 		logger.WithField("error", ingestErr).Error("SIF ingest failed")
