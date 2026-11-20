@@ -4,13 +4,16 @@ import (
 	"bytes"
 	"compress/zlib"
 	"crypto/md5"
+	"crypto/sha1"
 	"database/sql"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -18,7 +21,19 @@ type fakeEntry struct {
 	path  string
 	flags int64
 	link  string
+	data  []byte // regular file content, stored as a zlib sha1 object
 }
+
+func zlibBytes(b []byte) []byte {
+	var buf bytes.Buffer
+	zw := zlib.NewWriter(&buf)
+	zw.Write(b)
+	zw.Close()
+	return buf.Bytes()
+}
+
+// fakeObjects collects content objects referenced by fake catalogs.
+var fakeObjects = map[string][]byte{}
 
 // buildCatalog writes a minimal catalog database and returns it
 // zlib-compressed, as stored in the repository.
@@ -31,6 +46,7 @@ func buildCatalog(t *testing.T, entries []fakeEntry, nested map[string]string) [
 	}
 	for _, q := range []string{
 		`CREATE TABLE catalog (md5path_1 INTEGER, md5path_2 INTEGER, flags INTEGER, symlink TEXT,
+			size INTEGER, hash BLOB,
 			CONSTRAINT pk_catalog PRIMARY KEY (md5path_1, md5path_2))`,
 		`CREATE TABLE nested_catalogs (path TEXT, sha1 TEXT, size INTEGER, CONSTRAINT pk PRIMARY KEY (path))`,
 	} {
@@ -40,9 +56,16 @@ func buildCatalog(t *testing.T, entries []fakeEntry, nested map[string]string) [
 	}
 	for _, e := range entries {
 		sum := md5.Sum([]byte(e.path))
-		if _, err := db.Exec(`INSERT INTO catalog VALUES (?, ?, ?, ?)`,
+		var hash []byte
+		if e.data != nil {
+			h := sha1.Sum(e.data)
+			hash = h[:]
+			hx := hex.EncodeToString(hash)
+			fakeObjects["data/"+hx[:2]+"/"+hx[2:]] = zlibBytes(e.data)
+		}
+		if _, err := db.Exec(`INSERT INTO catalog VALUES (?, ?, ?, ?, ?, ?)`,
 			int64(binary.LittleEndian.Uint64(sum[:8])), int64(binary.LittleEndian.Uint64(sum[8:])),
-			e.flags, e.link); err != nil {
+			e.flags, e.link, len(e.data), hash); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -53,11 +76,7 @@ func buildCatalog(t *testing.T, entries []fakeEntry, nested map[string]string) [
 	}
 	db.Close()
 	raw, _ := os.ReadFile(file)
-	var buf bytes.Buffer
-	zw := zlib.NewWriter(&buf)
-	zw.Write(raw)
-	zw.Close()
-	return buf.Bytes()
+	return zlibBytes(raw)
 }
 
 func TestLookupPublished(t *testing.T) {
@@ -65,19 +84,24 @@ func TestLookupPublished(t *testing.T) {
 	id := "ab" + fmt.Sprintf("%062d", 7)
 	objects := map[string][]byte{
 		rootHash: buildCatalog(t, []fakeEntry{
-			{"", flagDir, ""},
-			{"/.flat", flagDir, ""},
-			{"/.flat/ab", flagDir | flagNestedMountpoint, ""},
-			{"/sif", flagDir, ""},
-			{"/sif/img:1", flagLink, "../.flat/ab/" + id},
-			{"/a_c", flagDir | flagNestedMountpoint, ""},
-			{"/ABC", flagDir | flagNestedMountpoint, ""},
-			{"/abc", flagDir, ""},
-			{"/abc/x", 4, ""},
+			{"", flagDir, "", nil},
+			{"/.flat", flagDir, "", nil},
+			{"/.flat/ab", flagDir | flagNestedMountpoint, "", nil},
+			{"/sif", flagDir, "", nil},
+			{"/sif/img:1", flagLink, "../.flat/ab/" + id, nil},
+			{"/a_c", flagDir | flagNestedMountpoint, "", nil},
+			{"/ABC", flagDir | flagNestedMountpoint, "", nil},
+			{"/abc", flagDir, "", nil},
+			{"/abc/x", 4, "", nil},
+			{"/meta", flagDir, "", nil},
+			{"/meta/manifest.json", flagFile, "", []byte(`{"config":{"digest":"sha256:x"}}`)},
+			{"/.multiarch", flagDir, "", nil},
+			{"/.multiarch/amd64", flagDir, "", nil},
+			{"/sif/variant", flagLink, "../.multiarch/$(CVMFS_ARCH:-amd64)", nil},
 		}, map[string]string{"/.flat/ab": flatHash, "/a_c": decoyHash, "/ABC": decoyHash}),
 		flatHash: buildCatalog(t, []fakeEntry{
-			{"/.flat/ab", flagDir, ""},
-			{"/.flat/ab/" + id, flagDir | flagNestedMountpoint, ""},
+			{"/.flat/ab", flagDir, "", nil},
+			{"/.flat/ab/" + id, flagDir | flagNestedMountpoint, "", nil},
 		}, map[string]string{"/.flat/ab/" + id: imgHash}),
 		decoyHash: buildCatalog(t, nil, nil),
 	}
@@ -85,6 +109,10 @@ func TestLookupPublished(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/.cvmfspublished" {
 			fmt.Fprintf(w, "C%s\nRdeadbeef\nS42\n--\nsignature\x00\x01", rootHash)
+			return
+		}
+		if data, ok := fakeObjects[strings.TrimPrefix(r.URL.Path, "/")]; ok {
+			w.Write(data)
 			return
 		}
 		for h, data := range objects {
@@ -105,7 +133,9 @@ func TestLookupPublished(t *testing.T) {
 	check := func(path string, want PublishedEntry) {
 		t.Helper()
 		got, err := LookupPublished("repo.example.org", path)
-		if err != nil || got != want {
+		if err != nil || got.Exists != want.Exists || got.Dir != want.Dir ||
+			got.NestedMountpoint != want.NestedMountpoint || got.Symlink != want.Symlink ||
+			got.LinkTarget != want.LinkTarget || got.Regular != want.Regular {
 			t.Errorf("%s: got %+v, %v; want %+v", path, got, err, want)
 		}
 	}
@@ -113,7 +143,7 @@ func TestLookupPublished(t *testing.T) {
 	check(".flat/ab/"+fmt.Sprintf("ab%062d", 8), PublishedEntry{})
 	check("sif/img:1", PublishedEntry{Exists: true, Symlink: true, LinkTarget: "../.flat/ab/" + id})
 	check("sif/other", PublishedEntry{})
-	check("abc/x", PublishedEntry{Exists: true})
+	check("abc/x", PublishedEntry{Exists: true, Regular: true})
 	for _, h := range fetched {
 		if h == imgHash || h == decoyHash {
 			t.Errorf("fetched catalog %s that does not lie on the looked-up paths", h)
@@ -128,6 +158,35 @@ func TestLookupPublished(t *testing.T) {
 	if left, _ := filepath.Glob(filepath.Join(os.TempDir(), "ducc-catalog-*")); len(left) != 0 {
 		t.Errorf("catalog temp files left behind: %v", left)
 	}
+	data, err := ReadPublishedFile("repo.example.org", "meta/manifest.json")
+	if err != nil || string(data) != `{"config":{"digest":"sha256:x"}}` {
+		t.Errorf("ReadPublishedFile: %q, %v", data, err)
+	}
+	if _, err := ReadPublishedFile("repo.example.org", "meta/missing"); !os.IsNotExist(err) {
+		t.Errorf("missing file: %v", err)
+	}
+
+	SetMountlessPublishing(true)
+	defer SetMountlessPublishing(false)
+	if fi, err := RepoStat("/cvmfs/repo.example.org/sif/variant"); err != nil || !fi.IsDir() {
+		t.Errorf("RepoStat through variant symlink: %v, %v", fi, err)
+	}
+	if _, err := RepoStat("/cvmfs/repo.example.org/sif/missing"); !os.IsNotExist(err) {
+		t.Errorf("RepoStat missing: %v", err)
+	}
+	if fi, err := RepoLstat("/cvmfs/repo.example.org/sif/img:1"); err != nil || fi.Mode()&os.ModeSymlink == 0 {
+		t.Errorf("RepoLstat symlink: %v, %v", fi, err)
+	}
+	if fi, err := RepoStat("/cvmfs/repo.example.org/meta/manifest.json"); err != nil || !fi.Mode().IsRegular() {
+		t.Errorf("RepoStat regular file: %v, %v", fi, err)
+	}
+	if b, err := RepoReadFile("/cvmfs/repo.example.org/meta/manifest.json"); err != nil || len(b) == 0 {
+		t.Errorf("RepoReadFile: %q, %v", b, err)
+	}
+	if target, err := RepoReadlink("/cvmfs/repo.example.org/sif/img:1"); err != nil || target != "../.flat/ab/"+id {
+		t.Errorf("RepoReadlink: %q, %v", target, err)
+	}
+
 	if n := len(fetched); n != 2 {
 		t.Errorf("catalogs fetched %d times, want 2 (cached by hash): %v", n, fetched)
 	}

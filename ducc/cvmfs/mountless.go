@@ -112,6 +112,50 @@ func mountlessIngestBase(dest string) (baseDir, rel string) {
 	return top, rest
 }
 
+// EnsureDirectoryWithLogger creates dir (repository-relative) if it is not
+// published yet. Gateway leases, mounted or mountless, need an existing
+// parent directory, so callers ensure it before ingesting below it. The
+// directory is created by an ingest at its top-level component, which
+// always has a parent; the tarball engine adds the levels in between.
+func EnsureDirectoryWithLogger(logger *log.Entry, CVMFSRepo, dir string) error {
+	logger = l.Ensure(logger)
+	dest := PrefixRepoSubdirOnce(CVMFSRepo, dir)
+	if dest == "" {
+		return nil
+	}
+	repoName, _ := GetRepoAndSubdir(CVMFSRepo)
+	if fi, err := RepoStat(filepath.Join("/", "cvmfs", repoName, dest)); err == nil {
+		if !fi.IsDir() {
+			return fmt.Errorf("%s exists and is not a directory", dest)
+		}
+		return nil
+	}
+	baseDir, rel := mountlessIngestBase(dest)
+	if baseDir == "" {
+		// A missing top-level directory is created by an empty ingest into it.
+		baseDir, rel = dest, ""
+	}
+	return ingestTarStreamWithLogger(logger, CVMFSRepo, baseDir, func(tw *tar.Writer) error {
+		if rel == "" {
+			return nil
+		}
+		parts := strings.Split(rel, "/")
+		for i := range parts {
+			if err := tw.WriteHeader(&tar.Header{
+				Typeflag: tar.TypeDir,
+				Name:     strings.Join(parts[:i+1], "/") + "/",
+				Mode:     0755,
+				Uid:      os.Getuid(),
+				Gid:      os.Getgid(),
+				ModTime:  time.Now(),
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
 // createSymlinkMountless creates (or replaces) a symlink at repoLink pointing
 // to linkTarget (the verbatim link contents).
 func createSymlinkMountless(logger *log.Entry, CVMFSRepo, repoLink, linkTarget string) error {
