@@ -266,6 +266,19 @@ class PosixQuotaManager : public QuotaManager {
   static const unsigned kCommandBufferSize = 32;
 
   /**
+   * Touch() drops repeated touches of the same object within this window.
+   * Busy nodes open the same libraries and configuration files thousands of
+   * times per second; each touch costs a pipe write and an sqlite update but
+   * hardly changes the eviction order.
+   */
+  static const unsigned kTouchFilterWindowSec = 5;
+
+  /**
+   * Number of slots of the touch filter, must be a power of 2.
+   */
+  static const unsigned kTouchFilterSize = 4096;
+
+  /**
    * Batch size for database operations during DoCleanup()
    */
   static const unsigned kEvictBatchSize = 1000;
@@ -368,6 +381,18 @@ class PosixQuotaManager : public QuotaManager {
    * operation.
    */
   uint64_t seq_;
+
+  /**
+   * Direct-mapped table of recently touched objects, keyed by a 64 bit prefix
+   * of the content hash.  Races between threads only cause an extra or a
+   * dropped touch, which is harmless for the LRU order.
+   */
+  struct TouchFilterSlot {
+    std::atomic<uint64_t> tag;
+    std::atomic<uint64_t> timestamp;
+  };
+  TouchFilterSlot touch_filter_[kTouchFilterSize];
+  bool IsRecentlyTouched(const shash::Any &hash);
 
   /**
    * Should match the directory given to the cache manager.

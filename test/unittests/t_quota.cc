@@ -576,6 +576,17 @@ TEST_F(T_QuotaManager, Touch) {
   EXPECT_EQ("a\n", PrintStringVector(quota_mgr_->List()));
 }
 
+TEST_F(T_QuotaManager, TouchFilter) {
+  quota_mgr_->Insert(hashes_[0], 1, "a");
+  quota_mgr_->Insert(hashes_[1], 1, "b");
+  quota_mgr_->Touch(hashes_[0]);
+  quota_mgr_->Touch(hashes_[1]);
+  // Within the filter window, so it does not move "a" ahead of "b"
+  quota_mgr_->Touch(hashes_[0]);
+  quota_mgr_->Cleanup(1);
+  EXPECT_EQ("b\n", PrintStringVector(quota_mgr_->List()));
+}
+
 TEST_F(T_QuotaManager, ReadPipeStringUsesExactLength) {
   int mypipe[2];
   MakePipe(mypipe);
