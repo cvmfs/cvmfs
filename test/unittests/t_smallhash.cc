@@ -10,6 +10,7 @@
 
 #include "crypto/hash.h"
 #include "smallhash.h"
+#include "util/atomic.h"
 #include "util/murmur.hxx"
 
 static uint32_t hasher_int(const int &key) {
@@ -64,15 +65,35 @@ class T_Smallhash : public ::testing::Test {
     return NULL;
   }
 
+  /**
+   * Every thread races against all other threads over the full key range so
+   * that ContainsOrInsert sees heavy duplicate traffic.  Each thread-local
+   * "newly inserted" count is aggregated into fresh_insert_count; the test
+   * then asserts the aggregate equals kContainsOrInsertPoolSize.
+   */
+  static void *tf_contains_or_insert(void *data) {
+    int ID = reinterpret_cast<uint64_t>(data);
+    (void)ID;
+    for (unsigned i = 0; i < kContainsOrInsertPoolSize; ++i) {
+      if (!active_multihash->ContainsOrInsert(i, i)) {
+        atomic_inc64(&fresh_insert_count);
+      }
+    }
+    return NULL;
+  }
+
   static const unsigned kNumElements = 1000000;
   static const unsigned kNumHashmaps = 42;
   static const unsigned kNumThreads = 8;
+  static const unsigned kContainsOrInsertPoolSize = 50000;
   SmallHashDynamic<int, int> smallhash_;
   SmallHashDynamic<shash::Md5, int> smallhash_md5_;
   MultiHash<int, int> multihash_;
   static MultiHash<int, int> *active_multihash;
+  static atomic_int64 fresh_insert_count;
 };
 MultiHash<int, int> *T_Smallhash::active_multihash = NULL;
+atomic_int64 T_Smallhash::fresh_insert_count = 0;
 
 
 TEST_F(T_Smallhash, Insert) {
@@ -229,6 +250,54 @@ TEST_F(T_Smallhash, MultihashMultithread) {
   }
   EXPECT_EQ(unsigned(0), GetMultiSize());
 }
+
+TEST_F(T_Smallhash, MultihashContainsOrInsert) {
+  // Single-threaded baseline for ContainsOrInsert / Contains on MultiHash.
+  const unsigned N = 1000;
+  for (unsigned i = 0; i < N; ++i) {
+    // First call: key absent, should be inserted and return false.
+    EXPECT_FALSE(multihash_.ContainsOrInsert(i, i));
+  }
+  for (unsigned i = 0; i < N; ++i) {
+    // Second call: key present, must return true and leave the map unchanged.
+    EXPECT_TRUE(multihash_.ContainsOrInsert(i, -1));
+  }
+  EXPECT_EQ(N, GetMultiSize());
+  for (unsigned i = 0; i < N; ++i) {
+    EXPECT_TRUE(multihash_.Contains(i));
+    int value = -1;
+    ASSERT_TRUE(multihash_.Lookup(i, &value));
+    // Value stored at first insert must survive the duplicate ContainsOrInsert.
+    EXPECT_EQ(static_cast<int>(i), value);
+  }
+  EXPECT_FALSE(multihash_.Contains(N + 1));
+}
+
+
+TEST_F(T_Smallhash, MultihashContainsOrInsertMultithread) {
+  // All threads race over the same key pool.  Exactly PoolSize calls (one per
+  // unique key) must observe the "freshly inserted" return value, regardless
+  // of how many threads tried to insert the same key.
+  const unsigned PoolSize = kContainsOrInsertPoolSize;
+  atomic_init64(&fresh_insert_count);
+
+  pthread_t threads[kNumThreads];
+  for (unsigned i = 0; i < kNumThreads; ++i) {
+    pthread_create(&threads[i], NULL, tf_contains_or_insert,
+                   reinterpret_cast<void *>(i));
+  }
+  for (unsigned i = 0; i < kNumThreads; ++i) {
+    pthread_join(threads[i], NULL);
+  }
+
+  EXPECT_EQ(static_cast<int64_t>(PoolSize),
+            atomic_read64(&fresh_insert_count));
+  EXPECT_EQ(PoolSize, GetMultiSize());
+  for (unsigned i = 0; i < PoolSize; ++i) {
+    EXPECT_TRUE(multihash_.Contains(i));
+  }
+}
+
 
 TEST_F(T_Smallhash, CanDestructUninitialized) {
   SmallHashDynamic<int, int>

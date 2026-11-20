@@ -540,6 +540,13 @@ class CatalogTraversal : public CatalogTraversalBase<ObjectFetcherT> {
   explicit CatalogTraversal(const Parameters &params)
       : CatalogTraversalBase<ObjectFetcherT>(params) { }
 
+  /**
+   * No-op in the serial traversal; callbacks are inherently sequential.
+   * Declared so the templated GarbageCollector can call it regardless of
+   * which traversal class it was instantiated with.
+   */
+  void SetSerializeCallbacks(bool /* serialize */) { }
+
   bool Traverse(const TraversalType type = Base::kBreadthFirst) {
     const shash::Any root_catalog_hash = this->GetRepositoryRootCatalogHash();
     if (root_catalog_hash.IsNull()) {
