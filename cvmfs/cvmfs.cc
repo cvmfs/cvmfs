@@ -2584,17 +2584,32 @@ static FileSystem *InitSystemFs(const string &mount_path,
  * NULL if the mounted config repository is to be used.
  */
 static std::shared_ptr<const ConfigRepoTree> FetchConfigRepoTree(
-    const std::string &fqrn, bool simple_parser, bool *required_failed = NULL) {
+    const std::string &fqrn, bool simple_parser,
+    std::shared_ptr<const ConfigRepoTree> previous = NULL,
+    bool *required_failed = NULL) {
   const config_repo::FetchResult fetch = config_repo::FetchForRepository(
       fqrn, simple_parser);
-  if (required_failed != NULL) {
-    *required_failed = !fetch.tree && fetch.required
-                       && (fetch.mode == config_repo::kFetchDirect);
-  }
+  if (required_failed != NULL)
+    *required_failed = false;
   if (fetch.mode == config_repo::kFetchMount)
     return NULL;
   if (fetch.tree)
     return fetch.tree;
+
+  // On reload, the running module's copy avoids the mount, which may hang
+  if (previous && !previous->root_hash.empty()
+      && (previous->fqrn == fetch.config_repo)) {
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+             "failed to fetch config repository %s (%s), "
+             "keeping revision %" PRIu64,
+             fetch.config_repo.c_str(), fetch.error.c_str(),
+             previous->revision);
+    return previous;
+  }
+  if (required_failed != NULL) {
+    *required_failed = fetch.required
+                       && (fetch.mode == config_repo::kFetchDirect);
+  }
 
   if (fetch.mode == config_repo::kFetchDirect) {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
@@ -2622,8 +2637,12 @@ static std::shared_ptr<const ConfigRepoTree> FetchConfigRepoTree(
 static int FetchConfigRepo(const std::string &fqrn, bool simple_parser,
                            std::string *serialized_tree) {
   bool required_failed = false;
+  // Set if called on the running module before a reload
+  std::shared_ptr<const ConfigRepoTree> previous;
+  if (cvmfs::options_mgr_ != NULL)
+    previous = cvmfs::options_mgr_->config_repo_tree();
   const std::shared_ptr<const ConfigRepoTree> tree = FetchConfigRepoTree(
-      fqrn, simple_parser, &required_failed);
+      fqrn, simple_parser, previous, &required_failed);
   if (required_failed)
     return loader::kConfigRepoFetchRequiredFail;
   if (!tree)

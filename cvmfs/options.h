@@ -236,11 +236,12 @@ class OptionsManager {
    * instead of the mount point.  The tree is shared with copies of this
    * object and stays available for consumers of key files (MountPoint).
    */
+  // Atomic: the remount and reload threads swap or read the tree concurrently
   void set_config_repo_tree(std::shared_ptr<const ConfigRepoTree> tree) {
-    config_repo_tree_ = tree;
+    std::atomic_store(&config_repo_tree_, tree);
   }
   std::shared_ptr<const ConfigRepoTree> config_repo_tree() const {
-    return config_repo_tree_;
+    return std::atomic_load(&config_repo_tree_);
   }
 
   /**
