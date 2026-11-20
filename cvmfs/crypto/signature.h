@@ -59,6 +59,7 @@ class CVMFS_EXPORT SignatureManager {
   static shash::Any MkFromFingerprint(const std::string &fingerprint);
 
   bool LoadPublicRsaKeys(const std::string &path_list);
+  bool LoadPublicRsaKeysMem(const std::vector<std::string> &pems);
   bool LoadBlacklist(const std::string &path_blacklist, bool append);
   std::vector<std::string> GetBlacklist();
 

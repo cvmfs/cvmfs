@@ -357,6 +357,33 @@ bool SignatureManager::LoadPublicRsaKeys(const string &path_list) {
 }
 
 
+bool SignatureManager::LoadPublicRsaKeysMem(const vector<string> &pems) {
+  UnloadPublicRsaKeys();
+
+  for (unsigned i = 0; i < pems.size(); ++i) {
+    BIO *bp = BIO_new_mem_buf(pems[i].data(), static_cast<int>(pems[i].size()));
+    assert(bp != NULL);
+    EVP_PKEY *this_key = PEM_read_bio_PUBKEY(bp, NULL, NULL, NULL);
+    BIO_free(bp);
+    if (this_key == NULL) {
+      LogCvmfs(kLogSignature, kLogDebug | kLogSyslogErr,
+               "failed to load public key #%u from memory", i);
+      return false;
+    }
+    RSA *key = EVP_PKEY_get1_RSA(this_key);
+    EVP_PKEY_free(this_key);
+    if (key == NULL) {
+      LogCvmfs(kLogSignature, kLogDebug | kLogSyslogErr,
+               "failed to read public key #%u from memory", i);
+      return false;
+    }
+    public_keys_.push_back(key);
+  }
+
+  return true;
+}
+
+
 void SignatureManager::UnloadPublicRsaKeys() {
   for (unsigned i = 0; i < public_keys_.size(); ++i)
     RSA_free(public_keys_[i]);
