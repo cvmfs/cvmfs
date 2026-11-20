@@ -281,9 +281,18 @@ func hasSingularityDir(ix *squashfs.Index) bool {
 // Without a mounted repository it reports false and the link is rewritten.
 func symlinkPointsTo(repo, link, flat string) bool {
 	abs := filepath.Join("/", "cvmfs", repo, link)
-	target, err := os.Readlink(abs)
-	if err != nil {
-		return false
+	var target string
+	if cvmfs.MountlessPublishing() {
+		e, err := cvmfs.LookupPublished(repo, link)
+		if err != nil || !e.Symlink {
+			return false
+		}
+		target = e.LinkTarget
+	} else {
+		var err error
+		if target, err = os.Readlink(abs); err != nil {
+			return false
+		}
 	}
 	if !filepath.IsAbs(target) {
 		target = filepath.Join(filepath.Dir(abs), target)
@@ -292,12 +301,19 @@ func symlinkPointsTo(repo, link, flat string) bool {
 }
 
 func flatComplete(repo, flat string) bool {
+	if cvmfs.MountlessPublishing() {
+		// The image root is a nested catalog created by one ingest, so it is
+		// published complete or not at all. Checking .singularity.d would
+		// download the image's root catalog on every check.
+		e, err := cvmfs.LookupPublished(repo, flat)
+		return err == nil && e.NestedMountpoint
+	}
 	_, err := os.Stat(filepath.Join("/", "cvmfs", repo, flat, ".singularity.d"))
 	return err == nil
 }
 
-// Published reports whether image id is complete in the mounted repository
-// and sif/<name> points at it, i.e. whether Convert would be a no-op.
+// Published reports whether image id is complete in the repository and
+// sif/<name> points at it, i.e. whether Convert would be a no-op.
 func Published(repo, name, id string) bool {
 	return flatComplete(repo, FlatPath(id)) && symlinkPointsTo(repo, PublicPath(name), FlatPath(id))
 }

@@ -197,6 +197,9 @@ linked from `sif/<name>`, so it runs with
   tar stream, both without touching a repository.
 - With a local storage backend the published objects still use disk on the
   publisher; the small-disk benefit applies to gateway and S3 upstreams.
+- With `--mountless`, whether an image is already published is looked up
+  in the published catalogs fetched from `CVMFS_STRATUM0`, so unchanged
+  images are skipped without a mounted repository.
 
 ### delete-sif
 

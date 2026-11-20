@@ -723,10 +723,22 @@ Measured on cvm-perf10, with the gateway and the publisher on one host as in
   ducc avoids missing parents itself. It creates `.flat/<xx>` before the
   ingest, and its mountless file, symlink and tree writes ingest at the
   top-level directory, letting the engine create the levels below.
-- **Mountless existence check:** without a mount, the existence checks
-  (`flatComplete`, `symlinkPointsTo`) always report false. Every run then
-  re-ingests, unless the repository is also mounted as a client at
-  `/cvmfs/<repo>`.
+- **Mountless existence checks** use the published revision instead of
+  the missing mount (`cvmfs/published.go`).
+  - ducc fetches `.cvmfspublished` from `CVMFS_STRATUM0` and the catalogs
+    on the looked-up path, cached by hash as unlinked temporary SQLite
+    files.
+  - An image counts as complete when `.flat/<xx>/<id>` is a nested catalog
+    mountpoint; one ingest creates it atomically. Checking `.singularity.d`
+    would download the image's root catalog on every check.
+  - `sif/<name>` is compared through the catalog's symlink field.
+  - `.cvmfscatalog` markers are found the same way, so `.flat` and
+    `.flat/<xx>` are not republished.
+  - Measured on `sifgw.example.org`: an unchanged image takes 0.01–0.03 s
+    and publishes no revision, both through `convert-sif` and through a
+    wish list run twice with `convert` (S41 → S41).
+  - The manifest signature is not checked: a forged manifest could only
+    make ducc skip or repeat work.
 
 ## 12. OCI-SIF
 

@@ -555,7 +555,14 @@ func CreateCatalogIntoDirWithLogger(logger *log.Entry, CVMFSRepo, dir string) (e
 	normalizedDir := PrefixRepoSubdirOnce(CVMFSRepo, dir)
 	catalogRelativePath := filepath.Join(normalizedDir, ".cvmfscatalog")
 	catalogPath := filepath.Join("/", "cvmfs", repoName, catalogRelativePath)
-	if _, err := os.Stat(catalogPath); os.IsNotExist(err) {
+	exists := false
+	if MountlessPublishing() {
+		e, err := LookupPublished(repoName, catalogRelativePath)
+		exists = err == nil && e.Exists
+	} else if _, err := os.Stat(catalogPath); err == nil {
+		exists = true
+	}
+	if !exists {
 		tmpFile, err := ioutil.TempFile("", "tempCatalog")
 		if err != nil {
 			return err
