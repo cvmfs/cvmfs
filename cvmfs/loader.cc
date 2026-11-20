@@ -462,9 +462,6 @@ static fuse_args *ParseCmdLine(int argc, char *argv[]) {
   fuse_passthrough_ = cvmfs_options.fuse_passthrough;
   if (cvmfs_options.backend_fskit) {
     fuse_opt_add_arg(mount_options, "-obackend=fskit");
-    // FSKit manages the mount lifecycle; daemonizing would break the
-    // FSKit connection, so we force foreground mode.
-    foreground_ = true;
     disable_watchdog_ = true;
   }
 
@@ -661,6 +658,29 @@ using namespace loader;  // NOLINT(build/namespaces)
 
 #ifdef CVMFS_DAEMONIZE_BEFORE_MOUNT
 /**
+ * With FSKit, FUSE_INIT arrives some 15 ms before the volume shows up at the
+ * mount point.  Wait until it does, so that the mount command only returns
+ * with a usable mount.
+ */
+static void WaitForMountpoint() {
+  const unsigned kTimeoutMs = 10000;
+  const unsigned kPollMs = 10;
+  const string parent = *mount_point_ + "/..";
+  for (unsigned waited = 0; waited < kTimeoutMs; waited += kPollMs) {
+    platform_stat64 info_mnt, info_parent;
+    if ((platform_stat(mount_point_->c_str(), &info_mnt) == 0)
+        && (platform_stat(parent.c_str(), &info_parent) == 0)
+        && (info_mnt.st_dev != info_parent.st_dev)) {
+      return;
+    }
+    SafeSleepMs(kPollMs);
+  }
+  LogCvmfs(kLogCvmfs, kLogStderr,
+           "CernVM-FS: %s did not appear as a mount point within %u s",
+           mount_point_->c_str(), kTimeoutMs / 1000);
+}
+
+/**
  * Detaches like Daemonize(), but the calling process exits only once the
  * daemon reports that the mount is in place, with a matching exit code.
  * Until then the daemon keeps stdout/stderr, so that startup errors still
@@ -676,7 +696,10 @@ static int DaemonizeUntilMounted() {
     close(pipe_ready[1]);
     char status = 1;
     const ssize_t retval = read(pipe_ready[0], &status, 1);
-    _exit((retval == 1 && status == 0) ? kFailOk : kFailMount);
+    if ((retval != 1) || (status != 0))
+      _exit(kFailMount);
+    WaitForMountpoint();
+    _exit(kFailOk);
   }
   close(pipe_ready[0]);
   const int retval = setsid();
