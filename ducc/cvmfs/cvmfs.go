@@ -333,6 +333,10 @@ func SaveLayersBacklinkWithLogger(logger *log.Entry, CVMFSRepo string, imgManife
 		backlinks[backlinkPath] = backlinkBytesMarshal
 	}
 
+	if MountlessPublishing() {
+		return saveBacklinksMountless(logger, CVMFSRepo, backlinks)
+	}
+
 	llog(logger).Trace("Start transaction")
 	err := WithinTransactionWithLogger(logger, CVMFSRepo, func() error {
 

@@ -24,6 +24,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	"github.com/cvmfs/ducc/constants"
 	l "github.com/cvmfs/ducc/log"
 )
 
@@ -154,6 +155,56 @@ func EnsureDirectoryWithLogger(logger *log.Entry, CVMFSRepo, dir string) error {
 		}
 		return nil
 	})
+}
+
+// saveBacklinksMountless writes the backlink files (absolute paths below
+// /cvmfs/<repo>) with one ingest per top-level directory, instead of a
+// transaction that needs the mount.
+func saveBacklinksMountless(logger *log.Entry, CVMFSRepo string, files map[string][]byte) error {
+	logger = l.Ensure(logger)
+	repoName, _ := GetRepoAndSubdir(CVMFSRepo)
+	root := filepath.Join("/", "cvmfs", repoName)
+	groups := map[string]map[string][]byte{}
+	for path, content := range files {
+		rel, err := filepath.Rel(root, path)
+		if err != nil || rel == "." || strings.HasPrefix(rel, "..") {
+			return fmt.Errorf("backlink %s is outside the repository", path)
+		}
+		base, name := mountlessIngestBase(rel)
+		if groups[base] == nil {
+			groups[base] = map[string][]byte{}
+		}
+		groups[base][name] = content
+	}
+	var firstErr error
+	for base, group := range groups {
+		err := ingestTarStreamWithLogger(logger, CVMFSRepo, base, func(tw *tar.Writer) error {
+			for name, content := range group {
+				if err := tw.WriteHeader(&tar.Header{
+					Typeflag: tar.TypeReg,
+					Name:     name,
+					Mode:     int64(constants.FilePermision),
+					Size:     int64(len(content)),
+					Uid:      os.Getuid(),
+					Gid:      os.Getgid(),
+					ModTime:  time.Now(),
+				}); err != nil {
+					return err
+				}
+				if _, err := tw.Write(content); err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			logger.WithFields(log.Fields{"base": base, "error": err}).Error("Error in writing backlinks")
+			if firstErr == nil {
+				firstErr = err
+			}
+		}
+	}
+	return firstErr
 }
 
 // createSymlinkMountless creates (or replaces) a symlink at repoLink pointing

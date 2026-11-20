@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -181,5 +182,29 @@ func TestEnsureDirectory(t *testing.T) {
 	}
 	if fi, err := os.Stat(filepath.Join(mockrepo, "enstop")); err != nil || !fi.IsDir() {
 		t.Fatalf("top-level directory not created: %v", err)
+	}
+}
+
+func TestMountlessSaveBacklinks(t *testing.T) {
+	withMountlessPublishing(t)
+	mockrepo := filepath.Clean("/" + os.Getenv("CVMFS_TEST_REPO"))
+	repo := ".." + mockrepo
+	l1, l2 := strings.Repeat("a", 64), strings.Repeat("b", 64)
+	files := map[string][]byte{
+		GetBacklinkPath(repo, l1):                       []byte(`{"Origin":["one"]}`),
+		GetBacklinkPath(repo, l2):                       []byte(`{"Origin":["two"]}`),
+		filepath.Join(mockrepo, "other", "x", "f.json"): []byte(`{}`),
+	}
+	if err := saveBacklinksMountless(nil, repo, files); err != nil {
+		t.Fatal(err)
+	}
+	for path, want := range files {
+		got, err := os.ReadFile(path)
+		if err != nil || string(got) != string(want) {
+			t.Errorf("%s: got %q, %v", path, got, err)
+		}
+	}
+	if err := saveBacklinksMountless(nil, repo, map[string][]byte{"/elsewhere/f": nil}); err == nil {
+		t.Error("path outside the repository accepted")
 	}
 }
