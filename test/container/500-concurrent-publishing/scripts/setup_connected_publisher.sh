@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #jsudo yum install -y https://cvmrepo.s3.cern.ch/cvmrepo/yum/cvmfs-release-latest.noarch.rpm
 #sudo yum install -y cvmfs cvmfs-server
 FQRN=test.repo.org

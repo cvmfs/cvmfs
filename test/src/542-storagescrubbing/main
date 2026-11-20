@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 cvmfs_test_name="Local File Backend Health Check"
 cvmfs_test_autofs_on_startup=false
 

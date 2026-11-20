@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # entrypoint-apache.sh – start-up script for the cvmfs-apache container.
 #
 # Waits until the gateway container has written at least one CVMFS Apache

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # source the common platform independent functionality and option parsing
 script_location=$(dirname $(readlink --canonicalize $0))
