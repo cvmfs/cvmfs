@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -93,6 +94,7 @@ var loopCmd = &cobra.Command{
 					} else {
 						l.LogE(err).WithFields(fields).Error("Error in converting wish (layers), going on")
 						conversionErrors = append(conversionErrors, fmt.Sprintf("[%s] layers: %s", wish.InputName, err))
+						iterationSummary.AddFailed(wish.InputName)
 					}
 				}
 				if !skipThinImage {
@@ -103,6 +105,7 @@ var loopCmd = &cobra.Command{
 						} else {
 							l.LogE(err).WithFields(fields).Error("Error in converting wish (docker), going on")
 							conversionErrors = append(conversionErrors, fmt.Sprintf("[%s] docker: %s", wish.InputName, err))
+							iterationSummary.AddFailed(wish.InputName)
 						}
 					}
 				}
@@ -114,11 +117,15 @@ var loopCmd = &cobra.Command{
 						} else {
 							l.LogE(err).WithFields(fields).Error("Error in converting wish (singularity), going on")
 							conversionErrors = append(conversionErrors, fmt.Sprintf("[%s] singularity: %s", wish.InputName, err))
+							iterationSummary.AddFailed(wish.InputName)
 						}
 					}
 				}
 				checkQuitSignal()
 			}
+			sifSummary, sifErrors := convertSIFWishes(context.Background(), recipe, convertAgain, checkQuitSignal)
+			iterationSummary.Merge(sifSummary)
+			conversionErrors = append(conversionErrors, sifErrors...)
 			logConversionSummary("Conversion summary for this iteration:", iterationSummary)
 			if len(conversionErrors) > 0 {
 				summary := fmt.Sprintf("%d conversion error(s) in this iteration:\n  %s", len(conversionErrors), strings.Join(conversionErrors, "\n  "))
