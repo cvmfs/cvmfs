@@ -15,6 +15,8 @@ CVMFS_TEST_116_CFGREPO="cvmfs-config.cern.ch"
 CVMFS_TEST_116_CFGLOCAL="/etc/cvmfs/config.d/${CVMFS_TEST_116_CFGREPO}.local"
 CVMFS_TEST_116_CFGLOCAL_BAK=""
 CVMFS_TEST_116_STOPPED_PID=""
+CVMFS_TEST_116_DEFAULTLOCAL="/etc/cvmfs/default.local"
+CVMFS_TEST_116_DEFAULTLOCAL_BAK=""
 
 cleanup() {
   echo "running cleanup() ..."
@@ -24,6 +26,10 @@ cleanup() {
   if [ -n "$CVMFS_TEST_116_CFGLOCAL_BAK" ]; then
     sudo cp "$CVMFS_TEST_116_CFGLOCAL_BAK" "$CVMFS_TEST_116_CFGLOCAL"
     rm -f "$CVMFS_TEST_116_CFGLOCAL_BAK"
+  fi
+  if [ -n "$CVMFS_TEST_116_DEFAULTLOCAL_BAK" ]; then
+    sudo cp "$CVMFS_TEST_116_DEFAULTLOCAL_BAK" "$CVMFS_TEST_116_DEFAULTLOCAL"
+    rm -f "$CVMFS_TEST_116_DEFAULTLOCAL_BAK"
   fi
 }
 
@@ -102,6 +108,22 @@ cvmfs_run_test() {
   CVMFS_TEST_116_STOPPED_PID=""
   cvmfs_config probe $CVMFS_TEST_116_CFGREPO || return 30
   cvmfs_config probe $CVMFS_TEST_116_REPO || return 31
+
+  echo "*** reload with a required but unreachable config repository"
+  CVMFS_TEST_116_DEFAULTLOCAL_BAK=$(mktemp) || return 40
+  sudo sh -c "cat $CVMFS_TEST_116_DEFAULTLOCAL 2>/dev/null" \
+    > "$CVMFS_TEST_116_DEFAULTLOCAL_BAK"
+  sudo sh -c "printf 'CVMFS_CONFIG_REPO_FETCH=direct\nCVMFS_CONFIG_REPO_REQUIRED=yes\n' >> $CVMFS_TEST_116_DEFAULTLOCAL" || return 41
+  sudo sh -c "echo CVMFS_SERVER_URL=http://127.0.0.1:1/cvmfs/@fqrn@ >> $CVMFS_TEST_116_CFGLOCAL" || return 42
+  local pid_before
+  pid_before=$(get_xattr pid /cvmfs/$CVMFS_TEST_116_REPO) || return 43
+  # The reload must be refused before the running module is torn down
+  reload_repo "$socket" && return 44
+  [ "$(get_xattr pid /cvmfs/$CVMFS_TEST_116_REPO)" = "$pid_before" ] || return 45
+  ls /cvmfs/$CVMFS_TEST_116_REPO > /dev/null || return 46
+  sudo cp "$CVMFS_TEST_116_CFGLOCAL_BAK" "$CVMFS_TEST_116_CFGLOCAL" || return 47
+  reload_repo "$socket" || return 48
+  check_fetched_config || return 49
 
   return 0
 }

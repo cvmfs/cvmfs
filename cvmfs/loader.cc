@@ -548,22 +548,24 @@ static CvmfsExports *LoadLibrary(const bool debug_mode,
 
 
 /**
- * Lets the fuse module fetch the config repository, so that the loader's own
- * option parsing does not depend on the mounted config repository.  Returns
- * false if the module does not support it.  *has_tree is false if the
- * mounted config repository is to be used.
+ * Lets the fuse module fetch the config repository, so that option parsing
+ * does not depend on the mounted config repository.  Returns false if the
+ * module does not support it; otherwise *result is a ConfigRepoFetch.
  */
-static bool FetchConfigRepo(bool *has_tree, string *serialized_tree) {
-  *has_tree = false;
+static bool CallFetchConfigRepo(CvmfsExports *exports, int *result,
+                                string *serialized_tree) {
+  if ((exports->version < 3) || (exports->fnFetchConfigRepo == NULL))
+    return false;
+  *result = exports->fnFetchConfigRepo(
+      *repository_name_, simple_options_parsing_, serialized_tree);
+  return true;
+}
+
+static bool FetchConfigRepo(int *result, string *serialized_tree) {
   CvmfsExports *exports = LoadLibrary(debug_mode_, NULL);
   if (exports == NULL)
     return false;
-  bool supported = false;
-  if ((exports->version >= 3) && (exports->fnFetchConfigRepo != NULL)) {
-    supported = true;
-    *has_tree = exports->fnFetchConfigRepo(
-        *repository_name_, simple_options_parsing_, serialized_tree);
-  }
+  const bool supported = CallFetchConfigRepo(exports, result, serialized_tree);
   // Loaded again for good after option parsing
   CloseLibrary();
   return supported;
@@ -579,6 +581,24 @@ Failures Reload(const int fd_progress, const bool stop_and_go,
     debug_mode_ = true;
   } else if (reload_mode == kReloadNoDebug) {
     debug_mode_ = false;
+  }
+
+  // Fetch while the old module still serves requests, and abort before
+  // teardown if a required config repository is unavailable.  Old modules
+  // without the export fetch in fnInit.
+  int fetch_result = kConfigRepoFetchMount;
+  string serialized_tree;
+  SendMsg2Socket(fd_progress, "Fetching config repository\n");
+  if (CallFetchConfigRepo(cvmfs_exports_, &fetch_result, &serialized_tree)) {
+    if (fetch_result == kConfigRepoFetchRequiredFail) {
+      SendMsg2Socket(fd_progress,
+                     "Required config repository unavailable, "
+                     "keeping the current module\n");
+      return kFailConfigRepo;
+    }
+    loader_exports_->config_repo_fetched = true;
+    if (fetch_result == kConfigRepoFetchTree)
+      loader_exports_->config_repo_tree = serialized_tree;
   }
 
   retval = cvmfs_exports_->fnMaintenanceMode(fd_progress);
@@ -612,6 +632,8 @@ Failures Reload(const int fd_progress, const bool stop_and_go,
   if (!cvmfs_exports_)
     return kFailLoadLibrary;
   retval = cvmfs_exports_->fnInit(loader_exports_);
+  loader_exports_->config_repo_fetched = false;
+  loader_exports_->config_repo_tree.clear();
   if (retval != kFailOk) {
     const string msg_progress = cvmfs_exports_->fnGetErrorMsg() + " ("
                                 + StringifyInt(retval) + ")\n";
@@ -768,7 +790,7 @@ int FuseMain(int argc, char *argv[]) {
 
   string parameter;
   bool config_repo_fetched = false;
-  bool has_config_repo_tree = false;
+  int config_repo_fetch = kConfigRepoFetchMount;
   string config_repo_tree;
   if (!config_files_ && !parse_options_only_) {
     // Fetch with the credentials that the fuse module uses on reload, so that
@@ -783,7 +805,7 @@ int FuseMain(int argc, char *argv[]) {
                "Failed to switch credentials for config repository fetch");
       return kFailPermission;
     }
-    config_repo_fetched = FetchConfigRepo(&has_config_repo_tree,
+    config_repo_fetched = FetchConfigRepo(&config_repo_fetch,
                                           &config_repo_tree);
     if (switch_ids
         && !SwitchCredentials(fetch_origuid, fetch_origgid,
@@ -793,7 +815,15 @@ int FuseMain(int argc, char *argv[]) {
                "fetch");
       return kFailPermission;
     }
+    if (config_repo_fetched
+        && (config_repo_fetch == kConfigRepoFetchRequiredFail)) {
+      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+               "required configuration repository could not be fetched");
+      return kFailConfigRepo;
+    }
   }
+  bool has_config_repo_tree = config_repo_fetched
+                              && (config_repo_fetch == kConfigRepoFetchTree);
 
   OptionsManager *options_manager;
   bool restore_origids = false;

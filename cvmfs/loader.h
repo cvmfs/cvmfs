@@ -52,6 +52,7 @@ enum Failures {
   kFailLockWorkspace,
   kFailRevisionBlacklisted,
   kFailIgnoredMount,
+  kFailConfigRepo,
 
   kFailNumEntries
 };
@@ -85,7 +86,8 @@ inline const char *Code2Ascii(const Failures error) {
   texts[24] = "workspace already locked";
   texts[25] = "revision blacklisted";
   texts[26] = "mount attempt ignored";
-  texts[27] = "no text";
+  texts[27] = "required config repository unavailable";
+  texts[28] = "no text";
   return texts[error];
 }
 
@@ -277,10 +279,19 @@ struct CvmfsExports {
   void (*fnClearExit)();
 
   // added with CernVM-FS 2.15.0 (CvmfsExports Version: 3)
-  // Returns true and a serialized ConfigRepoTree to parse fqrn's options with,
-  // or false if the mounted config repository is to be used.
-  bool (*fnFetchConfigRepo)(const std::string &fqrn, bool simple_parser,
-                            std::string *serialized_tree);
+  // Returns a ConfigRepoFetch; for kConfigRepoFetchTree, *serialized_tree is
+  // the ConfigRepoTree to parse fqrn's options with.
+  int (*fnFetchConfigRepo)(const std::string &fqrn, bool simple_parser,
+                           std::string *serialized_tree);
+};
+
+/**
+ * Result of CvmfsExports::fnFetchConfigRepo
+ */
+enum ConfigRepoFetch {
+  kConfigRepoFetchMount = 0,     ///< use the mounted config repository
+  kConfigRepoFetchTree,          ///< parse with the returned tree
+  kConfigRepoFetchRequiredFail,  ///< fetch failed, config repo required
 };
 
 enum ReloadMode {

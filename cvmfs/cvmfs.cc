@@ -2584,9 +2584,13 @@ static FileSystem *InitSystemFs(const string &mount_path,
  * NULL if the mounted config repository is to be used.
  */
 static std::shared_ptr<const ConfigRepoTree> FetchConfigRepoTree(
-    const std::string &fqrn, bool simple_parser) {
+    const std::string &fqrn, bool simple_parser, bool *required_failed = NULL) {
   const config_repo::FetchResult fetch = config_repo::FetchForRepository(
       fqrn, simple_parser);
+  if (required_failed != NULL) {
+    *required_failed = !fetch.tree && fetch.required
+                       && (fetch.mode == config_repo::kFetchDirect);
+  }
   if (fetch.mode == config_repo::kFetchMount)
     return NULL;
   if (fetch.tree)
@@ -2615,14 +2619,17 @@ static std::shared_ptr<const ConfigRepoTree> FetchConfigRepoTree(
  * Exported to the loader, which parses the options before loading the
  * module for good.
  */
-static bool FetchConfigRepo(const std::string &fqrn, bool simple_parser,
-                            std::string *serialized_tree) {
+static int FetchConfigRepo(const std::string &fqrn, bool simple_parser,
+                           std::string *serialized_tree) {
+  bool required_failed = false;
   const std::shared_ptr<const ConfigRepoTree> tree = FetchConfigRepoTree(
-      fqrn, simple_parser);
+      fqrn, simple_parser, &required_failed);
+  if (required_failed)
+    return loader::kConfigRepoFetchRequiredFail;
   if (!tree)
-    return false;
+    return loader::kConfigRepoFetchMount;
   *serialized_tree = tree->Serialize();
-  return true;
+  return loader::kConfigRepoFetchTree;
 }
 
 
