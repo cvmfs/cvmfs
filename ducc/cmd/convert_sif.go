@@ -41,11 +41,14 @@ var (
 	sifCatalogMinWeight int
 	sifMaxEntries       int
 	sifContiguous       bool
+	sifSpoolDir         string
+	sifPlainHTTP        bool
+	sifVerifyDigest     bool
 )
 
 func init() {
 	f := convertSIFCmd.Flags()
-	f.StringVar(&sifName, "name", "", "public path below sif/ (e.g. lhcb/analysis:v3)")
+	f.StringVar(&sifName, "name", "", "public path below sif/ (e.g. lhcb/analysis:v3); defaults to registry/repository:tag for oras:// sources")
 	f.StringVar(&sifDigest, "digest", "", "override the image ID (sha256:HEX); default is a hash of the SIF header and descriptors")
 	f.BoolVar(&sifForce, "force", false, "ingest again even if the image is already present")
 	f.IntVarP(&sifAttempts, "attempts", "r", 1, "number of attempts for the whole conversion")
@@ -63,6 +66,9 @@ func init() {
 	f.IntVar(&sifCatalogMinWeight, "catalog-min-weight", 1000, "do not create nested catalogs smaller than this")
 	f.IntVar(&sifMaxEntries, "max-entries", 10_000_000, "refuse images with more entries")
 	f.BoolVar(&sifContiguous, "contiguous-catalogs", false, "upload each nested catalog as soon as it is complete (needs cvmfs_server ingest --contiguous-catalogs)")
+	f.StringVar(&sifSpoolDir, "spool-dir", "", "download the image into this directory first if the server does not support range requests")
+	f.BoolVar(&sifPlainHTTP, "plain-http", false, "use http instead of https for oras:// registries")
+	f.BoolVar(&sifVerifyDigest, "verify-digest", false, "hash the whole source after ingest and link the image only if it matches the oras or --digest digest")
 	rootCmd.AddCommand(convertSIFCmd)
 }
 
@@ -71,6 +77,9 @@ func sifSourceOptions() (sif.SourceOptions, error) {
 	o.ChunkSize = int64(sifChunkMiB) << 20
 	o.CacheSize = int64(sifCacheMiB) << 20
 	o.Readahead = sifReadahead
+	o.SpoolDir = sifSpoolDir
+	o.PlainHTTP = sifPlainHTTP
+	o.Credentials = lib.RegistryCredentials
 	o.Headers = http.Header{}
 	for _, h := range sifHeaders {
 		k, v, ok := strings.Cut(h, ":")
@@ -133,6 +142,9 @@ URL served with range-request support. The image is stored at
 		if len(args) != 2 {
 			return fmt.Errorf("a cvmfs repository is required unless --dry-run or --emit-tar is given")
 		}
+		if sifName == "" {
+			sifName = sif.DefaultName(source)
+		}
 		if err := sif.ValidateName(sifName); err != nil {
 			return err
 		}
@@ -140,7 +152,7 @@ URL served with range-request support. The image is stored at
 
 		opts := sif.ConvertOptions{
 			Source: source, Repo: args[1], Name: sifName, Digest: sifDigest,
-			Force: sifForce, AllowMissingSingularityDir: sifAllowNoSingDir,
+			Force: sifForce, AllowMissingSingularityDir: sifAllowNoSingDir, VerifyDigest: sifVerifyDigest,
 			MaxEntries: sifMaxEntries, Stream: sifStreamOptions(), SourceOpts: sopts,
 			Notification: notification.NewNotification(lib.NotificationService),
 			Logger:       l.Log(),

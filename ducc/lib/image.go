@@ -1354,6 +1354,16 @@ func (img *Image) CreateFlatOverlayWithLogger(logger *log.Entry, CVMFSRepo strin
 	return
 }
 
+// RegistryCredentials returns the DUCC_AUTH_REGISTRIES credentials that
+// apply to url, if any; used for oras:// SIF sources.
+func RegistryCredentials(url string) (user, pass string, ok bool) {
+	reg := getRegistry(url)
+	if reg == nil || reg.creds.username == "" {
+		return "", "", false
+	}
+	return reg.creds.username, reg.creds.password, true
+}
+
 func getRegistry(url string) *RegistryConfig {
 	for _, reg := range inputRegistries {
 		if strings.Contains(url, reg.baseUrl) {

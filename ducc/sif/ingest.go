@@ -2,6 +2,8 @@ package sif
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -31,11 +33,14 @@ type ConvertOptions struct {
 	Force  bool
 	// AllowMissingSingularityDir publishes images without /.singularity.d.
 	AllowMissingSingularityDir bool
-	MaxEntries                 int
-	Stream                     StreamOptions
-	SourceOpts                 SourceOptions
-	Notification               *notification.Notification
-	Logger                     *log.Entry
+	// VerifyDigest hashes the whole source after ingest and links the image
+	// only if it matches the digest used as image ID.
+	VerifyDigest bool
+	MaxEntries   int
+	Stream       StreamOptions
+	SourceOpts   SourceOptions
+	Notification *notification.Notification
+	Logger       *log.Entry
 }
 
 type Result struct {
@@ -210,6 +215,9 @@ func flatComplete(repo, flat string) bool {
 // single streamed ingest, then points sif/<name> at it.
 func Convert(ctx context.Context, o ConvertOptions) (res Result, err error) {
 	logger := l.Ensure(o.Logger).WithFields(log.Fields{"source": o.Source, "repo": o.Repo})
+	if o.Name == "" {
+		o.Name = DefaultName(o.Source)
+	}
 	if err = ValidateName(o.Name); err != nil {
 		return
 	}
@@ -266,6 +274,12 @@ func Convert(ctx context.Context, o ConvertOptions) (res Result, err error) {
 		}
 	}
 	res.Source = in.Src.Stats()
+
+	if o.VerifyDigest && !res.Skipped {
+		if err = verifyDigest(ctx, logger, in); err != nil {
+			return
+		}
+	}
 
 	if !res.Skipped {
 		if perr := writeProvenance(logger, o, in, &res); perr != nil {
@@ -345,6 +359,40 @@ func ingest(ctx context.Context, logger *log.Entry, o ConvertOptions, in *Inspec
 			Warn("extended attributes were dropped; the tarball ingest does not support them")
 	}
 	return nil
+}
+
+func verifyDigest(ctx context.Context, logger *log.Entry, in *Inspected) error {
+	if in.IDKind == "sif-descriptors" {
+		return fmt.Errorf("--verify-digest needs a content digest (oras:// source or --digest)")
+	}
+	if fs, ok := in.Src.(*fileSource); ok && fs.remove && fs.digest == in.ID {
+		return nil // checked while downloading
+	}
+	t := time.Now()
+	h := sha256.New()
+	r := io.NewSectionReader(in.Src, 0, in.Src.Size())
+	if _, err := io.Copy(h, &ctxReader{ctx, r}); err != nil {
+		return fmt.Errorf("verifying digest: %w", err)
+	}
+	sum := hex.EncodeToString(h.Sum(nil))
+	if sum != in.ID {
+		// The tree stays unlinked and is removed by the next flat GC.
+		return fmt.Errorf("source has sha256 %s, expected %s; image not linked", sum, in.ID)
+	}
+	logger.WithField("elapsed", time.Since(t).Round(time.Millisecond)).Info("source digest verified")
+	return nil
+}
+
+type ctxReader struct {
+	ctx context.Context
+	r   io.Reader
+}
+
+func (c *ctxReader) Read(p []byte) (int, error) {
+	if err := c.ctx.Err(); err != nil {
+		return 0, err
+	}
+	return c.r.Read(p)
 }
 
 func NewProvenance(o ConvertOptions, in *Inspected, res *Result) Provenance {

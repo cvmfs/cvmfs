@@ -3,6 +3,8 @@ package sif
 import (
 	"container/list"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -45,6 +47,13 @@ type SourceOptions struct {
 	Headers   http.Header
 	Client    *http.Client
 	Logger    *log.Entry
+	// SpoolDir enables downloading the whole image to a temporary file in
+	// this directory when the server does not support range requests.
+	SpoolDir string
+	// PlainHTTP talks to oras:// registries without TLS.
+	PlainHTTP bool
+	// Credentials returns the registry login for an oras:// registry URL.
+	Credentials func(url string) (user, pass string, ok bool)
 }
 
 func DefaultSourceOptions() SourceOptions {
@@ -61,7 +70,7 @@ func OpenSource(ctx context.Context, ref string, opts SourceOptions) (Source, er
 	case strings.HasPrefix(ref, "http://"), strings.HasPrefix(ref, "https://"):
 		return openHTTP(ctx, ref, opts)
 	case strings.HasPrefix(ref, "oras://"):
-		return nil, fmt.Errorf("oras:// sources are not supported yet")
+		return openOras(ctx, ref, opts)
 	case strings.HasPrefix(ref, "file://"):
 		ref = strings.TrimPrefix(ref, "file://")
 	case strings.Contains(ref, "://"):
@@ -72,9 +81,11 @@ func OpenSource(ctx context.Context, ref string, opts SourceOptions) (Source, er
 
 type fileSource struct {
 	*os.File
-	size  int64
-	ident string
-	read  int64
+	size   int64
+	ident  string
+	read   int64
+	digest string
+	remove bool // spooled download, deleted on Close
 }
 
 func openFile(path string) (Source, error) {
@@ -102,7 +113,14 @@ func (s *fileSource) ReadAt(p []byte, off int64) (int, error) {
 }
 func (s *fileSource) Size() int64         { return s.size }
 func (s *fileSource) Identity() string    { return s.ident }
-func (s *fileSource) KnownDigest() string { return "" }
+func (s *fileSource) KnownDigest() string { return s.digest }
+func (s *fileSource) Close() error {
+	err := s.File.Close()
+	if s.remove {
+		os.Remove(s.File.Name())
+	}
+	return err
+}
 func (s *fileSource) Stats() SourceStats {
 	return SourceStats{BytesFetched: atomic.LoadInt64(&s.read)}
 }
@@ -123,6 +141,8 @@ type httpSource struct {
 	readahead int
 	attempts  int
 	logger    *log.Entry
+	auth      *registryAuth
+	digest    string
 
 	mu       sync.Mutex
 	lru      *list.List
@@ -147,9 +167,16 @@ type cachedChunk struct {
 var (
 	errSourceChanged = errors.New("source changed during conversion")
 	errNoRanges      = errors.New("server ignored the range request")
+	errUnauthorized  = errors.New("unauthorized")
 )
 
 func openHTTP(ctx context.Context, url string, opts SourceOptions) (Source, error) {
+	return newHTTPSource(ctx, url, opts, nil, "")
+}
+
+// newHTTPSource opens url for range reads; auth is set for registry blobs,
+// digest when the content hash is known in advance.
+func newHTTPSource(ctx context.Context, url string, opts SourceOptions, auth *registryAuth, digest string) (Source, error) {
 	def := DefaultSourceOptions()
 	if opts.ChunkSize <= 0 {
 		opts.ChunkSize = def.ChunkSize
@@ -171,12 +198,98 @@ func openHTTP(ctx context.Context, url string, opts SourceOptions) (Source, erro
 		chunk: opts.ChunkSize, maxChunks: int(opts.CacheSize / opts.ChunkSize),
 		readahead: opts.Readahead, attempts: opts.Attempts, logger: opts.Logger,
 		lru: list.New(), chunks: map[int64]*list.Element{}, inflight: map[int64]*chunkFetch{},
-		last: -2,
+		last: -2, auth: auth, digest: digest,
 	}
 	if err := s.probe(); err != nil {
+		if errors.Is(err, errNoRanges) && opts.SpoolDir != "" {
+			s.logger.WithFields(log.Fields{"url": url, "spool_dir": opts.SpoolDir}).
+				Warn("server does not support range requests, downloading the image first")
+			return s.spool(opts.SpoolDir)
+		}
+		if errors.Is(err, errNoRanges) {
+			err = fmt.Errorf("%w; --spool-dir downloads the image first instead", err)
+		}
 		return nil, err
 	}
+	if digest != "" {
+		s.ident = "digest:sha256:" + digest
+	}
 	return s, nil
+}
+
+// spool downloads the whole object into dir. The content hash is checked
+// against the known digest when there is one.
+func (s *httpSource) spool(dir string) (Source, error) {
+	f, err := os.CreateTemp(dir, "ducc-sif-*.sif")
+	if err != nil {
+		return nil, err
+	}
+	fail := func(err error) (Source, error) {
+		f.Close()
+		os.Remove(f.Name())
+		return nil, err
+	}
+	var ident string
+	h := sha256.New()
+	err = s.retry(func() error {
+		if _, err := f.Seek(0, io.SeekStart); err != nil {
+			return err
+		}
+		if err := f.Truncate(0); err != nil {
+			return err
+		}
+		h.Reset()
+		req, err := s.newRequest(http.MethodGet)
+		if err != nil {
+			return err
+		}
+		resp, err := s.client.Do(req)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+		if err := s.checkAuth(resp); err != nil {
+			return err
+		}
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("%s: HTTP %s", s.url, resp.Status)
+		}
+		n, err := io.Copy(io.MultiWriter(f, h), resp.Body)
+		atomic.AddInt64(&s.stats.BytesFetched, n)
+		if err != nil {
+			return fmt.Errorf("%s: download: %w", s.url, err)
+		}
+		ident = fmt.Sprintf("http:%d:%s:%s", n, resp.Header.Get("ETag"), resp.Header.Get("Last-Modified"))
+		return nil
+	})
+	if err != nil {
+		return fail(err)
+	}
+	sum := hex.EncodeToString(h.Sum(nil))
+	if s.digest != "" && sum != s.digest {
+		return fail(fmt.Errorf("%s: downloaded content has sha256 %s, expected %s", s.url, sum, s.digest))
+	}
+	fi, err := f.Stat()
+	if err != nil {
+		return fail(err)
+	}
+	if s.digest != "" {
+		ident = "digest:sha256:" + s.digest
+	}
+	return &fileSource{File: f, size: fi.Size(), ident: ident, digest: s.digest, remove: true,
+		read: atomic.LoadInt64(&s.stats.BytesFetched)}, nil
+}
+
+// checkAuth turns a 401 into a retryable error after refreshing the
+// registry token, or a final one when there is nothing to refresh.
+func (s *httpSource) checkAuth(resp *http.Response) error {
+	if resp.StatusCode != http.StatusUnauthorized {
+		return nil
+	}
+	if s.auth != nil && s.auth.refresh(s.ctx, resp) {
+		return fmt.Errorf("%s: token expired, refreshed", s.url)
+	}
+	return fmt.Errorf("%s: %w", s.url, errUnauthorized)
 }
 
 func (s *httpSource) newRequest(method string) (*http.Request, error) {
@@ -186,6 +299,9 @@ func (s *httpSource) newRequest(method string) (*http.Request, error) {
 	}
 	for k, v := range s.headers {
 		req.Header[k] = v
+	}
+	if s.auth != nil {
+		s.auth.apply(req)
 	}
 	return req, nil
 }
@@ -204,6 +320,10 @@ func (s *httpSource) probe() error {
 		if err != nil {
 			return err
 		}
+		if err := s.checkAuth(resp); err != nil {
+			resp.Body.Close()
+			return err
+		}
 		if retryable(resp.StatusCode) {
 			resp.Body.Close()
 			return fmt.Errorf("%s: HTTP %s", s.url, resp.Status)
@@ -218,7 +338,7 @@ func (s *httpSource) probe() error {
 	switch resp.StatusCode {
 	case http.StatusPartialContent:
 	case http.StatusOK:
-		return fmt.Errorf("%s: server does not support range requests", s.url)
+		return fmt.Errorf("%s: %w", s.url, errNoRanges)
 	default:
 		return fmt.Errorf("%s: HTTP %s", s.url, resp.Status)
 	}
@@ -265,7 +385,8 @@ func (s *httpSource) retry(f func() error) error {
 			}
 		}
 		err = f()
-		if err == nil || errors.Is(err, errSourceChanged) || errors.Is(err, errNoRanges) || s.ctx.Err() != nil {
+		if err == nil || errors.Is(err, errSourceChanged) || errors.Is(err, errNoRanges) ||
+			errors.Is(err, errUnauthorized) || s.ctx.Err() != nil {
 			return err
 		}
 		s.logger.WithFields(log.Fields{"url": s.url, "attempt": attempt + 1, "error": err}).Debug("range request failed")
@@ -292,6 +413,9 @@ func (s *httpSource) fetchChunk(idx int64) ([]byte, error) {
 			return err
 		}
 		defer resp.Body.Close()
+		if err := s.checkAuth(resp); err != nil {
+			return err
+		}
 		switch {
 		case resp.StatusCode == http.StatusPartialContent:
 		case resp.StatusCode == http.StatusOK:
@@ -402,7 +526,7 @@ func (s *httpSource) ReadAt(p []byte, off int64) (int, error) {
 
 func (s *httpSource) Size() int64         { return s.size }
 func (s *httpSource) Identity() string    { return s.ident }
-func (s *httpSource) KnownDigest() string { return "" }
+func (s *httpSource) KnownDigest() string { return s.digest }
 func (s *httpSource) Close() error        { return nil }
 func (s *httpSource) Stats() SourceStats {
 	return SourceStats{
@@ -412,3 +536,5 @@ func (s *httpSource) Stats() SourceStats {
 		Retries:      atomic.LoadInt64(&s.stats.Retries),
 	}
 }
+
+func defaultLogger() *log.Entry { return log.NewEntry(log.StandardLogger()) }
