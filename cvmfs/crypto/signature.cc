@@ -608,7 +608,23 @@ bool SignatureManager::LoadBlacklist(const std::string &path_blacklist,
   close(fd);
   if (!retval)
     return false;
+  AppendBlacklistLines(blacklist_buffer);
+  return true;
+}
 
+
+bool SignatureManager::LoadBlacklistMem(const std::string &blacklist_buffer,
+                                        bool append) {
+  const MutexLockGuard lock_guard(&lock_blacklist_);
+  if (!append)
+    blacklist_.clear();
+  AppendBlacklistLines(blacklist_buffer);
+  return true;
+}
+
+
+void SignatureManager::AppendBlacklistLines(
+    const std::string &blacklist_buffer) {
   unsigned num_bytes = 0;
   while (num_bytes < blacklist_buffer.size()) {
     const string line = GetLineMem(blacklist_buffer.data() + num_bytes,
@@ -616,8 +632,6 @@ bool SignatureManager::LoadBlacklist(const std::string &path_blacklist,
     blacklist_.push_back(line);
     num_bytes += line.length() + 1;
   }
-
-  return true;
 }
 
 

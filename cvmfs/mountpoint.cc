@@ -1211,7 +1211,18 @@ bool MountPoint::CheckBlacklists() {
   if (options_mgr_->HasConfigRepository(fqrn_, &config_repository_path)) {
     blacklist = config_repository_path + "blacklist";
     blacklist_paths_.push_back(blacklist);
-    if (FileExists(blacklist)) {
+    // Not through the mount point during (re-)load if the config repository
+    // was fetched
+    const std::shared_ptr<const ConfigRepoTree> tree = options_mgr_
+                                                           ->config_repo_tree();
+    string mount_dir;
+    options_mgr_->GetValue("CVMFS_MOUNT_DIR", &mount_dir);
+    string rel_path;
+    if (tree && tree->MapMountPath(mount_dir, blacklist, &rel_path)) {
+      string content;
+      if (tree->Lookup(rel_path, &content))
+        signature_mgr_->LoadBlacklistMem(content, append);
+    } else if (FileExists(blacklist)) {
       if (!signature_mgr_->LoadBlacklist(blacklist, append)) {
         boot_error_ = "failed to load blacklist from config repository";
         boot_status_ = loader::kFailSignature;

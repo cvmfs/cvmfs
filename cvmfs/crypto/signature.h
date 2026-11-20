@@ -61,6 +61,7 @@ class CVMFS_EXPORT SignatureManager {
   bool LoadPublicRsaKeys(const std::string &path_list);
   bool LoadPublicRsaKeysMem(const std::vector<std::string> &pems);
   bool LoadBlacklist(const std::string &path_blacklist, bool append);
+  bool LoadBlacklistMem(const std::string &blacklist_buffer, bool append);
   std::vector<std::string> GetBlacklist();
 
   bool LoadTrustedCaCrl(const std::string &path_list);
@@ -98,6 +99,8 @@ class CVMFS_EXPORT SignatureManager {
   void GenerateCertificate(const std::string &cn);
 
  private:
+  // Caller holds lock_blacklist_
+  void AppendBlacklistLines(const std::string &blacklist_buffer);
   RSA *GenerateRsaKeyPair();
   std::string GenerateKeyText(RSA *pubkey) const;
 
