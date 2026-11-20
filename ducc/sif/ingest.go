@@ -119,6 +119,21 @@ type Inspected struct {
 }
 
 func Inspect(ctx context.Context, source, digest string, maxEntries int, sopts SourceOptions) (*Inspected, error) {
+	in, err := Identify(ctx, source, digest, sopts)
+	if err != nil {
+		return nil, err
+	}
+	if err := in.BuildIndex(maxEntries); err != nil {
+		in.Src.Close()
+		return nil, err
+	}
+	return in, nil
+}
+
+// Identify opens the source and determines the image ID from the SIF
+// header alone (a few small reads), so an unchanged image can be skipped
+// without reading the squashfs metadata.
+func Identify(ctx context.Context, source, digest string, sopts SourceOptions) (*Inspected, error) {
 	src, err := OpenSource(ctx, source, sopts)
 	if err != nil {
 		return nil, err
@@ -144,17 +159,22 @@ func Inspect(ctx context.Context, source, digest string, maxEntries int, sopts S
 	default:
 		in.ID, in.IDKind = in.Image.HeaderDigest(), "sif-descriptors"
 	}
-	if in.FS, err = squashfs.Open(in.Image.Partition(src), in.Image.PartSize); err != nil {
-		return fail(err)
+	return in, nil
+}
+
+// BuildIndex opens the squashfs partition and reads its directory tree.
+func (in *Inspected) BuildIndex(maxEntries int) (err error) {
+	if in.FS, err = squashfs.Open(in.Image.Partition(in.Src), in.Image.PartSize); err != nil {
+		return err
 	}
 	if maxEntries <= 0 {
 		maxEntries = 10_000_000
 	}
 	if in.Index, err = in.FS.BuildIndex(maxEntries); err != nil {
-		return fail(err)
+		return err
 	}
 	in.FS.DropMetadataCache()
-	return in, nil
+	return nil
 }
 
 func hasSingularityDir(ix *squashfs.Index) bool {
@@ -213,7 +233,7 @@ func Convert(ctx context.Context, o ConvertOptions) (res Result, err error) {
 	}()
 
 	o.SourceOpts.Logger = logger
-	in, err := Inspect(ctx, o.Source, o.Digest, o.MaxEntries, o.SourceOpts)
+	in, err := Identify(ctx, o.Source, o.Digest, o.SourceOpts)
 	if err != nil {
 		return
 	}
@@ -221,17 +241,19 @@ func Convert(ctx context.Context, o ConvertOptions) (res Result, err error) {
 	res.ImageID, res.IDKind = in.ID, in.IDKind
 	res.FlatPath, res.PublicPath = FlatPath(in.ID), PublicPath(o.Name)
 	logger = logger.WithFields(log.Fields{"image_id": in.ID, "flat": res.FlatPath, "public": res.PublicPath})
-	logger.WithFields(log.Fields{"entries": len(in.Index.Entries), "id_kind": in.IDKind}).Info("SIF image indexed")
-
-	if !hasSingularityDir(in.Index) && !o.AllowMissingSingularityDir {
-		err = fmt.Errorf("image has no /.singularity.d; not an Apptainer image? (override with --allow-missing-singularity-d)")
-		return
-	}
 
 	if !o.Force && flatComplete(o.Repo, res.FlatPath) {
 		logger.Info("image already ingested")
 		res.Skipped = true
 	} else {
+		if err = in.BuildIndex(o.MaxEntries); err != nil {
+			return
+		}
+		logger.WithFields(log.Fields{"entries": len(in.Index.Entries), "id_kind": in.IDKind}).Info("SIF image indexed")
+		if !hasSingularityDir(in.Index) && !o.AllowMissingSingularityDir {
+			err = fmt.Errorf("image has no /.singularity.d; not an Apptainer image? (override with --allow-missing-singularity-d)")
+			return
+		}
 		if o.Force {
 			// Ingesting over an existing tree keeps the old metadata of
 			// directories that already exist, so start from scratch.
