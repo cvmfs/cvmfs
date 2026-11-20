@@ -1704,26 +1704,82 @@ bool MountPoint::CreateSignatureManager() {
   signature_mgr_ = new signature::SignatureManager();
   signature_mgr_->Init();
 
+  const std::shared_ptr<const ConfigRepoTree> tree = options_mgr_
+                                                         ->config_repo_tree();
+  string mount_dir;
+  options_mgr_->GetValue("CVMFS_MOUNT_DIR", &mount_dir);
+  // Keys below the config repository mount point are taken from the fetched
+  // tree, if available
+  vector<string> tree_keys;
   string public_keys;
   if (options_mgr_->GetValue("CVMFS_PUBLIC_KEY", &optarg)) {
     public_keys = optarg;
   } else if (options_mgr_->GetValue("CVMFS_KEYS_DIR", &optarg)) {
-    // Collect .pub files from CVMFS_KEYS_DIR
-    public_keys = JoinStrings(FindFilesBySuffix(optarg, ".pub"), ":");
+    string rel_dir;
+    if (tree && tree->MapMountPath(mount_dir, optarg, &rel_dir)) {
+      const vector<string> names = tree->List(rel_dir);
+      vector<string> key_paths;
+      for (unsigned i = 0; i < names.size(); ++i) {
+        if (HasSuffix(names[i], ".pub", false))
+          key_paths.push_back(MakeCanonicalPath(optarg) + "/" + names[i]);
+      }
+      public_keys = JoinStrings(key_paths, ":");
+    } else {
+      public_keys = JoinStrings(FindFilesBySuffix(optarg, ".pub"), ":");
+    }
   } else {
     public_keys = JoinStrings(FindFilesBySuffix("/etc/cvmfs/keys", ".pub"),
                               ":");
   }
 
-  if (!signature_mgr_->LoadPublicRsaKeys(public_keys)) {
+  bool use_tree = false;
+  const vector<string> key_paths = SplitString(public_keys, ':');
+  if (tree && !public_keys.empty()) {
+    for (unsigned i = 0; i < key_paths.size(); ++i) {
+      string rel_path;
+      if (tree->MapMountPath(mount_dir, key_paths[i], &rel_path)) {
+        use_tree = true;
+        break;
+      }
+    }
+  }
+
+  bool keys_loaded;
+  if (use_tree) {
+    vector<string> pems;
+    keys_loaded = true;
+    for (unsigned i = 0; keys_loaded && (i < key_paths.size()); ++i) {
+      string rel_path;
+      string pem;
+      if (tree->MapMountPath(mount_dir, key_paths[i], &rel_path)) {
+        keys_loaded = tree->Lookup(rel_path, &pem);
+      } else {
+        const int fd = open(key_paths[i].c_str(), O_RDONLY);
+        keys_loaded = (fd >= 0) && SafeReadToString(fd, &pem);
+        if (fd >= 0)
+          close(fd);
+      }
+      if (!keys_loaded) {
+        LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+                 "failed to open public key '%s'", key_paths[i].c_str());
+      }
+      pems.push_back(pem);
+    }
+    keys_loaded = keys_loaded && signature_mgr_->LoadPublicRsaKeysMem(pems);
+  } else {
+    keys_loaded = signature_mgr_->LoadPublicRsaKeys(public_keys);
+  }
+
+  if (!keys_loaded) {
     boot_error_ = "failed to load public key(s)";
     boot_status_ = loader::kFailSignature;
     return false;
   }
 
   if (public_keys.size() > 0) {
-    LogCvmfs(kLogCvmfs, kLogDebug, "CernVM-FS: using public key(s) %s",
-             public_keys.c_str());
+    LogCvmfs(kLogCvmfs, kLogDebug, "CernVM-FS: using public key(s) %s%s",
+             public_keys.c_str(),
+             use_tree ? " (from fetched config repository)" : "");
   } else {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn, "no public key loaded");
   }
