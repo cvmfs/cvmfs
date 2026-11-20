@@ -1,0 +1,87 @@
+#!/bin/bash
+# shellcheck disable=SC2034
+cvmfs_test_name="Mountless repository gateway ingest"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+LOCAL_MOUNTPOINT=""
+cleanup() {
+    remove_local_mount "$LOCAL_MOUNTPOINT" || :
+    sudo cvmfs_server rmfs -f "$CVMFS_TEST_REPO" || :
+}
+
+test_case() {
+    local EXTRA_CONFIG=()
+    EXTRA_CONFIG=( "$@" )
+
+    echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+    create_empty_repo "$CVMFS_TEST_REPO" "$CVMFS_TEST_USER"
+    trap cleanup EXIT HUP INT TERM
+
+    sudo tee -a /etc/cvmfs/repositories.d/"$CVMFS_TEST_REPO"/server.conf <<-EOF
+CVMFS_REPOSITORY_TTL=1
+CVMFS_QUOTA_LIMIT=-1
+EOF
+    echo "open transaction"
+    start_transaction "$CVMFS_TEST_REPO"
+
+    mkdir -p /cvmfs/"$CVMFS_TEST_REPO"/foo/dir
+
+    echo "publish changes"
+    publish_repo "$CVMFS_TEST_REPO"
+
+
+    echo "create a local mount of the created repository"
+    LOCAL_MOUNTPOINT="$PWD/local_mount"
+    mkdir -p ./"$CVMFS_TEST_REPO"/{cache,reload_sockets}
+    chmod a=rwx ./"$CVMFS_TEST_REPO"
+
+    cat > client.conf <<-EOF
+CVMFS_SERVER_URL=$(get_repo_url "$CVMFS_TEST_REPO")
+CVMFS_HTTP_PROXY=DIRECT
+CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/$CVMFS_TEST_REPO.pub
+CVMFS_KCACHE_TIMEOUT=15
+CVMFS_DEBUGLOG=$PWD/$CVMFS_TEST_REPO/cvmfs-debug.log
+CVMFS_USYSLOG=$PWD/$CVMFS_TEST_REPO/cvmfs-usyslog.log
+
+CVMFS_CACHE_BASE=$PWD/$CVMFS_TEST_REPO/cache
+CVMFS_RELOAD_SOCKETS=$PWD/$CVMFS_TEST_REPO/reload_sockets
+CVMFS_TALK_SOCKET=$PWD/$CVMFS_TEST_REPO/cvmfs_io
+CVMFS_KCACHE_TIMEOUT=0
+CVMFS_MAX_TTL_SECS=1
+CVMFS_AUTO_UPDATE=yes
+EOF
+    for setting in "${EXTRA_CONFIG[@]}"; do
+        echo "$setting" >> client.conf
+    done
+    do_local_mount "$LOCAL_MOUNTPOINT" \
+        "$CVMFS_TEST_REPO"     \
+        "$(get_repo_url "$CVMFS_TEST_REPO")" \
+        client.conf
+
+    FRESH=$(cvmfs_talk -p "$PWD"/"$CVMFS_TEST_REPO"/cvmfs_io internal affairs | grep 'cvmfs.n_fs_readdir_0_offset\>' | cut -d'|' -f 2)
+    [[ "$FRESH" == 0 ]]
+    ls "$LOCAL_MOUNTPOINT"
+    AFTER_1_PASS=$(cvmfs_talk -p "$PWD"/"$CVMFS_TEST_REPO"/cvmfs_io internal affairs | grep 'cvmfs.n_fs_readdir_0_offset\>' | cut -d'|' -f 2)
+    [[ "$AFTER_1_PASS" == 1 ]]
+    ls "$LOCAL_MOUNTPOINT"
+    AFTER_2_PASSES=$(cvmfs_talk -p "$PWD"/"$CVMFS_TEST_REPO"/cvmfs_io internal affairs | grep 'cvmfs.n_fs_readdir_0_offset\>' | cut -d'|' -f 2)
+    if [[ "${EXTRA_CONFIG[*]}" =~ 'CVMFS_FUSE_KEEP_DIR_CACHE=1' ]]; then
+        [[ "$AFTER_2_PASSES" == 1 ]]
+    else
+        [[ "$AFTER_2_PASSES" == 2 ]]
+    fi
+    remove_local_mount "$LOCAL_MOUNTPOINT"
+    sudo cvmfs_server rmfs -f "$CVMFS_TEST_REPO"
+    trap - EXIT HUP INT TERM
+}
+
+cvmfs_run_test() {
+    tarfile="$PWD/tarball.tar"
+
+    export CVMFS_TEST_REPO=test.repo.readdir-normal
+    test_case
+
+    export CVMFS_TEST_REPO=test.repo.readdir-cached
+    test_case CVMFS_FUSE_KEEP_DIR_CACHE=1
+}
