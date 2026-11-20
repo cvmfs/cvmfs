@@ -13,8 +13,7 @@ cleanup() {
   fi
 
   if [ ! -z $CVMFS_TEST_708_PID_HELPER ]; then
-    kill -USR1 $CVMFS_TEST_708_PID_HELPER
-    wait $CVMFS_TEST_708_PID_HELPER
+    cvmfs_finish_openwaitprint "$CVMFS_TEST_708_PID_HELPER" || true
   fi
 
   if [ ! -z $CVMFS_TEST_708_MOUNTPOINT ]; then
@@ -68,7 +67,7 @@ cvmfs_run_test() {
   echo "*** keep a file open with the old content"
   gcc -Wall -pthread -o openwaitprint ${src_location}/openwaitprint.c || return 20
   echo "pause" > ${CVMFS_TEST_708_MOUNTPOINT}c/barrier01 || return 21
-  ./openwaitprint ${CVMFS_TEST_708_MOUNTPOINT}/foo > foo.old &
+  cvmfs_start_openwaitprint "${CVMFS_TEST_708_MOUNTPOINT}/foo" foo.old || return 21
   CVMFS_TEST_708_PID_HELPER=$!
   echo "*** PID of openwaitprint is $CVMFS_TEST_708_PID_HELPER"
   local inode_foo=$(get_inode ${CVMFS_TEST_708_MOUNTPOINT}/foo)
@@ -88,6 +87,7 @@ cvmfs_run_test() {
   # [ $inode_foo -eq $(get_inode ${CVMFS_TEST_708_MOUNTPOINT}/foo) ] || return 42
 
   echo "resume" > ${CVMFS_TEST_708_MOUNTPOINT}c/barrier01 || return 43
+  cvmfs_wait_openwaitprint "$CVMFS_TEST_708_PID_HELPER" || return 22
   sleep 2
   ninsert=$(get_ninsert)
   echo "*** Number of page cache tracker inserts: $ninsert"
@@ -112,8 +112,9 @@ cvmfs_run_test() {
   # Not true anymore since fixed
   # [ $ndirect -eq 1 ] || return 53
 
-  cleanup
+  cvmfs_finish_openwaitprint "$CVMFS_TEST_708_PID_HELPER" || return 54
   CVMFS_TEST_708_PID_HELPER=
+  cleanup
   local mntpnt=$CVMFS_TEST_708_MOUNTPOINT
   CVMFS_TEST_708_MOUNTPOINT=
 
