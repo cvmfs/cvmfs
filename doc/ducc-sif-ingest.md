@@ -203,7 +203,7 @@ defeats the purpose of the feature.
   - FS type ext3 or encrypted squashfs → error `unsupported SIF partition
     type`.
   - No primary partition but OCI root index/blob descriptors present → OCI-SIF
-    (§12). In v1, error `OCI-SIF not supported yet`.
+    (§12).
 - Record for metadata (§8.4): SIF ID (UUID), creation time, partition
   architecture, the list of descriptor types and sizes, and whether signature
   descriptors exist.
@@ -395,8 +395,9 @@ ingest cannot rename. Image ID (64 hex chars):
 
 1. `--digest sha256:HEX` (CLI) / `digest:` (wish list) if given: explicit
    override.
-2. Else the oras layer digest: the sha256 of the whole SIF.
-3. Else (default) `sha256( SIF global header ‖ descriptor table )`. This
+2. Else, for an OCI-SIF, the OCI config digest (§12).
+3. Else the oras layer digest: the sha256 of the whole SIF.
+4. Else (default) `sha256( SIF global header ‖ descriptor table )`. This
    covers the SIF UUID, creation time and every partition's offset, size and
    type. It is cheap (one small read) and changes on every rebuild. It is not
    a content hash; `--verify-digest` (§8.5) gives content guarantees when an
@@ -470,7 +471,7 @@ SIF images never collide with registry-sourced ones:
   "source": "https://example.org/images/foo.sif",
   "source_identity": "\"etag-abc\"",
   "image_id": "…",
-  "id_kind": "oras-digest | sif-descriptors | user-digest",
+  "id_kind": "user-digest | oci-config | source-digest | sif-descriptors",
   "sif": { "uuid": "…", "created": "…", "arch": "amd64",
            "signed": true, "descriptors": [{"type": "…", "size": 0}] },
   "squashfs": { "compressor": "zstd", "block_size": 131072,
@@ -623,27 +624,64 @@ flat-image path uses there. If nothing is available, use `--force`-like
 behaviour plus a provenance check through the client mount when one exists.
 Integration-test this explicitly (§13).
 
-## 12. OCI-SIF (later phase)
+## 12. OCI-SIF
 
-`apptainer --oci` produces SIFs that embed an OCI image: index, manifest,
-config and layer blobs as SIF descriptors, with layers stored as squashfs
-(`application/vnd.sylabs.image.layer.v1.squashfs`), usually squashed to one
-layer.
+`singularity pull --oci` / `build --oci` (SingularityCE 4.x; apptainer
+1.5 does not write OCI-SIFs) produce SIFs without a primary partition. The
+image is stored as OCI blobs: one `OCI.RootIndex` descriptor and
+`OCI.Blob` descriptors for the manifest, config and layers. Each
+descriptor's `Extra` field holds the blob digest as text
+(`sha256:HEX\0…`, apptainer/sif v2 `ociBlob`). Layers have media type
+`application/vnd.sylabs.image.layer.v1.squashfs`. The image is squashed to
+one layer by default; `--keep-layers` keeps one squashfs per OCI layer.
 
-Plan:
+Implemented (`sif/oci.go`, `sif/tree.go`):
 
-- Parse the OCI root index descriptor, then the manifest and config from blob
-  descriptors.
-- Single layer: ingest it as a flat tree with the reader above, then generate
-  `.singularity.d` from the OCI config with the existing `singularity` package
-  (`InsertRunScript`, `InsertEnv`, `MakeBaseEnv`), as an extra tar section at
-  the end of the same stream.
-- Multiple layers: ingest each squashfs layer into
-  `.layers/<xx>/<digest>/layerfs` (OCI whiteouts are stored as such in those
-  layers) and reuse `cvmfs_server overlay` + `-c <config>` exactly like
-  `CreateFlatOverlayWithLogger`.
-- Image ID = OCI config digest, so the result shares `.flat/` with
-  registry-sourced images of the same config.
+- `Parse` marks such a SIF as OCI. `ReadOCI` reads the root index, the
+  manifest and the config, and checks each against its digest. The index
+  must list exactly one manifest, of type OCI image manifest or Docker v2
+  manifest (SingularityCE keeps the Docker type for images pulled from
+  Docker v2 registries). Every layer must be squashfs; ext3 overlay or
+  other layer types are rejected. Layers are not hashed: that would need a
+  full extra read of the image.
+- **Image ID** = OCI config digest (`id_kind: oci-config`), i.e. the same
+  `.flat/<xx>/<config digest>` path `Manifest.GetSingularityPath` gives a
+  registry conversion of the same config. In practice SingularityCE
+  rewrites the config (history entry with the pull time, squashed
+  `diff_ids`), so an OCI-SIF does not share a flat tree with the registry
+  image it came from, and a re-pull gives a new ID.
+- **Layers are merged in ducc, in the one tar stream.** Each layer gets its
+  own squashfs reader and index; the indexes are merged bottom-up into one
+  tree (later layer wins; a directory over a directory keeps the lower
+  children unless it is opaque). The ordered stream reads layer after layer,
+  each front to back. Whiteouts: SingularityCE converts layer whiteouts to
+  the overlayfs form, because apptainer/singularity mount the layers with
+  overlayfs: a 0/0 character device for a removed entry and the
+  `trusted.overlay.opaque=y` xattr on opaque directories (verified on real
+  images built with `tar2sqfs`). The AUFS form (`.wh.<name>`,
+  `.wh..wh..opq`) is accepted as well. The squashfs reader now reads xattr
+  values for this.
+  - Rejected alternative: ingest each layer to `.layers/<xx>/<digest>/layerfs`
+    and run `cvmfs_server overlay -c`. That costs one ingest per layer plus
+    an overlay transaction, needs whiteout translation into the `.wh.` form
+    the overlay tool expects, and stores every layer a second time in the
+    repository. The in-ducc merge keeps one ingest, no local disk and the
+    catalog-grouped order (§16.1), and its memory cost is one extra index
+    copy during the merge.
+- **`/.singularity.d`** is generated from the OCI config and added to the
+  merged tree as in-memory entries, in the base catalog group. Content,
+  modes and the FHS/symlink rules are exactly those of the C++ overlay
+  (`swissknife_overlay.cc` `InjectSingularityDotfiles`), which registry
+  conversions use; the Go `singularity` package was aligned to it (its env
+  script double-escaped values and lacked `91-environment.sh`) and now
+  exposes the files as data (`singularity.Files`), so nothing is written to
+  local disk. Entries the image already has: `.singularity.d` files are
+  replaced, as the overlay does; FHS dirs and root symlinks are only added
+  when missing. Generated entries are owned by root and get the config's
+  `created` time (the overlay uses the publish time).
+- Provenance (`.sifinfo`) gains `oci` (index/manifest/config digests,
+  layers) and `merge` (layers, whiteouts, opaque dirs, hidden and generated
+  entries).
 
 Signature verification (both kinds): verify the SIF signature descriptors
 against a configured keyring before linking. Record the fingerprints in
@@ -724,7 +762,7 @@ against a configured keyring before linking. Record the fingerprints in
 
 ## 16. Implementation status
 
-Implemented in `ducc/sif/` (`sif.go`, `squashfs/`, `tarstream.go`,
+Implemented in `ducc/sif/` (`sif.go`, `squashfs/`, `tarstream.go`, `oci.go`, `tree.go`,
 `source.go`, `ingest.go`) and `ducc/cmd/convert_sif.go`. Deviations from the
 sections above are noted there (§5.2 validators, §7.2 ownership, §8.2
 `--force` and symlink, §8.6 locking).
@@ -739,7 +777,9 @@ sections above are noted there (§5.2 validators, §7.2 ownership, §8.2
   - `--force`, provenance file.
 - **M3 partly done.** The HTTP range source has a chunk cache, readahead,
   retries and change detection. oras:// and `--spool-dir` are not done.
-- **M4, M5:** not started.
+- **M5 partly done:** OCI-SIF ingestion (§12), single and multi layer.
+  Signature verification not started.
+- **M4:** not started.
 
 ### 16.1 Ordering for early catalog upload
 
@@ -800,7 +840,41 @@ lists (EIO on read). `Clone` does not copy chunk lists, and the branch's
 enabling of ingest chunking (`956990e21`) made that reachable. A fix is
 pending on that branch.
 
-### 16.3 Tests
+### 16.3 OCI-SIF measurements (cvm-perf10)
+
+Images built with SingularityCE 4.6.0 (`singularity pull --oci
+[--keep-layers]`, in a container on cvm-perf10), served by the local httpd,
+published into `sifoci1.example.org` with cvmfs-server 2.14.0.
+
+| image | layers | entries | ingest | fetch ratio |
+|---|---:|---:|---:|---:|
+| alpine:3.20 | 1 | 542 | 0.9 s | 1.004 |
+| python:3.12-slim | 1 / 4 | 5,598 | 1.4 s / 1.3 s | 1.000 / 1.000 |
+| whiteout test image (alpine + 3 layers) | 1 / 4 | 547 | 1.0 s / 1.0 s | 1.004 / 1.004 |
+| pytorch 2.5.1-cuda12.4-cudnn9-runtime (3.3 GB) | 1 / 5 | 77,850 | 83 s / 82 s | 1.059 / 1.057 |
+
+- PyTorch: tar stream alone (`--emit-tar /dev/null`) 2.3 s and 0.44 GB peak
+  RSS for both variants. The 1.3 GB peak reported by `/usr/bin/time` for
+  the full run is the `cvmfs_server ingest` child. The 1.06 fetch ratio is
+  the same with one layer, so it comes from this image's layout, not from
+  the merge.
+- Correctness: every published tree, multi-layer included, equals an
+  `unsquashfs` extraction of the squashed OCI-SIF of the same image (type,
+  mode, uid/gid, mtime, size, content, link target; 77,825 entries for
+  PyTorch), apart from the generated environment. Before ingest, the tar
+  stream of each `--keep-layers` SIF also matches the stream of its
+  squashed twin entry by entry.
+- `/.singularity.d`, the FHS dirs and the root symlinks equal those of a
+  `convert-single-image` registry conversion of python:3.12-slim (content
+  and mode). The only other differences in the tree are 13 entries with
+  non-root group ownership, which the registry layer ingest does not keep
+  (§7.2).
+- `apptainer exec` / `run` work, including the OCI entrypoint and command,
+  argument override, `ENV` with `$` and `"`, and whiteouts (removed files
+  absent, recreated directory showing only new content).
+- A rerun publishes no revision (S34 → S34).
+
+### 16.4 Tests
 
 - `go test ./sif/...`:
   - mksquashfs fixture matrix (11 variants), compared entry by entry with
@@ -810,7 +884,16 @@ pending on that branch.
   - catalog placement and contiguity, cross-catalog hardlinks;
   - HTTP range source: byte-identical to the file path; change, no-range,
     retry, weak→strong ETag;
-  - corruption loop and `FuzzImage` (650k execs, no failure).
+  - corruption loop and `FuzzImage` (650k execs, no failure; with OCI-SIF
+    seeds, including a whiteout/opaque layer, 1.3M execs in 90 s);
+  - synthetic OCI-SIFs (`writeOCISIF`): single layer against the source
+    tree plus the generated environment; three-layer merge with overlayfs
+    whiteouts and opaque xattrs (mksquashfs pseudo files) and AUFS
+    whiteouts, file/dir replacement, metadata override, hardlink with
+    one path removed; an image with its own `.singularity.d`; rejection of
+    missing blobs, digest mismatch, non-squashfs layers, nested indexes and
+    multiple manifests;
+  - `singularity`: env script and runscript run through `/bin/sh`.
 - `test/src/409-ducc-sif-ingest`: passes on cvm-perf10 (AlmaLinux 9.8,
   cvmfs-server 2.14.0). It compares with `unsquashfs` (metadata and
   content), runs apptainer, checks that a no-op rerun publishes no
