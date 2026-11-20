@@ -69,6 +69,7 @@
 #include "clientctx.h"
 #include "compat.h"
 #include "compression/compression.h"
+#include "config_repo_fetch.h"
 #include "crypto/crypto_util.h"
 #include "crypto/hash.h"
 #include "directory_entry.h"
@@ -2577,8 +2578,45 @@ static FileSystem *InitSystemFs(const string &mount_path,
 }
 
 
+/**
+ * Fetches the config repository from the server so that a broken or
+ * unavailable config repository mount does not affect (re-)loading.
+ */
+static void SetupConfigRepoTree(const std::string &fqrn, bool simple_parser) {
+  const config_repo::FetchResult fetch = config_repo::FetchForRepository(
+      fqrn, simple_parser);
+  if (fetch.mode == config_repo::kFetchMount)
+    return;
+
+  if (fetch.tree) {
+    cvmfs::options_mgr_->set_config_repo_tree(fetch.tree);
+    return;
+  }
+
+  if (fetch.mode == config_repo::kFetchDirect) {
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+             "failed to fetch config repository %s (%s)",
+             fetch.config_repo.c_str(), fetch.error.c_str());
+    // An empty tree makes ParseDefault() behave as for a missing config
+    // repository directory
+    ConfigRepoTree *empty_tree = new ConfigRepoTree();
+    empty_tree->fqrn = fetch.config_repo;
+    cvmfs::options_mgr_->set_config_repo_tree(
+        std::shared_ptr<const ConfigRepoTree>(empty_tree));
+    return;
+  }
+
+  LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+           "failed to fetch config repository %s (%s), "
+           "using the mounted repository",
+           fetch.config_repo.c_str(), fetch.error.c_str());
+}
+
+
 static void InitOptionsMgr(const loader::LoaderExports *loader_exports) {
-  if (loader_exports->version >= 3 && loader_exports->simple_options_parsing) {
+  const bool simple_parser = (loader_exports->version >= 3)
+                             && loader_exports->simple_options_parsing;
+  if (simple_parser) {
     cvmfs::options_mgr_ = new SimpleOptionsParser(
         new DefaultOptionsTemplateManager(loader_exports->repository_name));
   } else {
@@ -2592,6 +2630,7 @@ static void InitOptionsMgr(const loader::LoaderExports *loader_exports) {
       cvmfs::options_mgr_->ParsePath(tokens[i], false);
     }
   } else {
+    SetupConfigRepoTree(loader_exports->repository_name, simple_parser);
     cvmfs::options_mgr_->ParseDefault(loader_exports->repository_name);
   }
 #ifdef CVMFS_NFS_FRONTEND
@@ -2653,6 +2692,14 @@ static int Init(const loader::LoaderExports *loader_exports) {
   // We need logging set up before forking the watchdog
   FileSystem::SetupLoggingStandalone(*cvmfs::options_mgr_,
                                      loader_exports->repository_name);
+  if (cvmfs::options_mgr_->config_repo_tree()
+      && !cvmfs::options_mgr_->config_repo_tree()->root_hash.empty()) {
+    LogCvmfs(kLogCvmfs, kLogDebug,
+             "using config repository %s revision %" PRIu64
+             " fetched from the server",
+             cvmfs::options_mgr_->config_repo_tree()->fqrn.c_str(),
+             cvmfs::options_mgr_->config_repo_tree()->revision);
+  }
 
   // Start a watchdog if this is the first time or if this is a reload with
   // an old loader that expected the FUSE module to start a watchdog
