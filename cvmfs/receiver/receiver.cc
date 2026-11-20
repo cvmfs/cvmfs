@@ -30,6 +30,8 @@ swissknife::ParameterList MakeParameterList() {
       'd', "Path to debug log. Ignored if the non-debug version runs, "
            "Default: "
                + std::string(kDefaultDebugLog)));
+  params.push_back(swissknife::Parameter::Optional(
+      'l', "Lease path (unused, for process identification)"));
   return params;
 }
 
