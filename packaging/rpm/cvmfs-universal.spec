@@ -656,16 +656,8 @@ if [ $1 -eq 0 ]; then
      rm -f /etc/auto.master.d/cvmfs.autofs
    fi
    [ -f /var/lock/subsys/autofs ] && /sbin/service autofs reload >/dev/null
-   rmdir /cvmfs
+   rmdir /cvmfs 2>/dev/null || :
 fi
-
-%if 0%{?selinux_cvmfs}
-if [ $1 -eq 0 ]; then
-    for variant in %{selinux_variants} ; do
-        /usr/sbin/semodule -u %{_datadir}/selinux/${variant}/cvmfs.pp || :
-    done
-fi
-%endif
 /sbin/ldconfig
 
 %postun server
