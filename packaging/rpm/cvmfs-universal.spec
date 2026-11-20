@@ -610,6 +610,19 @@ fi
 # Port 8000 is also assigned to soundd (CVM-1308)
 /usr/sbin/semanage port -m -t http_port_t -p tcp 8000 2>/dev/null || :
 restorecon -R /var/log/cvmfs
+# Persist the labels cvmfs_server sets via chcon, so a relabel keeps them.
+# Existing rules are left alone (semanage -a would silently modify them);
+# only rules added here are recorded for removal.
+fcontext_owned=/var/lib/cvmfs-server/selinux-fcontext
+fcontext_rules=$(/usr/sbin/semanage fcontext -l 2>/dev/null | awk '{print $1}')
+for d in /srv/cvmfs /var/lib/cvmfs-server/geo; do
+  echo "$fcontext_rules" | grep -qxF "$d(/.*)?" && continue
+  /usr/sbin/semanage fcontext -a -t httpd_sys_content_t "$d(/.*)?" 2>/dev/null && \
+    echo "$d(/.*)?" >> $fcontext_owned
+done
+# Repository content is already labelled by chcon -R; avoid walking it
+[ -d /srv/cvmfs ] && restorecon /srv/cvmfs || :
+[ -d /var/lib/cvmfs-server/geo ] && restorecon -R /var/lib/cvmfs-server/geo || :
 %endif
 # remove old-style geoip data
 rm -f /var/lib/cvmfs-server/geo/*.dat
@@ -631,6 +644,17 @@ if [ $1 = 0 ] ; then
 
   /usr/bin/cvmfs_config umount
 fi
+
+%if 0%{?selinux_cvmfs_server}
+# In preun, so that /var/lib/cvmfs-server can still be removed by rpm
+%preun server
+if [ $1 -eq 0 ] && [ -f /var/lib/cvmfs-server/selinux-fcontext ]; then
+  while read -r expr; do
+    /usr/sbin/semanage fcontext -d "$expr" 2>/dev/null || :
+  done < /var/lib/cvmfs-server/selinux-fcontext
+  rm -f /var/lib/cvmfs-server/selinux-fcontext
+fi
+%endif
 
 %if 0%{?build_gateway}
 %preun gateway
