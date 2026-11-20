@@ -822,14 +822,33 @@ TEST_F(T_Dns, CaresResolverTimeout) {
       CaresResolver::Create(false, 3, 256));
   ASSERT_TRUE(quick_resolver.get() != nullptr);
 
+  // Use a local UDP socket that never answers as name server.  Sending to a
+  // closed port would instead return ICMP port unreachable right away, which
+  // c-ares reports as a connection error rather than a timeout.
+  int fd_blackhole = socket(AF_INET, SOCK_DGRAM, 0);
+  ASSERT_GE(fd_blackhole, 0);
+  struct sockaddr_in blackhole_addr;
+  memset(&blackhole_addr, 0, sizeof(blackhole_addr));
+  blackhole_addr.sin_family = AF_INET;
+  blackhole_addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+  blackhole_addr.sin_port = 0;
+  ASSERT_EQ(0, bind(fd_blackhole,
+                    reinterpret_cast<struct sockaddr *>(&blackhole_addr),
+                    sizeof(blackhole_addr)));
+  socklen_t blackhole_addrlen = sizeof(blackhole_addr);
+  ASSERT_EQ(0, getsockname(fd_blackhole,
+                           reinterpret_cast<struct sockaddr *>(&blackhole_addr),
+                           &blackhole_addrlen));
+
   vector<string> bad_address;
-  bad_address.push_back("127.0.0.2");
+  bad_address.push_back("127.0.0.1:"
+                        + StringifyInt(ntohs(blackhole_addr.sin_port)));
   bool retval = quick_resolver->SetResolvers(bad_address);
   ASSERT_EQ(retval, true);
   uint64_t before = platform_monotonic_time();
   Host host = quick_resolver->Resolve("a.root-servers.net");
   uint64_t after = platform_monotonic_time();
-  // C-ares oddity: why is it kFailInvalidResolvers in CaresResolverBadResolver?
+  close(fd_blackhole);
   EXPECT_EQ(kFailTimeout, host.status());
   // TODO(jblomer): on macOS, the real timeout is sometimes 4s, sometimes 3.1s
   // This is not yet understood.
@@ -1141,7 +1160,7 @@ TEST_F(T_Dns, NormalResolverCombinedSlow) {
   names.push_back("[::1]");
   names.push_back("nemo.root-servers.net");
   vector<Host> hosts;
-  default_resolver->ResolveMany(names, &hosts);
+  resolver->ResolveMany(names, &hosts);
   ASSERT_EQ(names.size(), hosts.size());
   ExpectResolvedName(hosts[0], "a.root-servers.net", "198.41.0.4",
                      "[2001:503:ba3e::2:30]");
