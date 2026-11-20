@@ -12,6 +12,8 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <map>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -21,9 +23,14 @@
 #include "directory_entry.h"
 #include "fetch.h"
 #include "interrupt.h"
+#include "manifest.h"
 #include "mountpoint.h"
+#include "network/download.h"
+#include "network/jobinfo.h"
+#include "network/sink_mem.h"
 #include "options.h"
 #include "shortstring.h"
+#include "statistics.h"
 #include "util/logging.h"
 #include "util/platform.h"
 #include "util/posix.h"
@@ -36,6 +43,7 @@ extern char **environ;
 namespace config_repo {
 
 static const char *kConfigSubtree = "/etc/cvmfs";
+
 static const unsigned kDefaultTimeout = 10;
 static const char *kCacheInstance = "cfgfetch";
 // Same as FileSystem::kDefaultCacheBase
@@ -282,9 +290,64 @@ static void ClearCvmfsEnvironment() {
 }
 
 
-static bool BootstrapAndFetch(const string &config_repo, bool simple_parser,
-                              const string &workspace, unsigned timeout_s,
-                              ConfigRepoTree *tree, string *error) {
+/**
+ * Downloads only the manifest to get the current root catalog hash.  It is
+ * not verified: a forged "changed" only triggers a verified fetch, and a forged
+ * "unchanged" is no worse than blocking the download.
+ */
+static bool ProbeRootHash(OptionsManager *options_mgr, string *root_hash,
+                          string *error) {
+  perf::Statistics statistics;
+  download::DownloadManager download_mgr(
+      1, perf::StatisticsTemplate("download", &statistics));
+  string proxies;
+  string fallback_proxies;
+  options_mgr->GetValue("CVMFS_HTTP_PROXY", &proxies);
+  options_mgr->GetValue("CVMFS_FALLBACK_PROXY", &fallback_proxies);
+  download_mgr.SetProxyChain(proxies, fallback_proxies,
+                             download::DownloadManager::kSetProxyBoth);
+  string optarg;
+  if (options_mgr->GetValue("CVMFS_SERVER_URL", &optarg))
+    download_mgr.SetHostChain(optarg);
+  unsigned timeout = 5;
+  unsigned timeout_direct = 10;
+  if (options_mgr->GetValue("CVMFS_TIMEOUT", &optarg))
+    timeout = String2Uint64(optarg);
+  if (options_mgr->GetValue("CVMFS_TIMEOUT_DIRECT", &optarg))
+    timeout_direct = String2Uint64(optarg);
+  download_mgr.SetTimeout(timeout, timeout_direct);
+
+  const string url = "/.cvmfspublished";
+  cvmfs::MemSink sink;
+  download::JobInfo job(&url, false, true /* probe hosts */, NULL, &sink);
+  const download::Failures retval = download_mgr.Fetch(&job);
+  if (retval != download::kFailOk) {
+    *error = string("manifest download failed: ")
+             + download::Code2Ascii(retval);
+    return false;
+  }
+  manifest::Manifest *manifest = manifest::Manifest::LoadMem(sink.data(),
+                                                             sink.pos());
+  if (manifest == NULL) {
+    *error = "invalid manifest";
+    return false;
+  }
+  *root_hash = manifest->catalog_hash().ToString();
+  delete manifest;
+  return true;
+}
+
+
+/**
+ * Returns kFetchUnchanged without a full fetch if expected_root_hash is
+ * still current.
+ */
+static FetchStatus BootstrapAndFetch(const string &config_repo,
+                                     bool simple_parser,
+                                     const string &workspace,
+                                     unsigned timeout_s,
+                                     const string &expected_root_hash,
+                                     ConfigRepoTree *tree, string *error) {
   ClearCvmfsEnvironment();
   OptionsTemplateManager *templ = new DefaultOptionsTemplateManager(
       config_repo);
@@ -296,40 +359,91 @@ static bool BootstrapAndFetch(const string &config_repo, bool simple_parser,
   options_mgr->set_taint_environment(false);
   options_mgr->ParseDefault(config_repo);
   PrepareFetchOptions(workspace, timeout_s, options_mgr);
-  return FetchInProcess(config_repo, options_mgr, tree, error);
+  if (!expected_root_hash.empty()) {
+    string root_hash;
+    if (!ProbeRootHash(options_mgr, &root_hash, error))
+      return kFetchFailed;
+    if (root_hash == expected_root_hash)
+      return kFetchUnchanged;
+  }
+  return FetchInProcess(config_repo, options_mgr, tree, error) ? kFetchOk
+                                                               : kFetchFailed;
 }
 
 
-bool FetchTree(const string &config_repo, bool simple_parser,
-               const string &workspace, unsigned timeout_s,
-               ConfigRepoTree *tree, string *error) {
+/**
+ * Writes the fetch result to fd: 'O' + serialized tree, 'U' for unchanged, or
+ * 'E' + error.
+ */
+static bool WriteResult(int fd, FetchStatus status, const ConfigRepoTree &tree,
+                        const string &error) {
+  string payload;
+  switch (status) {
+    case kFetchOk:
+      payload = "O" + tree.Serialize();
+      break;
+    case kFetchUnchanged:
+      payload = "U";
+      break;
+    case kFetchFailed:
+      payload = "E" + error;
+      break;
+  }
+  return SafeWrite(fd, payload.data(), payload.size());
+}
+
+
+int MainConfigFetch(int argc, char **argv) {
+  // cvmfs2 __config_fetch__ <result fd> <config repo> <simple parser>
+  //                         <workspace> <timeout> [<expected root hash>]
+  if ((argc != 7) && (argc != 8))
+    return 1;
+  // Not stdout, which logging may write to
+  const int fd_result = String2Int64(argv[2]);
+  const string config_repo = argv[3];
+  const bool simple_parser = (string(argv[4]) == "1");
+  const string workspace = argv[5];
+  const unsigned timeout_s = String2Uint64(argv[6]);
+  const string expected_root_hash = (argc == 8) ? argv[7] : "";
+  ConfigRepoTree tree;
+  string error;
+  const FetchStatus status = BootstrapAndFetch(
+      config_repo, simple_parser, workspace, timeout_s, expected_root_hash,
+      &tree, &error);
+  return WriteResult(fd_result, status, tree, error) ? 0 : 1;
+}
+
+
+FetchStatus FetchTree(const string &config_repo, bool simple_parser,
+                      const string &workspace, unsigned timeout_s,
+                      const string &expected_root_hash, ConfigRepoTree *tree,
+                      string *error) {
+  // A fresh process instead of a plain fork: the caller can be multi-threaded
+  // (e.g. the remount thread), so locks may be held in a forked copy
   int pipe_result[2];
   MakePipe(pipe_result);
-  const pid_t pid = fork();
-  if (pid < 0) {
+  vector<string> command_line;
+  command_line.push_back(platform_getexepath());
+  command_line.push_back("__config_fetch__");
+  command_line.push_back(StringifyInt(pipe_result[1]));
+  command_line.push_back(config_repo);
+  command_line.push_back(simple_parser ? "1" : "0");
+  command_line.push_back(workspace);
+  command_line.push_back(StringifyUint(timeout_s));
+  if (!expected_root_hash.empty())
+    command_line.push_back(expected_root_hash);
+
+  set<int> preserve_fildes;
+  preserve_fildes.insert(2);
+  preserve_fildes.insert(pipe_result[1]);
+  pid_t pid;
+  if (!ManagedExec(command_line, preserve_fildes, map<int, int>(),
+                   false /* drop_credentials */, false /* clear_env */,
+                   false /* double_fork */, &pid)) {
     close(pipe_result[0]);
     close(pipe_result[1]);
-    *error = "fork failed";
-    return false;
-  }
-  if (pid == 0) {
-    close(pipe_result[0]);
-    ConfigRepoTree child_tree;
-    string child_error;
-    const bool ok = BootstrapAndFetch(config_repo, simple_parser, workspace,
-                                      timeout_s, &child_tree, &child_error);
-    const char status = ok ? 'O' : 'E';
-    bool written = SafeWrite(pipe_result[1], &status, 1);
-    if (ok) {
-      const string buf = child_tree.Serialize();
-      written = written && SafeWrite(pipe_result[1], buf.data(), buf.size());
-    } else {
-      written = written
-                && SafeWrite(pipe_result[1], child_error.data(),
-                             child_error.size());
-    }
-    // Don't run destructors or atexit handlers of the parent's state
-    _exit(written ? 0 : 1);
+    *error = "failed to start " + command_line[0];
+    return kFetchFailed;
   }
 
   close(pipe_result[1]);
@@ -381,22 +495,24 @@ bool FetchTree(const string &config_repo, bool simple_parser,
   if (timed_out) {
     if (error->empty())
       *error = "timeout after " + StringifyUint(timeout_s) + "s";
-    return false;
+    return kFetchFailed;
   }
   if (!WIFEXITED(statloc) || (WEXITSTATUS(statloc) != 0) || output.empty()) {
     *error = "fetch process failed";
-    return false;
+    return kFetchFailed;
   }
   if (output[0] == 'E') {
     *error = output.substr(1);
-    return false;
+    return kFetchFailed;
   }
+  if (output == "U")
+    return kFetchUnchanged;
 
   if (!ConfigRepoTree::Deserialize(output.substr(1), tree)) {
     *error = "malformed fetch result";
-    return false;
+    return kFetchFailed;
   }
-  return true;
+  return kFetchOk;
 }
 
 
@@ -411,7 +527,8 @@ static unsigned GetTimeout(const OptionsManager &options_mgr) {
 }
 
 
-FetchResult FetchForRepository(const string &fqrn, bool simple_parser) {
+FetchResult FetchForRepository(const string &fqrn, bool simple_parser,
+                               const string &expected_root_hash) {
   FetchResult result;
   OptionsManager *local_mgr;
   if (simple_parser)
@@ -443,14 +560,16 @@ FetchResult FetchForRepository(const string &fqrn, bool simple_parser) {
   }
 
   ConfigRepoTree *tree = new ConfigRepoTree();
-  if (FetchTree(result.config_repo, simple_parser,
-                cache_base + "/config-fetch/" + fqrn, timeout_s, tree,
-                &result.error)) {
+  const FetchStatus status = FetchTree(
+      result.config_repo, simple_parser, cache_base + "/config-fetch/" + fqrn,
+      timeout_s, expected_root_hash, tree, &result.error);
+  result.unchanged = (status == kFetchUnchanged);
+  if (status == kFetchOk)
     result.tree.reset(tree);
-  } else {
+  else
     delete tree;
-  }
   return result;
 }
+
 
 }  // namespace config_repo

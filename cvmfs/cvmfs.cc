@@ -3037,6 +3037,9 @@ static int AltProcessFlavor(int argc, char **argv) {
   if (strcmp(argv[1], "__wpad__") == 0) {
     return download::MainResolveProxyDescription(argc, argv);
   }
+  if (strcmp(argv[1], "__config_fetch__") == 0) {
+    return config_repo::MainConfigFetch(argc, argv);
+  }
   return 1;
 }
 

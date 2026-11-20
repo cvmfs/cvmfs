@@ -71,6 +71,17 @@ FuseRemounter::Status FuseRemounter::Check() {
   if (IsInMaintenanceMode())
     return kStatusMaintenance;
 
+  // Blacklists can block new revisions, so they must be current before a
+  // remount.  If that cannot be established, stay on the current revision.
+  if (mountpoint_->RefreshConfigRepo() == MountPoint::kConfigRepoUnknown) {
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+             "config repository blacklist may be outdated, "
+             "postponing catalog update");
+    catalogs_valid_until_ = time(NULL) + MountPoint::kShortTermTTL;
+    SetAlarm(MountPoint::kShortTermTTL);
+    return kStatusFailGeneral;
+  }
+
   LogCvmfs(kLogCvmfs, kLogDebug,
            "catalog TTL expired, checking revision against blacklists");
   if (mountpoint_->ReloadBlacklists()

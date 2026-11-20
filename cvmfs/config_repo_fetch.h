@@ -37,19 +37,33 @@ void RewriteProxies(std::string *proxies, std::string *fallback_proxies);
 void PrepareFetchOptions(const std::string &workspace, unsigned timeout_s,
                          OptionsManager *options_mgr);
 
+enum FetchStatus {
+  kFetchOk,
+  kFetchUnchanged,  ///< root hash equals the expected one, nothing fetched
+  kFetchFailed,
+};
+
 /**
- * Fetches the etc/cvmfs subtree of config_repo in a forked child process,
- * which parses the local configuration of config_repo for the server
- * settings.  The child is killed after timeout_s seconds.
+ * Fetches the etc/cvmfs subtree of config_repo in a helper process, which
+ * parses the local configuration of config_repo for the server settings.  If
+ * expected_root_hash is given, only the manifest is downloaded as long as it
+ * still matches.  The helper is killed after timeout_s seconds.
  */
-bool FetchTree(const std::string &config_repo, bool simple_parser,
-               const std::string &workspace, unsigned timeout_s,
-               ConfigRepoTree *tree, std::string *error);
+FetchStatus FetchTree(const std::string &config_repo, bool simple_parser,
+                      const std::string &workspace, unsigned timeout_s,
+                      const std::string &expected_root_hash,
+                      ConfigRepoTree *tree, std::string *error);
+
+/**
+ * Entry point of "cvmfs2 __config_fetch__", started by FetchTree().
+ */
+int MainConfigFetch(int argc, char **argv);
 
 struct FetchResult {
-  FetchResult() : mode(kFetchMount), required(false) { }
+  FetchResult() : mode(kFetchMount), required(false), unchanged(false) { }
   FetchMode mode;
-  bool required;  ///< CVMFS_CONFIG_REPO_REQUIRED
+  bool required;   ///< CVMFS_CONFIG_REPO_REQUIRED
+  bool unchanged;  ///< expected root hash still current, tree is NULL
   std::string config_repo;
   std::string error;
   std::shared_ptr<const ConfigRepoTree> tree;  ///< NULL on failure or mount
@@ -57,9 +71,11 @@ struct FetchResult {
 
 /**
  * Reads the fetch mode from the local configuration and, unless it is
- * "mount", fetches the config repository for repository fqrn.
+ * "mount", fetches the config repository for repository fqrn.  See FetchTree()
+ * for expected_root_hash.
  */
-FetchResult FetchForRepository(const std::string &fqrn, bool simple_parser);
+FetchResult FetchForRepository(const std::string &fqrn, bool simple_parser,
+                               const std::string &expected_root_hash = "");
 
 }  // namespace config_repo
 

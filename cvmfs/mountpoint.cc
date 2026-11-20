@@ -41,6 +41,7 @@
 #include "catalog.h"
 #include "catalog_mgr_client.h"
 #include "clientctx.h"
+#include "config_repo_fetch.h"
 #include "crypto/signature.h"
 #include "duplex_sqlite3.h"
 #include "fetch.h"
@@ -71,6 +72,7 @@
 #include "telemetry_aggregator.h"
 #include "tracer.h"
 #include "util/logging.h"
+#include "util/mutex.h"
 #include "util/posix.h"
 #include "util/string.h"
 #include "util/uuid.h"
@@ -1242,8 +1244,24 @@ bool MountPoint::CheckBlacklists() {
 bool MountPoint::ReloadBlacklists() {
   const bool result = true;
   bool append = false;
+  std::shared_ptr<const ConfigRepoTree> tree;
+  {
+    const MutexLockGuard guard(&lock_config_repo_);
+    tree = options_mgr_->config_repo_tree();
+  }
+  string mount_dir;
+  options_mgr_->GetValue("CVMFS_MOUNT_DIR", &mount_dir);
   for (unsigned i = 0; i < blacklist_paths_.size(); ++i) {
     const string blacklist = blacklist_paths_[i];
+    string rel_path;
+    if (tree && tree->MapMountPath(mount_dir, blacklist, &rel_path)) {
+      string content;
+      if (tree->Lookup(rel_path, &content)) {
+        signature_mgr_->LoadBlacklistMem(content, append);
+        append = true;
+      }
+      continue;
+    }
     if (FileExists(blacklist)) {
       const bool retval = signature_mgr_->LoadBlacklist(blacklist, append);
       // TODO(jblomer): this can leave us with a half-loaded blacklist
@@ -1254,6 +1272,37 @@ bool MountPoint::ReloadBlacklists() {
   }
   return result;
 }
+
+MountPoint::ConfigRepoState MountPoint::RefreshConfigRepo() {
+  const MutexLockGuard guard(&lock_config_repo_);
+  const std::shared_ptr<const ConfigRepoTree> tree = options_mgr_
+                                                         ->config_repo_tree();
+  if (!tree || tree->root_hash.empty())
+    return kConfigRepoNotFetched;
+
+  const bool simple_parser = dynamic_cast<SimpleOptionsParser *>(options_mgr_)
+                             != NULL;
+  const config_repo::FetchResult fetch = config_repo::FetchForRepository(
+      fqrn_, simple_parser, tree->root_hash);
+  if (fetch.mode == config_repo::kFetchMount)
+    return kConfigRepoNotFetched;
+  if (fetch.unchanged)
+    return kConfigRepoCurrent;
+  if (!fetch.tree || fetch.tree->root_hash.empty()) {
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+             "failed to check config repository %s (%s)",
+             fetch.config_repo.c_str(), fetch.error.c_str());
+    return kConfigRepoUnknown;
+  }
+  // Only the blacklist is taken from the new tree; other options change on
+  // the next reload
+  options_mgr_->set_config_repo_tree(fetch.tree);
+  LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
+           "config repository %s changed to revision %" PRIu64,
+           fetch.tree->fqrn.c_str(), fetch.tree->revision);
+  return kConfigRepoCurrent;
+}
+
 
 /**
  * Disables kernel caching of symlinks.
@@ -2087,13 +2136,16 @@ MountPoint::MountPoint(const string &fqrn,
     , talk_socket_path_(std::string("./cvmfs_io.") + fqrn)
     , talk_socket_uid_(0)
     , talk_socket_gid_(0) {
-  const int retval = pthread_mutex_init(&lock_max_ttl_, NULL);
+  int retval = pthread_mutex_init(&lock_max_ttl_, NULL);
+  assert(retval == 0);
+  retval = pthread_mutex_init(&lock_config_repo_, NULL);
   assert(retval == 0);
 }
 
 
 MountPoint::~MountPoint() {
   pthread_mutex_destroy(&lock_max_ttl_);
+  pthread_mutex_destroy(&lock_config_repo_);
 
   // The bundle prefetcher owns background threads that use the catalog
   // manager, the fetchers and the cache manager; join them before any of
