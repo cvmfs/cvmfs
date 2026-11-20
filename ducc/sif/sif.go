@@ -100,16 +100,21 @@ type Descriptor struct {
 	Name   string `json:"name,omitempty"`
 	Offset int64  `json:"offset"`
 	Size   int64  `json:"size"`
+	// Digest of an OCI blob ("sha256:HEX"), as recorded by the SIF writer.
+	Digest string `json:"digest,omitempty"`
 }
 
 // Image is the parsed metadata of a SIF file or bare squashfs image.
 type Image struct {
-	Bare      bool // bare squashfs, no SIF container
-	UUID      string
-	Created   time.Time
-	Arch      string
-	Signed    bool
-	Descs     []Descriptor
+	Bare    bool // bare squashfs, no SIF container
+	UUID    string
+	Created time.Time
+	Arch    string
+	Signed  bool
+	Descs   []Descriptor
+	// OCI is set for an OCI-SIF: the root filesystem is in the layer blobs
+	// (see ReadOCI) and PartStart/PartSize are unset.
+	OCI       bool
 	PartStart int64
 	PartSize  int64
 	// headerDigest is sha256(global header || descriptor table); empty for
@@ -192,7 +197,11 @@ func Parse(r io.ReaderAt, size int64) (*Image, error) {
 			return nil, fmt.Errorf("SIF descriptor %d: object %d+%d outside image of %d bytes",
 				d.ID, d.Offset, d.Size, size)
 		}
-		im.Descs = append(im.Descs, Descriptor{d.DataType, d.ID, cstring(d.Name[:]), d.Offset, d.Size})
+		desc := Descriptor{Type: d.DataType, ID: d.ID, Name: cstring(d.Name[:]), Offset: d.Offset, Size: d.Size}
+		if d.DataType == DataOCIRootIndex || d.DataType == DataOCIBlob {
+			desc.Digest = cstring(d.Extra[:])
+		}
+		im.Descs = append(im.Descs, desc)
 		switch d.DataType {
 		case DataSignature:
 			im.Signed = true
@@ -227,7 +236,8 @@ func Parse(r io.ReaderAt, size int64) (*Image, error) {
 	}
 	if primary == nil {
 		if hasOCI {
-			return nil, fmt.Errorf("OCI-SIF images are not supported yet")
+			im.OCI = true
+			return im, nil
 		}
 		return nil, fmt.Errorf("SIF has no primary system partition")
 	}

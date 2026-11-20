@@ -17,9 +17,15 @@ type FS struct {
 	mdMu    sync.Mutex
 	mdCache map[uint64]*mdBlock
 
-	ids        []uint32
-	frags      []fragment
-	xattrCount []uint32 // per xattr id: number of key/value pairs
+	ids     []uint32
+	frags   []fragment
+	xattrs  []xattrID
+	xattrKV uint64 // start of the xattr key/value metadata blocks
+}
+
+type xattrID struct {
+	ref   uint64 // (block offset in the kv table << 16) | offset
+	count uint32 // number of key/value pairs
 }
 
 type fragment struct {
@@ -92,11 +98,86 @@ func (fs *FS) readXattrIDs() error {
 	if err != nil {
 		return err
 	}
-	fs.xattrCount = make([]uint32, count)
-	for i := range fs.xattrCount {
-		fs.xattrCount[i] = binary.LittleEndian.Uint32(raw[i*16+8:])
+	fs.xattrKV = binary.LittleEndian.Uint64(hdr[:])
+	if fs.xattrKV >= start {
+		return fmt.Errorf("xattr table offset %d out of range", fs.xattrKV)
+	}
+	fs.xattrs = make([]xattrID, count)
+	for i := range fs.xattrs {
+		fs.xattrs[i] = xattrID{binary.LittleEndian.Uint64(raw[i*16:]), binary.LittleEndian.Uint32(raw[i*16+8:])}
 	}
 	return nil
+}
+
+type Xattr struct {
+	Name  string
+	Value []byte
+}
+
+const (
+	maxXattrs        = 1024
+	maxXattrNameLen  = 255
+	maxXattrValueLen = 64 << 10
+	xattrOutOfLine   = 0x100
+)
+
+var xattrPrefixes = [...]string{"user.", "trusted.", "security."}
+
+// Xattrs reads the extended attributes of entry e. It reads metadata blocks
+// that BuildIndex may not have touched, so it is meant for the few entries
+// whose attributes matter (overlayfs opaque directories).
+func (fs *FS) Xattrs(e *Entry) ([]Xattr, error) {
+	if e.Xattrs == 0 {
+		return nil, nil
+	}
+	x := fs.xattrs[e.XattrID]
+	if x.count > maxXattrs {
+		return nil, fmt.Errorf("xattr id %d: %d attributes", e.XattrID, x.count)
+	}
+	limit := fs.sb.XattrIDTableStart
+	c := fs.cursor(fs.xattrKV+x.ref>>16, int(x.ref&0xffff), limit)
+	out := make([]Xattr, 0, x.count)
+	for i := uint32(0); i < x.count; i++ {
+		var k struct{ Type, NameSize uint16 }
+		if err := c.readStruct(&k); err != nil {
+			return nil, err
+		}
+		prefix := k.Type &^ xattrOutOfLine
+		if int(prefix) >= len(xattrPrefixes) || k.NameSize > maxXattrNameLen {
+			return nil, fmt.Errorf("xattr id %d: invalid key type %d / length %d", e.XattrID, k.Type, k.NameSize)
+		}
+		name := make([]byte, k.NameSize)
+		if err := c.read(name); err != nil {
+			return nil, err
+		}
+		v, err := readXattrValue(c)
+		if err != nil {
+			return nil, err
+		}
+		if k.Type&xattrOutOfLine != 0 {
+			if len(v) != 8 {
+				return nil, fmt.Errorf("xattr id %d: out-of-line reference of %d bytes", e.XattrID, len(v))
+			}
+			ref := binary.LittleEndian.Uint64(v)
+			if v, err = readXattrValue(fs.cursor(fs.xattrKV+ref>>16, int(ref&0xffff), limit)); err != nil {
+				return nil, err
+			}
+		}
+		out = append(out, Xattr{xattrPrefixes[prefix] + string(name), v})
+	}
+	return out, nil
+}
+
+func readXattrValue(c *mdCursor) ([]byte, error) {
+	n, err := c.u32()
+	if err != nil {
+		return nil, err
+	}
+	if n > maxXattrValueLen {
+		return nil, fmt.Errorf("xattr value of %d bytes", n)
+	}
+	v := make([]byte, n)
+	return v, c.read(v)
 }
 
 func (fs *FS) Superblock() Superblock { return *fs.sb }

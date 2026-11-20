@@ -49,7 +49,7 @@ var (
 func init() {
 	f := convertSIFCmd.Flags()
 	f.StringVar(&sifName, "name", "", "public path below sif/ (e.g. lhcb/analysis:v3); defaults to registry/repository:tag for oras:// sources")
-	f.StringVar(&sifDigest, "digest", "", "override the image ID (sha256:HEX); default is a hash of the SIF header and descriptors")
+	f.StringVar(&sifDigest, "digest", "", "override the image ID (sha256:HEX); default is the oras blob digest, the OCI config digest for OCI-SIFs, else a hash of the SIF header and descriptors")
 	f.BoolVar(&sifForce, "force", false, "ingest again even if the image is already present")
 	f.IntVarP(&sifAttempts, "attempts", "r", 1, "number of attempts for the whole conversion")
 	f.BoolVar(&sifAllowNoSingDir, "allow-missing-singularity-d", false, "publish images without /.singularity.d")
@@ -108,9 +108,10 @@ var convertSIFCmd = &cobra.Command{
 	Use:   "convert-sif <sif file or URL> [<cvmfs repository>]",
 	Short: "Publish the root filesystem of a SIF image as a flat image",
 	Long: `Streams the squashfs partition of a SIF image into 'cvmfs_server ingest'
-without unpacking it locally. The source can be a local path or an http(s)
-URL served with range-request support. The image is stored at
-.flat/<xx>/<id> and linked from sif/<name>.`,
+without unpacking it locally. For an OCI-SIF the squashfs layers are merged
+in the same stream and a /.singularity.d is generated from the OCI config.
+The source can be a local path or an http(s) URL served with range-request
+support. The image is stored at .flat/<xx>/<id> and linked from sif/<name>.`,
 	Args: cobra.RangeArgs(1, 2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx, cancel := context.WithCancel(context.Background())
@@ -196,7 +197,7 @@ func sifInspectOnly(ctx context.Context, source string, sopts sif.SourceOptions)
 		}
 		sopts := sifStreamOptions()
 		sopts.Logger = l.Log()
-		if st, err = sif.Stream(ctx, w, in.FS, in.Index, sopts); err != nil {
+		if st, err = sif.StreamTree(ctx, w, in.Tree, sopts); err != nil {
 			return err
 		}
 	}
@@ -216,9 +217,9 @@ func sifInspectOnly(ctx context.Context, source string, sopts sif.SourceOptions)
 	}{
 		Provenance: sif.NewProvenance(sif.ConvertOptions{Source: source}, in, &res),
 		FlatPath:   res.FlatPath, PublicPath: res.PublicPath,
-		Entries: len(in.Index.Entries), IndexTime: indexTime.Seconds(),
+		Entries: len(in.Tree.Index.Entries), IndexTime: indexTime.Seconds(),
 		StreamTime: st.Elapsed.Seconds(),
-		FetchRatio: float64(res.Source.BytesFetched) / float64(in.Image.PartSize),
+		FetchRatio: float64(res.Source.BytesFetched) / float64(in.DataSize()),
 	}
 	out := os.Stdout
 	if sifEmitTar == "-" {

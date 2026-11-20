@@ -30,6 +30,12 @@ func FuzzImage(f *testing.F) {
 				if s, err := os.ReadFile(sifPath); err == nil {
 					f.Add(s)
 				}
+				upper := filepath.Join(dir, comp+"-upper.sqfs")
+				mklayer(f, src, upper, "wh c 644 0 0 0 0", "d x trusted.overlay.opaque=y")
+				writeOCISIF(f, newOCIParts(f, []string{img, upper}, testConfig()), sifPath)
+				if s, err := os.ReadFile(sifPath); err == nil {
+					f.Add(s)
+				}
 			}
 		}
 	}
@@ -37,6 +43,18 @@ func FuzzImage(f *testing.F) {
 		r := bytes.NewReader(data)
 		im, err := Parse(r, int64(len(data)))
 		if err != nil {
+			return
+		}
+		opts := DefaultStreamOptions()
+		opts.Workers = 2
+		if im.OCI {
+			o, err := im.ReadOCI(r)
+			if err != nil {
+				return
+			}
+			if t, _, err := BuildOCITree(r, o, 1<<14); err == nil {
+				StreamTree(context.Background(), io.Discard, t, opts)
+			}
 			return
 		}
 		fs, err := squashfs.Open(im.Partition(r), im.PartSize)
@@ -47,8 +65,6 @@ func FuzzImage(f *testing.F) {
 		if err != nil {
 			return
 		}
-		opts := DefaultStreamOptions()
-		opts.Workers = 2
 		Stream(context.Background(), io.Discard, fs, ix, opts)
 	})
 }

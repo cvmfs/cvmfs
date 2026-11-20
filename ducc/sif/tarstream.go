@@ -72,7 +72,8 @@ type StreamStats struct {
 // A negative element -(d+1) stands for a synthetic marker in directory d;
 // ownMarker maps directories to the image's own regular .cvmfscatalog file,
 // which is emitted in its place.
-func Order(fs *squashfs.FS, ix *squashfs.Index, catalogs map[int32]bool, ownMarker map[int32]int32) ([]int32, []int32) {
+func Order(t *Tree, catalogs map[int32]bool, ownMarker map[int32]int32) ([]int32, []int32) {
+	ix := t.Index
 	n := len(ix.Entries)
 	catOf := make([]int32, n)
 	members := map[int32][]int32{}
@@ -98,13 +99,18 @@ func Order(fs *squashfs.FS, ix *squashfs.Index, catalogs map[int32]bool, ownMark
 		}
 	}
 
-	key := func(i int32) (uint64, uint32) {
-		e := &ix.Entries[i]
-		if len(e.Blocks) > 0 {
-			return e.BlocksStart, 0
+	// Generated files sort first; layers are read one after the other.
+	key := func(i int32) (int, uint64, uint32) {
+		if _, ok := t.inlineData(i); ok {
+			return -1, 0, 0
 		}
-		pos, _, _ := fs.Fragment(e.Frag)
-		return pos, e.FragOff
+		e := &ix.Entries[i]
+		l := t.layerOf(i)
+		if len(e.Blocks) > 0 {
+			return l, e.BlocksStart, 0
+		}
+		pos, _, _ := t.Layers[l].Fragment(e.Frag)
+		return l, pos, e.FragOff
 	}
 	hasData := func(i int32) bool {
 		e := &ix.Entries[i]
@@ -128,8 +134,11 @@ func Order(fs *squashfs.FS, ix *squashfs.Index, catalogs map[int32]bool, ownMark
 			if da != db || !da {
 				return !da && db
 			}
-			pa, oa := key(group[a])
-			pb, ob := key(group[b])
+			la, pa, oa := key(group[a])
+			lb, pb, ob := key(group[b])
+			if la != lb {
+				return la < lb
+			}
 			if pa != pb {
 				return pa < pb
 			}
@@ -188,6 +197,8 @@ func PlaceCatalogs(ix *squashfs.Index, max, min int) map[int32]bool {
 }
 
 type blockJob struct {
+	fs     *squashfs.FS
+	layer  int
 	pos    uint64
 	word   uint32
 	want   int
@@ -206,7 +217,13 @@ type blockResult struct {
 // Stream writes the image as a tar archive to w. Names are relative to the
 // image root; the root directory itself is not emitted.
 func Stream(ctx context.Context, w io.Writer, fs *squashfs.FS, ix *squashfs.Index, opts StreamOptions) (StreamStats, error) {
+	return StreamTree(ctx, w, SingleTree(fs, ix), opts)
+}
+
+// StreamTree is Stream for a tree merged from several layers.
+func StreamTree(ctx context.Context, w io.Writer, t *Tree, opts StreamOptions) (StreamStats, error) {
 	start := time.Now()
+	ix := t.Index
 	logger := opts.Logger
 	if logger == nil {
 		logger = log.NewEntry(log.StandardLogger())
@@ -214,7 +231,12 @@ func Stream(ctx context.Context, w io.Writer, fs *squashfs.FS, ix *squashfs.Inde
 	if opts.Workers <= 0 {
 		opts.Workers = 1
 	}
-	bs := fs.BlockSize()
+	bs := 0
+	for _, fs := range t.Layers {
+		if fs.BlockSize() > bs {
+			bs = fs.BlockSize()
+		}
+	}
 	tokens := opts.WindowBytes / bs
 	if tokens < 2*opts.Workers {
 		tokens = 2 * opts.Workers
@@ -244,8 +266,8 @@ func Stream(ctx context.Context, w io.Writer, fs *squashfs.FS, ix *squashfs.Inde
 		}
 	}
 
-	order, catOf := Order(fs, ix, catalogs, ownMarker)
-	targets := linkTargets(ix, order, catOf, opts.ContiguousCatalogs)
+	order, catOf := Order(t, catalogs, ownMarker)
+	targets := linkTargets(t, order, catOf, opts.ContiguousCatalogs)
 	secondLink := func(i int32) (int32, bool) {
 		t, ok := targets[i]
 		return t, ok
@@ -255,7 +277,7 @@ func Stream(ctx context.Context, w io.Writer, fs *squashfs.FS, ix *squashfs.Inde
 	defer cancel()
 
 	pool := sync.Pool{New: func() interface{} { return make([]byte, bs) }}
-	frags := newFragCache(fs, opts.FragmentCache)
+	frags := newFragCache(t.Layers, opts.FragmentCache)
 	work := make(chan *blockJob, tokens)
 	ordered := make(chan *blockJob, tokens)
 	sem := make(chan struct{}, tokens)
@@ -271,7 +293,7 @@ func Stream(ctx context.Context, w io.Writer, fs *squashfs.FS, ix *squashfs.Inde
 					continue
 				}
 				if j.frag {
-					data, err := frags.get(j.fragID)
+					data, err := frags.get(j.layer, j.fragID)
 					if err == nil && j.off+j.want > len(data) {
 						err = fmt.Errorf("fragment %d: tail %d+%d beyond %d bytes", j.fragID, j.off, j.want, len(data))
 					}
@@ -283,7 +305,7 @@ func Stream(ctx context.Context, w io.Writer, fs *squashfs.FS, ix *squashfs.Inde
 					continue
 				}
 				buf := pool.Get().([]byte)
-				data, err := fs.ReadBlock(buf[:0], j.pos, j.word, j.want)
+				data, err := j.fs.ReadBlock(buf[:0], j.pos, j.word, j.want)
 				j.res <- blockResult{data: data, buf: buf, err: err}
 			}
 		}()
@@ -304,7 +326,10 @@ func Stream(ctx context.Context, w io.Writer, fs *squashfs.FS, ix *squashfs.Inde
 			if _, ok := secondLink(i); ok {
 				continue
 			}
-			for _, j := range fileJobs(e, bs) {
+			if _, ok := t.inlineData(i); ok {
+				continue
+			}
+			for _, j := range fileJobs(e, t.fsOf(i), t.layerOf(i)) {
 				select {
 				case sem <- struct{}{}:
 				case <-ctx.Done():
@@ -325,7 +350,7 @@ func Stream(ctx context.Context, w io.Writer, fs *squashfs.FS, ix *squashfs.Inde
 		}
 	}()
 
-	err := writeTar(ctx, w, ix, order, skip, secondLink, ordered, sem, &pool, &st)
+	err := writeTar(ctx, w, t, order, skip, secondLink, ordered, sem, &pool, &st)
 	cancel()
 	for range ordered {
 	}
@@ -341,7 +366,8 @@ func isLink(e *squashfs.Entry) bool { return e.Nlink > 1 && e.Kind != squashfs.K
 // into its own catalog or an enclosing one, since other catalogs are
 // already finalised; otherwise the path carries the data itself (storage
 // deduplicates it).
-func linkTargets(ix *squashfs.Index, order, catOf []int32, contiguous bool) map[int32]int32 {
+func linkTargets(t *Tree, order, catOf []int32, contiguous bool) map[int32]int32 {
+	ix := t.Index
 	reachable := func(from, to int32) bool {
 		for c := from; ; {
 			if c == to {
@@ -353,7 +379,8 @@ func linkTargets(ix *squashfs.Index, order, catOf []int32, contiguous bool) map[
 			c = catOf[ix.Entries[c].Parent]
 		}
 	}
-	carriers := map[uint32][]int32{}
+	// Inode numbers are per layer.
+	carriers := map[uint64][]int32{}
 	targets := map[int32]int32{}
 	for _, i := range order {
 		if i < 0 {
@@ -364,7 +391,8 @@ func linkTargets(ix *squashfs.Index, order, catOf []int32, contiguous bool) map[
 			continue
 		}
 		linked := false
-		for _, c := range carriers[e.Inode] {
+		inode := uint64(t.layerOf(i))<<32 | uint64(e.Inode)
+		for _, c := range carriers[inode] {
 			if !contiguous || reachable(catOf[i], catOf[c]) {
 				targets[i] = c
 				linked = true
@@ -372,13 +400,14 @@ func linkTargets(ix *squashfs.Index, order, catOf []int32, contiguous bool) map[
 			}
 		}
 		if !linked {
-			carriers[e.Inode] = append(carriers[e.Inode], i)
+			carriers[inode] = append(carriers[inode], i)
 		}
 	}
 	return targets
 }
 
-func fileJobs(e *squashfs.Entry, bs int) []*blockJob {
+func fileJobs(e *squashfs.Entry, fs *squashfs.FS, layer int) []*blockJob {
+	bs := fs.BlockSize()
 	jobs := make([]*blockJob, 0, len(e.Blocks)+1)
 	pos := e.BlocksStart
 	remaining := int64(e.Size)
@@ -387,20 +416,21 @@ func fileJobs(e *squashfs.Entry, bs int) []*blockJob {
 		if remaining < int64(bs) {
 			want = int(remaining)
 		}
-		jobs = append(jobs, &blockJob{pos: pos, word: w, want: want})
+		jobs = append(jobs, &blockJob{fs: fs, layer: layer, pos: pos, word: w, want: want})
 		pos += uint64(w & (1<<24 - 1))
 		remaining -= int64(want)
 	}
 	if tail := e.TailSize(bs); tail > 0 {
-		jobs = append(jobs, &blockJob{frag: true, fragID: e.Frag, off: int(e.FragOff), want: tail})
+		jobs = append(jobs, &blockJob{fs: fs, layer: layer, frag: true, fragID: e.Frag, off: int(e.FragOff), want: tail})
 	}
 	return jobs
 }
 
-func writeTar(ctx context.Context, w io.Writer, ix *squashfs.Index, order []int32,
+func writeTar(ctx context.Context, w io.Writer, t *Tree, order []int32,
 	skip map[int32]bool, secondLink func(int32) (int32, bool),
 	ordered <-chan *blockJob, sem chan struct{}, pool *sync.Pool, st *StreamStats) error {
 
+	ix := t.Index
 	tw := tar.NewWriter(w)
 	hdr := func(e *squashfs.Entry, name string) *tar.Header {
 		return &tar.Header{
@@ -485,6 +515,13 @@ func writeTar(ctx context.Context, w io.Writer, ix *squashfs.Index, order []int3
 		if e.Size == 0 {
 			continue
 		}
+		if data, ok := t.inlineData(i); ok {
+			if _, err := tw.Write(data); err != nil {
+				return err
+			}
+			st.Bytes += int64(len(data))
+			continue
+		}
 		var written int64
 		for written < int64(e.Size) {
 			var j *blockJob
@@ -518,28 +555,29 @@ func writeTar(ctx context.Context, w io.Writer, ix *squashfs.Index, order []int3
 // fragCache keeps decompressed fragment blocks; files sharing a fragment
 // are adjacent in emission order, so a small LRU suffices.
 type fragCache struct {
-	fs    *squashfs.FS
-	max   int
-	mu    sync.Mutex
-	lru   *list.List
-	items map[uint32]*list.Element
+	layers []*squashfs.FS
+	max    int
+	mu     sync.Mutex
+	lru    *list.List
+	items  map[uint64]*list.Element
 }
 
 type fragItem struct {
-	id    uint32
+	id    uint64 // layer << 32 | fragment index
 	ready chan struct{}
 	data  []byte
 	err   error
 }
 
-func newFragCache(fs *squashfs.FS, max int) *fragCache {
+func newFragCache(layers []*squashfs.FS, max int) *fragCache {
 	if max < 1 {
 		max = 1
 	}
-	return &fragCache{fs: fs, max: max, lru: list.New(), items: map[uint32]*list.Element{}}
+	return &fragCache{layers: layers, max: max, lru: list.New(), items: map[uint64]*list.Element{}}
 }
 
-func (c *fragCache) get(id uint32) ([]byte, error) {
+func (c *fragCache) get(layer int, frag uint32) ([]byte, error) {
+	id := uint64(layer)<<32 | uint64(frag)
 	c.mu.Lock()
 	if el, ok := c.items[id]; ok {
 		c.lru.MoveToFront(el)
@@ -556,7 +594,7 @@ func (c *fragCache) get(id uint32) ([]byte, error) {
 		delete(c.items, old.Value.(*fragItem).id)
 	}
 	c.mu.Unlock()
-	it.data, it.err = c.fs.ReadFragment(id)
+	it.data, it.err = c.layers[layer].ReadFragment(frag)
 	close(it.ready)
 	if it.err != nil {
 		c.mu.Lock()
