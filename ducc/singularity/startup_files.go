@@ -62,45 +62,28 @@ func Escape(s string) string {
 // This other functions are adaptations of:
 // https://raw.githubusercontent.com/hpcng/singularity/0eca74e26dc6bc26e86ce203f704d46e22c68e55/internal/pkg/build/sources/conveyorPacker_oci.go
 
-func InsertRunScript(rootPath string, ociImage ocispec.Image) (err error) {
-	imgConfig := ociImage.Config
-	f, err := os.Create(rootPath + "/.singularity.d/runscript")
-	if err != nil {
-		return
+func InsertRunScript(rootPath string, ociImage ocispec.Image) error {
+	return writeScript(rootPath+"/.singularity.d/runscript", RunScript(ociImage.Config))
+}
+
+func InsertEnv(rootPath string, ociImage ocispec.Image) error {
+	return writeScript(rootPath+"/.singularity.d/env/10-docker2singularity.sh", EnvScript(ociImage.Config))
+}
+
+func writeScript(path, content string) error {
+	if err := os.WriteFile(path, []byte(content), 0755); err != nil {
+		return err
 	}
+	return os.Chmod(path, 0755)
+}
 
-	defer f.Close()
-
-	_, err = f.WriteString("#!/bin/sh\n")
-	if err != nil {
-		return
-	}
-
-	if len(imgConfig.Entrypoint) > 0 {
-		_, err = f.WriteString("OCI_ENTRYPOINT='" + ArgsQuoted(imgConfig.Entrypoint) + "'\n")
-		if err != nil {
-			return
-		}
-	} else {
-		_, err = f.WriteString("OCI_ENTRYPOINT=''\n")
-		if err != nil {
-			return
-		}
-	}
-
-	if len(imgConfig.Cmd) > 0 {
-		_, err = f.WriteString("OCI_CMD='" + ArgsQuoted(imgConfig.Cmd) + "'\n")
-		if err != nil {
-			return
-		}
-	} else {
-		_, err = f.WriteString("OCI_CMD=''\n")
-		if err != nil {
-			return
-		}
-	}
-
-	_, err = f.WriteString(`CMDLINE_ARGS=""
+// RunScript runs the OCI entrypoint and command the way docker does.
+func RunScript(cfg ocispec.ImageConfig) string {
+	var b strings.Builder
+	b.WriteString("#!/bin/sh\n")
+	b.WriteString("OCI_ENTRYPOINT='" + ArgsQuoted(cfg.Entrypoint) + "'\n")
+	b.WriteString("OCI_CMD='" + ArgsQuoted(cfg.Cmd) + "'\n")
+	b.WriteString(`CMDLINE_ARGS=""
 # prepare command line arguments for evaluation
 for arg in "$@"; do
     CMDLINE_ARGS="${CMDLINE_ARGS} \"$arg\""
@@ -133,58 +116,24 @@ fi
 eval "set ${SINGULARITY_OCI_RUN}"
 exec "$@"
 `)
-	if err != nil {
-		return
-	}
-
-	f.Sync()
-
-	err = os.Chmod(rootPath+"/.singularity.d/runscript", 0755)
-	if err != nil {
-		return
-	}
-
-	return nil
+	return b.String()
 }
 
-func InsertEnv(rootPath string, ociImage ocispec.Image) (err error) {
-	imgConfig := ociImage.Config
-	f, err := os.Create(rootPath + "/.singularity.d/env/10-docker2singularity.sh")
-	if err != nil {
-		return
-	}
-
-	defer f.Close()
-
-	_, err = f.WriteString("#!/bin/sh\n")
-	if err != nil {
-		return
-	}
-
-	for _, element := range imgConfig.Env {
-		export := ""
-		envParts := strings.SplitN(element, "=", 2)
-		if len(envParts) == 1 {
-			export = fmt.Sprintf("export %s=\"${%s:-}\"\n", envParts[0], envParts[0])
-		} else {
-			if envParts[0] == "PATH" {
-				export = fmt.Sprintf("export %s=%q\n", envParts[0], Escape(envParts[1]))
-			} else {
-				export = fmt.Sprintf("export %s=\"${%s:-%q}\"\n", envParts[0], envParts[0], Escape(envParts[1]))
-			}
-		}
-		_, err = f.WriteString(export)
-		if err != nil {
-			return
+// EnvScript exports the OCI environment; variables already set by the
+// user win, except PATH.
+func EnvScript(cfg ocispec.ImageConfig) string {
+	var b strings.Builder
+	b.WriteString("#!/bin/sh\n")
+	for _, element := range cfg.Env {
+		key, val, ok := strings.Cut(element, "=")
+		switch {
+		case !ok:
+			fmt.Fprintf(&b, "export %s=\"${%s:-}\"\n", key, key)
+		case key == "PATH":
+			fmt.Fprintf(&b, "export PATH=\"%s\"\n", Escape(val))
+		default:
+			fmt.Fprintf(&b, "export %s=\"${%s:-\"%s\"}\"\n", key, key, Escape(val))
 		}
 	}
-
-	f.Sync()
-
-	err = os.Chmod(rootPath+"/.singularity.d/env/10-docker2singularity.sh", 0755)
-	if err != nil {
-		return
-	}
-
-	return nil
+	return b.String()
 }
