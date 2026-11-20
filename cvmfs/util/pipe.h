@@ -11,10 +11,11 @@
 #include <cerrno>
 #include <cstddef>
 
-#include "exception.h"
 #include "duplex_testing.h"
+#include "exception.h"
 #include "util/export.h"
 #include "util/logging.h"
+#include "util/posix.h"
 #include "util/single_copy.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
@@ -206,8 +207,18 @@ class CVMFS_EXPORT Pipe : public SingleCopy {
    * Creating a pipe should always succeed.
    */
   void MakePipe(int pipe_fd[2]) {
-    const int retval = pipe(pipe_fd);
+    int retval = pipe(pipe_fd);
     if (retval != 0) {
+      if (errno == EMFILE) {
+        // if the NOFILE is the reason, try to increase it
+        auto infr = IncreaseNoFileSoft(NOFILE_STEP);
+        if (infr == 0) {
+          retval = pipe(pipe_fd);
+          if (retval == 0) {
+            return;
+          }
+        }
+      }
       PANIC(kLogSyslogErr | kLogDebug, "MakePipe failed with errno %d", errno);
     }
   }
@@ -252,3 +263,4 @@ class CVMFS_EXPORT Pipe : public SingleCopy {
 #endif
 
 #endif  // CVMFS_UTIL_PIPE_H_
+
