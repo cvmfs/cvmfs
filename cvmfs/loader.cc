@@ -547,6 +547,29 @@ static CvmfsExports *LoadLibrary(const bool debug_mode,
 }
 
 
+/**
+ * Lets the fuse module fetch the config repository, so that the loader's own
+ * option parsing does not depend on the mounted config repository.  Returns
+ * false if the module does not support it.  *has_tree is false if the
+ * mounted config repository is to be used.
+ */
+static bool FetchConfigRepo(bool *has_tree, string *serialized_tree) {
+  *has_tree = false;
+  CvmfsExports *exports = LoadLibrary(debug_mode_, NULL);
+  if (exports == NULL)
+    return false;
+  bool supported = false;
+  if ((exports->version >= 3) && (exports->fnFetchConfigRepo != NULL)) {
+    supported = true;
+    *has_tree = exports->fnFetchConfigRepo(
+        *repository_name_, simple_options_parsing_, serialized_tree);
+  }
+  // Loaded again for good after option parsing
+  CloseLibrary();
+  return supported;
+}
+
+
 Failures Reload(const int fd_progress, const bool stop_and_go,
                 const ReloadMode reload_mode) {
   int retval;
@@ -744,6 +767,34 @@ int FuseMain(int argc, char *argv[]) {
   }
 
   string parameter;
+  bool config_repo_fetched = false;
+  bool has_config_repo_tree = false;
+  string config_repo_tree;
+  if (!config_files_ && !parse_options_only_) {
+    // Fetch with the credentials that the fuse module uses on reload, so that
+    // they can share the fetch workspace
+    const uid_t fetch_origuid = geteuid();
+    const gid_t fetch_origgid = getegid();
+    const bool switch_ids = ((uid_ != 0) || (gid_ != 0))
+                            && ((uid_ != fetch_origuid)
+                                || (gid_ != fetch_origgid));
+    if (switch_ids && !SwitchCredentials(uid_, gid_, true /* temporarily */)) {
+      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+               "Failed to switch credentials for config repository fetch");
+      return kFailPermission;
+    }
+    config_repo_fetched = FetchConfigRepo(&has_config_repo_tree,
+                                          &config_repo_tree);
+    if (switch_ids
+        && !SwitchCredentials(fetch_origuid, fetch_origgid,
+                              true /* temporarily */)) {
+      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+               "Failed to switch credentials back after config repository "
+               "fetch");
+      return kFailPermission;
+    }
+  }
+
   OptionsManager *options_manager;
   bool restore_origids = false;
   uid_t origuid;
@@ -774,6 +825,17 @@ int FuseMain(int argc, char *argv[]) {
       options_manager->ParsePath(tokens[i], false);
     }
   } else {
+    if (has_config_repo_tree) {
+      ConfigRepoTree *tree = new ConfigRepoTree();
+      if (ConfigRepoTree::Deserialize(config_repo_tree, tree)) {
+        options_manager->set_config_repo_tree(
+            std::shared_ptr<const ConfigRepoTree>(tree));
+      } else {
+        delete tree;
+        has_config_repo_tree = false;
+        config_repo_tree.clear();
+      }
+    }
     options_manager->ParseDefault(*repository_name_);
   }
   if (restore_origids) {
@@ -874,6 +936,9 @@ int FuseMain(int argc, char *argv[]) {
   loader_exports_->device_id = "0:0";  // initially unknown, set after mount
   loader_exports_->disable_watchdog = disable_watchdog_;
   loader_exports_->simple_options_parsing = simple_options_parsing_;
+  loader_exports_->config_repo_fetched = config_repo_fetched;
+  if (has_config_repo_tree)
+    loader_exports_->config_repo_tree = config_repo_tree;
   loader_exports_->fuse_passthrough = fuse_passthrough_;
   if (options_manager->GetValue("CVMFS_FUSE_PASSTHROUGH", &parameter)) {
     // CVMFS_FUSE_PASSTHROUGH set to on in configs enables the feature.
@@ -1086,6 +1151,8 @@ int FuseMain(int argc, char *argv[]) {
     goto cleanup;
   }
   retval = cvmfs_exports_->fnInit(loader_exports_);
+  loader_exports_->config_repo_fetched = false;
+  loader_exports_->config_repo_tree.clear();
   if (retval != kFailOk) {
     if (retval == kFailDoubleMount) {
       LogCvmfs(kLogCvmfs, kLogStderr,

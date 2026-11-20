@@ -2580,18 +2580,17 @@ static FileSystem *InitSystemFs(const string &mount_path,
 
 /**
  * Fetches the config repository from the server so that a broken or
- * unavailable config repository mount does not affect (re-)loading.
+ * unavailable config repository mount does not affect (re-)loading.  Returns
+ * NULL if the mounted config repository is to be used.
  */
-static void SetupConfigRepoTree(const std::string &fqrn, bool simple_parser) {
+static std::shared_ptr<const ConfigRepoTree> FetchConfigRepoTree(
+    const std::string &fqrn, bool simple_parser) {
   const config_repo::FetchResult fetch = config_repo::FetchForRepository(
       fqrn, simple_parser);
   if (fetch.mode == config_repo::kFetchMount)
-    return;
-
-  if (fetch.tree) {
-    cvmfs::options_mgr_->set_config_repo_tree(fetch.tree);
-    return;
-  }
+    return NULL;
+  if (fetch.tree)
+    return fetch.tree;
 
   if (fetch.mode == config_repo::kFetchDirect) {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
@@ -2601,15 +2600,51 @@ static void SetupConfigRepoTree(const std::string &fqrn, bool simple_parser) {
     // repository directory
     ConfigRepoTree *empty_tree = new ConfigRepoTree();
     empty_tree->fqrn = fetch.config_repo;
-    cvmfs::options_mgr_->set_config_repo_tree(
-        std::shared_ptr<const ConfigRepoTree>(empty_tree));
-    return;
+    return std::shared_ptr<const ConfigRepoTree>(empty_tree);
   }
 
   LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
            "failed to fetch config repository %s (%s), "
            "using the mounted repository",
            fetch.config_repo.c_str(), fetch.error.c_str());
+  return NULL;
+}
+
+
+/**
+ * Exported to the loader, which parses the options before loading the
+ * module for good.
+ */
+static bool FetchConfigRepo(const std::string &fqrn, bool simple_parser,
+                            std::string *serialized_tree) {
+  const std::shared_ptr<const ConfigRepoTree> tree = FetchConfigRepoTree(
+      fqrn, simple_parser);
+  if (!tree)
+    return false;
+  *serialized_tree = tree->Serialize();
+  return true;
+}
+
+
+static void SetupConfigRepoTree(const loader::LoaderExports *loader_exports,
+                                bool simple_parser) {
+  if ((loader_exports->version < 8) || !loader_exports->config_repo_fetched) {
+    cvmfs::options_mgr_->set_config_repo_tree(
+        FetchConfigRepoTree(loader_exports->repository_name, simple_parser));
+    return;
+  }
+  // The loader fetched right before loading this module
+  if (loader_exports->config_repo_tree.empty())
+    return;
+  ConfigRepoTree *tree = new ConfigRepoTree();
+  if (!ConfigRepoTree::Deserialize(loader_exports->config_repo_tree, tree)) {
+    delete tree;
+    cvmfs::options_mgr_->set_config_repo_tree(
+        FetchConfigRepoTree(loader_exports->repository_name, simple_parser));
+    return;
+  }
+  cvmfs::options_mgr_->set_config_repo_tree(
+      std::shared_ptr<const ConfigRepoTree>(tree));
 }
 
 
@@ -2630,7 +2665,7 @@ static void InitOptionsMgr(const loader::LoaderExports *loader_exports) {
       cvmfs::options_mgr_->ParsePath(tokens[i], false);
     }
   } else {
-    SetupConfigRepoTree(loader_exports->repository_name, simple_parser);
+    SetupConfigRepoTree(loader_exports, simple_parser);
     cvmfs::options_mgr_->ParseDefault(loader_exports->repository_name);
   }
 #ifdef CVMFS_NFS_FRONTEND
@@ -3519,6 +3554,7 @@ static void __attribute__((constructor)) LibraryMain() {
   g_cvmfs_exports->so_version = CVMFS_VERSION;
   g_cvmfs_exports->fnAltProcessFlavor = AltProcessFlavor;
   g_cvmfs_exports->fnInit = Init;
+  g_cvmfs_exports->fnFetchConfigRepo = FetchConfigRepo;
   g_cvmfs_exports->fnSpawn = Spawn;
   g_cvmfs_exports->fnFini = Fini;
   g_cvmfs_exports->fnGetErrorMsg = GetErrorMsg;
