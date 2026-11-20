@@ -1277,29 +1277,33 @@ MountPoint::ConfigRepoState MountPoint::RefreshConfigRepo() {
   const MutexLockGuard guard(&lock_config_repo_);
   const std::shared_ptr<const ConfigRepoTree> tree = options_mgr_
                                                          ->config_repo_tree();
-  if (!tree || tree->root_hash.empty())
-    return kConfigRepoNotFetched;
+  // No fetched copy if fetching failed at (re)load: retry the full fetch
+  const bool have_tree = tree && !tree->root_hash.empty();
 
   const bool simple_parser = dynamic_cast<SimpleOptionsParser *>(options_mgr_)
                              != NULL;
   const config_repo::FetchResult fetch = config_repo::FetchForRepository(
-      fqrn_, simple_parser, tree->root_hash);
+      fqrn_, simple_parser, have_tree ? tree->root_hash : "");
   if (fetch.mode == config_repo::kFetchMount)
     return kConfigRepoNotFetched;
   if (fetch.unchanged)
     return kConfigRepoCurrent;
   if (!fetch.tree || fetch.tree->root_hash.empty()) {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
-             "failed to check config repository %s (%s)",
-             fetch.config_repo.c_str(), fetch.error.c_str());
-    return kConfigRepoUnknown;
+             "failed to %s config repository %s (%s)",
+             have_tree ? "check" : "fetch", fetch.config_repo.c_str(),
+             fetch.error.c_str());
+    // Without a previous copy, the blacklist is read as at (re)load
+    return have_tree ? kConfigRepoUnknown : kConfigRepoNotFetched;
   }
   // Only the blacklist is taken from the new tree; other options change on
   // the next reload
   options_mgr_->set_config_repo_tree(fetch.tree);
   LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
-           "config repository %s changed to revision %" PRIu64,
-           fetch.tree->fqrn.c_str(), fetch.tree->revision);
+           "config repository %s %s revision %" PRIu64
+           ", other options apply on the next reload",
+           fetch.tree->fqrn.c_str(), have_tree ? "changed to" : "fetched at",
+           fetch.tree->revision);
   return kConfigRepoCurrent;
 }
 

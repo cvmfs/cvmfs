@@ -603,7 +603,8 @@ class MountPoint : SingleCopy, public BootFactory {
   /**
    * If the options were parsed from a fetched config repository, checks that
    * the fetched tree (and thus its blacklist) still matches the config
-   * repository's current revision and fetches it again otherwise.
+   * repository's current revision and fetches it again otherwise.  If
+   * fetching failed at (re)load, retries the fetch.
    */
   ConfigRepoState RefreshConfigRepo();
 
