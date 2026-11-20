@@ -67,7 +67,7 @@ cvmfs_run_test() {
   logfile=$1
 
   if running_on_osx; then
-    echo "autofs-specific test, skipping on macOS"
+    echo "Linux-specific test, skipping on macOS"
     return 0
   fi
 
@@ -92,6 +92,9 @@ cvmfs_run_test() {
 
   echo "*** repair mounting of the config repository and freeze its client"
   sudo cp "$CVMFS_TEST_116_CFGLOCAL_BAK" "$CVMFS_TEST_116_CFGLOCAL" || return 20
+  if [ "${CVMFS_TEST_DOCKER:-}" = "yes" ]; then
+    _cvmfs_mount_manually $CVMFS_TEST_116_CFGREPO
+  fi
   ls /cvmfs/$CVMFS_TEST_116_CFGREPO/etc/cvmfs > /dev/null || return 21
   CVMFS_TEST_116_STOPPED_PID=$(get_xattr pid /cvmfs/$CVMFS_TEST_116_CFGREPO) || return 22
   sudo kill -STOP $CVMFS_TEST_116_STOPPED_PID || return 23
