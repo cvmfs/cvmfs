@@ -312,6 +312,11 @@ func ingest(ctx context.Context, logger *log.Entry, o ConvertOptions, in *Inspec
 	if err := cvmfs.CreateCatalogIntoDirWithLogger(logger, o.Repo, ".flat"); err != nil {
 		logger.WithField("error", err).Warn("could not create catalog in .flat")
 	}
+	// A gateway lease needs an existing parent directory, as for
+	// .layers/<xx>; a catalog per prefix also keeps .flat's catalog small.
+	if err := cvmfs.CreateCatalogIntoDirWithLogger(logger, o.Repo, filepath.Dir(res.FlatPath)); err != nil {
+		return fmt.Errorf("creating %s: %w", filepath.Dir(res.FlatPath), err)
+	}
 	target := cvmfs.PrefixRepoSubdirOnce(o.Repo, res.FlatPath)
 
 	ctx, cancel := context.WithCancel(ctx)
