@@ -1303,7 +1303,7 @@ static void cvmfs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
   FuseInterruptCue ic(&req);
   const ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid,
                                  &ic);
-  PathString path(pending_path);
+  const PathString path(pending_path);
   DirectoryListing listing;
   fuse_remounter_->fence()->Enter();
   const bool retval = BuildDirListing(req, path, &listing);
