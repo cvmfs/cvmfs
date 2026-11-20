@@ -1774,7 +1774,6 @@ bool MountPoint::CreateSignatureManager() {
   options_mgr_->GetValue("CVMFS_MOUNT_DIR", &mount_dir);
   // Keys below the config repository mount point are taken from the fetched
   // tree, if available
-  vector<string> tree_keys;
   string public_keys;
   if (options_mgr_->GetValue("CVMFS_PUBLIC_KEY", &optarg)) {
     public_keys = optarg;
