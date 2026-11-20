@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	copy "github.com/otiai10/copy"
@@ -320,6 +321,9 @@ func SaveLayersBacklinkWithLogger(logger *log.Entry, CVMFSRepo string, imgManife
 				"Error in obtaining the backlink from a layer digest, skipping...")
 			continue
 		}
+		if slices.Contains(backlink.Origin, imgDigest) {
+			continue
+		}
 		backlink.Origin = append(backlink.Origin, imgDigest)
 
 		backlinkBytesMarshal, err := json.Marshal(backlink)
@@ -331,6 +335,13 @@ func SaveLayersBacklinkWithLogger(logger *log.Entry, CVMFSRepo string, imgManife
 
 		backlinkPath := GetBacklinkPath(CVMFSRepo, layerDigest)
 		backlinks[backlinkPath] = backlinkBytesMarshal
+	}
+
+	if len(backlinks) == 0 {
+		return nil
+	}
+	if MountlessPublishing() {
+		return saveBacklinksMountless(logger, CVMFSRepo, backlinks)
 	}
 
 	llog(logger).Trace("Start transaction")
