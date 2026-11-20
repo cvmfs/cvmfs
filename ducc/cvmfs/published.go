@@ -28,8 +28,17 @@ import (
 const (
 	flagDir              = 1
 	flagNestedMountpoint = 2
+	flagFile             = 4
 	flagLink             = 8
+	flagChunked          = 64
+	flagExternal         = 128
+	flagPosHash          = 8
+	flagPosCompression   = 11
 )
+
+// Suffixes of the content hash algorithms, indexed by the catalog's
+// encoding (shash::Algorithms minus one: sha1, rmd160, shake128).
+var hashSuffixes = []string{"", "-rmd160", "-shake128"}
 
 // PublishedEntry describes a path in the published revision.
 type PublishedEntry struct {
@@ -40,6 +49,11 @@ type PublishedEntry struct {
 	NestedMountpoint bool
 	Symlink          bool
 	LinkTarget       string
+	Regular          bool
+	Size             int64
+
+	flags int64
+	hash  []byte
 }
 
 var (
@@ -116,10 +130,11 @@ func lookupEntry(db *sql.DB, path string) (PublishedEntry, error) {
 	sum := md5.Sum([]byte(path))
 	lo := int64(binary.LittleEndian.Uint64(sum[:8]))
 	hi := int64(binary.LittleEndian.Uint64(sum[8:]))
-	var flags int64
+	var flags, size int64
 	var link sql.NullString
-	err := db.QueryRow(`SELECT flags, symlink FROM catalog WHERE md5path_1 = ? AND md5path_2 = ?`,
-		lo, hi).Scan(&flags, &link)
+	var hash []byte
+	err := db.QueryRow(`SELECT flags, symlink, size, hash FROM catalog WHERE md5path_1 = ? AND md5path_2 = ?`,
+		lo, hi).Scan(&flags, &link, &size, &hash)
 	if err == sql.ErrNoRows {
 		return PublishedEntry{}, nil
 	}
@@ -132,7 +147,55 @@ func lookupEntry(db *sql.DB, path string) (PublishedEntry, error) {
 		NestedMountpoint: flags&flagNestedMountpoint != 0,
 		Symlink:          flags&flagLink != 0,
 		LinkTarget:       link.String,
+		Regular:          flags&flagFile != 0,
+		Size:             size,
+		flags:            flags,
+		hash:             hash,
 	}, nil
+}
+
+// ReadPublishedFile returns the content of a small regular file in the
+// published revision. Chunked and external files are not supported; ducc
+// only reads its own metadata files this way.
+func ReadPublishedFile(CVMFSRepo, repoPath string) ([]byte, error) {
+	e, err := LookupPublished(CVMFSRepo, repoPath)
+	if err != nil {
+		return nil, err
+	}
+	if !e.Exists {
+		return nil, os.ErrNotExist
+	}
+	if !e.Regular || e.flags&(flagChunked|flagExternal) != 0 {
+		return nil, fmt.Errorf("%s: not a small regular file", repoPath)
+	}
+	if e.Size == 0 {
+		return []byte{}, nil
+	}
+	algo := int(e.flags>>flagPosHash) & 7
+	if algo >= len(hashSuffixes) || len(e.hash) == 0 {
+		return nil, fmt.Errorf("%s: unsupported content hash", repoPath)
+	}
+	hexHash := fmt.Sprintf("%x", e.hash)
+	repoName, _ := GetRepoAndSubdir(CVMFSRepo)
+	base, err := stratum0URL(repoName)
+	if err != nil {
+		return nil, err
+	}
+	raw, err := fetch(base + "/data/" + hexHash[:2] + "/" + hexHash[2:] + hashSuffixes[algo])
+	if err != nil {
+		return nil, err
+	}
+	switch (e.flags >> flagPosCompression) & 7 {
+	case 0:
+		zr, err := zlib.NewReader(bytes.NewReader(raw))
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", repoPath, err)
+		}
+		return io.ReadAll(io.LimitReader(zr, e.Size+1))
+	case 1:
+		return raw, nil
+	}
+	return nil, fmt.Errorf("%s: unsupported compression", repoPath)
 }
 
 // publishedRootHash reads the root catalog hash from .cvmfspublished. The

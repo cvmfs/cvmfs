@@ -182,7 +182,7 @@ func createMultiarchAliasSymlinksWithLogger(logger *log.Entry, repo string) {
 		// If the alias name is itself a real directory, native content exists
 		// for that arch — no symlink alias is needed or wanted.
 		aliasFullPath := filepath.Join("/", "cvmfs", repo, ".multiarch", alias)
-		if lstat, err := os.Lstat(aliasFullPath); err == nil && lstat.Mode()&os.ModeSymlink == 0 {
+		if lstat, err := cvmfs.RepoLstat(aliasFullPath); err == nil && lstat.Mode()&os.ModeSymlink == 0 {
 			continue
 		}
 
@@ -190,7 +190,7 @@ func createMultiarchAliasSymlinksWithLogger(logger *log.Entry, repo string) {
 		target := ""
 		for _, candidate := range candidates {
 			candidateFullPath := filepath.Join("/", "cvmfs", repo, ".multiarch", candidate)
-			if _, err := os.Stat(candidateFullPath); err == nil {
+			if _, err := cvmfs.RepoStat(candidateFullPath); err == nil {
 				target = candidate
 				break
 			}
@@ -269,7 +269,7 @@ func ConvertWishFlat(wish WishFriendly, multiArch bool) error {
 			imageLogger := l.WithImage(imageNameWithPlatform(inputImage, manifestEntry))
 			publicSymlinkPath := inputImage.GetPublicSymlinkPathWithArch(nameWithArch)
 			completePubSymPath := filepath.Join("/", "cvmfs", wish.CvmfsRepo, publicSymlinkPath)
-			pubDirInfo, errPub := os.Stat(completePubSymPath)
+			pubDirInfo, errPub := cvmfs.RepoStat(completePubSymPath)
 
 			singularityPrivatePath, err := inputImage.GetSingularityPath2(manifestEntry.Manifest)
 			if err != nil {
@@ -279,7 +279,7 @@ func ConvertWishFlat(wish WishFriendly, multiArch bool) error {
 				continue
 			}
 			completeSingularityPriPath := filepath.Join("/", "cvmfs", wish.CvmfsRepo, singularityPrivatePath)
-			priDirInfo, errPri := os.Stat(completeSingularityPriPath)
+			priDirInfo, errPri := cvmfs.RepoStat(completeSingularityPriPath)
 
 			// Validate the flat image: if the private path exists, check that
 			// it contains a .singularity.d directory.  Also check that the
@@ -288,7 +288,7 @@ func ConvertWishFlat(wish WishFriendly, multiArch bool) error {
 			// and force a re-creation of the overlay.
 			if errPri == nil {
 				singDirPath := filepath.Join(completeSingularityPriPath, ".singularity.d")
-				if _, errSingDir := os.Stat(singDirPath); errSingDir != nil {
+				if _, errSingDir := cvmfs.RepoStat(singDirPath); errSingDir != nil {
 					imageLogger.WithFields(log.Fields{
 						"flat path":       completeSingularityPriPath,
 						"singularity dir": singDirPath,
@@ -308,7 +308,7 @@ func ConvertWishFlat(wish WishFriendly, multiArch bool) error {
 			// Check for a dangling public symlink (Lstat succeeds but Stat failed)
 			if errPub != nil && !os.IsNotExist(errPub) {
 				// Stat failed for a reason other than not-exist; could be a dangling symlink
-				if _, errLstat := os.Lstat(completePubSymPath); errLstat == nil {
+				if _, errLstat := cvmfs.RepoLstat(completePubSymPath); errLstat == nil {
 					imageLogger.WithField("symlink", completePubSymPath).
 						Warn("Public symlink is dangling, will re-create flat image")
 					// The flat image is already gone (errPri would be non-nil too),
@@ -325,7 +325,7 @@ func ConvertWishFlat(wish WishFriendly, multiArch bool) error {
 			// no error in stating both directories
 			// either the image is up to date or the image became stale
 			if errPub == nil && errPri == nil {
-				if os.SameFile(pubDirInfo, priDirInfo) {
+				if cvmfs.RepoSameFile(completePubSymPath, completeSingularityPriPath, pubDirInfo, priDirInfo) {
 					// the link is up to date
 					imageLogger.Trace("Singularity image is up to date")
 					continue
@@ -496,7 +496,7 @@ func pickVariantDefaultArch(repo string, img *Image, archPaths []string) string 
 	available := []string{}
 	for _, archPath := range archPaths {
 		pubPath := filepath.Join("/", "cvmfs", repo, img.GetPublicSymlinkPathWithArch(archPath))
-		if _, err := os.Stat(pubPath); err == nil {
+		if _, err := cvmfs.RepoStat(pubPath); err == nil {
 			available = append(available, strings.TrimPrefix(archPath, ".multiarch/"))
 		}
 	}
@@ -568,7 +568,7 @@ func ConvertWishDocker(wish WishFriendly) (err error) {
 		outputWithTag := outputImageForExpandedTag(inputImage, outputImage, tag)
 
 		manifestPath := filepath.Join("/", "cvmfs", wish.CvmfsRepo, ".metadata", expandedImgTag.GetSimpleName(), "manifest.json")
-		if _, err := os.Stat(manifestPath); os.IsNotExist(err) {
+		if _, err := cvmfs.RepoStat(manifestPath); os.IsNotExist(err) {
 			imageLogger.Trace("Layers not downloaded yet, not converting for docker")
 			continue
 		}
@@ -677,7 +677,7 @@ func convertInputOutput2(inputImage *Image, imageLabel, nameWithArch, repo strin
 		}
 		layerPath := cvmfs.LayerRootfsPath(repo, digest)
 		if !forceDownload {
-			if _, statErr := os.Stat(layerPath); statErr == nil {
+			if _, statErr := cvmfs.RepoStat(layerPath); statErr == nil {
 				layersAlreadyConverted = append(layersAlreadyConverted, shortDigest)
 				continue
 			}
@@ -963,9 +963,9 @@ func AlreadyConverted(manifestPath, reference string) ConversionResult {
 
 func AlreadyConvertedWithLogger(logger *log.Entry, manifestPath, reference string) ConversionResult {
 	logger = l.Ensure(logger)
-	manifestStat, err := os.Stat(manifestPath)
-	if os.IsNotExist(err) {
-		logger.Trace("Manifest not existing")
+	manifestStat, err := cvmfs.RepoStat(manifestPath)
+	if err != nil {
+		logger.WithField("error", err).Trace("Manifest not existing")
 		return ConversionNotFound
 	}
 	if !manifestStat.Mode().IsRegular() {
@@ -973,14 +973,11 @@ func AlreadyConvertedWithLogger(logger *log.Entry, manifestPath, reference strin
 		return ConversionNotFound
 	}
 
-	manifestFile, err := os.Open(manifestPath)
+	bytes, err := cvmfs.RepoReadFile(manifestPath)
 	if err != nil {
-		logger.WithField("error", err).Trace("Error in opening the manifest")
+		logger.WithField("error", err).Trace("Error in reading the manifest")
 		return ConversionNotFound
 	}
-	defer manifestFile.Close()
-
-	bytes, _ := ioutil.ReadAll(manifestFile)
 
 	var manifest da.Manifest
 	err = json.Unmarshal(bytes, &manifest)

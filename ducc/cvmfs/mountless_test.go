@@ -158,3 +158,28 @@ func TestMountlessPublishTreeBelowNewParents(t *testing.T) {
 		t.Fatalf("tree not published below new parents: %v", err)
 	}
 }
+
+func TestEnsureDirectory(t *testing.T) {
+	mockrepo := filepath.Clean("/" + os.Getenv("CVMFS_TEST_REPO"))
+	repo := ".." + mockrepo
+	if err := EnsureDirectoryWithLogger(nil, repo, "ens/a/b"); err != nil {
+		t.Fatal(err)
+	}
+	if fi, err := os.Stat(filepath.Join(mockrepo, "ens", "a", "b")); err != nil || !fi.IsDir() {
+		t.Fatalf("directory not created: %v", err)
+	}
+	// existing directory: no ingest needed, must still succeed
+	if err := EnsureDirectoryWithLogger(nil, repo, "ens/a"); err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(filepath.Join(mockrepo, "ens", "file"), []byte("x"), 0644)
+	if err := EnsureDirectoryWithLogger(nil, repo, "ens/file"); err == nil {
+		t.Error("a regular file was accepted as directory")
+	}
+	if err := EnsureDirectoryWithLogger(nil, repo, "enstop"); err != nil {
+		t.Fatal(err)
+	}
+	if fi, err := os.Stat(filepath.Join(mockrepo, "enstop")); err != nil || !fi.IsDir() {
+		t.Fatalf("top-level directory not created: %v", err)
+	}
+}
