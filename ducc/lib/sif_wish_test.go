@@ -261,3 +261,29 @@ func TestFindSifInfoToDeleteIgnoresOtherPaths(t *testing.T) {
 		t.Errorf("got %v, want [%s]", got, want)
 	}
 }
+
+func TestParseRecipeOrasDefaultName(t *testing.T) {
+	r, err := ParseYamlRecipeV1([]byte(`
+version: 1
+user: cvmfs
+cvmfs_repo: unpacked.example.org
+sif_input:
+  - source: oras://ghcr.io/org/img:v1
+  - source: oras://ghcr.io/org/img:v2
+    name: custom/img:v2
+sif_options:
+  plain_http: true
+  spool_dir: /var/tmp/ducc
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	drainWishes(r)
+	if r.SIFWishes[0].Name != "ghcr.io/org/img:v1" || r.SIFWishes[1].Name != "custom/img:v2" {
+		t.Errorf("names %q, %q", r.SIFWishes[0].Name, r.SIFWishes[1].Name)
+	}
+	src := r.SIFOptions.sourceOptions()
+	if !src.PlainHTTP || src.SpoolDir != "/var/tmp/ducc" || src.Credentials == nil {
+		t.Errorf("unexpected source options %+v", src)
+	}
+}

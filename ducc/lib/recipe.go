@@ -30,11 +30,13 @@ type YamlRecipeV1 struct {
 // YamlSIFOptionsV1 holds ingest tuning shared by all sif_input entries;
 // unset fields keep the convert-sif defaults.
 type YamlSIFOptionsV1 struct {
-	ContiguousCatalogs bool `yaml:"contiguous_catalogs"`
-	CatalogMaxWeight   *int `yaml:"catalog_max_weight"`
-	CatalogMinWeight   *int `yaml:"catalog_min_weight"`
-	Workers            int  `yaml:"workers"`
-	CacheSizeMiB       int  `yaml:"cache_size_mib"`
+	ContiguousCatalogs bool   `yaml:"contiguous_catalogs"`
+	CatalogMaxWeight   *int   `yaml:"catalog_max_weight"`
+	CatalogMinWeight   *int   `yaml:"catalog_min_weight"`
+	Workers            int    `yaml:"workers"`
+	CacheSizeMiB       int    `yaml:"cache_size_mib"`
+	PlainHTTP          bool   `yaml:"plain_http"`
+	SpoolDir           string `yaml:"spool_dir"`
 }
 
 type IgnoreErrorsConfig struct {
@@ -157,7 +159,11 @@ func ParseYamlRecipeV1(data []byte) (Recipe, error) {
 func validateSIFInput(wishes []SIFWish) error {
 	var errs []string
 	seen := make(map[string]int)
-	for i, w := range wishes {
+	for i := range wishes {
+		if wishes[i].Name == "" {
+			wishes[i].Name = sif.DefaultName(wishes[i].Source)
+		}
+		w := wishes[i]
 		where := fmt.Sprintf("sif_input[%d]", i)
 		if w.Source == "" {
 			errs = append(errs, where+": source is required")

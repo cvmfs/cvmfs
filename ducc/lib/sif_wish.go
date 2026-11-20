@@ -68,6 +68,9 @@ func (o YamlSIFOptionsV1) sourceOptions() sif.SourceOptions {
 	if o.CacheSizeMiB > 0 {
 		s.CacheSize = int64(o.CacheSizeMiB) << 20
 	}
+	s.PlainHTTP = o.PlainHTTP
+	s.SpoolDir = o.SpoolDir
+	s.Credentials = RegistryCredentials
 	return s
 }
 
@@ -76,8 +79,11 @@ func (o YamlSIFOptionsV1) sourceOptions() sif.SourceOptions {
 // chunk the ingest uses.
 const sifProbeChunk = 64 << 10
 
-func identifySIF(ctx context.Context, w SIFWish, logger *log.Entry) (string, error) {
-	opts := sif.SourceOptions{ChunkSize: sifProbeChunk, CacheSize: 2 * sifProbeChunk, Logger: logger}
+func identifySIF(ctx context.Context, w SIFWish, o YamlSIFOptionsV1, logger *log.Entry) (string, error) {
+	opts := o.sourceOptions()
+	opts.ChunkSize, opts.CacheSize, opts.Readahead, opts.Logger = sifProbeChunk, 2*sifProbeChunk, 0, logger
+	// Spooling would download the whole image just to read its ID.
+	opts.SpoolDir = ""
 	in, err := sif.Identify(ctx, w.Source, w.Digest, opts)
 	if err != nil {
 		return "", err
@@ -100,11 +106,15 @@ func ConvertSIFWish(ctx context.Context, repo string, w SIFWish, o YamlSIFOption
 	public := w.PublicPath()
 	logger := l.Log().WithFields(log.Fields{"source": w.Source, "public": public, "repo": repo})
 	if !force {
-		id, err := identifySIF(ctx, w, logger)
-		if err != nil {
+		id, err := identifySIF(ctx, w, o, logger)
+		switch {
+		case err != nil && o.SpoolDir != "":
+			// Without range support the ID is only known after a full
+			// download, which sif.Convert does anyway.
+			logger.WithField("error", err).Debug("cheap identification failed, converting")
+		case err != nil:
 			return summary, err
-		}
-		if sif.Published(repo, w.Name, id) {
+		case sif.Published(repo, w.Name, id):
 			logger.WithField("image_id", id).Info("SIF image unchanged, nothing to do")
 			summary.Add(ConversionMatch, public)
 			return summary, nil

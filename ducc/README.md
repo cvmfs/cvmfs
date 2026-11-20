@@ -120,16 +120,20 @@ This recipe format allow to specify only some wish, specifically all the images
 need to be stored in the same CVMFS repository and have the same format.
 
 **sif_input** (optional): Apptainer SIF images to publish as with
-`convert-sif`. Each entry needs a `source` (a local path or an http(s) URL
-with range support) and a `name`, published as `sif/<name>`; `digest:
-sha256:...` pins the image ID. Names must be unique within the recipe.
-**sif_options** (optional) apply to all entries: `contiguous_catalogs`,
-`catalog_max_weight`, `catalog_min_weight`, `workers`, `cache_size_mib`.
+`convert-sif`. Each entry needs a `source` (a local path, an http(s) URL
+or an `oras://` reference) and a `name`, published as `sif/<name>`; for
+`oras://` sources the name defaults to `<registry>/<repository>:<tag>`.
+`digest: sha256:...` pins the image ID. Names must be unique within the
+recipe. **sif_options** (optional) apply to all entries:
+`contiguous_catalogs`, `catalog_max_weight`, `catalog_min_weight`,
+`workers`, `cache_size_mib`, `plain_http` (oras registries without TLS),
+`spool_dir` (download first from servers without range support).
 
 ``` yaml
 version: 1
 cvmfs_repo: unpacked.cern.ch
 sif_input:
+  - source: oras://ghcr.io/org/tools:1.2
   - source: https://images.example.org/sif/sim-2026.sif
     name: example/sim:2026
   - source: /data/analysis.sif
@@ -163,7 +167,7 @@ make sure that all the images are up to date.
 ### convert-sif
 
 ```
-convert-sif <sif file or http(s) URL> <cvmfs repository> --name <name>
+convert-sif <sif file, http(s) URL or oras:// reference> <cvmfs repository> [--name <name>]
 ```
 
 Publishes the root filesystem of an Apptainer SIF image (or a bare squashfs
@@ -173,6 +177,15 @@ downloaded to local disk, and a remote image only needs to be served with
 HTTP range-request support. The image is stored at `.flat/<xx>/<id>` and
 linked from `sif/<name>`, so it runs with
 `apptainer exec /cvmfs/<repo>/sif/<name> ...`.
+
+- `oras://<registry>/<repository>[:tag][@sha256:...]` reads the SIF
+  pushed with `apptainer push`; the image ID is the blob digest and the
+  name defaults to `<registry>/<repository>:<tag>`. Credentials come from
+  `DUCC_AUTH_REGISTRIES` as for docker inputs; `--plain-http` disables TLS.
+  `--verify-digest` hashes the whole blob after ingest and links the image
+  only if it matches.
+- `--spool-dir DIR` downloads the image into `DIR` first when the server
+  does not support range requests; the file is removed afterwards.
 
 - `<id>` is a hash of the SIF header and descriptor table, which changes
   on every rebuild; `--digest sha256:...` overrides it.
