@@ -458,7 +458,6 @@ class Sql {
   Sql()
       : database_(NULL)
       , statement_(NULL)
-      , query_string_(NULL)
       , last_error_code_(0) { }
 
   bool IsInitialized() const { return statement_ != NULL; }
@@ -478,9 +477,10 @@ class Sql {
    * Typically this method is used in constructors of derived classes.
    *
    * @param database   the sqlite database pointer to be query against
-   * @param statement  the query string to be prepared for execution
+   * @param statement  the query string to be prepared for execution; the Sql
+   *                   object keeps its own copy (moved in when possible)
    */
-  void DeferredInit(const sqlite3 *database, const char *statement);
+  void DeferredInit(const sqlite3 *database, std::string statement);
 
   /**
    * Checks the last action for success
@@ -496,15 +496,15 @@ class Sql {
   void LazyInit() {
     if (!IsInitialized()) {
       assert(NULL != database_);
-      assert(NULL != query_string_);
-      const bool success = Init(query_string_);
+      assert(!query_string_.empty());
+      const bool success = Init(query_string_.c_str());
       assert(success);
     }
   }
 
   sqlite3 *database_;
   sqlite3_stmt *statement_;
-  const char *query_string_;
+  std::string query_string_;
   int last_error_code_;
 };
 
