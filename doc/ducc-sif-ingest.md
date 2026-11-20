@@ -739,6 +739,20 @@ Measured on cvm-perf10, with the gateway and the publisher on one host as in
     wish list run twice with `convert` (S41 → S41).
   - The manifest signature is not checked: a forged manifest could only
     make ducc skip or repeat work.
+- **Registry conversions use the same lookups** (`RepoStat`, `RepoReadFile`
+  and friends in `cvmfs/repofs.go`): layers already present, converted
+  manifests, flat images, public, variant and multi-arch symlinks, and
+  backlinks.
+  - Layer ingests and overlay merges first create their missing parent
+    (`.layers/<xx>/<digest>`, `.flat/<xx>`) with `EnsureDirectoryWithLogger`.
+    A gateway refuses the lease otherwise.
+  - On `sifgw.example.org`, a `--mountless convert-single-image` of an
+    image from the local registry published in run 1 (S81 → S90, 10 s).
+    Runs 2 and 3 published nothing (S90 → S90, 1.9 s each).
+  - The flat image needs the `swissknife overlay` chunk-list fix on
+    `ingest-spool-usage` (`8acab56ee`).
+  - Saving layer backlinks still uses a mounted transaction, so it fails
+    (logged only) on mountless publishers.
 
 ## 12. OCI-SIF
 
