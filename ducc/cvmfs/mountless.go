@@ -19,6 +19,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -83,23 +84,32 @@ func publishToCVMFSMountless(logger *log.Entry, CVMFSRepo, repoPath, target stri
 		// (regular --delete needs the rdonly mount for traversal).  Best effort
 		// — the path may not exist yet.
 		_ = IngestFastDeleteWithLogger(logger, CVMFSRepo, dest)
-		return ingestTarStreamWithLogger(logger, CVMFSRepo, dest,
-			func(tw *tar.Writer) error { return writeDirTree(tw, target) })
+		baseDir, prefix := mountlessIngestBase(dest)
+		return ingestTarStreamWithLogger(logger, CVMFSRepo, baseDir,
+			func(tw *tar.Writer) error { return writeDirTree(tw, target, prefix) })
 	}
 
 	if !st.Mode().IsRegular() {
 		return fmt.Errorf("Trying to ingest neither a file nor a directory")
 	}
 
-	// A single regular file: extract one named member into the parent dir.
 	// The tarball engine adds-or-replaces the entry, so no delete is needed.
-	baseDir := filepath.Dir(dest)
-	if baseDir == "." {
-		baseDir = ""
-	}
-	name := filepath.Base(dest)
+	baseDir, name := mountlessIngestBase(dest)
 	return ingestTarStreamWithLogger(logger, CVMFSRepo, baseDir,
 		func(tw *tar.Writer) error { return writeRegularFile(tw, name, target, st) })
+}
+
+// mountlessIngestBase splits a destination into the ingest base directory,
+// its first path component, and the path below it. Mountless ingest refuses
+// a base whose parent does not exist yet; a top-level base always has one
+// (the root), and the tarball engine creates the missing directories below
+// it. A single-component destination ingests at the root.
+func mountlessIngestBase(dest string) (baseDir, rel string) {
+	top, rest, nested := strings.Cut(dest, "/")
+	if !nested {
+		return "", dest
+	}
+	return top, rest
 }
 
 // createSymlinkMountless creates (or replaces) a symlink at repoLink pointing
@@ -107,11 +117,7 @@ func publishToCVMFSMountless(logger *log.Entry, CVMFSRepo, repoPath, target stri
 func createSymlinkMountless(logger *log.Entry, CVMFSRepo, repoLink, linkTarget string) error {
 	logger = l.Ensure(logger)
 	dest := PrefixRepoSubdirOnce(CVMFSRepo, repoLink)
-	baseDir := filepath.Dir(dest)
-	if baseDir == "." {
-		baseDir = ""
-	}
-	name := filepath.Base(dest)
+	baseDir, name := mountlessIngestBase(dest)
 	return ingestTarStreamWithLogger(logger, CVMFSRepo, baseDir,
 		func(tw *tar.Writer) error {
 			return tw.WriteHeader(&tar.Header{
@@ -150,8 +156,8 @@ func writeRegularFile(tw *tar.Writer, name, target string, st os.FileInfo) error
 }
 
 // writeDirTree walks root and writes its contents into the tar with paths
-// relative to root (so they land directly under the ingest base_dir).
-func writeDirTree(tw *tar.Writer, root string) error {
+// relative to root, below prefix within the ingest base_dir.
+func writeDirTree(tw *tar.Writer, root, prefix string) error {
 	return filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -161,7 +167,10 @@ func writeDirTree(tw *tar.Writer, root string) error {
 			return err
 		}
 		if rel == "." {
-			return nil // the base_dir itself is created by the ingest
+			return nil // created by the ingest or as an implicit parent
+		}
+		if prefix != "" {
+			rel = filepath.Join(prefix, rel)
 		}
 
 		var link string
