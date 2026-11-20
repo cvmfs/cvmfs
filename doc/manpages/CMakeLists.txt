@@ -72,7 +72,7 @@ else()
                 ${CMAKE_CURRENT_LIST_DIR} # location of include files
                 ${MAN_OUTPUT_DIR} # directory for generated manpage
                 ${CMAKE_BINARY_DIR}/cvmfs # location of swissknife binary
-        DEPENDS cvmfs_server_script
+        DEPENDS cvmfs_server_script cvmfs_swissknife
         COMMENT "Generating man page for cvmfs_server"
         VERBATIM
     )
