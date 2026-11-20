@@ -39,9 +39,10 @@ type Entry struct {
 	Frag        uint32   // fragment index, or NoFragment
 	FragOff     uint32
 
-	Target string // symlink target
-	Rdev   uint32 // squashfs-encoded device number
-	Xattrs uint32 // number of extended attributes
+	Target  string // symlink target
+	Rdev    uint32 // squashfs-encoded device number
+	Xattrs  uint32 // number of extended attributes
+	XattrID uint32 // valid if Xattrs > 0
 }
 
 const NoFragment = noFragment
@@ -71,6 +72,31 @@ func (ix *Index) Path(i int) string {
 		return ix.dirPath[i]
 	}
 	return joinPath(ix.dirPath[e.Parent], e.Name)
+}
+
+// NewIndex starts an index assembled by the caller rather than read from an
+// image, e.g. several layers merged into one tree.
+func NewIndex(root Entry) *Index {
+	root.Parent = -1
+	return &Index{Entries: []Entry{root}, dirPath: []string{""}}
+}
+
+// Add appends e below e.Parent, which must be a directory already in ix, so
+// parents keep preceding their children.
+func (ix *Index) Add(e Entry) (int32, error) {
+	if e.Parent < 0 || int(e.Parent) >= len(ix.Entries) || ix.Entries[e.Parent].Kind != KindDir {
+		return 0, fmt.Errorf("%s: parent %d is not a directory in the index", e.Name, e.Parent)
+	}
+	if e.Name == "" || e.Name == "." || e.Name == ".." || strings.ContainsAny(e.Name, "/\x00") {
+		return 0, fmt.Errorf("invalid name %q", e.Name)
+	}
+	ix.Entries = append(ix.Entries, e)
+	p := ""
+	if e.Kind == KindDir {
+		p = joinPath(ix.dirPath[e.Parent], e.Name)
+	}
+	ix.dirPath = append(ix.dirPath, p)
+	return int32(len(ix.Entries) - 1), nil
 }
 
 func joinPath(dir, name string) string {
@@ -201,10 +227,10 @@ func (fs *FS) readInode(ref uint64, e *Entry) (dirLoc, error) {
 		return loc, fmt.Errorf("inode %#x: %w", ref, err)
 	}
 	if xattr != noXattr {
-		if int(xattr) >= len(fs.xattrCount) {
+		if int(xattr) >= len(fs.xattrs) {
 			return loc, fmt.Errorf("inode %#x: xattr id %d out of range", ref, xattr)
 		}
-		e.Xattrs = fs.xattrCount[xattr]
+		e.Xattrs, e.XattrID = fs.xattrs[xattr].count, xattr
 	}
 	return loc, nil
 }
