@@ -371,6 +371,9 @@ class SettingsRepository {
   void SetProxy(const std::string &proxy);
   void SetTmpDir(const std::string &tmp_dir);
   void SetCertBundle(const std::string &cert_bundle);
+  void SetPublicKeyPaths(const std::string &paths);
+  std::string ResolvePublicKeyPaths() const;
+  std::string GetClientPublicKeyPaths() const;
 
   std::string fqrn() const { return fqrn_(); }
   std::string url() const { return url_(); }
@@ -389,6 +392,7 @@ class SettingsRepository {
   // Currently only used for testing, steered by X509_CERT_BUNDLE
   // in /etc/cvmfs/server.local
   Setting<std::string> cert_bundle_;
+  Setting<std::string> public_key_paths_;
 
   SettingsKeychain keychain_;
 };  // class SettingsRepository
