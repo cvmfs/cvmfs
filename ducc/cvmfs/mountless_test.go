@@ -129,3 +129,32 @@ func TestMountlessCreateCatalog(t *testing.T) {
 		t.Fatalf("expected .cvmfscatalog at %s: %v", catalog, err)
 	}
 }
+
+func TestMountlessIngestBase(t *testing.T) {
+	cases := map[string][2]string{
+		"file":                   {"", "file"},
+		"sif/name":               {"sif", "name"},
+		".sifinfo/ab/abcd.json":  {".sifinfo", "ab/abcd.json"},
+		"subdir/.flat/ab/x/data": {"subdir", ".flat/ab/x/data"},
+	}
+	for dest, want := range cases {
+		b, r := mountlessIngestBase(dest)
+		if b != want[0] || r != want[1] {
+			t.Errorf("%s: got (%q, %q), want %v", dest, b, r, want)
+		}
+	}
+}
+
+func TestMountlessPublishTreeBelowNewParents(t *testing.T) {
+	withMountlessPublishing(t)
+	mockrepo := filepath.Clean("/" + os.Getenv("CVMFS_TEST_REPO"))
+	src := t.TempDir()
+	os.MkdirAll(filepath.Join(src, "a", "b"), 0755)
+	os.WriteFile(filepath.Join(src, "a", "b", "f"), []byte("x"), 0644)
+	if err := PublishToCVMFS(".."+mockrepo, "top/new/tree", src); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(mockrepo, "top", "new", "tree", "a", "b", "f")); err != nil {
+		t.Fatalf("tree not published below new parents: %v", err)
+	}
+}
