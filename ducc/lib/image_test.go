@@ -470,6 +470,11 @@ func TestSelectIndexEntries(t *testing.T) {
 		e.Platform.Architecture = arch
 		return e
 	}
+	osEntry := func(digest, arch, os string) da.ManifestListItem {
+		e := entry(digest, arch)
+		e.Platform.OS = os
+		return e
+	}
 	tests := []struct {
 		name        string
 		entries     []da.ManifestListItem
@@ -483,6 +488,8 @@ func TestSelectIndexEntries(t *testing.T) {
 		{"attestation dropped", []da.ManifestListItem{entry("a", "amd64"), entry("x", "unknown")}, []string{"a"}, "a", false},
 		{"no amd64", []da.ManifestListItem{entry("b", "arm64"), entry("c", "ppc64le")}, []string{"b", "c"}, "b", false},
 		{"only attestation", []da.ManifestListItem{entry("x", "unknown")}, nil, "", true},
+		{"windows dropped", []da.ManifestListItem{osEntry("w", "amd64", "windows"), osEntry("a", "amd64", "linux"), osEntry("b", "arm64", "linux")}, []string{"a", "b"}, "a", false},
+		{"only windows", []da.ManifestListItem{osEntry("w", "amd64", "windows")}, nil, "", true},
 		{"empty", nil, nil, "", true},
 	}
 	for _, tt := range tests {

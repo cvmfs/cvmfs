@@ -351,14 +351,19 @@ func (img *Image) FetchManifestList2() (*da.ManifestList, error) {
 	return &manifestList, nil
 }
 
-// selectIndexEntries drops "unknown" platform entries (attestations) from an
-// image index and picks the default entry: amd64 if present, else the first
-// remaining one.
+// selectIndexEntries drops "unknown" platform entries (attestations) and
+// non-Linux entries from an image index and picks the default entry: amd64 if
+// present, else the first remaining one.  Windows entries must go because
+// .multiarch/ is keyed by architecture only, so windows/amd64 would collide
+// with linux/amd64.
 func selectIndexEntries(entries []da.ManifestListItem) ([]da.ManifestListItem, string, error) {
 	filtered := make([]da.ManifestListItem, 0, len(entries))
 	defaultRef := ""
 	for _, v := range entries {
 		if v.Platform.Architecture == "unknown" {
+			continue
+		}
+		if v.Platform.OS != "" && v.Platform.OS != "linux" {
 			continue
 		}
 		if v.Platform.Architecture == "amd64" && defaultRef == "" {
