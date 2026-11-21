@@ -69,6 +69,7 @@
 #include "clientctx.h"
 #include "compat.h"
 #include "compression/compression.h"
+#include "config_repo_fetch.h"
 #include "crypto/crypto_util.h"
 #include "crypto/hash.h"
 #include "directory_entry.h"
@@ -2577,8 +2578,106 @@ static FileSystem *InitSystemFs(const string &mount_path,
 }
 
 
+/**
+ * Fetches the config repository from the server so that a broken or
+ * unavailable config repository mount does not affect (re-)loading.  Returns
+ * NULL if the mounted config repository is to be used.
+ */
+static std::shared_ptr<const ConfigRepoTree> FetchConfigRepoTree(
+    const std::string &fqrn, bool simple_parser,
+    std::shared_ptr<const ConfigRepoTree> previous = NULL,
+    bool *required_failed = NULL) {
+  const config_repo::FetchResult fetch = config_repo::FetchForRepository(
+      fqrn, simple_parser);
+  if (required_failed != NULL)
+    *required_failed = false;
+  if (fetch.mode == config_repo::kFetchMount)
+    return NULL;
+  if (fetch.tree)
+    return fetch.tree;
+
+  // On reload, the running module's copy avoids the mount, which may hang
+  if (previous && !previous->root_hash.empty()
+      && (previous->fqrn == fetch.config_repo)) {
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+             "failed to fetch config repository %s (%s), "
+             "keeping revision %" PRIu64,
+             fetch.config_repo.c_str(), fetch.error.c_str(),
+             previous->revision);
+    return previous;
+  }
+  if (required_failed != NULL) {
+    *required_failed = fetch.required
+                       && (fetch.mode == config_repo::kFetchDirect);
+  }
+
+  if (fetch.mode == config_repo::kFetchDirect) {
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+             "failed to fetch config repository %s (%s)",
+             fetch.config_repo.c_str(), fetch.error.c_str());
+    // An empty tree makes ParseDefault() behave as for a missing config
+    // repository directory
+    ConfigRepoTree *empty_tree = new ConfigRepoTree();
+    empty_tree->fqrn = fetch.config_repo;
+    return std::shared_ptr<const ConfigRepoTree>(empty_tree);
+  }
+
+  LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+           "failed to fetch config repository %s (%s), "
+           "using the mounted repository",
+           fetch.config_repo.c_str(), fetch.error.c_str());
+  return NULL;
+}
+
+
+/**
+ * Exported to the loader, which parses the options before loading the
+ * module for good.
+ */
+static int FetchConfigRepo(const std::string &fqrn, bool simple_parser,
+                           std::string *serialized_tree) {
+  bool required_failed = false;
+  // Set if called on the running module before a reload
+  std::shared_ptr<const ConfigRepoTree> previous;
+  if (cvmfs::options_mgr_ != NULL)
+    previous = cvmfs::options_mgr_->config_repo_tree();
+  const std::shared_ptr<const ConfigRepoTree> tree = FetchConfigRepoTree(
+      fqrn, simple_parser, previous, &required_failed);
+  if (required_failed)
+    return loader::kConfigRepoFetchRequiredFail;
+  if (!tree)
+    return loader::kConfigRepoFetchMount;
+  *serialized_tree = tree->Serialize();
+  return loader::kConfigRepoFetchTree;
+}
+
+
+static void SetupConfigRepoTree(const loader::LoaderExports *loader_exports,
+                                bool simple_parser) {
+  if ((loader_exports->version < 8) || !loader_exports->config_repo_fetched) {
+    cvmfs::options_mgr_->set_config_repo_tree(
+        FetchConfigRepoTree(loader_exports->repository_name, simple_parser));
+    return;
+  }
+  // The loader fetched right before loading this module
+  if (loader_exports->config_repo_tree.empty())
+    return;
+  ConfigRepoTree *tree = new ConfigRepoTree();
+  if (!ConfigRepoTree::Deserialize(loader_exports->config_repo_tree, tree)) {
+    delete tree;
+    cvmfs::options_mgr_->set_config_repo_tree(
+        FetchConfigRepoTree(loader_exports->repository_name, simple_parser));
+    return;
+  }
+  cvmfs::options_mgr_->set_config_repo_tree(
+      std::shared_ptr<const ConfigRepoTree>(tree));
+}
+
+
 static void InitOptionsMgr(const loader::LoaderExports *loader_exports) {
-  if (loader_exports->version >= 3 && loader_exports->simple_options_parsing) {
+  const bool simple_parser = (loader_exports->version >= 3)
+                             && loader_exports->simple_options_parsing;
+  if (simple_parser) {
     cvmfs::options_mgr_ = new SimpleOptionsParser(
         new DefaultOptionsTemplateManager(loader_exports->repository_name));
   } else {
@@ -2592,6 +2691,7 @@ static void InitOptionsMgr(const loader::LoaderExports *loader_exports) {
       cvmfs::options_mgr_->ParsePath(tokens[i], false);
     }
   } else {
+    SetupConfigRepoTree(loader_exports, simple_parser);
     cvmfs::options_mgr_->ParseDefault(loader_exports->repository_name);
   }
 #ifdef CVMFS_NFS_FRONTEND
@@ -2653,6 +2753,14 @@ static int Init(const loader::LoaderExports *loader_exports) {
   // We need logging set up before forking the watchdog
   FileSystem::SetupLoggingStandalone(*cvmfs::options_mgr_,
                                      loader_exports->repository_name);
+  if (cvmfs::options_mgr_->config_repo_tree()
+      && !cvmfs::options_mgr_->config_repo_tree()->root_hash.empty()) {
+    LogCvmfs(kLogCvmfs, kLogDebug,
+             "using config repository %s revision %" PRIu64
+             " fetched from the server",
+             cvmfs::options_mgr_->config_repo_tree()->fqrn.c_str(),
+             cvmfs::options_mgr_->config_repo_tree()->revision);
+  }
 
   // Start a watchdog if this is the first time or if this is a reload with
   // an old loader that expected the FUSE module to start a watchdog
@@ -2954,6 +3062,9 @@ static int AltProcessFlavor(int argc, char **argv) {
   }
   if (strcmp(argv[1], "__wpad__") == 0) {
     return download::MainResolveProxyDescription(argc, argv);
+  }
+  if (strcmp(argv[1], "__config_fetch__") == 0) {
+    return config_repo::MainConfigFetch(argc, argv);
   }
   return 1;
 }
@@ -3477,6 +3588,7 @@ static void __attribute__((constructor)) LibraryMain() {
   g_cvmfs_exports->fnGetErrorMsg = GetErrorMsg;
   g_cvmfs_exports->fnMaintenanceMode = MaintenanceMode;
 #ifndef __TEST_CVMFS_MOCKFUSE
+  g_cvmfs_exports->fnFetchConfigRepo = FetchConfigRepo;
   g_cvmfs_exports->fnSaveState = SaveState;
   g_cvmfs_exports->fnRestoreState = RestoreState;
   g_cvmfs_exports->fnFreeSavedState = FreeSavedState;

@@ -9,6 +9,7 @@
 
 #include <cassert>
 #include <map>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -40,6 +41,50 @@ class DefaultOptionsTemplateManager : public OptionsTemplateManager {
 };
 
 /**
+ * In-memory copy of a config repository's /etc/cvmfs tree, fetched from the
+ * server instead of read through the mounted repository.  Paths are relative
+ * to the repository root, e.g. "etc/cvmfs/default.conf".
+ */
+struct ConfigRepoTree {
+  static const unsigned kMaxEntries = 4096;
+  static const uint64_t kMaxFileSize = 1024 * 1024;
+  static const uint64_t kMaxTotalSize = 16 * 1024 * 1024;
+
+  ConfigRepoTree() : revision(0) { }
+
+  /**
+   * Resolves "." / ".." and symbolic links inside the tree.  Fails if the
+   * path is absent, a directory, or escapes the repository root.
+   */
+  bool Lookup(const std::string &path, std::string *content) const;
+  bool HasDirectory(const std::string &path) const;
+  /**
+   * Names of regular files and symlinks directly below dir_path, sorted.
+   */
+  std::vector<std::string> List(const std::string &dir_path) const;
+  /**
+   * Repository-relative path for an absolute path below
+   * <mount_dir>/<fqrn>/, or false if the path lies outside.
+   */
+  bool MapMountPath(const std::string &mount_dir, const std::string &abs_path,
+                    std::string *rel_path) const;
+
+  std::string Serialize() const;
+  static bool Deserialize(const std::string &buf, ConfigRepoTree *tree);
+
+  std::string fqrn;
+  uint64_t revision;
+  std::string root_hash;
+  std::map<std::string, std::string> files;
+  std::map<std::string, std::string> symlinks;  ///< path -> raw target
+
+ private:
+  bool Resolve(const std::string &path, unsigned depth,
+               std::string *resolved) const;
+};
+
+
+/**
  * This is the abstract base class for the different option parsers. It parses
  * and stores the information contained in different config files, keeping
  * the last parsed file that changed each property. It stores the information
@@ -62,6 +107,7 @@ class OptionsManager {
     protected_parameters_ = opt_mgr.protected_parameters_;
     templatable_values_ = opt_mgr.templatable_values_;
     taint_environment_ = opt_mgr.taint_environment_;
+    config_repo_tree_ = opt_mgr.config_repo_tree_;
 
     opt_templ_mgr_ = new OptionsTemplateManager(*(opt_mgr.opt_templ_mgr_));
   }
@@ -84,6 +130,17 @@ class OptionsManager {
    */
   virtual void ParsePath(const std::string &config_file,
                          const bool external) = 0;
+
+  /**
+   * Like ParsePath() but for a file that is already in memory.  The shell
+   * evaluates shell_text; assignments are only extracted from the lines of
+   * scan_text (the file itself, without inlined includes), as for ParsePath().
+   *
+   * @param label  recorded as the source of the parsed parameters
+   */
+  virtual void ParseBuffer(const std::string &shell_text,
+                           const std::string &scan_text,
+                           const std::string &label) = 0;
 
   /**
    * Parses the default config files for cvmfs
@@ -175,6 +232,29 @@ class OptionsManager {
   bool HasConfigRepository(const std::string &fqrn, std::string *config_path);
 
   /**
+   * If set, ParseDefault() takes the config repository files from the tree
+   * instead of the mount point.  The tree is shared with copies of this
+   * object and stays available for consumers of key files (MountPoint).
+   */
+  // Atomic: the remount and reload threads swap or read the tree concurrently
+  void set_config_repo_tree(std::shared_ptr<const ConfigRepoTree> tree) {
+    std::atomic_store(&config_repo_tree_, tree);
+  }
+  std::shared_ptr<const ConfigRepoTree> config_repo_tree() const {
+    return std::atomic_load(&config_repo_tree_);
+  }
+
+  /**
+   * Replaces ". <path>" / "source <path>" lines whose literal path resolves
+   * inside the tree by the content of the included file.  path is the
+   * repository-relative path of content.  Other lines are kept as is.
+   */
+  static std::string InlineIncludes(const ConfigRepoTree &tree,
+                                    const std::string &mount_dir,
+                                    const std::string &path,
+                                    const std::string &content);
+
+  /**
    * Similar to a bash "read-only" parameter: the current value will be locked
    * and cannot be changed anymore by succeeding parsings of config files.
    */
@@ -214,6 +294,12 @@ class OptionsManager {
   void PopulateParameter(const std::string &param, const ConfigValue val);
   void ParseValue(const std::string param, ConfigValue *val);
   void UpdateEnvironment(const std::string &param, ConfigValue val);
+  /**
+   * Parses one file of the config repository, from config_repo_tree_ if set,
+   * otherwise from the mount point.  rel_path is relative to etc/cvmfs/.
+   */
+  void ParseConfigRepoFile(const std::string &config_path,
+                           const std::string &rel_path);
   std::map<std::string, ConfigValue> config_;
   std::map<std::string, std::string> protected_parameters_;
   std::map<std::string, std::string> templatable_values_;
@@ -224,8 +310,15 @@ class OptionsManager {
    * In libcvmfs, we don't want a tainted environment.
    */
   bool taint_environment_;
+  std::shared_ptr<const ConfigRepoTree> config_repo_tree_;
 
  private:
+  static bool InlineIncludesRec(const ConfigRepoTree &tree,
+                                const std::string &mount_dir,
+                                const std::string &path,
+                                const std::string &content,
+                                std::vector<std::string> *stack,
+                                std::string *result);
   // NOLINTNEXTLINE(bugprone-unhandled-self-assignment,cert-oop54-cpp)
   OptionsManager &operator=(const OptionsManager & /* other */) {
     assert(false);
@@ -257,8 +350,14 @@ class SimpleOptionsParser : public OptionsManager {
                          const bool external __attribute__((unused))) {
     (void)TryParsePath(config_file);
   }
+  virtual void ParseBuffer(const std::string &shell_text,
+                           const std::string &scan_text,
+                           const std::string &label);
   // Libcvmfs returns success or failure, the fuse module fails silently
   bool TryParsePath(const std::string &config_file);
+
+ private:
+  void ParseLines(const std::string &text, const std::string &label);
 };  // class SimpleOptionsManager
 
 
@@ -274,6 +373,13 @@ class BashOptionsManager : public OptionsManager {
       OptionsTemplateManager *opt_templ_mgr_param = NULL)
       : OptionsManager(opt_templ_mgr_param) { }
   void ParsePath(const std::string &config_file, const bool external);
+  virtual void ParseBuffer(const std::string &shell_text,
+                           const std::string &scan_text,
+                           const std::string &label);
+
+ private:
+  void ParseWithShell(const std::string &cwd, const std::string &shell_text,
+                      const std::string &scan_text, const std::string &label);
 };  // class BashOptionsManager
 
 

@@ -52,6 +52,7 @@ enum Failures {
   kFailLockWorkspace,
   kFailRevisionBlacklisted,
   kFailIgnoredMount,
+  kFailConfigRepo,
 
   kFailNumEntries
 };
@@ -85,7 +86,8 @@ inline const char *Code2Ascii(const Failures error) {
   texts[24] = "workspace already locked";
   texts[25] = "revision blacklisted";
   texts[26] = "mount attempt ignored";
-  texts[27] = "no text";
+  texts[27] = "required config repository unavailable";
+  texts[28] = "no text";
   return texts[error];
 }
 
@@ -161,10 +163,11 @@ typedef std::vector<LoadEvent *> EventList;
  *                      during reload; fuse_passthrough inserted before
  *                      device_id, shifting it (check version >= 6 for both)
  * CernVM-FS 2.15.0 --> Version 7, fuse_channel_or_session --> fuse_session
+ * CernVM-FS 2.15.0 --> Version 8, add config_repo_fetched, config_repo_tree
  */
 struct LoaderExports {
   LoaderExports()
-      : version(7)
+      : version(8)
       , size(sizeof(LoaderExports))
       , boot_time(0)
       , foreground(false)
@@ -172,7 +175,7 @@ struct LoaderExports {
       , simple_options_parsing(false)
       , fuse_session(NULL)
       , fuse_passthrough(false)
-  { }
+      , config_repo_fetched(false) { }
 
   ~LoaderExports() {
     for (unsigned i = 0; i < history.size(); ++i)
@@ -209,6 +212,15 @@ struct LoaderExports {
   // The identifier is read just after mount from /proc/self/mountinfo
   // If it cannot be determined (e.g. on macOS), device_id is "0:0".
   std::string device_id;
+
+  // added with CernVM-FS 2.15.0 (LoaderExports Version: 8)
+  // Set by the loader if it fetched the config repository for its own option
+  // parsing; the first fnInit() then uses config_repo_tree instead of fetching
+  // again.  config_repo_tree is a serialized ConfigRepoTree, empty if the
+  // mounted config repository is to be used.  Reset after the first fnInit()
+  // so that reloads fetch the current config repository.
+  bool config_repo_fetched;
+  std::string config_repo_tree;
 };
 
 
@@ -219,7 +231,7 @@ struct LoaderExports {
  * A global CvmfsExports struct is looked up by the loader via dlsym.
  * Since the cvmfs fuse module gets replaced each time there's an
  * upgrade or downgrade, the only way to get a cvmfs module older than
- * the loader is via a downgrade, which is an unusual situation.  
+ * the loader is via a downgrade, which is an unusual situation.
  * It is still possible, however, so code that uses newer fields should
  * check the version before doing so.
  *
@@ -227,10 +239,11 @@ struct LoaderExports {
  * enough fuse
  *
  * CernVM-FS 2.14.0 --> Version 2, add fnClearExit
+ * CernVM-FS 2.15.0 --> Version 3, add fnFetchConfigRepo
  */
 struct CvmfsExports {
   CvmfsExports() {
-    version = 2;
+    version = 3;
     size = sizeof(CvmfsExports);
     fnAltProcessFlavor = NULL;
     fnInit = NULL;
@@ -243,6 +256,7 @@ struct CvmfsExports {
     fnFreeSavedState = NULL;
     memset(&cvmfs_operations, 0, sizeof(cvmfs_operations));
     fnClearExit = NULL;
+    fnFetchConfigRepo = NULL;
   }
 
   uint32_t version;
@@ -262,7 +276,22 @@ struct CvmfsExports {
   struct fuse_lowlevel_ops cvmfs_operations;
 
   // added with CernVM-FS 2.14.0 (CvmfsExports Version: 2)
-  void (*fnClearExit)(); 
+  void (*fnClearExit)();
+
+  // added with CernVM-FS 2.15.0 (CvmfsExports Version: 3)
+  // Returns a ConfigRepoFetch; for kConfigRepoFetchTree, *serialized_tree is
+  // the ConfigRepoTree to parse fqrn's options with.
+  int (*fnFetchConfigRepo)(const std::string &fqrn, bool simple_parser,
+                           std::string *serialized_tree);
+};
+
+/**
+ * Result of CvmfsExports::fnFetchConfigRepo
+ */
+enum ConfigRepoFetch {
+  kConfigRepoFetchMount = 0,     ///< use the mounted config repository
+  kConfigRepoFetchTree,          ///< parse with the returned tree
+  kConfigRepoFetchRequiredFail,  ///< fetch failed, config repo required
 };
 
 enum ReloadMode {
