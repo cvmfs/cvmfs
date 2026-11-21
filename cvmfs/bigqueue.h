@@ -55,8 +55,15 @@ class BigQueue {
     assert(!IsEmpty());
     head_++;
     size_--;
-    if ((size_ > kCompactThreshold) && (size_ < (capacity_ / 2)))
-      Migrate(static_cast<int>(static_cast<float>(capacity_ * 0.6)));
+    // Compact once the consumed prefix in front of head_ is worth reclaiming.
+    // Testing size_ here instead never fires for a queue that stays at or below
+    // kCompactThreshold entries.  Its prefix then keeps growing, because
+    // GetAvailableSpace() counts it as occupied, until PushBack() migrates into
+    // a buffer 1.9 times larger.  The capacity of such a queue ends up tracking
+    // the total number of pushes rather than the entries it actually holds.
+    size_t const min_items = kNumInit;
+    if ((GetHeadOffset() > kCompactThreshold) && (size_ < (capacity_ / 2)))
+      Migrate(std::max(min_items, static_cast<size_t>(capacity_ * 0.6)));
   }
 
   bool Peek(Item **item) {
