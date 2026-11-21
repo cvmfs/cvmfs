@@ -53,6 +53,7 @@ TEST_F(T_Sanitizer, PositiveIntegerSanitizer) {
   EXPECT_FALSE(test_sanitizer.IsValid("?"));
   EXPECT_FALSE(test_sanitizer.IsValid("5-0"));
   EXPECT_FALSE(test_sanitizer.IsValid("-50"));
+  EXPECT_FALSE(test_sanitizer.IsValid("-"));
 
   EXPECT_EQ(test_sanitizer.Filter("1+2"), "12");
   EXPECT_EQ(test_sanitizer.Filter("0abc1243"), "01243");
@@ -70,10 +71,12 @@ TEST_F(T_Sanitizer, IntegerSanitizer) {
   EXPECT_FALSE(test_sanitizer.IsValid(""));
   EXPECT_FALSE(test_sanitizer.IsValid("?"));
   EXPECT_FALSE(test_sanitizer.IsValid("5-0"));
+  EXPECT_FALSE(test_sanitizer.IsValid("-"));
 
   EXPECT_EQ(test_sanitizer.Filter("1+2"), "12");
   EXPECT_EQ(test_sanitizer.Filter("0abc1243"), "01243");
   EXPECT_EQ(test_sanitizer.Filter("-4-1243"), "-41243");
+  EXPECT_EQ(test_sanitizer.Filter("-"), "");
 }
 
 TEST_F(T_Sanitizer, Base64) {
