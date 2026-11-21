@@ -463,6 +463,122 @@ func TestGetManifestListSingleEntryIndex(t *testing.T) {
 	}
 }
 
+// newNegotiatingRegistry mimics registry.k8s.io: a multi-arch tag is served
+// as an index only if the client accepts index types, otherwise as the amd64
+// manifest.  Single-arch tags are always served as a plain manifest.
+func newNegotiatingRegistry(t *testing.T) *httptest.Server {
+	manifest := func(layer string) string {
+		return `{"schemaVersion": 2, "mediaType": "application/vnd.docker.distribution.manifest.v2+json", "layers": [{"digest": "` + layer + `"}]}`
+	}
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		acceptsIndex := strings.Contains(r.Header.Get("Accept"), "manifest.list.v2+json") ||
+			strings.Contains(r.Header.Get("Accept"), "image.index.v1+json")
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/manifests/sha256:amd64"):
+			w.Write([]byte(manifest("sha256:layer-amd64")))
+		case strings.HasSuffix(r.URL.Path, "/manifests/sha256:arm64"):
+			w.Write([]byte(manifest("sha256:layer-arm64")))
+		case strings.HasSuffix(r.URL.Path, "/multi/manifests/1") && acceptsIndex:
+			w.Write([]byte(`{"schemaVersion": 2, "mediaType": "application/vnd.docker.distribution.manifest.list.v2+json",
+				"manifests": [{"digest": "sha256:amd64", "platform": {"architecture": "amd64", "os": "linux"}},
+				              {"digest": "sha256:arm64", "platform": {"architecture": "arm64", "os": "linux"}},
+				              {"digest": "sha256:windows", "platform": {"architecture": "amd64", "os": "windows"}}]}`))
+		case strings.HasSuffix(r.URL.Path, "/multi/manifests/1"):
+			w.Write([]byte(manifest("sha256:layer-amd64")))
+		case strings.HasSuffix(r.URL.Path, "/single/manifests/1"):
+			w.Write([]byte(manifest("sha256:layer-single")))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+			w.Write([]byte(`{"errors": [{"code": "MANIFEST_UNKNOWN"}]}`))
+		}
+	}))
+}
+
+func TestGetManifestListContentNegotiatingRegistry(t *testing.T) {
+	registry := newNegotiatingRegistry(t)
+	defer registry.Close()
+
+	img, err := ParseImage(registry.URL + "/lab/multi:1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifestList, err := img.GetManifestList()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var archs, layers []string
+	for _, m := range manifestList.Manifests {
+		archs = append(archs, m.Platform.Architecture)
+		layers = append(layers, m.Manifest.Layers[0].Digest)
+	}
+	if !reflect.DeepEqual(archs, []string{"amd64", "arm64"}) {
+		t.Fatalf("archs = %v, want [amd64 arm64]", archs)
+	}
+	if !reflect.DeepEqual(layers, []string{"sha256:layer-amd64", "sha256:layer-arm64"}) {
+		t.Fatalf("layers = %v", layers)
+	}
+}
+
+func TestGetManifestListSingleArchImage(t *testing.T) {
+	registry := newNegotiatingRegistry(t)
+	defer registry.Close()
+
+	img, err := ParseImage(registry.URL + "/lab/single:1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifestList, err := img.GetManifestList()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if manifestList.MediaType != "SingleManifest" || len(manifestList.Manifests) != 1 {
+		t.Fatalf("want one SingleManifest entry, got %+v", manifestList)
+	}
+	if got := manifestList.Manifests[0].Manifest.Layers[0].Digest; got != "sha256:layer-single" {
+		t.Fatalf("layer = %q", got)
+	}
+	raw, err := img.GetRawManifestBytes()
+	if err != nil || !strings.Contains(string(raw), "sha256:layer-single") {
+		t.Fatalf("raw manifest bytes = %q, err = %v", raw, err)
+	}
+}
+
+func TestGetManifestListMissingImage(t *testing.T) {
+	registry := newNegotiatingRegistry(t)
+	defer registry.Close()
+
+	img, err := ParseImage(registry.URL + "/lab/missing:1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := img.GetManifestList(); err == nil {
+		t.Fatal("want an error for a missing image")
+	}
+}
+
+func TestIsManifestIndex(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+		want bool
+	}{
+		{"docker list", `{"mediaType": "application/vnd.docker.distribution.manifest.list.v2+json", "manifests": []}`, true},
+		{"oci index", `{"mediaType": "application/vnd.oci.image.index.v1+json", "manifests": [{}]}`, true},
+		{"oci index without mediaType", `{"schemaVersion": 2, "manifests": [{"digest": "sha256:a"}]}`, true},
+		{"docker manifest", `{"mediaType": "application/vnd.docker.distribution.manifest.v2+json", "layers": []}`, false},
+		{"oci manifest without mediaType", `{"schemaVersion": 2, "layers": [{"digest": "sha256:a"}]}`, false},
+		{"registry error", `{"errors": [{"code": "MANIFEST_UNKNOWN"}]}`, false},
+		{"not json", `<html></html>`, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isManifestIndex([]byte(tt.body)); got != tt.want {
+				t.Errorf("isManifestIndex = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestSelectIndexEntries(t *testing.T) {
 	entry := func(digest, arch string) da.ManifestListItem {
 		var e da.ManifestListItem
