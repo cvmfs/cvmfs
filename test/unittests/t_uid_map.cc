@@ -88,6 +88,12 @@ class T_UidMap : public ::testing::Test {
     return path;
   }
 
+  std::string GetFileWithContent(const std::string &content) {
+    const std::string path = CreateTempPath(sandbox + "/custom", 0600);
+    WriteFile(path, content);
+    return path;
+  }
+
   template<typename T>
   key_type k(const T k) const {
     return key_type(k);
@@ -222,4 +228,23 @@ TYPED_TEST(T_UidMap, ReadFromCorruptFiles) {
 
   ASSERT_FALSE(map3.Read(path3));
   EXPECT_FALSE(map3.IsValid());
+}
+
+
+TYPED_TEST(T_UidMap, ReadRejectsSignOnlyIds) {
+  // A lone '-' is not a number and must not be accepted as an ID; otherwise it
+  // is silently converted to 0, which maps to root.
+  const char *const invalid_lines[] = {
+      "- 1000\n",  // sign-only key
+      "5 -\n",     // sign-only map result
+      "* -\n"      // sign-only default value
+  };
+
+  for (unsigned i = 0; i < sizeof(invalid_lines) / sizeof(invalid_lines[0]);
+       ++i) {
+    TypeParam map;
+    const std::string path = TestFixture::GetFileWithContent(invalid_lines[i]);
+    EXPECT_FALSE(map.Read(path)) << "accepted: " << invalid_lines[i];
+    EXPECT_FALSE(map.IsValid()) << "accepted: " << invalid_lines[i];
+  }
 }
