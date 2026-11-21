@@ -1,5 +1,5 @@
 #!/bin/bash
-cvmfs_test_name="Mountless repository gateway ingest"
+cvmfs_test_name="Readdir caching by FUSE"
 cvmfs_test_autofs_on_startup=false
 cvmfs_test_suites="quick"
 
