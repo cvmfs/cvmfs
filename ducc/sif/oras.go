@@ -2,22 +2,20 @@ package sif
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"strings"
-	"sync"
 	"time"
+
+	"github.com/google/go-containerregistry/pkg/authn"
+	"github.com/google/go-containerregistry/pkg/name"
+	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
-const (
-	sifLayerMediaType  = "application/vnd.sylabs.sif.layer.v1.sif"
-	ociManifestType    = "application/vnd.oci.image.manifest.v1+json"
-	dockerManifestType = "application/vnd.docker.distribution.manifest.v2+json"
-)
+const sifLayerMediaType = "application/vnd.sylabs.sif.layer.v1.sif"
 
 // OrasRef is a parsed oras://<registry>/<repository>[:<tag>][@sha256:<hex>].
 type OrasRef struct {
@@ -74,138 +72,6 @@ func DefaultName(source string) string {
 	return ""
 }
 
-// registryAuth implements the registry token flow: a 401 carries a
-// WWW-Authenticate challenge, answered with a bearer token from the realm
-// (or basic credentials). Tokens expire during long ingests, so refresh is
-// called again on any later 401.
-type registryAuth struct {
-	client     *http.Client
-	user, pass string
-
-	mu     sync.Mutex
-	header string
-	last   time.Time
-}
-
-func (a *registryAuth) apply(req *http.Request) {
-	a.mu.Lock()
-	h := a.header
-	a.mu.Unlock()
-	if h != "" {
-		req.Header.Set("Authorization", h)
-	}
-}
-
-// refresh reports whether a new Authorization header was obtained.
-func (a *registryAuth) refresh(ctx context.Context, resp *http.Response) bool {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	// Concurrent chunk fetches all see the 401; one refresh serves them.
-	if time.Since(a.last) < time.Second && a.header != "" {
-		return true
-	}
-	scheme, params := parseChallenge(resp.Header.Get("WWW-Authenticate"))
-	switch strings.ToLower(scheme) {
-	case "basic":
-		if a.user == "" {
-			return false
-		}
-		a.header = "Basic " + base64.StdEncoding.EncodeToString([]byte(a.user+":"+a.pass))
-	case "bearer":
-		tok, err := a.fetchToken(ctx, params)
-		if err != nil {
-			return false
-		}
-		a.header = "Bearer " + tok
-	default:
-		return false
-	}
-	a.last = time.Now()
-	return true
-}
-
-func (a *registryAuth) fetchToken(ctx context.Context, params map[string]string) (string, error) {
-	realm := params["realm"]
-	if realm == "" {
-		return "", fmt.Errorf("bearer challenge without realm")
-	}
-	u, err := url.Parse(realm)
-	if err != nil {
-		return "", err
-	}
-	q := u.Query()
-	for _, k := range []string{"service", "scope"} {
-		if v := params[k]; v != "" {
-			q.Set(k, v)
-		}
-	}
-	u.RawQuery = q.Encode()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
-	if err != nil {
-		return "", err
-	}
-	if a.user != "" {
-		req.SetBasicAuth(a.user, a.pass)
-	}
-	resp, err := a.client.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("token request: HTTP %s", resp.Status)
-	}
-	var body struct {
-		Token       string `json:"token"`
-		AccessToken string `json:"access_token"`
-	}
-	if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&body); err != nil {
-		return "", err
-	}
-	if body.Token == "" {
-		body.Token = body.AccessToken
-	}
-	if body.Token == "" {
-		return "", fmt.Errorf("token response without token")
-	}
-	return body.Token, nil
-}
-
-// parseChallenge parses `Bearer realm="...",service="...",scope="..."`.
-func parseChallenge(h string) (string, map[string]string) {
-	scheme, rest, _ := strings.Cut(strings.TrimSpace(h), " ")
-	params := map[string]string{}
-	for rest != "" {
-		rest = strings.TrimLeft(rest, " ,")
-		k, v, ok := strings.Cut(rest, "=")
-		if !ok {
-			break
-		}
-		k = strings.ToLower(strings.TrimSpace(k))
-		if strings.HasPrefix(v, `"`) {
-			end := strings.Index(v[1:], `"`)
-			if end < 0 {
-				params[k] = v[1:]
-				break
-			}
-			params[k], rest = v[1:end+1], v[end+2:]
-		} else {
-			val, r, _ := strings.Cut(v, ",")
-			params[k], rest = strings.TrimSpace(val), r
-		}
-	}
-	return scheme, params
-}
-
-type ociManifest struct {
-	MediaType string `json:"mediaType"`
-	Layers    []struct {
-		MediaType string `json:"mediaType"`
-		Digest    string `json:"digest"`
-		Size      int64  `json:"size"`
-	} `json:"layers"`
-}
-
 // openOras resolves the reference to the SIF layer blob and reads it with
 // range requests like any HTTP source; the blob digest becomes the image
 // ID.
@@ -215,68 +81,66 @@ func openOras(ctx context.Context, ref string, opts SourceOptions) (Source, erro
 		return nil, err
 	}
 	scheme := "https"
+	var nameOpts []name.Option
 	if opts.PlainHTTP {
 		scheme = "http"
+		nameOpts = append(nameOpts, name.Insecure)
 	}
-	base := scheme + "://" + r.Registry + "/v2/" + r.Repository
+	// Built from parts: name.ParseReference would send a registry without
+	// a dot or port to Docker Hub.
+	reg, err := name.NewRegistry(r.Registry, nameOpts...)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", ref, err)
+	}
+	repo := reg.Repo(r.Repository)
+	auth := authn.Anonymous
+	if opts.Credentials != nil {
+		if user, pass, ok := opts.Credentials(scheme + "://" + r.Registry); ok {
+			auth = authn.FromConfig(authn.AuthConfig{Username: user, Password: pass})
+		}
+	}
+
 	client := &http.Client{Timeout: 5 * time.Minute}
 	if opts.Client != nil {
 		*client = *opts.Client
 	}
-	// Blob GETs redirect to object storage. Go keeps Authorization when only
-	// the port differs, so drop it on any change of host:port.
-	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
-		if len(via) >= 10 {
-			return fmt.Errorf("stopped after 10 redirects")
-		}
-		if req.URL.Host != via[0].URL.Host {
-			req.Header.Del("Authorization")
-		}
-		return nil
+	inner := client.Transport
+	if inner == nil {
+		inner = http.DefaultTransport
+	}
+	// Refreshes expired tokens on 401 and sends credentials only to the
+	// registry, not to the storage that blob GETs redirect to.
+	client.Transport, err = transport.NewWithContext(ctx, reg, auth, inner,
+		[]string{repo.Scope(transport.PullScope)})
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", ref, err)
 	}
 	opts.Client = client
-	auth := &registryAuth{client: client}
-	if opts.Credentials != nil {
-		auth.user, auth.pass, _ = opts.Credentials(scheme + "://" + r.Registry)
-	}
 
+	base := scheme + "://" + r.Registry + "/v2/" + r.Repository
 	reference := r.Tag
 	if r.Digest != "" {
 		reference = "sha256:" + r.Digest
 	}
-	var m ociManifest
-	for attempt := 0; ; attempt++ {
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"/manifests/"+reference, nil)
-		if err != nil {
-			return nil, err
-		}
-		req.Header.Set("Accept", ociManifestType+", "+dockerManifestType)
-		auth.apply(req)
-		resp, err := opts.Client.Do(req)
-		if err != nil {
-			return nil, err
-		}
-		if resp.StatusCode == http.StatusUnauthorized && attempt == 0 && auth.refresh(ctx, resp) {
-			resp.Body.Close()
-			continue
-		}
-		if resp.StatusCode != http.StatusOK {
-			resp.Body.Close()
-			return nil, fmt.Errorf("%s: fetching manifest %s: HTTP %s", ref, reference, resp.Status)
-		}
-		err = json.NewDecoder(io.LimitReader(resp.Body, 4<<20)).Decode(&m)
-		resp.Body.Close()
-		if err != nil {
-			return nil, fmt.Errorf("%s: invalid manifest: %w", ref, err)
-		}
-		break
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"/manifests/"+reference, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", ocispec.MediaTypeImageManifest+", "+mediaTypeDockerManifest)
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("%s: fetching manifest %s: HTTP %s", ref, reference, resp.Status)
+	}
+	var m ocispec.Manifest
+	if err := json.NewDecoder(io.LimitReader(resp.Body, maxOCIJSON)).Decode(&m); err != nil {
+		return nil, fmt.Errorf("%s: invalid manifest: %w", ref, err)
 	}
 
-	var layer *struct {
-		MediaType string `json:"mediaType"`
-		Digest    string `json:"digest"`
-		Size      int64  `json:"size"`
-	}
+	var layer *ocispec.Descriptor
 	var types []string
 	for i := range m.Layers {
 		types = append(types, m.Layers[i].MediaType)
@@ -290,11 +154,11 @@ func openOras(ctx context.Context, ref string, opts SourceOptions) (Source, erro
 	if layer == nil {
 		return nil, fmt.Errorf("%s: no %s layer in manifest (layers: %v)", ref, sifLayerMediaType, types)
 	}
-	digest, err := normalizeDigest(layer.Digest)
+	digest, err := normalizeDigest(string(layer.Digest))
 	if err != nil {
 		return nil, fmt.Errorf("%s: layer digest: %w", ref, err)
 	}
-	src, err := newHTTPSource(ctx, base+"/blobs/sha256:"+digest, opts, auth, digest)
+	src, err := newHTTPSource(ctx, base+"/blobs/sha256:"+digest, opts, digest)
 	if err != nil {
 		return nil, err
 	}

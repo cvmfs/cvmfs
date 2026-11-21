@@ -141,7 +141,6 @@ type httpSource struct {
 	readahead int
 	attempts  int
 	logger    *log.Entry
-	auth      *registryAuth
 	digest    string
 
 	mu       sync.Mutex
@@ -171,12 +170,12 @@ var (
 )
 
 func openHTTP(ctx context.Context, url string, opts SourceOptions) (Source, error) {
-	return newHTTPSource(ctx, url, opts, nil, "")
+	return newHTTPSource(ctx, url, opts, "")
 }
 
-// newHTTPSource opens url for range reads; auth is set for registry blobs,
-// digest when the content hash is known in advance.
-func newHTTPSource(ctx context.Context, url string, opts SourceOptions, auth *registryAuth, digest string) (Source, error) {
+// newHTTPSource opens url for range reads; digest is set when the content
+// hash is known in advance.
+func newHTTPSource(ctx context.Context, url string, opts SourceOptions, digest string) (Source, error) {
 	def := DefaultSourceOptions()
 	if opts.ChunkSize <= 0 {
 		opts.ChunkSize = def.ChunkSize
@@ -198,7 +197,7 @@ func newHTTPSource(ctx context.Context, url string, opts SourceOptions, auth *re
 		chunk: opts.ChunkSize, maxChunks: int(opts.CacheSize / opts.ChunkSize),
 		readahead: opts.Readahead, attempts: opts.Attempts, logger: opts.Logger,
 		lru: list.New(), chunks: map[int64]*list.Element{}, inflight: map[int64]*chunkFetch{},
-		last: -2, auth: auth, digest: digest,
+		last: -2, digest: digest,
 	}
 	if err := s.probe(); err != nil {
 		if errors.Is(err, errNoRanges) && opts.SpoolDir != "" {
@@ -280,14 +279,11 @@ func (s *httpSource) spool(dir string) (Source, error) {
 		read: atomic.LoadInt64(&s.stats.BytesFetched)}, nil
 }
 
-// checkAuth turns a 401 into a retryable error after refreshing the
-// registry token, or a final one when there is nothing to refresh.
+// checkAuth makes a 401 final: registry transports have already refreshed
+// their token by the time one gets here.
 func (s *httpSource) checkAuth(resp *http.Response) error {
 	if resp.StatusCode != http.StatusUnauthorized {
 		return nil
-	}
-	if s.auth != nil && s.auth.refresh(s.ctx, resp) {
-		return fmt.Errorf("%s: token expired, refreshed", s.url)
 	}
 	return fmt.Errorf("%s: %w", s.url, errUnauthorized)
 }
@@ -299,9 +295,6 @@ func (s *httpSource) newRequest(method string) (*http.Request, error) {
 	}
 	for k, v := range s.headers {
 		req.Header[k] = v
-	}
-	if s.auth != nil {
-		s.auth.apply(req)
 	}
 	return req, nil
 }

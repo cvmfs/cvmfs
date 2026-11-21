@@ -174,8 +174,10 @@ type Source interface {
 
 ### 5.3 oras://
 
-- Resolve the manifest with the existing registry client code (`lib/image.go`:
-  token handling, `SetupRegistries` credentials).
+- Authenticate with the go-containerregistry registry transport
+  (`pkg/v1/remote/transport`), credentials from `SetupRegistries`. The
+  transport answers basic and bearer challenges, refreshes tokens on `401` and
+  sends `Authorization` only to the registry host.
 - Accept a manifest with exactly one layer of media type
   `application/vnd.sylabs.sif.layer.v1.sif`. Take its `digest` and `size`.
 - Blob URL is `<base>/v2/<repo>/blobs/<digest>`. Refresh bearer tokens on
@@ -909,9 +911,9 @@ sections above are noted there (§5.2 validators, §7.2 ownership, §8.2
   - The HTTP range source has a chunk cache, readahead, retries and change
     detection.
   - `oras://` resolves the manifest's SIF layer and reads the blob with
-    range requests. Bearer tokens are refreshed on 401; Authorization is
-    dropped on redirects to another host:port. Credentials come from
-    `DUCC_AUTH_REGISTRIES`.
+    range requests through the go-containerregistry registry transport,
+    which refreshes tokens on 401 and keeps Authorization off redirects to
+    another host. Credentials come from `DUCC_AUTH_REGISTRIES`.
   - `--spool-dir` downloads first when the server ignores ranges.
   - `--verify-digest` hashes the source after ingest.
 - **M4 complete** (§10.2, §10.3; oras:// entries may omit `name`): `sif_input`

@@ -12,9 +12,12 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 func TestParseOrasRef(t *testing.T) {
@@ -45,19 +48,23 @@ func TestParseOrasRef(t *testing.T) {
 }
 
 // fakeRegistry serves one SIF as an oras artifact behind bearer-token auth.
-// Tokens stop working after tokenUses requests; blobs redirect to storage.
+// Each token stops working after tokenUses requests; blobs redirect to
+// storage.
 type fakeRegistry struct {
 	srv, storage *httptest.Server
 	data         []byte
 	digest       string
 	tokenUses    int32
 	tokens       int32 // tokens issued
-	tokenLeft    int32
+
+	mu        sync.Mutex
+	tokenLeft map[string]int32
 }
 
 func newFakeRegistry(t *testing.T, data []byte, tokenUses int32) *fakeRegistry {
 	sum := sha256.Sum256(data)
-	r := &fakeRegistry{data: data, digest: hex.EncodeToString(sum[:]), tokenUses: tokenUses}
+	r := &fakeRegistry{data: data, digest: hex.EncodeToString(sum[:]), tokenUses: tokenUses,
+		tokenLeft: map[string]int32{}}
 	r.storage = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if req.Header.Get("Authorization") != "" {
 			t.Errorf("registry credentials leaked to storage host")
@@ -74,13 +81,19 @@ func newFakeRegistry(t *testing.T, data []byte, tokenUses int32) *fakeRegistry {
 			if req.URL.Query().Get("scope") != "repository:test/img:pull" {
 				t.Errorf("unexpected scope %q", req.URL.Query().Get("scope"))
 			}
-			n := atomic.AddInt32(&r.tokens, 1)
-			atomic.StoreInt32(&r.tokenLeft, r.tokenUses)
-			json.NewEncoder(w).Encode(map[string]string{"token": fmt.Sprintf("tok%d", n)})
+			tok := fmt.Sprintf("tok%d", atomic.AddInt32(&r.tokens, 1))
+			r.mu.Lock()
+			r.tokenLeft[tok] = r.tokenUses
+			r.mu.Unlock()
+			json.NewEncoder(w).Encode(map[string]string{"token": tok})
 			return
 		}
-		want := fmt.Sprintf("Bearer tok%d", atomic.LoadInt32(&r.tokens))
-		if req.Header.Get("Authorization") != want || atomic.AddInt32(&r.tokenLeft, -1) < 0 {
+		tok, _ := strings.CutPrefix(req.Header.Get("Authorization"), "Bearer ")
+		r.mu.Lock()
+		left, ok := r.tokenLeft[tok]
+		r.tokenLeft[tok] = left - 1
+		r.mu.Unlock()
+		if !ok || left <= 0 {
 			w.Header().Set("WWW-Authenticate", fmt.Sprintf(
 				`Bearer realm="%s/token",service="fake",scope="repository:test/img:pull"`, r.srv.URL))
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
@@ -88,11 +101,11 @@ func newFakeRegistry(t *testing.T, data []byte, tokenUses int32) *fakeRegistry {
 		}
 		switch req.URL.Path {
 		case "/v2/test/img/manifests/v1", "/v2/test/img/manifests/sha256:" + r.digest:
-			w.Header().Set("Content-Type", ociManifestType)
+			w.Header().Set("Content-Type", ocispec.MediaTypeImageManifest)
 			fmt.Fprintf(w, `{"schemaVersion":2,"mediaType":%q,
 				"config":{"mediaType":"application/vnd.sylabs.sif.config.v1+json","digest":"sha256:%s","size":2},
 				"layers":[{"mediaType":%q,"digest":"sha256:%s","size":%d}]}`,
-				ociManifestType, strings.Repeat("0", 64), sifLayerMediaType, r.digest, len(r.data))
+				ocispec.MediaTypeImageManifest, strings.Repeat("0", 64), sifLayerMediaType, r.digest, len(r.data))
 		case "/v2/test/img/blobs/sha256:" + r.digest:
 			http.Redirect(w, req, r.storage.URL+"/blob", http.StatusTemporaryRedirect)
 		default:
