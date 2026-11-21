@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"fmt"
 	"io/ioutil"
 	"math/rand"
 	"os"
@@ -9,18 +10,33 @@ import (
 	"time"
 
 	l "github.com/cvmfs/ducc/log"
+	"github.com/cvmfs/ducc/sif"
 	log "github.com/sirupsen/logrus"
 
 	"gopkg.in/yaml.v2"
 )
 
 type YamlRecipeV1 struct {
-	Version      int      `yaml:"version"`
-	User         string   `yaml:"user"`
-	CVMFSRepo    string   `yaml:"cvmfs_repo"`
-	OutputFormat string   `yaml:"output_format"`
-	Input        []string `yaml:"input"`
-	IgnoreErrors []string `yaml:"ignoreErrors"`
+	Version      int              `yaml:"version"`
+	User         string           `yaml:"user"`
+	CVMFSRepo    string           `yaml:"cvmfs_repo"`
+	OutputFormat string           `yaml:"output_format"`
+	Input        []string         `yaml:"input"`
+	IgnoreErrors []string         `yaml:"ignoreErrors"`
+	SIFInput     []SIFWish        `yaml:"sif_input"`
+	SIFOptions   YamlSIFOptionsV1 `yaml:"sif_options"`
+}
+
+// YamlSIFOptionsV1 holds ingest tuning shared by all sif_input entries;
+// unset fields keep the convert-sif defaults.
+type YamlSIFOptionsV1 struct {
+	ContiguousCatalogs bool   `yaml:"contiguous_catalogs"`
+	CatalogMaxWeight   *int   `yaml:"catalog_max_weight"`
+	CatalogMinWeight   *int   `yaml:"catalog_min_weight"`
+	Workers            int    `yaml:"workers"`
+	CacheSizeMiB       int    `yaml:"cache_size_mib"`
+	PlainHTTP          bool   `yaml:"plain_http"`
+	SpoolDir           string `yaml:"spool_dir"`
 }
 
 type IgnoreErrorsConfig struct {
@@ -32,6 +48,11 @@ type Recipe struct {
 	Wishes           chan WishFriendly
 	IgnoreErrorsList []string
 	OutputFormat     string
+	// NumInputs counts the docker inputs, so that callers can tell a
+	// SIF-only recipe apart before draining Wishes.
+	NumInputs  int
+	SIFWishes  []SIFWish
+	SIFOptions YamlSIFOptionsV1
 }
 
 // loadIgnoreErrorsList loads the ignore errors list from an external file if DUCC_IGNORE_ERRORS_FILE env var is set
@@ -92,6 +113,15 @@ func ParseYamlRecipeV1(data []byte) (Recipe, error) {
 	if err != nil {
 		return recipe, err
 	}
+	if err := validateSIFInput(recipeYamlV1.SIFInput); err != nil {
+		return recipe, err
+	}
+	if err := recipeYamlV1.SIFOptions.validate(); err != nil {
+		return recipe, err
+	}
+	recipe.SIFWishes = recipeYamlV1.SIFInput
+	recipe.SIFOptions = recipeYamlV1.SIFOptions
+	recipe.NumInputs = len(recipeYamlV1.Input)
 
 	registryMap := make(map[string][]Image)
 	for _, inputImage := range recipeYamlV1.Input {
@@ -121,6 +151,52 @@ func ParseYamlRecipeV1(data []byte) (Recipe, error) {
 		}(inputImages, reg)
 	}
 	return recipe, nil
+}
+
+// validateSIFInput rejects the whole recipe on a bad entry: publishing the
+// others would hide the typo, and two entries with the same name would
+// relink sif/<name> back and forth on every run.
+func validateSIFInput(wishes []SIFWish) error {
+	var errs []string
+	seen := make(map[string]int)
+	for i := range wishes {
+		if wishes[i].Name == "" {
+			wishes[i].Name = sif.DefaultName(wishes[i].Source)
+		}
+		w := wishes[i]
+		where := fmt.Sprintf("sif_input[%d]", i)
+		if w.Source == "" {
+			errs = append(errs, where+": source is required")
+		}
+		if err := sif.ValidateName(w.Name); err != nil {
+			errs = append(errs, fmt.Sprintf("%s (%s): %v", where, w.Source, err))
+		} else if j, dup := seen[w.Name]; dup {
+			errs = append(errs, fmt.Sprintf("%s: name %q already used by sif_input[%d]", where, w.Name, j))
+		} else {
+			seen[w.Name] = i
+		}
+		if w.Digest != "" {
+			if err := sif.ValidateDigest(w.Digest); err != nil {
+				errs = append(errs, fmt.Sprintf("%s (%s): %v", where, w.Source, err))
+			}
+		}
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf("invalid sif_input:\n  %s", strings.Join(errs, "\n  "))
+	}
+	return nil
+}
+
+func (o YamlSIFOptionsV1) validate() error {
+	for name, v := range map[string]*int{"catalog_max_weight": o.CatalogMaxWeight, "catalog_min_weight": o.CatalogMinWeight} {
+		if v != nil && *v < 0 {
+			return fmt.Errorf("sif_options.%s must not be negative", name)
+		}
+	}
+	if o.Workers < 0 || o.CacheSizeMiB < 0 {
+		return fmt.Errorf("sif_options.workers and sif_options.cache_size_mib must not be negative")
+	}
+	return nil
 }
 
 func formatOutputImage(OutputFormat string, inputImage Image) string {

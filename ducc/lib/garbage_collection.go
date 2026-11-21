@@ -126,6 +126,26 @@ func FindAllFlatImages(CVMFSRepo string) ([]string, error) {
 	return result, nil
 }
 
+// FindSifInfoToDelete returns the provenance files that belong to the given
+// flat image paths (/cvmfs/<repo>/.flat/<xx>/<id>), so that they go together
+// with the image. Docker-sourced flat images have none.
+func FindSifInfoToDelete(flatImages []string) []string {
+	result := make([]string, 0)
+	for _, flat := range flatImages {
+		id := filepath.Base(flat)
+		shard := filepath.Dir(flat)
+		root := filepath.Dir(filepath.Dir(shard))
+		if filepath.Base(filepath.Dir(shard)) != ".flat" || len(id) < 2 || filepath.Base(shard) != id[:2] {
+			continue
+		}
+		info := filepath.Join(root, ".sifinfo", id[:2], id+".json")
+		if _, err := os.Lstat(info); err == nil {
+			result = append(result, info)
+		}
+	}
+	return result
+}
+
 func FindAllLayers(CVMFSRepo string) ([]string, error) {
 	root := filepath.Join("/", "cvmfs", CVMFSRepo, ".layers")
 	root_components := strings.Split(root, string(os.PathSeparator))

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -86,14 +87,6 @@ var convertCmd = &cobra.Command{
 			l.Log().Warn("--skip-layers is deprecated and no longer functional: layers will be unpacked regardless. If you only need the flat image, use `docker save` and `cvmfs_server ingest` instead.")
 		}
 
-		if (skipLayers == false) && (skipThinImage == false) {
-			_, err := lib.GetPassword()
-			if err != nil {
-				l.LogE(err).Error("No password provide to upload the docker images")
-				return (err)
-			}
-		}
-
 		data, err := ioutil.ReadFile(args[0])
 		if err != nil {
 			l.LogE(err).Error("Impossible to read the recipe file")
@@ -107,6 +100,14 @@ var convertCmd = &cobra.Command{
 		if !cvmfs.RepositoryExists(recipe.Repo) {
 			l.LogE(err).Error("The repository does not seem to exists.")
 			return err
+		}
+		// A SIF-only recipe pushes no thin images.
+		if !skipLayers && !skipThinImage && recipe.NumInputs > 0 {
+			_, err := lib.GetPassword()
+			if err != nil {
+				l.LogE(err).Error("No password provide to upload the docker images")
+				return (err)
+			}
 		}
 
 		// Set up signal handler to abort the cvmfs transaction on Ctrl-C
@@ -144,6 +145,7 @@ var convertCmd = &cobra.Command{
 				} else {
 					l.LogE(layerErr).WithFields(fields).Error("Error in converting wish (layers), going on")
 					conversionErrors = append(conversionErrors, fmt.Sprintf("[%s] layers: %s", wish.InputName, layerErr))
+					totalSummary.AddFailed(wish.InputName)
 				}
 			} else {
 				if len(summary.Added) == 0 && len(summary.Updated) == 0 {
@@ -160,6 +162,7 @@ var convertCmd = &cobra.Command{
 					} else {
 						l.LogE(err).WithFields(fields).Error("Error in converting wish (docker), going on")
 						conversionErrors = append(conversionErrors, fmt.Sprintf("[%s] docker: %s", wish.InputName, err))
+						totalSummary.AddFailed(wish.InputName)
 					}
 				}
 			}
@@ -174,6 +177,7 @@ var convertCmd = &cobra.Command{
 						} else {
 							l.LogE(err).WithFields(fields).Error("Error in converting wish (singularity), going on")
 							conversionErrors = append(conversionErrors, fmt.Sprintf("[%s] singularity: %s", wish.InputName, err))
+							totalSummary.AddFailed(wish.InputName)
 						}
 					} else if !skipPodman {
 						if podmanErr := lib.ConvertWishPodman(wish, multiArch); podmanErr != nil {
@@ -182,12 +186,16 @@ var convertCmd = &cobra.Command{
 							} else {
 								l.LogE(podmanErr).WithFields(fields).Error("Error publishing podman store, going on")
 								conversionErrors = append(conversionErrors, fmt.Sprintf("[%s] podman: %s", wish.InputName, podmanErr))
+								totalSummary.AddFailed(wish.InputName)
 							}
 						}
 					}
 				}
 			}
 		}
+		sifSummary, sifErrors := convertSIFWishes(context.Background(), recipe, convertAgain, nil)
+		totalSummary.Merge(sifSummary)
+		conversionErrors = append(conversionErrors, sifErrors...)
 		logConversionSummary("Conversion summary:", totalSummary)
 		if len(conversionErrors) > 0 {
 			summary := fmt.Sprintf("%d conversion error(s):\n  %s", len(conversionErrors), strings.Join(conversionErrors, "\n  "))

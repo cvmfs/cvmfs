@@ -80,7 +80,7 @@ func OpenGCDatabase(dbPath string) (*GCDatabase, error) {
 	CREATE TABLE IF NOT EXISTS gc_paths (
 		id        INTEGER PRIMARY KEY AUTOINCREMENT,
 		path      TEXT    NOT NULL UNIQUE,
-		category  TEXT    NOT NULL,  -- 'image', 'layer', or 'podman'
+		category  TEXT    NOT NULL,  -- 'image', 'layer', 'podman' or 'sifinfo'
 		scanned_at TEXT   NOT NULL,  -- RFC3339 timestamp of when the path was recorded
 		deleted   INTEGER NOT NULL DEFAULT 0  -- 0 = pending, 1 = deleted
 	);
