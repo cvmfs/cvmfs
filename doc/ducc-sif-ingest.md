@@ -18,6 +18,10 @@ from OCI images: `apptainer exec /cvmfs/<repo>/<public path> ...`.
 
 ### Non-goals (v1)
 
+- Platforms other than Linux. The publisher side (`cvmfs_server ingest`)
+  is Linux-only, and the tests use Linux semantics for device numbers and
+  temporary paths. The test files in `sif/` and `lib/sif_wish_test.go`
+  carry `//go:build linux`.
 - Encrypted SIF partitions, ext3 partitions, overlay partitions. These are
   rejected with a clear error.
 - Signature verification of the SIF (see §12, later phase).

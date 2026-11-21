@@ -178,6 +178,9 @@ HTTP range-request support. The image is stored at `.flat/<xx>/<id>` and
 linked from `sif/<name>`, so it runs with
 `apptainer exec /cvmfs/<repo>/sif/<name> ...`.
 
+SIF ingestion is supported on Linux only, and its tests are built only
+there.
+
 - `oras://<registry>/<repository>[:tag][@sha256:...]` reads the SIF
   pushed with `apptainer push`; the image ID is the blob digest and the
   name defaults to `<registry>/<repository>:<tag>`. Credentials come from
