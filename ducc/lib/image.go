@@ -302,9 +302,14 @@ func (img *Image) FetchManifestList2() (*da.ManifestList, error) {
 	if err != nil {
 		return nil, err
 	}
+	return img.manifestListFromBytes(bytes1)
+}
 
+// manifestListFromBytes parses an image index and fetches the manifest of
+// every usable entry.
+func (img *Image) manifestListFromBytes(bytes1 []byte) (*da.ManifestList, error) {
 	var manifestList da.ManifestList
-	err = json.Unmarshal(bytes1, &manifestList)
+	err := json.Unmarshal(bytes1, &manifestList)
 	if err != nil {
 		return nil, err
 	}
@@ -451,27 +456,62 @@ func (img *Image) GetManifestList() (da.ManifestList, error) {
 		return *img.ManifestList, nil
 	}
 
-	var manifestList da.ManifestList
-	// First try to fetch a simple manifest
-	manifest, err := img.fetchManifest()
-
-	if err != nil || manifest.MediaType == "application/vnd.docker.distribution.manifest.list.v2+json" || manifest.MediaType == "application/vnd.oci.image.index.v1+json" {
-		// If the first fetch fails, try to fetch from a manifest list
-		manifestList2, err := img.FetchManifestList2()
+	// Accept index and single manifest types in one request.  Registries that
+	// negotiate content (e.g. registry.k8s.io) answer a single-manifest-only
+	// request for a multi-arch tag with the default platform's manifest,
+	// which would hide all other architectures.
+	bytes, err := img.getByteManifestOrList()
+	if err == nil && isManifestIndex(bytes) {
+		manifestList, err := img.manifestListFromBytes(bytes)
 		if err != nil {
-			return da.ManifestList{}, fmt.Errorf("could not retrieve manifestlist for %s", img.WholeName())
+			return da.ManifestList{}, fmt.Errorf("could not retrieve manifestlist for %s: %w", img.WholeName(), err)
+		}
+		return *manifestList, nil
+	}
+	var manifest da.Manifest
+	if err == nil {
+		err = json.Unmarshal(bytes, &manifest)
+	}
+	if err == nil && reflect.DeepEqual(da.Manifest{}, manifest) {
+		err = fmt.Errorf("got empty manifest")
+	}
+	if err != nil {
+		manifestList2, err2 := img.FetchManifestList2()
+		if err2 != nil {
+			return da.ManifestList{}, fmt.Errorf("could not retrieve manifestlist for %s: %w", img.WholeName(), err)
 		}
 		return *manifestList2, nil
-	} else if err == nil {
-		var placeholderitem da.ManifestListItem
-		placeholderitem.Manifest = *manifest
-		placeholderitem.Platform.Architecture = "" //for images without manifestlist, assume amd64 arch
-		manifestList.Manifests = append(manifestList.Manifests, placeholderitem)
-		manifestList.MediaType = "SingleManifest"
-
 	}
+	img.Manifest = &manifest
+	img.rawManifestBytes = bytes
 
+	var manifestList da.ManifestList
+	var placeholderitem da.ManifestListItem
+	placeholderitem.Manifest = manifest
+	placeholderitem.Platform.Architecture = "" //for images without manifestlist, assume amd64 arch
+	manifestList.Manifests = append(manifestList.Manifests, placeholderitem)
+	manifestList.MediaType = "SingleManifest"
 	return manifestList, nil
+}
+
+// isManifestIndex reports whether a manifest response is an image index or a
+// Docker manifest list.  OCI makes mediaType optional, so a body with a
+// "manifests" array and no mediaType also counts.
+func isManifestIndex(body []byte) bool {
+	var probe struct {
+		MediaType string            `json:"mediaType"`
+		Manifests []json.RawMessage `json:"manifests"`
+	}
+	if json.Unmarshal(body, &probe) != nil {
+		return false
+	}
+	switch probe.MediaType {
+	case "application/vnd.docker.distribution.manifest.list.v2+json", "application/vnd.oci.image.index.v1+json":
+		return true
+	case "":
+		return len(probe.Manifests) > 0
+	}
+	return false
 }
 
 func (img *Image) GetManifest() (da.Manifest, error) {
@@ -762,6 +802,11 @@ func (i *Image) GetVariantSymlinkTarget(defaultArch string) string {
 func (img *Image) getByteManifestList() ([]byte, error) {
 	url := img.GetManifestUrl("")
 	return makeGetRequest(url, map[string]string{"Accept": "application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.index.v1+json"})
+}
+
+func (img *Image) getByteManifestOrList() ([]byte, error) {
+	url := img.GetManifestUrl("")
+	return makeGetRequest(url, map[string]string{"Accept": "application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json, application/vnd.oci.image.manifest.v1+json"})
 }
 
 func (img *Image) getByteManifest(reference string) ([]byte, error) {
