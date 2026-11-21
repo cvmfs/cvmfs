@@ -19,6 +19,11 @@ Running the testsuite
 $ go test -v ./...
 ```
 
+HTTP timeout
+------------
+
+Set `http_timeout` in the gateway configuration or pass `--http_timeout` to set the HTTP read and write timeout in seconds. Omitting it or setting it to zero uses `max_lease_time`, preserving the default behavior. The timeout does not change when leases expire.
+
 License and copyright
 ---------------------
 

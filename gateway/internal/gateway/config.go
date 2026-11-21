@@ -19,6 +19,8 @@ type Config struct {
 	// MaxLeaseTime is the initial lease duration in seconds. It also caps the
 	// extension that a refresh (PATCH /leases/:token) can apply.
 	MaxLeaseTime time.Duration `mapstructure:"max_lease_time"`
+	// HTTPTimeout is the HTTP read and write timeout in seconds. Zero uses MaxLeaseTime.
+	HTTPTimeout time.Duration `mapstructure:"http_timeout"`
 	// LeaseRefreshTime is the default duration (in seconds) by which an active
 	// lease's expiration is extended when it is refreshed via
 	// PATCH /leases/:token without an explicit expires_in_sec. It is capped by
@@ -59,6 +61,7 @@ func ReadConfig() (*Config, error) {
 	pflag.Int("pprof_port_range_max", 6260, "pprof port on localhost")
 	pflag.Int("lease_refresh_time", 0, "lease extension in seconds applied on refresh (0: use max_lease_time)")
 	pflag.Int("max_lease_time", 7200, "maximum lease time in seconds")
+	pflag.Int("http_timeout", 0, "HTTP read and write timeout in seconds (0: use max_lease_time)")
 	pflag.Int("commit_lease_expiry_margin", 1, "safety margin in seconds before lease expiry within which a commit is refused")
 	pflag.String("log_level", "info", "log level (debug|info|warn|error|fatal|panic)")
 	pflag.Bool("log_timestamps", false, "enable timestamps in logging output")
@@ -80,6 +83,13 @@ func ReadConfig() (*Config, error) {
 
 	// max_lease_time is given in seconds in the config file or at the command line
 	conf.MaxLeaseTime = conf.MaxLeaseTime * time.Second
+	if conf.HTTPTimeout < 0 {
+		return nil, fmt.Errorf("http_timeout must be non-negative")
+	}
+	conf.HTTPTimeout *= time.Second
+	if conf.HTTPTimeout == 0 {
+		conf.HTTPTimeout = conf.MaxLeaseTime
+	}
 	// commit_lease_expiry_margin is likewise given in seconds
 	conf.CommitLeaseExpiryMargin = conf.CommitLeaseExpiryMargin * time.Second
 
