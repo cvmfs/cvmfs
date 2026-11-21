@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -127,5 +128,83 @@ func TestMountlessCreateCatalog(t *testing.T) {
 	catalog := filepath.Join(mockrepo, "catalogdir", "nested", ".cvmfscatalog")
 	if _, err := os.Stat(catalog); err != nil {
 		t.Fatalf("expected .cvmfscatalog at %s: %v", catalog, err)
+	}
+}
+
+func TestMountlessIngestBase(t *testing.T) {
+	cases := map[string][2]string{
+		"file":                   {"", "file"},
+		"sif/name":               {"sif", "name"},
+		".sifinfo/ab/abcd.json":  {".sifinfo", "ab/abcd.json"},
+		"subdir/.flat/ab/x/data": {"subdir", ".flat/ab/x/data"},
+	}
+	for dest, want := range cases {
+		b, r := mountlessIngestBase(dest)
+		if b != want[0] || r != want[1] {
+			t.Errorf("%s: got (%q, %q), want %v", dest, b, r, want)
+		}
+	}
+}
+
+func TestMountlessPublishTreeBelowNewParents(t *testing.T) {
+	withMountlessPublishing(t)
+	mockrepo := filepath.Clean("/" + os.Getenv("CVMFS_TEST_REPO"))
+	src := t.TempDir()
+	os.MkdirAll(filepath.Join(src, "a", "b"), 0755)
+	os.WriteFile(filepath.Join(src, "a", "b", "f"), []byte("x"), 0644)
+	if err := PublishToCVMFS(".."+mockrepo, "top/new/tree", src); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(mockrepo, "top", "new", "tree", "a", "b", "f")); err != nil {
+		t.Fatalf("tree not published below new parents: %v", err)
+	}
+}
+
+func TestEnsureDirectory(t *testing.T) {
+	mockrepo := filepath.Clean("/" + os.Getenv("CVMFS_TEST_REPO"))
+	repo := ".." + mockrepo
+	if err := EnsureDirectoryWithLogger(nil, repo, "ens/a/b"); err != nil {
+		t.Fatal(err)
+	}
+	if fi, err := os.Stat(filepath.Join(mockrepo, "ens", "a", "b")); err != nil || !fi.IsDir() {
+		t.Fatalf("directory not created: %v", err)
+	}
+	// existing directory: no ingest needed, must still succeed
+	if err := EnsureDirectoryWithLogger(nil, repo, "ens/a"); err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(filepath.Join(mockrepo, "ens", "file"), []byte("x"), 0644)
+	if err := EnsureDirectoryWithLogger(nil, repo, "ens/file"); err == nil {
+		t.Error("a regular file was accepted as directory")
+	}
+	if err := EnsureDirectoryWithLogger(nil, repo, "enstop"); err != nil {
+		t.Fatal(err)
+	}
+	if fi, err := os.Stat(filepath.Join(mockrepo, "enstop")); err != nil || !fi.IsDir() {
+		t.Fatalf("top-level directory not created: %v", err)
+	}
+}
+
+func TestMountlessSaveBacklinks(t *testing.T) {
+	withMountlessPublishing(t)
+	mockrepo := filepath.Clean("/" + os.Getenv("CVMFS_TEST_REPO"))
+	repo := ".." + mockrepo
+	l1, l2 := strings.Repeat("a", 64), strings.Repeat("b", 64)
+	files := map[string][]byte{
+		GetBacklinkPath(repo, l1):                       []byte(`{"Origin":["one"]}`),
+		GetBacklinkPath(repo, l2):                       []byte(`{"Origin":["two"]}`),
+		filepath.Join(mockrepo, "other", "x", "f.json"): []byte(`{}`),
+	}
+	if err := saveBacklinksMountless(nil, repo, files); err != nil {
+		t.Fatal(err)
+	}
+	for path, want := range files {
+		got, err := os.ReadFile(path)
+		if err != nil || string(got) != string(want) {
+			t.Errorf("%s: got %q, %v", path, got, err)
+		}
+	}
+	if err := saveBacklinksMountless(nil, repo, map[string][]byte{"/elsewhere/f": nil}); err == nil {
+		t.Error("path outside the repository accepted")
 	}
 }
