@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
-	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"os"
@@ -15,7 +14,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	digest "github.com/opencontainers/go-digest"
 	specs "github.com/opencontainers/image-spec/specs-go"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -81,42 +79,19 @@ func (p *ociParts) seal() {
 }
 
 // writeOCISIF lays the blobs out like SingularityCE does: layers, config,
-// manifest, then the root index, each descriptor carrying its digest.
+// manifest, then the root index.
 func writeOCISIF(t testing.TB, p *ociParts, out string) {
 	t.Helper()
-	var blobs []ociBlob
+	var objs []sifObject
 	for _, l := range p.layers {
-		blobs = append(blobs, ociBlob{DataOCIBlob, l})
+		objs = append(objs, sifObject{typ: DataOCIBlob, data: l})
 	}
-	blobs = append(blobs, ociBlob{DataOCIBlob, p.config}, ociBlob{DataOCIBlob, p.manifest})
-	blobs = append(blobs, p.extra...)
-	blobs = append(blobs, ociBlob{DataOCIRootIndex, p.index})
-	ndesc := len(blobs) + 2
-	descOff := int64(4096)
-	dataOff := descOff + int64(ndesc*descriptorSize)
-	h := rawHeader{
-		Magic: sifMagic, Version: [3]byte{'0', '1', 0}, ID: uuid.New(),
-		DescriptorsTotal: int64(ndesc), DescriptorsFree: int64(ndesc - len(blobs)),
-		DescriptorsOffset: descOff, DescriptorsSize: int64(ndesc * descriptorSize),
-		DataOffset: dataOff,
+	objs = append(objs, sifObject{typ: DataOCIBlob, data: p.config}, sifObject{typ: DataOCIBlob, data: p.manifest})
+	for _, b := range p.extra {
+		objs = append(objs, sifObject{typ: b.typ, data: b.data})
 	}
-	descs := make([]rawDescriptor, ndesc)
-	var data bytes.Buffer
-	for i, b := range blobs {
-		descs[i] = rawDescriptor{DataType: b.typ, Used: true, ID: uint32(i + 1),
-			Offset: dataOff + int64(data.Len()), Size: int64(len(b.data))}
-		copy(descs[i].Extra[:], sha(b.data))
-		data.Write(b.data)
-	}
-	h.DataSize = int64(data.Len())
-	var buf bytes.Buffer
-	binary.Write(&buf, binary.LittleEndian, h)
-	buf.Write(make([]byte, int(descOff)-buf.Len()))
-	binary.Write(&buf, binary.LittleEndian, descs)
-	buf.Write(data.Bytes())
-	if err := os.WriteFile(out, buf.Bytes(), 0644); err != nil {
-		t.Fatal(err)
-	}
+	objs = append(objs, sifObject{typ: DataOCIRootIndex, data: p.index})
+	createSIF(t, out, objs)
 }
 
 // mklayer builds a squashfs layer keeping xattrs, with pseudo definitions

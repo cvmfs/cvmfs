@@ -19,8 +19,10 @@ import (
 )
 
 // Layouts follow github.com/apptainer/sif/v2 pkg/sif (header, rawDescriptor,
-// partition). That module is not imported because it pulls in signing and
-// registry dependencies that ducc does not need for reading.
+// partition); tests write images with that library. Its loader is not used
+// here: it needs a writable image, and it sizes the descriptor table from
+// the header unchecked, so a hostile remote image can panic it or make it
+// allocate gigabytes.
 type rawHeader struct {
 	LaunchScript [32]byte
 	Magic        [10]byte

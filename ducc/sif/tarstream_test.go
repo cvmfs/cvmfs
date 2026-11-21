@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
-	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -16,7 +15,7 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/google/uuid"
+	apsif "github.com/apptainer/sif/v2/pkg/sif"
 
 	"github.com/cvmfs/ducc/sif/squashfs"
 )
@@ -459,41 +458,20 @@ func TestExistingCatalogMarker(t *testing.T) {
 	}
 }
 
-// writeSIF wraps a squashfs image into a minimal SIF container.
+// writeSIF wraps a squashfs image into a SIF written by apptainer/sif, so
+// the parser is checked against an independent writer.
 func writeSIF(t testing.TB, sqfs, out string, fstype, parttype int32, extra ...int32) {
 	t.Helper()
 	part, err := os.ReadFile(sqfs)
 	if err != nil {
 		t.Fatal(err)
 	}
-	const ndesc = 4
-	descOff := int64(4096)
-	dataOff := descOff + int64(ndesc*descriptorSize)
-	dataOff = (dataOff + 4095) &^ 4095
-	h := rawHeader{
-		Magic: sifMagic, Version: [3]byte{'0', '1', 0}, ID: uuid.New(),
-		CreatedAt: 1700000000, DescriptorsTotal: ndesc, DescriptorsFree: ndesc - 1 - int64(len(extra)),
-		DescriptorsOffset: descOff, DescriptorsSize: ndesc * int64(descriptorSize),
-		DataOffset: dataOff, DataSize: int64(len(part)),
+	objs := []sifObject{{DataPartition, part,
+		[]apsif.DescriptorInputOpt{apsif.OptPartitionMetadata(apsif.FSType(fstype), apsif.PartType(parttype), "amd64")}}}
+	for _, typ := range extra {
+		objs = append(objs, sifObject{typ: typ})
 	}
-	copy(h.LaunchScript[:], "#!/usr/bin/env run-singularity\n")
-	descs := make([]rawDescriptor, ndesc)
-	descs[0] = rawDescriptor{DataType: DataPartition, Used: true, ID: 1, Offset: dataOff, Size: int64(len(part))}
-	binary.LittleEndian.PutUint32(descs[0].Extra[0:], uint32(fstype))
-	binary.LittleEndian.PutUint32(descs[0].Extra[4:], uint32(parttype))
-	copy(descs[0].Extra[8:], "02\x00")
-	for i, typ := range extra {
-		descs[i+1] = rawDescriptor{DataType: typ, Used: true, ID: uint32(i + 2), Offset: 0, Size: 0}
-	}
-	var buf bytes.Buffer
-	binary.Write(&buf, binary.LittleEndian, h)
-	buf.Write(make([]byte, int(descOff)-buf.Len()))
-	binary.Write(&buf, binary.LittleEndian, descs)
-	buf.Write(make([]byte, int(dataOff)-buf.Len()))
-	buf.Write(part)
-	if err := os.WriteFile(out, buf.Bytes(), 0644); err != nil {
-		t.Fatal(err)
-	}
+	createSIF(t, out, objs)
 }
 
 func TestParseSIF(t *testing.T) {

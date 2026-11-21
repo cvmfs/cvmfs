@@ -194,11 +194,13 @@ defeats the purpose of the feature.
 
 ### 6.1 SIF
 
-- Parse the global header and descriptor table from the start of the source.
-  Use `github.com/apptainer/sif/v2` if its loader can run read-only on top of
-  an `io.ReaderAt`. Otherwise write a minimal parser (header + fixed-size
-  descriptors, ~200 lines): the format is small and stable, and DUCC needs
-  only read access.
+- Parse the global header and descriptor table from the start of the source
+  with a minimal parser (header + fixed-size descriptors, ~200 lines).
+  `github.com/apptainer/sif/v2` is not used for reading: `LoadContainer`
+  needs a writable image, and it sizes the descriptor table from the header
+  without bounds checks (a negative count panics, a large one allocates
+  gigabytes), which is unsafe for remote images. Tests write images with the
+  library and check the constants against it.
 - Select the partition: data type *partition*, partition type *primary
   system*. Exactly one is expected.
   - FS type squashfs → proceed.
