@@ -49,9 +49,14 @@ fetch_workspace() {
   echo "${cache_base:-/var/lib/cvmfs}/config-fetch/$CVMFS_TEST_116_CFGREPO"
 }
 
+# In containers, the autofs map is listed but does not remount repositories
+automounts() {
+  autofs_check && [ "${CVMFS_TEST_DOCKER:-}" != "yes" ]
+}
+
 # Not cvmfs_mount, which rewrites the config repository's .local file
 mount_repo() {
-  if autofs_check; then
+  if automounts; then
     ls /cvmfs/$CVMFS_TEST_116_REPO > /dev/null 2>&1
   else
     _cvmfs_mount_manually $CVMFS_TEST_116_REPO
@@ -118,7 +123,7 @@ cvmfs_run_test() {
 
   echo "*** repair mounting of the config repository and freeze its client"
   sudo cp "$CVMFS_TEST_116_CFGLOCAL_BAK" "$CVMFS_TEST_116_CFGLOCAL" || return 20
-  if ! autofs_check; then
+  if ! automounts; then
     _cvmfs_mount_manually $CVMFS_TEST_116_CFGREPO
   fi
   ls /cvmfs/$CVMFS_TEST_116_CFGREPO/etc/cvmfs > /dev/null || return 21
