@@ -141,7 +141,8 @@ bool FileSystem::CheckPosixCacheSettings(
     return false;
   }
 
-  if (type_ == kFsLibrary) {
+  // With a fallback cache dir, a shared cache is only used if already connected
+  if ((type_ == kFsLibrary) && fallback_cache_dir_.empty()) {
     if (settings.is_shared || settings.is_managed) {
       boot_error_ = "Failure: libcvmfs supports only unmanaged exclusive cache "
                     "or alien cache.";
@@ -410,6 +411,7 @@ FileSystem::FileSystem(const FileSystem::FileSystemInfo &fs_info)
     , options_mgr_(fs_info.options_mgr)
     , wait_workspace_(fs_info.wait_workspace)
     , foreground_(fs_info.foreground)
+    , fallback_cache_dir_(fs_info.fallback_cache_dir)
     , n_fs_open_(NULL)
     , n_fs_dir_open_(NULL)
     , n_fs_lookup_(NULL)
@@ -685,8 +687,35 @@ CacheManager *FileSystem::SetupExternalCacheMgr(const string &instance) {
 }
 
 
+/**
+ * The cache directory and, if different, the workspace of the quota manager
+ */
+static string QuotaWorkspace(const string &cache_path,
+                             const string &workspace) {
+  if (cache_path == workspace)
+    return cache_path;
+  return cache_path + ":" + workspace;
+}
+
+
 CacheManager *FileSystem::SetupPosixCacheMgr(const string &instance) {
-  const PosixCacheSettings settings = DeterminePosixCacheSettings(instance);
+  PosixCacheSettings settings = DeterminePosixCacheSettings(instance);
+  std::unique_ptr<PosixQuotaManager> shared_quota_mgr;
+  if (!fallback_cache_dir_.empty()) {
+    if (settings.is_shared && settings.is_managed && !settings.is_alien) {
+      shared_quota_mgr.reset(PosixQuotaManager::ConnectShared(
+          QuotaWorkspace(settings.cache_path, settings.workspace)));
+    }
+    if (shared_quota_mgr.get() == nullptr) {
+      LogCvmfs(kLogCvmfs, kLogDebug, "using unmanaged cache in %s",
+               fallback_cache_dir_.c_str());
+      settings.cache_path = fallback_cache_dir_;
+      settings.workspace = fallback_cache_dir_;
+      settings.is_alien = false;
+      settings.is_shared = false;
+      settings.is_managed = false;
+    }
+  }
   if (!CheckPosixCacheSettings(settings))
     return NULL;
   std::unique_ptr<PosixCacheManager> cache_mgr(PosixCacheManager::Create(
@@ -699,6 +728,15 @@ CacheManager *FileSystem::SetupPosixCacheMgr(const string &instance) {
                   + settings.cache_path + ": " + strerror(errno);
     boot_status_ = loader::kFailCacheDir;
     return NULL;
+  }
+
+  if (shared_quota_mgr.get() != nullptr) {
+    // Neither cleans up nor changes the cleanup policy of the other clients
+    shared_quota_mgr->DisablePinning();
+    const int retval = cache_mgr->AcquireQuotaManager(
+        shared_quota_mgr.release());
+    assert(retval);
+    return cache_mgr.release();
   }
 
   // Sentinel file for future use
@@ -980,12 +1018,12 @@ bool FileSystem::SetupPosixQuotaMgr(
     const FileSystem::PosixCacheSettings &settings, CacheManager *cache_mgr) {
   assert(settings.quota_limit >= 0);
   const int64_t quota_threshold = settings.quota_limit / 2;
-  string cache_workspace = settings.cache_path;
+  const string cache_workspace = QuotaWorkspace(settings.cache_path,
+                                                settings.workspace);
   if (settings.cache_path != settings.workspace) {
     LogCvmfs(kLogQuota, kLogDebug | kLogSyslog,
              "using workspace %s to protect cache database in %s",
              settings.workspace.c_str(), settings.cache_path.c_str());
-    cache_workspace += ":" + settings.workspace;
   }
   PosixQuotaManager *quota_mgr;
 

@@ -158,6 +158,12 @@ class FileSystem : SingleCopy, public BootFactory {
      * should not daemonize, too, but print debug messages to stdout.
      */
     bool foreground;
+    /**
+     * Library mode only.  If set, a shared posix cache is used only while its
+     * cache manager runs, without pinning and without starting one.  Otherwise
+     * the cache is an unmanaged one in this directory.
+     */
+    std::string fallback_cache_dir;
   };
 
   /**
@@ -345,6 +351,7 @@ class FileSystem : SingleCopy, public BootFactory {
   OptionsManager *options_mgr_;
   bool wait_workspace_;
   bool foreground_;
+  std::string fallback_cache_dir_;
 
   perf::Counter *n_fs_open_;
   perf::Counter *n_fs_dir_open_;

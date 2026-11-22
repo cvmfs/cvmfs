@@ -285,6 +285,29 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
     const uint64_t limit,
     const uint64_t cleanup_threshold,
     bool foreground) {
+  return DoCreateShared(exe_path, cache_workspace, limit, cleanup_threshold,
+                        foreground, false /* connect_only */);
+}
+
+
+/**
+ * Connects to a running shared quota manager.  Neither starts one nor waits
+ * for another client that starts one, so a stuck start does not block.
+ */
+PosixQuotaManager *PosixQuotaManager::ConnectShared(
+    const std::string &cache_workspace) {
+  return DoCreateShared("", cache_workspace, 0, 0, false,
+                        true /* connect_only */);
+}
+
+
+PosixQuotaManager *PosixQuotaManager::DoCreateShared(
+    const std::string &exe_path,
+    const std::string &cache_workspace,
+    const uint64_t limit,
+    const uint64_t cleanup_threshold,
+    bool foreground,
+    bool connect_only) {
   string cache_dir;
   string workspace_dir;
   ParseDirectories(cache_workspace, &cache_dir, &workspace_dir);
@@ -292,10 +315,12 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
   pid_t new_cachemgr_pid;
 
   // Create lock file: only one fuse client at a time
-  const int fd_lockfile = LockFile(workspace_dir + "/lock_cachemgr");
+  const string lockfile_path = workspace_dir + "/lock_cachemgr";
+  const int fd_lockfile = connect_only ? TryLockFile(lockfile_path)
+                                       : LockFile(lockfile_path);
   if (fd_lockfile < 0) {
-    LogCvmfs(kLogQuota, kLogDebug, "could not open lock file %s (%d)",
-             (workspace_dir + "/lock_cachemgr").c_str(), errno);
+    LogCvmfs(kLogQuota, kLogDebug, "could not lock %s (%d)",
+             lockfile_path.c_str(), errno);
     return NULL;
   }
 
@@ -355,6 +380,13 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
     return quota_mgr;
   }
   const int connect_error = errno;
+  if (connect_only) {
+    LogCvmfs(kLogQuota, kLogDebug, "no running cache manager (%d)",
+             connect_error);
+    UnlockFile(fd_lockfile);
+    delete quota_mgr;
+    return NULL;
+  }
 
   // Lock file: let existing cache manager finish first
   const int fd_lockfile_fifo = LockFile(workspace_dir + "/lock_cachemgr.fifo");
@@ -1826,6 +1858,15 @@ bool PosixQuotaManager::Pin(const shash::Any &hash,
                             const bool is_catalog) {
   assert((size > 0) || !is_catalog);
 
+  if (pinning_disabled_) {
+    // A cached object was touched when it was opened; replacing its entry
+    // would drop the pinned flag of other clients.  New objects are pinned
+    // before they are moved into place.
+    if (!FileExists(cache_dir_ + "/" + hash.MakePathWithoutSuffix()))
+      Insert(hash, size, description);
+    return true;
+  }
+
   const string hash_str = hash.ToString();
   LogCvmfs(kLogQuota, kLogDebug, "pin into lru %s, path %s", hash_str.c_str(),
            description.c_str());
@@ -1893,6 +1934,7 @@ PosixQuotaManager::PosixQuotaManager(const uint64_t limit,
                                      const string &cache_workspace)
     : shared_(false)
     , spawned_(false)
+    , pinning_disabled_(false)
     , limit_(limit)
     , cleanup_threshold_(cleanup_threshold)
     , gauge_(0)
@@ -2277,6 +2319,8 @@ void PosixQuotaManager::UnlinkReturnPipe(int pipe_wronly) {
 
 
 void PosixQuotaManager::Unpin(const shash::Any &hash) {
+  if (pinning_disabled_)
+    return;
   LogCvmfs(kLogQuota, kLogDebug, "Unpin %s", hash.ToString().c_str());
 
   LruCommand cmd;

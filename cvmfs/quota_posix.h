@@ -99,6 +99,7 @@ class PosixQuotaManager : public QuotaManager {
                                          const uint64_t limit,
                                          const uint64_t cleanup_threshold,
                                          bool foreground);
+  static PosixQuotaManager *ConnectShared(const std::string &cache_workspace);
   static int MainCacheManager(int argc, char **argv);
 
   virtual ~PosixQuotaManager();
@@ -111,6 +112,12 @@ class PosixQuotaManager : public QuotaManager {
   virtual bool Pin(const shash::Any &hash, const uint64_t size,
                    const std::string &description, const bool is_catalog);
   virtual void Unpin(const shash::Any &hash);
+  /**
+   * Pins in the shared cache manager are not reference counted: unpinning
+   * would also release the pins of other clients, and a client that is killed
+   * leaks its pins.  A short-lived client therefore does without them.
+   */
+  void DisablePinning() { pinning_disabled_ = true; }
   virtual void Touch(const shash::Any &hash);
   virtual void Remove(const shash::Any &file);
   virtual bool Cleanup(const uint64_t leave_size);
@@ -323,6 +330,11 @@ class PosixQuotaManager : public QuotaManager {
   bool SetSharedLimit(uint64_t limit);
   void GetLimits(uint64_t *limit, uint64_t *cleanup_threshold);
 
+  static PosixQuotaManager *DoCreateShared(const std::string &exe_path,
+                                           const std::string &cache_workspace,
+                                           const uint64_t limit,
+                                           const uint64_t cleanup_threshold,
+                                           bool foreground, bool connect_only);
   static void ParseDirectories(const std::string cache_workspace,
                                std::string *cache_dir,
                                std::string *workspace_dir);
@@ -342,6 +354,12 @@ class PosixQuotaManager : public QuotaManager {
    * manager process has been forked resp.
    */
   bool spawned_;
+
+  /**
+   * Pin() only registers the object and Unpin() does nothing; for short-lived
+   * clients of a shared cache manager, see DisablePinning().
+   */
+  bool pinning_disabled_;
 
   /**
    * Soft limit in bytes, start cleanup when reached.
