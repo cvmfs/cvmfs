@@ -118,6 +118,48 @@ TEST(T_SpecTreeStandalone, ExcludeChildrenHonorsOrder) {
 }
 
 
+// Regression test for https://github.com/cvmfs/cvmfs/issues/3497: an
+// exclusion followed by an inclusion sharing its parent made Parse() loop
+// forever.  Without the fix, SpecTree::Create() below never returns.
+TEST(T_SpecTreeStandalone, InclusionAfterExclusion) {
+  const std::string spec_file = "./cvmfs-spec-tree-incl-after-excl.spec.txt";
+  const std::string content = "!/a/b\n"
+                              "/a/c\n";
+  ASSERT_TRUE(SafeWriteToFile(content, spec_file, 0600));
+
+  SpecTree *specs = SpecTree::Create(spec_file);
+  ASSERT_TRUE(specs != NULL);
+
+  EXPECT_TRUE(specs->IsMatching("/a"));
+  EXPECT_FALSE(specs->IsMatching("/a/b"));
+  EXPECT_TRUE(specs->IsMatching("/a/c"));
+  EXPECT_FALSE(specs->IsMatching("/a/d"));
+
+  delete specs;
+  unlink(spec_file.c_str());
+}
+
+
+TEST(T_SpecTreeStandalone, InclusionAfterDeepExclusion) {
+  const std::string spec_file = "./cvmfs-spec-tree-incl-after-deep.spec.txt";
+  const std::string content = "!/a/b/c/d\n"
+                              "/a/b/c/e\n"
+                              "/a/b/x\n";
+  ASSERT_TRUE(SafeWriteToFile(content, spec_file, 0600));
+
+  SpecTree *specs = SpecTree::Create(spec_file);
+  ASSERT_TRUE(specs != NULL);
+
+  EXPECT_TRUE(specs->IsMatching("/a/b/c"));
+  EXPECT_FALSE(specs->IsMatching("/a/b/c/d"));
+  EXPECT_TRUE(specs->IsMatching("/a/b/c/e"));
+  EXPECT_TRUE(specs->IsMatching("/a/b/x"));
+
+  delete specs;
+  unlink(spec_file.c_str());
+}
+
+
 TEST_F(T_SpecTree, CheckListings) {
   size_t listLen = 0;
   char **dirList = NULL;
