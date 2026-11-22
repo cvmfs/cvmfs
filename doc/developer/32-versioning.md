@@ -72,11 +72,12 @@ git commit -m "packaging: debian changelog for 2.15.0" packaging/debian/cvmfs/ch
 ```
 
 The script finalises an `UNRELEASED` top entry (keeping its bullets) or adds a
-"New upstream release" entry. Note packaging changes between releases as
-bullets in an `UNRELEASED` entry. `ci/cvmfs/deb.sh` reuses the released entry's
-revision and date and adds a per-platform entry on top, e.g.
-`2.15.0-1+ubuntu24.04`. Builds without a matching released entry get revision
-`1`.
+"New upstream release" entry. With `--skip-prerelease`, it leaves the changelog
+unchanged for `~pre` versions, so the `UNRELEASED` entry is kept for the final
+release. Note packaging changes between releases as bullets in an `UNRELEASED`
+entry. `ci/cvmfs/deb.sh` reuses the released entry's revision and date and adds
+a per-platform entry on top, e.g. `2.15.0-1+ubuntu24.04`. Builds without a
+matching released entry, including skipped pre-releases, get revision `1`.
 
 ## Override a version
 
