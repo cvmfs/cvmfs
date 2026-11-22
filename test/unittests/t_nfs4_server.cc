@@ -474,6 +474,31 @@ TEST(T_Nfs4FileHandle, EncodeDecode) {
 }
 
 
+TEST(T_Nfs4Rpc, ParseIpv4Nets) {
+  std::vector<Ipv4Net> nets;
+  EXPECT_TRUE(ParseIpv4Nets("", &nets));
+  EXPECT_TRUE(nets.empty());
+
+  ASSERT_TRUE(ParseIpv4Nets("10.1.2.3/16, 192.168.7.12 0.0.0.0/0", &nets));
+  ASSERT_EQ(3u, nets.size());
+  EXPECT_EQ(0x0A010000u, nets[0].addr);
+  EXPECT_EQ(0xFFFF0000u, nets[0].mask);
+  EXPECT_TRUE(nets[0].Contains(0x0A01FFFFu));
+  EXPECT_FALSE(nets[0].Contains(0x0A020000u));
+  EXPECT_EQ(0xFFFFFFFFu, nets[1].mask);
+  EXPECT_TRUE(nets[1].Contains(0xC0A8070Cu));
+  EXPECT_FALSE(nets[1].Contains(0xC0A8070Du));
+  EXPECT_TRUE(nets[2].Contains(0x01020304u));
+
+  EXPECT_FALSE(ParseIpv4Nets("10.0.0.0/33", &nets));
+  EXPECT_FALSE(ParseIpv4Nets("10.0.0.0/", &nets));
+  EXPECT_FALSE(ParseIpv4Nets("10.0.0.0/-1", &nets));
+  EXPECT_FALSE(ParseIpv4Nets("10.0.0", &nets));
+  EXPECT_FALSE(ParseIpv4Nets("host.example.org", &nets));
+  EXPECT_FALSE(ParseIpv4Nets("::1", &nets));
+}
+
+
 TEST_F(T_Nfs4Server, RpcEnvelope) {
   XdrWriter w;
   w.PutU32(77);  // xid
