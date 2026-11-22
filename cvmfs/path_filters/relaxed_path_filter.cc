@@ -22,6 +22,10 @@ bool RelaxedPathFilter::IsMatching(const std::string &path) const {
     std::string current_path = path;
     while (current_path.length() > 0) {
       const size_t new_length = current_path.find_last_of("/");
+      // No slash left: substr(0, npos) would copy the string unchanged and the
+      // walk could never terminate.
+      if (new_length == std::string::npos)
+        break;
       current_path = current_path.substr(0, new_length);
       if (exact_dirtab_.IsMatching(current_path)) {
         has_positive_match = true;
@@ -41,6 +45,10 @@ bool RelaxedPathFilter::IsOpposing(const std::string &path) const {
   std::string current_path = path;
   while (current_path.length() > 0) {
     const size_t new_length = current_path.find_last_of("/");
+    // No slash left: substr(0, npos) would copy the string unchanged and the
+    // walk could never terminate.
+    if (new_length == std::string::npos)
+      break;
     current_path = current_path.substr(0, new_length);
     if (Dirtab::IsOpposing(current_path)) {
       return true;
@@ -74,6 +82,11 @@ bool RelaxedPathFilter::ParsePathspec(const std::string &pathspec_str,
     if (!Dirtab::ParsePathspec(current_pathspec_str, false))
       success = false;
     const size_t new_length = current_pathspec_str.find_last_of("/");
+    // No slash left: substr(0, npos) would copy the string unchanged and the
+    // walk could never terminate.  A positive rule without a leading slash
+    // ends up here; Dirtab::ParsePathspec has already rejected it above.
+    if (new_length == std::string::npos)
+      break;
     current_pathspec_str = current_pathspec_str.substr(0, new_length);
   }
 

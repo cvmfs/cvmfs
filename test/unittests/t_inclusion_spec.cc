@@ -181,3 +181,12 @@ TEST_F(T_InclusionSpec, ContentPreserved) {
   EXPECT_TRUE(spec.Parse(input));
   EXPECT_EQ(input, spec.content());
 }
+
+
+TEST_F(T_InclusionSpec, NonAbsolutePositiveRuleRejected) {
+  // The rule lacks a leading slash, so the underlying RelaxedPathFilter must
+  // reject it and Parse() must report the failure instead of looping.
+  EXPECT_FALSE(spec.Parse("version 1\n"
+                          "software\n"));
+  EXPECT_FALSE(spec.IsValid());
+}

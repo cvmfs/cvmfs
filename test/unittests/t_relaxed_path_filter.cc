@@ -104,3 +104,51 @@ TEST_F(T_RelaxedPathFilter, Parsing) {
   delete pf_from_file;
   unlink(filter_path.c_str());
 }
+
+
+TEST_F(T_RelaxedPathFilter, NonAbsolutePositiveRule) {
+  // A positive rule without a leading slash is rejected by Dirtab and must be
+  // rejected here too.  Before the npos guard in the prefix walk these calls
+  // never returned.
+  EXPECT_FALSE(path_filter.Parse("software\n"));
+  EXPECT_FALSE(path_filter.IsValid());
+  EXPECT_EQ(0u, path_filter.RuleCount());
+}
+
+
+TEST_F(T_RelaxedPathFilter, NonAbsolutePositiveRuleWithSlash) {
+  EXPECT_FALSE(path_filter.Parse("software/releases\n"));
+  EXPECT_FALSE(path_filter.IsValid());
+  EXPECT_EQ(0u, path_filter.RuleCount());
+}
+
+
+TEST_F(T_RelaxedPathFilter, NonAbsolutePositiveWildcardRule) {
+  // Forgetting the '!' on an intended exclusion lands here.
+  EXPECT_FALSE(path_filter.Parse("*.git\n"));
+  EXPECT_FALSE(path_filter.IsValid());
+  EXPECT_EQ(0u, path_filter.RuleCount());
+}
+
+
+TEST_F(T_RelaxedPathFilter, NegativeRulesStayUnaffected) {
+  EXPECT_TRUE(path_filter.Parse("/software\n"
+                                "! *.git\n"
+                                "! software\n"));
+  EXPECT_TRUE(path_filter.IsValid());
+  EXPECT_EQ(2u, path_filter.NegativeRuleCount());
+}
+
+
+TEST_F(T_RelaxedPathFilter, RelativeQueryPath) {
+  // The sub-path walks in IsMatching()/IsOpposing() have the same npos
+  // problem.  No in-tree caller passes a relative path today, but the walks
+  // must terminate for one.
+  EXPECT_TRUE(path_filter.Parse("/software\n"));
+  ASSERT_TRUE(path_filter.IsValid());
+
+  EXPECT_FALSE(path_filter.IsMatching("foo"));
+  EXPECT_FALSE(path_filter.IsMatching("foo/bar"));
+  EXPECT_FALSE(path_filter.IsOpposing("foo"));
+  EXPECT_FALSE(path_filter.IsOpposing("foo/bar"));
+}
