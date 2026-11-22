@@ -27,8 +27,23 @@ set_cvmfs_version_sequence_from_nightly "$CVMFS_NIGHTLY_BUILD_NUMBER"
 upstream_version="$(get_cvmfs_version "$CVMFS_SOURCE_LOCATION")"
 echo "detected upstream version: ${upstream_version}"
 
-# '+' keeps our builds sorting above a distribution's own ${upstream_version}-1.
-cvmfs_version="${upstream_version}-1+$(lsb_release -si | tr '[:upper:]' '[:lower:]')"
+orig_mtime="${SOURCE_DATE_EPOCH:-$(stat -c %Y "${CVMFS_SOURCE_LOCATION}/VERSION")}"
+
+# A released changelog entry for this version (ci/deb_changelog_release.sh)
+# provides the revision and date; development builds get revision 1.
+changelog="${CVMFS_SOURCE_LOCATION}/packaging/debian/cvmfs/changelog"
+top_version=$(dpkg-parsechangelog -l "$changelog" -S Version)
+if [ "${top_version%-*}" = "$upstream_version" ] && \
+   [ "$(dpkg-parsechangelog -l "$changelog" -S Distribution)" != UNRELEASED ]; then
+  deb_version="$top_version"
+  changelog_epoch=$(dpkg-parsechangelog -l "$changelog" -S Timestamp)
+else
+  deb_version="${upstream_version}-1"
+  changelog_epoch="$orig_mtime"
+fi
+# '+' keeps our builds sorting above a distribution's own build of the same
+# Debian version.
+cvmfs_version="${deb_version}+$(lsb_release -si | tr '[:upper:]' '[:lower:]')"
 cvmfs_version="${cvmfs_version}$(lsb_release -sr)"
 
 echo "creating release: $cvmfs_version"
@@ -64,7 +79,6 @@ printf '%s\n' "$upstream_version" > "$copied_source/CVMFS_VERSION"
 # Normalised metadata keeps it byte-identical across platforms. -T1 because
 # -T0 can fall back to single-threaded mode on one CPU, which encodes differently.
 orig_tarball="${CVMFS_RESULT_LOCATION}/cvmfs_${upstream_version}.orig.tar.xz"
-orig_mtime="${SOURCE_DATE_EPOCH:-$(stat -c %Y "${CVMFS_SOURCE_LOCATION}/VERSION")}"
 echo "creating upstream tarball $(basename "$orig_tarball")..."
 tar -C "$CVMFS_RESULT_LOCATION" \
   --sort=name --format=gnu --mtime="@${orig_mtime}" \
@@ -81,7 +95,15 @@ cd $copied_source
 VERSION_NUMBER=$(echo ${VERSION_ID} | tr -d '.')
 cpu_cores=$(get_number_of_cpu_cores)
 echo "do the build (with $cpu_cores cores)..."
-dch -v $cvmfs_version -M "bumped upstream version number"
+# Not dch: it stamps the build time, which breaks reproducible builds.
+{
+  printf 'cvmfs (%s) %s; urgency=medium\n\n' "$cvmfs_version" "$(lsb_release -sc)"
+  printf '  * Build %s for %s\n\n' "$upstream_version" "$(lsb_release -sd)"
+  printf ' -- %s  %s\n\n' "$(dpkg-parsechangelog -S Maintainer)" \
+    "$(LC_ALL=C date -u -R -d "@${changelog_epoch}")"
+  cat debian/changelog
+} > debian/changelog.new
+mv debian/changelog.new debian/changelog
 # -us -uc == skip signing
 DEBUILD_ARGS=""
 if [ x"$CVMFS_LINT_PKG" = x ]; then

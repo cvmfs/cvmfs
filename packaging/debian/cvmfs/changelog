@@ -1,3 +1,10 @@
+cvmfs (2.15.0-1) UNRELEASED; urgency=medium
+
+  * New upstream release, see ChangeLog
+  * Switch to source format 3.0 (quilt)
+
+ -- Valentin Volkl <valentin.volkl@cern.ch>  Sun, 22 Nov 2026 12:03:06 +0100
+
 cvmfs (2.1.0) lucid; urgency=low
 
   * Adopted package for cvmfs build and test servers

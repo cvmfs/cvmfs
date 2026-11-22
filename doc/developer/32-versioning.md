@@ -63,6 +63,21 @@ git tag -a cvmfs-2.15.0 -m "CernVM-FS 2.15.0"
 
 Build packages from the tagged commit so that `HEAD` exactly matches the tag.
 
+Before tagging, add the Debian changelog entry for the version the tag resolves
+to and commit it, so that the tagged tree contains it:
+
+```bash
+./ci/deb_changelog_release.sh 2.15.0
+git commit -m "packaging: debian changelog for 2.15.0" packaging/debian/cvmfs/changelog
+```
+
+The script finalises an `UNRELEASED` top entry (keeping its bullets) or adds a
+"New upstream release" entry. Note packaging changes between releases as
+bullets in an `UNRELEASED` entry. `ci/cvmfs/deb.sh` reuses the released entry's
+revision and date and adds a per-platform entry on top, e.g.
+`2.15.0-1+ubuntu24.04`. Builds without a matching released entry get revision
+`1`.
+
 ## Override a version
 
 Override the complete resolved version through the environment:
