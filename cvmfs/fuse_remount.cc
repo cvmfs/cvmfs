@@ -71,16 +71,11 @@ FuseRemounter::Status FuseRemounter::Check() {
   if (IsInMaintenanceMode())
     return kStatusMaintenance;
 
-  // Blacklists can block new revisions, so they must be current before a
-  // remount.  If that cannot be established, stay on the current revision.
-  if (mountpoint_->RefreshConfigRepo() == MountPoint::kConfigRepoUnknown) {
-    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
-             "config repository blacklist may be outdated, "
-             "postponing catalog update");
-    catalogs_valid_until_ = time(NULL) + MountPoint::kShortTermTTL;
-    SetAlarm(MountPoint::kShortTermTTL);
-    return kStatusFailGeneral;
-  }
+  // Blacklists can block new revisions, so they must be current before
+  // switching to one.  The catalog is still checked, which maintains the
+  // offline mode.
+  const bool blacklist_unknown = (mountpoint_->RefreshConfigRepo()
+                                  == MountPoint::kConfigRepoUnknown);
 
   LogCvmfs(kLogCvmfs, kLogDebug,
            "catalog TTL expired, checking revision against blacklists");
@@ -96,6 +91,14 @@ FuseRemounter::Status FuseRemounter::Check() {
   switch (retval) {
     case catalog::kLoadNew: {
       SetOfflineMode(false);
+      if (blacklist_unknown) {
+        LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+                 "config repository blacklist may be outdated, "
+                 "postponing catalog update");
+        catalogs_valid_until_ = time(NULL) + MountPoint::kShortTermTTL;
+        SetAlarm(MountPoint::kShortTermTTL);
+        return kStatusFailGeneral;
+      }
       int32_t expected_val = 0;
       if (drainout_mode_.compare_exchange_strong(expected_val, 1)) {
         // As of this point, fuse callbacks return zero as cache timeout

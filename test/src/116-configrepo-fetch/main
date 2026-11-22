@@ -9,6 +9,8 @@ cvmfs_test_timeout=600
 # of through /cvmfs/<config repository>.  Reloads must therefore work while
 # the config repository cannot be mounted or while its client hangs, and the
 # configuration must still contain the settings from the config repository.
+# The last fetched tree is kept in the cache and used if the server is
+# unreachable; a required config repository fails only without such a copy.
 
 CVMFS_TEST_116_REPO="alice.cern.ch"
 CVMFS_TEST_116_CFGREPO="cvmfs-config.cern.ch"
@@ -38,6 +40,27 @@ reload_socket() {
   socket_dir=$(cvmfs_config showconfig $CVMFS_TEST_116_REPO | \
     sed -n 's/^CVMFS_RELOAD_SOCKETS=\([^ ]*\).*/\1/p')
   echo "${socket_dir:-/var/run/cvmfs}/cvmfs.$CVMFS_TEST_116_REPO"
+}
+
+fetch_workspace() {
+  local cache_base
+  cache_base=$(cvmfs_config showconfig $CVMFS_TEST_116_REPO | \
+    sed -n 's/^CVMFS_CACHE_BASE=\([^ ]*\).*/\1/p')
+  echo "${cache_base:-/var/lib/cvmfs}/config-fetch/$CVMFS_TEST_116_CFGREPO"
+}
+
+# Not cvmfs_mount, which rewrites the config repository's .local file
+mount_repo() {
+  if autofs_check; then
+    ls /cvmfs/$CVMFS_TEST_116_REPO > /dev/null 2>&1
+  else
+    _cvmfs_mount_manually $CVMFS_TEST_116_REPO
+  fi
+  cvmfs_config probe $CVMFS_TEST_116_REPO
+}
+
+break_server_url() {
+  sudo sh -c "echo CVMFS_SERVER_URL=http://127.0.0.1:1/cvmfs/@fqrn@ >> $CVMFS_TEST_116_CFGLOCAL"
 }
 
 # Reloads only the test repository; cvmfs_config reload would itself touch
@@ -78,6 +101,9 @@ cvmfs_run_test() {
   local socket
   socket=$(reload_socket)
   check_fetched_config || return 2
+  local workspace
+  workspace=$(fetch_workspace)
+  sudo test -f "$workspace/tree" || return 3
 
   echo "*** unmount the config repository and break its mounting"
   cvmfs_umount $CVMFS_TEST_116_CFGREPO || return 10
@@ -92,7 +118,7 @@ cvmfs_run_test() {
 
   echo "*** repair mounting of the config repository and freeze its client"
   sudo cp "$CVMFS_TEST_116_CFGLOCAL_BAK" "$CVMFS_TEST_116_CFGLOCAL" || return 20
-  if [ "${CVMFS_TEST_DOCKER:-}" = "yes" ]; then
+  if ! autofs_check; then
     _cvmfs_mount_manually $CVMFS_TEST_116_CFGREPO
   fi
   ls /cvmfs/$CVMFS_TEST_116_CFGREPO/etc/cvmfs > /dev/null || return 21
@@ -112,21 +138,35 @@ cvmfs_run_test() {
   cvmfs_config probe $CVMFS_TEST_116_CFGREPO || return 30
   cvmfs_config probe $CVMFS_TEST_116_REPO || return 31
 
-  echo "*** reload with a required but unreachable config repository"
-  CVMFS_TEST_116_DEFAULTLOCAL_BAK=$(mktemp) || return 40
+  echo "*** reload with an unreachable server uses the cached copy"
+  break_server_url || return 40
+  reload_repo "$socket" || return 41
+  check_fetched_config || return 42
+
+  echo "*** mount with a required config repository and no cached copy"
+  cvmfs_umount $CVMFS_TEST_116_REPO || return 50
+  sudo rm -rf "$workspace" || return 51
+  CVMFS_TEST_116_DEFAULTLOCAL_BAK=$(mktemp) || return 52
   sudo sh -c "cat $CVMFS_TEST_116_DEFAULTLOCAL 2>/dev/null" \
     > "$CVMFS_TEST_116_DEFAULTLOCAL_BAK"
-  sudo sh -c "printf 'CVMFS_CONFIG_REPO_FETCH=direct\nCVMFS_CONFIG_REPO_REQUIRED=yes\n' >> $CVMFS_TEST_116_DEFAULTLOCAL" || return 41
-  sudo sh -c "echo CVMFS_SERVER_URL=http://127.0.0.1:1/cvmfs/@fqrn@ >> $CVMFS_TEST_116_CFGLOCAL" || return 42
-  local pid_before
-  pid_before=$(get_xattr pid /cvmfs/$CVMFS_TEST_116_REPO) || return 43
-  # The reload must be refused before the running module is torn down
-  reload_repo "$socket" && return 44
-  [ "$(get_xattr pid /cvmfs/$CVMFS_TEST_116_REPO)" = "$pid_before" ] || return 45
-  ls /cvmfs/$CVMFS_TEST_116_REPO > /dev/null || return 46
-  sudo cp "$CVMFS_TEST_116_CFGLOCAL_BAK" "$CVMFS_TEST_116_CFGLOCAL" || return 47
-  reload_repo "$socket" || return 48
-  check_fetched_config || return 49
+  sudo sh -c "printf 'CVMFS_CONFIG_REPO_FETCH=direct\nCVMFS_CONFIG_REPO_REQUIRED=yes\n' >> $CVMFS_TEST_116_DEFAULTLOCAL" || return 53
+  local required_msg="required configuration repository could not be fetched"
+  local n_required_before
+  n_required_before=$(cat_syslog | grep -c "$required_msg")
+  mount_repo && return 54
+  [ "$(cat_syslog | grep -c "$required_msg")" -gt "$n_required_before" ] || return 55
+
+  echo "*** mount with a required config repository, server reachable"
+  sudo cp "$CVMFS_TEST_116_CFGLOCAL_BAK" "$CVMFS_TEST_116_CFGLOCAL" || return 60
+  mount_repo || return 61
+  check_fetched_config || return 62
+  sudo test -f "$workspace/tree" || return 63
+
+  echo "*** mount with a required config repository from the cached copy"
+  cvmfs_umount $CVMFS_TEST_116_REPO || return 70
+  break_server_url || return 71
+  mount_repo || return 72
+  check_fetched_config || return 73
 
   return 0
 }

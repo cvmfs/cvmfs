@@ -1321,19 +1321,23 @@ MountPoint::ConfigRepoState MountPoint::RefreshConfigRepo() {
   const bool simple_parser = dynamic_cast<SimpleOptionsParser *>(options_mgr_)
                              != NULL;
   const config_repo::FetchResult fetch = config_repo::FetchForRepository(
-      fqrn_, simple_parser, have_tree ? tree->root_hash : "");
+      fqrn_, simple_parser);
   if (fetch.mode == config_repo::kFetchMount)
     return kConfigRepoNotFetched;
-  if (fetch.unchanged)
-    return kConfigRepoCurrent;
-  if (!fetch.tree || fetch.tree->root_hash.empty()) {
+  if (!fetch.tree || fetch.stale) {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
              "failed to %s config repository %s (%s)",
              have_tree ? "check" : "fetch", fetch.config_repo.c_str(),
              fetch.error.c_str());
+  }
+  if (!fetch.tree) {
     // Without a previous copy, the blacklist is read as at (re)load
     return have_tree ? kConfigRepoUnknown : kConfigRepoNotFetched;
   }
+  const ConfigRepoState state = fetch.stale ? kConfigRepoUnknown
+                                            : kConfigRepoCurrent;
+  if (have_tree && (fetch.tree->root_hash == tree->root_hash))
+    return state;
   // Only the blacklist is taken from the new tree; other options change on
   // the next reload
   options_mgr_->set_config_repo_tree(fetch.tree);
@@ -1342,7 +1346,7 @@ MountPoint::ConfigRepoState MountPoint::RefreshConfigRepo() {
            ", other options apply on the next reload",
            fetch.tree->fqrn.c_str(), have_tree ? "changed to" : "fetched at",
            fetch.tree->revision);
-  return kConfigRepoCurrent;
+  return state;
 }
 
 

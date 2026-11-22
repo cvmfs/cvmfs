@@ -31,8 +31,16 @@ FetchMode ParseFetchMode(const std::string &value);
 void RewriteProxies(std::string *proxies, std::string *fallback_proxies);
 
 /**
+ * The workspace of the shared quota manager that mounts with these options
+ * use, or empty if they use another kind of cache.
+ */
+std::string SharedCacheWorkspace(const OptionsManager &options_mgr);
+
+/**
  * Turns the options that mount the config repository into options for a
- * short-lived library mount with a RAM cache and tight timeouts.
+ * short-lived library mount with tight timeouts.  The fetch uses the shared
+ * cache of the mounts if its cache manager runs, and otherwise an unmanaged
+ * cache in the workspace.
  */
 void PrepareFetchOptions(const std::string &workspace, unsigned timeout_s,
                          OptionsManager *options_mgr);
@@ -47,23 +55,51 @@ enum FetchStatus {
  * Fetches the etc/cvmfs subtree of config_repo in a helper process, which
  * parses the local configuration of config_repo for the server settings.  If
  * expected_root_hash is given, only the manifest is downloaded as long as it
- * still matches.  The helper is killed after timeout_s seconds.
+ * still matches.  The helper is killed after timeout_s seconds.  *ttl is the
+ * config repository's catalog TTL in seconds unless the fetch failed.
  */
 FetchStatus FetchTree(const std::string &config_repo, bool simple_parser,
                       const std::string &workspace, unsigned timeout_s,
                       const std::string &expected_root_hash,
-                      ConfigRepoTree *tree, std::string *error);
+                      ConfigRepoTree *tree, unsigned *ttl,
+                      std::string *error);
 
 /**
  * Entry point of "cvmfs2 __config_fetch__", started by FetchTree().
  */
 int MainConfigFetch(int argc, char **argv);
 
+/**
+ * The last successfully fetched tree, kept in the workspace so that mounts
+ * within the TTL need no network and failed fetches can fall back to it.
+ */
+struct CachedTree {
+  CachedTree() : fetch_time(0), ttl(0), generation(0) { }
+  bool IsFresh(uint64_t now) const {
+    return (fetch_time <= now) && (now < fetch_time + ttl);
+  }
+
+  uint64_t fetch_time;  ///< wall clock, last time the tree was confirmed
+  unsigned ttl;
+  /// Number of revisions fetched into the object cache since it was emptied
+  unsigned generation;
+  ConfigRepoTree tree;
+};
+
+bool LoadCachedTree(const std::string &path, CachedTree *cached);
+bool StoreCachedTree(const std::string &path, const CachedTree &cached);
+
+enum CachePolicy {
+  kCacheUseFresh,   ///< no network while the cached tree is within its TTL
+  kCacheRevalidate  ///< always check the config repository's revision
+};
+
 struct FetchResult {
-  FetchResult() : mode(kFetchMount), required(false), unchanged(false) { }
+  FetchResult() : mode(kFetchMount), required(false), stale(false) { }
   FetchMode mode;
-  bool required;   ///< CVMFS_CONFIG_REPO_REQUIRED
-  bool unchanged;  ///< expected root hash still current, tree is NULL
+  bool required;  ///< CVMFS_CONFIG_REPO_REQUIRED
+  /// The fetch failed and tree is the last good copy from the workspace
+  bool stale;
   std::string config_repo;
   std::string error;
   std::shared_ptr<const ConfigRepoTree> tree;  ///< NULL on failure or mount
@@ -71,11 +107,12 @@ struct FetchResult {
 
 /**
  * Reads the fetch mode from the local configuration and, unless it is
- * "mount", fetches the config repository for repository fqrn.  See FetchTree()
- * for expected_root_hash.
+ * "mount", returns the config repository's tree for repository fqrn, from the
+ * workspace of the config repository or from the server.  Concurrent callers
+ * share one fetch.
  */
 FetchResult FetchForRepository(const std::string &fqrn, bool simple_parser,
-                               const std::string &expected_root_hash = "");
+                               CachePolicy policy = kCacheUseFresh);
 
 }  // namespace config_repo
 

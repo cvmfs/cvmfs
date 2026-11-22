@@ -2587,14 +2587,25 @@ static std::shared_ptr<const ConfigRepoTree> FetchConfigRepoTree(
     const std::string &fqrn, bool simple_parser,
     std::shared_ptr<const ConfigRepoTree> previous = NULL,
     bool *required_failed = NULL) {
+  // A reload revalidates, so that it picks up config repository changes
+  // within the TTL
   const config_repo::FetchResult fetch = config_repo::FetchForRepository(
-      fqrn, simple_parser);
+      fqrn, simple_parser,
+      previous ? config_repo::kCacheRevalidate : config_repo::kCacheUseFresh);
   if (required_failed != NULL)
     *required_failed = false;
   if (fetch.mode == config_repo::kFetchMount)
     return NULL;
-  if (fetch.tree)
+  if (fetch.tree) {
+    if (fetch.stale) {
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+               "failed to fetch config repository %s (%s), "
+               "using the cached revision %" PRIu64,
+               fetch.config_repo.c_str(), fetch.error.c_str(),
+               fetch.tree->revision);
+    }
     return fetch.tree;
+  }
 
   // On reload, the running module's copy avoids the mount, which may hang
   if (previous && !previous->root_hash.empty()

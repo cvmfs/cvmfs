@@ -5,13 +5,17 @@
 #include "config_repo_fetch.h"
 
 #include <errno.h>
+#include <fcntl.h>
 #include <poll.h>
 #include <signal.h>
+#include <sys/file.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
 #include <algorithm>
+#include <cstdio>
 #include <cstdlib>
+#include <ctime>
 #include <map>
 #include <set>
 #include <string>
@@ -45,7 +49,9 @@ namespace config_repo {
 static const char *kConfigSubtree = "/etc/cvmfs";
 
 static const unsigned kDefaultTimeout = 10;
-static const char *kCacheInstance = "cfgfetch";
+// Bounds the unmanaged object cache, which only grows with new revisions
+static const unsigned kMaxCacheGenerations = 16;
+static const char *kCachedTreeMagic = "CVMFSCFGCACHE1";
 // Same as FileSystem::kDefaultCacheBase
 static const char *kDefaultCacheBase = "/var/lib/cvmfs";
 
@@ -93,6 +99,30 @@ void RewriteProxies(string *proxies, string *fallback_proxies) {
 }
 
 
+string SharedCacheWorkspace(const OptionsManager &options_mgr) {
+  string optarg;
+  if (options_mgr.GetValue("CVMFS_CACHE_PRIMARY", &optarg) && !optarg.empty())
+    return "";
+  if (options_mgr.GetValue("CVMFS_ALIEN_CACHE", &optarg)
+      || options_mgr.GetValue("CVMFS_CACHE_DIR", &optarg)) {
+    return "";
+  }
+  if (!options_mgr.GetValue("CVMFS_SHARED_CACHE", &optarg)
+      || !options_mgr.IsOn(optarg)) {
+    return "";
+  }
+  if ((options_mgr.GetValue("CVMFS_CACHE_WORKSPACE", &optarg)
+       || options_mgr.GetValue("CVMFS_WORKSPACE", &optarg))
+      && !optarg.empty()) {
+    return optarg;
+  }
+  string cache_base = kDefaultCacheBase;
+  if (options_mgr.GetValue("CVMFS_CACHE_BASE", &optarg) && !optarg.empty())
+    cache_base = MakeCanonicalPath(optarg);
+  return cache_base + "/shared";
+}
+
+
 void PrepareFetchOptions(const string &workspace, unsigned timeout_s,
                          OptionsManager *options_mgr) {
   string proxies;
@@ -108,18 +138,21 @@ void PrepareFetchOptions(const string &workspace, unsigned timeout_s,
   options_mgr->UnsetValue("CVMFS_PAC_URLS");
   options_mgr->SetValue("CVMFS_USE_GEOAPI", "no");
 
-  // RAM cache: nothing is written to the local cache, and the library mode
-  // supports neither the shared nor the managed posix cache
-  options_mgr->UnsetValue("CVMFS_CACHE_DIR");
-  options_mgr->UnsetValue("CVMFS_ALIEN_CACHE");
-  options_mgr->SetValue("CVMFS_SHARED_CACHE", "no");
-  options_mgr->SetValue("CVMFS_QUOTA_LIMIT", "-1");
+  // FetchInProcess() falls back to an unmanaged cache in the workspace, which
+  // FetchForRepository() bounds
+  const string shared_workspace = SharedCacheWorkspace(*options_mgr);
+  if (shared_workspace.empty()) {
+    options_mgr->UnsetValue("CVMFS_CACHE_PRIMARY");
+    options_mgr->UnsetValue("CVMFS_ALIEN_CACHE");
+    options_mgr->UnsetValue("CVMFS_CACHE_BASE");
+    options_mgr->UnsetValue("CVMFS_CACHE_DIR");
+    options_mgr->UnsetValue("CVMFS_CACHE_WORKSPACE");
+    options_mgr->SetValue("CVMFS_SHARED_CACHE", "no");
+  } else {
+    // CVMFS_WORKSPACE below must not move the shared quota manager
+    options_mgr->SetValue("CVMFS_CACHE_WORKSPACE", shared_workspace);
+  }
   options_mgr->SetValue("CVMFS_STREAMING_CACHE", "no");
-  options_mgr->SetValue("CVMFS_CACHE_PRIMARY", kCacheInstance);
-  options_mgr->SetValue(string("CVMFS_CACHE_") + kCacheInstance + "_TYPE",
-                        "ram");
-  options_mgr->SetValue(string("CVMFS_CACHE_") + kCacheInstance + "_SIZE",
-                        "64");
   options_mgr->SetValue("CVMFS_WORKSPACE", workspace);
 
   options_mgr->SetValue("CVMFS_NFS_SOURCE", "no");
@@ -232,13 +265,14 @@ static bool WalkTree(MountPoint *mount_point, const string &dir_path,
 }
 
 
-static bool FetchInProcess(const string &config_repo,
+static bool FetchInProcess(const string &config_repo, const string &workspace,
                            OptionsManager *options_mgr, ConfigRepoTree *tree,
-                           string *error) {
+                           unsigned *ttl, string *error) {
   FileSystem::FileSystemInfo fs_info;
   fs_info.name = "config-fetch";
   fs_info.type = FileSystem::kFsLibrary;
   fs_info.options_mgr = options_mgr;
+  fs_info.fallback_cache_dir = workspace + "/cache";
   FileSystem *file_system = FileSystem::Create(fs_info);
   if (!file_system->IsValid()) {
     *error = "file system: " + file_system->boot_error();
@@ -250,6 +284,9 @@ static bool FetchInProcess(const string &config_repo,
     *error = "mount point: " + mount_point->boot_error();
     return false;
   }
+
+  // Before Spawn(), every download uses a new connection
+  mount_point->download_mgr()->Spawn();
 
   InterruptCue interrupt_cue;
   const ClientCtxGuard ctxg(geteuid(), getegid(), getpid(), &interrupt_cue);
@@ -268,6 +305,7 @@ static bool FetchInProcess(const string &config_repo,
   tree->fqrn = config_repo;
   tree->revision = mount_point->catalog_mgr()->GetRevision();
   tree->root_hash = mount_point->catalog_mgr()->GetRootHash().ToString();
+  *ttl = mount_point->GetEffectiveTtlSec();
   // Not torn down: the caller exits right away
   return true;
 }
@@ -296,7 +334,7 @@ static void ClearCvmfsEnvironment() {
  * "unchanged" is no worse than blocking the download.
  */
 static bool ProbeRootHash(OptionsManager *options_mgr, string *root_hash,
-                          string *error) {
+                          unsigned *ttl, string *error) {
   perf::Statistics statistics;
   download::DownloadManager download_mgr(
       1, perf::StatisticsTemplate("download", &statistics));
@@ -333,7 +371,14 @@ static bool ProbeRootHash(OptionsManager *options_mgr, string *root_hash,
     return false;
   }
   *root_hash = manifest->catalog_hash().ToString();
+  *ttl = manifest->ttl();
   delete manifest;
+  // As MountPoint::GetEffectiveTtlSec()
+  if (options_mgr->GetValue("CVMFS_MAX_TTL", &optarg)) {
+    const uint64_t max_ttl = String2Uint64(optarg) * 60;
+    if ((max_ttl > 0) && (max_ttl < *ttl))
+      *ttl = max_ttl;
+  }
   return true;
 }
 
@@ -347,7 +392,8 @@ static FetchStatus BootstrapAndFetch(const string &config_repo,
                                      const string &workspace,
                                      unsigned timeout_s,
                                      const string &expected_root_hash,
-                                     ConfigRepoTree *tree, string *error) {
+                                     ConfigRepoTree *tree, unsigned *ttl,
+                                     string *error) {
   ClearCvmfsEnvironment();
   OptionsTemplateManager *templ = new DefaultOptionsTemplateManager(
       config_repo);
@@ -361,29 +407,30 @@ static FetchStatus BootstrapAndFetch(const string &config_repo,
   PrepareFetchOptions(workspace, timeout_s, options_mgr);
   if (!expected_root_hash.empty()) {
     string root_hash;
-    if (!ProbeRootHash(options_mgr, &root_hash, error))
+    if (!ProbeRootHash(options_mgr, &root_hash, ttl, error))
       return kFetchFailed;
     if (root_hash == expected_root_hash)
       return kFetchUnchanged;
   }
-  return FetchInProcess(config_repo, options_mgr, tree, error) ? kFetchOk
-                                                               : kFetchFailed;
+  return FetchInProcess(config_repo, workspace, options_mgr, tree, ttl, error)
+             ? kFetchOk
+             : kFetchFailed;
 }
 
 
 /**
- * Writes the fetch result to fd: 'O' + serialized tree, 'U' for unchanged, or
- * 'E' + error.
+ * Writes the fetch result to fd: 'O' + TTL + '\n' + serialized tree, 'U' + TTL
+ * for unchanged, or 'E' + error.
  */
 static bool WriteResult(int fd, FetchStatus status, const ConfigRepoTree &tree,
-                        const string &error) {
+                        unsigned ttl, const string &error) {
   string payload;
   switch (status) {
     case kFetchOk:
-      payload = "O" + tree.Serialize();
+      payload = "O" + StringifyUint(ttl) + "\n" + tree.Serialize();
       break;
     case kFetchUnchanged:
-      payload = "U";
+      payload = "U" + StringifyUint(ttl);
       break;
     case kFetchFailed:
       payload = "E" + error;
@@ -406,18 +453,19 @@ int MainConfigFetch(int argc, char **argv) {
   const unsigned timeout_s = String2Uint64(argv[6]);
   const string expected_root_hash = (argc == 8) ? argv[7] : "";
   ConfigRepoTree tree;
+  unsigned ttl = 0;
   string error;
   const FetchStatus status = BootstrapAndFetch(
       config_repo, simple_parser, workspace, timeout_s, expected_root_hash,
-      &tree, &error);
-  return WriteResult(fd_result, status, tree, error) ? 0 : 1;
+      &tree, &ttl, &error);
+  return WriteResult(fd_result, status, tree, ttl, error) ? 0 : 1;
 }
 
 
 FetchStatus FetchTree(const string &config_repo, bool simple_parser,
                       const string &workspace, unsigned timeout_s,
                       const string &expected_root_hash, ConfigRepoTree *tree,
-                      string *error) {
+                      unsigned *ttl, string *error) {
   // A fresh process instead of a plain fork: the caller can be multi-threaded
   // (e.g. the remount thread), so locks may be held in a forked copy
   int pipe_result[2];
@@ -505,14 +553,67 @@ FetchStatus FetchTree(const string &config_repo, bool simple_parser,
     *error = output.substr(1);
     return kFetchFailed;
   }
-  if (output == "U")
+  if (output[0] == 'U') {
+    *ttl = String2Uint64(output.substr(1));
     return kFetchUnchanged;
+  }
 
-  if (!ConfigRepoTree::Deserialize(output.substr(1), tree)) {
+  const size_t pos_newline = output.find('\n');
+  if ((output[0] != 'O') || (pos_newline == string::npos)
+      || !ConfigRepoTree::Deserialize(output.substr(pos_newline + 1), tree)) {
     *error = "malformed fetch result";
     return kFetchFailed;
   }
+  *ttl = String2Uint64(output.substr(1, pos_newline - 1));
   return kFetchOk;
+}
+
+
+bool LoadCachedTree(const string &path, CachedTree *cached) {
+  const int fd = open(path.c_str(), O_RDONLY);
+  if (fd < 0)
+    return false;
+  string content;
+  const bool retval = SafeReadToString(fd, &content);
+  close(fd);
+  if (!retval)
+    return false;
+  const size_t pos_newline = content.find('\n');
+  if (pos_newline == string::npos)
+    return false;
+  const vector<string> header = SplitString(content.substr(0, pos_newline),
+                                            ' ');
+  if ((header.size() != 4) || (header[0] != kCachedTreeMagic))
+    return false;
+  CachedTree result;
+  result.fetch_time = String2Uint64(header[1]);
+  result.ttl = String2Uint64(header[2]);
+  result.generation = String2Uint64(header[3]);
+  if (!ConfigRepoTree::Deserialize(content.substr(pos_newline + 1),
+                                   &result.tree)
+      || result.tree.root_hash.empty()) {
+    return false;
+  }
+  *cached = result;
+  return true;
+}
+
+
+bool StoreCachedTree(const string &path, const CachedTree &cached) {
+  const string content = string(kCachedTreeMagic) + " "
+                         + StringifyUint(cached.fetch_time) + " "
+                         + StringifyUint(cached.ttl) + " "
+                         + StringifyUint(cached.generation) + "\n"
+                         + cached.tree.Serialize();
+  // Readers never see a partially written file
+  const string tmp_path = path + ".tmp";
+  if (!SafeWriteToFile(content, tmp_path, 0644))
+    return false;
+  if (rename(tmp_path.c_str(), path.c_str()) != 0) {
+    unlink(tmp_path.c_str());
+    return false;
+  }
+  return true;
 }
 
 
@@ -527,8 +628,98 @@ static unsigned GetTimeout(const OptionsManager &options_mgr) {
 }
 
 
+static string ReadFailureStamp(const string &path) {
+  string stamp;
+  const int fd = open(path.c_str(), O_RDONLY);
+  if (fd >= 0) {
+    if (!SafeReadToString(fd, &stamp))
+      stamp.clear();
+    close(fd);
+  }
+  return stamp;
+}
+
+
+/**
+ * Fetches config_repo into workspace, using and updating the cached tree.
+ * Called with the workspace lock held.  failure_before is the failure stamp
+ * read before waiting for the lock.
+ */
+static void FetchLocked(const string &config_repo, bool simple_parser,
+                        const string &workspace, unsigned timeout_s,
+                        CachePolicy policy, uint64_t wait_start,
+                        const string &failure_before, FetchResult *result) {
+  const string cached_path = workspace + "/tree";
+  const string failure_path = workspace + "/last_failure";
+  CachedTree cached;
+  const bool have_cached = LoadCachedTree(cached_path, &cached)
+                           && (cached.tree.fqrn == config_repo);
+  const uint64_t now = time(NULL);
+  if (have_cached) {
+    // Confirmed while this caller waited for the lock
+    const bool just_confirmed = (cached.fetch_time >= wait_start)
+                                && (cached.fetch_time <= now);
+    if (just_confirmed
+        || ((policy == kCacheUseFresh) && cached.IsFresh(now))) {
+      result->tree.reset(new ConfigRepoTree(cached.tree));
+      return;
+    }
+  }
+
+  // Concurrent callers waiting for the lock do not repeat a failed fetch
+  const bool just_failed = (ReadFailureStamp(failure_path) != failure_before);
+
+  FetchStatus status = kFetchFailed;
+  ConfigRepoTree *tree = new ConfigRepoTree();
+  unsigned ttl = 0;
+  if (just_failed) {
+    result->error = "fetch failed in a concurrent attempt";
+  } else {
+    status = FetchTree(config_repo, simple_parser, workspace, timeout_s,
+                       have_cached ? cached.tree.root_hash : "", tree, &ttl,
+                       &result->error);
+  }
+
+  switch (status) {
+    case kFetchOk:
+      if (!have_cached || (cached.tree.root_hash != tree->root_hash))
+        cached.generation++;
+      cached.tree = *tree;
+      break;
+    case kFetchUnchanged:
+      break;
+    case kFetchFailed:
+      delete tree;
+      if (!just_failed) {
+        SafeWriteToFile(StringifyUint(platform_realtime_ns()), failure_path,
+                        0644);
+      }
+      if (have_cached) {
+        result->stale = true;
+        result->tree.reset(new ConfigRepoTree(cached.tree));
+      }
+      return;
+  }
+  cached.fetch_time = time(NULL);
+  cached.ttl = ttl;
+  if (cached.generation >= kMaxCacheGenerations) {
+    RemoveTree(workspace + "/cache");
+    cached.generation = 0;
+  }
+  if (!StoreCachedTree(cached_path, cached)) {
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+             "failed to store the config repository tree in %s",
+             cached_path.c_str());
+  }
+  if (status == kFetchOk)
+    result->tree.reset(tree);
+  else
+    result->tree.reset(new ConfigRepoTree(cached.tree));
+}
+
+
 FetchResult FetchForRepository(const string &fqrn, bool simple_parser,
-                               const string &expected_root_hash) {
+                               CachePolicy policy) {
   FetchResult result;
   OptionsManager *local_mgr;
   if (simple_parser)
@@ -559,15 +750,34 @@ FetchResult FetchForRepository(const string &fqrn, bool simple_parser,
     return result;
   }
 
-  ConfigRepoTree *tree = new ConfigRepoTree();
-  const FetchStatus status = FetchTree(
-      result.config_repo, simple_parser, cache_base + "/config-fetch/" + fqrn,
-      timeout_s, expected_root_hash, tree, &result.error);
-  result.unchanged = (status == kFetchUnchanged);
-  if (status == kFetchOk)
-    result.tree.reset(tree);
-  else
-    delete tree;
+  // One workspace per config repository, shared by all repositories
+  const string workspace = cache_base + "/config-fetch/" + result.config_repo;
+  if (!MkdirDeep(workspace, 0755, false /* verify_writable */)) {
+    result.error = "cannot create " + workspace + " ("
+                   + StringifyInt(errno) + ")";
+    return result;
+  }
+  const uint64_t wait_start = time(NULL);
+  const string failure_before = ReadFailureStamp(workspace + "/last_failure");
+  // Not LockFile(), which logs every wait to syslog.  The holder is bounded by
+  // the fetch timeout.
+  const string lock_path = workspace + "/lock";
+  const int fd_lock = open(lock_path.c_str(), O_RDONLY | O_CREAT, 0600);
+  int retval = (fd_lock < 0) ? -1 : 0;
+  while ((retval == 0) && (flock(fd_lock, LOCK_EX) != 0)) {
+    if (errno != EINTR)
+      retval = -1;
+  }
+  if (retval != 0) {
+    result.error = "cannot lock " + lock_path + " (" + StringifyInt(errno)
+                   + ")";
+    if (fd_lock >= 0)
+      close(fd_lock);
+    return result;
+  }
+  FetchLocked(result.config_repo, simple_parser, workspace, timeout_s, policy,
+              wait_start, failure_before, &result);
+  close(fd_lock);
   return result;
 }
 

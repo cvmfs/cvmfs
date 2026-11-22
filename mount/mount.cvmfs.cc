@@ -695,6 +695,19 @@ int main(int argc, char **argv) {
                reload_sockets.c_str(), cvmfs_user.c_str());
       return 1;
     }
+    // The config repository fetch runs as cvmfs_user and keeps its
+    // workspace here; best effort, the fetch falls back to the mount
+    string cache_base;
+    if (options_manager_.GetValue("CVMFS_CACHE_BASE", &cache_base)) {
+      const string config_fetch = MakeCanonicalPath(cache_base)
+                                  + "/config-fetch";
+      if (MkdirDeep(config_fetch, 0755, false)
+          && (chown(config_fetch.c_str(), uid_cvmfs, getegid()) != 0)) {
+        LogCvmfs(kLogCvmfs, kLogSyslogWarn,
+                 "Failed to transfer ownership of %s to %s",
+                 config_fetch.c_str(), cvmfs_user.c_str());
+      }
+    }
   }
 
   // Set maximum number of files

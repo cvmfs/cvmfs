@@ -147,6 +147,51 @@ TEST_F(T_ConfigRepo, Serialization) {
 }
 
 
+TEST_F(T_ConfigRepo, CachedTree) {
+  const string dir = CreateTempDir("./cvmfs_ut_config_repo");
+  ASSERT_FALSE(dir.empty());
+  const string path = dir + "/tree";
+  UnlinkGuard path_guard(path);
+
+  config_repo::CachedTree cached;
+  EXPECT_FALSE(config_repo::LoadCachedTree(path, &cached));
+
+  cached.fetch_time = 1000;
+  cached.ttl = 240;
+  cached.generation = 3;
+  cached.tree = tree_;
+  ASSERT_TRUE(config_repo::StoreCachedTree(path, cached));
+  EXPECT_FALSE(FileExists(path + ".tmp"));
+  config_repo::CachedTree loaded;
+  ASSERT_TRUE(config_repo::LoadCachedTree(path, &loaded));
+  EXPECT_EQ(1000U, loaded.fetch_time);
+  EXPECT_EQ(240U, loaded.ttl);
+  EXPECT_EQ(3U, loaded.generation);
+  EXPECT_EQ(tree_.root_hash, loaded.tree.root_hash);
+  EXPECT_EQ(tree_.files, loaded.tree.files);
+  EXPECT_EQ(tree_.symlinks, loaded.tree.symlinks);
+
+  EXPECT_TRUE(loaded.IsFresh(1000));
+  EXPECT_TRUE(loaded.IsFresh(1239));
+  EXPECT_FALSE(loaded.IsFresh(1240));
+  // Clock set back after the fetch
+  EXPECT_FALSE(loaded.IsFresh(999));
+
+  // A tree without root hash was never fetched
+  cached.tree.root_hash = "";
+  ASSERT_TRUE(config_repo::StoreCachedTree(path, cached));
+  EXPECT_FALSE(config_repo::LoadCachedTree(path, &loaded));
+
+  ASSERT_TRUE(SafeWriteToFile("CVMFSCFGCACHE1 1 2\n" + tree_.Serialize(),
+                              path, 0644));
+  EXPECT_FALSE(config_repo::LoadCachedTree(path, &loaded));
+  ASSERT_TRUE(SafeWriteToFile("CVMFSCFGCACHE1 1 2 3\ngarbage", path, 0644));
+  EXPECT_FALSE(config_repo::LoadCachedTree(path, &loaded));
+  path_guard.Disable();
+  EXPECT_TRUE(RemoveTree(dir));
+}
+
+
 TEST_F(T_ConfigRepo, InlineIncludes) {
   const string path = "etc/cvmfs/domain.d/cern.ch.conf";
   string content;
@@ -294,6 +339,44 @@ TEST_F(T_ConfigRepo, RewriteProxies) {
     EXPECT_EQ(cases[i].exp_proxies, proxies) << i;
     EXPECT_EQ(cases[i].exp_fallback, fallback) << i;
   }
+}
+
+
+TEST_F(T_ConfigRepo, FetchCacheOptions) {
+  SimpleOptionsParser options_mgr(NULL);
+  options_mgr.set_taint_environment(false);
+  EXPECT_EQ("", config_repo::SharedCacheWorkspace(options_mgr));
+  options_mgr.SetValue("CVMFS_SHARED_CACHE", "yes");
+  EXPECT_EQ("/var/lib/cvmfs/shared",
+            config_repo::SharedCacheWorkspace(options_mgr));
+  options_mgr.SetValue("CVMFS_CACHE_BASE", "/srv/cvmfs/");
+  EXPECT_EQ("/srv/cvmfs/shared",
+            config_repo::SharedCacheWorkspace(options_mgr));
+
+  SimpleOptionsParser workspace(options_mgr);
+  workspace.SetValue("CVMFS_WORKSPACE", "/run/cvmfs");
+  EXPECT_EQ("/run/cvmfs", config_repo::SharedCacheWorkspace(workspace));
+  SimpleOptionsParser alien(options_mgr);
+  alien.SetValue("CVMFS_ALIEN_CACHE", "/alien");
+  EXPECT_EQ("", config_repo::SharedCacheWorkspace(alien));
+  SimpleOptionsParser plugin(options_mgr);
+  plugin.SetValue("CVMFS_CACHE_PRIMARY", "plugin");
+  EXPECT_EQ("", config_repo::SharedCacheWorkspace(plugin));
+
+  string value;
+  config_repo::PrepareFetchOptions("/ws", 10, &options_mgr);
+  EXPECT_TRUE(options_mgr.GetValue("CVMFS_CACHE_WORKSPACE", &value));
+  EXPECT_EQ("/srv/cvmfs/shared", value);
+  EXPECT_TRUE(options_mgr.GetValue("CVMFS_CACHE_BASE", &value));
+  EXPECT_TRUE(options_mgr.GetValue("CVMFS_WORKSPACE", &value));
+  EXPECT_EQ("/ws", value);
+
+  config_repo::PrepareFetchOptions("/ws", 10, &alien);
+  EXPECT_FALSE(alien.GetValue("CVMFS_ALIEN_CACHE", &value));
+  EXPECT_FALSE(alien.GetValue("CVMFS_CACHE_BASE", &value));
+  EXPECT_FALSE(alien.GetValue("CVMFS_CACHE_WORKSPACE", &value));
+  EXPECT_TRUE(alien.GetValue("CVMFS_SHARED_CACHE", &value));
+  EXPECT_EQ("no", value);
 }
 
 
