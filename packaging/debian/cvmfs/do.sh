@@ -33,19 +33,19 @@ echo -n "copying source tree to $workdir/tmp... "
 cp -R $srctree/* ${workdir}/tmp
 echo "done"
 
-echo -n "initializing build environment... "
-mkdir ${workdir}/src/cvmfs.orig ${workdir}/src/cvmfs
-cp -R $srctree/* ${workdir}/src/cvmfs.orig
-cp -R $srctree/* ${workdir}/src/cvmfs
-mkdir ${workdir}/src/cvmfs/debian
-cp -R ${workdir}/tmp/packaging/debian/cvmfs/* ${workdir}/src/cvmfs/debian
-echo "done"
-
 echo -n "figuring out version number... "
 resolved_version="$(${srctree}/cmake/get_version.sh "${srctree}")"
-printf '%s\n' "$resolved_version" > "${workdir}/src/cvmfs.orig/CVMFS_VERSION"
+upstream_version="${resolved_version}-1"
+echo "done"
+
+echo -n "initializing build environment... "
+mkdir ${workdir}/src/cvmfs
+cp -R $srctree/* ${workdir}/src/cvmfs
 printf '%s\n' "$resolved_version" > "${workdir}/src/cvmfs/CVMFS_VERSION"
-upstream_version="${resolved_version}-0"
+tar -C ${workdir}/src --transform "s,^cvmfs,cvmfs-${resolved_version}," \
+  -cJf ${workdir}/src/cvmfs_${resolved_version}.orig.tar.xz cvmfs
+mkdir ${workdir}/src/cvmfs/debian
+cp -R ${workdir}/tmp/packaging/debian/cvmfs/* ${workdir}/src/cvmfs/debian
 echo "done"
 
 echo "building..."

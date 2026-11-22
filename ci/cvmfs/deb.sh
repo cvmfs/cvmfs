@@ -27,7 +27,8 @@ set_cvmfs_version_sequence_from_nightly "$CVMFS_NIGHTLY_BUILD_NUMBER"
 upstream_version="$(get_cvmfs_version "$CVMFS_SOURCE_LOCATION")"
 echo "detected upstream version: ${upstream_version}"
 
-cvmfs_version="${upstream_version}+$(lsb_release -si | tr '[:upper:]' '[:lower:]')"
+# '+' keeps our builds sorting above a distribution's own ${upstream_version}-1.
+cvmfs_version="${upstream_version}-1+$(lsb_release -si | tr '[:upper:]' '[:lower:]')"
 cvmfs_version="${cvmfs_version}$(lsb_release -sr)"
 
 echo "creating release: $cvmfs_version"
@@ -57,6 +58,19 @@ cp -R --dereference ${CVMFS_SOURCE_LOCATION}/CITATION.cff       \
                     ${CVMFS_SOURCE_LOCATION}/ducc               \
                     $copied_source
 printf '%s\n' "$upstream_version" > "$copied_source/CVMFS_VERSION"
+
+# 3.0 (quilt) needs the pristine tree as orig tarball next to the source dir;
+# dpkg-source aborts if the tree differs from it, so create it before debian/.
+# Normalised metadata keeps it byte-identical across platforms. -T1 because
+# -T0 can fall back to single-threaded mode on one CPU, which encodes differently.
+orig_tarball="${CVMFS_RESULT_LOCATION}/cvmfs_${upstream_version}.orig.tar.xz"
+orig_mtime="${SOURCE_DATE_EPOCH:-$(stat -c %Y "${CVMFS_SOURCE_LOCATION}/VERSION")}"
+echo "creating upstream tarball $(basename "$orig_tarball")..."
+tar -C "$CVMFS_RESULT_LOCATION" \
+  --sort=name --format=gnu --mtime="@${orig_mtime}" \
+  --owner=0 --group=0 --numeric-owner --mode=go-w \
+  --transform "s,^wd_src,cvmfs-${upstream_version}," \
+  -I 'xz -T1' -cf "$orig_tarball" wd_src
 
 # produce the debian package
 echo "copy packaging meta information and get in place..."
