@@ -357,6 +357,89 @@ EOF
 }
 
 
+# Setup or tear down an .htaccess file in the data/ subdirectory of the
+# repository storage that restricts access to history (tag database) files.
+#
+# When CVMFS_PRIVATE_HISTORY=true a random token is generated and stored at
+# /etc/cvmfs/repositories.d/<name>/history.token (plain text) and
+# /etc/cvmfs/repositories.d/<name>/.history_auth (Apache htpasswd format).
+# The .htaccess in <storage_dir>/data/ then requires either local access or
+# HTTP Basic Auth with that token.
+#
+# Stratum-1 operators who need to replicate the history database must obtain
+# the token from the stratum-0 administrator and configure it accordingly.
+# TODO: integrate the token into cvmfs_server snapshot / the swissknife
+#       download manager so stratum-1 replication can use it automatically.
+#
+# @param name         repository name
+# @param storage_dir  local storage root (data/ subdir is located here)
+update_private_history_restriction() {
+  local name=$1
+  local storage_dir=$2
+  local data_dir="${storage_dir}/data"
+  local htaccess="${data_dir}/.htaccess"
+  local token_file="/etc/cvmfs/repositories.d/${name}/history.token"
+  local auth_file="/etc/cvmfs/repositories.d/${name}/.history_auth"
+
+  if [ "x${CVMFS_PRIVATE_HISTORY}" != "xtrue" ]; then
+    # Remove restriction if the setting is not active
+    rm -f "$htaccess" "$token_file" "$auth_file"
+    return 0
+  fi
+
+  # Generate token if it does not exist yet
+  if [ ! -f "$token_file" ]; then
+    local token
+    token=$(openssl rand -hex 32 2>/dev/null) || \
+      token=$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')
+    echo "$token" > "$token_file"
+    chmod 600 "$token_file"
+    # Create htpasswd entry (username: cvmfs, password: token)
+    # Use openssl to generate the password hash compatible with Apache Basic Auth
+    local hashed
+    hashed=$(openssl passwd -apr1 "$token" 2>/dev/null) || \
+      hashed=$(echo "$token" | openssl passwd -stdin -apr1 2>/dev/null)
+    echo "cvmfs:${hashed}" > "$auth_file"
+    chmod 640 "$auth_file"
+    echo "Generated history access token for $name."
+    echo "Token stored at: $token_file"
+    echo "Stratum-1 operators need this token to replicate the history database."
+  fi
+
+  # Write the .htaccess file
+  cat > "$htaccess" << HTEOF
+# Created by cvmfs_server.  Do not edit manually.
+# Restricts access to the tag/history database (files ending in H).
+<FilesMatch ".*H$">
+    AuthType Basic
+    AuthName "CVMFS Private History"
+    AuthUserFile ${auth_file}
+    <RequireAny>
+        Require local
+        Require valid-user
+    </RequireAny>
+</FilesMatch>
+HTEOF
+  chmod 644 "$htaccess"
+}
+
+
+# Print the history access token for a repository (for distributing to
+# stratum-1 operators who need to replicate a private history database).
+#
+# @param name  repository name
+print_history_token() {
+  local name=$1
+  local token_file="/etc/cvmfs/repositories.d/${name}/history.token"
+  if [ ! -f "$token_file" ]; then
+    echo "No history token found for $name."                         >&2
+    echo "Set CVMFS_PRIVATE_HISTORY=true and publish to generate one." >&2
+    return 1
+  fi
+  cat "$token_file"
+}
+
+
 has_apache_config_for_global_info() {
   has_apache_config_file $(get_apache_conf_filename "info")
 }
