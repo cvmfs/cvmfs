@@ -83,8 +83,17 @@ struct CachedTree {
   unsigned ttl;
   /// Number of revisions fetched into the object cache since it was emptied
   unsigned generation;
+  /// KeyDigest() of the keys that verified the tree
+  std::string key_digest;
   ConfigRepoTree tree;
 };
+
+/**
+ * Digest over the paths and contents of the public keys that verify the
+ * config repository according to the options for the config repository.  A
+ * cached tree is only trusted as long as these keys are unchanged.
+ */
+std::string KeyDigest(const OptionsManager &options_mgr);
 
 bool LoadCachedTree(const std::string &path, CachedTree *cached);
 bool StoreCachedTree(const std::string &path, const CachedTree &cached);

@@ -24,6 +24,7 @@
 #include "cache.h"
 #include "catalog_mgr_client.h"
 #include "clientctx.h"
+#include "crypto/hash.h"
 #include "directory_entry.h"
 #include "fetch.h"
 #include "interrupt.h"
@@ -51,7 +52,7 @@ static const char *kConfigSubtree = "/etc/cvmfs";
 static const unsigned kDefaultTimeout = 10;
 // Bounds the unmanaged object cache, which only grows with new revisions
 static const unsigned kMaxCacheGenerations = 16;
-static const char *kCachedTreeMagic = "CVMFSCFGCACHE1";
+static const char *kCachedTreeMagic = "CVMFSCFGCACHE2";
 // Same as FileSystem::kDefaultCacheBase
 static const char *kDefaultCacheBase = "/var/lib/cvmfs";
 
@@ -569,6 +570,36 @@ FetchStatus FetchTree(const string &config_repo, bool simple_parser,
 }
 
 
+string KeyDigest(const OptionsManager &options_mgr) {
+  // As MountPoint::CreateSignatureManager() without a fetched tree
+  vector<string> key_paths;
+  string optarg;
+  if (options_mgr.GetValue("CVMFS_PUBLIC_KEY", &optarg))
+    key_paths = SplitString(optarg, ':');
+  else if (options_mgr.GetValue("CVMFS_KEYS_DIR", &optarg))
+    key_paths = FindFilesBySuffix(optarg, ".pub");
+  else
+    key_paths = FindFilesBySuffix("/etc/cvmfs/keys", ".pub");
+
+  string input;
+  for (unsigned i = 0; i < key_paths.size(); ++i) {
+    string content;
+    const int fd = open(key_paths[i].c_str(), O_RDONLY);
+    const bool readable = (fd >= 0) && SafeReadToString(fd, &content);
+    if (fd >= 0)
+      close(fd);
+    // Length-prefixed, so that no two key sets give the same input
+    input += StringifyUint(key_paths[i].size()) + ":" + key_paths[i]
+             + (readable ? "+" : "-") + StringifyUint(content.size()) + ":"
+             + content;
+  }
+  shash::Any digest(shash::kSha1);
+  shash::HashMem(reinterpret_cast<const unsigned char *>(input.data()),
+                 input.size(), &digest);
+  return digest.ToString();
+}
+
+
 bool LoadCachedTree(const string &path, CachedTree *cached) {
   const int fd = open(path.c_str(), O_RDONLY);
   if (fd < 0)
@@ -583,12 +614,13 @@ bool LoadCachedTree(const string &path, CachedTree *cached) {
     return false;
   const vector<string> header = SplitString(content.substr(0, pos_newline),
                                             ' ');
-  if ((header.size() != 4) || (header[0] != kCachedTreeMagic))
+  if ((header.size() != 5) || (header[0] != kCachedTreeMagic))
     return false;
   CachedTree result;
   result.fetch_time = String2Uint64(header[1]);
   result.ttl = String2Uint64(header[2]);
   result.generation = String2Uint64(header[3]);
+  result.key_digest = header[4];
   if (!ConfigRepoTree::Deserialize(content.substr(pos_newline + 1),
                                    &result.tree)
       || result.tree.root_hash.empty()) {
@@ -603,7 +635,8 @@ bool StoreCachedTree(const string &path, const CachedTree &cached) {
   const string content = string(kCachedTreeMagic) + " "
                          + StringifyUint(cached.fetch_time) + " "
                          + StringifyUint(cached.ttl) + " "
-                         + StringifyUint(cached.generation) + "\n"
+                         + StringifyUint(cached.generation) + " "
+                         + cached.key_digest + "\n"
                          + cached.tree.Serialize();
   // Readers never see a partially written file
   const string tmp_path = path + ".tmp";
@@ -647,13 +680,17 @@ static string ReadFailureStamp(const string &path) {
  */
 static void FetchLocked(const string &config_repo, bool simple_parser,
                         const string &workspace, unsigned timeout_s,
-                        CachePolicy policy, uint64_t wait_start,
-                        const string &failure_before, FetchResult *result) {
+                        CachePolicy policy, const string &key_digest,
+                        uint64_t wait_start, const string &failure_before,
+                        FetchResult *result) {
   const string cached_path = workspace + "/tree";
   const string failure_path = workspace + "/last_failure";
   CachedTree cached;
+  // A tree verified with other keys is neither reused nor a fallback, so that
+  // broken or revoked keys take effect right away
   const bool have_cached = LoadCachedTree(cached_path, &cached)
-                           && (cached.tree.fqrn == config_repo);
+                           && (cached.tree.fqrn == config_repo)
+                           && (cached.key_digest == key_digest);
   const uint64_t now = time(NULL);
   if (have_cached) {
     // Confirmed while this caller waited for the lock
@@ -702,6 +739,7 @@ static void FetchLocked(const string &config_repo, bool simple_parser,
   }
   cached.fetch_time = time(NULL);
   cached.ttl = ttl;
+  cached.key_digest = key_digest;
   if (cached.generation >= kMaxCacheGenerations) {
     RemoveTree(workspace + "/cache");
     cached.generation = 0;
@@ -750,6 +788,16 @@ FetchResult FetchForRepository(const string &fqrn, bool simple_parser,
     return result;
   }
 
+  OptionsManager *config_repo_mgr;
+  if (simple_parser)
+    config_repo_mgr = new SimpleOptionsParser();
+  else
+    config_repo_mgr = new BashOptionsManager();
+  config_repo_mgr->set_taint_environment(false);
+  config_repo_mgr->ParseDefault(result.config_repo);
+  const string key_digest = KeyDigest(*config_repo_mgr);
+  delete config_repo_mgr;
+
   // One workspace per config repository, shared by all repositories
   const string workspace = cache_base + "/config-fetch/" + result.config_repo;
   if (!MkdirDeep(workspace, 0755, false /* verify_writable */)) {
@@ -776,7 +824,7 @@ FetchResult FetchForRepository(const string &fqrn, bool simple_parser,
     return result;
   }
   FetchLocked(result.config_repo, simple_parser, workspace, timeout_s, policy,
-              wait_start, failure_before, &result);
+              key_digest, wait_start, failure_before, &result);
   close(fd_lock);
   return result;
 }

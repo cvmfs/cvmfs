@@ -159,6 +159,7 @@ TEST_F(T_ConfigRepo, CachedTree) {
   cached.fetch_time = 1000;
   cached.ttl = 240;
   cached.generation = 3;
+  cached.key_digest = "0123abcd";
   cached.tree = tree_;
   ASSERT_TRUE(config_repo::StoreCachedTree(path, cached));
   EXPECT_FALSE(FileExists(path + ".tmp"));
@@ -167,6 +168,7 @@ TEST_F(T_ConfigRepo, CachedTree) {
   EXPECT_EQ(1000U, loaded.fetch_time);
   EXPECT_EQ(240U, loaded.ttl);
   EXPECT_EQ(3U, loaded.generation);
+  EXPECT_EQ("0123abcd", loaded.key_digest);
   EXPECT_EQ(tree_.root_hash, loaded.tree.root_hash);
   EXPECT_EQ(tree_.files, loaded.tree.files);
   EXPECT_EQ(tree_.symlinks, loaded.tree.symlinks);
@@ -185,9 +187,47 @@ TEST_F(T_ConfigRepo, CachedTree) {
   ASSERT_TRUE(SafeWriteToFile("CVMFSCFGCACHE1 1 2\n" + tree_.Serialize(),
                               path, 0644));
   EXPECT_FALSE(config_repo::LoadCachedTree(path, &loaded));
-  ASSERT_TRUE(SafeWriteToFile("CVMFSCFGCACHE1 1 2 3\ngarbage", path, 0644));
+  ASSERT_TRUE(SafeWriteToFile("CVMFSCFGCACHE2 1 2 3 d\ngarbage", path, 0644));
+  EXPECT_FALSE(config_repo::LoadCachedTree(path, &loaded));
+  // Format without key digest
+  ASSERT_TRUE(SafeWriteToFile("CVMFSCFGCACHE1 1 2 3\n" + tree_.Serialize(),
+                              path, 0644));
   EXPECT_FALSE(config_repo::LoadCachedTree(path, &loaded));
   path_guard.Disable();
+  EXPECT_TRUE(RemoveTree(dir));
+}
+
+
+TEST_F(T_ConfigRepo, KeyDigest) {
+  const string dir = CreateTempDir("./cvmfs_ut_config_repo_keys");
+  ASSERT_FALSE(dir.empty());
+  ASSERT_TRUE(SafeWriteToFile("key A", dir + "/a.pub", 0644));
+  ASSERT_TRUE(SafeWriteToFile("not a key", dir + "/README", 0644));
+  SimpleOptionsParser options_mgr(NULL);
+  options_mgr.set_taint_environment(false);
+  options_mgr.SetValue("CVMFS_KEYS_DIR", dir);
+  const string digest_a = config_repo::KeyDigest(options_mgr);
+  EXPECT_FALSE(digest_a.empty());
+  EXPECT_EQ(digest_a, config_repo::KeyDigest(options_mgr));
+
+  // Only .pub files count
+  ASSERT_TRUE(SafeWriteToFile("other", dir + "/README", 0644));
+  EXPECT_EQ(digest_a, config_repo::KeyDigest(options_mgr));
+
+  ASSERT_TRUE(SafeWriteToFile("broken", dir + "/b.pub", 0644));
+  const string digest_ab = config_repo::KeyDigest(options_mgr);
+  EXPECT_NE(digest_a, digest_ab);
+  ASSERT_TRUE(SafeWriteToFile("key B", dir + "/b.pub", 0644));
+  EXPECT_NE(digest_ab, config_repo::KeyDigest(options_mgr));
+  ASSERT_EQ(0, unlink((dir + "/b.pub").c_str()));
+  EXPECT_EQ(digest_a, config_repo::KeyDigest(options_mgr));
+
+  // CVMFS_PUBLIC_KEY takes precedence, also with missing files
+  options_mgr.SetValue("CVMFS_PUBLIC_KEY", dir + "/a.pub:" + dir + "/c.pub");
+  const string digest_ac = config_repo::KeyDigest(options_mgr);
+  EXPECT_NE(digest_a, digest_ac);
+  ASSERT_TRUE(SafeWriteToFile("", dir + "/c.pub", 0644));
+  EXPECT_NE(digest_ac, config_repo::KeyDigest(options_mgr));
   EXPECT_TRUE(RemoveTree(dir));
 }
 
