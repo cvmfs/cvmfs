@@ -859,7 +859,8 @@ int FuseMain(int argc, char *argv[]) {
   {
     const char *nfs_parameters[] = {
         "CVMFS_NFS_DELEGATIONS", "CVMFS_NFS_MOUNT_OPTIONS", "CVMFS_NFS_BIND",
-        "CVMFS_NFS_PORT", "CVMFS_NFS_ALLOWED_CLIENTS"};
+        "CVMFS_NFS_PORT", "CVMFS_NFS_ALLOWED_CLIENTS",
+        "CVMFS_NFS_MAX_OPEN_FILES"};
     for (unsigned i = 0;
          i < sizeof(nfs_parameters) / sizeof(nfs_parameters[0]); ++i) {
       if (options_manager->GetValue(nfs_parameters[i], &parameter))
