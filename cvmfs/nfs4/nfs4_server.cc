@@ -261,6 +261,7 @@ Nfs4Server::Nfs4Server(Backend *backend, const Options &options)
     , next_stateid_(1)
     , num_frozen_attrs_(0)
     , last_generation_(0)
+    , listing_clock_(0)
     , monitor_stopping_(false)
     , executors_stopping_(false) { }
 
@@ -1054,6 +1055,52 @@ uint32_t Nfs4Server::OpRead(XdrReader *args, Compound *c, XdrWriter *body) {
 }
 
 
+uint32_t Nfs4Server::GetListing(const Object &dir, uint64_t generation,
+                                bool refresh, ListingPtr *listing) {
+  if (dir.fh.kind != FileHandle::kObject) {
+    std::shared_ptr<std::vector<DirEntry> > entries(
+        new std::vector<DirEntry>());
+    const uint32_t status = ListChildren(dir, entries.get());
+    *listing = entries;
+    return status;
+  }
+
+  if (!refresh) {
+    const std::lock_guard<std::mutex> lock(listing_lock_);
+    const std::map<uint64_t, CachedListing>::iterator it =
+        listings_.find(dir.fh.ino);
+    if (it != listings_.end() && it->second.generation == generation) {
+      it->second.last_used = ++listing_clock_;
+      *listing = it->second.entries;
+      return NFS4_OK;
+    }
+  }
+
+  std::shared_ptr<std::vector<DirEntry> > entries(new std::vector<DirEntry>());
+  const uint32_t status = ListChildren(dir, entries.get());
+  if (status != NFS4_OK)
+    return status;
+  *listing = entries;
+
+  const std::lock_guard<std::mutex> lock(listing_lock_);
+  if (listings_.size() >= kMaxCachedListings
+      && listings_.count(dir.fh.ino) == 0) {
+    std::map<uint64_t, CachedListing>::iterator oldest = listings_.begin();
+    for (std::map<uint64_t, CachedListing>::iterator it = listings_.begin();
+         it != listings_.end(); ++it) {
+      if (it->second.last_used < oldest->second.last_used)
+        oldest = it;
+    }
+    listings_.erase(oldest);
+  }
+  CachedListing &cached = listings_[dir.fh.ino];
+  cached.generation = generation;
+  cached.entries = entries;
+  cached.last_used = ++listing_clock_;
+  return NFS4_OK;
+}
+
+
 uint32_t Nfs4Server::OpReaddir(XdrReader *args, Compound *c, XdrWriter *body) {
   uint64_t cookie;
   unsigned char verifier[kNfs4VerifierSize];
@@ -1075,8 +1122,9 @@ uint32_t Nfs4Server::OpReaddir(XdrReader *args, Compound *c, XdrWriter *body) {
   if (dir.fh.kind == FileHandle::kNamedAttr || !S_ISDIR(dir.attr.mode))
     return NFS4ERR_NOTDIR;
 
+  const uint64_t generation = backend_->Generation();
   XdrWriter my_verifier_w;
-  my_verifier_w.PutU64(backend_->Generation());
+  my_verifier_w.PutU64(generation);
   const std::string &my_verifier = my_verifier_w.buffer();
   if (cookie == 1 || cookie == 2)
     return NFS4ERR_BAD_COOKIE;
@@ -1085,10 +1133,11 @@ uint32_t Nfs4Server::OpReaddir(XdrReader *args, Compound *c, XdrWriter *body) {
     return NFS4ERR_NOT_SAME;
   }
 
-  std::vector<DirEntry> entries;
-  status = ListChildren(dir, &entries);
+  ListingPtr listing;
+  status = GetListing(dir, generation, cookie == 0, &listing);
   if (status != NFS4_OK)
     return status;
+  const std::vector<DirEntry> &entries = *listing;
 
   // Cookies 0, 1 and 2 are reserved; entry i has cookie i + 3
   size_t index = (cookie == 0) ? 0 : static_cast<size_t>(cookie - 2);

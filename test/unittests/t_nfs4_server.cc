@@ -47,6 +47,7 @@ class MemoryBackend : public Backend {
       , num_generation_calls_(0)
       , num_forgets_(0)
       , read_delay_ms_(0)
+      , num_readdirs_(0)
       , next_ino_(100) {
     Node &root = nodes_[kRoot];
     root.attr.ino = kRoot;
@@ -99,6 +100,7 @@ class MemoryBackend : public Backend {
     return 0;
   }
   virtual int ReadDir(uint64_t ino, std::vector<DirEntry> *entries) {
+    num_readdirs_++;
     entries->clear();
     for (std::map<std::string, uint64_t>::const_iterator it =
              nodes_[ino].children.begin();
@@ -148,6 +150,7 @@ class MemoryBackend : public Backend {
   std::atomic<unsigned> num_generation_calls_;
   unsigned num_forgets_;
   unsigned read_delay_ms_;
+  unsigned num_readdirs_;
 
  private:
   uint64_t Add(uint64_t parent, const std::string &name, mode_t mode,
@@ -747,6 +750,7 @@ TEST_F(T_Nfs4Server, ReaddirPaging) {
     backend_.AddFile(big, name, "x");
   }
   const std::string fh = FhOf("big");
+  const unsigned readdirs_before = backend_.num_readdirs_;
 
   std::vector<std::string> names;
   uint64_t cookie = 0;
@@ -784,6 +788,18 @@ TEST_F(T_Nfs4Server, ReaddirPaging) {
     ASSERT_GT(in_this_round, 0u);
   }
   EXPECT_GT(rounds, 1u);
+  // Continuations reuse the listing of the first round
+  EXPECT_EQ(readdirs_before + 1, backend_.num_readdirs_);
+  {
+    // A new traversal lists afresh
+    Compound c0;
+    c0.PutFh(fh);
+    c0.Readdir(0, verifier, 300, 1u << FATTR4_TYPE);
+    Reply r0;
+    Run(c0, &r0);
+    EXPECT_EQ(static_cast<uint32_t>(NFS4_OK), r0.status);
+    EXPECT_EQ(readdirs_before + 2, backend_.num_readdirs_);
+  }
   ASSERT_EQ(kNumFiles, names.size());
   EXPECT_EQ("file000", names[0]);
   EXPECT_EQ("file049", names[kNumFiles - 1]);
@@ -793,6 +809,7 @@ TEST_F(T_Nfs4Server, ReaddirPaging) {
   Compound c;
   c.PutFh(fh);
   c.Readdir(5, verifier, 300);
+
   Reply r;
   Run(c, &r);
   EXPECT_EQ(static_cast<uint32_t>(NFS4ERR_NOT_SAME), r.status);

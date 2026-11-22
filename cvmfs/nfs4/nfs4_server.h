@@ -215,6 +215,17 @@ class Nfs4Server : public RpcProgram {
   uint32_t LookupChild(const Object &dir, const std::string &name,
                        const Credentials &creds, Object *child);
   uint32_t ListChildren(const Object &dir, std::vector<DirEntry> *entries);
+  typedef std::shared_ptr<const std::vector<DirEntry> > ListingPtr;
+  /**
+   * A client pages through a directory with many READDIR calls.  Listing
+   * the whole directory for each of them makes reading a directory
+   * quadratic, so continuations (refresh false) reuse the listing of the
+   * same generation.  The first call of a traversal always lists afresh,
+   * because the generation of some backends does not cover directory
+   * changes.
+   */
+  uint32_t GetListing(const Object &dir, uint64_t generation, bool refresh,
+                      ListingPtr *listing);
 
   bool EncodeFattr(const Object &obj, const uint32_t *request,
                    unsigned request_len, const Credentials &creds,
@@ -270,6 +281,19 @@ class Nfs4Server : public RpcProgram {
   std::atomic<size_t> num_frozen_attrs_;
   std::vector<uint64_t> pending_probes_;
   uint64_t last_generation_;
+
+  struct CachedListing {
+    CachedListing() : generation(0), last_used(0) { }
+    uint64_t generation;
+    ListingPtr entries;
+    uint64_t last_used;
+  };
+  static const unsigned kMaxCachedListings = 64;
+  std::mutex listing_lock_;
+  /** By directory inode */
+  std::map<uint64_t, CachedListing> listings_;
+  uint64_t listing_clock_;
+
   std::thread monitor_;
   bool monitor_stopping_;
   std::condition_variable monitor_cond_;
