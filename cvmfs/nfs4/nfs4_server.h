@@ -180,6 +180,9 @@ class Nfs4Server : public RpcProgram {
                      XdrWriter *w);
   /** Called with state_lock_ held, after delegations_ changed */
   void UpdateFrozenAttrs();
+  /** Called with state_lock_ held; returns the next element */
+  std::map<std::string, Delegation>::iterator EraseDelegation(
+      std::map<std::string, Delegation>::iterator it);
   void ExecutorLoop();
 
   uint32_t ProcessCompound(const RpcCall &call, XdrReader *args,
@@ -248,6 +251,8 @@ class Nfs4Server : public RpcProgram {
   std::map<OwnerKey, OpenOwner> owners_;
   std::map<std::string, OpenState> open_states_;
   std::map<std::string, Delegation> delegations_;
+  /** (client id, inode) of every entry in delegations_ */
+  std::set<std::pair<uint64_t, uint64_t> > delegated_files_;
   /**
    * Files whose delegation of a client was recalled.  The client's next open
    * gets no delegation: a client holding a delegation trusts its cache, so

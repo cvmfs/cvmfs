@@ -1325,7 +1325,7 @@ void Nfs4Server::DropClient(uint64_t clientid) {
   for (std::map<std::string, Delegation>::iterator it = delegations_.begin();
        it != delegations_.end();) {
     if (it->second.clientid == clientid)
-      delegations_.erase(it++);
+      it = EraseDelegation(it);
     else
       ++it;
   }
@@ -1359,21 +1359,22 @@ void Nfs4Server::UpdateFrozenAttrs() {
 }
 
 
+std::map<std::string, Nfs4Server::Delegation>::iterator
+Nfs4Server::EraseDelegation(std::map<std::string, Delegation>::iterator it) {
+  delegated_files_.erase(std::make_pair(it->second.clientid,
+                                        it->second.fh.ino));
+  return delegations_.erase(it);
+}
+
+
 void Nfs4Server::PutDelegation(uint64_t clientid, const FileHandle &fh,
                                const Attr &attr, XdrWriter *w) {
   std::map<uint64_t, Client>::const_iterator const client = clients_.find(clientid);
+  // One delegation per client and file; none while a recall is going on
   bool grant = options_.delegations && fh.kind == FileHandle::kObject
-               && client != clients_.end() && client->second.callback_ok;
-  for (std::map<std::string, Delegation>::const_iterator it =
-           delegations_.begin();
-       grant && it != delegations_.end();
-       ++it) {
-    // One delegation per client and file; none while a recall is going on
-    if ((it->second.clientid == clientid && it->second.fh == fh)
-        || it->second.recalled != 0) {
-      grant = false;
-    }
-  }
+               && client != clients_.end() && client->second.callback_ok
+               && num_frozen_attrs_ == 0
+               && delegated_files_.count(std::make_pair(clientid, fh.ino)) == 0;
   if (grant && recalled_files_.erase(std::make_pair(clientid, fh.ino)) > 0)
     grant = false;
   if (!grant || delegations_.size() >= options_.max_stateids) {
@@ -1386,6 +1387,7 @@ void Nfs4Server::PutDelegation(uint64_t clientid, const FileHandle &fh,
   Delegation &delegation = delegations_[stateid.other];
   delegation.clientid = clientid;
   delegation.fh = fh;
+  delegated_files_.insert(std::make_pair(clientid, fh.ino));
   delegation.attr = attr;
   stateid.seqid = delegation.seqid;
 
@@ -1411,8 +1413,11 @@ uint32_t Nfs4Server::OpDelegreturn(XdrReader *args) {
   r.GetU32(&boot);
   if (boot != boot_)
     return NFS4ERR_STALE_STATEID;
-  if (delegations_.erase(stateid.other) == 0)
+  std::map<std::string, Delegation>::iterator const it =
+      delegations_.find(stateid.other);
+  if (it == delegations_.end())
     return NFS4ERR_BAD_STATEID;
+  EraseDelegation(it);
   if (num_frozen_attrs_ > 0)
     UpdateFrozenAttrs();
   return NFS4_OK;
@@ -1475,13 +1480,13 @@ void Nfs4Server::MonitorLoop() {
       Delegation &d = it->second;
       if (d.recalled != 0 && now - d.recalled > options_.lease_time) {
         Log(kLogLevelWarn, "revoking unreturned delegation");
-        delegations_.erase(it++);
+        it = EraseDelegation(it);
         continue;
       }
       if (changed && d.recalled == 0) {
         std::map<uint64_t, Client>::iterator const c = clients_.find(d.clientid);
         if (c == clients_.end() || !c->second.callback) {
-          delegations_.erase(it++);
+          it = EraseDelegation(it);
           continue;
         }
         d.recalled = now;
