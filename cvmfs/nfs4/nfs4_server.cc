@@ -1058,7 +1058,7 @@ uint32_t Nfs4Server::OpRead(XdrReader *args, Compound *c, XdrWriter *body) {
 uint32_t Nfs4Server::GetListing(const Object &dir, uint64_t generation,
                                 bool refresh, ListingPtr *listing) {
   if (dir.fh.kind != FileHandle::kObject) {
-    std::shared_ptr<std::vector<DirEntry> > entries(
+    const std::shared_ptr<std::vector<DirEntry> > entries(
         new std::vector<DirEntry>());
     const uint32_t status = ListChildren(dir, entries.get());
     *listing = entries;
@@ -1076,7 +1076,7 @@ uint32_t Nfs4Server::GetListing(const Object &dir, uint64_t generation,
     }
   }
 
-  std::shared_ptr<std::vector<DirEntry> > entries(new std::vector<DirEntry>());
+  const std::shared_ptr<std::vector<DirEntry> > entries(new std::vector<DirEntry>());
   const uint32_t status = ListChildren(dir, entries.get());
   if (status != NFS4_OK)
     return status;
