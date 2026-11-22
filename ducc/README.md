@@ -119,6 +119,32 @@ reference to the input image.
 This recipe format allow to specify only some wish, specifically all the images
 need to be stored in the same CVMFS repository and have the same format.
 
+**sif_input** (optional): Apptainer SIF images to publish as with
+`convert-sif`. Each entry needs a `source` (a local path, an http(s) URL
+or an `oras://` reference) and a `name`, published as `sif/<name>`; for
+`oras://` sources the name defaults to `<registry>/<repository>:<tag>`.
+`digest: sha256:...` pins the image ID. Names must be unique within the
+recipe. **sif_options** (optional) apply to all entries:
+`contiguous_catalogs`, `catalog_max_weight`, `catalog_min_weight`,
+`workers`, `cache_size_mib`, `plain_http` (oras registries without TLS),
+`spool_dir` (download first from servers without range support).
+
+``` yaml
+version: 1
+cvmfs_repo: unpacked.cern.ch
+sif_input:
+  - source: oras://ghcr.io/org/tools:1.2
+  - source: https://images.example.org/sif/sim-2026.sif
+    name: example/sim:2026
+  - source: /data/analysis.sif
+    name: lhcb/analysis:v3
+    digest: sha256:...
+sif_options:
+  contiguous_catalogs: true
+```
+
+A recipe with only `sif_input` needs no registry password.
+
 ## Commands
 
 ### convert
@@ -137,6 +163,56 @@ loop recipe.yaml
 
 This command is equivalent to call `convert` in an infinite loop, useful to
 make sure that all the images are up to date.
+
+### convert-sif
+
+```
+convert-sif <sif file, http(s) URL or oras:// reference> <cvmfs repository> [--name <name>]
+```
+
+Publishes the root filesystem of an Apptainer SIF image (or a bare squashfs
+image with `--digest`) as a flat image. The squashfs partition is streamed
+into `cvmfs_server ingest` as a tar archive: nothing is unpacked or
+downloaded to local disk, and a remote image only needs to be served with
+HTTP range-request support. The image is stored at `.flat/<xx>/<id>` and
+linked from `sif/<name>`, so it runs with
+`apptainer exec /cvmfs/<repo>/sif/<name> ...`.
+
+SIF ingestion is supported on Linux only, and its tests are built only
+there.
+
+- `oras://<registry>/<repository>[:tag][@sha256:...]` reads the SIF
+  pushed with `apptainer push`; the image ID is the blob digest and the
+  name defaults to `<registry>/<repository>:<tag>`. Credentials come from
+  `DUCC_AUTH_REGISTRIES` as for docker inputs; `--plain-http` disables TLS.
+  `--verify-digest` hashes the whole blob after ingest and links the image
+  only if it matches.
+- `--spool-dir DIR` downloads the image into `DIR` first when the server
+  does not support range requests; the file is removed afterwards.
+
+- `<id>` is a hash of the SIF header and descriptor table, which changes
+  on every rebuild; `--digest sha256:...` overrides it.
+- Running again with an unchanged image publishes nothing.
+- File ownership from the image is kept (`cvmfs_server ingest
+  --keep-ownership`). Extended attributes are dropped, since the tarball
+  ingest does not support them.
+- `--dry-run` prints the image metadata and `--emit-tar FILE` writes the
+  tar stream, both without touching a repository.
+- With a local storage backend the published objects still use disk on the
+  publisher; the small-disk benefit applies to gateway and S3 upstreams.
+- With `--mountless`, whether an image is already published is looked up
+  in the published catalogs fetched from `CVMFS_STRATUM0`, so unchanged
+  images are skipped without a mounted repository.
+
+### delete-sif
+
+```
+delete-sif <cvmfs repository> <name> [--dry-run]
+```
+
+Removes the link `sif/<name>`. The next `garbage-collection` run removes the
+image and its `.sifinfo` provenance file once no link points to the image.
+Remove the entry from the recipe first, or the next conversion recreates it.
 
 ## convert workflow
 

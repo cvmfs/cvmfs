@@ -1,0 +1,78 @@
+#!/bin/bash
+cvmfs_test_name="DUCC streaming SIF ingestion"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="ducc"
+
+CVMFS_TEST409_SIF_SOURCE="docker://almalinux:9"
+CVMFS_TEST409_WWW_DIR=/var/www/html/ducc-test-409
+CVMFS_TEST409_URL=http://localhost/ducc-test-409/image.sif
+
+ducc_test_409_clean_up() {
+  sudo cvmfs_server rmfs -f $CVMFS_TEST_REPO
+  sudo rm -f $CVMFS_TEST409_WWW_DIR/image.sif
+  sudo rmdir $CVMFS_TEST409_WWW_DIR
+}
+
+# file listing without directory sizes, which differ between file systems
+ducc_test_409_listing() {
+  (cd "$1" && find . -mindepth 1 -printf '%P %y %m %U %G %s %T@ %l\n') |
+    sed 's/\.[0-9]* / /' |
+    awk '{ if ($2 == "d") $6 = "-"; print }' |
+    grep -v '^\.cvmfscatalog ' |
+    sort
+}
+
+cvmfs_run_test() {
+  local scratch=$(pwd)
+  trap ducc_test_409_clean_up EXIT HUP INT TERM
+
+  local apptainer=$(command -v apptainer || command -v singularity)
+  [ -n "$apptainer" ] || { echo "apptainer not available"; return 1; }
+
+  echo "*** building SIF image ***"
+  $apptainer build $scratch/image.sif $CVMFS_TEST409_SIF_SOURCE || return 2
+  sudo mkdir -p $CVMFS_TEST409_WWW_DIR || return 3
+  sudo cp $scratch/image.sif $CVMFS_TEST409_WWW_DIR/ || return 3
+
+  echo "*** creating empty repo ***"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return 4
+
+  echo "*** ingesting SIF over HTTP ***"
+  sudo cvmfs_ducc convert-sif $CVMFS_TEST409_URL $CVMFS_TEST_REPO --name alma:9 || return 5
+  local image=/cvmfs/$CVMFS_TEST_REPO/sif/alma:9
+  [ -L "$image" ] || return 6
+  [ -d "$image/.singularity.d" ] || return 7
+
+  echo "*** comparing with unsquashfs extraction ***"
+  local offset=$(cvmfs_ducc convert-sif $scratch/image.sif --dry-run |
+    python3 -c 'import json,sys; d=json.load(sys.stdin); print([x["offset"] for x in d["sif"]["descriptors"] if x["type"] == 0x4004][0])')
+  [ -n "$offset" ] || return 8
+  sudo unsquashfs -q -o $offset -d $scratch/ref $scratch/image.sif > /dev/null || return 9
+  sudo bash -c "$(declare -f ducc_test_409_listing); ducc_test_409_listing $scratch/ref" > $scratch/ref.lst
+  ducc_test_409_listing $image/ > $scratch/cvmfs.lst
+  diff $scratch/ref.lst $scratch/cvmfs.lst || return 10
+  sudo diff -r --no-dereference $scratch/ref $image/ | grep -v "^Only in $image/: .cvmfscatalog$" && return 11
+
+  echo "*** running the image ***"
+  $apptainer exec $image cat /etc/os-release | grep -q AlmaLinux || return 12
+
+  echo "*** a second conversion must not publish ***"
+  local rdonly=/var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly
+  local rev_before=$(attr -qg revision $rdonly)
+  [ -n "$rev_before" ] || return 13
+  sudo cvmfs_ducc convert-sif $CVMFS_TEST409_URL $CVMFS_TEST_REPO --name alma:9 || return 13
+  local rev_after=$(attr -qg revision $rdonly)
+  [ "$rev_before" = "$rev_after" ] || return 14
+
+  echo "*** a changed SIF gets a new ID and is relinked ***"
+  local old_target=$(readlink $image)
+  $apptainer build --force $scratch/image.sif $CVMFS_TEST409_SIF_SOURCE || return 15
+  sudo cp $scratch/image.sif $CVMFS_TEST409_WWW_DIR/ || return 15
+  sudo cvmfs_ducc convert-sif $CVMFS_TEST409_URL $CVMFS_TEST_REPO --name alma:9 || return 16
+  [ "$(readlink $image)" != "$old_target" ] || return 17
+
+  echo "*** sources without range support or stdin are rejected ***"
+  cat $scratch/image.sif | cvmfs_ducc convert-sif - --dry-run && return 18
+
+  return 0
+}

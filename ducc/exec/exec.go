@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
+	"strings"
 
 	l "github.com/cvmfs/ducc/log"
 	log "github.com/sirupsen/logrus"
@@ -117,8 +118,38 @@ func (e *execCmd) Start() error {
 		logger.WithField("error", err).Error("Error in executing the command")
 		logger.WithFields(log.Fields{"pipe": "STDOUT"}).Trace(string(stdout.Bytes()))
 		logger.WithFields(log.Fields{"pipe": "STDERR"}).Trace(string(stderr.Bytes()))
+		if tail := outputTail(stderr.Bytes(), stdout.Bytes()); tail != "" {
+			return fmt.Errorf("%w: %s", err, tail)
+		}
 		return err
 	}
+}
+
+// outputTail returns the last meaningful lines of the command output, so
+// errors say why cvmfs_server failed instead of only "exit status 1".
+// Progress dots and the echoed command line are skipped.
+func outputTail(outputs ...[]byte) string {
+	const maxLines, maxBytes = 4, 1024
+	var lines []string
+	for _, out := range outputs {
+		all := strings.Split(string(out), "\n")
+		for i := len(all) - 1; i >= 0 && len(lines) < maxLines; i-- {
+			line := strings.TrimSpace(all[i])
+			if line == "" || strings.Trim(line, ".") == "" ||
+				strings.HasPrefix(line, "Executed Command") || strings.HasPrefix(line, "cvmfs_swissknife ") {
+				continue
+			}
+			lines = append([]string{line}, lines...)
+		}
+		if len(lines) > 0 {
+			break
+		}
+	}
+	tail := strings.Join(lines, " | ")
+	if len(tail) > maxBytes {
+		tail = "..." + tail[len(tail)-maxBytes:]
+	}
+	return tail
 }
 
 func (e *execCmd) Env(key, value string) *execCmd {

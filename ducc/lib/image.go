@@ -945,7 +945,7 @@ func (d *downloadedLayer) IngestIntoCVMFSWithLogger(logger *log.Entry, CVMFSRepo
 	logger = l.Ensure(logger)
 	layerDigest := strings.Split(d.Name, ":")[1]
 	layerPath := cvmfs.LayerRootfsPath(CVMFSRepo, layerDigest)
-	if _, err := os.Stat(layerPath); err == nil {
+	if _, err := cvmfs.RepoStat(layerPath); err == nil {
 		// the layer already exists
 		return nil
 	}
@@ -956,6 +956,11 @@ func (d *downloadedLayer) IngestIntoCVMFSWithLogger(logger *log.Entry, CVMFSRepo
 		return err
 	}
 	ingestPath := cvmfs.TrimCVMFSRepoPrefix(layerPath)
+	if err := cvmfs.EnsureDirectoryWithLogger(logger, CVMFSRepo, filepath.Dir(ingestPath)); err != nil {
+		logger.WithFields(log.Fields{"layer": d.Name, "error": err}).
+			Error("Error creating the layer directory")
+		return err
+	}
 
 	err := cvmfs.IngestWithLogger(logger, CVMFSRepo, d.Path,
 		"--catalog", "-t", "-",
@@ -1050,7 +1055,7 @@ func (img *Image) GetLayersWithLogger(logger *log.Entry, manifest da.Manifest, l
 			layerPath := cvmfs.LayerRootfsPath(CVMFSRepo, layerDigest)
 			layerLogger := logger.WithField("layer", layer.Digest)
 			if !forceDownload {
-				if _, err := os.Stat(layerPath); err == nil {
+				if _, err := cvmfs.RepoStat(layerPath); err == nil {
 					layerLogger.Trace("Skipping download of layer, already exists")
 					return
 				}
@@ -1402,6 +1407,16 @@ func (img *Image) CreateFlatOverlayWithLogger(logger *log.Entry, CVMFSRepo strin
 		return
 	}
 	return
+}
+
+// RegistryCredentials returns the DUCC_AUTH_REGISTRIES credentials that
+// apply to url, if any; used for oras:// SIF sources.
+func RegistryCredentials(url string) (user, pass string, ok bool) {
+	reg := getRegistry(url)
+	if reg == nil || reg.creds.username == "" {
+		return "", "", false
+	}
+	return reg.creds.username, reg.creds.password, true
 }
 
 func getRegistry(url string) *RegistryConfig {

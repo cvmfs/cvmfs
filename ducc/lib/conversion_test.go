@@ -74,6 +74,16 @@ func TestConversionSummaryMergeKeepsHighestPriorityState(t *testing.T) {
 	}
 }
 
+func TestConversionSummaryMergeKeepsFailedApart(t *testing.T) {
+	summary := ConversionSummary{}
+	summary.AddFailed("img-a")
+	summary.Merge(ConversionSummary{Added: []string{"img-a"}, Failed: []string{"img-a", "img-b"}})
+
+	if len(summary.Failed) != 2 || len(summary.Added) != 1 {
+		t.Fatalf("expected img-a added and both failed once, got %+v", summary)
+	}
+}
+
 func TestImageNameWithPlatform(t *testing.T) {
 	variant := "v8"
 	image := &Image{Registry: "registry.example.org", Repository: "team/demo", Tag: "latest"}

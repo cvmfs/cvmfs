@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	copy "github.com/otiai10/copy"
@@ -212,6 +213,10 @@ func CreateVariantSymlinkIntoCVMFSWithLogger(logger *log.Entry, CVMFSRepo, newLi
 	}
 
 	if MountlessPublishing() {
+		if existing, err := RepoReadlink(fullLinkName); err == nil && existing == rawTarget {
+			llog(logger).Trace("Variant symlink already up to date, skipping")
+			return nil
+		}
 		// rawTarget is stored verbatim (it may contain $(...) expansions).
 		return createSymlinkMountless(logger, CVMFSRepo, newLinkName, rawTarget)
 	}
@@ -273,28 +278,14 @@ func GetBacklinkFromLayer(CVMFSRepo, layerDigest string) (backlink Backlink, err
 			"backlinkPath": backlinkPath})
 	}
 
-	if _, err := os.Stat(backlinkPath); os.IsNotExist(err) {
+	if _, err := RepoStat(backlinkPath); os.IsNotExist(err) {
 		return Backlink{Origin: []string{}}, nil
 	}
 
-	backlinkFile, err := os.Open(backlinkPath)
-	if err != nil {
-		llog(l.LogE(err)).Error(
-			"Error in opening the file for writing the backlinks, skipping...")
-		return
-	}
-
-	byteBackLink, err := ioutil.ReadAll(backlinkFile)
+	byteBackLink, err := RepoReadFile(backlinkPath)
 	if err != nil {
 		llog(l.LogE(err)).Error(
 			"Error in reading the bytes from the origin file, skipping...")
-		return
-	}
-
-	err = backlinkFile.Close()
-	if err != nil {
-		llog(l.LogE(err)).Error(
-			"Error in closing the file after reading, moving on...")
 		return
 	}
 
@@ -330,6 +321,9 @@ func SaveLayersBacklinkWithLogger(logger *log.Entry, CVMFSRepo string, imgManife
 				"Error in obtaining the backlink from a layer digest, skipping...")
 			continue
 		}
+		if slices.Contains(backlink.Origin, imgDigest) {
+			continue
+		}
 		backlink.Origin = append(backlink.Origin, imgDigest)
 
 		backlinkBytesMarshal, err := json.Marshal(backlink)
@@ -341,6 +335,13 @@ func SaveLayersBacklinkWithLogger(logger *log.Entry, CVMFSRepo string, imgManife
 
 		backlinkPath := GetBacklinkPath(CVMFSRepo, layerDigest)
 		backlinks[backlinkPath] = backlinkBytesMarshal
+	}
+
+	if len(backlinks) == 0 {
+		return nil
+	}
+	if MountlessPublishing() {
+		return saveBacklinksMountless(logger, CVMFSRepo, backlinks)
 	}
 
 	llog(logger).Trace("Start transaction")
@@ -555,7 +556,14 @@ func CreateCatalogIntoDirWithLogger(logger *log.Entry, CVMFSRepo, dir string) (e
 	normalizedDir := PrefixRepoSubdirOnce(CVMFSRepo, dir)
 	catalogRelativePath := filepath.Join(normalizedDir, ".cvmfscatalog")
 	catalogPath := filepath.Join("/", "cvmfs", repoName, catalogRelativePath)
-	if _, err := os.Stat(catalogPath); os.IsNotExist(err) {
+	exists := false
+	if MountlessPublishing() {
+		e, err := LookupPublished(repoName, catalogRelativePath)
+		exists = err == nil && e.Exists
+	} else if _, err := os.Stat(catalogPath); err == nil {
+		exists = true
+	}
+	if !exists {
 		tmpFile, err := ioutil.TempFile("", "tempCatalog")
 		if err != nil {
 			return err
@@ -637,6 +645,13 @@ func OverlayWithLogger(logger *log.Entry, CVMFSRepo string, layerPaths []string,
 	}
 
 	llog(logger).Trace("Starting overlay merge")
+
+	// The overlay leases destPath; a gateway refuses a lease below a
+	// directory that does not exist yet.
+	if err := EnsureDirectoryWithLogger(logger, CVMFSRepo, filepath.Dir(destPath)); err != nil {
+		llog(l.LogE(err)).Error("Error creating the parent of the flat image")
+		return err
+	}
 
 	getLock(CVMFSRepo)
 	defer unlock(CVMFSRepo)

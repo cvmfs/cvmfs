@@ -206,6 +206,16 @@ func scanPaths(CVMFSRepo string, gcDB *lib.GCDatabase, llog func(*log.Entry) *lo
 			layerPathsFiltered = append(layerPathsFiltered, strings.TrimPrefix(path, prefix))
 		}
 	}
+	// Taken from the images that passed the grace period rather than judged
+	// by their own mtime, so a provenance file goes exactly with its image.
+	imagesFilteredAbs := make([]string, 0, len(imagePathsFiltered))
+	for _, path := range imagePathsFiltered {
+		imagesFilteredAbs = append(imagesFilteredAbs, prefix+path)
+	}
+	sifInfoFiltered := make([]string, 0)
+	for _, path := range lib.FindSifInfoToDelete(imagesFilteredAbs) {
+		sifInfoFiltered = append(sifInfoFiltered, strings.TrimPrefix(path, prefix))
+	}
 	podmanPathsFiltered := make([]string, 0)
 	for _, path := range podmanPathsToDelete {
 		if pathShouldBeDeleted(path) {
@@ -220,14 +230,18 @@ func scanPaths(CVMFSRepo string, gcDB *lib.GCDatabase, llog func(*log.Entry) *lo
 	if err := gcDB.InsertPaths(layerPathsFiltered, "layer"); err != nil {
 		llog(l.Log()).WithFields(log.Fields{"err": err}).Error("Failed to insert layer paths into GC database")
 	}
+	if err := gcDB.InsertPaths(sifInfoFiltered, "sifinfo"); err != nil {
+		llog(l.Log()).WithFields(log.Fields{"err": err}).Error("Failed to insert sifinfo paths into GC database")
+	}
 	if err := gcDB.InsertPaths(podmanPathsFiltered, "podman"); err != nil {
 		llog(l.Log()).WithFields(log.Fields{"err": err}).Error("Failed to insert podman paths into GC database")
 	}
 
 	llog(l.Log()).WithFields(log.Fields{
-		"images": len(imagePathsFiltered),
-		"layers": len(layerPathsFiltered),
-		"podman": len(podmanPathsFiltered),
+		"images":  len(imagePathsFiltered),
+		"layers":  len(layerPathsFiltered),
+		"podman":  len(podmanPathsFiltered),
+		"sifinfo": len(sifInfoFiltered),
 	}).Info("Paths recorded in GC database")
 }
 
