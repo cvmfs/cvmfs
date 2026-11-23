@@ -25,10 +25,15 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <elf.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/utsname.h>
 
 using namespace std;  // NOLINT
+
+// Everything except dcoredumper_main() is file-local, so that nothing clashes
+// with other code linked into the cvmfs2 stub
+namespace {
 
 constexpr size_t NoteAlign(size_t sz) { return (sz + 3) & ~3; }
 constexpr size_t kPageSize = 4096;
@@ -106,7 +111,7 @@ enum DumpLevel {
 struct DumperContext {
   const ArchDesc *arch;
   DumpLevel level;
-  char exe_path[256];
+  string exe_path;
 };
 
 /**
@@ -167,7 +172,7 @@ static bool should_dump_region(const MemRegion *r,
       return true;
 
     // Always keep the main executable's regions.
-    if (ctx->exe_path[0] && r->name == ctx->exe_path)
+    if (!ctx->exe_path.empty() && r->name == ctx->exe_path)
       return true;
 
     // Skip large read-only file-backed regions (.text, .rodata)
@@ -196,18 +201,26 @@ vector<MemRegion> parse_maps(int pid, DumperContext *ctx) {
   FILE *f = fopen(path, "r");
   if (!f) { perror("Cannot open maps"); return regions; }
 
-  char line[512];
-  while (fgets(line, sizeof(line), f)) {
-    unsigned long start, end, offset;
-    char perms[5];
-    unsigned int major, minor;
-    unsigned long inode;
-    char name[256] = "";
+  // getline() grows the buffer as needed, so long paths are never split
+  char *line = NULL;
+  size_t line_cap = 0;
+  while (getline(&line, &line_cap, f) != -1) {
+    line[strcspn(line, "\n")] = '\0';
 
+    unsigned long start = 0, end = 0, offset = 0;
+    char perms[5] = "";
+    unsigned int major = 0, minor = 0;
+    unsigned long inode = 0;
+    int name_pos = 0;
 
-    sscanf(line, "%lx-%lx %4s %lx %x:%x %lu %255[^\n]",
+    // %n records where the (optional) path starts; anonymous maps have none
+    const int n = sscanf(line, "%lx-%lx %4s %lx %x:%x %lu %n",
          &start, &end, perms, &offset,
-         &major, &minor, &inode, name);
+         &major, &minor, &inode, &name_pos);
+    if (n < 7 || end <= start) {
+      fprintf(stderr, "  warning: skipping unparsable maps line: %s\n", line);
+      continue;
+    }
 
     MemRegion r;
     r.start      = start;
@@ -217,20 +230,18 @@ vector<MemRegion> parse_maps(int pid, DumperContext *ctx) {
     r.writable   = (perms[1] == 'w');
     r.executable = (perms[2] == 'x');
 
-    char *p = name;
-    while (*p == ' ') p++;
+    const char *p = line + name_pos;
     r.name = p;
 
     // First file-backed region in maps is the main executable.
     // Save its path so should_dump_region() can always keep it.
-    if (ctx->exe_path[0] == '\0' && p[0] == '/') {
-      strncpy(ctx->exe_path, p, sizeof(ctx->exe_path) - 1);
-      ctx->exe_path[sizeof(ctx->exe_path) - 1] = '\0';
-    }
+    if (ctx->exe_path.empty() && p[0] == '/')
+      ctx->exe_path = p;
 
     regions.push_back(r);
   }
 
+  free(line);
   fclose(f);
   return regions;
 }
@@ -260,16 +271,23 @@ int read_thread_registers(int pid, int tid, unsigned long *regs,
     return -2;  // distinct from -1 (permission/read error)
 
   // Format: syscall_nr a0 a1 a2 a3 a4 a5 RSP RIP
-  unsigned long nr, a0, a1, a2, a3, a4, a5, rsp, rip;
+  // or "-1 RSP RIP" if blocked in the kernel outside a syscall (e.g. page fault)
+  long nr;
+  unsigned long a0, a1, a2, a3, a4, a5, rsp, rip;
 
   const int n = sscanf(line,
-    "%lu 0x%lx 0x%lx 0x%lx 0x%lx 0x%lx 0x%lx 0x%lx 0x%lx",
+    "%ld 0x%lx 0x%lx 0x%lx 0x%lx 0x%lx 0x%lx 0x%lx 0x%lx",
     &nr, &a0, &a1, &a2, &a3, &a4, &a5, &rsp, &rip);
 
-  if (n < 9) {
+  const bool in_syscall = !(n == 3 && nr < 0);
+  if (!in_syscall) {
+    rsp = a0;
+    rip = a1;
+  } else if (n < 9) {
     // Fallback: parse as space-separated tokens (some kernels omit 0x prefix)
+    unsigned long nr_u;
     unsigned long *vals[] = {
-      &nr, &a0, &a1, &a2, &a3, &a4, &a5, &rsp, &rip
+      &nr_u, &a0, &a1, &a2, &a3, &a4, &a5, &rsp, &rip
     };
     char copy[512];
     strncpy(copy, line, sizeof(copy));
@@ -280,6 +298,7 @@ int read_thread_registers(int pid, int tid, unsigned long *regs,
       tok = strtok(NULL, " \t\n");
     }
     if (i < 9) return -1;
+    nr = static_cast<long>(nr_u);
   }
 
   memset(regs, 0, ctx->arch->ngreg * sizeof(unsigned long));
@@ -287,6 +306,14 @@ int read_thread_registers(int pid, int tid, unsigned long *regs,
   /* SP and IP are always the last two fields in /proc/syscall output */
   regs[ctx->arch->reg_sp] = rsp;
   regs[ctx->arch->reg_ip] = rip;
+
+  if (ctx->arch == &arch_x86_64) {
+    regs[17] = 0x33; /* CS       */
+    regs[20] = 0x2b; /* SS       */
+  }
+  /* Not in a syscall: no syscall number or arguments to map */
+  if (!in_syscall)
+    return 0;
 
   /* Map syscall arguments into the architecture's register layout */
   if (ctx->arch == &arch_x86_64) {
@@ -299,8 +326,6 @@ int read_thread_registers(int pid, int tid, unsigned long *regs,
     regs[7]  = a3;   /* R10      */
     regs[9]  = a4;   /* R8       */
     regs[8]  = a5;   /* R9       */
-    regs[17] = 0x33; /* CS       */
-    regs[20] = 0x2b; /* SS       */
   } else if (ctx->arch == &arch_aarch64) {
     /* AArch64 syscall ABI: x8=nr, x0=a0, x1=a1, x2=a2, x3=a3, x4=a4, x5=a5 */
     regs[8]  = nr;   /* x8  (syscall number) */
@@ -515,6 +540,15 @@ size_t write_note(FILE *out, uint32_t type,
   }
 
   return sizeof(nhdr) + 8 + NoteAlign(desc_sz);
+}
+
+/**
+ * Returns the errno of a failed write on the stream, or 0 if none failed.
+ * Must be called right after the write, before errno is overwritten.
+ */
+static int stream_error(FILE *f) {
+  if (!ferror(f)) return 0;
+  return errno ? errno : EIO;
 }
 
 /**
@@ -754,8 +788,14 @@ int build_core(int pid, const char *output_path, DumperContext *ctx) {
            auxv_data.data(), auxv_sz);
   }
 
+  // Flush so the headers and notes are on disk before the bulk memory writes.
+  // Without them the core is unusable; with them, a core truncated later in
+  // the memory contents still has all threads' registers and file mappings.
+  const int notes_errno = (fflush(core) != 0) ? (errno ? errno : EIO) : 0;
+  int write_errno = notes_errno;
+
   // Finally, write the actual memory contents
-  for (int i = 0; i < num_regions; i++) {
+  for (int i = 0; i < num_regions && write_errno == 0; i++) {
     if (!should_dump_region(&regions[i], ctx)) continue;
 
     const size_t seg_size = regions[i].end - regions[i].start;
@@ -783,23 +823,44 @@ int build_core(int pid, const char *output_path, DumperContext *ctx) {
         addr += chunk;
         rem  -= chunk;
       }
+      if ((write_errno = stream_error(core)) != 0) break;
     }
   }
 
-  fclose(core);
   close(mem_fd);
-
-  // vectors clean up automatically
+  if (fclose(core) != 0 && write_errno == 0)
+    write_errno = errno;
+  struct stat st;
+  const bool is_regular = stat(output_path, &st) == 0 && S_ISREG(st.st_mode);
+  if (notes_errno != 0) {
+    fprintf(stderr, "Failed to write core dump to %s: %s\n",
+            output_path, strerror(notes_errno));
+    // Headers or notes incomplete: GDB cannot use the file.
+    // Only remove regular files, never e.g. a device node.
+    if (is_regular)
+      unlink(output_path);
+    return -1;
+  }
+  if (write_errno != 0) {
+    fprintf(stderr,
+      "Warning: writing core dump to %s failed: %s\n"
+      "  The core is truncated at %lld bytes. Register state and file\n"
+      "  mappings are complete, but some memory contents are missing.\n",
+      output_path, strerror(write_errno),
+      is_regular ? (long long)st.st_size : -1LL);
+    return -1;
+  }
 
   printf("Core dump successfully saved to %s\n", output_path);
 
   return 0;
 }
 
+}  // anonymous namespace
+
 int dcoredumper_main(int argc, char *argv[]) {
   DumperContext ctx;
   ctx.level = kDumpStandard;
-  memset(ctx.exe_path, 0, sizeof(ctx.exe_path));
 
   if (!detect_arch(&ctx)) return 1;
 
