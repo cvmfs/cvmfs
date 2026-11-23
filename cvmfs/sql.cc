@@ -5,6 +5,9 @@
 
 #include "sql.h"
 
+#include <string>
+#include <utility>
+
 #include "util/logging.h"
 #include "util/string.h"
 
@@ -15,7 +18,6 @@ namespace sqlite {
 Sql::Sql(sqlite3 *sqlite_db, const std::string &statement)
     : database_(NULL)
     , statement_(NULL)
-    , query_string_(NULL)
     , last_error_code_(0) {
   const bool success = Init(sqlite_db, statement);
   assert(success);
@@ -156,10 +158,10 @@ bool Sql::Init(const char *statement) {
   return true;
 }
 
-void Sql::DeferredInit(const sqlite3 *database, const char *statement) {
+void Sql::DeferredInit(const sqlite3 *database, std::string statement) {
   assert(NULL == database_);
   database_ = const_cast<sqlite3 *>(database);
-  query_string_ = statement;
+  query_string_ = std::move(statement);
 }
 
 std::string Sql::GetLastErrorMsg() const {

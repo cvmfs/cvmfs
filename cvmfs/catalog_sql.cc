@@ -7,11 +7,13 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <string>
 
 #include "catalog.h"
 #include "globals.h"
 #include "util/logging.h"
 #include "util/posix.h"
+#include "util/string.h"
 #include "xattr.h"
 
 using namespace std;  // NOLINT
@@ -709,56 +711,101 @@ shash::Any SqlListContentHashes::GetHash() const {
 
 //------------------------------------------------------------------------------
 
-#define DB_FIELDS_LT_V2_1                                       \
-  "catalog.hash,       catalog.inode,      catalog.size, "      \
-  "catalog.mode,       catalog.mtime,      catalog.flags, "     \
-  "catalog.name,       catalog.symlink,    catalog.md5path_1, " \
-  "catalog.md5path_2,  catalog.parent_1,   catalog.parent_2, "  \
-  "catalog.rowid"
-#define DB_FIELDS_GE_V2_1_LT_R2                                 \
-  "catalog.hash,       catalog.hardlinks,  catalog.size, "      \
-  "catalog.mode,       catalog.mtime,      catalog.flags, "     \
-  "catalog.name,       catalog.symlink,    catalog.md5path_1, " \
-  "catalog.md5path_2,  catalog.parent_1,   catalog.parent_2, "  \
-  "catalog.rowid,      catalog.uid,        catalog.gid, "       \
-  "0, NULL"
-#define DB_FIELDS_GE_V2_1_LT_R7                                 \
-  "catalog.hash,       catalog.hardlinks,  catalog.size, "      \
-  "catalog.mode,       catalog.mtime,      catalog.flags, "     \
-  "catalog.name,       catalog.symlink,    catalog.md5path_1, " \
-  "catalog.md5path_2,  catalog.parent_1,   catalog.parent_2, "  \
-  "catalog.rowid,      catalog.uid,        catalog.gid, "       \
-  "catalog.xattr IS NOT NULL, NULL"
-#define DB_FIELDS_GE_V2_1_GE_R7                                 \
-  "catalog.hash,       catalog.hardlinks,  catalog.size, "      \
-  "catalog.mode,       catalog.mtime,      catalog.flags, "     \
-  "catalog.name,       catalog.symlink,    catalog.md5path_1, " \
-  "catalog.md5path_2,  catalog.parent_1,   catalog.parent_2, "  \
-  "catalog.rowid,      catalog.uid,        catalog.gid, "       \
-  "catalog.xattr IS NOT NULL, catalog.mtimens"
-
-#define MAKE_STATEMENT(STMT_TMPL, REV)                                \
-  static const std::string REV = ReplaceAll(STMT_TMPL, "@DB_FIELDS@", \
-                                            DB_FIELDS_##REV)
-
-#define MAKE_STATEMENTS(STMT_TMPL)          \
-  MAKE_STATEMENT(STMT_TMPL, LT_V2_1);       \
-  MAKE_STATEMENT(STMT_TMPL, GE_V2_1_LT_R2); \
-  MAKE_STATEMENT(STMT_TMPL, GE_V2_1_LT_R7); \
-  MAKE_STATEMENT(STMT_TMPL, GE_V2_1_GE_R7)
-
-#define DEFERRED_INIT(DB, REV) DeferredInit((DB).sqlite_db(), (REV).c_str())
-
-#define DEFERRED_INITS(DB)                                             \
-  if ((DB).schema_version() < 2.1 - CatalogDatabase::kSchemaEpsilon) { \
-    DEFERRED_INIT((DB), LT_V2_1);                                      \
-  } else if ((DB).schema_revision() < 2) {                             \
-    DEFERRED_INIT((DB), GE_V2_1_LT_R2);                                \
-  } else if ((DB).schema_revision() < 7) {                             \
-    DEFERRED_INIT((DB), GE_V2_1_LT_R7);                                \
-  } else {                                                             \
-    DEFERRED_INIT((DB), GE_V2_1_GE_R7);                                \
+/**
+ * Builds directory entry queries for the schema of a given catalog.
+ */
+class DirentStatements {
+ public:
+  /**
+   * Returns statement_template with the @DB_FIELDS@ placeholder replaced by
+   * the columns available in the schema of database.
+   */
+  static std::string Expand(const char *statement_template,
+                            const CatalogDatabase &database) {
+    return ReplaceAll(statement_template, "@DB_FIELDS@",
+                      kDirentFields[Select(database)].columns);
   }
+
+ private:
+  /**
+   * The set of directory entry columns that can be selected depends on the
+   * catalog schema.  Each entry pairs the minimum schema version and revision
+   * with the column list usable from there on.
+   */
+  struct DirentFields {
+    double min_schema_version;
+    unsigned min_schema_revision;
+    const char *columns;
+  };
+
+  /**
+   * Ordered from newest to oldest schema; the first entry the catalog
+   * satisfies is used.  The last entry must accept any catalog.
+   */
+  static constexpr DirentFields kDirentFields[] = {
+      {2.1, 7,
+       "catalog.hash,       catalog.hardlinks,  catalog.size, "
+       "catalog.mode,       catalog.mtime,      catalog.flags, "
+       "catalog.name,       catalog.symlink,    catalog.md5path_1, "
+       "catalog.md5path_2,  catalog.parent_1,   catalog.parent_2, "
+       "catalog.rowid,      catalog.uid,        catalog.gid, "
+       "catalog.xattr IS NOT NULL, catalog.mtimens"},
+      {2.1, 2,
+       "catalog.hash,       catalog.hardlinks,  catalog.size, "
+       "catalog.mode,       catalog.mtime,      catalog.flags, "
+       "catalog.name,       catalog.symlink,    catalog.md5path_1, "
+       "catalog.md5path_2,  catalog.parent_1,   catalog.parent_2, "
+       "catalog.rowid,      catalog.uid,        catalog.gid, "
+       "catalog.xattr IS NOT NULL, NULL"},
+      {2.1, 0,
+       "catalog.hash,       catalog.hardlinks,  catalog.size, "
+       "catalog.mode,       catalog.mtime,      catalog.flags, "
+       "catalog.name,       catalog.symlink,    catalog.md5path_1, "
+       "catalog.md5path_2,  catalog.parent_1,   catalog.parent_2, "
+       "catalog.rowid,      catalog.uid,        catalog.gid, "
+       "0, NULL"},
+      {0.0, 0,
+       "catalog.hash,       catalog.inode,      catalog.size, "
+       "catalog.mode,       catalog.mtime,      catalog.flags, "
+       "catalog.name,       catalog.symlink,    catalog.md5path_1, "
+       "catalog.md5path_2,  catalog.parent_1,   catalog.parent_2, "
+       "catalog.rowid"},
+  };
+
+  static constexpr unsigned kNumDirentFields = sizeof(kDirentFields)
+                                               / sizeof(kDirentFields[0]);
+
+  static_assert(kDirentFields[kNumDirentFields - 1].min_schema_version == 0.0
+                    && kDirentFields[kNumDirentFields - 1].min_schema_revision
+                           == 0,
+                "the last kDirentFields entry must accept any catalog");
+
+  /**
+   * Returns the index of the kDirentFields entry to use for the catalog.
+   */
+  static unsigned Select(const CatalogDatabase &database) {
+    for (unsigned i = 0; i < kNumDirentFields; ++i) {
+      const DirentFields &fields = kDirentFields[i];
+      if ((database.schema_version()
+           >= fields.min_schema_version - CatalogDatabase::kSchemaEpsilon)
+          && (database.schema_revision() >= fields.min_schema_revision)) {
+        return i;
+      }
+    }
+    return kNumDirentFields - 1;  // unreachable, see static_assert above
+  }
+};
+
+// Indexing kDirentFields at runtime odr-uses it, which in C++11 requires a
+// namespace-scope definition
+constexpr DirentStatements::DirentFields DirentStatements::kDirentFields[];
+
+
+void SqlLookup::DeferredInitDirent(const CatalogDatabase &database,
+                                   const char *statement_template) {
+  DeferredInit(database.sqlite_db(),
+               DirentStatements::Expand(statement_template, database));
+}
 
 
 shash::Md5 SqlLookup::GetPathHash() const { return RetrieveMd5(8, 9); }
@@ -844,9 +891,9 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog,
 
 
 SqlListing::SqlListing(const CatalogDatabase &database) {
-  MAKE_STATEMENTS("SELECT @DB_FIELDS@ FROM catalog "
-                  "WHERE (parent_1 = :p_1) AND (parent_2 = :p_2);");
-  DEFERRED_INITS(database);
+  DeferredInitDirent(database,
+                     "SELECT @DB_FIELDS@ FROM catalog "
+                     "WHERE (parent_1 = :p_1) AND (parent_2 = :p_2);");
 }
 
 
@@ -859,9 +906,9 @@ bool SqlListing::BindPathHash(const struct shash::Md5 &hash) {
 
 
 SqlLookupPathHash::SqlLookupPathHash(const CatalogDatabase &database) {
-  MAKE_STATEMENTS("SELECT @DB_FIELDS@ FROM catalog "
-                  "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);");
-  DEFERRED_INITS(database);
+  DeferredInitDirent(database,
+                     "SELECT @DB_FIELDS@ FROM catalog "
+                     "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);");
 }
 
 bool SqlLookupPathHash::BindPathHash(const struct shash::Md5 &hash) {
@@ -873,8 +920,8 @@ bool SqlLookupPathHash::BindPathHash(const struct shash::Md5 &hash) {
 
 
 SqlLookupInode::SqlLookupInode(const CatalogDatabase &database) {
-  MAKE_STATEMENTS("SELECT @DB_FIELDS@ FROM catalog WHERE rowid = :rowid;");
-  DEFERRED_INITS(database);
+  DeferredInitDirent(database,
+                     "SELECT @DB_FIELDS@ FROM catalog WHERE rowid = :rowid;");
 }
 
 
@@ -888,12 +935,12 @@ bool SqlLookupInode::BindRowId(const uint64_t inode) {
 
 SqlLookupDanglingMountpoints::SqlLookupDanglingMountpoints(
     const catalog::CatalogDatabase &database) {
-  MAKE_STATEMENTS("SELECT DISTINCT @DB_FIELDS@ FROM catalog "
-                  "JOIN catalog AS c2 "
-                  "ON catalog.md5path_1 = c2.parent_1 AND "
-                  "   catalog.md5path_2 = c2.parent_2 "
-                  "WHERE catalog.flags & :nested_mountpoint_flag");
-  DEFERRED_INITS(database);
+  DeferredInitDirent(database,
+                     "SELECT DISTINCT @DB_FIELDS@ FROM catalog "
+                     "JOIN catalog AS c2 "
+                     "ON catalog.md5path_1 = c2.parent_1 AND "
+                     "   catalog.md5path_2 = c2.parent_2 "
+                     "WHERE catalog.flags & :nested_mountpoint_flag");
 
   // this pretty much removes the advantage of a deferred init but the statement
   // is anyway only used directly.
