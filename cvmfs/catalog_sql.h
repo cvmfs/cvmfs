@@ -317,6 +317,15 @@ class SqlLookup : public SqlDirent {
    * @return the MD5 parent path hash of a freshly performed lookup
    */
   shash::Md5 GetParentPathHash() const;
+
+ protected:
+  /**
+   * Defers the initialization of a directory entry query.  The @DB_FIELDS@
+   * placeholder in statement_template is replaced by the columns available in
+   * the schema of database.
+   */
+  void DeferredInitDirent(const CatalogDatabase &database,
+                          const char *statement_template);
 };
 
 

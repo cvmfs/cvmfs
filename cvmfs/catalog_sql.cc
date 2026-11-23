@@ -712,24 +712,18 @@ shash::Any SqlListContentHashes::GetHash() const {
 //------------------------------------------------------------------------------
 
 /**
- * Expands the @DB_FIELDS@ placeholder of a statement template once for every
- * catalog schema, and returns the expansion matching a given catalog.
- *
- * Sql::DeferredInit() keeps only the raw pointer to the query string, so
- * instances must outlive the statements using them; declare them as
- * function-local statics.
+ * Builds directory entry queries for the schema of a given catalog.
  */
 class DirentStatements {
  public:
-  explicit DirentStatements(const char *statement_template) {
-    for (unsigned i = 0; i < kNumDirentFields; ++i) {
-      statements_[i] = ReplaceAll(statement_template, "@DB_FIELDS@",
-                                  kDirentFields[i].columns);
-    }
-  }
-
-  const char *Get(const CatalogDatabase &database) const {
-    return statements_[Select(database)].c_str();
+  /**
+   * Returns statement_template with the @DB_FIELDS@ placeholder replaced by
+   * the columns available in the schema of database.
+   */
+  static std::string Expand(const char *statement_template,
+                            const CatalogDatabase &database) {
+    return ReplaceAll(statement_template, "@DB_FIELDS@",
+                      kDirentFields[Select(database)].columns);
   }
 
  private:
@@ -800,13 +794,18 @@ class DirentStatements {
     }
     return kNumDirentFields - 1;  // unreachable, see static_assert above
   }
-
-  std::string statements_[kNumDirentFields];
 };
 
 // Indexing kDirentFields at runtime odr-uses it, which in C++11 requires a
 // namespace-scope definition
 constexpr DirentStatements::DirentFields DirentStatements::kDirentFields[];
+
+
+void SqlLookup::DeferredInitDirent(const CatalogDatabase &database,
+                                   const char *statement_template) {
+  DeferredInit(database.sqlite_db(),
+               DirentStatements::Expand(statement_template, database));
+}
 
 
 shash::Md5 SqlLookup::GetPathHash() const { return RetrieveMd5(8, 9); }
@@ -892,10 +891,9 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog,
 
 
 SqlListing::SqlListing(const CatalogDatabase &database) {
-  static const DirentStatements kStatements(
-      "SELECT @DB_FIELDS@ FROM catalog "
-      "WHERE (parent_1 = :p_1) AND (parent_2 = :p_2);");
-  DeferredInit(database.sqlite_db(), kStatements.Get(database));
+  DeferredInitDirent(database,
+                     "SELECT @DB_FIELDS@ FROM catalog "
+                     "WHERE (parent_1 = :p_1) AND (parent_2 = :p_2);");
 }
 
 
@@ -908,10 +906,9 @@ bool SqlListing::BindPathHash(const struct shash::Md5 &hash) {
 
 
 SqlLookupPathHash::SqlLookupPathHash(const CatalogDatabase &database) {
-  static const DirentStatements kStatements(
-      "SELECT @DB_FIELDS@ FROM catalog "
-      "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);");
-  DeferredInit(database.sqlite_db(), kStatements.Get(database));
+  DeferredInitDirent(database,
+                     "SELECT @DB_FIELDS@ FROM catalog "
+                     "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);");
 }
 
 bool SqlLookupPathHash::BindPathHash(const struct shash::Md5 &hash) {
@@ -923,9 +920,8 @@ bool SqlLookupPathHash::BindPathHash(const struct shash::Md5 &hash) {
 
 
 SqlLookupInode::SqlLookupInode(const CatalogDatabase &database) {
-  static const DirentStatements kStatements(
-      "SELECT @DB_FIELDS@ FROM catalog WHERE rowid = :rowid;");
-  DeferredInit(database.sqlite_db(), kStatements.Get(database));
+  DeferredInitDirent(database,
+                     "SELECT @DB_FIELDS@ FROM catalog WHERE rowid = :rowid;");
 }
 
 
@@ -939,13 +935,12 @@ bool SqlLookupInode::BindRowId(const uint64_t inode) {
 
 SqlLookupDanglingMountpoints::SqlLookupDanglingMountpoints(
     const catalog::CatalogDatabase &database) {
-  static const DirentStatements kStatements(
-      "SELECT DISTINCT @DB_FIELDS@ FROM catalog "
-      "JOIN catalog AS c2 "
-      "ON catalog.md5path_1 = c2.parent_1 AND "
-      "   catalog.md5path_2 = c2.parent_2 "
-      "WHERE catalog.flags & :nested_mountpoint_flag");
-  DeferredInit(database.sqlite_db(), kStatements.Get(database));
+  DeferredInitDirent(database,
+                     "SELECT DISTINCT @DB_FIELDS@ FROM catalog "
+                     "JOIN catalog AS c2 "
+                     "ON catalog.md5path_1 = c2.parent_1 AND "
+                     "   catalog.md5path_2 = c2.parent_2 "
+                     "WHERE catalog.flags & :nested_mountpoint_flag");
 
   // this pretty much removes the advantage of a deferred init but the statement
   // is anyway only used directly.
