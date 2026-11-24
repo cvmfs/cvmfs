@@ -46,6 +46,7 @@ FuseRemounter::Status FuseRemounter::ChangeRoot(const shash::Any &root_hash) {
     // drainout_mode_ == 2, IsInDrainoutMode is now 'true'
   } else {
     LogCvmfs(kLogCvmfs, kLogDebug, "already in drainout mode, leaving");
+    SetAlarm(MountPoint::kShortTermTTL);
     return kStatusDraining;
   }
 
@@ -81,7 +82,7 @@ FuseRemounter::Status FuseRemounter::Check() {
     // The blacklists live on the config repository mount, which can block
     // indefinitely.  Fail like a failed catalog reload instead of hanging
     // the single remount trigger thread forever.
-    LogCvmfs(kLogCvmfs, kLogSyslogErr | kLogDebug,
+    LogCvmfs(kLogCvmfs, kLogDebug,
              "blacklist reload timed out, keeping catalog revision");
     SetOfflineMode(true);
     catalogs_valid_until_ = time(NULL) + MountPoint::kShortTermTTL;
@@ -425,15 +426,18 @@ unsigned FuseRemounter::BlacklistReloadTimeoutSec() const {
   string optarg;
   if (mountpoint_->file_system()->options_mgr()->GetValue(
           "CVMFS_BLACKLIST_RELOAD_TIMEOUT_SEC", &optarg)) {
-    // String2Uint64() yields 0 on unparsable input; a zero timeout would
-    // fail every check.  Clamp huge values: the wait math casts to int ms.
-    const uint64_t timeout = String2Uint64(optarg);
-    if (timeout > 0)
-      return timeout > 3600 ? 3600 : static_cast<unsigned>(timeout);
-    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
-             "invalid CVMFS_BLACKLIST_RELOAD_TIMEOUT_SEC=\"%s\", "
-             "using default %u seconds",
-             optarg.c_str(), kDefaultBlacklistReloadTimeoutSec);
+    // String2Uint64() wraps negative input and yields 0 on garbage
+    // (sscanf); Parse() rejects both.  Clamp huge values: the wait math
+    // casts to int milliseconds.
+    uint64_t timeout = 0;
+    if (!String2Uint64Parse(optarg, &timeout) || timeout == 0) {
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+               "invalid CVMFS_BLACKLIST_RELOAD_TIMEOUT_SEC=\"%s\", "
+               "using default %u seconds",
+               optarg.c_str(), kDefaultBlacklistReloadTimeoutSec);
+      return kDefaultBlacklistReloadTimeoutSec;
+    }
+    return timeout > 3600 ? 3600 : static_cast<unsigned>(timeout);
   }
   return kDefaultBlacklistReloadTimeoutSec;
 }
@@ -466,6 +470,7 @@ std::string FuseRemounter::GetRemountInfo() const {
 
 void FuseRemounter::Spawn() {
   invalidator_->Spawn();
+  // Unconditional: talk "remount" reaches Check() on fixed catalogs too.
   StartBlacklistReloader();
   if (!mountpoint_->fixed_catalog()) {
     MakePipe(pipe_remount_trigger_);
