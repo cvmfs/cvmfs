@@ -33,7 +33,9 @@ enum PipeType {
   kPipeDetachedChild,
   kPipeTest,
   kPipeDownloadJobs,
-  kPipeDownloadJobsResults
+  kPipeDownloadJobsResults,
+  kPipeBlacklistReload,
+  kPipeBlacklistReloadResult
 };
 
 /**

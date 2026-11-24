@@ -29,6 +29,7 @@ All parameters can be found here
 |`CVMFS_HTTP_PROXY`           | `DIRECT` for local repo or URL for remote|
 |`CVMFS_KCACHE_TIMEOUT`       | Kernel cache timeout in seconds|
 |`CVMFS_MAX_TTL`              | Catalog Time-To-Live in minutes|
+|`CVMFS_BLACKLIST_RELOAD_TIMEOUT_SEC` | Seconds to wait for the config repository blacklist reload; on timeout the catalog revision is kept and the check retried after the short term TTL|
 |`CVMFS_HIDE_MAGIC_XATTRS=no` | Make all extended attributes available|
 
 ## Mounting

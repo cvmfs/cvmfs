@@ -8,12 +8,15 @@
 #include <pthread.h>
 
 #include <atomic>
+#include <cstdint>
 #include <ctime>
+#include <string>
 
 #include "crypto/hash.h"
 #include "duplex_fuse.h"
 #include "fence.h"
 #include "fuse_evict.h"
+#include "util/pipe.h"
 #include "util/single_copy.h"
 
 namespace cvmfs {
@@ -45,6 +48,15 @@ class FuseRemounter : SingleCopy {
     kStatusFailNoSpace,
   };
 
+  /**
+   * Result of a bounded blacklist reload; travels through a pipe as int32_t.
+   */
+  enum BlacklistReloadStatus : int32_t {
+    kBlReloadOk = 0,    ///< blacklist (re)loaded successfully
+    kBlReloadTimedOut,  ///< reload did not finish within the timeout
+    kBlReloadFailed,    ///< reload ran but failed (see syslog)
+  };
+
   FuseRemounter(MountPoint *mountpoint,
                 cvmfs::InodeGenerationInfo *inode_generation_info,
                 struct fuse_session **fuse_session,
@@ -60,8 +72,11 @@ class FuseRemounter : SingleCopy {
   bool IsCaching() {
     return (maintenance_mode_.load() == 0) && (drainout_mode_.load() == 0);
   }
-  bool IsInDrainoutMode() { return drainout_mode_.load() == 2; }
-  bool IsInMaintenanceMode() { return maintenance_mode_.load() == 1; }
+  bool IsInDrainoutMode() const { return drainout_mode_.load() == 2; }
+  bool IsInMaintenanceMode() const { return maintenance_mode_.load() == 1; }
+
+  /// State of the remount/update loop, for the "remount info" command.
+  std::string GetRemountInfo() const;
 
   Fence *fence() { return fence_; }
   time_t catalogs_valid_until() { return catalogs_valid_until_; }
@@ -73,8 +88,16 @@ class FuseRemounter : SingleCopy {
  private:
   static void *MainRemountTrigger(void *data);
 
-  bool HasRemountTrigger() { return pipe_remount_trigger_[0] >= 0; }
+  bool HasRemountTrigger() const { return pipe_remount_trigger_[0] >= 0; }
   void SetAlarm(int timeout);
+  static const unsigned kDefaultBlacklistReloadTimeoutSec = 10;
+  /// Bounded ReloadBlacklists(): runs on the helper thread, waits at most
+  /// BlacklistReloadTimeoutSec(); on timeout Check() keeps the revision.
+  BlacklistReloadStatus ReloadBlacklistsBounded();
+  unsigned BlacklistReloadTimeoutSec() const;
+  static void *MainBlacklistReload(void *data);
+  void StartBlacklistReloader();
+  void StopBlacklistReloader();
 
   bool EnterCriticalSection() {
     int32_t expected_val = 0;
@@ -107,6 +130,22 @@ class FuseRemounter : SingleCopy {
    * through this pipe.
    */
   int pipe_remount_trigger_[2];
+  /**
+   * Helper thread that reloads the blacklists (they live on the config
+   * repository mount, which can block indefinitely).
+   */
+  pthread_t thread_blacklist_reload_;
+  std::atomic<bool> blacklist_reloader_started_;
+  /**
+   * Parent -> helper: request sequence number.
+   * Helper -> parent: request sequence number and result.
+   */
+  Pipe<kPipeBlacklistReload> *pipe_blacklist_reload_;
+  Pipe<kPipeBlacklistReloadResult> *pipe_blacklist_reload_result_;
+  Pipe<kPipeThreadTerminator> *pipe_blacklist_reload_terminate_;
+  /** Serializes concurrent Check() callers around one bounded reload. */
+  pthread_mutex_t blacklist_reload_mutex_;
+  int64_t blacklist_reload_request_id_;
   /**
    * Indicates whether the last reload attempt failed. If so, the short term
    * TTL is active.

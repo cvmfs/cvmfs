@@ -165,6 +165,7 @@ static void Usage(const std::string &exe) {
       "  device id              returns major:minor virtual device id    \n"
       "                         on Linux and 0:0 on macOS                \n"
       "  remount [sync]         look for new catalogs                    \n"
+      "  remount info           gets the remount/update loop state      \n"
       "  revision               gets the repository revision             \n"
       "  max ttl info           gets the maximum ttl                     \n"
       "  max ttl set <minutes>  sets the maximum ttl                     \n"

@@ -345,6 +345,9 @@ void *TalkManager::MainResponder(void *data) {
                  "Attempt to send fuse connection info to new mount (via %s)%s",
                  socket_path.c_str(), retval ? "" : " -- failed!");
       }
+    } else if (line == "remount info") {
+      // Before the prefix-matching "remount" branch.
+      talk_mgr->Answer(con_fd, remounter->GetRemountInfo());
     } else if (line.substr(0, 7) == "remount") {
       FuseRemounter::Status status;
       if (line == "remount sync")
