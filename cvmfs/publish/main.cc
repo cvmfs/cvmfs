@@ -113,6 +113,9 @@ int main(int argc, char **argv) {
                e.msg().c_str());
     } else if (e.failure() == publish::EPublish::kFailPermission) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Permission error: %s", e.msg().c_str());
+    } else if (e.failure() == publish::EPublish::kFailWhitelistExpired
+               || e.failure() == publish::EPublish::kFailWhitelistInvalid) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Whitelist error: %s", e.msg().c_str());
     } else {
       LogCvmfs(kLogCvmfs, kLogStderr, "(unexpected termination) %s", e.what());
     }

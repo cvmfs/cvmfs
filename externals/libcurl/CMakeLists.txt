@@ -9,10 +9,15 @@ set(CURL_HASH "MD5=9ce4ebba8a446e7c176dd35899004d33")
 # -> libcurl <-
 # NOTE: libcurl exports the target `CURL::libcurl`. The options below mirror the
 # NOTE: former autotools configure flags (externals/libcurl/src/configureHook.sh).
-# NOTE: The old reenable_poll_darwin.patch only patched the autotools `configure`
-# NOTE: script; the CMake build has its own poll detection, so it is not needed.
 
 set(CMAKE_INSTALL_DEFAULT_COMPONENT_NAME external_deps)
+
+# curl's CMake skips the poll() check on Apple and falls back to select(), which
+# fails for fds >= FD_SETSIZE (1024). cvmfs2 easily exceeds that with many open
+# catalogs, and then every download fails with "host connection problem".
+if(APPLE)
+  set(HAVE_POLL_FINE 1)
+endif()
 
 # Static, position-independent library, no curl executable or tests.
 set(BUILD_SHARED_LIBS OFF)
@@ -88,6 +93,11 @@ if (APPLE AND NOT DEFINED OPENSSL_ROOT_DIR)
 endif()
 
 setup_external_build_mode(CURL)
+# The macOS system libcurl has the same select() limitation, so build our own
+# unless the system one is requested explicitly via BUILTIN_EXTERNALS_EXCLUDE.
+if(APPLE AND NOT FETCHCONTENT_TRY_FIND_PACKAGE_MODE STREQUAL "ALWAYS")
+  set(FETCHCONTENT_TRY_FIND_PACKAGE_MODE NEVER)
+endif()
 
 FetchContent_Declare(
   CURL

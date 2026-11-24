@@ -26,6 +26,17 @@ produce_dependency_files() {
 }
 EOF
 
+  # Suffixed spec form, so extension-scanning tools (Lmod) skip it
+  printf "whatis('module')\n" > module.lua
+  cat > .cvmfsbundle-module.lua.cvmfsbundle <<-EOF
+{
+  "name": "CVMFS_BUNDLE",
+  "version": "1.0.0",
+  "encoding": "UTF-8",
+  "dependencies": ["./dep1.txt"]
+}
+EOF
+
   popd >/dev/null || return 1
 }
 
@@ -98,6 +109,8 @@ EOF
   [ "x$attr_value" = "x1" ] || return 20
   attr_value=$(get_xattr bundle_trigger $repo_dir/dep1.txt)
   [ "x$attr_value" = "x0" ] || return 21
+  attr_value=$(get_xattr bundle_trigger $repo_dir/module.lua)
+  [ "x$attr_value" = "x1" ] || return 22
 
   echo "mount the repository on a local mountpoint with bundle prefetching enabled"
   do_local_mount $mnt_point $CVMFS_TEST_REPO $(get_repo_url $CVMFS_TEST_REPO) \
@@ -232,6 +245,25 @@ EOF
       fi
     done
   fi
+
+  echo "removing a trigger removes its suffixed bundle spec"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  rm $repo_dir/module.lua
+  publish_repo $CVMFS_TEST_REPO || return $?
+  [ ! -e $repo_dir/.cvmfsbundle-module.lua.cvmfsbundle ] || return 70
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  echo "both spec forms for the same trigger must fail the publish"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  cp $repo_dir/.cvmfsbundle-trigger.txt \
+    $repo_dir/.cvmfsbundle-trigger.txt.cvmfsbundle
+  if publish_repo $CVMFS_TEST_REPO > $scratch_dir/conflict.log 2>&1; then
+    echo "publishing conflicting bundle specs succeeded"
+    return 71
+  fi
+  grep "conflicting bundle specifications" $scratch_dir/conflict.log \
+    > /dev/null || return 72
+  abort_transaction $CVMFS_TEST_REPO || return $?
 
   echo "clean up"
   sudo cvmfs_server rmfs -f $CVMFS_TEST_REPO

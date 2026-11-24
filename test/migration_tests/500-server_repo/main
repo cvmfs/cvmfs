@@ -5,10 +5,43 @@ MIGRATIONTEST_500_REPO="migrationtest.cern.ch"
 MIGRATIONTEST_500_REPLICA="migrationtest-stratum1.cern.ch"
 
 
+MIGRATIONTEST_500_GEODB_DISABLED=no
+
 cleanup() {
   echo "running cleanup()"
   destroy_repo $MIGRATIONTEST_500_REPO
   destroy_repo $MIGRATIONTEST_500_REPLICA
+  if [ "$MIGRATIONTEST_500_GEODB_DISABLED" = "yes" ]; then
+    sudo sed -i '/^CVMFS_GEO_DB_FILE=NONE$/d' /etc/cvmfs/server.local
+  fi
+}
+
+# add-replica fails on a single non-gzip response from geoipdb.openhtc.io.
+# A fresh DB in place makes the lazy update in add-replica, snapshot and
+# migrate a no-op. If the download keeps failing, disable the geo API: it
+# is not what this test covers.
+prefetch_geodb() {
+  local dbfile=/var/lib/cvmfs-server/geo/iplocation.mmdb
+  local url=https://geoipdb.openhtc.io/iplocation.mmdb.gz
+  local tmpfile=$(mktemp)
+  sudo mkdir -p $(dirname $dbfile)
+  local attempt
+  for attempt in 1 2 3 4 5; do
+    if curl -fsSL --connect-timeout 10 --max-time 300 "$url" -o $tmpfile && \
+       gzip -t $tmpfile 2>/dev/null; then
+      gunzip -c $tmpfile | sudo tee ${dbfile}.new > /dev/null && \
+        sudo mv -f ${dbfile}.new $dbfile
+      rm -f $tmpfile
+      echo "pre-installed GeoIP DB (attempt $attempt)"
+      return 0
+    fi
+    echo "GeoIP DB download attempt $attempt failed"
+    sleep $((attempt * 10))
+  done
+  rm -f $tmpfile
+  echo "GeoIP DB unavailable, setting CVMFS_GEO_DB_FILE=NONE"
+  echo "CVMFS_GEO_DB_FILE=NONE" | sudo tee -a /etc/cvmfs/server.local > /dev/null
+  MIGRATIONTEST_500_GEODB_DISABLED=yes
 }
 
 cvmfs_run_test() {
@@ -57,6 +90,8 @@ cvmfs_run_test() {
   # install the upstream CernVM-FS package
   echo "installing CernVM-FS server $previous_version"
   install_packages $upstream_packages || return 4
+
+  prefetch_geodb
 
   # make sure that autofs is not running
   echo "switching off autofs"

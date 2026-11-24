@@ -15,6 +15,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # cvmfs_server enter needs unprivileged user namespaces, which Ubuntu
+      # restricts via AppArmor by default, also inside privileged containers
+      - name: Allow unprivileged user namespaces
+        run: |
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
       - name: Build  CVMFS in Image
         run: |
           cd test/common/container

@@ -119,6 +119,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   FRIEND_TEST(T_Download, ValidateGeoReply);
   FRIEND_TEST(T_Download, StripDirect);
   FRIEND_TEST(T_Download, EscapeUrl);
+  FRIEND_TEST(T_Download, NoProxyChainIsNotSelectable);
 
  public:
   // HostInfo is used for both metalink and host
@@ -323,6 +324,11 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   pthread_mutex_t *lock_options_;
   pthread_mutex_t *lock_synchronous_mode_;
   std::string opt_dns_server_;
+  /**
+   * False if libcurl lacks c-ares, in which case curl ignores
+   * CURLOPT_DNS_SERVERS and resolves hosts with the system resolver.
+   */
+  bool curl_dns_servers_supported_;
   std::string info_header_template_;
   unsigned opt_timeout_proxy_;
   unsigned opt_timeout_direct_;

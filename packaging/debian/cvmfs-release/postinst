@@ -56,9 +56,12 @@ case "$1" in
 	        return 2
 	    elif [ -x /usr/lib/apt/apt-helper ]; then
 	        _tmp=$(mktemp)
-	        /usr/lib/apt/apt-helper download-file "$_url" "$_tmp" >/dev/null 2>&1
+	        # apt-helper exits 100 on any failure; only its message tells a
+	        # 404 apart. LC_ALL=C because apt translates that message.
+	        _out=$(LC_ALL=C /usr/lib/apt/apt-helper download-file "$_url" "$_tmp" 2>&1)
 	        _rc=$?; rm -f "$_tmp"
 	        [ $_rc -eq 0 ] && return 0
+	        printf '%s\n' "$_out" | grep -q ' 404  *Not Found' && return 1
 	        return 2
 	    else
 	        return 2
@@ -92,6 +95,9 @@ case "$1" in
 	[ -n "$suite" ] || suite="$codename"
 
 	mkdir -p /etc/apt/sources.list.d
+	# Up to 4.9 this was a symlink into /usr/share/cvmfs-release; writing
+	# through it would modify (or, once gone, recreate) a packaged file.
+	rm -f "$dest"
 	cat > "$dest" <<EOF
 deb $base_url ${suite}-prod main
 # deb $base_url ${suite}-testing main

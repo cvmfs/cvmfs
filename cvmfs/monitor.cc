@@ -12,7 +12,10 @@
 #include "monitor.h"
 
 #include <errno.h>
+#if defined(__GLIBC__) || defined(__APPLE__)
 #include <execinfo.h>
+#define CVMFS_HAVE_EXECINFO
+#endif
 #include <fcntl.h>
 #include <poll.h>
 #include <pthread.h>
@@ -68,13 +71,14 @@ int Watchdog::g_crash_signals[] = {SIGQUIT, SIGILL, SIGABRT, SIGFPE,
 Watchdog *Watchdog::Create(FnOnExit on_exit,
                            bool needs_read_environ,
                            WatchdogState *saved_state,
-                           const std::string &oom_score_adj) {
+                           const std::string &oom_score_adj,
+                           bool retain_root) {
   assert(instance_ == NULL);
   instance_ = new Watchdog(on_exit, oom_score_adj);
   if (saved_state != NULL)
     instance_->RestoreState(saved_state);
   else
-    instance_->Fork(needs_read_environ);
+    instance_->Fork(needs_read_environ, retain_root);
   return instance_;
 }
 
@@ -87,10 +91,14 @@ string Watchdog::GenerateStackTrace(pid_t pid) {
   int retval;
   string result = "";
 
-  // Get capability to ptrace the dead main cvmfs2 process.
-  // This is often necessary because the main process can have its own
-  // elevated capability which would otherwise block ptrace.
-  if (!ObtainSysPtraceCapability()) {
+  if (retain_root_) {
+    if (!SwitchCredentials(0, getgid(), true /* temporarily */, true)) {
+      result += "failed to re-gain root permissions... still give it a try\n";
+    }
+  } else if (!ObtainSysPtraceCapability()) {
+    // Get capability to ptrace the dead main cvmfs2 process.
+    // This is often necessary because the main process can have its own
+    // elevated capability which would otherwise block ptrace.
     result += "failed to gain ptrace capability... still give it a try\n";
   }
 
@@ -192,6 +200,8 @@ pid_t Watchdog::GetPid() {
 void Watchdog::LogEmergency(string msg) {
   char ctime_buffer[32];
 
+  ReopenMicroSyslog();
+
   if (!crash_dump_path_.empty()) {
     FILE *fp = fopen(crash_dump_path_.c_str(), "a");
     if (fp) {
@@ -209,6 +219,20 @@ void Watchdog::LogEmergency(string msg) {
     }
   }
   LogCvmfs(kLogMonitor, kLogSyslogErr, "%s", msg.c_str());
+}
+
+
+/**
+ * Called in the watchdog process before it logs.  If the file system holding
+ * the µSyslog became read-only meanwhile, logging to it is skipped; opening it
+ * would abort.
+ */
+void Watchdog::ReopenMicroSyslog() {
+  if (usyslog_path_.empty() || !GetLogMicroSyslog().empty())
+    return;
+  if (access(GetParentPath(usyslog_path_).c_str(), W_OK) != 0)
+    return;
+  SetLogMicroSyslog(usyslog_path_);
 }
 
 /**
@@ -298,6 +322,8 @@ string Watchdog::ReportStacktrace() {
 
 void Watchdog::ReportSignalAndContinue(int sig, siginfo_t *siginfo,
                                        void * /* context */) {
+  // No ReopenMicroSyslog() here: it is not async-signal-safe.  Unless the
+  // µSyslog is already open, this message only goes to syslog.
   LogCvmfs(kLogMonitor, kLogSyslogErr,
            "watchdog: received unexpected signal %d from PID %d / UID %d", sig,
            siginfo->si_pid, siginfo->si_uid);
@@ -342,6 +368,7 @@ void Watchdog::SendTrace(int sig, siginfo_t *siginfo, void *context) {
 #if defined(CVMFS_FUSE_MODULE)
       LogCvmfs(kLogCvmfs, kLogSyslogErr, "Signal %d, errno %d", sig,
                send_errno);
+#ifdef CVMFS_HAVE_EXECINFO
       void *addr[kMaxBacktrace];
       // Note: this doesn't work due to the signal stack on OS X (it works on
       // Linux).  Since anyway lldb is supposed to produce the backtrace, we
@@ -353,6 +380,7 @@ void Watchdog::SendTrace(int sig, siginfo_t *siginfo, void *context) {
       for (int i = 0; i < num_addr; ++i)
         backtrace += string(symbols[i]) + "\n";
       LogCvmfs(kLogCvmfs, kLogSyslogErr, "%s", backtrace.c_str());
+#endif
       LogCvmfs(kLogCvmfs, kLogSyslogErr, "address of g_cvmfs_exports: %p",
                &g_cvmfs_exports);
 #endif
@@ -392,7 +420,8 @@ Watchdog::SigactionMap Watchdog::SetSignalHandlers(
 /**
  * Fork the watchdog process and put it on hold until Spawn() is called.
  */
-void Watchdog::Fork(bool needs_read_environ) {
+void Watchdog::Fork(bool needs_read_environ, bool retain_root) {
+  retain_root_ = retain_root;
   Pipe<kPipeWatchdogPid> pipe_pid;
   pipe_watchdog_ = std::unique_ptr<Pipe<kPipeWatchdog> >(
       new Pipe<kPipeWatchdog>());
@@ -439,7 +468,8 @@ void Watchdog::Fork(bool needs_read_environ) {
             }
           }
 #endif
-          if ((geteuid() != 0) && SetuidCapabilityPermitted()) {
+          if (!retain_root_ && (geteuid() != 0)
+              && SetuidCapabilityPermitted()) {
             const std::vector<cap_value_t> nocaps;
             if (on_exit_) {
               // Reduce to minimum capabilities, which unfortunately is
@@ -475,12 +505,10 @@ void Watchdog::Fork(bool needs_read_environ) {
           const pid_t watchdog_pid = getpid();
           pipe_pid.Write(watchdog_pid);
           pipe_pid.CloseWriteFd();
-          // Close all unused file descriptors
-          // close also usyslog, only get it back if necessary
-          // string usyslog_save = GetLogMicroSyslog();
+          // Close all unused file descriptors, including the µSyslog
           const string debuglog_save = GetLogDebugFile();
           SetLogDebugFile("");
-          const string usyslog_save = GetLogMicroSyslog();
+          usyslog_path_ = GetLogMicroSyslog();
           SetLogMicroSyslog("");
           // Gracefully close the syslog before closing all fds. The next call
           // to syslog will reopen it.
@@ -495,7 +523,6 @@ void Watchdog::Fork(bool needs_read_environ) {
           preserve_fds.insert(pipe_watchdog_->GetReadFd());
           preserve_fds.insert(pipe_listener_->GetWriteFd());
           CloseAllFildes(preserve_fds);
-          SetLogMicroSyslog(usyslog_save);  // no-op if usyslog not used
           SetLogDebugFile(debuglog_save);   // no-op if debug log not used
 
           if (WaitForSupervisee())
@@ -554,6 +581,7 @@ bool Watchdog::WaitForSupervisee() {
     case ControlFlow::kQuit:
       return false;
     case ControlFlow::kQuitWithExit:
+      ReopenMicroSyslog();
       if (on_exit_)
         on_exit_(false);
       return false;
@@ -689,7 +717,11 @@ void *Watchdog::MainWatchdogListener(void *data) {
 void Watchdog::Supervise() {
   ControlFlow::Flags control_flow = ControlFlow::kUnknown;
 
-  if (!pipe_watchdog_->TryRead<ControlFlow::Flags>(&control_flow)) {
+  const bool read_ok =
+      pipe_watchdog_->TryRead<ControlFlow::Flags>(&control_flow);
+  if (!read_ok || control_flow != ControlFlow::kQuit)
+    ReopenMicroSyslog();
+  if (!read_ok) {
     LogEmergency("watchdog: unexpected termination ("
                  + StringifyInt(control_flow) + ")");
     if (on_exit_)
@@ -753,6 +785,7 @@ Watchdog::Watchdog(FnOnExit on_exit, const std::string &oom_score_adj)
     , exe_path_(string(platform_getexepath()))
     , oom_score_adj_(oom_score_adj)
     , watchdog_pid_(0)
+    , retain_root_(false)
     , on_exit_(on_exit) {
   const int retval = platform_spinlock_init(&lock_handler_, 0);
   assert(retval == 0);

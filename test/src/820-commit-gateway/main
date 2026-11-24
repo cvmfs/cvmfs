@@ -1,8 +1,7 @@
 #!/bin/bash
 cvmfs_test_name="Commit command in a repository connected to the gateway"
 cvmfs_test_autofs_on_startup=false
-#TODO(vavolkl): Investigate flaky test, and re-add to quick suite
-cvmfs_test_suites=""
+cvmfs_test_suites="quick"
 
 cleanup() {
     sudo rm -f /etc/cvmfs/config.d/test.repo.org.local
@@ -18,10 +17,24 @@ cvmfs_run_test() {
     sudo bash -c "echo CVMFS_SERVER_URL=$(get_repo_url test.repo.org) > /etc/cvmfs/config.d/test.repo.org.local"
     sudo bash -c "echo CVMFS_HTTP_PROXY="DIRECT" >> /etc/cvmfs/config.d/test.repo.org.local"
 
+    rm -rf $HOME/.cvmfs/test.repo.org
+
     echo "*** checking that enter, commit and exit succeed"
     cvmfs_server enter test.repo.org --transaction --repo-config /etc/cvmfs/repositories.d -- false && return 2
     cvmfs_server enter test.repo.org --transaction --repo-config /etc/cvmfs/repositories.d -- cvmfs_server abort -f test.repo.org || return 3
     cvmfs_server enter test.repo.org --transaction --repo-config /etc/cvmfs/repositories.d -- cvmfs_publish commit test.repo.org || return 4
+
+    echo "*** checking that session dirs are properly cleaned up"
+    [ -z "$(ls -A $HOME/.cvmfs/test.repo.org)" ] || return 5
+
+    # On a single CPU, a short-lived command usually exits before enter
+    # starts waiting for it
+    echo "*** checking enter with a quickly exiting command on a single CPU"
+    local cpu=$(taskset -cp $$ | awk '{print $NF}' | cut -d, -f1 | cut -d- -f1)
+    for i in $(seq 1 10); do
+      taskset -c $cpu cvmfs_server enter test.repo.org -- true || return 6
+    done
+    [ -z "$(ls -A $HOME/.cvmfs/test.repo.org)" ] || return 7
 
     return 0
 }

@@ -1,3 +1,20 @@
+2.14.2:
+  * [client] Fix shared cache manager crash that drops all mounts during cache cleanup with CVMFS_CACHE_CLEANUP_NONOPENLRU=yes (#4560)
+  * [client] Fix watchdog losing its credentials on repositories mounted before the 2.14 upgrade; a remount is still needed to run with reduced privileges (#4553)
+  * [client] Fix abort on first file open with CVMFS_FUSE_PASSTHROUGH=on for unprivileged mounts and mounts running as the cvmfs user (#4545)
+  * [client] Allow naming bundle specs .cvmfsbundle-<file>.cvmfsbundle, so tools that scan by extension (e.g. Lmod) no longer pick them up (#4541)
+  * [client] Fix reload hanging when another repository triggers an automount of the config repository (#4485, #4514)
+  * [client] Add CVMFS_OOM_SCORE_WATCHDOG to protect the watchdog from the OOM killer, so a crashed client can still be unmounted and remounted (#4481)
+  * [client] Fix config variables being set to blank when only set inside a false conditional block (#4476)
+  * [client] Fix abort on every unmount when passthrough support is built in but disabled at runtime (#4457)
+  * [server] Fix cvmfs_server snapshot aborting on HTTP 502/503/504 from the stratum 0; retry them like 429 (#4540)
+  * [server] Use local time instead of GMT in garbage collection progress output, matching the gc wrapper's own timestamps (#4518)
+  * [server] Add cvmfs_server gc -p to prune objects that are no longer needed after a full replica becomes a partial replica (#4483)
+  * [ducc] Fix dangling arch-independent link for images that lack the server's architecture (e.g. arm64-only images on an amd64 stratum 0); fail on image indexes without a usable platform (#4549)
+  * [ducc] Fix flat image conversion when cvmfs_repo includes a subdirectory (#4519)
+  * [ducc] Add prune-images --prune-not-in-wishlist to remove images that were dropped from the wishlist but are still in the registry (#4471)
+  * [packaging] Build riscv64 packages (#4532)
+  * [packaging] Fix RPM build on Fedora 45+ by using the system curl, since the vendored one does not build with OpenSSL 4 (#4531)
 
 2.14.1:
   * [client] Fix metalink request retry and failover handling (#4380)

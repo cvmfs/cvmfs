@@ -1,0 +1,88 @@
+#!/bin/bash
+cvmfs_test_name="Release of chunked files opened with direct I/O"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+# A chunked file published with direct I/O is opened without a page cache
+# tracker reference.  If the file handle loses the direct I/O bit, release
+# calls PageCacheTracker::Close() for an inode that was never tracked and the
+# client asserts.
+
+CVMFS_TEST_717_MOUNTPOINT=
+cleanup() {
+  echo "running cleanup()"
+  if [ "x$CVMFS_TEST_717_MOUNTPOINT" != "x" ]; then
+    sudo umount $CVMFS_TEST_717_MOUNTPOINT
+  fi
+}
+
+talk() {
+  sudo cvmfs_talk -p \
+    ${CVMFS_TEST_717_MOUNTPOINT}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO "$@"
+}
+
+get_internal_counter() {
+  talk internal affairs | grep "^$1|" | cut -d\| -f2
+}
+
+cvmfs_run_test() {
+  local logfile=$1
+  local scratch_dir=$(pwd)
+
+  echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "*** publish a chunked and a small file with direct I/O"
+  # Checksum the local copy: reading through the publisher's mount would hit
+  # the same bug there.
+  dd if=/dev/urandom of=large bs=1M count=20 || return 1
+  local md5_large=$(md5sum < large)
+  start_transaction $CVMFS_TEST_REPO || return $?
+  cp large /cvmfs/$CVMFS_TEST_REPO/large || return 1
+  echo "Hello World" > /cvmfs/$CVMFS_TEST_REPO/small || return 1
+  publish_repo $CVMFS_TEST_REPO -d || return 2
+
+  trap cleanup EXIT HUP INT TERM || return 3
+
+  CVMFS_TEST_717_MOUNTPOINT="${scratch_dir}/mnt"
+  mkdir -p $CVMFS_TEST_717_MOUNTPOINT || return 4
+  do_local_mount "$CVMFS_TEST_717_MOUNTPOINT" \
+                 "$CVMFS_TEST_REPO" \
+                 "$(get_repo_url $CVMFS_TEST_REPO)" || return 5
+  local mnt=$CVMFS_TEST_717_MOUNTPOINT
+
+  local nchunks=$(get_xattr chunks $mnt/large)
+  echo "*** $mnt/large has $nchunks chunks"
+  [ $nchunks -gt 1 ] || return 10
+  [ "x$(get_xattr direct_io $mnt/large)" = "x1" ] || return 11
+  [ "x$(get_xattr direct_io $mnt/small)" = "x1" ] || return 11
+  local pid=$(talk pid) || return 12
+  echo "*** cvmfs2 pid is $pid"
+
+  echo "*** open and release the files repeatedly"
+  for i in 1 2 3; do
+    [ "x$(md5sum < $mnt/large)" = "x$md5_large" ] || return 20
+    cat $mnt/small > /dev/null || return 21
+  done
+  # Concurrent handles on the same chunked inode
+  exec 5< $mnt/large || return 22
+  exec 6< $mnt/large || return 22
+  [ "x$(md5sum < $mnt/large)" = "x$md5_large" ] || return 23
+  exec 5<&- 6<&-
+
+  echo "*** check that the client survived"
+  [ "x$(talk pid)" = "x$pid" ] || return 30
+  talk internal affairs | grep ^page_cache_tracker
+  local ndirect=$(get_internal_counter page_cache_tracker.n_open_direct)
+  [ $ndirect -ge 9 ] || return 31
+  # No open counted towards the tracker, so nothing may be left tracked.
+  [ $(get_internal_counter page_cache_tracker.n_insert) -eq 0 ] || return 32
+
+  local stacktrace=${mnt}c/$CVMFS_TEST_REPO/stacktrace.$CVMFS_TEST_REPO
+  if sudo test -f $stacktrace; then
+    sudo cat $stacktrace
+    return 33
+  fi
+
+  return 0
+}

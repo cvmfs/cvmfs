@@ -265,7 +265,7 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
 
 std::string ClientCatalogManager::GetCatalogDescription(
     const PathString &mountpoint, const shash::Any &hash) {
-  return "file catalog at " + repo_name_ + ":"
+  return repo_name_ + ":"
          + (mountpoint.IsEmpty()
                 ? "/"
                 : string(mountpoint.GetChars(), mountpoint.GetLength()))

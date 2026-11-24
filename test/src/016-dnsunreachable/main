@@ -30,7 +30,17 @@ cvmfs_run_test() {
   local milliseconds
   cvmfs_disable_config_repository
   # should fail
-  milliseconds=$(stop_watch do_faulty_mount) && return 4
+  if milliseconds=$(stop_watch do_faulty_mount); then
+    # no grep -q: early exit SIGPIPEs cat_syslog under pipefail
+    if cat_syslog | grep "libcurl lacks c-ares support" >/dev/null; then
+      echo "WARNING: libcurl ignores CVMFS_DNS_SERVER, skipping"
+      cvmfs_umount $repo
+      cvmfs_enable_config_repository
+      CVMFS_GENERAL_WARNING_FLAG=1
+      return 0
+    fi
+    return 4
+  fi
   cvmfs_enable_config_repository
   echo "timeout was $milliseconds seconds"
 

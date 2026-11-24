@@ -223,6 +223,8 @@ void SpawnGuardian(struct fuse_session *se) {
       if (fd != listen_fd && fd != control[0])
         close(fd);
     }
+    // The listening socket is close-on-exec, see RpcServer::Listen()
+    fcntl(listen_fd, F_SETFD, 0);
     setsid();
     execv(argv[0], const_cast<char *const *>(argv));
     _exit(127);
@@ -294,6 +296,7 @@ int SessionLoop(struct fuse_session *se, unsigned max_threads) {
   NotifyReady(mounted);
   if (!mounted) {
     se->rpc->Stop();
+    se->server->Shutdown();
     return -1;
   }
   se->mounted = true;
@@ -326,6 +329,9 @@ int SessionLoop(struct fuse_session *se, unsigned max_threads) {
     }
   }
   se->rpc->Stop();
+  // The callback monitor polls the backend; the loader tears down cvmfs
+  // (fnFini) as soon as the loop returns
+  se->server->Shutdown();
   se->backend->ReleaseAll();
   return retval;
 }
@@ -657,6 +663,8 @@ void fuse_session_unmount(struct fuse_session *se) {
 void fuse_session_destroy(struct fuse_session *se) {
   if (!se)
     return;
+  if (se->server)
+    se->server->Shutdown();
   if (se->init_called && !se->destroy_called && se->ops.destroy) {
     se->ops.destroy(se->userdata);
     se->destroy_called = true;

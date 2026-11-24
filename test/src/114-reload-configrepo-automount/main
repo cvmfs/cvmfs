@@ -26,9 +26,11 @@ cvmfs_test_timeout=600
 # reload then stalls on its pause and resumes only once a mount of the
 # config repository is possible again.
 #
-# Only `cd` (LOOKUP_DIRECTORY) triggers autofs; the stat() behind readlink -f
-# and getxattr() in the earlier loop of cvmfs_reload do not, which is why the
-# hang sits in _cvmfs_reload_pause of the config repository.
+# The automount is triggered either by the `cd` in _cvmfs_reload_pause of the
+# config repository, or earlier by cvmfs_readconfig (cvmfs2 -o parse reads
+# the config repository's etc/cvmfs/) while pausing another repository. Which
+# one depends on whether the SIGSTOP lands before the reload queries the other
+# client, so the config repository's marker must exist from the start.
 
 CVMFS_TEST_114_REPO="sft.cern.ch"
 CVMFS_TEST_114_CFGREPO="cvmfs-config.cern.ch"

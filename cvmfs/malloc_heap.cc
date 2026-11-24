@@ -120,4 +120,7 @@ MallocHeap::MallocHeap(uint64_t capacity, CallbackPtr callback_ptr)
 }
 
 
-MallocHeap::~MallocHeap() { sxunmap(heap_, capacity_); }
+MallocHeap::~MallocHeap() {
+  sxunmap(heap_, capacity_);
+  delete callback_ptr_;
+}

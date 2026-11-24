@@ -184,6 +184,26 @@ class T_BundleMgr : public ::testing::Test {
 
   BundleMgr *bundle_mgr_;
 
+  // Only spec_path exists in the catalog; the trigger must resolve to it and
+  // fetch it exactly once.
+  void ExpectSpecResolved(const std::string &spec_path) {
+    const catalog::DirectoryEntry dirent = trigger_dirent_;
+    ON_CALL(*mock_catalog_mgr_, LookupPath(testing::_, testing::_, testing::_))
+        .WillByDefault(
+            [dirent, spec_path](const PathString &path,
+                                const catalog::LookupOptions,
+                                catalog::DirectoryEntry *out) -> bool {
+              if (path.ToString() != spec_path)
+                return false;
+              *out = dirent;
+              return true;
+            });
+    EXPECT_TRUE(bundle_mgr_->ScheduleTrigger(PathString("/dir/trigger.txt")));
+    bundle_mgr_->JoinDispatcher();
+    bundle_mgr_->JoinFetcherPool();
+    EXPECT_EQ(MockFetcher::counter_.load(), 1u);
+  }
+
   catalog::DirectoryEntry trigger_dirent_{};
 
   // Mocks
@@ -278,6 +298,14 @@ TEST_F(T_BundleMgr, ScheduleTriggerBeforeSpawn) {
   mgr.JoinDispatcher();
   mgr.JoinFetcherPool();
   EXPECT_EQ(MockFetcher::counter_.load(), 1u);
+}
+
+TEST_F(T_BundleMgr, ScheduleTriggerSuffixedSpec) {
+  ExpectSpecResolved("/dir/.cvmfsbundle-trigger.txt.cvmfsbundle");
+}
+
+TEST_F(T_BundleMgr, ScheduleTriggerPlainSpec) {
+  ExpectSpecResolved("/dir/.cvmfsbundle-trigger.txt");
 }
 
 TEST_F(T_BundleMgr, TrySendPathDropsWhenFull) {

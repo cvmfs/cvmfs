@@ -18,6 +18,10 @@ GO_SKIP :=
 GO_INSTALL_DEPS := debian/cvmfs-gateway.install debian/cvmfs-snapshotter.install
 endif
 
+# The vendored curl does not compile against OpenSSL 4 (opaque ASN1 types)
+OPENSSL_MAJOR := $(shell pkg-config --modversion openssl 2>/dev/null | cut -d. -f1)
+BUILTIN_EXTERNALS_EXCLUDE := $(shell [ "$(OPENSSL_MAJOR)" -ge 4 ] 2>/dev/null && echo curl)
+
 # TODO:
 #  -> Support debian multiarch
 #       CMake's GNUInstallDirs supports multiarch beginning from CMake 2.8.8...
@@ -38,6 +42,7 @@ Makefile:
 		-DBUILD_LIBCVMFS=yes -DBUILD_LIBCVMFS_CACHE=yes \
 		-DBUILD_GATEWAY=$(BUILD_GO) \
 		-DBUILD_SNAPSHOTTER=$(BUILD_GO) \
+		-DBUILTIN_EXTERNALS_EXCLUDE=$(BUILTIN_EXTERNALS_EXCLUDE) \
 		-DCMAKE_INSTALL_PREFIX:PATH=/usr \
 		.
 

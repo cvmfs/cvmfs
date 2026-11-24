@@ -6,9 +6,7 @@
  */
 
 #include <errno.h>
-#include <fcntl.h>
 #include <pwd.h>
-#include <signal.h>
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -775,10 +773,6 @@ int main(int argc, char **argv) {
       AddMountOption("obackend=fskit", &mount_options);
     if (!HasMountOption("noappledouble", mount_options))
       AddMountOption("noappledouble", &mount_options);
-    // FSKit requires the cvmfs2 process to stay in the foreground;
-    // daemonizing would break the FSKit connection.
-    if (!HasMountOption("foreground", mount_options))
-      AddMountOption("foreground", &mount_options);
     if (!HasMountOption("disable_watchdog", mount_options))
       AddMountOption("disable_watchdog", &mount_options);
   }
@@ -821,89 +815,6 @@ int main(int argc, char **argv) {
                " the list of supplementary groups");
       return 1;
     }
-  }
-
-  // FSKit foreground mode: cvmfs2 must stay running as the filesystem process.
-  // We launch it in its own session (fully detached) and poll until the mount
-  // point appears (device ID changes), then return success.
-  if (backend == kBackendFskit) {
-    // Get the device ID of the mountpoint before mounting
-    platform_stat64 info_before;
-    dev_t dev_before = 0;
-    if (platform_stat(mountpoint.c_str(), &info_before) == 0) {
-      dev_before = info_before.st_dev;
-    }
-
-    // Fork cvmfs2 into its own session so it survives our exit
-    const pid_t pid = fork();
-    if (pid < 0) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to fork");
-      return 32;
-    }
-    if (pid == 0) {
-      // Child: create new session, redirect stdio to /dev/null, exec cvmfs2
-      setsid();
-      const int null_fd = open("/dev/null", O_RDWR);
-      if (null_fd >= 0) {
-        dup2(null_fd, 0);
-        dup2(null_fd, 1);
-        dup2(null_fd, 2);
-        if (null_fd > 2) close(null_fd);
-      }
-
-      const string opts = JoinStrings(mount_options, ",");
-      execl(cvmfs_binary.c_str(), cvmfs_binary.c_str(),
-            "-o", opts.c_str(),
-            fqrn.c_str(), mountpoint.c_str(), (char *)NULL);
-      _exit(127);  // exec failed
-    }
-
-    // Parent: poll until the mount appears or timeout
-    const int kMountTimeoutSec = 30;
-    const int kPollIntervalUs = 100000;  // 100ms
-    const int kMaxPolls = kMountTimeoutSec * (1000000 / kPollIntervalUs);
-    bool mount_appeared = false;
-
-    for (int i = 0; i < kMaxPolls; ++i) {
-      usleep(kPollIntervalUs);
-
-      // Check if the process died unexpectedly
-      int status = 0;
-      const pid_t ret = waitpid(pid, &status, WNOHANG);
-      if (ret == pid) {
-        LogCvmfs(kLogCvmfs, kLogStderr,
-                 "cvmfs2 process exited prematurely with status %d",
-                 WIFEXITED(status) ? WEXITSTATUS(status) : -1);
-        return 32;
-      }
-
-      // Check if the mount point appeared by comparing device IDs
-      platform_stat64 info_after;
-      if (platform_stat(mountpoint.c_str(), &info_after) == 0) {
-        if (info_after.st_dev != dev_before) {
-          mount_appeared = true;
-          break;
-        }
-      }
-    }
-
-    if (!mount_appeared) {
-      LogCvmfs(kLogCvmfs, kLogStderr,
-               "Timeout waiting for FSKit mount on %s", mountpoint.c_str());
-      // cvmfs2 may ignore SIGTERM while it waits for the FSKit mount, so
-      // never block indefinitely on it
-      kill(pid, SIGTERM);
-      for (int i = 0; i < 50; ++i) {
-        if (waitpid(pid, NULL, WNOHANG) == pid)
-          return 32;
-        usleep(kPollIntervalUs);
-      }
-      kill(pid, SIGKILL);
-      waitpid(pid, NULL, 0);
-      return 32;
-    }
-
-    return 0;
   }
 
   // Exec cvmfs2, from here on errors return 32 (mount error)

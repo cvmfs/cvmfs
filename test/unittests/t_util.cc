@@ -1357,6 +1357,14 @@ TEST_F(T_Util, String2Int64) {
   EXPECT_EQ(static_cast<int64_t>(-234), String2Int64("-234.034"));
   EXPECT_EQ(static_cast<int64_t>(234), String2Int64("234.999"));
   EXPECT_EQ(static_cast<int64_t>(234), String2Int64("0234"));
+  EXPECT_EQ(static_cast<int64_t>(20), String2Int64("20G"));
+  EXPECT_EQ(static_cast<int64_t>(42), String2Int64("  42"));
+  EXPECT_EQ(static_cast<int64_t>(7), String2Int64("+7"));
+  // Failed conversions return 0, like String2Uint64
+  EXPECT_EQ(static_cast<int64_t>(0), String2Int64(""));
+  EXPECT_EQ(static_cast<int64_t>(0), String2Int64(" "));
+  EXPECT_EQ(static_cast<int64_t>(0), String2Int64("abc"));
+  EXPECT_EQ(static_cast<int64_t>(0), String2Int64("unlimited"));
 }
 
 TEST_F(T_Util, String2Uint64Parse) {
@@ -1640,6 +1648,26 @@ TEST_F(T_Util, ReplaceAll) {
   EXPECT_EQ("it's for REPLACED or for @not-replace@",
             ReplaceAll("it's for @replace@ or for @not-replace@", "@replace@",
                        "REPLACED"));
+}
+
+// Matches are replaced left to right without rescanning the inserted text
+TEST_F(T_Util, ReplaceAllNonOverlapping) {
+  EXPECT_EQ("aa", ReplaceAll("aaa", "aa", "a"));
+  EXPECT_EQ("aa", ReplaceAll("aaaa", "aa", "a"));
+  EXPECT_EQ("ab", ReplaceAll("aabb", "ab", ""));
+  EXPECT_EQ("ba", ReplaceAll("ababa", "aba", ""));
+  EXPECT_EQ("a...b...c", ReplaceAll("a.b.c", ".", "..."));
+  EXPECT_EQ("abc", ReplaceAll("abc", "", "X"));
+}
+
+// These used to loop forever, e.g. the escaping in CommandOverlay::ShellEscape
+TEST_F(T_Util, ReplaceAllReplacementContainsNeedle) {
+  EXPECT_EQ("echo \\$HOME", ReplaceAll("echo $HOME", "$", "\\$"));
+  EXPECT_EQ("a\\\"b", ReplaceAll("a\"b", "\"", "\\\""));
+  EXPECT_EQ("a\\\\b", ReplaceAll("a\\b", "\\", "\\\\"));
+  EXPECT_EQ("\\`date\\`", ReplaceAll("`date`", "`", "\\`"));
+  EXPECT_EQ("abbc", ReplaceAll("abc", "b", "bb"));
+  EXPECT_EQ("ab", ReplaceAll("ab", "ab", "ab"));
 }
 
 TEST_F(T_Util, ProcessExists) {

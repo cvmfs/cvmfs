@@ -134,6 +134,11 @@ void SqliteMemoryManager::AssignGlobalArenas() {
                           kPageCacheSlotSize, kPageCacheNoSlots);
   assert(retval == SQLITE_OK);
 
+  // The arena allocator is not thread-safe; sqlite serializes calls into it
+  // only with memory statistics on, which some builds (e.g. the macOS system
+  // library) disable by default
+  retval = sqlite3_config(SQLITE_CONFIG_MEMSTATUS, 1);
+  assert(retval == SQLITE_OK);
   retval = sqlite3_config(SQLITE_CONFIG_GETMALLOC, &sqlite3_mem_vanilla_);
   assert(retval == SQLITE_OK);
   retval = sqlite3_config(SQLITE_CONFIG_MALLOC, &mem_methods_);

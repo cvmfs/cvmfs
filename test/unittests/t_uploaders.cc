@@ -97,12 +97,16 @@ class T_Uploaders : public FileSandbox {
   typedef std::vector<std::pair<Buffers, StreamHandle> > BufferStreams;
 
   T_Uploaders()
-      : FileSandbox(string(T_Uploaders::sandbox_path)), uploader_(NULL) { }
+      : FileSandbox(string(T_Uploaders::sandbox_path))
+      , uploader_(NULL)
+      , http_server_(NULL)
+      , s3_handler_data_(NULL) { }
 
  protected:
   AbstractUploader *uploader_;
   UploadCallbacks delegate_;
   MockHTTPServer *http_server_;
+  int *s3_handler_data_;
 
   virtual void SetUp() {
     CreateSandbox(T_Uploaders::tmp_dir);
@@ -127,10 +131,10 @@ class T_Uploaders : public FileSandbox {
     repo_alias = "testdata";
     CreateTempS3ConfigFile(10, 10);
     http_server_ = new MockHTTPServer(CVMFS_S3_TEST_MOCKUP_SERVER_PORT);
-    // Use custom_handler_data to implement S3 retry logic
-    int *custom_handler_data = new int(kTotal429Replies);
+    // Use s3_handler_data_ to implement S3 retry logic
+    s3_handler_data_ = new int(kTotal429Replies);
     http_server_->SetResponseCallback(S3MockupRequestHandler,
-                                      custom_handler_data);
+                                      s3_handler_data_);
     assert(http_server_->Start());
   }
 
@@ -155,6 +159,10 @@ class T_Uploaders : public FileSandbox {
   virtual void TearDown(const type<upload::S3Uploader> type_specifier) {
     // Request S3 mockup server to finish
     assert(http_server_->Stop());
+    delete http_server_;
+    http_server_ = NULL;
+    delete s3_handler_data_;
+    s3_handler_data_ = NULL;
   }
 
 
@@ -579,9 +587,11 @@ TYPED_TEST(T_Uploaders, IngestionSource) {
   close(fd);
   const std::string dest_name = "string";
 
+  // The uploader does not take ownership of the ingestion source
+  StringIngestionSource source(content);
   this->uploader_->UploadIngestionSource(
       dest_name,
-      new StringIngestionSource(content),
+      &source,
       AbstractUploader::MakeClosure(&UploadCallbacks::SimpleUploadClosure,
                                     &this->delegate_,
                                     UploaderResults(0, "MEM")));

@@ -108,6 +108,7 @@ enum StateId {
   kStatePageCacheTracker,  // >= 2.10
   kStateFuse,              // >= 2.11
   kStateWatchdog,          // >= 2.14
+  kStateFusePassthrough,   // >= 2.15
 
   // Note: kStateOpenFilesXXX was renamed to kStateOpenChunksXXX as of 2.4
 };
@@ -156,8 +157,9 @@ typedef std::vector<LoadEvent *> EventList;
  * CernVM-FS 2.4.0 --> Version 4
  * CernVM-FS 2.7.0 --> Version 4, fuse_channel --> fuse_channel_or_session
  * CernVM-FS 2.8.2 --> Version 5, add device_id
- * CernVM-FS 2.14.0 --> Version 6, no change to fields, but signifies that the
- *                      main watchdog process does not restart during reload
+ * CernVM-FS 2.14.0 --> Version 6, main watchdog process does not restart
+ *                      during reload; fuse_passthrough inserted before
+ *                      device_id, shifting it (check version >= 6 for both)
  * CernVM-FS 2.15.0 --> Version 7, fuse_channel_or_session --> fuse_session
  */
 struct LoaderExports {

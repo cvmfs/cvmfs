@@ -61,13 +61,15 @@ services:
     # to this container.
     # -----------------------------------------------------------------------
     garage:
-        image: docker.io/dxflrs/garage:v2.2.0
+        image: docker.io/dxflrs/garage:v2.5.0
         container_name: cvmfs-garage
         hostname: cvmfs-garage
         networks:
             default:
                 aliases:
                     - cvmfs.web.garage.internal
+                    - s3.garage.internal
+                    - admin.garage.internal
         volumes:
             - ./config/garage.toml:/etc/garage.toml:ro
             - garage-meta:/var/lib/garage/meta
@@ -92,7 +94,7 @@ services:
         depends_on:
             - garage
         environment:
-            GARAGE_ADMIN_URL: http://cvmfs-garage:3903
+            GARAGE_ADMIN_URL: http://admin.garage.internal:3903
             GARAGE_ADMIN_TOKEN: garage-admin-token
             SETUP_GARAGE_DEBUG: "1"
             <<: *s3-env
@@ -125,7 +127,7 @@ services:
         environment:
             REPO_NAME: test.repo.org
             REPO_OWNER: root
-            GARAGE_HOST: cvmfs-garage
+            GARAGE_HOST: s3.garage.internal
             GARAGE_S3_PORT: "3900"
             # Stratum-0 URL points directly at Garage's web endpoint.
             # The hostname must match <bucket>.web.garage.localhost so that

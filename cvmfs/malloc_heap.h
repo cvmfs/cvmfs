@@ -42,7 +42,7 @@ class MallocHeap {
   };
 
   // Pointer to the callback method invoked for each memory block that gets
-  // compacted.
+  // compacted.  The MallocHeap takes ownership of the callback object.
   typedef Callbackable<BlockPtr>::CallbackTN *CallbackPtr;
 
   MallocHeap(uint64_t capacity, CallbackPtr callback_ptr);

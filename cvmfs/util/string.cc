@@ -233,8 +233,8 @@ time_t IsoTimestamp2UtcTime(const std::string &iso8601) {
 }
 
 int64_t String2Int64(const string &value) {
-  int64_t result;
-  sscanf(value.c_str(), "%" PRId64, &result);
+  int64_t result = 0;
+  sscanf(value.c_str(), "%" SCNd64, &result);
   return result;
 }
 
@@ -514,17 +514,18 @@ string ToUpper(const string &mixed_case) {
   return result;
 }
 
-string ReplaceAll(const string &haystack, const string &needle,
+string ReplaceAll(string haystack, const string &needle,
                   const string &replace_by) {
-  string result(haystack);
-  size_t pos = 0;
-  const unsigned needle_size = needle.size();
   if (needle == "")
-    return result;
+    return haystack;
+  size_t pos = 0;
+  const size_t needle_size = needle.size();
 
-  while ((pos = result.find(needle, pos)) != string::npos)
-    result.replace(pos, needle_size, replace_by);
-  return result;
+  while ((pos = haystack.find(needle, pos)) != string::npos) {
+    haystack.replace(pos, needle_size, replace_by);
+    pos += replace_by.size();
+  }
+  return haystack;
 }
 
 static inline void Base64Block(const unsigned char input[3], const char *table,

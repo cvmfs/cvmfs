@@ -8,7 +8,7 @@ on:
 
 jobs:
   cpp-linter:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Set Clang version
         shell: bash

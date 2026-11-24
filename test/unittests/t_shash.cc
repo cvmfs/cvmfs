@@ -11,6 +11,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <set>
 #include <string>
 
 #include "crypto/hash.h"
@@ -1273,4 +1274,122 @@ TEST(T_Shash, ShortHash) {
   shash::Short short_hash(hash);
   EXPECT_TRUE(short_hash.Collide(hash));
   EXPECT_FALSE(short_hash.Collide(random_hash_generator()));
+}
+
+
+TEST(T_Shash, ShortHashOrdering) {
+  Prng rng;
+  rng.InitSeed(42);
+  RandomHashGenerator random_hash_generator(rng);
+  const shash::Any hash_a = random_hash_generator();
+  const shash::Any hash_b = random_hash_generator();
+  const shash::Short short_a(hash_a);
+  const shash::Short short_b(hash_b);
+
+  // irreflexive and asymmetric
+  EXPECT_FALSE(short_a < short_a);
+  EXPECT_NE(short_a < short_b, short_b < short_a);
+
+  // a hash that only differs beyond the short prefix is equivalent
+  shash::Any hash_a_tail = hash_a;
+  hash_a_tail.digest[hash_a_tail.GetDigestSize() - 1] ^= 0xff;
+  const shash::Short short_a_tail(hash_a_tail);
+  EXPECT_TRUE(short_a.Collide(hash_a_tail));
+  EXPECT_TRUE(short_a == short_a_tail);
+  EXPECT_FALSE(short_a < short_a_tail);
+  EXPECT_FALSE(short_a_tail < short_a);
+
+  // a hash that differs within the short prefix is not
+  shash::Any hash_a_head = hash_a;
+  hash_a_head.digest[0] ^= 0xff;
+  const shash::Short short_a_head(hash_a_head);
+  EXPECT_FALSE(short_a == short_a_head);
+  EXPECT_NE(short_a < short_a_head, short_a_head < short_a);
+}
+
+
+TEST(T_Shash, ShortHashRoundTrip) {
+  // The quota manager's hash collector parses what the list_open_hashes
+  // magic xattr prints: Short::ToString() -> Short(HexPtr)
+  Prng rng;
+  rng.InitSeed(42);
+  const shash::Algorithms algorithms[] = {shash::kSha1, shash::kRmd160,
+                                          shash::kShake128};
+  for (unsigned i = 0; i < 3; ++i) {
+    shash::Any full(algorithms[i]);
+    full.Randomize(&rng);
+    const shash::Short printed(full);
+    const std::string line = printed.ToString();
+    EXPECT_EQ(2 * (shash::kShortDigestSize / 4)
+                  + shash::kAlgorithmIdSizes[algorithms[i]],
+              line.length())
+        << line;
+    // the prefix digits of the full hash, then the algorithm identifier
+    EXPECT_EQ(full.ToString().substr(0, 2 * (shash::kShortDigestSize / 4)),
+              line.substr(0, 2 * (shash::kShortDigestSize / 4)));
+    EXPECT_EQ(std::string(shash::kAlgorithmIds[algorithms[i]]),
+              line.substr(2 * (shash::kShortDigestSize / 4)));
+
+    const shash::Short parsed((shash::HexPtr(line)));
+    EXPECT_EQ(algorithms[i], parsed.algorithm) << line;
+    EXPECT_TRUE(parsed.Collide(full)) << line;
+    EXPECT_TRUE(parsed == printed) << line;
+    EXPECT_EQ(line, parsed.ToString());
+
+    std::set<shash::Short> open_hashes;
+    open_hashes.insert(parsed);
+    EXPECT_TRUE(open_hashes.find(shash::Short(full)) != open_hashes.end())
+        << line;
+
+    // the full hash is not what the xattr prints
+    const shash::Short from_full((shash::HexPtr(full.ToString())));
+    EXPECT_EQ(shash::kAny, from_full.algorithm) << full.ToString();
+  }
+
+  // malformed input yields a null short hash
+  const char *malformed[] = {"",
+                             "012345678",         // too short
+                             "0123456789a",       // too long
+                             "0123456789ABCDEF",  // upper case
+                             "0123456789-sha1",   // unknown identifier
+                             "0123456789-rmd16",  // truncated identifier
+                             "012345678g",        // not hex
+                             "0123456789-shake128x"};
+  for (unsigned i = 0; i < sizeof(malformed) / sizeof(malformed[0]); ++i) {
+    const std::string line(malformed[i]);
+    const shash::Short parsed((shash::HexPtr(line)));
+    EXPECT_EQ(shash::kAny, parsed.algorithm) << "'" << line << "'";
+    EXPECT_TRUE(parsed.IsNull()) << "'" << line << "'";
+  }
+}
+
+
+TEST(T_Shash, ShortHashSetLookup) {
+  Prng rng;
+  rng.InitSeed(137);
+  RandomHashGenerator random_hash_generator(rng);
+  const shash::Any hash_open = random_hash_generator();
+  const shash::Any hash_closed = random_hash_generator();
+
+  std::set<shash::Short> open_hashes;
+  open_hashes.insert(shash::Short(hash_open));
+  EXPECT_EQ(1u, open_hashes.size());
+
+  // lookup with a Short built from the full hash finds it
+  EXPECT_TRUE(open_hashes.find(shash::Short(hash_open)) != open_hashes.end());
+  EXPECT_TRUE(open_hashes.find(shash::Short(hash_closed)) == open_hashes.end());
+
+  // ... also when the stored Short knows only the prefix (tail zeroed), as
+  // when it is parsed back from its hex string
+  shash::Any hash_open_prefix_only = hash_open;
+  for (unsigned i = shash::kShortDigestSize / 4; i < shash::kMaxDigestSize;
+       ++i) {
+    hash_open_prefix_only.digest[i] = 0;
+  }
+  EXPECT_TRUE(open_hashes.find(shash::Short(hash_open_prefix_only))
+              != open_hashes.end());
+
+  // inserting a colliding Short does not create a second element
+  open_hashes.insert(shash::Short(hash_open_prefix_only));
+  EXPECT_EQ(1u, open_hashes.size());
 }

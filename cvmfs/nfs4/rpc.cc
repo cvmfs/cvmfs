@@ -6,13 +6,16 @@
 
 #include <arpa/inet.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <poll.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <sys/uio.h>
 #include <unistd.h>
 
+#include <chrono>
 #include <cstring>
 
 #include "nfs4/logging.h"
@@ -24,6 +27,16 @@ namespace {
 const uint32_t kMaxAuthBody = 400;
 const uint32_t kMaxAuthSysGids = 16;
 const uint32_t kLastFragment = 0x80000000u;
+
+/**
+ * Child processes (mount_nfs, helpers of the cvmfs core) must not keep NFS
+ * sockets open: an inherited copy of a connection outlives its close here.
+ */
+void SetCloexec(int fd) {
+  const int flags = fcntl(fd, F_GETFD);
+  if (flags >= 0)
+    fcntl(fd, F_SETFD, flags | FD_CLOEXEC);
+}
 
 void PutReplyHeader(uint32_t xid, XdrWriter *w) {
   w->PutU32(xid);
@@ -56,12 +69,14 @@ bool ParseAuthSys(const std::string &body, Credentials *creds) {
   return r.ok();
 }
 
-bool ReadFull(int fd, void *buf, size_t len) {
+bool ReadFull(int fd, void *buf, size_t len, bool *eof) {
   char *p = static_cast<char *>(buf);
   while (len > 0) {
     const ssize_t n = read(fd, p, len);
-    if (n == 0)
+    if (n == 0) {
+      *eof = true;
       return false;
+    }
     if (n < 0) {
       if (errno == EINTR)
         continue;
@@ -245,6 +260,7 @@ bool RpcServer::Listen(const std::string &address, uint16_t port) {
   listen_fd_ = socket(AF_INET, SOCK_STREAM, 0);
   if (listen_fd_ < 0)
     return false;
+  SetCloexec(listen_fd_);
   const int on = 1;
   setsockopt(listen_fd_, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
   if (bind(listen_fd_, reinterpret_cast<struct sockaddr *>(&addr), sizeof(addr))
@@ -308,6 +324,12 @@ void RpcServer::Stop() {
 }
 
 
+RpcServer::WorkerStats RpcServer::GetWorkerStats() {
+  std::lock_guard<std::mutex> const lock(queue_lock_);
+  return worker_stats_;
+}
+
+
 unsigned RpcServer::NumConnections() {
   std::lock_guard<std::mutex> const lock(connections_lock_);
   unsigned n = 0;
@@ -320,6 +342,7 @@ unsigned RpcServer::NumConnections() {
 
 
 void RpcServer::AcceptLoop() {
+  int last_errno = 0;
   while (!stopping_) {
     struct pollfd pfd;
     pfd.fd = listen_fd_;
@@ -333,8 +356,24 @@ void RpcServer::AcceptLoop() {
     socklen_t peer_len = sizeof(peer);
     const int fd = accept(
         listen_fd_, reinterpret_cast<struct sockaddr *>(&peer), &peer_len);
-    if (fd < 0)
+    if (fd < 0) {
+      const int error = errno;
+      // Logged once per error kind, the loop retries every poll()
+      if (error != last_errno) {
+        Log(kLogLevelError, "cannot accept NFS connection (%d)", error);
+        last_errno = error;
+      }
+      // Linux keeps the connection queued, so poll() returns at once; pause
+      // instead of spinning until descriptors are freed
+      if (error == EMFILE || error == ENFILE)
+        usleep(100 * 1000);
       continue;
+    }
+    if (last_errno != 0) {
+      Log(kLogLevelInfo, "accepting NFS connections again");
+      last_errno = 0;
+    }
+    SetCloexec(fd);
     if (!options_.allow_remote && !IsLoopback(peer)) {
       Log(kLogLevelWarn, "rejected NFS connection from non-loopback peer");
       close(fd);
@@ -342,6 +381,12 @@ void RpcServer::AcceptLoop() {
     }
     const int on = 1;
     setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &on, sizeof(on));
+    if (options_.send_timeout_ms > 0) {
+      struct timeval tv;
+      tv.tv_sec = options_.send_timeout_ms / 1000;
+      tv.tv_usec = (options_.send_timeout_ms % 1000) * 1000;
+      setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+    }
 #ifdef SO_NOSIGPIPE
     setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &on, sizeof(on));
 #endif
@@ -364,9 +409,10 @@ void RpcServer::AcceptLoop() {
 
 void RpcServer::ReadLoop(ConnectionPtr connection) {
   std::string record;
+  bool eof = false;
   while (!stopping_) {
     uint32_t marker;
-    if (!ReadFull(connection->fd, &marker, sizeof(marker)))
+    if (!ReadFull(connection->fd, &marker, sizeof(marker), &eof))
       break;
     marker = ntohl(marker);
     const uint32_t len = marker & ~kLastFragment;
@@ -377,7 +423,7 @@ void RpcServer::ReadLoop(ConnectionPtr connection) {
     }
     const size_t offset = record.size();
     record.resize(offset + len);
-    if (len > 0 && !ReadFull(connection->fd, &record[offset], len))
+    if (len > 0 && !ReadFull(connection->fd, &record[offset], len, &eof))
       break;
     if (!(marker & kLastFragment))
       continue;
@@ -407,11 +453,16 @@ void RpcServer::ReadLoop(ConnectionPtr connection) {
       queue_.back().connection.swap(job.connection);
       queue_.back().xid = job.xid;
       queue_.back().record.swap(job.record);
+      queue_.back().queued_at = std::chrono::steady_clock::now();
     }
-    queue_cond_.notify_one();
+    if (options_.notify_workers)
+      queue_cond_.notify_one();
   }
 
-  shutdown(connection->fd, SHUT_RDWR);
+  // After EOF, replies of calls in flight are still delivered; the last
+  // reference to the connection closes it
+  if (!eof)
+    shutdown(connection->fd, SHUT_RDWR);
   std::lock_guard<std::mutex> const lock(connections_lock_);
   active_readers_--;
   readers_cond_.notify_all();
@@ -423,9 +474,35 @@ void RpcServer::WorkerLoop() {
     Job job;
     {
       std::unique_lock<std::mutex> lock(queue_lock_);
-      queue_cond_.wait(lock, [this] { return stopping_ || !queue_.empty(); });
+      bool timed_out = false;
+      while (!stopping_ && queue_.empty()) {
+        timed_out = queue_cond_.wait_for(
+                        lock, std::chrono::milliseconds(options_.idle_recheck_ms))
+                    == std::cv_status::timeout;
+        if (timed_out && queue_.empty())
+          worker_stats_.idle_timeouts++;
+      }
       if (queue_.empty())
         return;
+      if (timed_out) {
+        worker_stats_.queued_after_timeout++;
+        const int64_t waited_ms =
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - queue_.front().queued_at)
+                .count();
+        if (waited_ms >= static_cast<int64_t>(options_.idle_recheck_ms / 2)) {
+          // Rate limited, a stuck condition variable would log for every
+          // call otherwise
+          if ((worker_stats_.stale_after_timeout++ % 100) == 0) {
+            Log(kLogLevelWarn,
+                "call waited %lld ms in the queue until a worker's wait "
+                "timed out, a notification was lost (%llu times)",
+                static_cast<long long>(waited_ms),
+                static_cast<unsigned long long>(
+                    worker_stats_.stale_after_timeout));
+          }
+        }
+      }
       job.connection.swap(queue_.front().connection);
       job.xid = queue_.front().xid;
       job.record.swap(queue_.front().record);

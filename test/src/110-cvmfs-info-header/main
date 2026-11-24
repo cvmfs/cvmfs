@@ -36,7 +36,7 @@ cvmfs_run_test() {
   TEST110_INFO1="myinfo1" cat "/cvmfs/$repo/$file1" >/dev/null &
   pid1=$!
   wait $pid1 || return 2
-  info1="$(sudo grep "^cvmfs-info:" "$CVMFS_TEST_DEBUGLOG"|tail -n1)"
+  info1="$(sudo grep "^cvmfs-info:" "$CVMFS_TEST_DEBUGLOG"|tail -n1|tr -d '\r')"
 
   echo "do reload"
   sudo cvmfs_config reload || return 3
@@ -45,7 +45,7 @@ cvmfs_run_test() {
   TEST110_INFO2="my info2" cat "/cvmfs/$repo/$file2" >/dev/null &
   pid2=$!
   wait $pid2 || return 4
-  info2="$(sudo grep "^cvmfs-info:" "$CVMFS_TEST_DEBUGLOG"|tail -n1)"
+  info2="$(sudo grep "^cvmfs-info:" "$CVMFS_TEST_DEBUGLOG"|tail -n1|tr -d '\r')"
 
   echo "check output read from $CVMFS_TEST_DEBUGLOG"
   local path pid uid gid env x

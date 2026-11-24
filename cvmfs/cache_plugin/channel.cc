@@ -187,6 +187,13 @@ CachePlugin::CachePlugin(uint64_t capabilities)
 
 CachePlugin::~CachePlugin() {
   Terminate();
+  // Sessions that did not say goodbye
+  map<uint64_t, SessionInfo>::const_iterator iter = sessions_.begin();
+  for (; iter != sessions_.end(); ++iter) {
+    free(iter->second.reponame);
+    free(iter->second.client_instance);
+  }
+  sessions_.clear();
   ClosePipe(pipe_ctrl_);
   if (fd_socket_ >= 0)
     close(fd_socket_);

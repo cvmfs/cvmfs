@@ -115,6 +115,11 @@ if [ "$1" == "overlay" ]; then
       *)  repo="$1"; shift ;;
     esac
   done
+  # Like the real cvmfs_server, only accept a repository name, not repo/subdir
+  if [ -n "$(get_subdir "$repo")" ]; then
+    echo "Error: The repository $repo does not exist." >&2
+    exit 1
+  fi
   echo "overlay: layers=$layers dest=$dest repo=$repo oci_config=$oci_config skip_singularity=$skip_singularity"
   mkdir -p "$CVMFS_TEST_REPO/$dest"
   # Write a marker file so tests can verify the overlay was called

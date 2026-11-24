@@ -6,6 +6,7 @@
 
 #include <arpa/inet.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <netinet/in.h>
 #include <signal.h>
 #include <sys/socket.h>
@@ -67,6 +68,9 @@ int RunGuardian(int listen_fd, int control_fd, const std::string &mountpoint) {
   signal(SIGHUP, SIG_IGN);
   signal(SIGINT, SIG_IGN);
   signal(SIGPIPE, SIG_IGN);
+  // Not to be inherited by mount_nfs
+  fcntl(listen_fd, F_SETFD, FD_CLOEXEC);
+  fcntl(control_fd, F_SETFD, FD_CLOEXEC);
 
   // Serve mount and unmount requests until cvmfs2 exits (EOF)
   struct sockaddr_in addr;

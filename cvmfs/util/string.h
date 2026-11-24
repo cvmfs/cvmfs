@@ -75,7 +75,7 @@ CVMFS_EXPORT std::string TrimString(const std::string &path,
                                     const int trimMode = kTrimAll);
 
 CVMFS_EXPORT std::string ToUpper(const std::string &mixed_case);
-CVMFS_EXPORT std::string ReplaceAll(const std::string &haystack,
+CVMFS_EXPORT std::string ReplaceAll(std::string haystack,
                                     const std::string &needle,
                                     const std::string &replace_by);
 CVMFS_EXPORT std::string Tail(const std::string &source, unsigned num_lines);

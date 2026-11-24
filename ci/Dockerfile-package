@@ -1,0 +1,54 @@
+# Builds the cvmfs packages for BASE_IMAGE. Used by
+# ci/build_package_remote.sh; the `artifacts` stage holds only the packages.
+
+ARG BASE_IMAGE=almalinux:9
+
+FROM ${BASE_IMAGE} AS builder
+
+# EL needs CRB/PowerTools + EPEL for build deps; minimal images lack tools the
+# build scripts call before the dependency installer runs.
+RUN . /etc/os-release; \
+    case " $ID $ID_LIKE " in \
+      *" debian "*|*" ubuntu "*) \
+        if [ "$ID" = debian ] && [ "$VERSION_ID" = 11 ]; then \
+          sed -i -e 's|deb.debian.org|archive.debian.org|g' \
+                 -e '/bullseye-updates/d' /etc/apt/sources.list; \
+        fi; \
+        apt-get -y update && \
+        DEBIAN_FRONTEND=noninteractive apt-get -y install --no-install-recommends \
+          ca-certificates curl git ;; \
+      *" suse "*|*" opensuse "*|*" sles "*) \
+        zypper -n install rpm-build tar gzip curl git which ;; \
+      *" fedora "*) \
+        if [ "$ID" = fedora ]; then \
+          dnf -y install rpm-build dnf-plugins-core curl git which; \
+        else \
+          dnf -y install dnf-plugins-core epel-release && \
+          (dnf config-manager --set-enabled crb || \
+           dnf config-manager --set-enabled powertools) && \
+          dnf -y install rpm-build git which && \
+          (command -v curl || dnf -y install curl); \
+        fi ;; \
+    esac
+
+ENV CVMFS_EXTERNALS_PREFIX=/root/.cache/cvmfs_externals_install
+
+COPY . /src
+
+# build_package.sh finds bootstrapped cmake/go via CVMFS_EXTERNALS_PREFIX.
+# FetchContent_Declare(EXCLUDE_FROM_ALL) needs cmake >= 3.28; with older cmake
+# the vendored externals' install rules leak into the packages.
+RUN cd /src \
+    && ./ci/build_install_builddeps.sh --install /src \
+    && ./ci/bootstrap_cmake.sh --min-version 3.28.0 \
+    && mkdir -p /build/cvmfs \
+    && ./ci/build_package.sh /src /build/cvmfs cvmfs \
+    && mkdir -p /out \
+    && find /build -type f \( -name '*.rpm' -o -name '*.deb' -o -name '*.ddeb' \
+         -o -name '*.dsc' -o -name '*.changes' -o -name '*.buildinfo' \
+         -o -name '*_*.tar.xz' -o -name '*.debian.tar.*' -o -name '*.orig.tar.*' \) \
+         -not -path '*/BUILD/*' -not -path '*/BUILDROOT/*' \
+         -exec cp {} /out/ \;
+
+FROM scratch AS artifacts
+COPY --from=builder /out/ /

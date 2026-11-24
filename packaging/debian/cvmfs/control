@@ -11,6 +11,7 @@ Build-Depends:
  help2man,
  libarchive-dev,
  libcap-dev,
+ libcurl4-openssl-dev,
  libssl-dev,
  nettle-dev,
  libattr1-dev,

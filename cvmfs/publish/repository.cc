@@ -34,6 +34,9 @@
 #include "upload.h"
 #include "upload_spooler_definition.h"
 #include "util/logging.h"
+#include "util/platform.h"
+#include "util/posix.h"
+#include "util/string.h"
 #include "whitelist.h"
 
 // TODO(jblomer): Remove Me
@@ -140,8 +143,31 @@ void Repository::DownloadRootObjects(const std::string &url,
   whitelist_ = new whitelist::Whitelist(fqrn, download_mgr_, signature_mgr_);
   const whitelist::Failures rv_whitelist = whitelist_->LoadUrl(url);
   if (whitelist_->status() != whitelist::Whitelist::kStAvailable) {
-    throw EPublish(std::string("cannot load whitelist [")
-                   + whitelist::Code2Ascii(rv_whitelist) + "]");
+    if (rv_whitelist == whitelist::kFailExpired) {
+      const std::string msg = "repository whitelist of " + fqrn
+                              + " is expired, renew it with "
+                                "'cvmfs_server resign "
+                              + fqrn + "'";
+      throw EPublish(msg, EPublish::kFailWhitelistExpired);
+    }
+    std::string hint;
+    switch (rv_whitelist) {
+      case whitelist::kFailLoad:
+      case whitelist::kFailEmpty:
+        hint = "check that " + url + "/.cvmfswhitelist is reachable";
+        break;
+      case whitelist::kFailBadSignature:
+      case whitelist::kFailBadSignaturePkcs7:
+        hint = "check that the public key(s) in "
+               + settings_.keychain().keychain_dir()
+               + " match the repository master key";
+        break;
+      default:
+        hint = "check the repository status with 'cvmfs_server list'";
+    }
+    throw EPublish(std::string("cannot load whitelist of ") + fqrn + " ["
+                       + whitelist::Code2Ascii(rv_whitelist) + "], " + hint,
+                   EPublish::kFailWhitelistInvalid);
   }
 
   manifest::ManifestEnsemble ensemble;
@@ -803,14 +829,27 @@ void Publisher::ConstructSyncManagers() {
 
 void Publisher::ExitShell() {
   const std::string session_dir = Env::GetEnterSessionDir();
-  const std::string session_pid_tmp = session_dir + "/session_pid";
-  std::string session_pid;
-  const int fd_session_pid = open(session_pid_tmp.c_str(), O_RDONLY);
-  if (fd_session_pid < 0)
-    throw EPublish("Session pid cannot be retrieved");
-  SafeReadToString(fd_session_pid, &session_pid);
+  const std::string session_pid_path = session_dir + "/session_pid";
 
-  const pid_t pid_child = String2Uint64(session_pid);
+  // The enter shell writes the file only after starting its command, which
+  // may be us.  Pid 1 is the shell's own namespace init, never the command.
+  // A pid of 0 must never reach kill(): it would signal our process group.
+  pid_t pid_child = 0;
+  const uint64_t deadline = platform_monotonic_time() + 10;
+  while (true) {
+    std::string session_pid;
+    const int fd = open(session_pid_path.c_str(), O_RDONLY);
+    if (fd >= 0) {
+      SafeReadToString(fd, &session_pid);
+      close(fd);
+      pid_child = static_cast<pid_t>(String2Uint64(session_pid));
+      if (pid_child > 1)
+        break;
+    }
+    if (platform_monotonic_time() > deadline)
+      throw EPublish("Session pid cannot be retrieved");
+    SafeSleepMs(50);
+  }
   kill(pid_child, SIGUSR1);
 }
 

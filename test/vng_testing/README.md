@@ -54,8 +54,11 @@ DISK_SIZE="" default: 5G
 
 1. **Build the Kernel (if not already built):**
    ```sh
-   ./build_kernel.sh <linux-source-path>
+   ./build_kernel.sh <linux-source-path> [<tag>]
    ```
+   `<linux-source-path>` is either a git checkout of the kernel or an unpacked
+   release tarball. CI uses the tarball mirrored at
+   `https://ecsft.cern.ch/dist/cvmfs/caches/kernel/src/` to avoid load on kernel.org.
 
 2. **Run All Tests (default suite):**
    ```sh

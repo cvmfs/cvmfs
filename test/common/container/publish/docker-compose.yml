@@ -38,9 +38,15 @@ services:
     # Garage – S3-compatible object storage
     # -----------------------------------------------------------------------
     garage:
-        image: dxfleurs/garage:v1.0.1
+        image: dxfleurs/garage:v2.5.0
         container_name: cvmfs-garage
         hostname: cvmfs-garage
+        networks:
+            default:
+                aliases:
+                    - cvmfs.web.garage.internal
+                    - s3.garage.internal
+                    - admin.garage.internal
         volumes:
             - ./config/garage.toml:/etc/garage.toml:ro
             - garage-meta:/var/lib/garage/meta
@@ -67,7 +73,7 @@ services:
             garage:
                 condition: service_healthy
         environment:
-            GARAGE_ADMIN_URL: http://cvmfs-garage:3903
+            GARAGE_ADMIN_URL: http://admin.garage.internal:3903
             GARAGE_ADMIN_TOKEN: garage-admin-token
             <<: *s3-env
         volumes:
@@ -96,7 +102,7 @@ services:
         environment:
             REPO_NAME: test.repo.org
             REPO_OWNER: root
-            GARAGE_HOST: cvmfs-garage
+            GARAGE_HOST: s3.garage.internal
             GARAGE_S3_PORT: "3900"
             STRATUM0_URL: http://cvmfs-apache
             GW_KEY_ID: mykey

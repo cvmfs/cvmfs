@@ -132,6 +132,11 @@ static Failures PrepareDownloadDestination(JobInfo *info) {
 }
 
 
+static bool IsGatewayHttpError(const int http_code) {
+  return (http_code == 502) || (http_code == 503) || (http_code == 504);
+}
+
+
 /**
  * Called by curl for every HTTP header. Not called for file:// transfers.
  */
@@ -178,15 +183,16 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
       LogCvmfs(kLogDownload, kLogDebug,
                "(id %" PRId64 ") http status error code: %s [%d]", info->id(),
                header_line.c_str(), info->http_code());
-      if (((info->http_code() / 100) == 5) || (info->http_code() == 400)
-          || (info->http_code() == 404)) {
+      if ((info->http_code() == 429) || IsGatewayHttpError(info->http_code())) {
+        // 429: rate throttling (we ignore the backoff hint for the time being)
+        // 502/503/504: transient, retry the same URL with backoff
+        info->SetErrorCode(kFailHostConnection);
+      } else if (((info->http_code() / 100) == 5) || (info->http_code() == 400)
+                 || (info->http_code() == 404)) {
         // 5XX returned by host
         // 400: error from the GeoAPI module
         // 404: the stratum 1 does not have the newest files
         info->SetErrorCode(kFailHostHttp);
-      } else if (info->http_code() == 429) {
-        // 429: rate throttling (we ignore the backoff hint for the time being)
-        info->SetErrorCode(kFailHostConnection);
       } else {
         info->SetErrorCode((info->proxy() == "DIRECT") ? kFailHostHttp
                                                        : kFailProxyHttp);
@@ -320,6 +326,21 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
 
   return num_bytes;
 }
+
+/**
+ * Probes the option directly: curl_version_info() does not reliably tell the
+ * threaded resolver from c-ares.  Without c-ares, older curl returns
+ * CURLE_NOT_BUILT_IN and newer curl CURLE_UNKNOWN_OPTION.
+ */
+static bool CurlSupportsDnsServers() {
+  CURL *handle = curl_easy_init();
+  assert(handle != NULL);
+  const CURLcode retval = curl_easy_setopt(handle, CURLOPT_DNS_SERVERS,
+                                           "127.0.0.1");
+  curl_easy_cleanup(handle);
+  return retval == CURLE_OK;
+}
+
 
 #ifdef DEBUGMSG
 static int CallbackCurlDebug(CURL *handle,
@@ -1047,12 +1068,20 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
       if (changed) {
         proxy = ChooseProxyUnlocked(info->expected_hash());
       }
-      info->SetProxy(proxy->url);
-      if (proxy->host.status() == dns::kFailOk) {
+      if (!proxy) {
+        // The DNS refresh left nothing selectable.  Fail via the old proxy
+        // rather than going DIRECT, so the failure is a proxy failure.
+        // Note: "0.0.0.0" fails fast only if nothing listens on local port
+        // 1080 (curl's default proxy port); Linux maps 0.0.0.0 to localhost.
+        info->SetProxy(purl);
+        curl_easy_setopt(info->curl_handle(), CURLOPT_PROXY, "0.0.0.0");
+      } else if (proxy->host.status() == dns::kFailOk) {
+        info->SetProxy(proxy->url);
         curl_easy_setopt(info->curl_handle(), CURLOPT_PROXY,
                          info->proxy().c_str());
       } else {
         // We know it can't work, don't even try to download
+        info->SetProxy(proxy->url);
         curl_easy_setopt(info->curl_handle(), CURLOPT_PROXY, "0.0.0.0");
       }
     }
@@ -1070,7 +1099,7 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
     curl_easy_setopt(curl_handle, CURLOPT_CONNECTTIMEOUT, opt_timeout_direct_);
     curl_easy_setopt(curl_handle, CURLOPT_LOW_SPEED_TIME, opt_timeout_direct_);
   }
-  if (!opt_dns_server_.empty())
+  if (!opt_dns_server_.empty() && curl_dns_servers_supported_)
     curl_easy_setopt(curl_handle, CURLOPT_DNS_SERVERS, opt_dns_server_.c_str());
 
   if (info->probe_hosts()) {
@@ -1148,7 +1177,8 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
         curl_easy_setopt(info->curl_handle(), CURLOPT_PROXY, "");
         replacement = proxy_template_direct_;
       } else {
-        replacement = ChooseProxyUnlocked(info->expected_hash())->host.name();
+        const ProxyInfo *proxy = ChooseProxyUnlocked(info->expected_hash());
+        replacement = proxy ? proxy->host.name() : proxy_template_direct_;
       }
     }
     replacement = (replacement == "") ? proxy_template_direct_ : replacement;
@@ -1156,7 +1186,7 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
              "(manager %s - id %" PRId64 ") "
              "replacing @proxy@ by %s",
              name_.c_str(), info->id(), replacement.c_str());
-    url = ReplaceAll(url, "@proxy@", replacement);
+    url = ReplaceAll(std::move(url), "@proxy@", replacement);
   }
 
   // TODO(heretherebedragons) before removing
@@ -1708,6 +1738,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
       shash::Init(info->hash_context());
     }
     if (info->compressed() && !defer_reset) {
+      zlib::DecompressFini(info->GetZstreamPtr());
       zlib::DecompressInit(info->GetZstreamPtr());
     }
     if (defer_reset) {
@@ -1953,6 +1984,7 @@ DownloadManager::DownloadManager(const unsigned max_pool_handles,
   prng_.InitLocaltime();
 
   // Name resolving
+  curl_dns_servers_supported_ = CurlSupportsDnsServers();
   if ((getenv("CVMFS_IPV4_ONLY") != NULL)
       && (strlen(getenv("CVMFS_IPV4_ONLY")) > 0)) {
     opt_ipv4_only_ = true;
@@ -2206,6 +2238,15 @@ void DownloadManager::SetDnsServer(const string &address) {
   }
   LogCvmfs(kLogDownload, kLogSyslog, "(manager '%s') set nameserver to %s",
            name_.c_str(), address.c_str());
+  // Once per process: DNS roaming calls this on every resolv.conf change
+  static std::atomic<bool> warned(false);
+  if (!curl_dns_servers_supported_ && !warned.exchange(true)) {
+    LogCvmfs(kLogDownload, kLogSyslogWarn,
+             "(manager '%s') libcurl lacks c-ares support: nameserver %s "
+             "only applies to proxy name resolution, other hosts use the "
+             "system resolver",
+             name_.c_str(), address.c_str());
+  }
 }
 
 
@@ -3077,6 +3118,11 @@ DownloadManager::ProxyInfo *DownloadManager::ChooseProxyUnlocked(
   const uint32_t key = (hash ? hash->Partial32() : 0);
   const map<uint32_t, ProxyInfo *>::iterator it = opt_proxy_map_.lower_bound(
       key);
+  // The map is empty whenever nothing in the current group is selectable, and
+  // lower_bound() then returns end().  Dereferencing it was undefined
+  // behaviour; "nothing to choose" is a state the callers already handle.
+  if (it == opt_proxy_map_.end())
+    return NULL;
   ProxyInfo *proxy = it->second;
 
   return proxy;
@@ -3091,6 +3137,19 @@ void DownloadManager::UpdateProxiesUnlocked(const string &reason) {
 
   // Identify number of non-burned proxies within the current group
   vector<ProxyInfo> *group = current_proxy_group();
+  // Nothing in this group is usable when every proxy in it has been burned,
+  // and -- since the burn count is then 0 -- when the group is empty, which a
+  // DNS refresh that drops every address of a proxy can leave behind.  Either
+  // way the subtraction below would wrap, and the two branches that follow
+  // would run prng_.Next(0) and index (*group)[0] on an empty vector.
+  // Publish "nothing is selectable" instead: the map holds ProxyInfo pointers
+  // into the group, so leaving the previous selection in place would hand
+  // ChooseProxyUnlocked() pointers into entries that have just been erased.
+  if (opt_proxy_groups_current_burned_ >= group->size()) {
+    opt_proxy_map_.clear();
+    opt_proxies_.clear();
+    return;
+  }
   const unsigned num_alive = (group->size() - opt_proxy_groups_current_burned_);
   const string old_proxy = JoinStrings(opt_proxies_, "|");
 

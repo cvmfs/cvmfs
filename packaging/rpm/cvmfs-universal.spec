@@ -126,6 +126,10 @@ BuildRequires: nettle-devel
 # it, nettle falls back to the portable C implementations
 BuildRequires: m4
 BuildRequires: openssl-devel
+# The vendored curl does not compile against OpenSSL 4 (opaque ASN1 types)
+%if 0%{?fedora} >= 45
+BuildRequires: libcurl-devel >= 7.55.0
+%endif
 BuildRequires: patch
 BuildRequires: pkgconfig
 BuildRequires: %{cvmfs_python_devel}
@@ -399,6 +403,10 @@ BUILD_SNAPSHOTTER=no
 %if 0%{?build_snapshotter}
 BUILD_SNAPSHOTTER=yes
 %endif
+BUILTIN_EXTERNALS_EXCLUDE=
+%if 0%{?fedora} >= 45
+BUILTIN_EXTERNALS_EXCLUDE=curl
+%endif
 BUILD_UNITTESTS=no
 INSTALL_UNITTESTS=no
 %if 0%{?build_testing}
@@ -419,6 +427,7 @@ cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} \
   -DBUILD_DUCC=$BUILD_DUCC \
   -DBUILD_SNAPSHOTTER=$BUILD_SNAPSHOTTER \
   -DINSTALL_UNITTESTS=$INSTALL_UNITTESTS \
+  -DBUILTIN_EXTERNALS_EXCLUDE="$BUILTIN_EXTERNALS_EXCLUDE" \
   -DCMAKE_INSTALL_PREFIX:PATH=/usr .
 
 make %{?_smp_mflags}

@@ -173,6 +173,10 @@ CVMFS_EXPORT void WaitForSignal(int signum);
 CVMFS_EXPORT
 int WaitForChild(pid_t pid,
                  const std::vector<int> &sig_ok = std::vector<int>());
+CVMFS_EXPORT
+int WaitForChildAndReap(pid_t pid,
+                        const std::vector<int> &sig_ok = std::vector<int>());
+CVMFS_EXPORT void ReapZombies();
 CVMFS_EXPORT void Daemonize();
 CVMFS_EXPORT bool ExecAsDaemon(const std::vector<std::string> &command_line,
                                pid_t *child_pid = NULL);
