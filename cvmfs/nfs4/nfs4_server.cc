@@ -261,6 +261,7 @@ Nfs4Server::Nfs4Server(Backend *backend, const Options &options)
     , next_stateid_(1)
     , num_frozen_attrs_(0)
     , last_generation_(0)
+    , listing_clock_(0)
     , monitor_stopping_(false)
     , executors_stopping_(false) { }
 
@@ -1054,6 +1055,52 @@ uint32_t Nfs4Server::OpRead(XdrReader *args, Compound *c, XdrWriter *body) {
 }
 
 
+uint32_t Nfs4Server::GetListing(const Object &dir, uint64_t generation,
+                                bool refresh, ListingPtr *listing) {
+  if (dir.fh.kind != FileHandle::kObject) {
+    const std::shared_ptr<std::vector<DirEntry> > entries(
+        new std::vector<DirEntry>());
+    const uint32_t status = ListChildren(dir, entries.get());
+    *listing = entries;
+    return status;
+  }
+
+  if (!refresh) {
+    const std::lock_guard<std::mutex> lock(listing_lock_);
+    const std::map<uint64_t, CachedListing>::iterator it =
+        listings_.find(dir.fh.ino);
+    if (it != listings_.end() && it->second.generation == generation) {
+      it->second.last_used = ++listing_clock_;
+      *listing = it->second.entries;
+      return NFS4_OK;
+    }
+  }
+
+  const std::shared_ptr<std::vector<DirEntry> > entries(new std::vector<DirEntry>());
+  const uint32_t status = ListChildren(dir, entries.get());
+  if (status != NFS4_OK)
+    return status;
+  *listing = entries;
+
+  const std::lock_guard<std::mutex> lock(listing_lock_);
+  if (listings_.size() >= kMaxCachedListings
+      && listings_.count(dir.fh.ino) == 0) {
+    std::map<uint64_t, CachedListing>::iterator oldest = listings_.begin();
+    for (std::map<uint64_t, CachedListing>::iterator it = listings_.begin();
+         it != listings_.end(); ++it) {
+      if (it->second.last_used < oldest->second.last_used)
+        oldest = it;
+    }
+    listings_.erase(oldest);
+  }
+  CachedListing &cached = listings_[dir.fh.ino];
+  cached.generation = generation;
+  cached.entries = entries;
+  cached.last_used = ++listing_clock_;
+  return NFS4_OK;
+}
+
+
 uint32_t Nfs4Server::OpReaddir(XdrReader *args, Compound *c, XdrWriter *body) {
   uint64_t cookie;
   unsigned char verifier[kNfs4VerifierSize];
@@ -1075,8 +1122,9 @@ uint32_t Nfs4Server::OpReaddir(XdrReader *args, Compound *c, XdrWriter *body) {
   if (dir.fh.kind == FileHandle::kNamedAttr || !S_ISDIR(dir.attr.mode))
     return NFS4ERR_NOTDIR;
 
+  const uint64_t generation = backend_->Generation();
   XdrWriter my_verifier_w;
-  my_verifier_w.PutU64(backend_->Generation());
+  my_verifier_w.PutU64(generation);
   const std::string &my_verifier = my_verifier_w.buffer();
   if (cookie == 1 || cookie == 2)
     return NFS4ERR_BAD_COOKIE;
@@ -1085,10 +1133,11 @@ uint32_t Nfs4Server::OpReaddir(XdrReader *args, Compound *c, XdrWriter *body) {
     return NFS4ERR_NOT_SAME;
   }
 
-  std::vector<DirEntry> entries;
-  status = ListChildren(dir, &entries);
+  ListingPtr listing;
+  status = GetListing(dir, generation, cookie == 0, &listing);
   if (status != NFS4_OK)
     return status;
+  const std::vector<DirEntry> &entries = *listing;
 
   // Cookies 0, 1 and 2 are reserved; entry i has cookie i + 3
   size_t index = (cookie == 0) ? 0 : static_cast<size_t>(cookie - 2);
@@ -1325,7 +1374,7 @@ void Nfs4Server::DropClient(uint64_t clientid) {
   for (std::map<std::string, Delegation>::iterator it = delegations_.begin();
        it != delegations_.end();) {
     if (it->second.clientid == clientid)
-      delegations_.erase(it++);
+      it = EraseDelegation(it);
     else
       ++it;
   }
@@ -1359,21 +1408,22 @@ void Nfs4Server::UpdateFrozenAttrs() {
 }
 
 
+std::map<std::string, Nfs4Server::Delegation>::iterator
+Nfs4Server::EraseDelegation(std::map<std::string, Delegation>::iterator it) {
+  delegated_files_.erase(std::make_pair(it->second.clientid,
+                                        it->second.fh.ino));
+  return delegations_.erase(it);
+}
+
+
 void Nfs4Server::PutDelegation(uint64_t clientid, const FileHandle &fh,
                                const Attr &attr, XdrWriter *w) {
   std::map<uint64_t, Client>::const_iterator const client = clients_.find(clientid);
+  // One delegation per client and file; none while a recall is going on
   bool grant = options_.delegations && fh.kind == FileHandle::kObject
-               && client != clients_.end() && client->second.callback_ok;
-  for (std::map<std::string, Delegation>::const_iterator it =
-           delegations_.begin();
-       grant && it != delegations_.end();
-       ++it) {
-    // One delegation per client and file; none while a recall is going on
-    if ((it->second.clientid == clientid && it->second.fh == fh)
-        || it->second.recalled != 0) {
-      grant = false;
-    }
-  }
+               && client != clients_.end() && client->second.callback_ok
+               && num_frozen_attrs_ == 0
+               && delegated_files_.count(std::make_pair(clientid, fh.ino)) == 0;
   if (grant && recalled_files_.erase(std::make_pair(clientid, fh.ino)) > 0)
     grant = false;
   if (!grant || delegations_.size() >= options_.max_stateids) {
@@ -1386,6 +1436,7 @@ void Nfs4Server::PutDelegation(uint64_t clientid, const FileHandle &fh,
   Delegation &delegation = delegations_[stateid.other];
   delegation.clientid = clientid;
   delegation.fh = fh;
+  delegated_files_.insert(std::make_pair(clientid, fh.ino));
   delegation.attr = attr;
   stateid.seqid = delegation.seqid;
 
@@ -1411,8 +1462,11 @@ uint32_t Nfs4Server::OpDelegreturn(XdrReader *args) {
   r.GetU32(&boot);
   if (boot != boot_)
     return NFS4ERR_STALE_STATEID;
-  if (delegations_.erase(stateid.other) == 0)
+  std::map<std::string, Delegation>::iterator const it =
+      delegations_.find(stateid.other);
+  if (it == delegations_.end())
     return NFS4ERR_BAD_STATEID;
+  EraseDelegation(it);
   if (num_frozen_attrs_ > 0)
     UpdateFrozenAttrs();
   return NFS4_OK;
@@ -1475,13 +1529,13 @@ void Nfs4Server::MonitorLoop() {
       Delegation &d = it->second;
       if (d.recalled != 0 && now - d.recalled > options_.lease_time) {
         Log(kLogLevelWarn, "revoking unreturned delegation");
-        delegations_.erase(it++);
+        it = EraseDelegation(it);
         continue;
       }
       if (changed && d.recalled == 0) {
         std::map<uint64_t, Client>::iterator const c = clients_.find(d.clientid);
         if (c == clients_.end() || !c->second.callback) {
-          delegations_.erase(it++);
+          it = EraseDelegation(it);
           continue;
         }
         d.recalled = now;

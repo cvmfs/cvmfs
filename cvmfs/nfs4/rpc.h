@@ -70,6 +70,21 @@ bool HandleRpcRecord(RpcProgram *program, const std::string &record,
                      std::string *reply);
 
 
+/** IPv4 network, host byte order */
+struct Ipv4Net {
+  Ipv4Net() : addr(0), mask(0) { }
+  bool Contains(uint32_t a) const { return (a & mask) == addr; }
+  uint32_t addr;
+  uint32_t mask;
+};
+
+/**
+ * Parses a comma or space separated list of addresses and CIDR networks, e.g.
+ * "10.1.0.0/16, 192.168.7.12".  Returns false on any malformed entry.
+ */
+bool ParseIpv4Nets(const std::string &list, std::vector<Ipv4Net> *nets);
+
+
 /**
  * Threaded TCP server.  One reader thread per connection collects records;
  * a pool of workers runs the procedures, so a call that blocks in the backend
@@ -86,8 +101,10 @@ class RpcServer {
         , notify_workers(true)
         , send_timeout_ms(60 * 1000) { }
     unsigned workers;
-    /** Accept connections from non-loopback peers (testing only) */
+    /** Accept connections from any peer (testing only) */
     bool allow_remote;
+    /** Non-loopback peers accepted in addition to loopback ones */
+    std::vector<Ipv4Net> allowed_clients;
     uint32_t max_record;
     /**
      * Idle workers look at the queue at least this often.  On macOS, workers

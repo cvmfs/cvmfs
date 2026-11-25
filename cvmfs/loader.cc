@@ -856,10 +856,17 @@ int FuseMain(int argc, char *argv[]) {
   // The file system is mounted through the kernel's NFS client
   premount_fuse_ = false;
   // Settings of libcvmfs_nfsfuse, which only sees the environment
-  if (options_manager->GetValue("CVMFS_NFS_DELEGATIONS", &parameter))
-    setenv("CVMFS_NFS_DELEGATIONS", parameter.c_str(), 1);
-  if (options_manager->GetValue("CVMFS_NFS_MOUNT_OPTIONS", &parameter))
-    setenv("CVMFS_NFS_MOUNT_OPTIONS", parameter.c_str(), 1);
+  {
+    const char *nfs_parameters[] = {
+        "CVMFS_NFS_DELEGATIONS", "CVMFS_NFS_MOUNT_OPTIONS", "CVMFS_NFS_BIND",
+        "CVMFS_NFS_PORT", "CVMFS_NFS_ALLOWED_CLIENTS",
+        "CVMFS_NFS_MAX_OPEN_FILES"};
+    for (unsigned i = 0;
+         i < sizeof(nfs_parameters) / sizeof(nfs_parameters[0]); ++i) {
+      if (options_manager->GetValue(nfs_parameters[i], &parameter))
+        setenv(nfs_parameters[i], parameter.c_str(), 1);
+    }
+  }
 #endif
 
   if (options_manager->GetValue("CVMFS_REPOSITORIES_NOMOUNT", &parameter)

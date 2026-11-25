@@ -47,6 +47,7 @@ class MemoryBackend : public Backend {
       , num_generation_calls_(0)
       , num_forgets_(0)
       , read_delay_ms_(0)
+      , num_readdirs_(0)
       , next_ino_(100) {
     Node &root = nodes_[kRoot];
     root.attr.ino = kRoot;
@@ -99,6 +100,7 @@ class MemoryBackend : public Backend {
     return 0;
   }
   virtual int ReadDir(uint64_t ino, std::vector<DirEntry> *entries) {
+    num_readdirs_++;
     entries->clear();
     for (std::map<std::string, uint64_t>::const_iterator it =
              nodes_[ino].children.begin();
@@ -148,6 +150,7 @@ class MemoryBackend : public Backend {
   std::atomic<unsigned> num_generation_calls_;
   unsigned num_forgets_;
   unsigned read_delay_ms_;
+  unsigned num_readdirs_;
 
  private:
   uint64_t Add(uint64_t parent, const std::string &name, mode_t mode,
@@ -474,6 +477,31 @@ TEST(T_Nfs4FileHandle, EncodeDecode) {
 }
 
 
+TEST(T_Nfs4Rpc, ParseIpv4Nets) {
+  std::vector<Ipv4Net> nets;
+  EXPECT_TRUE(ParseIpv4Nets("", &nets));
+  EXPECT_TRUE(nets.empty());
+
+  ASSERT_TRUE(ParseIpv4Nets("10.1.2.3/16, 192.168.7.12 0.0.0.0/0", &nets));
+  ASSERT_EQ(3u, nets.size());
+  EXPECT_EQ(0x0A010000u, nets[0].addr);
+  EXPECT_EQ(0xFFFF0000u, nets[0].mask);
+  EXPECT_TRUE(nets[0].Contains(0x0A01FFFFu));
+  EXPECT_FALSE(nets[0].Contains(0x0A020000u));
+  EXPECT_EQ(0xFFFFFFFFu, nets[1].mask);
+  EXPECT_TRUE(nets[1].Contains(0xC0A8070Cu));
+  EXPECT_FALSE(nets[1].Contains(0xC0A8070Du));
+  EXPECT_TRUE(nets[2].Contains(0x01020304u));
+
+  EXPECT_FALSE(ParseIpv4Nets("10.0.0.0/33", &nets));
+  EXPECT_FALSE(ParseIpv4Nets("10.0.0.0/", &nets));
+  EXPECT_FALSE(ParseIpv4Nets("10.0.0.0/-1", &nets));
+  EXPECT_FALSE(ParseIpv4Nets("10.0.0", &nets));
+  EXPECT_FALSE(ParseIpv4Nets("host.example.org", &nets));
+  EXPECT_FALSE(ParseIpv4Nets("::1", &nets));
+}
+
+
 TEST_F(T_Nfs4Server, RpcEnvelope) {
   XdrWriter w;
   w.PutU32(77);  // xid
@@ -722,6 +750,7 @@ TEST_F(T_Nfs4Server, ReaddirPaging) {
     backend_.AddFile(big, name, "x");
   }
   const std::string fh = FhOf("big");
+  const unsigned readdirs_before = backend_.num_readdirs_;
 
   std::vector<std::string> names;
   uint64_t cookie = 0;
@@ -759,6 +788,18 @@ TEST_F(T_Nfs4Server, ReaddirPaging) {
     ASSERT_GT(in_this_round, 0u);
   }
   EXPECT_GT(rounds, 1u);
+  // Continuations reuse the listing of the first round
+  EXPECT_EQ(readdirs_before + 1, backend_.num_readdirs_);
+  {
+    // A new traversal lists afresh
+    Compound c0;
+    c0.PutFh(fh);
+    c0.Readdir(0, verifier, 300, 1u << FATTR4_TYPE);
+    Reply r0;
+    Run(c0, &r0);
+    EXPECT_EQ(static_cast<uint32_t>(NFS4_OK), r0.status);
+    EXPECT_EQ(readdirs_before + 2, backend_.num_readdirs_);
+  }
   ASSERT_EQ(kNumFiles, names.size());
   EXPECT_EQ("file000", names[0]);
   EXPECT_EQ("file049", names[kNumFiles - 1]);
@@ -768,6 +809,7 @@ TEST_F(T_Nfs4Server, ReaddirPaging) {
   Compound c;
   c.PutFh(fh);
   c.Readdir(5, verifier, 300);
+
   Reply r;
   Run(c, &r);
   EXPECT_EQ(static_cast<uint32_t>(NFS4ERR_NOT_SAME), r.status);

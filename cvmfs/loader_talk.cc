@@ -7,6 +7,7 @@
 
 #include <errno.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/un.h>
 #include <unistd.h>
 
@@ -27,6 +28,10 @@ bool spawned_ = false;
 string *socket_path_ = NULL;
 int socket_fd_ = -1;
 pthread_t thread_talk_;
+// Identifies our socket file, so that Fini() does not remove a socket that a
+// new mount of the same repository has bound in the meantime
+struct stat socket_stat_;
+bool socket_stat_valid_ = false;
 
 bool Init(const string &socket_path) {
   spawned_ = false;
@@ -39,6 +44,7 @@ bool Init(const string &socket_path) {
     LogCvmfs(kLogCvmfs, kLogDebug, "listening on socket failed (%d)", errno);
     return false;
   }
+  socket_stat_valid_ = (stat(socket_path_->c_str(), &socket_stat_) == 0);
 
   unlink((socket_path + ".paused.crashed").c_str());
   unlink((socket_path + ".paused").c_str());
@@ -108,7 +114,13 @@ void Spawn() {
 
 
 void Fini() {
-  unlink(socket_path_->c_str());
+  struct stat info;
+  if (socket_stat_valid_ && (stat(socket_path_->c_str(), &info) == 0)
+      && (info.st_dev == socket_stat_.st_dev)
+      && (info.st_ino == socket_stat_.st_ino)) {
+    unlink(socket_path_->c_str());
+  }
+  socket_stat_valid_ = false;
   shutdown(socket_fd_, SHUT_RDWR);
   close(socket_fd_);
   if (spawned_)

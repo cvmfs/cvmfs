@@ -442,7 +442,13 @@ break_hardlink() {
 
 wait_for_umount() {
   local timeout=60
-  while $(pgrep -u cvmfs cvmfs2 > /dev/null); do
+  # On macOS cvmfs2 runs as the invoking user, not as cvmfs, and pgrep -x
+  # does not match full-path process names
+  local pgrep_args=(-u cvmfs cvmfs2)
+  if running_on_osx; then
+    pgrep_args=(-f '(^|/)cvmfs2( |$)')
+  fi
+  while pgrep "${pgrep_args[@]}" > /dev/null; do
     if [ $timeout -eq 0 ]; then
       return 1
     fi
