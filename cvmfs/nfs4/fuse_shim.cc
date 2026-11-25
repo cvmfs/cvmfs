@@ -176,7 +176,10 @@ bool GuardianRequest(struct fuse_session *se, char command) {
 bool MountNfs(struct fuse_session *se) {
   const bool mounted = (se->guardian_fd >= 0)
                            ? GuardianRequest(se, 'M')
-                           : nfs4::MountNfs(se->mountpoint, se->rpc->port());
+                           : nfs4::MountNfs(
+                                 se->mountpoint,
+                                 nfs4::LocalServerAddress(se->rpc->listen_fd()),
+                                 se->rpc->port());
   if (mounted)
     se->mount_id = nfs4::FindMount(se->mountpoint, se->rpc->port());
   return mounted;
@@ -638,11 +641,30 @@ int fuse_session_mount(struct fuse_session *se, const char *mountpoint) {
   se->server = new nfs4::Nfs4Server(se->backend, server_options);
   nfs4::RpcServer::Options rpc_options;
   rpc_options.workers = se->workers;
-  se->rpc = new nfs4::RpcServer(se->server, rpc_options);
-  const char *port = getenv("CVMFS_NFS_PORT");
-  if (!se->rpc->Listen("127.0.0.1",
-                       port ? static_cast<uint16_t>(atoi(port)) : 0)) {
+  const char *clients = getenv("CVMFS_NFS_ALLOWED_CLIENTS");
+  if (clients
+      && !nfs4::ParseIpv4Nets(clients, &rpc_options.allowed_clients)) {
+    nfs4::Log(nfs4::kLogLevelError, "invalid CVMFS_NFS_ALLOWED_CLIENTS: %s",
+              clients);
     return -1;
+  }
+  const char *bind = getenv("CVMFS_NFS_BIND");
+  const std::string address = (bind && *bind) ? bind : "127.0.0.1";
+  const char *port = getenv("CVMFS_NFS_PORT");
+  se->rpc = new nfs4::RpcServer(se->server, rpc_options);
+  if (!se->rpc->Listen(address, port ? static_cast<uint16_t>(atoi(port)) : 0))
+    return -1;
+  if (address.compare(0, 4, "127.") != 0) {
+    if (rpc_options.allowed_clients.empty()) {
+      nfs4::Log(nfs4::kLogLevelWarn,
+                "listening on %s, but CVMFS_NFS_ALLOWED_CLIENTS is empty: "
+                "only loopback clients are accepted", address.c_str());
+    }
+    if (port == NULL) {
+      nfs4::Log(nfs4::kLogLevelWarn,
+                "listening on %s with ephemeral port %u, set CVMFS_NFS_PORT "
+                "for remote clients", address.c_str(), se->rpc->port());
+    }
   }
   if (getenv("CVMFS_NFS_NO_GUARDIAN") == NULL)
     SpawnGuardian(se);

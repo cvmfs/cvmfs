@@ -4,10 +4,13 @@
 
 #include "nfs4/mount_util.h"
 
+#include <arpa/inet.h>
 #include <errno.h>
+#include <netinet/in.h>
 #include <spawn.h>
 #include <sys/mount.h>
 #include <sys/param.h>
+#include <sys/socket.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -172,7 +175,22 @@ std::string NfsMountOptions(uint16_t port) {
 }
 
 
-bool MountNfs(const std::string &mountpoint, uint16_t port) {
+std::string LocalServerAddress(int listen_fd) {
+  struct sockaddr_in addr;
+  socklen_t len = sizeof(addr);
+  char buf[INET_ADDRSTRLEN];
+  if (getsockname(listen_fd, reinterpret_cast<struct sockaddr *>(&addr), &len)
+          != 0
+      || addr.sin_family != AF_INET || addr.sin_addr.s_addr == htonl(INADDR_ANY)
+      || inet_ntop(AF_INET, &addr.sin_addr, buf, sizeof(buf)) == NULL) {
+    return "127.0.0.1";
+  }
+  return buf;
+}
+
+
+bool MountNfs(const std::string &mountpoint, const std::string &address,
+              uint16_t port) {
   std::string options = NfsMountOptions(port);
   const char *extra = getenv("CVMFS_NFS_MOUNT_OPTIONS");
   if (extra && *extra)
@@ -182,8 +200,9 @@ bool MountNfs(const std::string &mountpoint, uint16_t port) {
   // cvmfs2 may run as CVMFS_USER with only CAP_SYS_ADMIN left, which
   // suffices for mount(2), but /bin/mount would treat it as a user mount.
   // The kernel takes the NFS options as text; it needs the server address.
-  const std::string data = options + ",addr=127.0.0.1,clientaddr=127.0.0.1";
-  if (mount("127.0.0.1:/", mountpoint.c_str(), "nfs4", MS_RDONLY,
+  const std::string data = options + ",addr=" + address
+                           + ",clientaddr=" + address;
+  if (mount((address + ":/").c_str(), mountpoint.c_str(), "nfs4", MS_RDONLY,
             data.c_str()) == 0) {
     Log(kLogLevelInfo, "mounted %s with options %s",
               mountpoint.c_str(), data.c_str());
@@ -203,7 +222,7 @@ bool MountNfs(const std::string &mountpoint, uint16_t port) {
 #endif
   args.push_back("-o");
   args.push_back(options);
-  args.push_back("127.0.0.1:/");
+  args.push_back(address + ":/");
   args.push_back(mountpoint);
   Log(kLogLevelInfo, "mounting %s with options %s",
             mountpoint.c_str(), options.c_str());
