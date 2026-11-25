@@ -31,4 +31,8 @@ log ""
 rm -f /etc/cvmfs/default.d/11-osx-fskit.conf
 
 $cvmfs_cfg setup >> $postinstall_log 2>&1 || die "Configuring cvmfs failed."
-[ ! -d /var/run/cvmfs ] || $cvmfs_cfg reload >> $postinstall_log 2>&1
+
+if mount | grep -q " on /Volumes/cvmfs/"; then
+  log "cvmfs repositories are mounted; to use the new version, remount them"
+  log "or run 'cvmfs_config reload' (without sudo) as the mounting user"
+fi
