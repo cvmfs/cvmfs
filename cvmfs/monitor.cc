@@ -200,6 +200,8 @@ pid_t Watchdog::GetPid() {
 void Watchdog::LogEmergency(string msg) {
   char ctime_buffer[32];
 
+  ReopenMicroSyslog();
+
   if (!crash_dump_path_.empty()) {
     FILE *fp = fopen(crash_dump_path_.c_str(), "a");
     if (fp) {
@@ -217,6 +219,20 @@ void Watchdog::LogEmergency(string msg) {
     }
   }
   LogCvmfs(kLogMonitor, kLogSyslogErr, "%s", msg.c_str());
+}
+
+
+/**
+ * Called in the watchdog process before it logs.  If the file system holding
+ * the µSyslog became read-only meanwhile, logging to it is skipped; opening it
+ * would abort.
+ */
+void Watchdog::ReopenMicroSyslog() {
+  if (usyslog_path_.empty() || !GetLogMicroSyslog().empty())
+    return;
+  if (access(GetParentPath(usyslog_path_).c_str(), W_OK) != 0)
+    return;
+  SetLogMicroSyslog(usyslog_path_);
 }
 
 /**
@@ -306,6 +322,8 @@ string Watchdog::ReportStacktrace() {
 
 void Watchdog::ReportSignalAndContinue(int sig, siginfo_t *siginfo,
                                        void * /* context */) {
+  // No ReopenMicroSyslog() here: it is not async-signal-safe.  Unless the
+  // µSyslog is already open, this message only goes to syslog.
   LogCvmfs(kLogMonitor, kLogSyslogErr,
            "watchdog: received unexpected signal %d from PID %d / UID %d", sig,
            siginfo->si_pid, siginfo->si_uid);
@@ -487,12 +505,10 @@ void Watchdog::Fork(bool needs_read_environ, bool retain_root) {
           const pid_t watchdog_pid = getpid();
           pipe_pid.Write(watchdog_pid);
           pipe_pid.CloseWriteFd();
-          // Close all unused file descriptors
-          // close also usyslog, only get it back if necessary
-          // string usyslog_save = GetLogMicroSyslog();
+          // Close all unused file descriptors, including the µSyslog
           const string debuglog_save = GetLogDebugFile();
           SetLogDebugFile("");
-          const string usyslog_save = GetLogMicroSyslog();
+          usyslog_path_ = GetLogMicroSyslog();
           SetLogMicroSyslog("");
           // Gracefully close the syslog before closing all fds. The next call
           // to syslog will reopen it.
@@ -507,7 +523,6 @@ void Watchdog::Fork(bool needs_read_environ, bool retain_root) {
           preserve_fds.insert(pipe_watchdog_->GetReadFd());
           preserve_fds.insert(pipe_listener_->GetWriteFd());
           CloseAllFildes(preserve_fds);
-          SetLogMicroSyslog(usyslog_save);  // no-op if usyslog not used
           SetLogDebugFile(debuglog_save);   // no-op if debug log not used
 
           if (WaitForSupervisee())
@@ -566,6 +581,7 @@ bool Watchdog::WaitForSupervisee() {
     case ControlFlow::kQuit:
       return false;
     case ControlFlow::kQuitWithExit:
+      ReopenMicroSyslog();
       if (on_exit_)
         on_exit_(false);
       return false;
@@ -701,7 +717,11 @@ void *Watchdog::MainWatchdogListener(void *data) {
 void Watchdog::Supervise() {
   ControlFlow::Flags control_flow = ControlFlow::kUnknown;
 
-  if (!pipe_watchdog_->TryRead<ControlFlow::Flags>(&control_flow)) {
+  const bool read_ok =
+      pipe_watchdog_->TryRead<ControlFlow::Flags>(&control_flow);
+  if (!read_ok || control_flow != ControlFlow::kQuit)
+    ReopenMicroSyslog();
+  if (!read_ok) {
     LogEmergency("watchdog: unexpected termination ("
                  + StringifyInt(control_flow) + ")");
     if (on_exit_)

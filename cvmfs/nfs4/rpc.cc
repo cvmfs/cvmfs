@@ -16,6 +16,7 @@
 #include <unistd.h>
 
 #include <chrono>
+#include <cstdlib>
 #include <cstring>
 
 #include "nfs4/logging.h"
@@ -140,7 +141,72 @@ bool IsLoopback(const struct sockaddr_storage &addr) {
   return false;
 }
 
+bool IsAllowedPeer(const RpcServer::Options &options,
+                   const struct sockaddr_storage &peer) {
+  if (options.allow_remote || IsLoopback(peer))
+    return true;
+  if (peer.ss_family != AF_INET)
+    return false;
+  const uint32_t a = ntohl(
+      reinterpret_cast<const struct sockaddr_in *>(&peer)->sin_addr.s_addr);
+  for (unsigned i = 0; i < options.allowed_clients.size(); ++i) {
+    if (options.allowed_clients[i].Contains(a))
+      return true;
+  }
+  return false;
+}
+
+std::string PeerName(const struct sockaddr_storage &peer) {
+  char buf[INET6_ADDRSTRLEN] = "?";
+  if (peer.ss_family == AF_INET) {
+    inet_ntop(AF_INET,
+              &reinterpret_cast<const struct sockaddr_in *>(&peer)->sin_addr,
+              buf, sizeof(buf));
+  } else if (peer.ss_family == AF_INET6) {
+    inet_ntop(AF_INET6,
+              &reinterpret_cast<const struct sockaddr_in6 *>(&peer)->sin6_addr,
+              buf, sizeof(buf));
+  }
+  return buf;
+}
+
 }  // anonymous namespace
+
+
+bool ParseIpv4Nets(const std::string &list, std::vector<Ipv4Net> *nets) {
+  nets->clear();
+  size_t pos = 0;
+  while (pos < list.size()) {
+    const size_t end = list.find_first_of(", \t", pos);
+    const std::string token = list.substr(
+        pos, (end == std::string::npos) ? std::string::npos : end - pos);
+    pos = (end == std::string::npos) ? list.size() : end + 1;
+    if (token.empty())
+      continue;
+
+    const size_t slash = token.find('/');
+    unsigned prefix = 32;
+    if (slash != std::string::npos) {
+      const std::string bits = token.substr(slash + 1);
+      if (bits.empty() || bits.size() > 2
+          || bits.find_first_not_of("0123456789") != std::string::npos) {
+        return false;
+      }
+      prefix = static_cast<unsigned>(atoi(bits.c_str()));
+      if (prefix > 32)
+        return false;
+    }
+    struct in_addr in;
+    if (inet_pton(AF_INET, token.substr(0, slash).c_str(), &in) != 1)
+      return false;
+    Ipv4Net net;
+    // Shifting a 32-bit value by 32 is undefined
+    net.mask = (prefix == 0) ? 0 : (0xFFFFFFFFu << (32 - prefix));
+    net.addr = ntohl(in.s_addr) & net.mask;
+    nets->push_back(net);
+  }
+  return true;
+}
 
 
 bool HandleRpcRecord(RpcProgram *program, const std::string &record,
@@ -374,8 +440,9 @@ void RpcServer::AcceptLoop() {
       last_errno = 0;
     }
     SetCloexec(fd);
-    if (!options_.allow_remote && !IsLoopback(peer)) {
-      Log(kLogLevelWarn, "rejected NFS connection from non-loopback peer");
+    if (!IsAllowedPeer(options_, peer)) {
+      Log(kLogLevelWarn, "rejected NFS connection from %s",
+          PeerName(peer).c_str());
       close(fd);
       continue;
     }

@@ -34,13 +34,19 @@ class ScopedRoot {
 
 /** Runs args[0] with args, returns its exit code or a negative errno */
 int RunCommand(const std::vector<std::string> &args);
-/** Default NFS mount options for a server on 127.0.0.1:port */
+/** Default NFS mount options for a server on port */
 std::string NfsMountOptions(uint16_t port);
 /**
- * Mounts the server on 127.0.0.1:port; CVMFS_NFS_MOUNT_OPTIONS from the
+ * Address under which this host reaches the server listening on listen_fd:
+ * the bound address, or 127.0.0.1 for the wildcard address.
+ */
+std::string LocalServerAddress(int listen_fd);
+/**
+ * Mounts the server on address:port; CVMFS_NFS_MOUNT_OPTIONS from the
  * environment is appended to the options.
  */
-bool MountNfs(const std::string &mountpoint, uint16_t port);
+bool MountNfs(const std::string &mountpoint, const std::string &address,
+              uint16_t port);
 /**
  * Identifies the NFS mount on mountpoint served on port, 0 if there is none.
  * A later mount on the same path (e.g. after an external unmount) gets a

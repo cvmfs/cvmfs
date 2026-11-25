@@ -129,6 +129,7 @@ class Watchdog : SingleCopy {
   SigactionMap SetSignalHandlers(const SigactionMap &signal_handlers);
   void Supervise();
   void LogEmergency(std::string msg);
+  void ReopenMicroSyslog();
   std::string ReportStacktrace();
   std::string GenerateStackTrace(pid_t pid);
   std::string ReadUntilGdbPrompt(int fd_pipe);
@@ -136,6 +137,12 @@ class Watchdog : SingleCopy {
   bool spawned_;
   bool maintenance_mode_;
   std::string crash_dump_path_;
+  /**
+   * The watchdog keeps the µSyslog closed until it has something to report: an
+   * fd open for writing would block a read-only remount of the file system
+   * holding it, e.g. the cache after "tear down to read-only".
+   */
+  std::string usyslog_path_;
   std::string exe_path_;
   std::string oom_score_adj_;
   pid_t watchdog_pid_;

@@ -538,7 +538,8 @@ void SignatureManager::GenerateCertificate(const std::string &cn) {
       reinterpret_cast<ASN1_TIME *>(X509_get_notAfter(certificate_)),
       3600 * 24 * 365);
 
-  X509_NAME *name = X509_get_subject_name(certificate_);
+  X509_NAME *name = X509_NAME_new();
+  assert(name != NULL);
 #ifdef OPENSSL_API_INTERFACE_V09
   X509_NAME_add_entry_by_txt(
       name, "CN", MBSTRING_ASC,
@@ -550,8 +551,11 @@ void SignatureManager::GenerateCertificate(const std::string &cn) {
       name, "CN", MBSTRING_ASC,
       reinterpret_cast<const unsigned char *>(cn.c_str()), -1, -1, 0);
 #endif
+  retval = X509_set_subject_name(certificate_, name);
+  assert(retval == 1);
   retval = X509_set_issuer_name(certificate_, name);
   assert(retval == 1);
+  X509_NAME_free(name);
 
 #ifdef OPENSSL_API_INTERFACE_V09
   retval = X509_sign(certificate_, pkey, EVP_sha1());
@@ -700,8 +704,8 @@ string SignatureManager::Whois() {
     return "No certificate loaded";
 
   string result;
-  X509_NAME *subject = X509_get_subject_name(certificate_);
-  X509_NAME *issuer = X509_get_issuer_name(certificate_);
+  const X509_NAME *subject = X509_get_subject_name(certificate_);
+  const X509_NAME *issuer = X509_get_issuer_name(certificate_);
   char *buffer = NULL;
   buffer = X509_NAME_oneline(subject, NULL, 0);
   if (buffer) {

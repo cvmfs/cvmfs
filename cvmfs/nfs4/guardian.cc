@@ -90,7 +90,7 @@ int RunGuardian(int listen_fd, int control_fd, const std::string &mountpoint) {
       break;
     bool ok = false;
     if (command == 'M') {
-      ok = MountNfs(mountpoint, port);
+      ok = MountNfs(mountpoint, LocalServerAddress(listen_fd), port);
       if (ok)
         mount_id = FindMount(mountpoint, port);
     } else if (command == 'U') {
@@ -109,6 +109,7 @@ int RunGuardian(int listen_fd, int control_fd, const std::string &mountpoint) {
       "cvmfs2 serving %s is gone, failing NFS requests until unmounted",
       mountpoint.c_str());
   ErrorProgram program;
+  // Refuses remote clients: they retry until a restarted cvmfs2 serves them
   RpcServer::Options options;
   options.workers = 2;
   RpcServer rpc(&program, options);

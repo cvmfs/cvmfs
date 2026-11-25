@@ -25,11 +25,13 @@ namespace {
 
 void Usage(const char *progname) {
   fprintf(stderr,
-          "Usage: %s [-b address] [-p port] [-w workers] [-r] [-s ms] [-D ms] <dir>\n"
+          "Usage: %s [-b address] [-p port] [-w workers] [-r] [-a clients] "
+          "[-s ms] [-D ms] <dir>\n"
           "  -b  listen address (default 127.0.0.1)\n"
           "  -p  port (default: ephemeral, printed on stdout)\n"
           "  -w  worker threads (default 16)\n"
-          "  -r  accept non-loopback clients\n"
+          "  -r  accept any client\n"
+          "  -a  also accept these clients, e.g. 10.0.0.0/8,192.168.1.7\n"
           "  -s  delay every read by ms (testing)\n"
           "  -D  answer NFS4ERR_DELAY for requests slower than ms\n",
           progname);
@@ -44,7 +46,7 @@ int main(int argc, char * const*argv) {
   nfs4::Nfs4Server::Options server_options;
   unsigned read_delay_ms = 0;
   int c;
-  while ((c = getopt(argc, argv, "b:p:w:rs:D:h")) != -1) {
+  while ((c = getopt(argc, argv, "b:p:w:ra:s:D:h")) != -1) {
     switch (c) {
       case 'b':
         address = optarg;
@@ -57,6 +59,12 @@ int main(int argc, char * const*argv) {
         break;
       case 'r':
         rpc_options.allow_remote = true;
+        break;
+      case 'a':
+        if (!nfs4::ParseIpv4Nets(optarg, &rpc_options.allowed_clients)) {
+          fprintf(stderr, "invalid client list %s\n", optarg);
+          return 1;
+        }
         break;
       case 's':
         read_delay_ms = static_cast<unsigned>(atoi(optarg));
