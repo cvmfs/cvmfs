@@ -116,6 +116,11 @@ UTLog2Histogram::GetBins(const Log2Histogram &h) {
 
 unsigned int Log2Histogram::GetQuantile(float n) {
   const uint64_t total = this->N();
+  // without samples there is no element to interpolate, and falling through
+  // would divide zero by zero below
+  if (total == 0) {
+    return 0;
+  }
   // pivot is the index of the element corresponding to the requested quantile
   uint64_t pivot = static_cast<uint64_t>(static_cast<float>(total) * n);
   float normalized_pivot = 0.0;
@@ -125,7 +130,9 @@ unsigned int Log2Histogram::GetQuantile(float n) {
   for (i = 1; i <= this->bins_.size() - 1; i++) {
     const unsigned int bin_value = static_cast<unsigned int>(
         (this->bins_[i]->load()));
-    if (pivot <= bin_value) {
+    // an empty bin holds no element, so it cannot hold the pivot. It would
+    // otherwise match a pivot of zero and turn the division below into 0 / 0
+    if (bin_value != 0 && pivot <= bin_value) {
       normalized_pivot = static_cast<float>(pivot)
                          / static_cast<float>(bin_value);
       break;
