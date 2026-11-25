@@ -1,7 +1,10 @@
 #!/bin/bash
 
-cvmfs_test_name="Read-only cache"
+cvmfs_test_name="Read-only cache with the µSyslog in the cache"
 cvmfs_test_suites="quick"
+
+# µCernVM keeps CVMFS_USYSLOG next to the cache, tears down to read-only,
+# remounts that file system read-only and powers off without sync.
 
 ro_mount() {
   local mountpoint=$1
@@ -15,6 +18,23 @@ ro_mount() {
 
 CVMFS_TEST_041_TMPDIR=
 CVMFS_TEST_041_OSXMOUNTPOINT=
+
+# Lists cvmfs processes with files in $1 open for writing (Linux only)
+writers_in() {
+  local dir=$1 pid fd target
+  for pid in $(pgrep cvmfs2); do
+    for fd in $(sudo ls /proc/$pid/fd); do
+      target=$(sudo readlink /proc/$pid/fd/$fd) || continue
+      case "$target" in
+        $dir/*) ;;
+        *) continue ;;
+      esac
+      if sudo grep -qE '^flags:\s+[0-7]*[12]$' /proc/$pid/fdinfo/$fd; then
+        echo "  pid $pid ($(sudo cat /proc/$pid/comm)): $target"
+      fi
+    done
+  done
+}
 
 cleanup() {
   echo "cleanup $cvmfs_test_name"
@@ -62,7 +82,10 @@ cvmfs_run_test() {
   cvmfs_mount atlas.cern.ch \
     "CVMFS_CACHE_BASE=$CVMFS_TEST_041_TMPDIR" \
     "CVMFS_SHARED_CACHE=no" \
-    "CVMFS_STRICT_MOUNT=yes" || return 2
+    "CVMFS_STRICT_MOUNT=yes" \
+    "CVMFS_USYSLOG=$CVMFS_TEST_041_TMPDIR/usyslog" || return 2
+  ls /cvmfs/atlas.cern.ch > /dev/null || return 5
+  sudo [ -s $CVMFS_TEST_041_TMPDIR/usyslog ] || return 6
 
   echo "try to remount with open r/w descriptors (should fail)"
   if sudo mount -o remount,ro $CVMFS_TEST_041_TMPDIR; then
@@ -75,7 +98,14 @@ cvmfs_run_test() {
   if running_on_osx; then
     sudo mount -u -r $CVMFS_TEST_041_OSXMOUNTPOINT || return 20
   else
-    sudo mount -o remount,ro $CVMFS_TEST_041_TMPDIR || return 20
+    if ! sudo mount -o remount,ro $CVMFS_TEST_041_TMPDIR; then
+      echo "files still open for writing after tear down:"
+      writers_in $CVMFS_TEST_041_TMPDIR
+      return 20
+    fi
   fi
+
+  echo "repository stays readable"
+  ls /cvmfs/atlas.cern.ch > /dev/null || return 21
 }
 

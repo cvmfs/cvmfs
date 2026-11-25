@@ -514,19 +514,18 @@ string ToUpper(const string &mixed_case) {
   return result;
 }
 
-string ReplaceAll(const string &haystack, const string &needle,
+string ReplaceAll(string haystack, const string &needle,
                   const string &replace_by) {
-  string result(haystack);
+  if (needle == "")
+    return haystack;
   size_t pos = 0;
   const size_t needle_size = needle.size();
-  if (needle == "")
-    return result;
 
-  while ((pos = result.find(needle, pos)) != string::npos) {
-    result.replace(pos, needle_size, replace_by);
+  while ((pos = haystack.find(needle, pos)) != string::npos) {
+    haystack.replace(pos, needle_size, replace_by);
     pos += replace_by.size();
   }
-  return result;
+  return haystack;
 }
 
 static inline void Base64Block(const unsigned char input[3], const char *table,

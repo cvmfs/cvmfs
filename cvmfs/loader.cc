@@ -53,6 +53,14 @@
 
 using namespace std;  // NOLINT
 
+// On macOS, detach before loading the cvmfs library, not after mounting:
+// macFUSE does not support forking after the mount (with macFUSE 5.4 the mount
+// vanishes when the mounting process exits), and macOS' libsqlite3
+// invalidates connections reused after fork().
+#if defined(CVMFS_NFS_FRONTEND) || defined(__APPLE__)
+#define CVMFS_DAEMONIZE_BEFORE_MOUNT
+#endif
+
 // Client library of this stub's frontend, set by cvmfs_add_frontend()
 #ifndef CVMFS_FRONTEND_LIBRARY
 #define CVMFS_FRONTEND_LIBRARY "cvmfs_fuse3"
@@ -162,6 +170,35 @@ Fence *fence_reload_;
 CvmfsExports *cvmfs_exports_;
 LoaderExports *loader_exports_;
 
+#if defined(CVMFS_DAEMONIZE_BEFORE_MOUNT) && !defined(CVMFS_NFS_FRONTEND)
+// Write end of the pipe to the parent waiting in DaemonizeUntilMounted()
+int fd_mount_ready_ = -1;
+
+/**
+ * Lets the waiting parent exit with the mount status and releases the
+ * terminal, which the daemon kept until now so that startup errors are shown.
+ */
+static void NotifyMounted(bool mounted) {
+  if (fd_mount_ready_ < 0)
+    return;
+  const char status = mounted ? 0 : 1;
+  const ssize_t retval = write(fd_mount_ready_, &status, 1);
+  (void)retval;
+  close(fd_mount_ready_);
+  fd_mount_ready_ = -1;
+  const int null_fd = open("/dev/null", O_RDWR);
+  if (null_fd >= 0) {
+    dup2(null_fd, 0);
+    dup2(null_fd, 1);
+    dup2(null_fd, 2);
+    if (null_fd > 2)
+      close(null_fd);
+  }
+}
+#else
+static void NotifyMounted(bool /* mounted */) {}
+#endif
+
 
 static void Usage(const string &exename) {
   LogCvmfs(kLogCvmfs, kLogStdout,
@@ -221,6 +258,9 @@ bool CheckPremounted(const std::string &mountpoint) {
 static void stub_init(void *userdata, struct fuse_conn_info *conn) {
   const FenceGuard fence_guard(fence_reload_);
   cvmfs_exports_->cvmfs_operations.init(userdata, conn);
+  // FUSE_INIT is the first point where the mount is known to be in place;
+  // macFUSE may defer the actual mount until the session loop runs
+  NotifyMounted(true);
 }
 
 
@@ -422,9 +462,6 @@ static fuse_args *ParseCmdLine(int argc, char *argv[]) {
   fuse_passthrough_ = cvmfs_options.fuse_passthrough;
   if (cvmfs_options.backend_fskit) {
     fuse_opt_add_arg(mount_options, "-obackend=fskit");
-    // FSKit manages the mount lifecycle; daemonizing would break the
-    // FSKit connection, so we force foreground mode.
-    foreground_ = true;
     disable_watchdog_ = true;
   }
 
@@ -619,14 +656,38 @@ Failures Reload(const int fd_progress, const bool stop_and_go,
 
 using namespace loader;  // NOLINT(build/namespaces)
 
-#ifdef CVMFS_NFS_FRONTEND
+#ifdef CVMFS_DAEMONIZE_BEFORE_MOUNT
+/**
+ * With FSKit, FUSE_INIT arrives some 15 ms before the volume shows up at the
+ * mount point.  Wait until it does, so that the mount command only returns
+ * with a usable mount.
+ */
+static void WaitForMountpoint() {
+  const unsigned kTimeoutMs = 10000;
+  const unsigned kPollMs = 10;
+  const string parent = *mount_point_ + "/..";
+  for (unsigned waited = 0; waited < kTimeoutMs; waited += kPollMs) {
+    platform_stat64 info_mnt, info_parent;
+    if ((platform_stat(mount_point_->c_str(), &info_mnt) == 0)
+        && (platform_stat(parent.c_str(), &info_parent) == 0)
+        && (info_mnt.st_dev != info_parent.st_dev)) {
+      return;
+    }
+    SafeSleepMs(kPollMs);
+  }
+  LogCvmfs(kLogCvmfs, kLogStderr,
+           "CernVM-FS: %s did not appear as a mount point within %u s",
+           mount_point_->c_str(), kTimeoutMs / 1000);
+}
+
 /**
  * Detaches like Daemonize(), but the calling process exits only once the
- * daemon reports that the NFS mount is in place, with a matching exit code.
+ * daemon reports that the mount is in place, with a matching exit code.
  * Until then the daemon keeps stdout/stderr, so that startup errors still
- * reach the terminal; libcvmfs_nfsfuse redirects them once the mount is ready.
+ * reach the terminal.  The daemon reports through the returned file
+ * descriptor and then redirects stdout/stderr itself.
  */
-static void DaemonizeUntilMounted() {
+static int DaemonizeUntilMounted() {
   int pipe_ready[2];
   MakePipe(pipe_ready);
   pid_t pid = fork();
@@ -635,7 +696,10 @@ static void DaemonizeUntilMounted() {
     close(pipe_ready[1]);
     char status = 1;
     const ssize_t retval = read(pipe_ready[0], &status, 1);
-    _exit((retval == 1 && status == 0) ? kFailOk : kFailMount);
+    if ((retval != 1) || (status != 0))
+      _exit(kFailMount);
+    WaitForMountpoint();
+    _exit(kFailOk);
   }
   close(pipe_ready[0]);
   const int retval = setsid();
@@ -644,7 +708,7 @@ static void DaemonizeUntilMounted() {
   assert(pid >= 0);
   if (pid > 0)
     _exit(0);
-  cvmfs_nfsfuse_set_ready_fd(pipe_ready[1]);
+  return pipe_ready[1];
 }
 #endif
 
@@ -792,10 +856,17 @@ int FuseMain(int argc, char *argv[]) {
   // The file system is mounted through the kernel's NFS client
   premount_fuse_ = false;
   // Settings of libcvmfs_nfsfuse, which only sees the environment
-  if (options_manager->GetValue("CVMFS_NFS_DELEGATIONS", &parameter))
-    setenv("CVMFS_NFS_DELEGATIONS", parameter.c_str(), 1);
-  if (options_manager->GetValue("CVMFS_NFS_MOUNT_OPTIONS", &parameter))
-    setenv("CVMFS_NFS_MOUNT_OPTIONS", parameter.c_str(), 1);
+  {
+    const char *nfs_parameters[] = {
+        "CVMFS_NFS_DELEGATIONS", "CVMFS_NFS_MOUNT_OPTIONS", "CVMFS_NFS_BIND",
+        "CVMFS_NFS_PORT", "CVMFS_NFS_ALLOWED_CLIENTS",
+        "CVMFS_NFS_MAX_OPEN_FILES"};
+    for (unsigned i = 0;
+         i < sizeof(nfs_parameters) / sizeof(nfs_parameters[0]); ++i) {
+      if (options_manager->GetValue(nfs_parameters[i], &parameter))
+        setenv(nfs_parameters[i], parameter.c_str(), 1);
+    }
+  }
 #endif
 
   if (options_manager->GetValue("CVMFS_REPOSITORIES_NOMOUNT", &parameter)
@@ -1069,11 +1140,15 @@ int FuseMain(int argc, char *argv[]) {
   delete options_manager;
   options_manager = NULL;
 
+#ifdef CVMFS_DAEMONIZE_BEFORE_MOUNT
+  if (!foreground_) {
+    const int fd_ready = DaemonizeUntilMounted();
 #ifdef CVMFS_NFS_FRONTEND
-  // Fork before the cvmfs library opens its databases: macOS' libsqlite3
-  // invalidates connections that are used again after fork()
-  if (!foreground_)
-    DaemonizeUntilMounted();
+    cvmfs_nfsfuse_set_ready_fd(fd_ready);
+#else
+    fd_mount_ready_ = fd_ready;
+#endif
+  }
 #endif
   loader_exports_->fuse_session = &session;
 
@@ -1092,6 +1167,7 @@ int FuseMain(int argc, char *argv[]) {
                "\nCernVM-FS: repository %s already mounted on %s",
                loader_exports_->repository_name.c_str(),
                loader_exports_->mount_point.c_str());
+      NotifyMounted(true);
       return 0;
     }
     LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s (%d - %s)",
@@ -1268,7 +1344,7 @@ int FuseMain(int argc, char *argv[]) {
   }
   LogCvmfs(kLogCvmfs, kLogSyslog, "CernVM-FS: linking %s to repository %s",
            mount_point_->c_str(), repository_name_->c_str());
-#ifndef CVMFS_NFS_FRONTEND
+#ifndef CVMFS_DAEMONIZE_BEFORE_MOUNT
   if (!foreground_)
     Daemonize();
 #endif
@@ -1315,6 +1391,8 @@ int FuseMain(int argc, char *argv[]) {
     retval = fuse_session_loop_mt(session, 1 /* use fd per thread */);
 #endif  // CVMFS_ENABLE_FUSE3_LOOP_CONFIG
   }
+  // No-op if FUSE_INIT arrived; otherwise the mount never came up
+  NotifyMounted(false);
   SetLogMicroSyslog(*usyslog_path_);
 
   // Decide whether we will need to do our own unmount.
@@ -1404,6 +1482,7 @@ int FuseMain(int argc, char *argv[]) {
   return retval;
 
 cleanup:
+  NotifyMounted(false);
 #ifndef __APPLE__
   if (dounmount && !delegated_unmount) {
     if (!SwitchCredentials(0, getgid(), true /* temporarily */)) {

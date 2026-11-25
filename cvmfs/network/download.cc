@@ -1186,7 +1186,7 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
              "(manager %s - id %" PRId64 ") "
              "replacing @proxy@ by %s",
              name_.c_str(), info->id(), replacement.c_str());
-    url = ReplaceAll(url, "@proxy@", replacement);
+    url = ReplaceAll(std::move(url), "@proxy@", replacement);
   }
 
   // TODO(heretherebedragons) before removing

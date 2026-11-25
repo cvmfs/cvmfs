@@ -71,6 +71,10 @@ const size_t kDirentHeader = 24;
 }  // anonymous namespace
 
 
+const unsigned FuseBackend::kMaxOpenFiles;
+const unsigned FuseBackend::kMinOpenFiles;
+
+
 FuseBackend::FuseBackend(const struct fuse_lowlevel_ops *ops, uint64_t fsid)
     : ops_(ops)
     , fsid_(fsid)
@@ -81,8 +85,15 @@ FuseBackend::FuseBackend(const struct fuse_lowlevel_ops *ops, uint64_t fsid)
   if (getrlimit(RLIMIT_NOFILE, &limit) == 0 && limit.rlim_cur != RLIM_INFINITY) {
     const rlim_t share = limit.rlim_cur / 8;
     if (share < max_open_files_)
-      max_open_files_ = (share < 16) ? 16 : static_cast<unsigned>(share);
+      max_open_files_ = (share < kMinOpenFiles)
+                            ? kMinOpenFiles : static_cast<unsigned>(share);
   }
+  const char *configured = getenv("CVMFS_NFS_MAX_OPEN_FILES");
+  if (configured != NULL && atoi(configured) > 0) {
+    max_open_files_ = std::max(kMinOpenFiles,
+                               static_cast<unsigned>(atoi(configured)));
+  }
+  Log(kLogLevelInfo, "caching up to %u open files", max_open_files_);
 }
 
 
