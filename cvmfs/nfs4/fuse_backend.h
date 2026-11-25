@@ -56,8 +56,14 @@ class FuseBackend : public Backend {
    */
   void ReleaseIdle(unsigned max_idle);
 
-  /** Upper bound of cached open files, if the descriptor limit allows */
-  static const unsigned kMaxOpenFiles = 256;
+  /**
+   * Upper bound of cached open files, if the descriptor limit allows (an
+   * eighth of RLIMIT_NOFILE); CVMFS_NFS_MAX_OPEN_FILES overrides it.  Each
+   * one holds a descriptor in cvmfs2 and keeps its object on disk even if
+   * the cache evicts it.
+   */
+  static const unsigned kMaxOpenFiles = 8192;
+  static const unsigned kMinOpenFiles = 16;
 
  private:
   /**
