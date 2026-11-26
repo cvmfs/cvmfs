@@ -679,10 +679,15 @@ func convertInputOutput2(inputImage *Image, imageLabel, nameWithArch, repo strin
 		"already converted": layersAlreadyConverted,
 	}).Info("Starting layer conversion")
 
-	if alreadyConverted == ConversionMatch {
-		if !convertAgain {
+	if alreadyConverted == ConversionMatch && !convertAgain {
+		if len(layersToConvert) == 0 {
 			return result, nil
 		}
+		// Metadata alone doesn't prove a complete conversion: without the
+		// layers, the flat overlay fails on every run.
+		logger.WithField("missing layers", layersToConvert).
+			Warning("Image metadata is up to date but layers are missing, re-ingesting them")
+		result = ConversionNotMatch
 	}
 
 	layersChanell := make(chan downloadedLayer, 10)
@@ -744,7 +749,9 @@ func convertInputOutput2(inputImage *Image, imageLabel, nameWithArch, repo strin
 	err = inputImage.GetLayersWithLogger(logger, manifest, layersChanell, manifestChanell, stopGettingLayers, tmpDir, maxConcurrentDownloads, repo, forceDownload)
 	if err != nil {
 		logger.WithField("error", err).Error("Error in getting layers")
-		return result, err
+		// let in-flight ingests finish before tmpDir is removed
+		<-noErrorInConversion
+		return ConversionUnknown, err
 	}
 
 	// Collect all layer digests from the manifest for backlink saving,
