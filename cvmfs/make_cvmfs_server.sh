@@ -70,6 +70,7 @@ COMPONENTS="\
     server/cvmfs_server_fix_stats.sh
     server/cvmfs_server_ingest.sh
     server/cvmfs_server_ingestsql.sh
+    server/cvmfs_server_ingestsql_gen.sh
     server/cvmfs_server_overlay.sh
     server/cvmfs_server_print_stats.sh
     server/cvmfs_server_merge_stats.sh
