@@ -73,7 +73,7 @@ cvmfs_server_update_repoinfo() {
       create_repometa_skeleton $tmp_file_info
     fi
 
-    edit_json_until_valid $tmp_file_info
+    edit_json_until_valid $tmp_file_info || die "Aborting..."
   else
     local jq_output
     if ! jq_output="$(validate_json $json_file)"; then

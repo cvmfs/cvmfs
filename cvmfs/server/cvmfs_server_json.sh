@@ -180,9 +180,26 @@ edit_json_until_valid() {
   local editor=$(get_editor)
   local has_jq=$(check_jq)
 
+  # Use the inherited terminal when possible.  After su/sudo -u, the
+  # /dev/pts/N device may still be inaccessible to the repository owner.
+  # If stdin/stdout are not terminals, use /dev/tty instead.
+  local term=
+  if [ -t 0 ] && [ -t 1 ]; then
+    term=inherited
+  elif true < /dev/tty 2> /dev/null; then
+    term=/dev/tty
+  else
+    echo "No terminal available for editing; provide the JSON file with -f" >&2
+    return 1
+  fi
+
   local retval=0
   while true; do
-    $editor $json_file < $(tty) > $(tty) 2>&1
+    if [ $term = /dev/tty ]; then
+      $editor $json_file < /dev/tty > /dev/tty 2>&1
+    else
+      $editor $json_file
+    fi
     [ $has_jq -eq 1 ] || break
 
     local jq_output=""
@@ -191,7 +208,11 @@ edit_json_until_valid() {
       echo
       echo "Your JSON file is invalid, please check again:"
       echo "$jq_output"
-      read -p "Edit again? [y]: " retry
+      if [ $term = /dev/tty ]; then
+        read -p "Edit again? [y]: " retry < /dev/tty
+      else
+        read -p "Edit again? [y]: " retry
+      fi
       if [ x"$retry" != x"y" ] && \
          [ x"$retry" != x"Y" ] && \
          [ x"$retry" != x""  ]; then
