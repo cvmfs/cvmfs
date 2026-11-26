@@ -233,6 +233,9 @@ class FileSystem : SingleCopy, public BootFactory {
   perf::Counter *n_fs_lookup_negative() { return n_fs_lookup_negative_; }
   perf::Counter *n_fs_open() { return n_fs_open_; }
   perf::Counter *n_fs_read() { return n_fs_read_; }
+  perf::Counter *n_fs_readdir() { return n_fs_readdir_; }
+  perf::Counter *n_fs_readdir_0_offset() { return n_fs_readdir_0_offset_; }
+  perf::Counter *n_fs_readdir_einval() { return n_fs_readdir_einval_; }
   perf::Counter *n_fs_readlink() { return n_fs_readlink_; }
   perf::Counter *n_fs_stat() { return n_fs_stat_; }
   perf::Counter *n_fs_stat_stale() { return n_fs_stat_stale_; }
@@ -355,6 +358,9 @@ class FileSystem : SingleCopy, public BootFactory {
   perf::Counter *n_fs_statfs_;
   perf::Counter *n_fs_statfs_cached_;
   perf::Counter *n_fs_read_;
+  perf::Counter *n_fs_readdir_;
+  perf::Counter *n_fs_readdir_0_offset_;
+  perf::Counter *n_fs_readdir_einval_;
   perf::Counter *n_fs_readlink_;
   perf::Counter *n_fs_forget_;
   perf::Counter *n_fs_inode_replace_;
@@ -562,6 +568,8 @@ class MountPoint : SingleCopy, public BootFactory {
   glue::InodeTracker *inode_tracker() { return inode_tracker_; }
   lru::InodeCache *inode_cache() { return inode_cache_; }
   double kcache_timeout_sec() { return kcache_timeout_sec_; }
+  bool fuse_dir_cache() { return fuse_dir_cache_; }
+  bool fuse_keep_dir_cache() { return fuse_keep_dir_cache_; }
   lru::Md5PathCache *md5path_cache() { return md5path_cache_; }
   std::string membership_req() { return membership_req_; }
   glue::DentryTracker *dentry_tracker() { return dentry_tracker_; }
@@ -732,6 +740,8 @@ class MountPoint : SingleCopy, public BootFactory {
   unsigned max_ttl_sec_;
   pthread_mutex_t lock_max_ttl_;
   double kcache_timeout_sec_;
+  bool fuse_dir_cache_;
+  bool fuse_keep_dir_cache_;
   bool fixed_catalog_;
   bool enforce_acls_;
   bool cache_symlinks_;
