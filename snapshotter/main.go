@@ -27,9 +27,9 @@ import (
 
 	"github.com/BurntSushi/toml"
 	snapshotsapi "github.com/containerd/containerd/api/services/snapshots/v1"
-	"github.com/containerd/containerd/contrib/snapshotservice"
-	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/snapshots"
+	"github.com/containerd/containerd/v2/contrib/snapshotservice"
+	"github.com/containerd/containerd/v2/core/snapshots"
+	"github.com/containerd/log"
 	snbase "github.com/containerd/stargz-snapshotter/snapshot"
 	"github.com/sirupsen/logrus"
 

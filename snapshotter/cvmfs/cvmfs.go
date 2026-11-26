@@ -9,7 +9,7 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/containerd/containerd/log"
+	"github.com/containerd/log"
 	"github.com/containerd/stargz-snapshotter/snapshot"
 )
 
