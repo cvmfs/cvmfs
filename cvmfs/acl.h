@@ -16,6 +16,11 @@ int acl_from_text_to_xattr_value(const std::string &textual_acl,
                                  char *&o_binary_acl, size_t &o_size,
                                  bool &o_equiv_mode);
 
+/* Inverse of acl_from_text_to_xattr_value: takes a system.posix_acl_access
+ * value, outputs a comma-separated textual ACL with numeric uids/gids */
+int acl_from_xattr_value_to_text(const char *binary_acl, size_t size,
+                                 std::string *o_textual_acl);
+
 // #define COMPARE_TO_LIBACL
 #ifdef COMPARE_TO_LIBACL
 int acl_from_text_to_xattr_value_both_impl(const std::string textual_acl,

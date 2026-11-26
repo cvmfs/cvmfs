@@ -12,11 +12,14 @@
 #include <vector>
 
 #include "util/posix.h"
+#include "util/string.h"
 
 #ifdef __APPLE__
 #include <libkern/OSByteOrder.h>
 #define htole16(x) OSSwapHostToLittleInt16(x)
 #define htole32(x) OSSwapHostToLittleInt32(x)
+#define le16toh(x) OSSwapLittleToHostInt16(x)
+#define le32toh(x) OSSwapLittleToHostInt32(x)
 #endif
 
 using namespace std;  // NOLINT
@@ -323,6 +326,60 @@ int acl_from_text_to_xattr_value(const string &textual_acl, char *&o_binary_acl,
 
   o_binary_acl = buf;
   o_size = buf_size;
+  return 0;
+}
+
+int acl_from_xattr_value_to_text(const char *binary_acl, size_t size,
+                                 string *o_textual_acl) {
+  if (size < sizeof(acl_ea_header)
+      || (size - sizeof(acl_ea_header)) % sizeof(acl_ea_entry) != 0) {
+    return EINVAL;
+  }
+  acl_ea_header header;
+  memcpy(&header, binary_acl, sizeof(header));
+  if (le32toh(header.a_version) != ACL_EA_VERSION) {
+    return EINVAL;
+  }
+
+  string text;
+  const size_t nentries = (size - sizeof(acl_ea_header)) / sizeof(acl_ea_entry);
+  for (size_t i = 0; i < nentries; ++i) {
+    acl_ea_entry e;
+    memcpy(&e, binary_acl + sizeof(acl_ea_header) + i * sizeof(acl_ea_entry),
+           sizeof(e));
+    const u_int16_t tag = le16toh(e.e_tag);
+    const u_int16_t perm = le16toh(e.e_perm);
+    const u_int32_t id = le32toh(e.e_id);
+    if (!text.empty()) {
+      text += ",";
+    }
+    switch (tag) {
+      case ACL_USER_OBJ:
+        text += "user::";
+        break;
+      case ACL_USER:
+        text += "user:" + StringifyUint(id) + ":";
+        break;
+      case ACL_GROUP_OBJ:
+        text += "group::";
+        break;
+      case ACL_GROUP:
+        text += "group:" + StringifyUint(id) + ":";
+        break;
+      case ACL_MASK:
+        text += "mask::";
+        break;
+      case ACL_OTHER:
+        text += "other::";
+        break;
+      default:
+        return EINVAL;
+    }
+    text += (perm & ACL_READ) ? 'r' : '-';
+    text += (perm & ACL_WRITE) ? 'w' : '-';
+    text += (perm & ACL_EXECUTE) ? 'x' : '-';
+  }
+  *o_textual_acl = text;
   return 0;
 }
 

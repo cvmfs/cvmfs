@@ -5,6 +5,8 @@
 #include <algorithm>
 
 #include <cerrno>
+#include <cstdlib>
+#include <cstring>
 #include <string>
 #include <gtest/gtest.h>
 
@@ -201,4 +203,37 @@ TEST_F(T_Acl, t9) {
   };
   unsigned int const acl_binary_expected_len = 60;
   should_pass(textual, acl_binary_expected, acl_binary_expected_len);
+}
+
+TEST_F(T_Acl, ToTextRoundTrip) {
+  const char *textual = "u:2:rx,g:0:rx,g:2:rwx,u::-,g::-,o::-,m::-";
+  char *binary_acl;
+  size_t binary_size;
+  bool equiv_mode;
+  ASSERT_EQ(0, acl_from_text_to_xattr_value(string(textual), binary_acl,
+                                            binary_size, equiv_mode));
+  string text;
+  ASSERT_EQ(0, acl_from_xattr_value_to_text(binary_acl, binary_size, &text));
+  EXPECT_EQ("user::---,user:2:r-x,group::---,group:0:r-x,group:2:rwx,"
+            "mask::---,other::---", text);
+
+  char *binary_acl2;
+  size_t binary_size2;
+  ASSERT_EQ(0, acl_from_text_to_xattr_value(text, binary_acl2, binary_size2,
+                                            equiv_mode));
+  ASSERT_EQ(binary_size, binary_size2);
+  EXPECT_EQ(0, memcmp(binary_acl, binary_acl2, binary_size));
+  free(binary_acl);
+  free(binary_acl2);
+}
+
+TEST_F(T_Acl, ToTextInvalid) {
+  string text;
+  const char truncated[] = {0x02, 0x00, 0x00, 0x00, 0x01, 0x00};
+  EXPECT_EQ(EINVAL, acl_from_xattr_value_to_text(truncated, sizeof(truncated),
+                                                 &text));
+  const char bad_version[] = {0x01, 0x00, 0x00, 0x00};
+  EXPECT_EQ(EINVAL, acl_from_xattr_value_to_text(bad_version,
+                                                 sizeof(bad_version), &text));
+  EXPECT_EQ(EINVAL, acl_from_xattr_value_to_text(bad_version, 2, &text));
 }
