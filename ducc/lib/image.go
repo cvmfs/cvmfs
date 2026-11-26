@@ -1,7 +1,6 @@
 package lib
 
 import (
-	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -1136,14 +1135,14 @@ func (img *Image) downloadLayerWithLogger(logger *log.Entry, layer da.Layer, tok
 		}
 
 		if 200 <= resp.StatusCode && resp.StatusCode < 300 {
-			gread, errG := gzip.NewReader(resp.Body)
-			if errG != nil {
-				err = errG
-				logger.WithField("error", err).Warning("Error in creating the zip to unzip the layer")
+			layerStream, errD := decompressLayer(resp.Body)
+			if errD != nil {
+				err = errD
+				logger.WithField("error", err).Warning("Error in creating the reader to decompress the layer")
 				resp.Body.Close()
 				continue
 			}
-			path := NewReadAndHash(gread)
+			path := NewReadAndHash(layerStream)
 			toSend = newDownloadedLayer(layer.Digest, path)
 			return toSend, nil
 		} else {

@@ -1,5 +1,6 @@
 // Command testregistry runs an in-process OCI registry on a fixed address and
-// seeds it with the crafted dangling-hardlink image (and any extra images
+// seeds it with the crafted dangling-hardlink image and images with gzip, zstd
+// and uncompressed layers (and any extra images
 // requested).  It is used by integration tests so that `cvmfs_ducc convert`
 // has a local image source without needing an external registry.
 //
@@ -30,6 +31,8 @@ func main() {
 	addr := flag.String("addr", ":5000", "address to listen on")
 	ref := flag.String("ref", "ducc-test/dangling-hardlink:latest",
 		"repository:tag for the crafted dangling-hardlink image")
+	compressionPrefix := flag.String("compression-prefix", "ducc-test/layers",
+		"repository prefix for the images with gzip, zstd and uncompressed layers")
 	flag.Parse()
 
 	srv := &http.Server{Addr: *addr, Handler: registry.New()}
@@ -57,7 +60,11 @@ func main() {
 	if err := testutils.PushDanglingHardlinkImage(ctx, fullRef); err != nil {
 		log.Fatalf("push dangling-hardlink image: %v", err)
 	}
-	log.Printf("ready: pushed dangling-hardlink image to %s", fullRef)
+	if err := testutils.PushCompressionTestImages(ctx, host, *compressionPrefix); err != nil {
+		log.Fatalf("push compression test images: %v", err)
+	}
+	log.Printf("ready: pushed dangling-hardlink image to %s and %s-{%s} images",
+		fullRef, *compressionPrefix, strings.Join(testutils.LayerCompressions, ","))
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
