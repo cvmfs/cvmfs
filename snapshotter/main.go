@@ -21,6 +21,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"sort"
 	"syscall"
 
 	"google.golang.org/grpc"
@@ -31,6 +32,7 @@ import (
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/log"
 	snbase "github.com/containerd/stargz-snapshotter/snapshot"
+	"github.com/moby/sys/mountinfo"
 	"github.com/sirupsen/logrus"
 
 	"github.com/cvmfs/cvmfs/snapshotter/cvmfs"
@@ -86,6 +88,7 @@ func main() {
 	if err != nil {
 		log.G(ctx).WithError(err).Fatalf("failed to configure filesystem")
 	}
+	detachLayerMounts(ctx, filepath.Join(*rootDir, "snapshotter", "snapshots"))
 	var rs snapshots.Snapshotter
 	rs, err = snbase.NewSnapshotter(ctx, filepath.Join(*rootDir, "snapshotter"), fs, snbase.AsynchronousRemove)
 	if err != nil {
@@ -133,6 +136,28 @@ func main() {
 	}()
 	waitForSignal(fs.(*cvmfs.Filesystem))
 	log.G(ctx).Info("Got SIGINT")
+}
+
+// detachLayerMounts lazily unmounts layer bind mounts left by a snapshotter
+// that did not shut down cleanly. The stargz restore step would unmount them
+// with MNT_FORCE, which aborts the host's cvmfs FUSE connection. Running
+// containers keep their own references to the layers.
+func detachLayerMounts(ctx context.Context, snapshotsDir string) {
+	mounts, err := mountinfo.GetMounts(mountinfo.PrefixFilter(snapshotsDir))
+	if err != nil {
+		log.G(ctx).WithError(err).Warn("failed to list leftover layer mounts")
+		return
+	}
+	// Unmount nested mounts before their parents
+	sort.Slice(mounts, func(i, j int) bool {
+		return len(mounts[i].Mountpoint) > len(mounts[j].Mountpoint)
+	})
+	for _, m := range mounts {
+		log.G(ctx).WithField("mountpoint", m.Mountpoint).Info("Detaching leftover layer mount")
+		if err := syscall.Unmount(m.Mountpoint, syscall.MNT_DETACH); err != nil {
+			log.G(ctx).WithError(err).WithField("mountpoint", m.Mountpoint).Warn("failed to detach leftover layer mount")
+		}
+	}
 }
 
 func waitForSignal(fs *cvmfs.Filesystem) {

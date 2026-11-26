@@ -8,6 +8,7 @@ require (
 	github.com/containerd/containerd/v2 v2.2.0
 	github.com/containerd/log v0.1.0
 	github.com/containerd/stargz-snapshotter v0.18.2
+	github.com/moby/sys/mountinfo v0.7.2
 	github.com/sirupsen/logrus v1.9.4
 	google.golang.org/grpc v1.83.2
 )
@@ -24,7 +25,6 @@ require (
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
-	github.com/moby/sys/mountinfo v0.7.2 // indirect
 	github.com/moby/sys/userns v0.1.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.1 // indirect
