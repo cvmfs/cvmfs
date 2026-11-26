@@ -1,3 +1,11 @@
+cvmfs-release (5.2) unstable; urgency=low
+
+  * Restrict the apt source to the native architecture, so multiarch
+    systems (e.g. with i386 enabled) no longer get a "doesn't support
+    architecture" notice on apt update
+
+ -- Valentin Volkl <vavolkl@cern.ch>  Thu, 26 Nov 2026 12:00:00 +0100
+
 
 cvmfs-release (5.1) unstable; urgency=low
 
