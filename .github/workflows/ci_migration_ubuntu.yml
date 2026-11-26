@@ -111,7 +111,7 @@ jobs:
         run: |
           cd test
           CVMFS_TEST_PROXY=DIRECT CVMFS_TEST_USE_CDN=yes CVMFS_TEST_CLASS_NAME=MigrationTests \
-            ./run.sh /tmp/cvmfs-migration-test.log \
+            ./run.sh /tmp/cvmfs-migration-test.log -c \
             migration_tests/001-hotpatch \
             migration_tests/003-watchdog-old-loader \
             migration_tests/500-server_repo

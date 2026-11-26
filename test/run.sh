@@ -1,7 +1,7 @@
 #!/bin/bash
 
 usage() {
-  echo "$0 [logfile] [-o xUnit XML output] [-s suite labels] [-p profile]"
+  echo "$0 [logfile] [-o xUnit XML output] [-s suite labels] [-p profile] [-c]"
   echo "          [-x <exclusion list> --] [test list]"
   echo "  -- or --"
   echo "$0 [logfile] -s3 <S3 storage path>"
@@ -9,6 +9,10 @@ usage() {
   echo "Profiles are shell fragments loaded from $(dirname "$0")/profiles/<name>.sh;"
   echo "they may set PROFILE_EXCLUSIONS, PROFILE_TESTSUITE, PROFILE_LABELS,"
   echo "PROFILE_CLASS_NAME and may define a profile_setup() hook."
+  echo ""
+  echo "-c forces colored status output even when stdout is not a terminal"
+  echo "(useful in CI). Setting FORCE_COLOR in the environment does the same."
+  echo "NO_COLOR takes precedence and disables colors regardless."
 }
 
 git_source_revision() {
@@ -142,10 +146,20 @@ suite_option_provided=0
 default_suite_used=0
 default_testsuite_used=0
 profile_name=""
-while getopts "xo:ds:p:" option; do
+# Force colored status output even without a tty (e.g. under GitHub Actions,
+# which captures step output through a pipe). Honors the FORCE_COLOR
+# convention; the -c flag below sets it explicitly.
+force_color=0
+if [ -n "$FORCE_COLOR" ]; then
+  force_color=1
+fi
+while getopts "xo:ds:p:c" option; do
   case $option in
     x)
       test_exclusions=1
+    ;;
+    c)
+      force_color=1
     ;;
     o)
       xml_output="$OPTARG"
@@ -272,7 +286,10 @@ num_passed=0
 num_failures=0
 num_warnings=0
 
-TEST_ID_WIDTH=24
+# Test-id column width; padding is drawn as dots (see
+# format_status_entry_prefix). Leaves at least three dots for the longest
+# test name under test/src.
+TEST_ID_WIDTH=45
 TEST_STATUS_WIDTH=6
 TEST_TIMESTAMP_WIDTH=6
 STATUS_LAYOUT_MIN_COLUMNS=100
@@ -375,19 +392,24 @@ configure_status_layout() {
 }
 
 configure_status_colors() {
-  if [ ! -t 1 ]; then
-    return
-  fi
-
+  # NO_COLOR always wins (https://no-color.org/).
   if [ -n "$NO_COLOR" ]; then
     return
   fi
 
-  case "${TERM:-}" in
-    ''|dumb)
+  # Unless colors are forced (-c / FORCE_COLOR), only enable them for an
+  # interactive terminal with a capable TERM.
+  if [ "$force_color" -ne 1 ]; then
+    if [ ! -t 1 ]; then
       return
-      ;;
-  esac
+    fi
+
+    case "${TERM:-}" in
+      ''|dumb)
+        return
+        ;;
+    esac
+  fi
 
   STATUS_COLOR_ENABLED=1
   COLOR_RESET=$'\033[0m'

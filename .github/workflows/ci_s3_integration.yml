@@ -33,6 +33,7 @@ jobs:
           docker compose exec -u sftnight -T cvmfs-dev bash -c '
             cd /home/sftnight/cvmfs/test && \
             ./run.sh /tmp/cvmfs-s3-test.log          \
+                     -c                                  \
                      -o /tmp/cvmfs-s3-test.log.xunit.xml \
                      -p s3
           '
