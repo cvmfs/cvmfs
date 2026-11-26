@@ -22,8 +22,7 @@ private_mount() {
   do_local_mount_as_root "$mntpnt"          \
                  "$CVMFS_TEST_REPO" \
                  "$(get_repo_url $CVMFS_TEST_REPO)" \
-                 "" \
-                 "CVMFS_KCACHE_TIMEOUT=1" || return 1
+                 || return 1
 }
 
 
