@@ -1,0 +1,14 @@
+services:
+    cvmfs-dev:
+        volumes:
+            - var_spool_cvmfs:/var/spool/cvmfs
+
+    garage:
+        volumes:
+            - garage-meta:/var/lib/garage/meta
+            - garage-data:/var/lib/garage/data
+
+volumes:
+    var_spool_cvmfs:
+    garage-meta:
+    garage-data:
