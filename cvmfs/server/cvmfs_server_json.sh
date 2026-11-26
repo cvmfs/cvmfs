@@ -182,15 +182,11 @@ edit_json_until_valid() {
 
   # Use the inherited terminal when possible.  After su/sudo -u, the
   # /dev/pts/N device may still be inaccessible to the repository owner.
-  # If stdin/stdout are not terminals, use /dev/tty instead.
-  local term=
-  if [ -t 0 ] && [ -t 1 ]; then
-    term=inherited
-  elif true < /dev/tty 2> /dev/null; then
+  # If stdin/stdout are not terminals, use /dev/tty instead.  Without any
+  # terminal, keep the inherited stdio so that non-interactive editors work.
+  local term=inherited
+  if ! { [ -t 0 ] && [ -t 1 ]; } && { : < /dev/tty; } 2> /dev/null; then
     term=/dev/tty
-  else
-    echo "No terminal available for editing; provide the JSON file with -f" >&2
-    return 1
   fi
 
   local retval=0

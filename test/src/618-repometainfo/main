@@ -20,18 +20,15 @@ cvmfs_run_test() {
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
 
-  local tty_bin=$(which tty)
-  sudo mv $tty_bin ${tty_bin}.disabled || return 10
-  sudo sh -c "echo '#!/bin/sh' > $tty_bin" || return 11
-  sudo sh -c "echo 'echo reference' >> $tty_bin" || return 12
-  sudo chmod +x $tty_bin || return 13
-  touch reference
-  EDITOR="cat" cvmfs_server update-repoinfo $CVMFS_TEST_REPO
-  local retval=$?
-  sudo mv ${tty_bin}.disabled $tty_bin || return 14
-  if [ $retval -ne 0 ]; then
-    return 21
-  fi
+  # Non-interactive editor that records the skeleton it was handed
+  local editor="$scratch_dir/editor.sh"
+  cat > "$editor" << EOF
+#!/bin/sh
+cat "\$1" > "$scratch_dir/reference"
+EOF
+  chmod +x "$editor" || return 10
+  EDITOR="$editor" cvmfs_server update-repoinfo $CVMFS_TEST_REPO < /dev/null || return 21
+  [ -s reference ] || return 22
   curl -q "$(get_repo_url $CVMFS_TEST_REPO)/.cvmfspublished" | grep -a "^M" || return 20
 
   cvmfs_swissknife info -r $(get_repo_url $CVMFS_TEST_REPO) -M > downloaded || return 30
