@@ -184,8 +184,9 @@ edit_json_until_valid() {
   # /dev/pts/N device may still be inaccessible to the repository owner.
   # If stdin/stdout are not terminals, use /dev/tty instead.  Without any
   # terminal, keep the inherited stdio so that non-interactive editors work.
+  # Not `:` -- in POSIX sh a redirection error on a special builtin exits.
   local term=inherited
-  if ! { [ -t 0 ] && [ -t 1 ]; } && { : < /dev/tty; } 2> /dev/null; then
+  if ! { [ -t 0 ] && [ -t 1 ]; } && { true < /dev/tty; } 2> /dev/null; then
     term=/dev/tty
   fi
 
