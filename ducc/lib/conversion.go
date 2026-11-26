@@ -744,7 +744,9 @@ func convertInputOutput2(inputImage *Image, imageLabel, nameWithArch, repo strin
 	err = inputImage.GetLayersWithLogger(logger, manifest, layersChanell, manifestChanell, stopGettingLayers, tmpDir, maxConcurrentDownloads, repo, forceDownload)
 	if err != nil {
 		logger.WithField("error", err).Error("Error in getting layers")
-		return result, err
+		// let in-flight ingests finish before tmpDir is removed
+		<-noErrorInConversion
+		return ConversionUnknown, err
 	}
 
 	// Collect all layer digests from the manifest for backlink saving,

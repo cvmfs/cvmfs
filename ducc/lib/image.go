@@ -1028,6 +1028,10 @@ func (img *Image) GetLayersWithLogger(logger *log.Entry, manifest da.Manifest, l
 
 	var wg sync.WaitGroup
 	defer wg.Wait()
+
+	var downloadErrMu sync.Mutex
+	var downloadErr error
+
 	// at this point we iterate each layer and we download it.
 	for _, layer := range manifest.Layers {
 		if layer.MediaType == "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip" {
@@ -1062,6 +1066,11 @@ func (img *Image) GetLayersWithLogger(logger *log.Entry, manifest da.Manifest, l
 			if err != nil {
 				layerLogger.WithField("error", err).Error("Error in downloading a layer")
 				toSend.Close()
+				downloadErrMu.Lock()
+				if downloadErr == nil {
+					downloadErr = fmt.Errorf("error downloading layer %s: %w", layer.Digest, err)
+				}
+				downloadErrMu.Unlock()
 				return
 			}
 			select {
@@ -1090,6 +1099,11 @@ func (img *Image) GetLayersWithLogger(logger *log.Entry, manifest da.Manifest, l
 
 	// we wait here to make sure that the channel is populated
 	wg.Wait()
+	// A layer that failed to download must fail the conversion, otherwise the
+	// image metadata is published for an image whose layers are missing.
+	if downloadErr != nil {
+		return downloadErr
+	}
 	select {
 	case err := <-errorChannel:
 		return err
