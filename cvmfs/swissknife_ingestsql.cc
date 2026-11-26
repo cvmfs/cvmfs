@@ -22,6 +22,7 @@
 #include "catalog_mgr_rw.h"
 #include "curl/curl.h"
 #include "gateway_util.h"
+#include "ingestsql_schema.h"
 #include "shortstring.h"
 #include "swissknife_lease_curl.h"
 #include "swissknife_lease_json.h"
@@ -56,8 +57,8 @@
   } while (0)
 
 
-static const unsigned kExternalChunkSize = 24 * 1024 * 1024;
-static const unsigned kInternalChunkSize = 6 * 1024 * 1024;
+using ingestsql::kExternalChunkSize;
+using ingestsql::kInternalChunkSize;
 static const unsigned kDefaultLeaseBusyRetryInterval = 10;
 static const unsigned kLeaseRefreshInterval = 90;  // seconds
 
@@ -1539,54 +1540,6 @@ int swissknife::IngestSQL::do_deletions(
   return ret;
 }
 
-const char *schema[] = {"PRAGMA journal_mode=WAL;",
-
-                        "CREATE TABLE IF NOT EXISTS dirs ( \
-        name  TEXT    PRIMARY KEY, \
-        mode  INTEGER NOT NULL DEFAULT 493,\
-        mtime INTEGER NOT NULL DEFAULT 0,\
-        owner INTEGER NOT NULL DEFAULT 0, \
-        grp   INTEGER NOT NULL DEFAULT 0, \
-        acl   TEXT    NOT NULL DEFAULT '', \
-        nested INTEGER DEFAULT 1);",
-
-                        "CREATE TABLE IF NOT EXISTS files ( \
-        name   TEXT    PRIMARY KEY, \
-        mode   INTEGER NOT NULL DEFAULT 420, \
-        mtime  INTEGER NOT NULL DEFAULT 0,\
-        owner  INTEGER NOT NULL DEFAULT 0,\
-        grp    INTEGER NOT NULL DEFAULT 0,\
-        size   INTEGER NOT NULL DEFAULT 0,\
-        hashes TEXT    NOT NULL DEFAULT '',\
-        internal INTEGER NOT NULL DEFAULT 0,\
-        compressed INTEGER NOT NULL DEFAULT 0\
-  );",
-
-                        "CREATE TABLE IF NOT EXISTS links (\
-        name   TEXT    PRIMARY KEY,\
-        target TEXT    NOT NULL DEFAULT '',\
-        mtime  INTEGER NOT NULL DEFAULT 0,\
-        owner  INTEGER NOT NULL DEFAULT 0,\
-        grp    INTEGER NOT NULL DEFAULT 0,\
-        skip_if_file_or_dir INTEGER NOT NULL DEFAULT 0\
-  );",
-
-                        "CREATE TABLE IF NOT EXISTS deletions (\
-        name      TEXT PRIMARY KEY,\
-        directory INTEGER NOT NULL DEFAULT 0,\
-        file      INTEGER NOT NULL DEFAULT 0,\
-        link      INTEGER NOT NULL DEFAULT 0\
-  );",
-
-                        "CREATE TABLE IF NOT EXISTS properties (\
-        key   TEXT PRIMARY KEY,\
-        value TEXT NOT NULL\
-  );",
-
-                        "INSERT INTO properties VALUES ('schema_revision', "
-                        "'4') ON CONFLICT DO NOTHING;",
-                        NULL};
-
 static void create_empty_database(string &filename) {
   sqlite3 *db_out;
   LogCvmfs(kLogCvmfs, kLogStdout, "Creating empty database file %s",
@@ -1596,7 +1549,7 @@ static void create_empty_database(string &filename) {
   CHECK_SQLITE_ERROR(ret, SQLITE_OK);
   relax_db_locking(db_out);
 
-  const char **ptr = schema;
+  const char *const *ptr = ingestsql::kSchema;
   while (*ptr != NULL) {
     ret = sqlite3_exec(db_out, *ptr, NULL, NULL, NULL);
     CHECK_SQLITE_ERROR(ret, SQLITE_OK);

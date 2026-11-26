@@ -14,6 +14,7 @@
 #include "swissknife_info.h"
 #include "swissknife_ingest.h"
 #include "swissknife_ingestsql.h"
+#include "swissknife_ingestsql_gen.h"
 #include "swissknife_lease.h"
 #include "swissknife_letter.h"
 #include "swissknife_list_reflog.h"
@@ -101,6 +102,7 @@ int main(int argc, char **argv) {
   command_list.push_back(new swissknife::CommandLease());
   command_list.push_back(new swissknife::Ingest());
   command_list.push_back(new swissknife::IngestSQL());
+  command_list.push_back(new swissknife::IngestSQLGen());
   command_list.push_back(new swissknife::CommandNotify());
   command_list.push_back(new swissknife::CommandOverlay());
   command_list.push_back(new swissknife::CommandFileStats());

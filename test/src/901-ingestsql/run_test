@@ -85,6 +85,7 @@ sudo tee -a /etc/cvmfs/repositories.d/"$CVMFS_TEST_REPO"/client.conf <<EOF
 CVMFS_MAX_TTL_SECS=1
 CVMFS_AUTO_UPDATE=yes
 CVMFS_KCACHE_TIMEOUT=0
+CVMFS_EXTERNAL_URL=$CVMFS_TEST_HTTP_BASE/ext
 EOF
 # Some test cases will add files stored uncompressed, possibly as "external". Upload into S3 to make this work.
 CONTENTS=$(mktemp)
@@ -117,6 +118,15 @@ export LANG=C.UTF-8
 set +e
 sudo -E "$this_script_dir"/graft-tests.py --no-mount standard file-read quick |& sudo tee /var/log/graft-tests.log
 RC=$?
+if [[ $RC -eq 0 ]]; then
+    CVMFS_TEST_REPO="$CVMFS_TEST_REPO" \
+    CVMFS_TEST_MOUNTPOINT="$CVMFS_TEST_MOUNTPOINT" \
+    CVMFS_TEST_S3_CONFIG="$CVMFS_TEST_S3_CONFIG" \
+    CVMFS_TEST_HTTP_BASE="$CVMFS_TEST_HTTP_BASE" \
+    CVMFS_S3_BUCKET="$CVMFS_S3_BUCKET" \
+        "$this_script_dir"/gen-test.sh |& sudo tee /var/log/gen-test.log
+    RC=${PIPESTATUS[0]}
+fi
 if [[ -v DEBUG ]]; then
     sleep 2
     kill $NGREP_PID

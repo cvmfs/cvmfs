@@ -44,6 +44,7 @@ RUN chmod 0400 /etc/shadow
 # cloudtest dependencies (s3cmd is only available from EPEL;
 # pylibacl/xattr/requests are needed by test/src/901-ingestsql/graft-tests.py)
 RUN dnf install -y epel-release && dnf install -y \
+    acl \
     attr \
     autofs \
     bc \

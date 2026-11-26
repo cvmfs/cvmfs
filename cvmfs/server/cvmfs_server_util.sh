@@ -1241,7 +1241,7 @@ is_subcommand() {
     resign list info tag list-tags lstags check transaction enter abort snapshot    \
     skeleton migrate list-catalogs diff checkout update-geodb gc catalog-chown      \
     eliminate-hardlinks eliminate-bulk-hashes fix-stats update-info update-repoinfo \
-    mount fix-permissions masterkeycard ingest ingestsql overlay merge-stats print-stats \
+    mount fix-permissions masterkeycard ingest ingestsql ingestsql-gen overlay merge-stats print-stats \
     refresh-lease"
 
   for possible_command in $supported_commands; do
@@ -1465,6 +1465,14 @@ Supported Commands:
                   <fully qualified name>
                   Graft the contents of a SQLite database to the repository
                   via the gateway.
+  ingestsql-gen   [-p <repository path>] [-o <output database>]
+                  [-f sql|table] [-N <nested catalog globs>]
+                  [-u <uid>:<gid>] [-j <hashing threads>] [--no-hash]
+                  <local file or directory>
+                  Print the ingestsql input describing a local tree as
+                  external data, or write it to a database for ingestsql -D.
+  ingestsql-gen   --schema
+                  Print the annotated ingestsql database schema.
   overlay         -l <layer1,layer2,...> (comma-separated, bottom-to-top order)
                   -d <destination path>
                   <fully qualified name>
