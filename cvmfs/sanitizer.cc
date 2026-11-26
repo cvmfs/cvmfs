@@ -123,7 +123,11 @@ bool IntegerSanitizer::Sanitize(std::string::const_iterator begin,
   }
 
   if (*begin == '-') {
-    // minus is allowed as the first character!
+    // minus is allowed as the first character, but only as the sign of a
+    // number; a lone minus is not an integer
+    if (std::distance(begin, end) == 1) {
+      return false;
+    }
     filtered_output->push_back('-');
     begin++;
   }
