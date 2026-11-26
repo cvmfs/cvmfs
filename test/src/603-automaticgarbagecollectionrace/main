@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 cvmfs_test_name="Automatic Garbage Collection Preserves Re-added Objects"
 cvmfs_test_autofs_on_startup=false

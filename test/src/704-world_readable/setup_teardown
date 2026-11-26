@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 create_world_readable_repo() {
   echo ""
   echo "*** CREATE a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"

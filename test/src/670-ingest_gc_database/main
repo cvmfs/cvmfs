@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 cvmfs_test_name="Ingest with --gc-db deletes paths from GC SQLite database"
 cvmfs_test_autofs_on_startup=false

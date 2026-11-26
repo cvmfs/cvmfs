@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Reproducer for https://github.com/cvmfs/cvmfs/issues/3481
 

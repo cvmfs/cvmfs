@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 cvmfs_test_name="Ignore mount attempts for configured repositories"
 cvmfs_test_suites="quick"

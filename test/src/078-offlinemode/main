@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 cvmfs_test_name="Offline mode - normal catalog and fixed catalog test"
 cvmfs_test_suites="quick"

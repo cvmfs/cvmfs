@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 cvmfs_test_name="Sync files into a repository using cvmfs_rsync"
 cvmfs_test_autofs_on_startup=false

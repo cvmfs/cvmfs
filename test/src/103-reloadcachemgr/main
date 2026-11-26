@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 cvmfs_test_name="Check changing CVMFS_CACHE_REFCOUNT between reloads"
 cvmfs_test_suites="quick"

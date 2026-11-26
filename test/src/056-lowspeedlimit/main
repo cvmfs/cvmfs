@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 cvmfs_test_name="Low speed limit"
 CVMFS_TEST056_MOUNTPOINT=
