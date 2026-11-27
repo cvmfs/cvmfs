@@ -42,6 +42,7 @@ EOF
   # CentOS 9
   # Fedora 43
   sudo a2enmod proxy || true
+  sudo a2enmod proxy_http || true
 
   apache_switch off > /dev/null
   apache_switch on  > /dev/null
