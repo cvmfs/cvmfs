@@ -2,6 +2,7 @@ package cvmfs
 
 import (
 	"bytes"
+	da "github.com/cvmfs/ducc/docker-api"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -267,5 +268,24 @@ func TestOverlaySubdir(t *testing.T) {
 	markerPath := filepath.Join(mockrepo, subdirName, destPath, ".overlay_marker")
 	if _, err := os.Stat(markerPath); err != nil {
 		t.Fatalf("Overlay did not create %s: %s", markerPath, err)
+	}
+}
+
+func TestSaveLayersBacklinkNoDuplicates(t *testing.T) {
+	repo := ".." + filepath.Clean("/"+os.Getenv("CVMFS_TEST_REPO"))
+	layer := strings.Repeat("d", 64)
+	var m da.Manifest
+	m.Config.Digest = "sha256:" + strings.Repeat("e", 64)
+	for i := 0; i < 2; i++ {
+		if err := SaveLayersBacklink(repo, m, []string{layer}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	b, err := GetBacklinkFromLayer(repo, layer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(b.Origin) != 1 || b.Origin[0] != m.Config.Digest {
+		t.Errorf("origin %v, want one entry", b.Origin)
 	}
 }

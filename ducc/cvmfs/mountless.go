@@ -19,10 +19,12 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 
+	"github.com/cvmfs/ducc/constants"
 	l "github.com/cvmfs/ducc/log"
 )
 
@@ -83,23 +85,126 @@ func publishToCVMFSMountless(logger *log.Entry, CVMFSRepo, repoPath, target stri
 		// (regular --delete needs the rdonly mount for traversal).  Best effort
 		// — the path may not exist yet.
 		_ = IngestFastDeleteWithLogger(logger, CVMFSRepo, dest)
-		return ingestTarStreamWithLogger(logger, CVMFSRepo, dest,
-			func(tw *tar.Writer) error { return writeDirTree(tw, target) })
+		baseDir, prefix := mountlessIngestBase(dest)
+		return ingestTarStreamWithLogger(logger, CVMFSRepo, baseDir,
+			func(tw *tar.Writer) error { return writeDirTree(tw, target, prefix) })
 	}
 
 	if !st.Mode().IsRegular() {
 		return fmt.Errorf("Trying to ingest neither a file nor a directory")
 	}
 
-	// A single regular file: extract one named member into the parent dir.
 	// The tarball engine adds-or-replaces the entry, so no delete is needed.
-	baseDir := filepath.Dir(dest)
-	if baseDir == "." {
-		baseDir = ""
-	}
-	name := filepath.Base(dest)
+	baseDir, name := mountlessIngestBase(dest)
 	return ingestTarStreamWithLogger(logger, CVMFSRepo, baseDir,
 		func(tw *tar.Writer) error { return writeRegularFile(tw, name, target, st) })
+}
+
+// mountlessIngestBase splits a destination into the ingest base directory,
+// its first path component, and the path below it. Mountless ingest refuses
+// a base whose parent does not exist yet; a top-level base always has one
+// (the root), and the tarball engine creates the missing directories below
+// it. A single-component destination ingests at the root.
+func mountlessIngestBase(dest string) (baseDir, rel string) {
+	top, rest, nested := strings.Cut(dest, "/")
+	if !nested {
+		return "", dest
+	}
+	return top, rest
+}
+
+// EnsureDirectoryWithLogger creates dir (repository-relative) if it is not
+// published yet. Gateway leases, mounted or mountless, need an existing
+// parent directory, so callers ensure it before ingesting below it. The
+// directory is created by an ingest at its top-level component, which
+// always has a parent; the tarball engine adds the levels in between.
+func EnsureDirectoryWithLogger(logger *log.Entry, CVMFSRepo, dir string) error {
+	logger = l.Ensure(logger)
+	dest := PrefixRepoSubdirOnce(CVMFSRepo, dir)
+	if dest == "" {
+		return nil
+	}
+	repoName, _ := GetRepoAndSubdir(CVMFSRepo)
+	if fi, err := RepoStat(filepath.Join("/", "cvmfs", repoName, dest)); err == nil {
+		if !fi.IsDir() {
+			return fmt.Errorf("%s exists and is not a directory", dest)
+		}
+		return nil
+	}
+	baseDir, rel := mountlessIngestBase(dest)
+	if baseDir == "" {
+		// A missing top-level directory is created by an empty ingest into it.
+		baseDir, rel = dest, ""
+	}
+	return ingestTarStreamWithLogger(logger, CVMFSRepo, baseDir, func(tw *tar.Writer) error {
+		if rel == "" {
+			return nil
+		}
+		parts := strings.Split(rel, "/")
+		for i := range parts {
+			if err := tw.WriteHeader(&tar.Header{
+				Typeflag: tar.TypeDir,
+				Name:     strings.Join(parts[:i+1], "/") + "/",
+				Mode:     0755,
+				Uid:      os.Getuid(),
+				Gid:      os.Getgid(),
+				ModTime:  time.Now(),
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+// saveBacklinksMountless writes the backlink files (absolute paths below
+// /cvmfs/<repo>) with one ingest per top-level directory, instead of a
+// transaction that needs the mount.
+func saveBacklinksMountless(logger *log.Entry, CVMFSRepo string, files map[string][]byte) error {
+	logger = l.Ensure(logger)
+	repoName, _ := GetRepoAndSubdir(CVMFSRepo)
+	root := filepath.Join("/", "cvmfs", repoName)
+	groups := map[string]map[string][]byte{}
+	for path, content := range files {
+		rel, err := filepath.Rel(root, path)
+		if err != nil || rel == "." || strings.HasPrefix(rel, "..") {
+			return fmt.Errorf("backlink %s is outside the repository", path)
+		}
+		base, name := mountlessIngestBase(rel)
+		if groups[base] == nil {
+			groups[base] = map[string][]byte{}
+		}
+		groups[base][name] = content
+	}
+	var firstErr error
+	for base, group := range groups {
+		err := ingestTarStreamWithLogger(logger, CVMFSRepo, base, func(tw *tar.Writer) error {
+			for name, content := range group {
+				if err := tw.WriteHeader(&tar.Header{
+					Typeflag: tar.TypeReg,
+					Name:     name,
+					Mode:     int64(constants.FilePermision),
+					Size:     int64(len(content)),
+					Uid:      os.Getuid(),
+					Gid:      os.Getgid(),
+					ModTime:  time.Now(),
+				}); err != nil {
+					return err
+				}
+				if _, err := tw.Write(content); err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			logger.WithFields(log.Fields{"base": base, "error": err}).Error("Error in writing backlinks")
+			if firstErr == nil {
+				firstErr = err
+			}
+		}
+	}
+	return firstErr
 }
 
 // createSymlinkMountless creates (or replaces) a symlink at repoLink pointing
@@ -107,11 +212,7 @@ func publishToCVMFSMountless(logger *log.Entry, CVMFSRepo, repoPath, target stri
 func createSymlinkMountless(logger *log.Entry, CVMFSRepo, repoLink, linkTarget string) error {
 	logger = l.Ensure(logger)
 	dest := PrefixRepoSubdirOnce(CVMFSRepo, repoLink)
-	baseDir := filepath.Dir(dest)
-	if baseDir == "." {
-		baseDir = ""
-	}
-	name := filepath.Base(dest)
+	baseDir, name := mountlessIngestBase(dest)
 	return ingestTarStreamWithLogger(logger, CVMFSRepo, baseDir,
 		func(tw *tar.Writer) error {
 			return tw.WriteHeader(&tar.Header{
@@ -150,8 +251,8 @@ func writeRegularFile(tw *tar.Writer, name, target string, st os.FileInfo) error
 }
 
 // writeDirTree walks root and writes its contents into the tar with paths
-// relative to root (so they land directly under the ingest base_dir).
-func writeDirTree(tw *tar.Writer, root string) error {
+// relative to root, below prefix within the ingest base_dir.
+func writeDirTree(tw *tar.Writer, root, prefix string) error {
 	return filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -161,7 +262,10 @@ func writeDirTree(tw *tar.Writer, root string) error {
 			return err
 		}
 		if rel == "." {
-			return nil // the base_dir itself is created by the ingest
+			return nil // created by the ingest or as an implicit parent
+		}
+		if prefix != "" {
+			rel = filepath.Join(prefix, rel)
 		}
 
 		var link string
