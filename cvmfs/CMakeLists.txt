@@ -59,6 +59,7 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS)
        catalog_sql.cc
        clientctx.cc
        compression/compression.cc
+       config_repo_fetch.cc
        directory_entry.cc
        duplex_fuse.cc
        fd_refcount_mgr.cc

@@ -360,6 +360,7 @@ set(CVMFS_UNITTEST_SOURCES
   t_nfs4_server.cc
   t_notify_messages.cc
   t_object_fetcher.cc
+  t_config_repo.cc
   t_options.cc
   t_pack.cc
   t_panic.cc
@@ -442,6 +443,7 @@ set(CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/catalog_virtual.cc
   ${CVMFS_SOURCE_DIR}/clientctx.cc
   ${CVMFS_SOURCE_DIR}/compression/compression.cc
+  ${CVMFS_SOURCE_DIR}/config_repo_fetch.cc
   ${CVMFS_SOURCE_DIR}/cvmfs_suid_util.cc
   ${CVMFS_SOURCE_DIR}/directory_entry.cc
   ${CVMFS_SOURCE_DIR}/duplex_fuse.cc
@@ -624,6 +626,7 @@ set(CVMFS_UNITTEST_MOCKFUSE_SOURCES
   ${CVMFS_SOURCE_DIR}/clientctx.cc
   ${CVMFS_SOURCE_DIR}/compat.cc
   ${CVMFS_SOURCE_DIR}/compression/compression.cc
+  ${CVMFS_SOURCE_DIR}/config_repo_fetch.cc
   ${CVMFS_SOURCE_DIR}/cvmfs_suid_util.cc
   ${CVMFS_SOURCE_DIR}/directory_entry.cc
   ${CVMFS_SOURCE_DIR}/duplex_fuse.cc

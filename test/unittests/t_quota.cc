@@ -509,6 +509,35 @@ TEST_F(T_QuotaManager, PinUnpin) {
 }
 
 
+TEST_F(T_QuotaManager, DisablePinning) {
+  quota_mgr_->Pin(hashes_[0], 1, "catalog", true);
+  CreateFile(tmp_path_ + "/" + hashes_[0].MakePathWithoutSuffix(), 0600);
+  quota_mgr_->DisablePinning();
+
+  // Cached objects keep their entry, new ones are only registered
+  EXPECT_TRUE(quota_mgr_->Pin(hashes_[0], 1, "other", true));
+  EXPECT_TRUE(quota_mgr_->Pin(hashes_[1], 1, "new", true));
+  quota_mgr_->Unpin(hashes_[0]);
+  EXPECT_EQ("catalog\n", PrintStringVector(quota_mgr_->ListCatalogs()));
+  EXPECT_EQ("new\n", PrintStringVector(quota_mgr_->List()));
+  EXPECT_EQ("catalog\n", PrintStringVector(quota_mgr_->ListPinned()));
+  EXPECT_EQ(1U, quota_mgr_->GetSizePinned());
+}
+
+
+TEST_F(T_QuotaManager, ConnectShared) {
+  // Neither starts a cache manager nor leaves a FIFO behind
+  EXPECT_EQ(NULL, PosixQuotaManager::ConnectShared(tmp_path_));
+  EXPECT_FALSE(FileExists(tmp_path_ + "/cachemgr"));
+
+  // Does not wait for a client that is starting a cache manager
+  const int fd_lock = LockFile(tmp_path_ + "/lock_cachemgr");
+  ASSERT_GE(fd_lock, 0);
+  EXPECT_EQ(NULL, PosixQuotaManager::ConnectShared(tmp_path_));
+  UnlockFile(fd_lock);
+}
+
+
 TEST_F(T_QuotaManager, RebuildDatabase) {
   delete quota_mgr_;
   quota_mgr_ = NULL;

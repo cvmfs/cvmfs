@@ -93,7 +93,8 @@ static void *MainTalk(void *data __attribute__((unused))) {
       int retval = Reload(con_fd, command == 'S', reload_mode);
       SendMsg2Socket(con_fd, "~");
       (void)send(con_fd, &retval, sizeof(retval), MSG_NOSIGNAL);
-      if (retval != kFailOk) {
+      // kFailConfigRepo is returned before the module is torn down
+      if ((retval != kFailOk) && (retval != kFailConfigRepo)) {
         PANIC(kLogSyslogErr, "reloading Fuse module failed (%d - %s)", retval,
               Code2Ascii(static_cast<Failures>(retval)));
       }
@@ -216,7 +217,10 @@ int MainReload(const std::string &socket_path, const bool stop_and_go,
              "Socket read FAILED! "
              "CernVM-FS mountpoints unusable.");
   } else {
-    if (result != kFailOk) {
+    if (result == kFailConfigRepo) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "Reload aborted, the current Fuse module stays active.");
+    } else if (result != kFailOk) {
       LogCvmfs(kLogCvmfs, kLogStderr,
                "Reload FAILED! "
                "CernVM-FS mountpoints unusable.");

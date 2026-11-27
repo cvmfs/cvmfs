@@ -41,6 +41,7 @@
 #include "catalog.h"
 #include "catalog_mgr_client.h"
 #include "clientctx.h"
+#include "config_repo_fetch.h"
 #include "crypto/signature.h"
 #include "duplex_sqlite3.h"
 #include "fetch.h"
@@ -71,6 +72,7 @@
 #include "telemetry_aggregator.h"
 #include "tracer.h"
 #include "util/logging.h"
+#include "util/mutex.h"
 #include "util/posix.h"
 #include "util/string.h"
 #include "util/uuid.h"
@@ -139,7 +141,8 @@ bool FileSystem::CheckPosixCacheSettings(
     return false;
   }
 
-  if (type_ == kFsLibrary) {
+  // With a fallback cache dir, a shared cache is only used if already connected
+  if ((type_ == kFsLibrary) && fallback_cache_dir_.empty()) {
     if (settings.is_shared || settings.is_managed) {
       boot_error_ = "Failure: libcvmfs supports only unmanaged exclusive cache "
                     "or alien cache.";
@@ -408,6 +411,7 @@ FileSystem::FileSystem(const FileSystem::FileSystemInfo &fs_info)
     , options_mgr_(fs_info.options_mgr)
     , wait_workspace_(fs_info.wait_workspace)
     , foreground_(fs_info.foreground)
+    , fallback_cache_dir_(fs_info.fallback_cache_dir)
     , n_fs_open_(NULL)
     , n_fs_dir_open_(NULL)
     , n_fs_lookup_(NULL)
@@ -683,8 +687,35 @@ CacheManager *FileSystem::SetupExternalCacheMgr(const string &instance) {
 }
 
 
+/**
+ * The cache directory and, if different, the workspace of the quota manager
+ */
+static string QuotaWorkspace(const string &cache_path,
+                             const string &workspace) {
+  if (cache_path == workspace)
+    return cache_path;
+  return cache_path + ":" + workspace;
+}
+
+
 CacheManager *FileSystem::SetupPosixCacheMgr(const string &instance) {
-  const PosixCacheSettings settings = DeterminePosixCacheSettings(instance);
+  PosixCacheSettings settings = DeterminePosixCacheSettings(instance);
+  std::unique_ptr<PosixQuotaManager> shared_quota_mgr;
+  if (!fallback_cache_dir_.empty()) {
+    if (settings.is_shared && settings.is_managed && !settings.is_alien) {
+      shared_quota_mgr.reset(PosixQuotaManager::ConnectShared(
+          QuotaWorkspace(settings.cache_path, settings.workspace)));
+    }
+    if (shared_quota_mgr.get() == nullptr) {
+      LogCvmfs(kLogCvmfs, kLogDebug, "using unmanaged cache in %s",
+               fallback_cache_dir_.c_str());
+      settings.cache_path = fallback_cache_dir_;
+      settings.workspace = fallback_cache_dir_;
+      settings.is_alien = false;
+      settings.is_shared = false;
+      settings.is_managed = false;
+    }
+  }
   if (!CheckPosixCacheSettings(settings))
     return NULL;
   std::unique_ptr<PosixCacheManager> cache_mgr(PosixCacheManager::Create(
@@ -697,6 +728,15 @@ CacheManager *FileSystem::SetupPosixCacheMgr(const string &instance) {
                   + settings.cache_path + ": " + strerror(errno);
     boot_status_ = loader::kFailCacheDir;
     return NULL;
+  }
+
+  if (shared_quota_mgr.get() != nullptr) {
+    // Neither cleans up nor changes the cleanup policy of the other clients
+    shared_quota_mgr->DisablePinning();
+    const int retval = cache_mgr->AcquireQuotaManager(
+        shared_quota_mgr.release());
+    assert(retval);
+    return cache_mgr.release();
   }
 
   // Sentinel file for future use
@@ -978,12 +1018,12 @@ bool FileSystem::SetupPosixQuotaMgr(
     const FileSystem::PosixCacheSettings &settings, CacheManager *cache_mgr) {
   assert(settings.quota_limit >= 0);
   const int64_t quota_threshold = settings.quota_limit / 2;
-  string cache_workspace = settings.cache_path;
+  const string cache_workspace = QuotaWorkspace(settings.cache_path,
+                                                settings.workspace);
   if (settings.cache_path != settings.workspace) {
     LogCvmfs(kLogQuota, kLogDebug | kLogSyslog,
              "using workspace %s to protect cache database in %s",
              settings.workspace.c_str(), settings.cache_path.c_str());
-    cache_workspace += ":" + settings.workspace;
   }
   PosixQuotaManager *quota_mgr;
 
@@ -1211,7 +1251,18 @@ bool MountPoint::CheckBlacklists() {
   if (options_mgr_->HasConfigRepository(fqrn_, &config_repository_path)) {
     blacklist = config_repository_path + "blacklist";
     blacklist_paths_.push_back(blacklist);
-    if (FileExists(blacklist)) {
+    // Not through the mount point during (re-)load if the config repository
+    // was fetched
+    const std::shared_ptr<const ConfigRepoTree> tree = options_mgr_
+                                                           ->config_repo_tree();
+    string mount_dir;
+    options_mgr_->GetValue("CVMFS_MOUNT_DIR", &mount_dir);
+    string rel_path;
+    if (tree && tree->MapMountPath(mount_dir, blacklist, &rel_path)) {
+      string content;
+      if (tree->Lookup(rel_path, &content))
+        signature_mgr_->LoadBlacklistMem(content, append);
+    } else if (FileExists(blacklist)) {
       if (!signature_mgr_->LoadBlacklist(blacklist, append)) {
         boot_error_ = "failed to load blacklist from config repository";
         boot_status_ = loader::kFailSignature;
@@ -1231,8 +1282,24 @@ bool MountPoint::CheckBlacklists() {
 bool MountPoint::ReloadBlacklists() {
   const bool result = true;
   bool append = false;
+  std::shared_ptr<const ConfigRepoTree> tree;
+  {
+    const MutexLockGuard guard(&lock_config_repo_);
+    tree = options_mgr_->config_repo_tree();
+  }
+  string mount_dir;
+  options_mgr_->GetValue("CVMFS_MOUNT_DIR", &mount_dir);
   for (unsigned i = 0; i < blacklist_paths_.size(); ++i) {
     const string blacklist = blacklist_paths_[i];
+    string rel_path;
+    if (tree && tree->MapMountPath(mount_dir, blacklist, &rel_path)) {
+      string content;
+      if (tree->Lookup(rel_path, &content)) {
+        signature_mgr_->LoadBlacklistMem(content, append);
+        append = true;
+      }
+      continue;
+    }
     if (FileExists(blacklist)) {
       const bool retval = signature_mgr_->LoadBlacklist(blacklist, append);
       // TODO(jblomer): this can leave us with a half-loaded blacklist
@@ -1243,6 +1310,45 @@ bool MountPoint::ReloadBlacklists() {
   }
   return result;
 }
+
+MountPoint::ConfigRepoState MountPoint::RefreshConfigRepo() {
+  const MutexLockGuard guard(&lock_config_repo_);
+  const std::shared_ptr<const ConfigRepoTree> tree = options_mgr_
+                                                         ->config_repo_tree();
+  // No fetched copy if fetching failed at (re)load: retry the full fetch
+  const bool have_tree = tree && !tree->root_hash.empty();
+
+  const bool simple_parser = dynamic_cast<SimpleOptionsParser *>(options_mgr_)
+                             != NULL;
+  const config_repo::FetchResult fetch = config_repo::FetchForRepository(
+      fqrn_, simple_parser);
+  if (fetch.mode == config_repo::kFetchMount)
+    return kConfigRepoNotFetched;
+  if (!fetch.tree || fetch.stale) {
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+             "failed to %s config repository %s (%s)",
+             have_tree ? "check" : "fetch", fetch.config_repo.c_str(),
+             fetch.error.c_str());
+  }
+  if (!fetch.tree) {
+    // Without a previous copy, the blacklist is read as at (re)load
+    return have_tree ? kConfigRepoUnknown : kConfigRepoNotFetched;
+  }
+  const ConfigRepoState state = fetch.stale ? kConfigRepoUnknown
+                                            : kConfigRepoCurrent;
+  if (have_tree && (fetch.tree->root_hash == tree->root_hash))
+    return state;
+  // Only the blacklist is taken from the new tree; other options change on
+  // the next reload
+  options_mgr_->set_config_repo_tree(fetch.tree);
+  LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
+           "config repository %s %s revision %" PRIu64
+           ", other options apply on the next reload",
+           fetch.tree->fqrn.c_str(), have_tree ? "changed to" : "fetched at",
+           fetch.tree->revision);
+  return state;
+}
+
 
 /**
  * Disables kernel caching of symlinks.
@@ -1704,26 +1810,81 @@ bool MountPoint::CreateSignatureManager() {
   signature_mgr_ = new signature::SignatureManager();
   signature_mgr_->Init();
 
+  const std::shared_ptr<const ConfigRepoTree> tree = options_mgr_
+                                                         ->config_repo_tree();
+  string mount_dir;
+  options_mgr_->GetValue("CVMFS_MOUNT_DIR", &mount_dir);
+  // Keys below the config repository mount point are taken from the fetched
+  // tree, if available
   string public_keys;
   if (options_mgr_->GetValue("CVMFS_PUBLIC_KEY", &optarg)) {
     public_keys = optarg;
   } else if (options_mgr_->GetValue("CVMFS_KEYS_DIR", &optarg)) {
-    // Collect .pub files from CVMFS_KEYS_DIR
-    public_keys = JoinStrings(FindFilesBySuffix(optarg, ".pub"), ":");
+    string rel_dir;
+    if (tree && tree->MapMountPath(mount_dir, optarg, &rel_dir)) {
+      const vector<string> names = tree->List(rel_dir);
+      vector<string> key_paths;
+      for (unsigned i = 0; i < names.size(); ++i) {
+        if (HasSuffix(names[i], ".pub", false))
+          key_paths.push_back(MakeCanonicalPath(optarg) + "/" + names[i]);
+      }
+      public_keys = JoinStrings(key_paths, ":");
+    } else {
+      public_keys = JoinStrings(FindFilesBySuffix(optarg, ".pub"), ":");
+    }
   } else {
     public_keys = JoinStrings(FindFilesBySuffix("/etc/cvmfs/keys", ".pub"),
                               ":");
   }
 
-  if (!signature_mgr_->LoadPublicRsaKeys(public_keys)) {
+  bool use_tree = false;
+  const vector<string> key_paths = SplitString(public_keys, ':');
+  if (tree && !public_keys.empty()) {
+    for (unsigned i = 0; i < key_paths.size(); ++i) {
+      string rel_path;
+      if (tree->MapMountPath(mount_dir, key_paths[i], &rel_path)) {
+        use_tree = true;
+        break;
+      }
+    }
+  }
+
+  bool keys_loaded;
+  if (use_tree) {
+    vector<string> pems;
+    keys_loaded = true;
+    for (unsigned i = 0; keys_loaded && (i < key_paths.size()); ++i) {
+      string rel_path;
+      string pem;
+      if (tree->MapMountPath(mount_dir, key_paths[i], &rel_path)) {
+        keys_loaded = tree->Lookup(rel_path, &pem);
+      } else {
+        const int fd = open(key_paths[i].c_str(), O_RDONLY);
+        keys_loaded = (fd >= 0) && SafeReadToString(fd, &pem);
+        if (fd >= 0)
+          close(fd);
+      }
+      if (!keys_loaded) {
+        LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+                 "failed to open public key '%s'", key_paths[i].c_str());
+      }
+      pems.push_back(pem);
+    }
+    keys_loaded = keys_loaded && signature_mgr_->LoadPublicRsaKeysMem(pems);
+  } else {
+    keys_loaded = signature_mgr_->LoadPublicRsaKeys(public_keys);
+  }
+
+  if (!keys_loaded) {
     boot_error_ = "failed to load public key(s)";
     boot_status_ = loader::kFailSignature;
     return false;
   }
 
   if (public_keys.size() > 0) {
-    LogCvmfs(kLogCvmfs, kLogDebug, "CernVM-FS: using public key(s) %s",
-             public_keys.c_str());
+    LogCvmfs(kLogCvmfs, kLogDebug, "CernVM-FS: using public key(s) %s%s",
+             public_keys.c_str(),
+             use_tree ? " (from fetched config repository)" : "");
   } else {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn, "no public key loaded");
   }
@@ -2020,13 +2181,16 @@ MountPoint::MountPoint(const string &fqrn,
     , talk_socket_path_(std::string("./cvmfs_io.") + fqrn)
     , talk_socket_uid_(0)
     , talk_socket_gid_(0) {
-  const int retval = pthread_mutex_init(&lock_max_ttl_, NULL);
+  int retval = pthread_mutex_init(&lock_max_ttl_, NULL);
+  assert(retval == 0);
+  retval = pthread_mutex_init(&lock_config_repo_, NULL);
   assert(retval == 0);
 }
 
 
 MountPoint::~MountPoint() {
   pthread_mutex_destroy(&lock_max_ttl_);
+  pthread_mutex_destroy(&lock_config_repo_);
 
   // The bundle prefetcher owns background threads that use the catalog
   // manager, the fetchers and the cache manager; join them before any of

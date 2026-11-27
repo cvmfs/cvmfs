@@ -158,6 +158,12 @@ class FileSystem : SingleCopy, public BootFactory {
      * should not daemonize, too, but print debug messages to stdout.
      */
     bool foreground;
+    /**
+     * Library mode only.  If set, a shared posix cache is used only while its
+     * cache manager runs, without pinning and without starting one.  Otherwise
+     * the cache is an unmanaged one in this directory.
+     */
+    std::string fallback_cache_dir;
   };
 
   /**
@@ -345,6 +351,7 @@ class FileSystem : SingleCopy, public BootFactory {
   OptionsManager *options_mgr_;
   bool wait_workspace_;
   bool foreground_;
+  std::string fallback_cache_dir_;
 
   perf::Counter *n_fs_open_;
   perf::Counter *n_fs_dir_open_;
@@ -594,6 +601,20 @@ class MountPoint : SingleCopy, public BootFactory {
   bool partial_replica_fail_mode() const { return partial_replica_fail_mode_; }
 
   bool ReloadBlacklists();
+
+  enum ConfigRepoState {
+    kConfigRepoNotFetched,  ///< options were read from the mount point
+    kConfigRepoCurrent,
+    kConfigRepoUnknown,  ///< could not establish the current revision
+  };
+  /**
+   * If the options were parsed from a fetched config repository, checks that
+   * the fetched tree (and thus its blacklist) still matches the config
+   * repository's current revision and fetches it again otherwise.  If
+   * fetching failed at (re)load, retries the fetch.
+   */
+  ConfigRepoState RefreshConfigRepo();
+
   void DisableCacheSymlinks();
   void EnableFuseExpireEntry();
 
@@ -738,6 +759,8 @@ class MountPoint : SingleCopy, public BootFactory {
   bool fuse_expire_entry_;
   std::string repository_tag_;
   std::vector<std::string> blacklist_paths_;
+  /// Protects the config repository tree of options_mgr_ after boot
+  pthread_mutex_t lock_config_repo_;
 
   // TODO(jblomer): this should go in the catalog manager
   std::string membership_req_;

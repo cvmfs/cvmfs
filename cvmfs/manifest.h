@@ -89,6 +89,7 @@ class Manifest {
 
   shash::Algorithms GetHashAlgorithm() const { return catalog_hash_.algorithm; }
 
+  uint32_t ttl() const { return ttl_; }
   void set_ttl(const uint32_t ttl) { ttl_ = ttl; }
   void set_revision(const uint64_t revision) { revision_ = revision; }
   void set_certificate(const shash::Any &certificate) {
