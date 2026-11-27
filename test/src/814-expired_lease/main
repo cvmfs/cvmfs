@@ -28,7 +28,8 @@ cvmfs_run_test() {
     CVMFS_TEST_814_BACKUP="$(pwd)/user.json.orig"
     trap cleanup EXIT HUP INT TERM || return 12
     cp "$CVMFS_TEST_814_USER_JSON" "$CVMFS_TEST_814_BACKUP" || return 13
-    jq '.max_lease_time = 1' "$CVMFS_TEST_814_USER_JSON" > user.json.new || return 14
+    # Keep the HTTP deadline independent of the one-second lease.
+    jq '.max_lease_time = 1 | .http_timeout = 30' "$CVMFS_TEST_814_USER_JSON" > user.json.new || return 14
     sudo mv user.json.new "$CVMFS_TEST_814_USER_JSON"
     restart_repository_gateway || return 15
 
