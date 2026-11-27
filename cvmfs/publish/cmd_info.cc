@@ -22,7 +22,7 @@ int CmdInfo::Main(const Options &options) {
       options.plain_args().empty() ? "" : options.plain_args()[0].value_str);
 
   if (options.Has("keychain")) {
-    settings.GetKeychain()->SetKeychainDir(options.GetString("keychain"));
+    settings.SetPublicKeyPaths(options.GetString("keychain"));
   }
   Repository repository(settings);
 
@@ -57,11 +57,10 @@ int CmdInfo::Main(const Options &options) {
            "Create /etc/cvmfs/config.d/%s.conf and set\n"
            "  CVMFS_SERVER_URL=%s\n"
            "  CVMFS_PUBLIC_KEY=%s\n"
-           "Copy %s to the client",
+           "Copy the public key file(s) to the client",
            settings.fqrn().c_str(), settings.fqrn().c_str(),
            settings.url().c_str(),
-           settings.keychain().master_public_key_path().c_str(),
-           settings.keychain().master_public_key_path().c_str());
+           settings.GetClientPublicKeyPaths().c_str());
 
   if (options.Has("meta-info")) {
     LogCvmfs(kLogCvmfs, kLogStdout, "\nMeta info:\n%s",
