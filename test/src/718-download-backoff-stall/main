@@ -1,0 +1,156 @@
+#!/bin/bash
+cvmfs_test_name="Download backoff must not stall concurrent downloads"
+cvmfs_test_autofs_on_startup=false
+
+# Reproducer for https://github.com/cvmfs/cvmfs/issues/3563
+#
+# A same-URL retry calls DownloadManager::Backoff(), which sleeps on the
+# MainDownload thread, the only thread that drives the curl multi handle.
+# While one job backs off, no other transfer makes progress: unrelated reads
+# block for the full backoff and, under load, time out or fail as "too slow",
+# which triggers more backoffs.
+#
+# The test serves the repository through a mock stratum 1 that answers
+# HTTP 503 for a single object ("bad"). Reading "bad" therefore loops through
+# Backoff(). While that is going on, it reads many small, uncached, healthy
+# files and requires each of them to be served quickly.
+
+CVMFS_TEST_718_MOUNTPOINT=
+CVMFS_TEST_718_SERVER_PID=
+CVMFS_TEST_718_BAD_PID=
+cleanup() {
+  echo "running cleanup()"
+  [ -z "$CVMFS_TEST_718_BAD_PID" ] || kill $CVMFS_TEST_718_BAD_PID 2>/dev/null
+  if [ "x$CVMFS_TEST_718_MOUNTPOINT" != "x" ]; then
+    sudo umount $CVMFS_TEST_718_MOUNTPOINT
+  fi
+  [ -z "$CVMFS_TEST_718_SERVER_PID" ] || kill $CVMFS_TEST_718_SERVER_PID
+}
+
+talk() {
+  sudo cvmfs_talk -p \
+    ${CVMFS_TEST_718_MOUNTPOINT}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO "$@"
+}
+
+get_internal_counter() {
+  talk internal affairs | grep "^$1|" | cut -d\| -f2
+}
+
+count_503() {
+  grep -c '" 503 ' $1
+}
+
+cvmfs_run_test() {
+  local logfile=$1
+  local script_location=$2
+  local scratch_dir=$(pwd)
+
+  local num_good=60
+  local backoff_s=2           # CVMFS_BACKOFF_INIT and CVMFS_BACKOFF_MAX
+  local max_retries=8
+  local max_latency_ms=1000   # must be well below backoff_s
+  local http_port=8718
+
+  echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "*** publish one 'bad' file and $num_good small 'good' files"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  echo "this object is answered with HTTP 503" > /cvmfs/$CVMFS_TEST_REPO/bad || return 1
+  mkdir /cvmfs/$CVMFS_TEST_REPO/good || return 1
+  for i in $(seq 1 $num_good); do
+    echo "healthy file number $i" > /cvmfs/$CVMFS_TEST_REPO/good/$i || return 1
+  done
+  publish_repo $CVMFS_TEST_REPO || return 2
+
+  local bad_hash=$(get_xattr hash /cvmfs/$CVMFS_TEST_REPO/bad)
+  echo "*** hash of 'bad' is $bad_hash"
+  [ -n "$bad_hash" ] || return 3
+
+  trap cleanup EXIT HUP INT TERM || return 4
+
+  echo "*** start the fault injecting HTTP server on port $http_port"
+  local server_log="${scratch_dir}/fault_server.log"
+  CVMFS_TEST_718_SERVER_PID=$(run_background_service $server_log \
+    "$CVMFS_SYS_PYTHON ${script_location}/fault_server.py -p $http_port -r /srv/cvmfs -f $bad_hash")
+  [ $? -eq 0 ] || return 5
+  local repo_url="http://127.0.0.1:${http_port}/${CVMFS_TEST_REPO}"
+  local timeout=10
+  while ! curl -sf "${repo_url}/.cvmfspublished" > /dev/null; do
+    timeout=$(( $timeout - 1 ))
+    [ $timeout -gt 0 ] || return 6
+    sleep 1
+  done
+
+  echo "*** mount the repository through the faulty server"
+  CVMFS_TEST_718_MOUNTPOINT="${scratch_dir}/mnt"
+  mkdir -p $CVMFS_TEST_718_MOUNTPOINT || return 7
+  do_local_mount "$CVMFS_TEST_718_MOUNTPOINT" \
+                 "$CVMFS_TEST_REPO" \
+                 "$repo_url" \
+                 "" \
+                 "CVMFS_MAX_RETRIES=$max_retries\nCVMFS_BACKOFF_INIT=$backoff_s\nCVMFS_BACKOFF_MAX=$backoff_s\nCVMFS_TIMEOUT=10\nCVMFS_TIMEOUT_DIRECT=10" \
+    || return 8
+  local mnt=$CVMFS_TEST_718_MOUNTPOINT
+  # Load the catalog up front so that only data objects are fetched later
+  ls $mnt/good > /dev/null || return 9
+
+  echo "*** read 'bad' in the background (expected to fail after retries)"
+  cat $mnt/bad > /dev/null 2>&1 &
+  CVMFS_TEST_718_BAD_PID=$!
+
+  echo "*** wait until the client is in its backoff/retry loop"
+  timeout=20
+  while [ $(count_503 $server_log) -lt 2 ]; do
+    timeout=$(( $timeout - 1 ))
+    [ $timeout -gt 0 ] || return 10
+    sleep 0.5
+  done
+
+  echo "*** read good files while 'bad' is backing off"
+  local max_seen=0
+  local slow=0
+  local read_while_backoff=0
+  for i in $(seq 1 $num_good); do
+    kill -0 $CVMFS_TEST_718_BAD_PID 2>/dev/null || break
+    local t0=$(get_millisecond_epoch)
+    cat $mnt/good/$i > /dev/null || { echo "reading good/$i failed"; return 20; }
+    local dt=$(( $(get_millisecond_epoch) - t0 ))
+    read_while_backoff=$(( $read_while_backoff + 1 ))
+    [ $dt -gt $max_seen ] && max_seen=$dt
+    if [ $dt -gt $max_latency_ms ]; then
+      echo "    good/$i took ${dt} ms"
+      slow=$(( $slow + 1 ))
+    fi
+    sleep 0.1
+  done
+
+  echo "*** wait for the read of 'bad' to finish"
+  local bad_retval=0
+  wait $CVMFS_TEST_718_BAD_PID || bad_retval=$?
+  CVMFS_TEST_718_BAD_PID=
+
+  local n_503=$(count_503 $server_log)
+  local n_retries=$(get_internal_counter download.n_retries)
+  echo "*** summary:"
+  echo "    good files read during backoff: $read_while_backoff"
+  echo "    slowest good read:              ${max_seen} ms (limit ${max_latency_ms} ms)"
+  echo "    good reads over the limit:      $slow"
+  echo "    HTTP 503 answers:               $n_503"
+  echo "    download.n_retries:             $n_retries"
+  echo "    exit code of reading 'bad':     $bad_retval"
+
+  # Sanity checks: the backoff path was actually exercised
+  [ $read_while_backoff -ge 5 ] || return 30
+  [ $n_503 -ge 3 ]              || return 31
+  [ $n_retries -ge 2 ]          || return 32
+  [ $bad_retval -ne 0 ]         || return 33
+
+  # The actual check for issue #3563
+  if [ $slow -gt 0 ]; then
+    echo "concurrent downloads were stalled by Backoff() (issue #3563)"
+    return 40
+  fi
+
+  return 0
+}
