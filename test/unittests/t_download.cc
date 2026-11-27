@@ -525,6 +525,18 @@ void *BackoffFetchThread(void *data) {
   return NULL;
 }
 
+// Reports the cancellation only after the first num_not_canceled queries
+class CancelLaterInterruptCue : public InterruptCue {
+ public:
+  explicit CancelLaterInterruptCue(int num_not_canceled)
+      : num_not_canceled_(num_not_canceled), num_queries_(0) { }
+  virtual bool IsCanceled() { return num_queries_++ >= num_not_canceled_; }
+
+ private:
+  const int num_not_canceled_;
+  std::atomic<int> num_queries_;
+};
+
 struct CountingErrorState {
   CountingErrorState() : num_requests(0) { }
   std::atomic<int> num_requests;
@@ -567,6 +579,44 @@ TEST_F(T_Download, MultiThreadedRetryGatewayError) {
   EXPECT_EQ(1U, info.num_retries());
   // The retry waits for the backoff (between 1 and 200 ms)
   EXPECT_GE(elapsed_ms, info.backoff_ms());
+}
+
+// A job that is canceled while it waits for its backoff to expire is given up
+// with kFailCanceled; the download manager stays usable afterwards.
+TEST_F(T_Download, MultiThreadedCancelDuringBackoff) {
+  FlakyServerState state(503, 1);
+  MockHTTPServer server(8098);
+  server.SetResponseCallback(FlakyServerHandler, &state);
+  ASSERT_TRUE(server.Start());
+
+  perf::Statistics mt_statistics;
+  DownloadManager mt_download_mgr(
+      8, perf::StatisticsTemplate("test_mt", &mt_statistics));
+  mt_download_mgr.SetRetryParameters(3, 50, 50);
+  mt_download_mgr.Spawn();
+
+  string url = "http://127.0.0.1:8098/foo";
+  {
+    cvmfs::MemSink memsink;
+    JobInfo info(&url, false /* compressed */, false /* probe hosts */, NULL,
+                 &memsink);
+    // Not yet canceled when the retry is decided, canceled when the backoff
+    // expired
+    CancelLaterInterruptCue cue(1);
+    info.SetInterruptCue(&cue);
+    mt_download_mgr.Fetch(&info);
+    EXPECT_EQ(kFailCanceled, info.error_code());
+    EXPECT_EQ(1, state.num_requests);
+    EXPECT_EQ(1U, info.num_retries());
+    EXPECT_EQ(NULL, info.headers());
+  }
+
+  cvmfs::MemSink memsink;
+  JobInfo info(&url, false /* compressed */, false /* probe hosts */, NULL,
+               &memsink);
+  mt_download_mgr.Fetch(&info);
+  EXPECT_EQ(kFailOk, info.error_code());
+  EXPECT_EQ(2, state.num_requests);
 }
 
 // Regression test for issue #3563: a job that backs off must not stall the

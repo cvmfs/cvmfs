@@ -632,7 +632,10 @@ void *DownloadManager::MainDownload(void *data) {
         JobInfo *info;
         curl_easy_getinfo(easy_handle, CURLINFO_PRIVATE, &info);
         if (info->interrupt_cue() && info->interrupt_cue()->IsCanceled()) {
+          // VerifyAndFinalize() asked for a retry, so the job still holds its
+          // headers and credential
           info->SetErrorCode(kFailCanceled);
+          download_mgr->FinalizeTransfer(info);
           download_mgr->FinishJob(easy_handle, info);
           continue;
         }
@@ -1874,6 +1877,18 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
   }
 
 verify_and_finalize_stop:
+  FinalizeTransfer(info);
+  return false;  // stop transfer and return to Fetch()
+}
+
+
+/**
+ * Releases what a job holds for its transfer and flushes the destination.
+ * Has to run exactly once for every job that is not retried anymore, i.e.
+ * also for a job that is given up after VerifyAndFinalize() asked for a retry
+ * (e.g. canceled while waiting for its backoff to expire).
+ */
+void DownloadManager::FinalizeTransfer(JobInfo *info) {
   // Finalize, flush destination file.
   ReleaseCredential(info);
 
@@ -1895,8 +1910,6 @@ verify_and_finalize_stop:
     header_lists_->PutList(info->headers());
     info->SetHeaders(NULL);
   }
-
-  return false;  // stop transfer and return to Fetch()
 }
 
 DownloadManager::~DownloadManager() {
