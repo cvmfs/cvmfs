@@ -166,13 +166,26 @@ jobs:
           echo "Transmitted: $tx_mb MB"
           echo "Total: $total_mb MB"
 
+      # Failed tests keep their workdir; private mounts store client logs and
+      # crash stacktraces there, and those are root-owned
+      - name: Collect client crash diagnostics
+        if: ${{ failure() }}
+        run: |
+          mkdir -p /tmp/client-diag
+          sudo find /tmp/cvmfs-test/workdir -type f -size -10M \
+            \( -name 'stacktrace.*' -o -name '*mnt*.log' -o -name '*mnt*.log.*' \) \
+            -exec cp --parents {} /tmp/client-diag \; || true
+          sudo dmesg > /tmp/client-diag/dmesg.txt 2>&1 || true
+          sudo chown -R $(id -un) /tmp/client-diag
+
       - name: Upload logs as artifact
         if: ${{ always () }}
         uses: actions/upload-artifact@v4
-        with: 
+        with:
           name: CVMFS test logs
           path: |
               /tmp/test.log
+              /tmp/client-diag
 
       - name: Analyze cache misses
         run: |

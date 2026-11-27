@@ -6,6 +6,7 @@ cvmfs_test_suites="quick"
 
 TEST633_PRIVATE_MOUNT=
 TEST633_PIDS=
+TEST633_REVISION=
 
 private_mount() {
   local mntpnt="$1"
@@ -99,6 +100,26 @@ wait_for_inode_change() {
   get_inode $path
 }
 
+# Sets TEST633_REVISION. Returns the test's error code for the failed step.
+remount_private_mount() {
+  local old_revision=$1
+  local mntpnt=$TEST633_PRIVATE_MOUNT
+  local rc=0
+  sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO remount sync \
+    || rc=87
+  if [ $rc -eq 0 ]; then
+    TEST633_REVISION=$(get_xattr revision $mntpnt) || rc=26
+  fi
+  if [ $rc -eq 0 ] && ! [ "$TEST633_REVISION" -gt "$old_revision" ] 2>/dev/null; then
+    rc=23
+  fi
+  if [ $rc -ne 0 ]; then
+    echo "*** remount from revision $old_revision failed (got '$TEST633_REVISION')"
+    dump_client_state
+  fi
+  return $rc
+}
+
 dump_client_state() {
   local mntpnt=$TEST633_PRIVATE_MOUNT
   echo "*** private mount state"
@@ -111,6 +132,7 @@ dump_client_state() {
   for f in ${mntpnt}.log.*; do
     [ -f $f ] && tail -n 200 $f
   done
+  sudo dmesg | tail -n 20
   return 0
 }
 
@@ -179,10 +201,9 @@ cvmfs_run_test() {
   ls -lisa /cvmfs/$CVMFS_TEST_REPO/dir/*
 
   echo "*** {1} remount private mount point"
-  sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO remount sync || return 87
-  local revision02=$(get_xattr revision ${mntpnt}) || return 26
+  remount_private_mount $revision01 || return $?
+  local revision02=$TEST633_REVISION
   echo "*** {1} revision is now $revision02"
-  [ $revision02 -gt $revision01 ] || return 23
 
   echo "*** {1} new open()s should flush the cache, then reuse it"
   cat ${mntpnt}/dir/small > /dev/null
@@ -239,10 +260,9 @@ cvmfs_run_test() {
   ls -lisa /cvmfs/$CVMFS_TEST_REPO/dir/*
 
   echo "*** {2} remount private mount point"
-  sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO remount sync || return 87
-  local revision03=$(get_xattr revision ${mntpnt}) || return 26
+  remount_private_mount $revision02 || return $?
+  local revision03=$TEST633_REVISION
   echo "*** {2} revision is now $revision03"
-  [ $revision03 -gt $revision02 ] || return 23
 
   echo "*** {2} wait for one more round"
   wait_for_next_round topen02_small.stdout $pid_small02 || return 101
@@ -329,10 +349,9 @@ cvmfs_run_test() {
   ls -lisa /cvmfs/$CVMFS_TEST_REPO/dir/*
 
   echo "*** {4} remount private mount point"
-  sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO remount sync || return 87
-  local revision04=$(get_xattr revision ${mntpnt}) || return 26
+  remount_private_mount $revision03 || return $?
+  local revision04=$TEST633_REVISION
   echo "*** {4} revision is now $revision04"
-  [ $revision04 -gt $revision03 ] || return 23
 
   local inode_small04
   inode_small04=$(wait_for_inode_change ${mntpnt}/dir/small $inode_small03) || return 102
