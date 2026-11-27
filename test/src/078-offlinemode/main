@@ -60,6 +60,24 @@ check_fixed_catalog() {
   echo "* ...done test offline mode for fixed root catalogs using cvmfs-config.cern.ch"
 }
 
+wait_for_syslog_count() {
+  local message=$1
+  local expected=$2
+  local attempt count
+
+  # A successful remount can return before the system logger writes the message.
+  # cat_syslog already waits one second per read.
+  for attempt in 1 2 3 4 5; do
+    count=$(cat_syslog | awk -v message="$message" 'index($0, message) { count++ } END { print count+0 }') || return 1
+    if [ "$count" -ge "$expected" ]; then
+      [ "$count" -eq "$expected" ]
+      return $?
+    fi
+  done
+  echo "Expected $expected syslog messages containing '$message', found $count"
+  return 1
+}
+
 check_normal_catalog() {
   echo "* Test offline mode for normal root catalogs using sft.cern.ch"
   cvmfs_mount sft.cern.ch "CVMFS_AUTO_UPDATE=false" || return 10
@@ -84,8 +102,7 @@ check_normal_catalog() {
   ts_io_err=$(get_xattr timestamp_last_ioerr /cvmfs/sft.cern.ch)
   [ $n_io_err -eq 1 ] || return 13
   [ $ts_io_err -gt 0 ] || return 14
-  n_offline_msg=$(cat_syslog | grep "entering offline mode" | wc -l)
-  [ $n_offline_msg -eq $(($n_offline_msg_before + 1)) ] || return 15
+  wait_for_syslog_count "entering offline mode" "$((n_offline_msg_before + 1))" || return 15
 
   echo "*** remount again, expect error number to remain constant"
   sudo cvmfs_talk -i sft.cern.ch remount sync
@@ -102,8 +119,7 @@ check_normal_catalog() {
   [ $n_io_err -eq 1 ] || return 18
   n_offline_msg=$(cat_syslog | grep "entering offline mode" | wc -l)
   [ $n_offline_msg -eq $(($n_offline_msg_before + 1)) ] || return 19
-  local n_recovery_msg=$(cat_syslog | grep "recovered from offline mode" | wc -l)
-  [ $n_recovery_msg -eq $(($n_recovery_msg_before + 1)) ] || return 20
+  wait_for_syslog_count "recovered from offline mode" "$((n_recovery_msg_before + 1))" || return 20
 
   echo "*** cutting network connectivity again, expecting more remount errors"
   sudo cvmfs_talk -i sft.cern.ch proxy set DIRECT
@@ -111,8 +127,7 @@ check_normal_catalog() {
   sudo cvmfs_talk -i sft.cern.ch remount sync
   n_io_err=$(get_xattr nioerr /cvmfs/sft.cern.ch)
   [ $n_io_err -eq 2 ] || return 21
-  n_offline_msg=$(cat_syslog | grep "entering offline mode" | wc -l)
-  [ $n_offline_msg -eq $(($n_offline_msg_before + 2)) ] || return 22
+  wait_for_syslog_count "entering offline mode" "$((n_offline_msg_before + 2))" || return 22
 
   echo "* ...done test offline mode for normal root catalogs using sft.cern.ch"
 }
