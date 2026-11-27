@@ -278,6 +278,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   void RebalanceProxiesUnlocked(const std::string &reason);
   CURL *AcquireCurlHandle();
   void ReleaseCurlHandle(CURL *handle, bool allow_reuse);
+  void FinishJob(CURL *easy_handle, JobInfo *info);
   void ReleaseCredential(JobInfo *info);
   void InitializeRequest(JobInfo *info, CURL *handle);
   void SetUrlOptions(JobInfo *info);

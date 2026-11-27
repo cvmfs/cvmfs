@@ -3,10 +3,13 @@
  */
 
 #include <fcntl.h>
+#include <pthread.h>
 #include <sys/resource.h>
 #include <sys/select.h>
 #include <unistd.h>
 
+#include <algorithm>
+#include <atomic>
 #include <cassert>
 #include <cstdio>
 #include <vector>
@@ -23,6 +26,7 @@
 #include "network/sink_file.h"
 #include "statistics.h"
 #include "util/file_guard.h"
+#include "util/platform.h"
 #include "util/posix.h"
 #include "util/prng.h"
 
@@ -500,6 +504,130 @@ TEST_F(T_Download, RemoteFileNoRetryInternalServerError) {
   download_mgr.Fetch(&info);
   EXPECT_EQ(kFailHostHttp, info.error_code());
   EXPECT_EQ(1, state.num_requests);
+}
+
+namespace {
+
+struct BackoffFetchArgs {
+  DownloadManager *download_mgr;
+  string url;
+  Failures result;
+  unsigned num_retries;
+};
+
+void *BackoffFetchThread(void *data) {
+  BackoffFetchArgs *args = static_cast<BackoffFetchArgs *>(data);
+  cvmfs::MemSink memsink;
+  JobInfo info(&args->url, false /* compressed */, false /* probe hosts */,
+               NULL, &memsink);
+  args->result = args->download_mgr->Fetch(&info);
+  args->num_retries = info.num_retries();
+  return NULL;
+}
+
+struct CountingErrorState {
+  CountingErrorState() : num_requests(0) { }
+  std::atomic<int> num_requests;
+};
+
+HTTPResponse AlwaysUnavailableHandler(const HTTPRequest & /*req*/,
+                                      void *data) {
+  static_cast<CountingErrorState *>(data)->num_requests++;
+  HTTPResponse response;
+  response.code = 503;
+  response.reason = "Service Unavailable";
+  return response;
+}
+
+}  // anonymous namespace
+
+// In multi-threaded mode, a retry after backoff must still be carried out
+// (the parked curl handle is re-added to the multi handle).
+TEST_F(T_Download, MultiThreadedRetryGatewayError) {
+  FlakyServerState state(503, 1);
+  MockHTTPServer server(8095);
+  server.SetResponseCallback(FlakyServerHandler, &state);
+  ASSERT_TRUE(server.Start());
+
+  perf::Statistics mt_statistics;
+  DownloadManager mt_download_mgr(
+      8, perf::StatisticsTemplate("test_mt", &mt_statistics));
+  mt_download_mgr.SetRetryParameters(1, 200, 200);
+  mt_download_mgr.Spawn();
+
+  string url = "http://127.0.0.1:8095/foo";
+  cvmfs::MemSink memsink;
+  JobInfo info(&url, false /* compressed */, false /* probe hosts */, NULL,
+               &memsink);
+  const uint64_t t0 = platform_monotonic_time_ns();
+  mt_download_mgr.Fetch(&info);
+  const uint64_t elapsed_ms = (platform_monotonic_time_ns() - t0) / 1000000;
+  EXPECT_EQ(kFailOk, info.error_code());
+  EXPECT_EQ(2, state.num_requests);
+  EXPECT_EQ(1U, info.num_retries());
+  // The retry waits for the backoff (between 1 and 200 ms)
+  EXPECT_GE(elapsed_ms, info.backoff_ms());
+}
+
+// Regression test for issue #3563: a job that backs off must not stall the
+// other transfers of the same (multi-threaded) download manager.
+TEST_F(T_Download, MultiThreadedBackoffDoesNotStall) {
+  CountingErrorState bad_state;
+  MockHTTPServer bad_server(8096);
+  bad_server.SetResponseCallback(AlwaysUnavailableHandler, &bad_state);
+  ASSERT_TRUE(bad_server.Start());
+
+  const string src_path = GetSmallFile();
+  MockFileServer file_server(8097, sandbox_path_);
+  const string good_url = "http://127.0.0.1:8097/" + GetFileName(src_path);
+
+  perf::Statistics mt_statistics;
+  DownloadManager mt_download_mgr(
+      8, perf::StatisticsTemplate("test_mt", &mt_statistics));
+  const unsigned kMaxRetries = 3;
+  const unsigned kBackoffMs = 1000;
+  mt_download_mgr.SetRetryParameters(kMaxRetries, kBackoffMs, kBackoffMs);
+  mt_download_mgr.Spawn();
+
+  BackoffFetchArgs bad_args;
+  bad_args.download_mgr = &mt_download_mgr;
+  bad_args.url = "http://127.0.0.1:8096/foo";
+  bad_args.result = kFailOk;
+  bad_args.num_retries = 0;
+  pthread_t bad_thread;
+  ASSERT_EQ(0, pthread_create(&bad_thread, NULL, BackoffFetchThread,
+                              &bad_args));
+
+  // Wait until the failing job entered its retry loop
+  const uint64_t wait_start = platform_monotonic_time_ns();
+  while (bad_state.num_requests.load() < 2) {
+    ASSERT_LT(platform_monotonic_time_ns() - wait_start, 10000000000ULL);
+    SafeSleepMs(10);
+  }
+
+  // Fetch healthy files while the other job keeps backing off. Before the fix,
+  // each of these blocked for up to kBackoffMs.
+  uint64_t max_latency_ms = 0;
+  unsigned num_fetches = 0;
+  for (unsigned i = 0; i < 15; ++i) {
+    cvmfs::MemSink memsink;
+    JobInfo info(&good_url, false /* compressed */, false /* probe hosts */,
+                 NULL, &memsink);
+    const uint64_t t0 = platform_monotonic_time_ns();
+    mt_download_mgr.Fetch(&info);
+    const uint64_t latency_ms = (platform_monotonic_time_ns() - t0) / 1000000;
+    EXPECT_EQ(kFailOk, info.error_code());
+    max_latency_ms = std::max(max_latency_ms, latency_ms);
+    num_fetches++;
+    SafeSleepMs(100);
+  }
+
+  pthread_join(bad_thread, NULL);
+  EXPECT_EQ(kFailHostConnection, bad_args.result);
+  EXPECT_EQ(kMaxRetries, bad_args.num_retries);
+  EXPECT_EQ(static_cast<int>(kMaxRetries) + 1, bad_state.num_requests.load());
+  EXPECT_EQ(15U, num_fetches);
+  EXPECT_LT(max_latency_ms, kBackoffMs / 2);
 }
 
 TEST_F(T_Download, RemoteFileEmpty) {

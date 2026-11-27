@@ -59,6 +59,7 @@
 #include "util/algorithm.h"
 #include "util/exception.h"
 #include "util/logging.h"
+#include "util/platform.h"
 #include "util/posix.h"
 #include "util/prng.h"
 #include "util/smalloc.h"
@@ -575,6 +576,11 @@ void *DownloadManager::MainDownload(void *data) {
   download_mgr->watch_fds_[kIdxPipeJobs].revents = 0;
   download_mgr->watch_fds_inuse_ = 2;
 
+  // Handles of jobs that wait for their backoff to expire before being
+  // retried, keyed by the monotonic deadline in ns. Waiting here instead of
+  // sleeping keeps the other transfers going (issue #3563).
+  std::multimap<uint64_t, CURL *> backoff_queue;
+
   int still_running = 0;
   struct timeval timeval_start, timeval_stop;
   gettimeofday(&timeval_start, NULL);
@@ -593,15 +599,47 @@ void *DownloadManager::MainDownload(void *data) {
       timeout = 1;
     } else {
       timeout = -1;
-      gettimeofday(&timeval_stop, NULL);
-      const int64_t delta = static_cast<int64_t>(
-          1000 * DiffTimeSeconds(timeval_start, timeval_stop));
-      perf::Xadd(download_mgr->counters_->sz_transfer_time, delta);
+      // Account the transfer time once per busy period, not on every wake-up
+      // for a parked retry (in which case the period is still ongoing)
+      if (backoff_queue.empty()) {
+        gettimeofday(&timeval_stop, NULL);
+        const int64_t delta = static_cast<int64_t>(
+            1000 * DiffTimeSeconds(timeval_start, timeval_stop));
+        perf::Xadd(download_mgr->counters_->sz_transfer_time, delta);
+      }
+    }
+    // Wake up in time for the next parked retry
+    if (!backoff_queue.empty()) {
+      const uint64_t now = platform_monotonic_time_ns();
+      const uint64_t deadline = backoff_queue.begin()->first;
+      const int wait_ms = (deadline > now)
+                              ? static_cast<int>((deadline - now) / 1000000) + 1
+                              : 0;
+      timeout = (timeout < 0) ? wait_ms : std::min(timeout, wait_ms);
     }
     const int retval = poll(download_mgr->watch_fds_,
                             download_mgr->watch_fds_inuse_, timeout);
     if (retval < 0) {
       continue;
+    }
+
+    // Retry jobs whose backoff expired
+    if (!backoff_queue.empty()) {
+      const uint64_t now = platform_monotonic_time_ns();
+      while (!backoff_queue.empty() && (backoff_queue.begin()->first <= now)) {
+        CURL *easy_handle = backoff_queue.begin()->second;
+        backoff_queue.erase(backoff_queue.begin());
+        JobInfo *info;
+        curl_easy_getinfo(easy_handle, CURLINFO_PRIVATE, &info);
+        if (info->interrupt_cue() && info->interrupt_cue()->IsCanceled()) {
+          info->SetErrorCode(kFailCanceled);
+          download_mgr->FinishJob(easy_handle, info);
+          continue;
+        }
+        curl_multi_add_handle(download_mgr->curl_multi_, easy_handle);
+        curl_multi_socket_action(download_mgr->curl_multi_,
+                                 CURL_SOCKET_TIMEOUT, 0, &still_running);
+      }
     }
 
     // Handle timeout
@@ -679,19 +717,22 @@ void *DownloadManager::MainDownload(void *data) {
 
         curl_multi_remove_handle(download_mgr->curl_multi_, easy_handle);
         if (download_mgr->VerifyAndFinalize(curl_error, info)) {
-          curl_multi_add_handle(download_mgr->curl_multi_, easy_handle);
-          curl_multi_socket_action(download_mgr->curl_multi_,
-                                   CURL_SOCKET_TIMEOUT,
-                                   0,
-                                   &still_running);
+          if (info->backoff_pending()) {
+            // Park the handle; it is re-added once the backoff expired
+            info->SetBackoffPending(false);
+            const uint64_t deadline =
+                platform_monotonic_time_ns()
+                + static_cast<uint64_t>(info->backoff_ms()) * 1000000ULL;
+            backoff_queue.insert(std::make_pair(deadline, easy_handle));
+          } else {
+            curl_multi_add_handle(download_mgr->curl_multi_, easy_handle);
+            curl_multi_socket_action(download_mgr->curl_multi_,
+                                     CURL_SOCKET_TIMEOUT,
+                                     0,
+                                     &still_running);
+          }
         } else {
-          // Return easy handle into pool and write result back
-          download_mgr->ReleaseCurlHandle(easy_handle, true /* allow_reuse */);
-
-          DataTubeElement *ele = new DataTubeElement(kActionStop);
-          info->GetDataTubePtr()->EnqueueBack(ele);
-          info->GetPipeJobResultPtr()->Write<download::Failures>(
-              info->error_code());
+          download_mgr->FinishJob(easy_handle, info);
         }
       }
     }
@@ -711,6 +752,19 @@ void *DownloadManager::MainDownload(void *data) {
            "download I/O thread of DownloadManager '%s' terminated",
            download_mgr->name_.c_str());
   return NULL;
+}
+
+
+/**
+ * Returns the easy handle of a finished (succeeded or given up) job into the
+ * pool and writes the result back to the caller waiting in Fetch().
+ */
+void DownloadManager::FinishJob(CURL *easy_handle, JobInfo *info) {
+  ReleaseCurlHandle(easy_handle, true /* allow_reuse */);
+
+  DataTubeElement *ele = new DataTubeElement(kActionStop);
+  info->GetDataTubePtr()->EnqueueBack(ele);
+  info->GetPipeJobResultPtr()->Write<download::Failures>(info->error_code());
 }
 
 
@@ -914,6 +968,7 @@ void DownloadManager::InitializeRequest(JobInfo *info, CURL *handle) {
   info->SetNumUsedHosts(1);
   info->SetNumRetries(0);
   info->SetBackoffMs(0);
+  info->SetBackoffPending(false);
   info->SetHeaders(header_lists_->DuplicateList(default_headers_));
   if (info->info_header()) {
     header_lists_->AppendHeader(info->headers(), info->info_header());
@@ -1319,7 +1374,11 @@ bool DownloadManager::CanRetry(const JobInfo *info) {
  * cvmfs nodes.
  * Retry only when HTTP caching is on.
  *
- * \return true if backoff has been performed, false otherwise
+ * Only computes the delay and marks it as pending on the job; it does not
+ * sleep. The caller of VerifyAndFinalize() has to wait for backoff_ms()
+ * before the next attempt. In multi-threaded mode, MainDownload() parks the
+ * curl handle instead of blocking: a sleep there would stall every other
+ * transfer of this download manager (issue #3563).
  */
 void DownloadManager::Backoff(JobInfo *info) {
   unsigned backoff_init_ms = 0;
@@ -1333,7 +1392,9 @@ void DownloadManager::Backoff(JobInfo *info) {
   info->SetNumRetries(info->num_retries() + 1);
   perf::Inc(counters_->n_retries);
   if (info->backoff_ms() == 0) {
-    info->SetBackoffMs(prng_.Next(backoff_init_ms + 1));  // Must be != 0
+    // Must be != 0, otherwise the doubling below never increases it
+    info->SetBackoffMs((backoff_init_ms > 0) ? 1 + prng_.Next(backoff_init_ms)
+                                             : 0);
   } else {
     info->SetBackoffMs(info->backoff_ms() * 2);
   }
@@ -1344,7 +1405,7 @@ void DownloadManager::Backoff(JobInfo *info) {
   LogCvmfs(kLogDownload, kLogDebug,
            "(manager '%s' - id %" PRId64 ") backing off for %d ms",
            name_.c_str(), info->id(), info->backoff_ms());
-  SafeSleepMs(info->backoff_ms());
+  info->SetBackoffPending(true);
 }
 
 void DownloadManager::SetNocache(JobInfo *info) {
@@ -2173,7 +2234,7 @@ Failures DownloadManager::Fetch(JobInfo *info) {
     SetUrlOptions(info);
     // curl_easy_setopt(handle, CURLOPT_VERBOSE, 1);
     int retval;
-    do {
+    while (true) {
       retval = curl_easy_perform(handle);
       perf::Inc(counters_->n_requests);
       double elapsed;
@@ -2182,7 +2243,14 @@ Failures DownloadManager::Fetch(JobInfo *info) {
         perf::Xadd(counters_->sz_transfer_time,
                    static_cast<int64_t>(elapsed * 1000));
       }
-    } while (VerifyAndFinalize(retval, info));
+      if (!VerifyAndFinalize(retval, info))
+        break;
+      // Synchronous mode: blocking only affects this caller
+      if (info->backoff_pending()) {
+        info->SetBackoffPending(false);
+        SafeSleepMs(info->backoff_ms());
+      }
+    }
     result = info->error_code();
     // Prevent the handle from being added to the idle list, which
     // avoids that it is mistakenly picked up by the multi handle later

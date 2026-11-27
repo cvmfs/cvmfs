@@ -107,6 +107,9 @@ class JobInfo {
   unsigned char num_used_hosts_;
   unsigned char num_retries_;
   unsigned backoff_ms_;
+  // Set by DownloadManager::Backoff(): the next attempt must be delayed by
+  // backoff_ms_. The caller of VerifyAndFinalize() performs the wait.
+  bool backoff_pending_;
   int current_metalink_chain_index_;
   int current_host_chain_index_;
 
@@ -208,6 +211,7 @@ class JobInfo {
   unsigned char num_used_hosts() const { return num_used_hosts_; }
   unsigned char num_retries() const { return num_retries_; }
   unsigned backoff_ms() const { return backoff_ms_; }
+  bool backoff_pending() const { return backoff_pending_; }
   int current_metalink_chain_index() const {
     return current_metalink_chain_index_;
   }
@@ -270,6 +274,9 @@ class JobInfo {
   }
   void SetNumRetries(unsigned char num_retries) { num_retries_ = num_retries; }
   void SetBackoffMs(unsigned backoff_ms) { backoff_ms_ = backoff_ms; }
+  void SetBackoffPending(bool backoff_pending) {
+    backoff_pending_ = backoff_pending;
+  }
   void SetCurrentMetalinkChainIndex(int current_metalink_chain_index) {
     current_metalink_chain_index_ = current_metalink_chain_index;
   }
