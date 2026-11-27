@@ -1,0 +1,47 @@
+#!/bin/bash
+set -euo pipefail
+set -x
+
+produce_db() {
+  local db_path=$1
+  local dir=$2
+  [[ -f ingestsql_template.db ]]
+  #cvmfs_swissknife ingestsql -D "" -N "" -n "$db_path"
+  cp ingestsql_template.db "$db_path"
+  sqlite3 "$db_path" <<EOF
+  INSERT INTO dirs (name) VALUES ("$dir");
+EOF
+}
+
+dir=$1
+db_path=$dir.sql
+log_file=$dir.log
+produce_db "$db_path" "$dir"
+XARGS_PID=$(ps -o ppid= -p "$$")
+set +e
+cvmfs_swissknife_debug ingestsql \
+  -c \
+  -v \
+  -@ "$CVMFS_TEST_PROXY" \
+  -N "$CVMFS_TEST_REPO" \
+  -D "$db_path" \
+  -w "$CVMFS_TEST_HTTP_BASE/$CVMFS_TEST_REPO" \
+  -k "/etc/cvmfs/keys/$CVMFS_TEST_REPO.pub" \
+  -3 "$CVMFS_TEST_S3_CONFIG" \
+  -s /etc/cvmfs/keys/"$CVMFS_TEST_REPO".gw \
+  -g http://127.0.0.1:4929/api/v1 \
+  -t "$PWD" \
+  -a \
+  -d \
+  -T 2 \
+  -B "$CVMFS_SPOOL_DIR"/rdonly &> "$log_file"
+RC=$?
+set -e
+echo $RC > "$dir".exitcode
+#if [[ $RC != 0 ]] || grep "something went wrong\|missing_reflog" "$log_file"; then
+if [[ $RC != 0 ]]; then
+  kill -9 "$XARGS_PID"
+  pkill -9 cvmfs_swissknife_debug
+  touch "$dir".fail
+  exit 1
+fi

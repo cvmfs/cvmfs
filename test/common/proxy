@@ -1,0 +1,121 @@
+#!/usr/bin/env python3
+
+import os
+import http.server
+import socketserver
+from socketserver import ThreadingMixIn
+import socket
+import struct
+import requests
+
+
+class ProxyHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
+    """
+    Simple promiscious HTTP proxy handling HEAD, GET, PUT, POST requests.
+    Meant to be interposed between parts of CVMFS, for example, gateway and S3 backend.
+
+    Launch with PROXY_TCP_RST=1 env var to cause it to close connections with TCP RST.
+    This is meant to simulate challenging network conditions.
+    """
+    def do_HEAD(self):
+        try:
+            # Forward the GET request to the target server
+            print(f"Received HEAD request for {self.path}")
+            response = requests.head(self.path, headers=self.headers)
+
+            # Send response status and headers
+            self.send_response(response.status_code)
+            for header, value in response.headers.items():
+                self.send_header(header, value)
+            self.end_headers()
+
+            # Send response content
+            self.wfile.write(response.content)
+        except Exception as e:
+            self.send_error(500, f"Internal server error: {e}")
+
+    def do_GET(self):
+        try:
+            # Forward the GET request to the target server
+            print(f"Received GET request for {self.path}")
+            response = requests.get(self.path, headers=self.headers)
+
+            # Send response status and headers
+            self.send_response(response.status_code)
+            for header, value in response.headers.items():
+                self.send_header(header, value)
+            self.end_headers()
+
+            # Send response content
+            self.wfile.write(response.content)
+        except Exception as e:
+            self.send_error(500, f"Internal server error: {e}")
+
+    def do_PUT(self):
+        try:
+            # Read the content length to get the body of the POST request
+            content_length = int(self.headers.get('Content-Length', 0))
+            post_body = self.rfile.read(content_length)
+
+            # Forward the POST request to the target server
+            print(f"Received PUT request for {self.path}")
+            response = requests.put(self.path, data=post_body, headers=self.headers)
+
+            # Send response status and headers
+            self.send_response(response.status_code)
+            for header, value in response.headers.items():
+                self.send_header(header, value)
+            self.end_headers()
+
+            # Send response content
+            self.wfile.write(response.content)
+        except Exception as e:
+            self.send_error(500, f"Internal server error: {e}")
+
+    def do_POST(self):
+        try:
+            # Read the content length to get the body of the POST request
+            content_length = int(self.headers.get('Content-Length', 0))
+            post_body = self.rfile.read(content_length)
+
+            # Forward the POST request to the target server
+            print(f"Received POST request for {self.path}")
+            response = requests.post(self.path, data=post_body, headers=self.headers)
+
+            # Send response status and headers
+            self.send_response(response.status_code)
+            for header, value in response.headers.items():
+                self.send_header(header, value)
+            self.end_headers()
+
+            # Send response content
+            self.wfile.write(response.content)
+        except Exception as e:
+            self.send_error(500, f"Internal server error: {e}")
+
+
+class CustomTCPServer(socketserver.TCPServer):
+    allow_reuse_address = True
+
+    def server_bind(self):
+        # Set SO_LINGER before binding
+        if os.getenv("PROXY_TCP_RST") == '1':
+            print(f"TCP shutdown: RST (setsockopt SO_LINGER, on=1, timeout=0)")
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 1, 0))
+        else:
+            print(f"TCP shutdown: standard (graceful)")
+        super().server_bind()
+
+
+class ThreadingSimpleServer(ThreadingMixIn, CustomTCPServer):
+    pass
+
+
+def run_proxy_server(host='127.0.0.1', port=8825):
+    with ThreadingSimpleServer((host, port), ProxyHTTPRequestHandler) as httpd:
+        print(f"Serving HTTP Proxy on {host}:{port}")
+        httpd.serve_forever()
+
+
+if __name__ == "__main__":
+    run_proxy_server()

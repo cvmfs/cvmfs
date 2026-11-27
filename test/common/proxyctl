@@ -1,0 +1,53 @@
+#!/bin/bash
+set -euo pipefail
+set -x
+
+PROXY_EXE=$(dirname "$(readlink -f "$0")")/proxy
+[[ -f "$PROXY_EXE" ]]
+
+PIDFILE=/tmp/proxy.pid
+CFGFILE=/tmp/s3.conf
+
+[[ -v CVMFS_TEST_REPO ]]
+: "${PROXY_PORT:=8825}"
+
+enable_now() {
+  fuser --kill --verbose "$PROXY_PORT"/tcp || true
+  while fuser "$PROXY_PORT"/tcp; do sleep 1; done
+  "$PROXY_EXE" &
+  PROXY_PID=$!
+  echo $PROXY_PID > "$PIDFILE"
+  echo CVMFS_SERVER_PROXY=http://localhost:$PROXY_PORT | sudo tee -a /etc/cvmfs/repositories.d/"$CVMFS_TEST_REPO"/server.conf
+  cp "$CVMFS_TEST_S3_CONFIG" "$CFGFILE"
+  chmod a+w "$CFGFILE"
+  echo CVMFS_S3_PROXY=http://localhost:$PROXY_PORT | tee -a "$CFGFILE"
+  sudo sed -i -e s:"$CVMFS_TEST_S3_CONFIG":"$CFGFILE": /etc/cvmfs/repositories.d/"$CVMFS_TEST_REPO"/server.conf
+  sudo systemctl restart cvmfs-gateway@root
+  for _ in {1..30}; do
+    if ! [[ -d /proc/"$PROXY_PID" ]]; then
+      echo "Proxy startup failed"
+      exit 1
+    fi
+    if fuser "$PROXY_PORT"/tcp; then
+      break
+    fi
+    sleep 1
+  done
+  fuser "$PROXY_PORT"/tcp # assertion: proxy is up
+}
+
+disable_now() {
+  pkill --pidfile="$PIDFILE" --exact --full "$PROXY_EXE"
+  sudo sed -i -e s:"$CFGFILE":"$CVMFS_TEST_S3_CONFIG": /etc/cvmfs/repositories.d/"$CVMFS_TEST_REPO"/server.conf
+  sudo systemctl restart cvmfs-gateway@root
+}
+
+[[ $# == 1 ]]
+ACTION=$1
+case "$ACTION" in
+  enable_now) enable_now;;
+  disable_now) disable_now;;
+  *)
+    echo "Unknown action $1"
+    exit 1
+esac
