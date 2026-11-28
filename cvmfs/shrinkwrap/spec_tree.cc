@@ -199,7 +199,7 @@ void SpecTree::Parse(FILE *spec_file) {
         }
         while (!node_backup.empty()) {
           node_cache.push(node_backup.top());
-          node_cache.pop();
+          node_backup.pop();
         }
         node_cache.push(entr);
       }
