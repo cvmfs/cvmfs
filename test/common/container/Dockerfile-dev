@@ -40,6 +40,7 @@ USER root
 # upgrade to the build image. Similar to https://github.com/apptainer/apptainer/issues/2756 but not quite clear
 RUN chmod 0400 /etc/shadow
 
+RUN dnf -y install dnf-utils && dnf config-manager --set-enabled crb && dnf install -y epel-release
 
 # cloudtest dependencies (s3cmd is only available from EPEL;
 # pylibacl/xattr/requests are needed by test/src/901-ingestsql/graft-tests.py)
