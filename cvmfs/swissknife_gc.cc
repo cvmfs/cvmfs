@@ -219,9 +219,11 @@ int CommandGc::Main(const ArgumentList &args) {
   if (!success) {
     LogCvmfs(kLogCvmfs, kLogStderr, "garbage collection failed");
     if (!dry_run) {
-      stats_db->StoreGCStatistics(this->statistics(), start_time, false);
-      if (upload_statsdb) {
-        stats_db->UploadStatistics(uploader.get());
+      if (stats_db != NULL) {
+        stats_db->StoreGCStatistics(this->statistics(), start_time, false);
+        if (upload_statsdb) {
+          stats_db->UploadStatistics(uploader.get());
+        }
       }
     }
     uploader->TearDown();
@@ -240,9 +242,11 @@ int CommandGc::Main(const ArgumentList &args) {
     LogCvmfs(kLogCvmfs, kLogStderr,
              "garbage collection of auxiliary files failed");
     if (!dry_run) {
-      stats_db->StoreGCStatistics(this->statistics(), start_time, false);
-      if (upload_statsdb) {
-        stats_db->UploadStatistics(uploader.get());
+      if (stats_db != NULL) {
+        stats_db->StoreGCStatistics(this->statistics(), start_time, false);
+        if (upload_statsdb) {
+          stats_db->UploadStatistics(uploader.get());
+        }
       }
     }
     uploader->TearDown();
@@ -279,9 +283,11 @@ int CommandGc::Main(const ArgumentList &args) {
   if (uploader->GetNumberOfErrors() > 0 && !dry_run) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to upload updated Reflog");
 
-    stats_db->StoreGCStatistics(this->statistics(), start_time, false);
-    if (upload_statsdb) {
-      stats_db->UploadStatistics(uploader.get());
+    if (stats_db != NULL) {
+      stats_db->StoreGCStatistics(this->statistics(), start_time, false);
+      if (upload_statsdb) {
+        stats_db->UploadStatistics(uploader.get());
+      }
     }
 
     uploader->TearDown();
@@ -289,9 +295,11 @@ int CommandGc::Main(const ArgumentList &args) {
   }
 
   if (!dry_run) {
-    stats_db->StoreGCStatistics(this->statistics(), start_time, true);
-    if (upload_statsdb) {
-      stats_db->UploadStatistics(uploader.get());
+    if (stats_db != NULL) {
+      stats_db->StoreGCStatistics(this->statistics(), start_time, true);
+      if (upload_statsdb) {
+        stats_db->UploadStatistics(uploader.get());
+      }
     }
   }
   uploader->TearDown();
