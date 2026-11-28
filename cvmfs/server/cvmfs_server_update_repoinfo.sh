@@ -54,8 +54,10 @@ cvmfs_server_update_repoinfo() {
   is_in_transaction $name && die "Cannot edit repository meta info while in a transaction"
   [ x"$json_file" = x"" ] || [ -f "$json_file" ] || die "Provided file '$json_file' doesn't exist"
 
-  tmp_file_info=$(mktemp)
-  tmp_file_manifest=$(mktemp)
+  # Not in /tmp: with fs.protected_regular, root may not write to a file owned
+  # by $CVMFS_USER in a sticky world-writable directory.
+  tmp_file_info=$(mktemp "${CVMFS_SPOOL_DIR}/tmp/repoinfo.XXXXXX") || die "Cannot create temporary file"
+  tmp_file_manifest=$(mktemp "${CVMFS_SPOOL_DIR}/tmp/manifest.XXXXXX") || die "Cannot create temporary file"
   chown $CVMFS_USER $tmp_file_info $tmp_file_manifest || die "Cannot change ownership of temporary files"
 
   trap "_update_repoinfo_cleanup $name $tmp_file_info $tmp_file_manifest" EXIT HUP INT TERM
@@ -71,7 +73,7 @@ cvmfs_server_update_repoinfo() {
       create_repometa_skeleton $tmp_file_info
     fi
 
-    edit_json_until_valid $tmp_file_info
+    edit_json_until_valid $tmp_file_info || die "Aborting..."
   else
     local jq_output
     if ! jq_output="$(validate_json $json_file)"; then
